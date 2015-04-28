@@ -1,0 +1,4 @@
+elasticsearch==1.4.0
+SQLAlchemy==1.0.2
+ujson==1.33
+urllib3==1.10.3

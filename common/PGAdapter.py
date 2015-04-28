@@ -1,0 +1,175 @@
+from sqlalchemy.dialects.postgresql import JSON
+
+__author__ = 'andreap'
+
+from settings import Config
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine.url import URL
+from sqlalchemy import Column, Integer, String, Date, Text,TIMESTAMP, BOOLEAN
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+
+
+
+
+
+class Adapter():
+    '''Adapter to the postgres database'''
+    def __init__(self, database_url = Config.POSTGRES_DATABASE):
+        self.engine = self.db_connect(database_url)
+        self.setup()
+
+    def db_connect(self,url):
+        """
+        Performs database connection using database settings.
+        Returns sqlalchemy engine instance
+        """
+        return create_engine(URL(**url))
+
+
+
+    def setup(self,):
+
+        Base.metadata.bind = self.engine
+        DBSession = sessionmaker(bind=self.engine)
+        self.session = DBSession()
+
+    def get_session(self, schema = None):
+
+        # self.session.execute("SET search_path TO lookup, rdf_conversion, public")
+        return self.session
+
+        # self.session.close()
+        # self.setup()
+        # if not schema:
+        #     schema = 'public'
+        # self.session.execute("SET search_path TO "+ schema)
+        # return self.session
+
+    def close(self):
+        try:
+            self.session.close()
+        except:
+            pass
+
+
+'''TABLES'''
+class LatestEvidenceString(Base):
+    __tablename__ = 'vw_evidence_strings_latest'
+    __table_args__ = {'schema':'public'}
+    uniq_assoc_fields_hashdig = Column(String(250), primary_key=True)
+    json_doc_hashdig = Column(String(250))
+    evidence_string = Column(Text)
+    data_source_name = Column(Text)
+    json_doc_version = Column(String(250))
+    json_schema_version = Column(Integer)
+    release_date = Column(Date)
+
+class ECOPath(Base):
+    __tablename__ = 'eco_path'
+    __table_args__ = {'schema':'rdf_conversion'}
+    # id = Column(Integer, primary_key=True)
+    uri = Column(Text,primary_key=True)
+    tree_path = Column(Text)
+    uri_id_org = Column(Text)
+
+class EFOPath(Base):
+    __tablename__ = 'efo_path'
+    __table_args__ = {'schema':'rdf_conversion'}
+    uri = Column(Text)
+    tree_path = Column(JSON)
+    id = Column(Integer, primary_key=True)
+
+class EFONames(Base):
+    __tablename__ = 'efo_names'
+    __table_args__ = {'schema':'rdf_conversion'}
+    uri = Column(Text, primary_key=True)
+    uri_id_org = Column(Text)
+    label = Column(Text)
+    synonyms = Column(Text)
+    description = Column(Text)
+
+class HgncGeneInfo(Base):
+    __tablename__ = 'hgnc_gene_info'
+    __table_args__ = {'schema':'lookups'}
+    hgnc_id = Column(Text, primary_key=True)
+    approved_symbol = Column(Text)
+    approved_name = Column(Text)
+    status = Column(Text)
+    locus_group = Column(Text)
+    previous_symbols = Column(Text)
+    previous_names = Column(Text)
+    synonyms = Column(Text)
+    name_synonyms = Column(Text)
+    chromosome = Column(Text)
+    accession_numbers = Column(Text)
+    enzyme_ids = Column(Text)
+    entrez_gene_id = Column(Text)
+    ensembl_gene_id = Column(Text)
+    mouse_genome_database_id = Column(Text)
+    pubmed_ids = Column(Text)
+    refseq_ids = Column(Text)
+    gene_family_tag = Column(Text)
+    gene_family_description = Column(Text)
+    record_type = Column(Text)
+    primary_ids = Column(Text)
+    secondary_ids = Column(Text)
+    ccds_ids = Column(Text)
+    vega_ids = Column(Text)
+    locus_specific_databases = Column(Text)
+    ensembl_id_supplied_by_ensembl = Column(Text)
+
+class EnsemblGeneInfo(Base):
+    __tablename__ = 'ensembl_gene_info'
+    __table_args__ = {'schema':'lookups'}
+    ensembl_gene_id = Column(Text, primary_key=True)
+    assembly_name = Column(Text)
+    biotype = Column(Text)
+    description = Column(Text)
+    gene_end = Column(Integer)
+    external_name = Column(Text)
+    logic_name = Column(Text)
+    chromosome = Column(Text)
+    gene_start = Column(Integer)
+    strand = Column(Integer)
+    source = Column(Text)
+    gene_version = Column(Integer)
+    cytobands = Column(Text)
+    ensembl_release = Column(Integer)
+
+class EnsemblToUniprotMapping(Base):
+    __tablename__ = 'uniprot_ensembl_mapping'
+    __table_args__ = {'schema':'lookups'}
+    uniprot_ensembl_mapping_id = Column(Integer, primary_key=True)
+    uniprot_accession = Column(Text)
+    uniprot_entry_type = Column(Integer)# 1:uniprot, 0:trembl
+    ensembl_transcript_id = Column(Text)
+    ensembl_protein_id = Column(Text)
+    ensembl_gene_id = Column(Integer)
+    uniprot_note = Column(Text)
+    download_date = Column(Date)
+
+class UniprotInfo(Base):
+    __tablename__ = 'uniprot_info'
+    __table_args__ = {'schema':'lookups'}
+    uniprot_accession = Column(Text, primary_key=True)
+    uniprot_entry = Column(Text)
+
+class ElasticsearchLoad(Base):
+    __tablename__ = 'elasticsearch_load'
+    __table_args__ = {'schema':'pipeline'}
+    id = Column(Text, primary_key=True)
+    index = Column(Text, primary_key=True)
+    type = Column(Text)
+    data = Column(JSON)
+    date_created = Column(TIMESTAMP)
+    date_modified = Column(TIMESTAMP)
+    active = Column(BOOLEAN)
+    successfully_loaded = Column(BOOLEAN)
+
+
+class Pipeline():
+    ElasticsearchLoad = ElasticsearchLoad
