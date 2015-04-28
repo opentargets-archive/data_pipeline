@@ -33,6 +33,10 @@ class Config():
             'username': iniparser.get(ENV, 'username'),
             'password': iniparser.get(ENV, 'password'),
             'database': iniparser.get(ENV, 'database')}
+    HPA_NORMAL_TISSUE_URL = 'http://www.proteinatlas.org/download/normal_tissue.csv.zip'
+    HPA_CANCER_URL = 'http://www.proteinatlas.org/download/cancer.csv.zip'
+    HPA_RNA_URL = 'http://www.proteinatlas.org/download/subcellular_location.csv.zip'
+    HPA_SUBCELLULAR_LOCATION_URL = 'http://www.proteinatlas.org/download/rna.csv.zip'
 
 
 
