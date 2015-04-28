@@ -1,13 +1,14 @@
 from sqlalchemy.dialects.postgresql import JSON
 
-__author__ = 'andreap'
-
 from settings import Config
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine.url import URL
-from sqlalchemy import Column, Integer, String, Date, Text,TIMESTAMP, BOOLEAN
+from sqlalchemy import Column, Integer, String, Date, Text,TIMESTAMP, BOOLEAN, Float
 from sqlalchemy.ext.declarative import declarative_base
+
+
+__author__ = 'andreap'
 
 Base = declarative_base()
 
@@ -170,6 +171,42 @@ class ElasticsearchLoad(Base):
     active = Column(BOOLEAN)
     successfully_loaded = Column(BOOLEAN)
 
+class HPANormalTissue(Base):
+    __tablename__ = 'hpa_normal_tissue'
+    __table_args__ = {'schema':'pipeline'}
+    gene = Column(Text, primary_key=True)
+    tissue = Column(Text, primary_key=True)
+    cell_type = Column(Text, primary_key=True)
+    level = Column(Text)
+    expression_type = Column(Text)
+    reliability = Column(Text)
 
-class Pipeline():
-    ElasticsearchLoad = ElasticsearchLoad
+
+class HPACancer(Base):
+    __tablename__ = 'hpa_cancer'
+    __table_args__ = {'schema':'pipeline'}
+    gene = Column(Text, primary_key=True)
+    tumor = Column(Text, primary_key=True)
+    level = Column(Text, primary_key=True)
+    count_patients = Column(Integer)
+    total_patients = Column(Integer)
+    expression_type = Column(Text)
+    reliability = Column(Text)
+
+class HPARNA(Base):
+    __tablename__ = 'hpa_rna'
+    __table_args__ = {'schema':'pipeline'}
+    gene = Column(Text, primary_key=True)
+    samplw = Column(Text, primary_key=True)
+    value = Column(Float)
+    unit = Column(Text)
+    aboundance = Column(Text)
+
+class HPASubcellularLocation(Base):
+    __tablename__ = 'hpa_subcellular_location'
+    __table_args__ = {'schema':'pipeline'}
+    gene = Column(Text, primary_key=True)
+    main_location = Column(Text)
+    other_location = Column(Text)
+    expression_type = Column(Text)
+    reliability = Column(Text)
