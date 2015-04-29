@@ -1,4 +1,4 @@
-
+import logging
 from settings import Config
 import requests
 from common.PGAdapter import *
@@ -9,7 +9,7 @@ import zlib
 
 __author__ = 'andreap'
 
-
+logging.basicConfig(level=logging.INFO)
 
 
 class HPADataDownloader():
@@ -17,6 +17,7 @@ class HPADataDownloader():
 
     def __init__(self, adapter):
         self.adapter = adapter
+        self.session = adapter.session
 
 
     def retrieve_all(self):
@@ -58,17 +59,72 @@ class HPADataDownloader():
 
     def _load_normal_tissue_data_to_pg(self, data):
         reader= self._get_csv_reader(data)
+        rows_deleted= self.session.query(HPANormalTissue).delete()
+        if rows_deleted:
+            logging.info('deleted %i rows from hpa_normal_tissue'%rows_deleted)
+        c=0
         for row in reader:
-            print row
-            exit()
+            self.session.add(HPANormalTissue(tissue=row['Tissue'],
+                                             cell_type=row['Cell type'],
+                                             level=row['Level'],
+                                             reliability=row['Reliability'],
+                                             gene=row['Gene'],
+                                             expression_type=row['Expression type'],
+                                             ))
+            c+=1
+        self.session.commit()
+        logging.info('inserted %i rows in hpa_normal_tissue'%c)
 
     def _load_rna_data_to_pg(self, data):
-        pass
+        reader= self._get_csv_reader(data)
+        rows_deleted= self.session.query(HPARNA).delete()
+        if rows_deleted:
+            logging.info('deleted %i rows from hpa_rna'%rows_deleted)
+        c=0
+        for row in reader:
+            self.session.add(HPARNA(sample=row['Sample'],
+                                     abundance=row['Abundance'],
+                                     unit=row['Unit'],
+                                     value=row['Value'],
+                                     gene=row['Gene'],
+                                     ))
+            c+=1
+        self.session.commit()
+        logging.info('inserted %i rows in hpa_rna'%c)
 
     def _load_cancer_data_to_pg(self, data):
-        pass
+        reader= self._get_csv_reader(data)
+        rows_deleted= self.session.query(HPACancer).delete()
+        if rows_deleted:
+            logging.info('deleted %i rows from hpa_cancer'%rows_deleted)
+        c=0
+        for row in reader:
+            self.session.add(HPACancer(tumor=row['Tumor'],
+                                       level=row['Level'],
+                                       count_patients=row['Count patients'],
+                                       total_patients=row['Total patients'],
+                                       gene=row['Gene'],
+                                       expression_type=row['Expression type'],
+                                       ))
+            c+=1
+        self.session.commit()
+        logging.info('inserted %i rows in hpa_cancer'%c)
 
     def _load_subcellular_location_data_to_pg(self, data):
-        pass
+        reader= self._get_csv_reader(data)
+        rows_deleted= self.session.query(HPASubcellularLocation).delete()
+        if rows_deleted:
+            logging.info('deleted %i rows from hpa_subcellular_location'%rows_deleted)
+        c=0
+        for row in reader:
+            self.session.add(HPASubcellularLocation(main_location=row['Main location'],
+                                       other_location=row['Other location'],
+                                       gene=row['Gene'],
+                                       expression_type=row['Expression type'],
+                                       reliability=row['Reliability'],
+                                       ))
+            c+=1
+        self.session.commit()
+        logging.info('inserted %i rows in hpa_subcellular_location'%c)
 
 

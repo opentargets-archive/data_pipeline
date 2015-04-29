@@ -38,17 +38,6 @@ class Adapter():
         DBSession = sessionmaker(bind=self.engine)
         self.session = DBSession()
 
-    def get_session(self, schema = None):
-
-        # self.session.execute("SET search_path TO lookup, rdf_conversion, public")
-        return self.session
-
-        # self.session.close()
-        # self.setup()
-        # if not schema:
-        #     schema = 'public'
-        # self.session.execute("SET search_path TO "+ schema)
-        # return self.session
 
     def close(self):
         try:
@@ -191,16 +180,15 @@ class HPACancer(Base):
     count_patients = Column(Integer)
     total_patients = Column(Integer)
     expression_type = Column(Text)
-    reliability = Column(Text)
 
 class HPARNA(Base):
     __tablename__ = 'hpa_rna'
     __table_args__ = {'schema':'pipeline'}
     gene = Column(Text, primary_key=True)
-    samplw = Column(Text, primary_key=True)
+    sample = Column(Text, primary_key=True)
     value = Column(Float)
     unit = Column(Text)
-    aboundance = Column(Text)
+    abundance = Column(Text)
 
 class HPASubcellularLocation(Base):
     __tablename__ = 'hpa_subcellular_location'
