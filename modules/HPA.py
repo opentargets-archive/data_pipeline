@@ -67,8 +67,20 @@ class HPADataDownloader():
         rows_deleted= self.session.query(HPANormalTissue).delete()
         if rows_deleted:
             logging.info('deleted %i rows from hpa_normal_tissue'%rows_deleted)
+        # '''very fast, don't use the orm functions'''
+        # self.adapter.engine.execute(
+        #     HPANormalTissue.__table__.insert(),
+        #     [{"tissue": row['Tissue'],
+        #       "cell_type": row['Cell type'],
+        #       "level": row['Level'],
+        #       "reliability": row['Reliability'],
+        #       "gene": row['Gene'],
+        #       "expression_type": row['Expression type'],
+        #       } for row in reader]
+        # )
         c=0
         for row in reader:
+            c+=1
             self.session.add(HPANormalTissue(tissue=row['Tissue'],
                                              cell_type=row['Cell type'],
                                              level=row['Level'],
@@ -76,7 +88,9 @@ class HPADataDownloader():
                                              gene=row['Gene'],
                                              expression_type=row['Expression type'],
                                              ))
-            c+=1
+            if c % 1000 == 0:
+                logging.info("%i rows uploaded to hpa_normal_tissue"%c)
+                self.session.flush()
         self.session.commit()
         logging.info('inserted %i rows in hpa_normal_tissue'%c)
 
@@ -87,13 +101,17 @@ class HPADataDownloader():
             logging.info('deleted %i rows from hpa_rna'%rows_deleted)
         c=0
         for row in reader:
+            c+=1
             self.session.add(HPARNA(sample=row['Sample'],
                                      abundance=row['Abundance'],
                                      unit=row['Unit'],
                                      value=row['Value'],
                                      gene=row['Gene'],
                                      ))
-            c+=1
+
+            if c % 1000 == 0:
+                logging.info("%i rows uploaded to hpa_rna"%c)
+                self.session.flush()
         self.session.commit()
         logging.info('inserted %i rows in hpa_rna'%c)
 
@@ -104,6 +122,7 @@ class HPADataDownloader():
             logging.info('deleted %i rows from hpa_cancer'%rows_deleted)
         c=0
         for row in reader:
+            c+=1
             self.session.add(HPACancer(tumor=row['Tumor'],
                                        level=row['Level'],
                                        count_patients=row['Count patients'],
@@ -111,7 +130,9 @@ class HPADataDownloader():
                                        gene=row['Gene'],
                                        expression_type=row['Expression type'],
                                        ))
-            c+=1
+            if c % 1000 == 0:
+                logging.info("%i rows uploaded to hpa_cancer"%c)
+                self.session.flush()
         self.session.commit()
         logging.info('inserted %i rows in hpa_cancer'%c)
 
@@ -122,13 +143,16 @@ class HPADataDownloader():
             logging.info('deleted %i rows from hpa_subcellular_location'%rows_deleted)
         c=0
         for row in reader:
+            c+=1
             self.session.add(HPASubcellularLocation(main_location=row['Main location'],
                                        other_location=row['Other location'],
                                        gene=row['Gene'],
                                        expression_type=row['Expression type'],
                                        reliability=row['Reliability'],
                                        ))
-            c+=1
+            if c % 1000 == 0:
+                logging.info("%i rows uploaded to hpa_subcellular_location"%c)
+                self.session.flush()
         self.session.commit()
         logging.info('inserted %i rows in hpa_subcellular_location'%c)
 
