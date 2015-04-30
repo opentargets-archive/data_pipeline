@@ -1,5 +1,5 @@
 from common.PGAdapter import Adapter
-from modules.HPA import HPADataDownloader, HPAActions
+from modules.HPA import HPADataDownloader, HPAActions, HPAProcess
 import argparse
 
 __author__ = 'andreap'
@@ -21,9 +21,8 @@ if __name__ == '__main__':
     if args.hpa:
         do_all = HPAActions.ALL in args.hpa
         if (HPAActions.DOWNLOAD in args.hpa) or do_all:
-            downloader = HPADataDownloader(adapter)
-            downloader.retrieve_all()
+            HPADataDownloader(adapter).retrieve_all()
         if (HPAActions.PROCESS in args.hpa) or do_all:
-            pass
+            HPAProcess(adapter).process_all()
         if (HPAActions.UPLOAD in args.hpa) or do_all:
             pass

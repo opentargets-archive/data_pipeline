@@ -5,10 +5,12 @@ from common.PGAdapter import *
 from StringIO import StringIO
 import csv
 from zipfile import ZipFile
+from common.DataStructure import JSONSerializable
+import pprint
 
 __author__ = 'andreap'
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 class HPAActions():
@@ -16,6 +18,17 @@ class HPAActions():
     PROCESS='process'
     UPLOAD='upload'
     ALL='all'
+
+
+class HPAExpression(JSONSerializable):
+    def __init__(self, gene):
+        self.gene = gene
+        self.protein ={}
+        self.rna ={}
+
+    def get_id(self):
+        return self.gene
+
 
 
 class HPADataDownloader():
@@ -88,7 +101,7 @@ class HPADataDownloader():
                                              gene=row['Gene'],
                                              expression_type=row['Expression type'],
                                              ))
-            if c % 1000 == 0:
+            if c % 10000 == 0:
                 logging.info("%i rows uploaded to hpa_normal_tissue"%c)
                 self.session.flush()
         self.session.commit()
@@ -109,7 +122,7 @@ class HPADataDownloader():
                                      gene=row['Gene'],
                                      ))
 
-            if c % 1000 == 0:
+            if c % 10000 == 0:
                 logging.info("%i rows uploaded to hpa_rna"%c)
                 self.session.flush()
         self.session.commit()
@@ -130,7 +143,7 @@ class HPADataDownloader():
                                        gene=row['Gene'],
                                        expression_type=row['Expression type'],
                                        ))
-            if c % 1000 == 0:
+            if c % 10000 == 0:
                 logging.info("%i rows uploaded to hpa_cancer"%c)
                 self.session.flush()
         self.session.commit()
@@ -150,10 +163,138 @@ class HPADataDownloader():
                                        expression_type=row['Expression type'],
                                        reliability=row['Reliability'],
                                        ))
-            if c % 1000 == 0:
+            if c % 10000 == 0:
                 logging.info("%i rows uploaded to hpa_subcellular_location"%c)
                 self.session.flush()
         self.session.commit()
         logging.info('inserted %i rows in hpa_subcellular_location'%c)
 
 
+
+
+class HPAProcess():
+
+    def __init__(self, adapter):
+        self.adapter = adapter
+        self.session = adapter.session
+        self.data ={}
+        self.set_translations()
+
+    def process_all(self):
+
+        self.process_normal_tissue()
+        self.process_rna()
+        self.process_cancer()
+        self.process_subcellular_location()
+        self.store_data()
+
+
+    def _get_available_genes(self, table = HPANormalTissue):
+        # genes =[ row.gene for row in self.session.query(table).distinct(table.gene).group_by(table.gene)]
+        genes =[row.gene for row in self.session.query(table.gene).distinct()]
+        logging.debug('found %i genes in table %s'%(len(genes),table.__tablename__))
+        return genes
+
+    def process_normal_tissue(self):
+        for gene in self._get_available_genes( HPANormalTissue):
+            if gene not in self.data:
+                self.init_gene(gene)
+            self.data[gene]['expression'].protein = self.get_normal_tissue_data_for_gene(gene)
+        return
+
+    def _get_row_as_dict(row):
+        d = row.__dict__
+        d.pop('_sa_instance_state')
+        return d
+
+
+    def process_rna(self):
+        pass
+
+    def process_cancer(self):
+        pass
+
+    def process_subcellular_location(self):
+        pass
+
+    def store_data(self):
+        pass
+
+    def init_gene(self, gene):
+        self.data[gene]=dict(expression = HPAExpression(gene),
+                             cancer = {},#TODO
+                             subcellular_location = {}, #TODO
+                            )
+
+    def get_normal_tissue_data_for_gene(self, gene):
+        tissue_data = {}
+        for row in self.session.query(HPANormalTissue).filter_by(gene=gene).all():
+            tissue = row.tissue.replace('1','').replace('2','').strip()
+            if tissue not in tissue_data:
+                tissue_data[tissue]= {'cell_type' : {},
+                                      'efo_code' : self.tissue_translation[tissue]}
+            if row.cell_type not in tissue_data[tissue]['cell_type']:
+                tissue_data[tissue]['cell_type'][row.cell_type] = []
+            tissue_data[tissue]['cell_type'][row.cell_type].append(dict(level = self.level_translation[row.level],
+                                                          expression_type = row.expression_type,
+                                                          reliability = self.reliability_translation[row.reliability],
+                                                          ))
+
+        return tissue_data
+
+    def set_translations(self):
+        self.level_translation={'Not detected':0,
+                                'Low':1,
+                                'Medium':2,
+                                'High':3,
+                                }
+        self.reliability_translation={'Supportive':True,
+                                'Uncertain':False,
+                                }
+
+        self.tissue_translation ={
+            'adrenal gland': 'CL_0000336',
+            'appendix': 'EFO_0000849',
+            'bone marrow': 'UBERON_0002371',
+            'breast': 'UBERON_0000310',
+            'bronchus': 'UBERON_0002185',
+            'cerebellum': 'UBERON_0002037',
+            'cerebral cortex': 'UBERON_0000956',
+            'cervix, uterine': 'EFO_0000979',
+            'colon': 'UBERON_0001155',
+            'duodenum': 'UBERON_0002114',
+            'endometrium': 'UBERON_0001295',
+            'epididymis': 'UBERON_0001301',
+            'esophagus': 'UBERON_0001043',
+            'fallopian tube': 'UBERON_0003889',
+            'gallbladder': 'UBERON_0002110',
+            'heart muscle': 'UBERON_0002349',
+            'hippocampus': 'EFO_0000530',
+            'kidney': 'UBERON_0002113',
+            'lateral ventricle': 'EFO_0001961',
+            'liver': 'UBERON_0002107',
+            'lung': 'UBERON_0002048',
+            'lymph node': 'UBERON_0000029',
+            'nasopharynx':'nasopharynx', #TODO: nothing matching except nasopharynx cancers
+            'oral mucosa': 'UBERON_0003729',
+            'ovary': 'EFO_0000973',
+            'pancreas': 'UBERON_0001264',
+            'parathyroid gland': 'CL_0000446',
+            'placenta': 'UBERON_0001987',
+            'prostate': 'UBERON_0002367',
+            'rectum': 'UBERON_0001052',
+            'salivary gland': 'UBERON_0001044',
+            'seminal vesicle': 'UBERON_0000998',
+            'skeletal muscle': 'CL_0000188',
+            'skin': 'EFO_0000962',
+            'small intestine': 'UBERON_0002108',
+            'smooth muscle': 'EFO_0000889',
+            'soft tissue': 'soft_tissue',#TODO: cannot map automatically to anything except: EFO_0000691 that is sarcoma (and includes soft tissue tumor)
+            'spleen': 'UBERON_0002106',
+            'stomach': 'UBERON_0000945',
+            'testis': 'UBERON_0000473',
+            'thyroid gland': 'UBERON_0002046',
+            'tonsil': 'UBERON_0002372',
+            'urinary bladder': 'UBERON_0001255',
+            'vagina': 'UBERON_0000996',
+            }
