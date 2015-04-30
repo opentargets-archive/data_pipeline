@@ -13,7 +13,7 @@ if __name__ == '__main__':
     parser.add_argument("--hpau", dest='hpa', help="upload processed human protein atlas json obects stored in postgres to elasticsearch",
                         action="append_const", const = HPAActions.UPLOAD)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",
-                        action="append_const", const = HPAActions.UPLOAD)
+                        action="append_const", const = HPAActions.ALL)
     args = parser.parse_args()
 
     adapter = Adapter()
