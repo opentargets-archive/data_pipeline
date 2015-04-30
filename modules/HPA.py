@@ -5,11 +5,17 @@ from common.PGAdapter import *
 from StringIO import StringIO
 import csv
 from zipfile import ZipFile
-import zlib
 
 __author__ = 'andreap'
 
 logging.basicConfig(level=logging.INFO)
+
+
+class HPAActions():
+    DOWNLOAD='download'
+    PROCESS='process'
+    UPLOAD='upload'
+    ALL='all'
 
 
 class HPADataDownloader():
@@ -31,7 +37,6 @@ class HPADataDownloader():
     def _download_data(self, url):
         r = requests.get(url)
         if r.status_code == 200:
-            # return  zlib.decompress(r.content, 16+zlib.MAX_WBITS)
             zipped_data = ZipFile(StringIO(r.content))
             info = zipped_data.getinfo(zipped_data.filelist[0].orig_filename)
             return zipped_data.open(info)
