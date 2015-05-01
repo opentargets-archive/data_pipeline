@@ -23,8 +23,8 @@ class HPAActions():
 class HPAExpression(JSONSerializable):
     def __init__(self, gene):
         self.gene = gene
-        self.protein ={}
-        self.rna ={}
+        self.tissues = {}
+        self.cell_lines = {}
 
     def get_id(self):
         return self.gene
@@ -199,7 +199,7 @@ class HPAProcess():
         for gene in self._get_available_genes( HPANormalTissue):
             if gene not in self.data:
                 self.init_gene(gene)
-            self.data[gene]['expression'].protein = self.get_normal_tissue_data_for_gene(gene)
+            self.data[gene]['expression'].tissues = self.get_normal_tissue_data_for_gene(gene)
         return
 
     def _get_row_as_dict(row):
@@ -209,7 +209,12 @@ class HPAProcess():
 
 
     def process_rna(self):
-        pass
+        for gene in self._get_available_genes(HPARNA):
+            if gene not in self.data:
+                self.init_gene(gene)
+            self.data[gene]['expression'].tissues,\
+                self.data[gene]['expression'].cell_lines= self.get_rna_data_for_gene(gene)
+        return
 
     def process_cancer(self):
         pass
@@ -231,16 +236,67 @@ class HPAProcess():
         for row in self.session.query(HPANormalTissue).filter_by(gene=gene).all():
             tissue = row.tissue.replace('1','').replace('2','').strip()
             if tissue not in tissue_data:
-                tissue_data[tissue]= {'cell_type' : {},
+                tissue_data[tissue]= {'protein':{
+                                            'cell_type' : {},
+                                            'level': 0,
+                                            'expression_type':'',
+                                            'reliability' : False,
+                                            },
+
+                                      'rna':{
+                                      },
                                       'efo_code' : self.tissue_translation[tissue]}
-            if row.cell_type not in tissue_data[tissue]['cell_type']:
-                tissue_data[tissue]['cell_type'][row.cell_type] = []
-            tissue_data[tissue]['cell_type'][row.cell_type].append(dict(level = self.level_translation[row.level],
+            if row.cell_type not in tissue_data[tissue]['protein']['cell_type']:
+                tissue_data[tissue]['protein']['cell_type'][row.cell_type] = []
+            tissue_data[tissue]['protein']['cell_type'][row.cell_type].append(dict(level = self.level_translation[row.level],
                                                           expression_type = row.expression_type,
                                                           reliability = self.reliability_translation[row.reliability],
                                                           ))
+            if self.level_translation[row.level] > tissue_data[tissue]['protein']['level']:
+                tissue_data[tissue]['protein']['level']=self.level_translation[row.level]#TODO: improvable by giving higher priority to reliable annotations over uncertain
+            if not tissue_data[tissue]['protein']['expression_type']:
+                tissue_data[tissue]['protein']['expression_type'] = row.expression_type
+            if self.reliability_translation[row.reliability]:
+                tissue_data[tissue]['protein']['reliability'] = True
 
         return tissue_data
+
+    def get_rna_data_for_gene(self, gene):
+        tissue_data = self.data[gene]['expression'].tissues
+        cell_line_data = {}
+        if not tissue_data:
+            tissue_data = {}
+        for row in self.session.query(HPARNA).filter_by(gene=gene).all():
+            sample = row.sample
+            is_cell_line = sample not in self.tissue_translation.keys()
+            if is_cell_line:
+                if sample not in cell_line_data:
+                     cell_line_data[sample] =  {'rna':{},
+                                        }
+                cell_line_data[sample]['rna']['level']=self.level_translation[row.abundance]
+                cell_line_data[sample]['rna']['value']=row.value
+                cell_line_data[sample]['rna']['unit']=row.unit
+            else:
+                if sample not in tissue_data:
+                    tissue_data[sample]= {'protein':{
+                                            'cell_type' : {},
+                                            'level': 0,
+                                            'expression_type':'',
+                                            'reliability' : False,
+                                            },
+
+                                      'rna':{
+                                      },
+                                      'efo_code' : self.tissue_translation[sample]}
+                tissue_data[sample]['rna']['level']=self.level_translation[row.abundance]
+                tissue_data[sample]['rna']['value']=row.value
+                tissue_data[sample]['rna']['unit']=row.unit
+        return tissue_data, cell_line_data
+
+
+
+
+
 
     def set_translations(self):
         self.level_translation={'Not detected':0,
@@ -297,4 +353,7 @@ class HPAProcess():
             'tonsil': 'UBERON_0002372',
             'urinary bladder': 'UBERON_0001255',
             'vagina': 'UBERON_0000996',
+            'adipose tissue': 'adipose tissue',
             }
+
+
