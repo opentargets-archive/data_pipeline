@@ -1,4 +1,6 @@
+from datetime import datetime
 import logging
+from sqlalchemy import and_
 from settings import Config
 import requests
 from common.PGAdapter import *
@@ -12,6 +14,8 @@ __author__ = 'andreap'
 
 logging.basicConfig(level=logging.DEBUG)
 
+ELASTICSEARCH_INDEX = 'expression'
+ELASTICSEARCH_EXPRESSION_TYPE = 'expression-data'
 
 class HPAActions():
     DOWNLOAD='download'
@@ -223,7 +227,33 @@ class HPAProcess():
         pass
 
     def store_data(self):
-        pass
+        if self.data.values()[0]['expression']:
+            rows_deleted= self.session.query(
+                ElasticsearchLoad).filter(
+                    and_(ElasticsearchLoad.index==ELASTICSEARCH_INDEX,
+                         ElasticsearchLoad.type==ELASTICSEARCH_EXPRESSION_TYPE)).delete()
+            if rows_deleted:
+                logging.info('deleted %i rows of expression data from elasticsearch_load'%rows_deleted)
+            c=0
+            for gene, data in self.data.items():
+                c+=1
+                self.session.add(ElasticsearchLoad(id=gene,
+                                                   index=ELASTICSEARCH_INDEX,
+                                                   type=ELASTICSEARCH_EXPRESSION_TYPE,
+                                                   data=data['expression'].to_json(),
+                                                   active=True,
+                                                   date_created=datetime.now(),
+                                                   date_modified=datetime.now(),
+                                                  ))
+                if c % 10000 == 0:
+                    logging.info("%i rows of expression data inserted to elasticsearch_load"%c)
+                    self.session.flush()
+            self.session.commit()
+            logging.info('inserted %i rows of expression data inserted in elasticsearch_load'%c)
+        if self.data.values()[0]['cancer']:
+            pass
+        if self.data.values()[0]['subcellular_location']:
+            pass
 
     def init_gene(self, gene):
         self.data[gene]=dict(expression = HPAExpression(gene),
