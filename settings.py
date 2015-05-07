@@ -18,6 +18,8 @@ class Config():
     ELASTICSEARCH_ECO_DOC_NAME = 'eco'
     ELASTICSEARCH_GENE_NAME_INDEX_NAME = 'gene-data'
     ELASTICSEARCH_GENE_NAME_DOC_NAME = 'genedata'
+    ELASTICSEARCH_EXPRESSION_INDEX_NAME = 'expression-data'
+    ELASTICSEARCH_EXPRESSION_DOC_NAME = 'expression'
     DEBUG = True
     PROFILE = False
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'C=41d6xo]4940NP,9jwF@@v0KDdTtO'
@@ -162,6 +164,7 @@ def _get_evidence_string_generic_mapping():
 
 class ElasticSearchConfiguration():
 
+
     available_databases = ['expression_atlas',
                           'uniprot',
                           'reactome',
@@ -180,11 +183,11 @@ class ElasticSearchConfiguration():
 
         bulk_load_chunk =1000
     else:
-        generic_shard_number = 1
+        generic_shard_number = 2
         generic_replicas_number = 0
         evidence_shard_number = 3
         evidence_replicas_number = 0
-        bulk_load_chunk =25
+        bulk_load_chunk =100
 
     eco_data_mapping = {"mappings": {
                            Config.ELASTICSEARCH_ECO_DOC_NAME : {
@@ -371,7 +374,13 @@ class ElasticSearchConfiguration():
             },
         }
 
+    expression_data_mapping = {
+        "settings": {
+                "number_of_shards" : generic_shard_number,
+                "number_of_replicas" : generic_replicas_number,
+                }
 
+    }
 
     evidence_mappings = {}
     for db in available_databases:

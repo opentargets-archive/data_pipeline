@@ -31,12 +31,12 @@ class Loader():
 
         # self.load_single(index_name, doc_type, ID, body)
 
-    def flush(self, index_name=None):
+    def flush(self):
         for ok, results in streaming_bulk(
             self.es,
             self.cache,
             chunk_size=self.chunk_size,
-            timeout=120,
+            request_timeout=120,
             ):
             action, result = results.popitem()
             self.results[result['_index']].append(result['_id'])
@@ -81,7 +81,7 @@ class Loader():
 
     def create_new_index(self, index_name):
         try:
-            self.es.indices.delete(index_name)
+            self.es.indices.delete(index_name, ignore=400)
         except NotFoundError:
             pass
         if index_name == Config.ELASTICSEARCH_DATA_INDEX_NAME:
@@ -104,6 +104,11 @@ class Loader():
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.gene_data_mapping
+            )
+        elif index_name == Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME:
+            self.es.indices.create(index=index_name,
+                                   ignore=400,
+                                   body=ElasticSearchConfiguration.expression_data_mapping
             )
         else:
             self.es.indices.create(index=index_name, ignore=400)

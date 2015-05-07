@@ -1,6 +1,10 @@
+import logging
+from elasticsearch import Elasticsearch
+from common.ElasticsearchLoader import Loader
 from common.PGAdapter import Adapter
-from modules.HPA import HPADataDownloader, HPAActions, HPAProcess
+from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 import argparse
+from settings import Config, ElasticSearchConfiguration
 
 __author__ = 'andreap'
 if __name__ == '__main__':
@@ -17,12 +21,26 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     adapter = Adapter()
+    '''init es client'''
+    print 'pointing to elasticsearch at:', Config.ELASTICSEARCH_URL
+    es = Elasticsearch(Config.ELASTICSEARCH_URL)
+    logging.getLogger('elasticsearch').setLevel(logging.ERROR)
+    # es = Elasticsearch(["10.0.0.11:9200"],
+    # # sniff before doing anything
+    #                     sniff_on_start=True,
+    #                     # refresh nodes after a node fails to respond
+    #                     sniff_on_connection_fail=True,
+    #                     # and also every 60 seconds
+    #                     sniffer_timeout=60)
+    #
 
-    if args.hpa:
-        do_all = HPAActions.ALL in args.hpa
-        if (HPAActions.DOWNLOAD in args.hpa) or do_all:
-            HPADataDownloader(adapter).retrieve_all()
-        if (HPAActions.PROCESS in args.hpa) or do_all:
-            HPAProcess(adapter).process_all()
-        if (HPAActions.UPLOAD in args.hpa) or do_all:
-            pass
+    logging.getLogger("requests").setLevel(logging.ERROR)
+    with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
+        if args.hpa:
+            do_all = HPAActions.ALL in args.hpa
+            if (HPAActions.DOWNLOAD in args.hpa) or do_all:
+                HPADataDownloader(adapter).retrieve_all()
+            if (HPAActions.PROCESS in args.hpa) or do_all:
+                HPAProcess(adapter).process_all()
+            if (HPAActions.UPLOAD in args.hpa) or do_all:
+                HPAUploader(adapter, loader).upload_all()

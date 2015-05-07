@@ -14,8 +14,6 @@ __author__ = 'andreap'
 
 logging.basicConfig(level=logging.DEBUG)
 
-ELASTICSEARCH_INDEX = 'expression'
-ELASTICSEARCH_EXPRESSION_TYPE = 'expression-data'
 
 class HPAActions():
     DOWNLOAD='download'
@@ -175,7 +173,6 @@ class HPADataDownloader():
 
 
 
-
 class HPAProcess():
 
     def __init__(self, adapter):
@@ -230,16 +227,16 @@ class HPAProcess():
         if self.data.values()[0]['expression']:
             rows_deleted= self.session.query(
                 ElasticsearchLoad).filter(
-                    and_(ElasticsearchLoad.index==ELASTICSEARCH_INDEX,
-                         ElasticsearchLoad.type==ELASTICSEARCH_EXPRESSION_TYPE)).delete()
+                    and_(ElasticsearchLoad.index==Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                         ElasticsearchLoad.type==Config.ELASTICSEARCH_EXPRESSION_DOC_NAME)).delete()
             if rows_deleted:
                 logging.info('deleted %i rows of expression data from elasticsearch_load'%rows_deleted)
             c=0
             for gene, data in self.data.items():
                 c+=1
                 self.session.add(ElasticsearchLoad(id=gene,
-                                                   index=ELASTICSEARCH_INDEX,
-                                                   type=ELASTICSEARCH_EXPRESSION_TYPE,
+                                                   index=Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                                                   type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
                                                    data=data['expression'].to_json(),
                                                    active=True,
                                                    date_created=datetime.now(),
@@ -387,3 +384,18 @@ class HPAProcess():
             }
 
 
+class HPAUploader():
+
+    def __init__(self, adapter,loader):
+        self.adapter = adapter
+        self.session = adapter.session
+        self.loader = loader
+
+    def upload_all(self):
+        for row in  self.session.query(ElasticsearchLoad.id,ElasticsearchLoad.data,).filter(and_(
+                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+                        ElasticsearchLoad.active==True)
+                    ).yield_per(self.loader.chunk_size):
+            self.loader.put(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME, Config.ELASTICSEARCH_EXPRESSION_DOC_NAME, row.id, row.data)
+        self.loader.flush()
