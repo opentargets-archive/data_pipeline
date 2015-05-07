@@ -1,6 +1,7 @@
 from datetime import datetime
 import logging
 from sqlalchemy import and_
+from common import Actions
 from settings import Config
 import requests
 from common.PGAdapter import *
@@ -15,11 +16,10 @@ __author__ = 'andreap'
 logging.basicConfig(level=logging.DEBUG)
 
 
-class HPAActions():
+class HPAActions(Actions):
     DOWNLOAD='download'
     PROCESS='process'
     UPLOAD='upload'
-    ALL='all'
 
 
 class HPAExpression(JSONSerializable):

@@ -3,8 +3,10 @@ from elasticsearch import Elasticsearch
 from common.ElasticsearchLoader import Loader
 from common.PGAdapter import Adapter
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
+from modules.Uniprot import UniProtActions,UniprotDownloader
 import argparse
 from settings import Config, ElasticSearchConfiguration
+
 
 __author__ = 'andreap'
 if __name__ == '__main__':
@@ -18,6 +20,8 @@ if __name__ == '__main__':
                         action="append_const", const = HPAActions.UPLOAD)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",
                         action="append_const", const = HPAActions.ALL)
+    parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in postgresql",
+                        action="append_const", const = UniProtActions.CACHE)
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -44,3 +48,7 @@ if __name__ == '__main__':
                 HPAProcess(adapter).process_all()
             if (HPAActions.UPLOAD in args.hpa) or do_all:
                 HPAUploader(adapter, loader).upload_all()
+        if args.uni:
+            do_all = UniProtActions.ALL in args.hpa
+            if (UniProtActions.CACHE in args.uni) or do_all:
+                UniprotDownloader(adapter).cache_human_entries()

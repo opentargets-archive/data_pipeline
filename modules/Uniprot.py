@@ -1,11 +1,19 @@
 from StringIO import StringIO
+import logging
 from xml.etree import cElementTree as ElementTree
+import requests
+from common import Actions
+from common.PGAdapter import UniprotInfo
 from common.UniprotIO import UniprotIterator, Parser
-
+from requests.exceptions import Timeout, HTTPError, ConnectionError
 
 __author__ = 'andreap'
 
-class UniprotDownloader():
+
+class UniProtActions(Actions):
+    CACHE='cache'
+
+class OLDUniprotDownloader():
     def __init__(self,
                  query="reviewed:yes+AND+organism:9606",
                  format="xml",
@@ -85,10 +93,76 @@ class UniprotDownloader():
             return uniprot_data.uniprot_entry
 
     def _save_to_postgresql(self, uniprotid, uniprot_xml):
-        entry = self.pg.query(UniprotInfo).filter_by(uniprot_accession=uniprotid).first()
+        entry = self.pg.query(UniprotInfo).filter_by(uniprot_accession=uniprotid).count()
         if not entry:
             self.pg.add(UniprotInfo(uniprot_accession=uniprotid,
                                     uniprot_entry=uniprot_xml))
             self.pg.commit()
             # except:
             # logging.warning("cannot store to postgres uniprot xml")
+
+
+class UniprotDownloader():
+    def __init__(self,
+                 adapter,
+                 query="reviewed:yes+AND+organism:9606",
+                 format="xml",
+                 chunk_size=1000,
+                 timeout=300,):
+        self.query = query
+        self.format = "&format=" + format
+        self.url = "http://www.uniprot.org/uniprot/?query="
+        self.chunk_size = chunk_size
+        self.timeout = timeout
+        self.pg = adapter.session
+        self.adapter = adapter
+        self.NS = "{http://uniprot.org/uniprot}"
+
+
+    def cache_human_entries(self):
+        self._delete_cache()
+        offset = 0
+        data = self._get_data_from_remote(self.chunk_size, offset)
+        c = 0
+        while data.content:
+            for xml in self._iterate_xml(StringIO(data.content)):
+                seqrec = Parser(xml, return_raw_comments=True).parse()
+                self._save_to_postgresql(seqrec.id, ElementTree.tostring(xml))
+            offset += self.chunk_size
+            data = self._get_data_from_remote(self.chunk_size, offset)
+
+    def _iterate_xml(self, handle):
+        for event, elem in ElementTree.iterparse(handle, events=("start", "end")):
+            if event == "end" and elem.tag == self.NS + "entry":
+                yield elem
+                elem.clear()
+
+    def _get_data_from_remote(self, limit, offset):
+        if offset:
+            url = self.url + self.query + self.format + "&limit=%i&offset=%i" % (limit, offset)
+        else:
+            url = self.url + self.query + self.format + "&limit=%i" % (limit)
+        try:
+            r = requests.get(url, timeout=self.timeout)
+            if r.status_code == 200:
+                return r
+            else:
+                raise IOError('cannot get data from uniprot.org')
+        except (ConnectionError, Timeout, HTTPError) as e:
+            raise IOError(e)
+        return r
+
+
+    def _save_to_postgresql(self, uniprotid, uniprot_xml):
+        entry = self.pg.query(UniprotInfo).filter_by(uniprot_accession=uniprotid).count()
+        if not entry:
+            self.pg.add(UniprotInfo(uniprot_accession=uniprotid,
+                                    uniprot_entry=uniprot_xml))
+            self.pg.commit()
+            # except:
+            # logging.warning("cannot store to postgres uniprot xml")
+
+    def _delete_cache(self):
+        rows_deleted= self.session.query(UniprotInfo).delete()
+        if rows_deleted:
+            logging.info('deleted %i rows from uniprot_info'%rows_deleted)
