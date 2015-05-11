@@ -14,6 +14,8 @@ class UniProtActions(Actions):
     CACHE='cache'
 
 class OLDUniprotDownloader():
+    """ this class is deprecated
+    """
     def __init__(self,
                  query="reviewed:yes+AND+organism:9606",
                  format="xml",
@@ -114,7 +116,7 @@ class UniprotDownloader():
         self.url = "http://www.uniprot.org/uniprot/?query="
         self.chunk_size = chunk_size
         self.timeout = timeout
-        self.pg = adapter.session
+        self.session = adapter.session
         self.adapter = adapter
         self.NS = "{http://uniprot.org/uniprot}"
 
@@ -154,11 +156,11 @@ class UniprotDownloader():
 
 
     def _save_to_postgresql(self, uniprotid, uniprot_xml):
-        entry = self.pg.query(UniprotInfo).filter_by(uniprot_accession=uniprotid).count()
+        entry = self.session.query(UniprotInfo).filter_by(uniprot_accession=uniprotid).count()
         if not entry:
-            self.pg.add(UniprotInfo(uniprot_accession=uniprotid,
+            self.session.add(UniprotInfo(uniprot_accession=uniprotid,
                                     uniprot_entry=uniprot_xml))
-            self.pg.commit()
+            self.session.commit()
             # except:
             # logging.warning("cannot store to postgres uniprot xml")
 
@@ -166,3 +168,15 @@ class UniprotDownloader():
         rows_deleted= self.session.query(UniprotInfo).delete()
         if rows_deleted:
             logging.info('deleted %i rows from uniprot_info'%rows_deleted)
+
+
+
+class UniprotData():
+    """ Retrieve data for a uniprot entry from the local cache or the remote website uniprot.org
+    """
+
+    def __init__(self, adapter):
+        self.adapter = adapter
+        self.session = adapter.session
+
+    #TODO: method to retrieve a single uniprot entry from the db cache with failover to uniprot.org
