@@ -161,10 +161,12 @@ class UniprotDownloader():
             self.session.add(UniprotInfo(uniprot_accession=uniprotid,
                                     uniprot_entry=uniprot_xml))
             self.session.commit()
-            # except:
-            # logging.warning("cannot store to postgres uniprot xml")
+            self.cached_count+=1
+            if (self.cached_count%5000)==0:
+                logging.info("Cached %i entries from uniprot to local postgres"%self.cached_count)
 
     def _delete_cache(self):
+        self.cached_count = 0
         rows_deleted= self.session.query(UniprotInfo).delete()
         if rows_deleted:
             logging.info('deleted %i rows from uniprot_info'%rows_deleted)

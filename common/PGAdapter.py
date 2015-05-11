@@ -129,18 +129,19 @@ class EnsemblGeneInfo(Base):
     gene_version = Column(Integer)
     cytobands = Column(Text)
     ensembl_release = Column(Integer)
+    is_reference = Column(BOOLEAN)
 
-class EnsemblToUniprotMapping(Base):
-    __tablename__ = 'uniprot_ensembl_mapping'
-    __table_args__ = {'schema':'lookups'}
-    uniprot_ensembl_mapping_id = Column(Integer, primary_key=True)
-    uniprot_accession = Column(Text)
-    uniprot_entry_type = Column(Integer)# 1:uniprot, 0:trembl
-    ensembl_transcript_id = Column(Text)
-    ensembl_protein_id = Column(Text)
-    ensembl_gene_id = Column(Integer)
-    uniprot_note = Column(Text)
-    download_date = Column(Date)
+# class EnsemblToUniprotMapping(Base):
+#     __tablename__ = 'uniprot_ensembl_mapping'
+#     __table_args__ = {'schema':'lookups'}
+#     uniprot_ensembl_mapping_id = Column(Integer, primary_key=True)
+#     uniprot_accession = Column(Text)
+#     uniprot_entry_type = Column(Integer)# 1:uniprot, 0:trembl
+#     ensembl_transcript_id = Column(Text)
+#     ensembl_protein_id = Column(Text)
+#     ensembl_gene_id = Column(Integer)
+#     uniprot_note = Column(Text)
+#     download_date = Column(Date)
 
 class UniprotInfo(Base):
     __tablename__ = 'uniprot_info'

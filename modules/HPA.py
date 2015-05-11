@@ -13,7 +13,6 @@ import pprint
 
 __author__ = 'andreap'
 
-logging.basicConfig(level=logging.DEBUG)
 
 
 class HPAActions(Actions):
@@ -392,6 +391,7 @@ class HPAUploader():
         self.loader = loader
 
     def upload_all(self):
+        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
         for row in  self.session.query(ElasticsearchLoad.id,ElasticsearchLoad.data,).filter(and_(
                         ElasticsearchLoad.index==Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
                         ElasticsearchLoad.type==Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
