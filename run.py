@@ -49,6 +49,6 @@ if __name__ == '__main__':
             if (HPAActions.UPLOAD in args.hpa) or do_all:
                 HPAUploader(adapter, loader).upload_all()
         if args.uni:
-            do_all = UniProtActions.ALL in args.hpa
+            do_all = UniProtActions.ALL in args.uni
             if (UniProtActions.CACHE in args.uni) or do_all:
                 UniprotDownloader(adapter).cache_human_entries()
