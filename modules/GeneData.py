@@ -1,9 +1,11 @@
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 import copy
 from datetime import datetime
 import logging
 from StringIO import StringIO
+import urllib2
 from sqlalchemy import and_
+import ujson as json
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.PGAdapter import HgncGeneInfo, EnsemblGeneInfo, UniprotInfo, ElasticsearchLoad
@@ -41,6 +43,9 @@ class Gene(JSONSerializable):
         self.gene_family_description = ""
         self.ccds_ids = []
         self.vega_ids = []
+        self.alias_name=[]
+        self.alias_symbol=[]
+        self.pubmed_ids =[]
         self.is_active_in_ensembl = False
         self.ensembl_assembly_name = ""
         self.biotype = ""
@@ -124,6 +129,49 @@ class Gene(JSONSerializable):
         if data.vega_ids:
             self.vega_ids = data.vega_ids.split(', ')
 
+    def load_hgnc_data_from_json(self, data):
+
+        if 'ensembl_gene_id' in data:
+            self.ensembl_gene_id = data['ensembl_gene_id']
+            if not self.ensembl_gene_id:
+                self.ensembl_gene_id = data['ensembl_id_supplied_by_ensembl']
+            if 'hgnc_id' in data:
+                self.hgnc_id = data['hgnc_id']
+            if 'symbol' in data:
+                self.approved_symbol = data['symbol']
+            if 'name' in data:
+                self.approved_name = data['name']
+            if 'status' in data:
+                self.status = data['status']
+            if 'locus_group' in data:
+                self.locus_group = data['locus_group']
+            if 'prev_symbols' in data:
+                self.previous_symbols = data['prev_symbols']
+            if 'prev_names' in data:
+                self.previous_names = data['prev_names']
+            if 'alias_symbol' in data:
+                self.symbol_synonyms = data['alias_symbol']
+            if 'alias_name' in data:
+                self.name_synonyms = data['alias_name']
+            if 'enzyme_ids' in data:
+                self.enzyme_ids = data['enzyme_ids']
+            if 'entrez_id' in data:
+                self.entrez_gene_id = data['entrez_id']
+            if 'refseq_accession' in data:
+                self.refseq_ids = data['refseq_accession']
+            if 'gene_family_tag' in data:
+                self.gene_family_tag = data['gene_family_tag']
+            if 'gene_family_description' in data:
+                self.gene_family_description = data['gene_family_description']
+            if 'ccds_ids' in data:
+                self.ccds_ids = data['ccds_ids']
+            if 'vega_id' in data:
+                self.vega_ids = data['vega_id']
+            if 'uniprot_ids' in data:
+                self.uniprot_accessions = data['uniprot_ids']
+                self.uniprot_id = self.uniprot_accessions [0]
+            if 'pubmed_id' in data:
+                self.pubmed_ids = data['pubmed_id']
 
     def load_ensembl_data(self, data):
 
@@ -186,6 +234,9 @@ class Gene(JSONSerializable):
                 elif v!= self.approved_symbol:
                     if v not in self.symbol_synonyms:
                         self.symbol_synonyms.append(v)
+            if k == 'gene_name_synonym':
+                if v not in self.symbol_synonyms:
+                    self.symbol_synonyms.append(v)
             if k.startswith('recommendedName'):
                 self.name_synonyms.extend(v)
             if k.startswith('alternativeName'):
@@ -335,7 +386,8 @@ class GeneManager():
 
 
     def merge_all(self):
-        self._get_hgnc_data()
+        # self._get_hgnc_data()
+        self._get_hgnc_data_from_json()
         self._get_ensembl_data()
         self._get_uniprot_data()
         self._store_data()
@@ -348,6 +400,20 @@ class GeneManager():
                 self.genes.add_gene(gene)
 
         logging.info("STATS AFTER HGNC PARSING:\n" + self.genes.get_stats())
+
+    def _get_hgnc_data_from_json(self):
+        req = urllib2.Request('ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json')
+        response = urllib2.urlopen(req)
+        # print response.code
+        # if response.code == '200':
+        data = json.loads(response.read())
+        for row in data['response']['docs']:
+            gene = Gene()
+            gene.load_hgnc_data_from_json(row)
+            self.genes.add_gene(gene)
+
+        logging.info("STATS AFTER HGNC PARSING:\n" + self.genes.get_stats())
+
 
     def _get_ensembl_data(self):
         for row in self.session.query(EnsemblGeneInfo).yield_per(1000):
