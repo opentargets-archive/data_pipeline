@@ -8,6 +8,7 @@ from sqlalchemy import and_
 import ujson as json
 from common import Actions
 from common.DataStructure import JSONSerializable
+from common.ElasticsearchLoader import EvidenceStringStorage
 from common.PGAdapter import HgncGeneInfo, EnsemblGeneInfo, UniprotInfo, ElasticsearchLoad
 from common.UniprotIO import UniprotIterator
 from settings import Config
@@ -506,11 +507,7 @@ class GeneUploader():
 
 
     def upload_all(self):
-        self.loader.create_new_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
-        for row in  self.session.query(ElasticsearchLoad.id,ElasticsearchLoad.data,).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                        ElasticsearchLoad.active==True)
-                    ).yield_per(self.loader.chunk_size):
-            self.loader.put(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME, Config.ELASTICSEARCH_GENE_NAME_DOC_NAME, row.id, row.data)
-        self.loader.flush()
+        EvidenceStringStorage.refresh_es(self.loader,
+                                         self.session,
+                                         Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                         Config.ELASTICSEARCH_GENE_NAME_DOC_NAME)

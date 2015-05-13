@@ -2,6 +2,7 @@ from datetime import datetime
 import logging
 from sqlalchemy import and_
 from common import Actions
+from common.ElasticsearchLoader import EvidenceStringStorage
 from settings import Config
 import requests
 from common.PGAdapter import *
@@ -391,11 +392,7 @@ class HPAUploader():
         self.loader = loader
 
     def upload_all(self):
-        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-        for row in  self.session.query(ElasticsearchLoad.id,ElasticsearchLoad.data,).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                        ElasticsearchLoad.active==True)
-                    ).yield_per(self.loader.chunk_size):
-            self.loader.put(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME, Config.ELASTICSEARCH_EXPRESSION_DOC_NAME, row.id, row.data)
-        self.loader.flush()
+        EvidenceStringStorage.refresh_es(self.loader,
+                                         self.session,
+                                         Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                                         Config.ELASTICSEARCH_EXPRESSION_DOC_NAME)

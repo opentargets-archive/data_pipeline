@@ -1,12 +1,56 @@
 from collections import defaultdict
+from datetime import datetime
 import logging
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk
+from sqlalchemy import and_
+from common.PGAdapter import ElasticsearchLoad
 from settings import ElasticSearchConfiguration, Config
 
 __author__ = 'andreap'
 
+class EvidenceStringStorage():
+
+    @staticmethod
+    def store_to_pg(session, index_name, doc_name, data):
+        rows_deleted= session.query(
+                ElasticsearchLoad).filter(
+                    and_(ElasticsearchLoad.index==index_name,
+                         ElasticsearchLoad.type==doc_name)).delete()
+        if rows_deleted:
+            logging.info('deleted %i rows of gene data from elasticsearch_load'%rows_deleted)
+        c=0
+        for key, value in data.iteritems():
+            c+=1
+            session.add(ElasticsearchLoad(id=key,
+                                               index=index_name,
+                                               type=doc_name,
+                                               data=value.to_json(),
+                                               active=True,
+                                               date_created=datetime.now(),
+                                               date_modified=datetime.now(),
+                                               ))
+            if c % 50000 == 0:
+                logging.info("%i rows of gene data inserted to elasticsearch_load"%c)
+                session.flush()
+        session.commit()
+        logging.info('inserted %i rows of gene data inserted in elasticsearch_load'%c)
+
+    @staticmethod
+    def refresh_es(loader, session, index_name, doc_name):
+        """given an index and a doc_name,
+        - remove and recreate the index
+        - load all the available data with that doc_name for that index
+        """
+        loader.create_new_index(index_name)
+        for row in session.query(ElasticsearchLoad.id,ElasticsearchLoad.data,).filter(and_(
+                        ElasticsearchLoad.index==index_name,
+                        ElasticsearchLoad.type==doc_name,
+                        ElasticsearchLoad.active==True)
+                    ).yield_per(loader.chunk_size):
+            loader.put(index_name, doc_name, row.id, row.data)
+        loader.flush()
 
 class Loader():
     """

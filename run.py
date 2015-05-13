@@ -2,6 +2,8 @@ import logging
 from elasticsearch import Elasticsearch
 from common.ElasticsearchLoader import Loader
 from common.PGAdapter import Adapter
+from modules.ECO import EcoActions, EcoProcess, EcoUploader
+from modules.EFO import EfoActions, EfoProcess, EfoUploader
 from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 from modules.Uniprot import UniProtActions,UniprotDownloader
@@ -29,6 +31,18 @@ if __name__ == '__main__':
                         action="append_const", const = GeneActions.UPLOAD)
     parser.add_argument("--gena", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = GeneActions.ALL)
+    parser.add_argument("--efop", dest='efo', help="process the efo information and store the resulting json objects in postgres",
+                        action="append_const", const = EfoActions.PROCESS)
+    parser.add_argument("--efou", dest='efo', help="upload the stored json efo object to elasticsearch",
+                        action="append_const", const = EfoActions.UPLOAD)
+    parser.add_argument("--efoa", dest='efo', help="process the efo information, store the resulting json objects in postgres and upload them in elasticsearch",
+                        action="append_const", const = EfoActions.ALL)
+    parser.add_argument("--ecop", dest='eco', help="process the eco information and store the resulting json objects in postgres",
+                        action="append_const", const = EcoActions.PROCESS)
+    parser.add_argument("--ecou", dest='eco', help="upload the stored json efo object to elasticsearch",
+                        action="append_const", const = EcoActions.UPLOAD)
+    parser.add_argument("--ecoa", dest='eco', help="process the eco information, store the resulting json objects in postgres and upload them in elasticsearch",
+                        action="append_const", const = EcoActions.ALL)
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -65,3 +79,16 @@ if __name__ == '__main__':
                 GeneManager(adapter).merge_all()
             if (GeneActions.UPLOAD in args.gen) or do_all:
                 GeneUploader(adapter, loader).upload_all()
+        if args.efo:
+            do_all = EfoActions.ALL in args.efo
+            if (EfoActions.PROCESS in args.efo) or do_all:
+                EfoProcess(adapter).process_all()
+            if (EfoActions.UPLOAD in args.efo) or do_all:
+                EfoUploader(adapter, loader).upload_all()
+        if args.eco:
+            do_all = EcoActions.ALL in args.eco
+            if (EcoActions.PROCESS in args.eco) or do_all:
+                EcoProcess(adapter).process_all()
+            if (EcoActions.UPLOAD in args.eco) or do_all:
+                EcoUploader(adapter, loader).upload_all()
+
