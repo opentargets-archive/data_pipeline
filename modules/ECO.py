@@ -1,10 +1,8 @@
 from collections import OrderedDict
-from datetime import datetime
-import logging
-from sqlalchemy import and_
+
 from common import Actions
 from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import EvidenceStringStorage
+from common.ElasticsearchLoader import JSONObjectStorage
 from common.PGAdapter import  ECOPath
 from settings import Config
 
@@ -76,12 +74,12 @@ class EcoProcess():
                           path_labels,
                           # id_org=row.uri_id_org,
                           )
-                self.ecos[row.uri] = eco
+                self.ecos[get_ontology_code_from_url(row.uri)] = eco
 
 
 
     def _store_eco(self):
-        EvidenceStringStorage.store_to_pg(self.session,
+        JSONObjectStorage.store_to_pg(self.session,
                                               Config.ELASTICSEARCH_ECO_INDEX_NAME,
                                               Config.ELASTICSEARCH_ECO_DOC_NAME,
                                               self.ecos)
@@ -99,8 +97,27 @@ class EcoUploader():
         self.loader=loader
 
     def upload_all(self):
-        EvidenceStringStorage.refresh_es(self.loader,
+        JSONObjectStorage.refresh_es(self.loader,
                                          self.session,
                                          Config.ELASTICSEARCH_ECO_INDEX_NAME,
                                          Config.ELASTICSEARCH_ECO_DOC_NAME,
                                          )
+
+
+class EcoRetriever():
+    """
+    Will retrieve a EFO object form the processed json stored in postgres
+    """
+    def __init__(self,
+                 adapter):
+        self.adapter=adapter
+        self.session=adapter.session
+
+    def get_eco(self, ecoid):
+        json_data = JSONObjectStorage.get_data_from_pg(self.session,
+                                                       Config.ELASTICSEARCH_ECO_INDEX_NAME,
+                                                       Config.ELASTICSEARCH_ECO_DOC_NAME,
+                                                       ecoid)
+        eco = ECO(ecoid)
+        eco.load_json(json_data)
+        return eco

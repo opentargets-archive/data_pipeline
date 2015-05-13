@@ -1,4 +1,4 @@
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict
 import copy
 from datetime import datetime
 import logging
@@ -8,7 +8,7 @@ from sqlalchemy import and_
 import ujson as json
 from common import Actions
 from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import EvidenceStringStorage
+from common.ElasticsearchLoader import JSONObjectStorage
 from common.PGAdapter import HgncGeneInfo, EnsemblGeneInfo, UniprotInfo, ElasticsearchLoad
 from common.UniprotIO import UniprotIterator
 from settings import Config
@@ -507,7 +507,26 @@ class GeneUploader():
 
 
     def upload_all(self):
-        EvidenceStringStorage.refresh_es(self.loader,
+        JSONObjectStorage.refresh_es(self.loader,
                                          self.session,
                                          Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                                          Config.ELASTICSEARCH_GENE_NAME_DOC_NAME)
+
+
+class GeneRetriever():
+    """
+    Will retrieve a Gene object form the processed json stored in postgres
+    """
+    def __init__(self,
+                 adapter):
+        self.adapter=adapter
+        self.session=adapter.session
+
+    def get_gene(self, geneid):
+        json_data = JSONObjectStorage.get_data_from_pg(self.session,
+                                                       Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                                       Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                                                       geneid)
+        gene = Gene(geneid)
+        gene.load_json(json_data)
+        return gene

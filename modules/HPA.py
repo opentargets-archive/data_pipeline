@@ -2,15 +2,13 @@ from datetime import datetime
 import logging
 from sqlalchemy import and_
 from common import Actions
-from common.ElasticsearchLoader import EvidenceStringStorage
-from settings import Config
+from common.ElasticsearchLoader import JSONObjectStorage
 import requests
 from common.PGAdapter import *
 from StringIO import StringIO
 import csv
 from zipfile import ZipFile
 from common.DataStructure import JSONSerializable
-import pprint
 
 __author__ = 'andreap'
 
@@ -392,7 +390,7 @@ class HPAUploader():
         self.loader = loader
 
     def upload_all(self):
-        EvidenceStringStorage.refresh_es(self.loader,
+        JSONObjectStorage.refresh_es(self.loader,
                                          self.session,
                                          Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
                                          Config.ELASTICSEARCH_EXPRESSION_DOC_NAME)

@@ -1,7 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
 import logging
-from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk
 from sqlalchemy import and_
@@ -10,7 +9,7 @@ from settings import ElasticSearchConfiguration, Config
 
 __author__ = 'andreap'
 
-class EvidenceStringStorage():
+class JSONObjectStorage():
 
     @staticmethod
     def store_to_pg(session, index_name, doc_name, data):
@@ -45,12 +44,24 @@ class EvidenceStringStorage():
         """
         loader.create_new_index(index_name)
         for row in session.query(ElasticsearchLoad.id,ElasticsearchLoad.data,).filter(and_(
-                        ElasticsearchLoad.index==index_name,
-                        ElasticsearchLoad.type==doc_name,
-                        ElasticsearchLoad.active==True)
+                        ElasticsearchLoad.index == index_name,
+                        ElasticsearchLoad.type == doc_name,
+                        ElasticsearchLoad.active == True)
                     ).yield_per(loader.chunk_size):
             loader.put(index_name, doc_name, row.id, row.data)
         loader.flush()
+
+    @staticmethod
+    def get_data_from_pg(session, index_name, doc_name, objid):
+        """given an index and a doc_name and an id return the json object tore in postgres
+        """
+        return session.query(ElasticsearchLoad.data,).filter(and_(
+                             ElasticsearchLoad.index == index_name,
+                             ElasticsearchLoad.type == doc_name,
+                             ElasticsearchLoad.active == True,
+                             ElasticsearchLoad.id == objid)
+                            ).first()
+
 
 class Loader():
     """

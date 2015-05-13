@@ -10,4 +10,9 @@ class JSONSerializable():
         return json.dumps(self.__dict__)
 
     def load_json(self, data):
-        self.__dict__.update(**json.loads(data))
+        if isinstance(data, str):
+            self.__dict__.update(**json.loads(data))
+        elif isinstance(data, dict):#already parsed json obj
+            self.__dict__.update(**data)
+        else:
+            raise AttributeError("datatype %s is not supported"%str(type(data)))

@@ -1,11 +1,9 @@
 from collections import OrderedDict
-from datetime import datetime
 import logging
-from sqlalchemy import and_
 from common import Actions
 from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import EvidenceStringStorage
-from common.PGAdapter import ElasticsearchLoad, EFONames, EFOPath
+from common.ElasticsearchLoader import JSONObjectStorage
+from common.PGAdapter import  EFONames, EFOPath
 from settings import Config
 
 __author__ = 'andreap'
@@ -15,7 +13,18 @@ class EfoActions(Actions):
     UPLOAD='upload'
 
 def get_ontology_code_from_url(url):
-        return url.split('/')[-1]
+    base_code = url.split('/')[-1]
+    if '/identifiers.org/efo/' in url:
+        return "EFO_"+base_code
+    if ('/identifiers.org/orphanet/' in url) and not ("Orphanet_" in base_code):
+        return "Orphanet_"+base_code
+    if ('/identifiers.org/eco/' in url) and ('ECO:' in base_code):
+        return "ECO_"+base_code.replace('ECO:','')
+    if ('/identifiers.org/so/' in url) and ('SO:' in base_code):
+        return "SO_"+base_code.replace('SO:','')
+    if ('/identifiers.org/doid/' in url) and ('ECO:' in base_code):
+        return "DOID_"+base_code.replace('SO:','')
+    return base_code
 
 class EFO(JSONSerializable):
     def __init__(self,
@@ -84,7 +93,7 @@ class EfoProcess():
             synonyms = []
             if row.synonyms != [None]:
                 synonyms = row.synonyms
-            self.efos[row.uri] = EFO(row.uri,
+            self.efos[get_ontology_code_from_url(row.uri)] = EFO(row.uri,
                                      row.label,
                                      synonyms,
                                      # id_org=row.uri_id_org,
@@ -97,8 +106,8 @@ class EfoProcess():
         for row in self.session.query(EFOPath).yield_per(1000):
             full_path_codes = []
             full_path_labels = []
-            if row.uri in self.efos:
-                efo = self.efos[row.uri]
+            if get_ontology_code_from_url(row.uri) in self.efos:
+                efo = self.efos[get_ontology_code_from_url(row.uri)]
                 full_tree_path = row.tree_path
                 for node in row.tree_path:
                     if isinstance(node, list):
@@ -111,7 +120,7 @@ class EfoProcess():
                 efo.path_codes.append(full_path_codes)
                 efo.path_labels.append(full_path_labels)
                 efo.path.append(full_tree_path)
-                self.efos[row.uri] = efo
+                self.efos[get_ontology_code_from_url(row.uri)] = efo
 
         """temporary clean efos with empty path"""
         keys = self.efos.keys()
@@ -125,7 +134,7 @@ class EfoProcess():
 
 
     def _store_efo(self):
-        EvidenceStringStorage.store_to_pg(self.session,
+        JSONObjectStorage.store_to_pg(self.session,
                                               Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                                               Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                                               self.efos)
@@ -143,8 +152,27 @@ class EfoUploader():
         self.loader=loader
 
     def upload_all(self):
-        EvidenceStringStorage.refresh_es(self.loader,
+        JSONObjectStorage.refresh_es(self.loader,
                                          self.session,
                                          Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                                          Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                                          )
+
+
+class EfoRetriever():
+    """
+    Will retrieve a EFO object form the processed json stored in postgres
+    """
+    def __init__(self,
+                 adapter):
+        self.adapter=adapter
+        self.session=adapter.session
+
+    def get_efo(self, efoid):
+        json_data = JSONObjectStorage.get_data_from_pg(self.session,
+                                                       Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                                                       Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+                                                       efoid)
+        efo = EFO(efoid)
+        efo.load_json(json_data)
+        return efo

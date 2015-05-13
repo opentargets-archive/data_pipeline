@@ -34,7 +34,6 @@ class OLDUniprotDownloader():
     def get_entry(self):
         offset = 0
         data = self.get_data(self.chunk_size, offset)
-        c = 0
         while data.content:
             for xml in self._iterate_xml(StringIO(data.content)):
                 seqrec = Parser(xml, return_raw_comments=True).parse()
@@ -62,7 +61,6 @@ class OLDUniprotDownloader():
                 raise IOError('cannot get data from uniprot.org')
         except (ConnectionError, Timeout, HTTPError) as e:
             raise IOError(e)
-        return r
 
     def get_single_entry(self, uniprotid):
         uniprot_xml = self.get_single_entry_xml(uniprotid)
@@ -125,7 +123,6 @@ class UniprotDownloader():
         self._delete_cache()
         offset = 0
         data = self._get_data_from_remote(self.chunk_size, offset)
-        c = 0
         while data.content:
             for xml in self._iterate_xml(StringIO(data.content)):
                 seqrec = Parser(xml, return_raw_comments=True).parse()
@@ -152,7 +149,6 @@ class UniprotDownloader():
                 raise IOError('cannot get data from uniprot.org')
         except (ConnectionError, Timeout, HTTPError) as e:
             raise IOError(e)
-        return r
 
 
     def _save_to_postgresql(self, uniprotid, uniprot_xml):
