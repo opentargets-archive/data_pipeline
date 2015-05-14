@@ -355,7 +355,7 @@ class EvidenceManager():
         extended_evidence['_private']['datasource']= evidence.datasource
         extended_evidence['_private']['datatype']= evidence.datatype
 
-        return extended_evidence
+        return Evidence(extended_evidence)
 
 
 
