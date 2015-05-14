@@ -553,6 +553,7 @@ class EvidenceStringProcess():
                 self._store_evidence_string()
                 logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         self._store_evidence_string()
+        self.session.commit()
         logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
 
@@ -568,7 +569,8 @@ class EvidenceStringProcess():
                                       Config.ELASTICSEARCH_DATA_INDEX_NAME,
                                       Config.ELASTICSEARCH_DATA_DOC_NAME,
                                       self.data,
-                                      delete_prev=False)
+                                      delete_prev=False,
+                                      autocommit=False)
         self.data=OrderedDict()
 
 
