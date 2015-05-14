@@ -22,7 +22,12 @@ class JSONObjectStorage():
             logging.info('deleted %i rows of gene data from elasticsearch_load' % rows_deleted)
 
     @staticmethod
-    def store_to_pg(session, index_name, doc_name, data, delete_prev=True):
+    def store_to_pg(session,
+                    index_name,
+                    doc_name,
+                    data,
+                    delete_prev=True,
+                    autocommit=True):
         if delete_prev:
             JSONObjectStorage.delete_prev_data_in_pg(session, index_name, doc_name)
         c = 0
@@ -39,7 +44,8 @@ class JSONObjectStorage():
             if c % 1000 == 0:
                 logging.info("%i rows of gene data inserted to elasticsearch_load" % c)
                 session.flush()
-        session.commit()
+        if autocommit:
+            session.commit()
         logging.info('inserted %i rows of gene data inserted in elasticsearch_load' % c)
 
     @staticmethod
