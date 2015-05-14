@@ -510,7 +510,7 @@ class EvidenceStringProcess():
 
     def process_all(self):
         self._process_evidence_string_data()
-        self._store_evidence_string()
+
 
 
     def _process_evidence_string_data(self):
@@ -519,7 +519,7 @@ class EvidenceStringProcess():
         err = 0
         fix = 0
         evidence_manager = EvidenceManager(self.adapter)
-
+        self._delete_prev_data()
         for row in self.session.query(LatestEvidenceString).yield_per(1000):
             ev = Evidence(row.evidence_string, datasource= row.data_source_name)
             idev = row.uniq_assoc_fields_hashdig
@@ -549,19 +549,26 @@ class EvidenceStringProcess():
                 # if "string" in str(error):
                 #   raise
                 # traceback.print_exc(limit=1, file=sys.stdout)
-
+            if len(self.data)>1000:
+                    self._store_evidence_string()
+        self._store_evidence_string()
         logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
 
 
 
-
+    def _delete_prev_data(self):
+        JSONObjectStorage.delete_prev_data_in_pg(self.session,
+                                                 Config.ELASTICSEARCH_DATA_INDEX_NAME,
+                                                 Config.ELASTICSEARCH_DATA_DOC_NAME)
 
     def _store_evidence_string(self):
         JSONObjectStorage.store_to_pg(self.session,
-                                              Config.ELASTICSEARCH_DATA_INDEX_NAME,
-                                              Config.ELASTICSEARCH_DATA_DOC_NAME,
-                                              self.data)
+                                      Config.ELASTICSEARCH_DATA_INDEX_NAME,
+                                      Config.ELASTICSEARCH_DATA_DOC_NAME,
+                                      self.data,
+                                      delete_prev=False)
+        self.data=OrderedDict()
 
 
 
