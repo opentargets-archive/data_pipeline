@@ -18,8 +18,8 @@ def get_ontology_code_from_url(url):
 
 class ECO(JSONSerializable):
     def __init__(self,
-                 code,
-                 label,
+                 code='',
+                 label='',
                  path=[],
                  path_codes=[],
                  path_labels=[],

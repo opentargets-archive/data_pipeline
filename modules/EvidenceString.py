@@ -175,10 +175,10 @@ class EvidenceManager():
                         a = a.split('-')[0]
                     uniprotid = a.split(self.uni_header)[1].strip()
                     ensemblid = self.uni2ens[uniprotid]
-                    new_sbj_about.append(ensemblid)
+                    new_sbj_about.append(self.get_reference_ensembl_id(ensemblid))
                 elif a.startswith(self.ens_header):
                     ensemblid = a.split(self.ens_header)[1].strip()
-                    new_sbj_about.append(ensemblid)
+                    new_sbj_about.append(self.get_reference_ensembl_id(ensemblid))
                 else:
                     logging.warning("could not recognize biological_subject: %s | not added" % a)
                     id_not_in_ensembl.append(a)
@@ -319,11 +319,11 @@ class EvidenceManager():
         all_efo_codes=[]
         efos_info = []
         for aboutid in extended_evidence['biological_object']['about']:
-            try:
-                efo = self._get_efo(aboutid)
-                efos_info.append(ExtendedInfoEFO(efo))
-            except Exception:
-                logging.warning("Cannot get generic info for efo: %s" % aboutid)
+            # try:
+            efo = self._get_efo(aboutid)
+            efos_info.append(ExtendedInfoEFO(efo))
+            # except Exception:
+            #     logging.warning("Cannot get generic info for efo: %s" % aboutid)
 
         if efos_info:
             data = []
@@ -337,11 +337,11 @@ class EvidenceManager():
         """get generic eco info"""
         ecos_info = []
         for eco_id in extended_evidence['evidence']['evidence_codes']:
-            try:
-                eco = self._get_eco(eco_id)
-                ecos_info.append(ExtendedInfoECO(eco))
-            except Exception:
-                logging.warning("Cannot get generic info for eco: %s" % eco_id)
+            # try:
+            eco = self._get_eco(eco_id)
+            ecos_info.append(ExtendedInfoECO(eco))
+            # except Exception:
+            #     logging.warning("Cannot get generic info for eco: %s" % eco_id)
 
         if ecos_info:
             data = []
@@ -367,6 +367,7 @@ class EvidenceManager():
                         ElasticsearchLoad.active==True)
                     ).yield_per(1000):
             self.available_genes.append(row.id)
+        self._get_non_reference_gene_mappings()
 
     def _get_available_efos(self):
         self.available_efos = []
@@ -407,6 +408,34 @@ class EvidenceManager():
                 self.uni2ens[data['uniprot_id']] = row.id
             for accession in data['uniprot_accessions']:
                 self.uni2ens[accession]=row.id
+
+    def _get_non_reference_gene_mappings(self):
+        self.non_reference_genes = {}
+        skip_header=True
+        for line in file('resources/genes_with_non_reference_ensembl_ids.tsv'):
+            if skip_header:
+                skip_header=False
+            symbol, ensg, assembly, chr, is_ref = line.split()
+            if symbol not in self.non_reference_genes:
+                self.non_reference_genes[symbol]=dict(reference='',
+                                                      alternative=[])
+            if is_ref == 't':
+                self.non_reference_genes[symbol]['reference']=ensg
+            else:
+                self.non_reference_genes[symbol]['alternative'].append(ensg)
+
+    def _map_to_reference_ensembl_gene(self, ensg):
+        for symbol, data in self.non_reference_genes.items():
+            if ensg in data['alternative']:
+                logging.info("Mapped non reference ensembl gene id %s to %s for gene %s"%(ensg, data['reference'], symbol ))
+                return data['reference']
+
+    def get_reference_ensembl_id(self, ensemblid):
+        if ensemblid not in self.available_genes:
+            ensemblid = self._map_to_reference_ensembl_gene(ensemblid) or ensemblid
+        return ensemblid
+
+
 
 class Evidence(JSONSerializable):
     def __init__(self, evidence, datasource = ""):
@@ -496,8 +525,9 @@ class EvidenceStringProcess():
             idev = row.uniq_assoc_fields_hashdig
             ev.evidence['id'] = idev
             base_id += 1
-            # try:
-            if 1:
+            try:
+            # if 1:
+            #     print idev, row.data_source_name
                 '''temporary: fix broken data '''
                 ev, fixed = evidence_manager.fix_evidence(ev)
                 if fixed:
@@ -512,13 +542,13 @@ class EvidenceStringProcess():
                     raise AttributeError("Invalid Evidence String")
 
 
-            # except Exception, error:
-            #     # UploadError(ev, error, idev).save()
-            #     err += 1
-            #     logging.error("Error loading data for id %s: %s" % (idev, str(error)))
-            #     # if "string" in str(error):
-            #     #   raise
-            #     # traceback.print_exc(limit=1, file=sys.stdout)
+            except Exception, error:
+                # UploadError(ev, error, idev).save()
+                err += 1
+                logging.error("Error loading data for id %s: %s" % (idev, str(error)))
+                # if "string" in str(error):
+                #   raise
+                # traceback.print_exc(limit=1, file=sys.stdout)
 
         logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return

@@ -55,12 +55,14 @@ class JSONObjectStorage():
     def get_data_from_pg(session, index_name, doc_name, objid):
         """given an index and a doc_name and an id return the json object tore in postgres
         """
-        return session.query(ElasticsearchLoad.data,).filter(and_(
+        row =  session.query(ElasticsearchLoad.data).filter(and_(
                              ElasticsearchLoad.index == index_name,
                              ElasticsearchLoad.type == doc_name,
                              ElasticsearchLoad.active == True,
                              ElasticsearchLoad.id == objid)
                             ).first()
+        if row:
+            return row.data
 
 
 class Loader():

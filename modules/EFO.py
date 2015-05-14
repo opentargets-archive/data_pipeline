@@ -28,8 +28,8 @@ def get_ontology_code_from_url(url):
 
 class EFO(JSONSerializable):
     def __init__(self,
-                 code,
-                 label,
+                 code='',
+                 label='',
                  synonyms=[],
                  path=[],
                  path_codes=[],
