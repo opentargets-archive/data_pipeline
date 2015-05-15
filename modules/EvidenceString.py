@@ -144,13 +144,14 @@ class EvidenceManager():
                         logging.warning("Malformed probability in evidence.evidence_chain.evidence.association_score in entry %s | fixed to make it an object"%evidence['id'])
                         fixed = 'Probability in evidence chain malformed and as string'
                 if "pvalue" in ec['evidence']["association_score"]:
-                    if (isinstance(ec['evidence']["association_score"]["pvalue"], unicode) or
-                            isinstance(ec['evidence']["association_score"]["pvalue"], str)):
-                        evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"] = float(ec['evidence']["association_score"]["pvalue"])
+                    if (isinstance(ec['evidence']["association_score"]["pvalue"]['value'], unicode) or
+                            isinstance(ec['evidence']["association_score"]["pvalue"]['value'], str)):
+                        evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"] ['value']= float(ec['evidence']["association_score"]["pvalue"]['value'])
                         logging.warning("string instead of double in evidence.evidence_chain.evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
                         fixed = 'malformed evidence.evidence_chain.evidence.association_score.pvalue.value'
-                    if  evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"]>1:
-                        logging.error("pvalue in entry %s is higher than 1 %f"%(evidence['id'], ec['evidence']["association_score"]))
+                    pvalue = evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"]["value"]
+                    if  pvalue>1:
+                        logging.error("pvalue in entry %s is higher than 1 %f"%(evidence['id'], pvalue))
                         raise AttributeError('Invalid pvalue value')
 
                 if 'date_asserted' in ec['evidence']:  # remove time, only load date
@@ -528,9 +529,9 @@ class EvidenceStringProcess():
             idev = row.uniq_assoc_fields_hashdig
             ev.evidence['id'] = idev
             base_id += 1
-            try:
-            # if 1:
-            #     print idev, row.data_source_name
+            # try:
+            if 1:
+                # print idev, row.data_source_name
                 '''temporary: fix broken data '''
                 ev, fixed = evidence_manager.fix_evidence(ev)
                 if fixed:
@@ -545,13 +546,13 @@ class EvidenceStringProcess():
                     raise AttributeError("Invalid Evidence String")
 
 
-            except Exception, error:
-                # UploadError(ev, error, idev).save()
-                err += 1
-                logging.error("Error loading data for id %s: %s" % (idev, str(error)))
-                # if "string" in str(error):
-                #   raise
-                # traceback.print_exc(limit=1, file=sys.stdout)
+            # except Exception, error:
+            #     # UploadError(ev, error, idev).save()
+            #     err += 1
+            #     logging.error("Error loading data for id %s: %s" % (idev, str(error)))
+            #     # if "string" in str(error):
+            #     #   raise
+            #     # traceback.print_exc(limit=1, file=sys.stdout)
             if len(self.data)>1000:
                 self._store_evidence_string()
                 logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
