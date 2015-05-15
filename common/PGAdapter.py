@@ -82,6 +82,13 @@ class EFONames(Base):
     synonyms = Column(Text)
     description = Column(Text)
 
+class EFOFirstChild(Base):
+    __tablename__ = 'efo_first_child_node'
+    __table_args__ = {'schema':'rdf_conversion'}
+    id = Column(Integer, primary_key=True)
+    parent_uri = Column(Text)
+    first_child_uri = Column(Text)
+
 class HgncGeneInfo(Base):
     __tablename__ = 'hgnc_gene_info'
     __table_args__ = {'schema':'lookups'}

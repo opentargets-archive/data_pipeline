@@ -3,7 +3,7 @@ import logging
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
-from common.PGAdapter import  EFONames, EFOPath
+from common.PGAdapter import  EFONames, EFOPath, EFOFirstChild
 from settings import Config
 
 __author__ = 'andreap'
@@ -44,6 +44,7 @@ class EFO(JSONSerializable):
         self.path_labels = path_labels
         # self.id_org = id_org
         self.definition = definition
+        self.children=[]
 
     def get_id(self):
         return get_ontology_code_from_url(self.path_codes[0][-1])
@@ -92,7 +93,7 @@ class EfoProcess():
             # efo_uri[get_ontology_code_from_url(row.uri)]=row.uri
             synonyms = []
             if row.synonyms != [None]:
-                synonyms = row.synonyms
+                synonyms = sorted(list(set(row.synonyms)))
             self.efos[get_ontology_code_from_url(row.uri)] = EFO(row.uri,
                                      row.label,
                                      synonyms,
@@ -129,6 +130,16 @@ class EfoProcess():
             if not efo.path:
                 del self.efos[k]
                 logging.warning("removed efo %s since it has an empty path, add it in postgres"%k)
+
+        for row in self.session.query(EFOFirstChild).yield_per(1000):
+            efo_code_parent = get_ontology_code_from_url(row.parent_uri)
+            efo_code_child = get_ontology_code_from_url(row.first_child_uri)
+            if efo_code_parent in self.efos:
+                efo_parent = self.efos[efo_code_parent]
+                efo_child = self.efos[efo_code_child]
+                efo_parent.children.append(dict(code = efo_code_child,
+                                         label = efo_child.label))
+                self.efos[efo_code_parent] = efo_parent
 
 
 
