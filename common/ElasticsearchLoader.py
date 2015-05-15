@@ -13,11 +13,15 @@ __author__ = 'andreap'
 class JSONObjectStorage():
 
     @staticmethod
-    def delete_prev_data_in_pg(session, index_name, doc_name):
-        rows_deleted = session.query(
-            ElasticsearchLoad).filter(
-            and_(ElasticsearchLoad.index == index_name,
-                 ElasticsearchLoad.type == doc_name)).delete()
+    def delete_prev_data_in_pg(session, index_name, doc_name = None):
+        if doc_name is not None:
+            rows_deleted = session.query(
+                ElasticsearchLoad).filter(
+                and_(ElasticsearchLoad.index == index_name,
+                     ElasticsearchLoad.type == doc_name)).delete()
+        else:
+            rows_deleted = session.query(
+                ElasticsearchLoad).filter(ElasticsearchLoad.index == index_name).delete()
         if rows_deleted:
             logging.info('deleted %i rows of gene data from elasticsearch_load' % rows_deleted)
 
