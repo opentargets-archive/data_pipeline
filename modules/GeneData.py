@@ -253,11 +253,11 @@ class Gene(JSONSerializable):
         if 'ChEMBL' in  seqrec.annotations['dbxref_extended']:
             self.chembl = seqrec.annotations['dbxref_extended']['ChEMBL']
         if 'DrugBank' in  seqrec.annotations['dbxref_extended']:
-            self.chembl = seqrec.annotations['dbxref_extended']['DrugBank']
+            self.drugbank = seqrec.annotations['dbxref_extended']['DrugBank']
         if 'Pfam' in  seqrec.annotations['dbxref_extended']:
-            self.chembl = seqrec.annotations['dbxref_extended']['Pfam']
+            self.pfam = seqrec.annotations['dbxref_extended']['Pfam']
         if 'InterPro' in  seqrec.annotations['dbxref_extended']:
-            self.chembl = seqrec.annotations['dbxref_extended']['InterPro']
+            self.interpro = seqrec.annotations['dbxref_extended']['InterPro']
 
     def get_id_org(self):
         return ENS_ID_ORG_PREFIX + self.ensembl_gene_id
