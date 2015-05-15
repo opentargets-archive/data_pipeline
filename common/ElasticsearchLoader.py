@@ -49,18 +49,25 @@ class JSONObjectStorage():
         logging.info('inserted %i rows of gene data inserted in elasticsearch_load' % c)
 
     @staticmethod
-    def refresh_es(loader, session, index_name, doc_name):
+    def refresh_es(loader, session, index_name, doc_name=None):
         """given an index and a doc_name,
         - remove and recreate the index
         - load all the available data with that doc_name for that index
         """
         loader.create_new_index(index_name)
-        for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.data, ).filter(and_(
-                        ElasticsearchLoad.index == index_name,
-                        ElasticsearchLoad.type == doc_name,
-                        ElasticsearchLoad.active == True)
-        ).yield_per(loader.chunk_size):
-            loader.put(index_name, doc_name, row.id, row.data)
+        if doc_name:
+            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.data, ).filter(and_(
+                            ElasticsearchLoad.index == index_name,
+                            ElasticsearchLoad.type == doc_name,
+                            ElasticsearchLoad.active == True)
+            ).yield_per(loader.chunk_size):
+                loader.put(index_name, doc_name, row.id, row.data)
+        else:
+            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
+                            ElasticsearchLoad.index == index_name,
+                            ElasticsearchLoad.active == True)
+            ).yield_per(loader.chunk_size):
+                loader.put(index_name, row.type, row.id, row.data)
         loader.flush()
 
     @staticmethod

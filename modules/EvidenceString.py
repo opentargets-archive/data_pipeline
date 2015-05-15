@@ -1,5 +1,6 @@
 from collections import defaultdict, OrderedDict
 import copy
+from datetime import datetime
 import json
 import logging
 import os
@@ -471,6 +472,9 @@ class Evidence(JSONSerializable):
             self.database = self.datasource.lower()
         self.datatype = translate_database[self.database]
 
+    def get_doc_name(self):
+        return Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+self.database,
+
 
     def to_json(self):
         return json.dumps(self.evidence)
@@ -565,16 +569,22 @@ class EvidenceStringProcess():
 
     def _delete_prev_data(self):
         JSONObjectStorage.delete_prev_data_in_pg(self.session,
-                                                 Config.ELASTICSEARCH_DATA_INDEX_NAME,
-                                                 Config.ELASTICSEARCH_DATA_DOC_NAME)
+                                                 Config.ELASTICSEARCH_DATA_INDEX_NAME)
 
     def _store_evidence_string(self):
-        JSONObjectStorage.store_to_pg(self.session,
-                                      Config.ELASTICSEARCH_DATA_INDEX_NAME,
-                                      Config.ELASTICSEARCH_DATA_DOC_NAME,
-                                      self.data,
-                                      delete_prev=False,
-                                      autocommit=False)
+        c = 0
+        for key, value in self.data.iteritems():
+            c += 1
+            self.session.add(ElasticsearchLoad(id=key,
+                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME,
+                                          type=value.get_doc_name(),
+                                          data=value.to_json(),
+                                          active=True,
+                                          date_created=datetime.now(),
+                                          date_modified=datetime.now(),
+                                          ))
+        logging.info("%i rows of gene data inserted to elasticsearch_load" % c)
+        self.session.flush()
         self.data=OrderedDict()
 
 
@@ -591,8 +601,7 @@ class EvidenceStringUploader():
     def upload_all(self):
         JSONObjectStorage.refresh_es(self.loader,
                                          self.session,
-                                         Config.ELASTICSEARCH_DATA_INDEX_NAME,
-                                         Config.ELASTICSEARCH_DATA_DOC_NAME,
+                                         Config.ELASTICSEARCH_DATA_INDEX_NAME
                                          )
 
 class EvidenceStringRetriever():
