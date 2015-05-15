@@ -149,7 +149,7 @@ class EvidenceManager():
                         evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"] = float(ec['evidence']["association_score"]["pvalue"])
                         logging.warning("string instead of double in evidence.evidence_chain.evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
                         fixed = 'malformed evidence.evidence_chain.evidence.association_score.pvalue.value'
-                    if  ec['evidence']["association_score"]>1:
+                    if  evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"]>1:
                         logging.error("pvalue in entry %s is higher than 1 %f"%(evidence['id'], ec['evidence']["association_score"]))
                         raise AttributeError('Invalid pvalue value')
 
