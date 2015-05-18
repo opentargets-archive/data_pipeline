@@ -15,7 +15,8 @@ class EfoActions(Actions):
 def get_ontology_code_from_url(url):
     base_code = url.split('/')[-1]
     if '/identifiers.org/efo/' in url:
-        return "EFO_"+base_code
+        if ('_' not in base_code) and (':' not in base_code):
+            return "EFO_"+base_code
     if ('/identifiers.org/orphanet/' in url) and not ("Orphanet_" in base_code):
         return "Orphanet_"+base_code
     if ('/identifiers.org/eco/' in url) and ('ECO:' in base_code):
