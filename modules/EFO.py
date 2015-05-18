@@ -163,7 +163,7 @@ class EfoUploader():
         self.loader=loader
 
     def upload_all(self):
-        JSONObjectStorage.refresh_es(self.loader,
+        JSONObjectStorage.refresh_index_data_in_es(self.loader,
                                          self.session,
                                          Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                                          Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,

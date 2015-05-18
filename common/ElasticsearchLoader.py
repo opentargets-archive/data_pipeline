@@ -4,11 +4,14 @@ import logging
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk
 from sqlalchemy import and_
+from common import Actions
 from common.PGAdapter import ElasticsearchLoad
 from settings import ElasticSearchConfiguration, Config
 
 __author__ = 'andreap'
 
+class ElasticsearchActions(Actions):
+    RELOAD='reload'
 
 class JSONObjectStorage():
 
@@ -53,7 +56,7 @@ class JSONObjectStorage():
         logging.info('inserted %i rows of gene data inserted in elasticsearch_load' % c)
 
     @staticmethod
-    def refresh_es(loader, session, index_name, doc_name=None):
+    def refresh_index_data_in_es(loader, session, index_name, doc_name=None):
         """given an index and a doc_name,
         - remove and recreate the index
         - load all the available data with that doc_name for that index
@@ -72,6 +75,22 @@ class JSONObjectStorage():
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
                 loader.put(index_name, row.type, row.id, row.data)
+        loader.flush()
+
+    @staticmethod
+    def refresh_all_data_in_es(loader, session):
+        """push all the data stored in elasticsearch_load table to elasticsearch,
+        - remove and recreate each index
+        - load all the available data with any for that index
+        """
+        created_indexes =[]
+
+        for row in session.query(ElasticsearchLoad).yield_per(loader.chunk_size):
+            if row.index not in created_indexes:
+                loader.create_new_index(row.index)
+                created_indexes.append(row.index)
+            loader.put(row.index, row.type, row.id, row.data)
+
         loader.flush()
 
     @staticmethod

@@ -97,7 +97,7 @@ class EcoUploader():
         self.loader=loader
 
     def upload_all(self):
-        JSONObjectStorage.refresh_es(self.loader,
+        JSONObjectStorage.refresh_index_data_in_es(self.loader,
                                          self.session,
                                          Config.ELASTICSEARCH_ECO_INDEX_NAME,
                                          Config.ELASTICSEARCH_ECO_DOC_NAME,

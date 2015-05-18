@@ -1,7 +1,7 @@
 import logging
 from elasticsearch import Elasticsearch
 from common import Actions
-from common.ElasticsearchLoader import Loader
+from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
 from common.PGAdapter import Adapter
 from modules.ECO import EcoActions, EcoProcess, EcoUploader
 from modules.EFO import EfoActions, EfoProcess, EfoUploader
@@ -53,6 +53,8 @@ if __name__ == '__main__':
                         action="append_const", const = EvidenceStringActions.UPLOAD)
     parser.add_argument("--evsa", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EvidenceStringActions.ALL)
+    parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
+                        action="append_const", const = ElasticsearchActions.RELOAD)
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -111,4 +113,10 @@ if __name__ == '__main__':
                 EvidenceStringProcess(adapter).process_all()
             if (EvidenceStringActions.UPLOAD in args.evs) or do_all:
                 EvidenceStringUploader(adapter, loader).upload_all()
+
+        '''only run if explicetely called'''
+        if args.es:
+            if ElasticsearchActions.RELOAD in args.es:
+                JSONObjectStorage.refresh_all_data_in_es(loader,adapter.session)
+
 
