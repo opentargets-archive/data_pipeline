@@ -33,25 +33,25 @@ if __name__ == '__main__':
                         action="append_const", const = GeneActions.MERGE)
     parser.add_argument("--genu", dest='gen', help="upload the stored json gene object to elasticsearch",
                         action="append_const", const = GeneActions.UPLOAD)
-    parser.add_argument("--gena", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = GeneActions.ALL)
     parser.add_argument("--efop", dest='efo', help="process the efo information and store the resulting json objects in postgres",
                         action="append_const", const = EfoActions.PROCESS)
     parser.add_argument("--efou", dest='efo', help="upload the stored json efo object to elasticsearch",
                         action="append_const", const = EfoActions.UPLOAD)
-    parser.add_argument("--efoa", dest='efo', help="process the efo information, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EfoActions.ALL)
     parser.add_argument("--ecop", dest='eco', help="process the eco information and store the resulting json objects in postgres",
                         action="append_const", const = EcoActions.PROCESS)
     parser.add_argument("--ecou", dest='eco', help="upload the stored json efo object to elasticsearch",
                         action="append_const", const = EcoActions.UPLOAD)
-    parser.add_argument("--ecoa", dest='eco', help="process the eco information, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--eco", dest='eco', help="process the eco information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EcoActions.ALL)
     parser.add_argument("--evsp", dest='evs', help="process and validate the available evidence strings and store the resulting json object in postgres ",
                         action="append_const", const = EvidenceStringActions.PROCESS)
     parser.add_argument("--evsu", dest='evs', help="upload the stored json evidence string object to elasticsearch",
                         action="append_const", const = EvidenceStringActions.UPLOAD)
-    parser.add_argument("--evsa", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EvidenceStringActions.ALL)
     parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
                         action="append_const", const = ElasticsearchActions.RELOAD)
