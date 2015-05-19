@@ -8,6 +8,7 @@ from modules.EFO import EfoActions, EfoProcess, EfoUploader
 from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess, EvidenceStringUploader
 from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
+from modules.Reactome import ReactomeActions, ReactomeDataDownloader
 from modules.Uniprot import UniProtActions,UniprotDownloader
 import argparse
 from settings import Config, ElasticSearchConfiguration
@@ -27,6 +28,14 @@ if __name__ == '__main__':
                         action="append_const", const = HPAActions.UPLOAD)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",
                         action="append_const", const = HPAActions.ALL)
+    parser.add_argument("--read", dest='rea', help="download data from reactome and store it in postgres",
+                        action="append_const", const = ReactomeActions.DOWNLOAD)
+    parser.add_argument("--reap", dest='rea', help="process reactome data stored in postgres and create json object",
+                        action="append_const", const = ReactomeActions.PROCESS)
+    parser.add_argument("--reau", dest='rea', help="upload processed reactome json obects stored in postgres to elasticsearch",
+                        action="append_const", const = ReactomeActions.UPLOAD)
+    parser.add_argument("--rea", dest='rea', help="download reactome data, process it and upload it to elasticsearch",
+                        action="append_const", const = ReactomeActions.ALL)
     parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in postgresql",
                         action="append_const", const = UniProtActions.CACHE)
     parser.add_argument("--genm", dest='gen', help="merge the available gene information and store the resulting json objects in postgres",
@@ -85,6 +94,16 @@ if __name__ == '__main__':
                 HPAProcess(adapter).process_all()
             if (HPAActions.UPLOAD in args.hpa) or do_all:
                 HPAUploader(adapter, loader).upload_all()
+        if args.rea or run_full_pipeline:
+            do_all = (ReactomeActions.ALL in args.rea) or run_full_pipeline
+            if (ReactomeActions.DOWNLOAD in args.rea) or do_all:
+                ReactomeDataDownloader(adapter).retrieve_all()
+            if (ReactomeActions.PROCESS in args.rea) or do_all:
+                # ReactomeProcess(adapter).process_all()
+                pass
+            if (ReactomeActions.UPLOAD in args.rea) or do_all:
+                # ReactomeUploader(adapter, loader).upload_all()
+                pass
         if args.uni or run_full_pipeline:
             do_all = (UniProtActions.ALL in args.uni) or run_full_pipeline
             if (UniProtActions.CACHE in args.uni) or do_all:

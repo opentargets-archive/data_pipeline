@@ -218,12 +218,12 @@ class ReactomePathwayData(Base):
 class ReactomePathwayRelation(Base):
     __tablename__ = 'reactome_pathway_relation'
     __table_args__ = {'schema':'pipeline'}
-    id = Column(Text, ForeignKey('reactome_pathway_data.id'), primary_key=True)
-    child = Column(Text, ForeignKey('reactome_pathway_data.id'), primary_key=True)
+    id = Column(Text, ForeignKey('pipeline.reactome_pathway_data.id'), primary_key=True)
+    child = Column(Text, ForeignKey('pipeline.reactome_pathway_data.id'), primary_key=True)
 
 class ReactomeEnsembleMapping(Base):
     __tablename__ = 'reactome_ensembl_mapping'
     __table_args__ = {'schema':'pipeline'}
     ensembl_id = Column(Text, primary_key=True)
-    reactome_id = Column(Text, ForeignKey('reactome_pathway_data.id'), primary_key=True)
+    reactome_id = Column(Text, ForeignKey('pipeline.reactome_pathway_data.id'), primary_key=True)
     species = Column(Text)
