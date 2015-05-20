@@ -3,7 +3,7 @@ import requests
 from sqlalchemy.exc import IntegrityError
 from common import Actions
 from common.DataStructure import NetworkNode, JSONSerializable
-from common.PGAdapter import ReactomePathwayData, ReactomePathwayRelation
+from common.PGAdapter import ReactomePathwayData, ReactomePathwayRelation, ReactomeEnsembleMapping
 from settings import Config
 
 __author__ = 'andreap'
@@ -31,7 +31,7 @@ class ReactomeDataDownloader():
 
 
     def retrieve_all(self):
-
+        self.delete_old_data()
         self.retrieve_pathway_data()
         self.retrieve_pathway_gene_mappings()
         self.retrieve_pathway_relation()
@@ -60,9 +60,6 @@ class ReactomeDataDownloader():
 
 
     def _load_pathway_data_to_pg(self, data):
-        rows_deleted= self.session.query(ReactomePathwayData).delete()
-        if rows_deleted:
-            logging.info('deleted %i rows from reactome_pathway_data'%rows_deleted)
         self.valid_pathway_ids=[]
         for row in data.split('\n'):
             if row:
@@ -83,12 +80,28 @@ class ReactomeDataDownloader():
         logging.info('inserted %i rows in reactome_pathway_data'%len(self.valid_pathway_ids))
 
     def _load_pathway_gene_mappings_to_pg(self, data):
-        pass
+        added_relations=[]
+        for row in data.split('\n'):
+            if row:
+                ensembl_id, reactome_id,url, name, eco, species  = row.split('\t')
+                relation =(ensembl_id, reactome_id)
+                if relation not in added_relations:
+                    if (reactome_id in self.valid_pathway_ids) and (species in self.allowed_species):
+                        self.session.add(ReactomeEnsembleMapping(ensembl_id=ensembl_id,
+                                                                 reactome_id=reactome_id,
+                                                                 evidence_code=eco,
+                                                                 species=species
+                                                             ))
+                        added_relations.append(relation)
+                        if len(added_relations)% 1000 == 0:
+                            logging.info("%i rows inserted to reactome_ensembl_mapping"%len(added_relations))
+                            self.session.flush()
+                else:
+                    logging.warn("Pathway mapping %s is already loaded, skipping duplicate data"%str(relation))
+        self.session.commit()
+        logging.info('inserted %i rows in reactome_ensembl_mapping'%len(added_relations))
 
     def _load_pathway_relation_to_pg(self, data):
-        rows_deleted= self.session.query(ReactomePathwayRelation).delete()
-        if rows_deleted:
-            logging.info('deleted %i rows from reactome_pathway_relation'%rows_deleted)
         added_relations=[]
         for row in data.split('\n'):
             if row:
@@ -107,3 +120,14 @@ class ReactomeDataDownloader():
                     logging.warn("Pathway relation %s is already loaded, skipping duplicate data"%str(relation))
         self.session.commit()
         logging.info('inserted %i rows in reactome_pathway_relation'%len(added_relations))
+
+    def delete_old_data(self):
+        rows_deleted= self.session.query(ReactomePathwayRelation).delete()
+        if rows_deleted:
+            logging.info('deleted %i rows from reactome_pathway_relation'%rows_deleted)
+        rows_deleted= self.session.query(ReactomeEnsembleMapping).delete()
+        if rows_deleted:
+            logging.info('deleted %i rows from reactome_ensembl_mapping'%rows_deleted)
+        rows_deleted= self.session.query(ReactomePathwayData).delete()
+        if rows_deleted:
+            logging.info('deleted %i rows from reactome_pathway_data'%rows_deleted)

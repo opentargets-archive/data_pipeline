@@ -226,4 +226,5 @@ class ReactomeEnsembleMapping(Base):
     __table_args__ = {'schema':'pipeline'}
     ensembl_id = Column(Text, primary_key=True)
     reactome_id = Column(Text, ForeignKey('pipeline.reactome_pathway_data.id'), primary_key=True)
+    evidence_code = Column(Text)
     species = Column(Text)
