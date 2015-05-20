@@ -1,7 +1,7 @@
 from sqlalchemy.dialects.postgresql import JSON
 
 from settings import Config
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, ForeignKey
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine.url import URL
 from sqlalchemy import Column, Integer, String, Date, Text,TIMESTAMP, BOOLEAN, Float
@@ -218,3 +218,25 @@ class HPASubcellularLocation(Base):
     other_location = Column(Text)
     expression_type = Column(Text)
     reliability = Column(Text)
+
+
+class ReactomePathwayData(Base):
+    __tablename__ = 'reactome_pathway_data'
+    __table_args__ = {'schema':'pipeline'}
+    id = Column(Text, primary_key=True)
+    name = Column(Text)
+    species = Column(Text)
+
+class ReactomePathwayRelation(Base):
+    __tablename__ = 'reactome_pathway_relation'
+    __table_args__ = {'schema':'pipeline'}
+    id = Column(Text, ForeignKey('pipeline.reactome_pathway_data.id'), primary_key=True)
+    child = Column(Text, ForeignKey('pipeline.reactome_pathway_data.id'), primary_key=True)
+
+class ReactomeEnsembleMapping(Base):
+    __tablename__ = 'reactome_ensembl_mapping'
+    __table_args__ = {'schema':'pipeline'}
+    ensembl_id = Column(Text, primary_key=True)
+    reactome_id = Column(Text, ForeignKey('pipeline.reactome_pathway_data.id'), primary_key=True)
+    evidence_code = Column(Text)
+    species = Column(Text)

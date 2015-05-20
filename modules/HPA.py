@@ -102,7 +102,7 @@ class HPADataDownloader():
                                              expression_type=row['Expression type'],
                                              ))
             if c % 10000 == 0:
-                logging.info("%i rows uploaded to hpa_normal_tissue"%c)
+                logging.info("%i rows inserted to hpa_normal_tissue"%c)
                 self.session.flush()
         self.session.commit()
         logging.info('inserted %i rows in hpa_normal_tissue'%c)
