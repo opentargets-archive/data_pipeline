@@ -168,6 +168,18 @@ class ElasticsearchLoad(Base):
     active = Column(BOOLEAN)
     successfully_loaded = Column(BOOLEAN)
 
+class EvidenceValidation(Base):
+    __tablename__ = 'evidence_validation'
+    __table_args__ = {'schema':'pipeline'}
+    provider_id = Column(Text, primary_key=True)
+    filename = Column(Text, primary_key=True)
+    md5 = Column(Text)
+    date_created = Column(TIMESTAMP)
+    date_modified = Column(TIMESTAMP)
+    date_validated = Column(TIMESTAMP)
+    nb_submission = Column(Integer)
+    successfully_validated = Column(BOOLEAN)
+
 class HPANormalTissue(Base):
     __tablename__ = 'hpa_normal_tissue'
     __table_args__ = {'schema':'pipeline'}
