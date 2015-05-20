@@ -26,7 +26,7 @@ class JSONObjectStorage():
             rows_deleted = session.query(
                 ElasticsearchLoad).filter(ElasticsearchLoad.index == index_name).delete()
         if rows_deleted:
-            logging.info('deleted %i rows of gene data from elasticsearch_load' % rows_deleted)
+            logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
 
     @staticmethod
     def store_to_pg(session,
@@ -49,11 +49,11 @@ class JSONObjectStorage():
                                           date_modified=datetime.now(),
                                           ))
             if c % 1000 == 0:
-                logging.info("%i rows of gene data inserted to elasticsearch_load" % c)
+                logging.info("%i rows of %s inserted to elasticsearch_load" %(c, doc_name))
                 session.flush()
         if autocommit:
             session.commit()
-        logging.info('inserted %i rows of gene data inserted in elasticsearch_load' % c)
+        logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(c, doc_name))
 
     @staticmethod
     def refresh_index_data_in_es(loader, session, index_name, doc_name=None):
@@ -142,7 +142,7 @@ class Loader():
             doc_id = '/%s/%s' % (result['_index'], result['_id'])
             if (len(self.results[result['_index']]) % 1000) == 0:
                 logging.info(
-                    "%i entries processed for index %s" % (len(self.results[result['_index']]), result['_index']))
+                    "%i entries uploaded in elasticsearch for index %s" % (len(self.results[result['_index']]), result['_index']))
             if not ok:
                 logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
             else:

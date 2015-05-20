@@ -1,4 +1,4 @@
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.dialects.postgresql import JSONB
 
 from settings import Config
 from sqlalchemy import create_engine, ForeignKey
@@ -52,7 +52,7 @@ class LatestEvidenceString(Base):
     __table_args__ = {'schema':'public'}
     uniq_assoc_fields_hashdig = Column(String(250), primary_key=True)
     json_doc_hashdig = Column(String(250))
-    evidence_string = Column(Text)
+    evidence_string = Column(JSONB)
     data_source_name = Column(Text)
     json_doc_version = Column(String(250))
     json_schema_version = Column(Integer)
@@ -70,7 +70,7 @@ class EFOPath(Base):
     __tablename__ = 'efo_path'
     __table_args__ = {'schema':'rdf_conversion'}
     uri = Column(Text)
-    tree_path = Column(JSON)
+    tree_path = Column(JSONB)
     id = Column(Integer, primary_key=True)
 
 class EFONames(Base):
@@ -162,7 +162,7 @@ class ElasticsearchLoad(Base):
     id = Column(Text, primary_key=True)
     index = Column(Text, primary_key=True)
     type = Column(Text)
-    data = Column(JSON)
+    data = Column(JSONB)
     date_created = Column(TIMESTAMP)
     date_modified = Column(TIMESTAMP)
     active = Column(BOOLEAN)
