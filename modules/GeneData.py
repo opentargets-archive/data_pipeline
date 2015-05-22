@@ -77,6 +77,7 @@ class Gene(JSONSerializable):
         self.pfam = []
         self.interpro = []
         self.is_ensembl_reference = []
+        self._private ={}
 
 
     def _set_id(self):
@@ -106,7 +107,7 @@ class Gene(JSONSerializable):
         if data.previous_names:
             self.previous_names = data.previous_names.split(', ')
         if data.synonyms:
-            self.symbol_synonyms = data.synonyms.split(', ')
+            self.symbol_synonyms.extend(data.synonyms.split(', '))
         if data.name_synonyms:
             self.name_synonyms = data.name_synonyms.split(', ')
         # if data.chromosome :
@@ -151,7 +152,7 @@ class Gene(JSONSerializable):
             if 'prev_names' in data:
                 self.previous_names = data['prev_names']
             if 'alias_symbol' in data:
-                self.symbol_synonyms = data['alias_symbol']
+                self.symbol_synonyms.extend( data['alias_symbol'])
             if 'alias_name' in data:
                 self.name_synonyms = data['alias_name']
             if 'enzyme_ids' in data:
@@ -236,8 +237,9 @@ class Gene(JSONSerializable):
                     if v not in self.symbol_synonyms:
                         self.symbol_synonyms.append(v)
             if k == 'gene_name_synonym':
-                if v not in self.symbol_synonyms:
-                    self.symbol_synonyms.append(v)
+                for symbol in v:
+                    if symbol not in self.symbol_synonyms:
+                        self.symbol_synonyms.append(symbol)
             if k.startswith('recommendedName'):
                 self.name_synonyms.extend(v)
             if k.startswith('alternativeName'):
@@ -248,6 +250,7 @@ class Gene(JSONSerializable):
             self.go = seqrec.annotations['dbxref_extended']['GO']
         if 'Reactome' in  seqrec.annotations['dbxref_extended']:
             self.reactome = seqrec.annotations['dbxref_extended']['Reactome']
+            self._extend_reactome_data()
         if 'PDB' in  seqrec.annotations['dbxref_extended']:
             self.pdb = seqrec.annotations['dbxref_extended']['PDB']
         if 'ChEMBL' in  seqrec.annotations['dbxref_extended']:
@@ -262,7 +265,11 @@ class Gene(JSONSerializable):
     def get_id_org(self):
         return ENS_ID_ORG_PREFIX + self.ensembl_gene_id
 
-    def create_suggestions(self):
+    def preprocess(self):
+        self._create_suggestions()
+        self._create_facets()
+
+    def _create_suggestions(self):
 
         field_order = [self.approved_symbol,
                        self.approved_name,
@@ -277,20 +284,41 @@ class Gene(JSONSerializable):
                        self.refseq_ids
                        ]
 
-        self._private = {'suggestions' : dict(input = [],
+        self._private['suggestions'] = dict(input = [],
                                               output = self.approved_symbol,
                                               payload = dict(gene_id = self.id,
                                                              gene_symbol = self.approved_symbol,
                                                              gene_name = self.approved_name),
                                               )
-        }
+
 
         for field in field_order:
             if isinstance(field, list):
                 self._private['suggestions']['input'].extend(field)
             else:
                 self._private['suggestions']['input'].append(field)
-        self._private['suggestions']['input'] = [x.lower() for x in self._private['suggestions']['input']]
+        try:
+            self._private['suggestions']['input'] = [x.lower() for x in self._private['suggestions']['input']]
+        except:
+            print "error", repr(self._private['suggestions']['input'])
+
+    def _create_facets(self):
+        self._private['facets'] = dict()
+        if self.reactome:
+            pathways=[]
+            pathway_types=[]
+            for reaction in self.reactome.values():
+                pathways.append(reaction['pathway name'])
+                pathway_types.append(reaction['pathway type'])
+            self._private['facets']['reactome']=dict(pathway=pathways,
+                                                     pathway_type=pathway_types)
+
+    def _extend_reactome_data(self):
+        for key, reaction in self.reactome.items():
+            self.reactome[key]['pathway type']=self._get_pathway_type(self.reactome[key]['pathway name'])
+
+    def _get_pathway_type(self, pathway_name):
+        return pathway_name#TODO: add pathway type here
 
 
 class GeneSet():
@@ -477,6 +505,7 @@ class GeneManager():
         c=0
         for geneid, gene in self.genes.iterate():
             if gene.is_ensembl_reference:
+                gene.preprocess()
                 c+=1
                 self.session.add(ElasticsearchLoad(id=gene.id,
                                                    index=Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
