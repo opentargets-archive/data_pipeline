@@ -466,6 +466,8 @@ class Evidence(JSONSerializable):
         translate_database['gwas'] = 'genetic_association'
         translate_database['cancer_gene_census'] = 'somatic_mutation'
         translate_database['chembl'] = 'known_drug'
+        translate_database['europmc'] = 'literature'
+
         try:
             self.database = self.evidence['evidence']['provenance_type']['database']['id'].lower()
         except KeyError:
@@ -533,8 +535,8 @@ class EvidenceStringProcess():
             idev = row.uniq_assoc_fields_hashdig
             ev.evidence['id'] = idev
             base_id += 1
-            try:
-            # if 1:
+            # try:
+            if 1:
                 # print idev, row.data_source_name
                 '''temporary: fix broken data '''
                 ev, fixed = evidence_manager.fix_evidence(ev)
@@ -550,10 +552,10 @@ class EvidenceStringProcess():
                     raise AttributeError("Invalid Evidence String")
 
 
-            except Exception, error:
+            # except Exception, error:
                 # UploadError(ev, error, idev).save()
-                err += 1
-                logging.error("Error loading data for id %s: %s" % (idev, str(error)))
+                # err += 1
+                # logging.error("Error loading data for id %s: %s" % (idev, str(error)))
                 # if "string" in str(error):
                 #   raise
                 # traceback.print_exc(limit=1, file=sys.stdout)

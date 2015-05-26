@@ -11,6 +11,7 @@ from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
 from common.PGAdapter import HgncGeneInfo, EnsemblGeneInfo, UniprotInfo, ElasticsearchLoad
 from common.UniprotIO import UniprotIterator
+from modules.Reactome import ReactomeRetriever
 from settings import Config
 
 __author__ = 'andreap'
@@ -250,7 +251,7 @@ class Gene(JSONSerializable):
             self.go = seqrec.annotations['dbxref_extended']['GO']
         if 'Reactome' in  seqrec.annotations['dbxref_extended']:
             self.reactome = seqrec.annotations['dbxref_extended']['Reactome']
-            self._extend_reactome_data()
+            # self._extend_reactome_data()
         if 'PDB' in  seqrec.annotations['dbxref_extended']:
             self.pdb = seqrec.annotations['dbxref_extended']['PDB']
         if 'ChEMBL' in  seqrec.annotations['dbxref_extended']:
@@ -307,18 +308,18 @@ class Gene(JSONSerializable):
         if self.reactome:
             pathways=[]
             pathway_types=[]
-            for reaction in self.reactome.values():
-                pathways.append(reaction['pathway name'])
-                pathway_types.append(reaction['pathway type'])
-            self._private['facets']['reactome']=dict(pathway=pathways,
-                                                     pathway_type=pathway_types)
+            for reaction_code, reaction in self.reactome.items():
+                pathways.append(reaction_code)
+                if 'pathway types' in reaction:
+                    pathway_types.append(reaction['pathway types'])
+            if not pathway_types:
+                pathway_types.append('other')
+            self._private['facets']['reactome']=dict(pathway_code = reaction_code,
+                                                     # pathway_name=pathways,
+                                                     pathway_type_code=pathway_types,
+                                                     # pathway_type_name=pathway_types,
+                                                     )
 
-    def _extend_reactome_data(self):
-        for key, reaction in self.reactome.items():
-            self.reactome[key]['pathway type']=self._get_pathway_type(self.reactome[key]['pathway name'])
-
-    def _get_pathway_type(self, pathway_name):
-        return pathway_name#TODO: add pathway type here
 
 
 class GeneSet():
@@ -411,6 +412,7 @@ class GeneManager():
         self.adapter=adapter
         self.session=adapter.session
         self.genes = GeneSet()
+        self.reactome_retriever=ReactomeRetriever(adapter)
 
 
 
@@ -482,6 +484,8 @@ class GeneManager():
                     if ensembl_id in self.genes:
                         gene = self.genes.get_gene(ensembl_id)
                         gene.load_uniprot_entry(seqrec)
+                        if gene.reactome:
+                            gene = self._extend_reactome_data(gene)
                         self.genes.add_gene(gene)
                         success=True
                         break
@@ -493,6 +497,29 @@ class GeneManager():
 
         logging.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
 
+    def _extend_reactome_data(self, gene):
+        reaction_types = dict()
+        for key, reaction in gene.reactome.items():
+            for reaction_type in self._get_pathway_type(key):
+                reaction_types[reaction_type['pathway type']]=reaction_type
+        gene.reactome[key]['pathway types']=reaction_types.values()
+        return gene
+
+    def _get_pathway_type(self, reaction_id):
+        types = []
+        try:
+            reaction = self.reactome_retriever.get_reaction(reaction_id)
+            type_codes =[]
+            for path in reaction.path:
+                if len(path)>1:
+                    type_codes.append(path[1])
+            for type_code in type_codes:
+                types.append({'pathway type':type_code,
+                              'pathway type name': self.reactome_retriever.get_reaction(type_code).label
+                              })
+        except:
+            logging.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
+        return types
 
 
     def _store_data(self):

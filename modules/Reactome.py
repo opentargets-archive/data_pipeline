@@ -206,3 +206,23 @@ class ReactomeUploader():
                                          Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
                                          Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
                                          )
+
+
+
+class ReactomeRetriever():
+    """
+    Will retrieve a Reactome object form the processed json stored in postgres
+    """
+    def __init__(self,
+                 adapter):
+        self.adapter=adapter
+        self.session=adapter.session
+
+    def get_reaction(self, reaction_id):
+        json_data = JSONObjectStorage.get_data_from_pg(self.session,
+                                                       Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
+                                                       Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                                                       reaction_id)
+        reaction = ReactomeNode()
+        reaction.load_json(json_data)
+        return reaction
