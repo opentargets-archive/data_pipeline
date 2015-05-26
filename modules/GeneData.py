@@ -311,10 +311,11 @@ class Gene(JSONSerializable):
             for reaction_code, reaction in self.reactome.items():
                 pathways.append(reaction_code)
                 if 'pathway types' in reaction:
-                    pathway_types.append(reaction['pathway types'])
+                    for ptype in reaction['pathway types']:
+                        pathway_types.append(ptype["pathway type"])
             if not pathway_types:
                 pathway_types.append('other')
-            self._private['facets']['reactome']=dict(pathway_code = reaction_code,
+            self._private['facets']['reactome']=dict(pathway_code = pathways,
                                                      # pathway_name=pathways,
                                                      pathway_type_code=pathway_types,
                                                      # pathway_type_name=pathway_types,
