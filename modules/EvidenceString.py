@@ -118,11 +118,12 @@ class EvidenceManager():
                 fixed = 'Probability in evidence chain malformed and as string'
 
         if 'pvalue' in evidence['evidence']["association_score"]:
-            if (isinstance(evidence['evidence']['association_score']['pvalue']['value'], unicode) or
-                    isinstance(evidence['evidence']['association_score']['pvalue']['value'], str)):
-                evidence['evidence']['association_score']['pvalue']['value'] = float(evidence['evidence']['association_score']['pvalue']['value'])
-                logging.warning("string instead of double in evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
-                fixed = 'malformed evidence.association_score.pvalue.value'
+            if evidence['evidence']["association_score"]['pvalue']:
+                if (isinstance(evidence['evidence']['association_score']['pvalue']['value'], unicode) or
+                        isinstance(evidence['evidence']['association_score']['pvalue']['value'], str)):
+                    evidence['evidence']['association_score']['pvalue']['value'] = float(evidence['evidence']['association_score']['pvalue']['value'])
+                    logging.warning("string instead of double in evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
+                    fixed = 'malformed evidence.association_score.pvalue.value'
 
         if 'properties' in evidence['evidence']:
             if 'evidence_chain' in evidence['evidence']['properties']:
