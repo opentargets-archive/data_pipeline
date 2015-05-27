@@ -468,7 +468,7 @@ class Evidence(JSONSerializable):
         translate_database['cancer_gene_census'] = 'somatic_mutation'
         translate_database['chembl'] = 'known_drug'
         translate_database['europmc'] = 'literature'
-
+        translate_database['disgenet'] = 'literature'
         try:
             self.database = self.evidence['evidence']['provenance_type']['database']['id'].lower()
         except KeyError:
