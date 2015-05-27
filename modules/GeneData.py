@@ -315,6 +315,7 @@ class Gene(JSONSerializable):
                         pathway_types.append(ptype["pathway type"])
             if not pathway_types:
                 pathway_types.append('other')
+            pathway_types=list(set(pathway_types))
             self._private['facets']['reactome']=dict(pathway_code = pathways,
                                                      # pathway_name=pathways,
                                                      pathway_type_code=pathway_types,
