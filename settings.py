@@ -376,12 +376,30 @@ class ElasticSearchConfiguration():
                                 "search_analyzer" : "whitespace_analyzer",
                                 "payloads" : True
                                 },
+                            "facets":{
+                                "type" : "object",
+                                "properties" : {
+                                    "reactome" : {
+                                        "type" : "object",
+                                        "properties" : {
+                                            "pathway_type_code" : {
+                                                "type" : "string",
+                                                "index" : "not_analyzed"
+                                            },
+                                            "pathway_code" : {
+                                                "type" : "string",
+                                                "index" : "not_analyzed"
+                                            }
+                                        }
+                                    }
+                                }
                             },
                         },
                     },
                 },
             },
         }
+    }
 
     expression_data_mapping = {
         "settings": {
