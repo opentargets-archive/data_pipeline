@@ -518,6 +518,7 @@ class EvidenceStringProcess():
         self.adapter=adapter
         self.session=adapter.session
         self.data=OrderedDict()
+        self.loaded_entries_to_pg = 0
 
     def process_all(self):
         self._process_evidence_string_data()
@@ -573,9 +574,8 @@ class EvidenceStringProcess():
                                                  Config.ELASTICSEARCH_DATA_INDEX_NAME)
 
     def _store_evidence_string(self):
-        c = 0
         for key, value in self.data.iteritems():
-            c += 1
+            self.loaded_entries_to_pg += 1
             self.session.add(ElasticsearchLoad(id=key,
                                           index=Config.ELASTICSEARCH_DATA_INDEX_NAME,
                                           type=value.get_doc_name(),
@@ -584,7 +584,7 @@ class EvidenceStringProcess():
                                           date_created=datetime.now(),
                                           date_modified=datetime.now(),
                                           ))
-        logging.info("%i rows of gene data inserted to elasticsearch_load" % c)
+        logging.info("%i rows of evidence strings inserted to elasticsearch_load" % self.loaded_entries_to_pg)
         self.session.flush()
         self.data=OrderedDict()
 
