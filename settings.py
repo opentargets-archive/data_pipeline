@@ -43,11 +43,7 @@ class Config():
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
     REACTOME_PATHWAY_RELATION = 'http://www.reactome.org/download/current/ReactomePathwaysRelation.txt'
-
-
-
-
-
+    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/home/gk680303/windows/data/ftp' #'/opt/share/data/ftp'
 
 
 def _get_evidence_string_generic_mapping():
