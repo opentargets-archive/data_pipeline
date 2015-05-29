@@ -6,6 +6,7 @@ from common.PGAdapter import Adapter
 from modules.ECO import EcoActions, EcoProcess, EcoUploader
 from modules.EFO import EfoActions, EfoProcess, EfoUploader
 from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess, EvidenceStringUploader
+from modules.EvidenceValidation import EvidenceValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader
@@ -64,6 +65,10 @@ if __name__ == '__main__':
                         action="append_const", const = EvidenceStringActions.ALL)
     parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
                         action="append_const", const = ElasticsearchActions.RELOAD)
+    parser.add_argument("--valck", dest='val', help="check new json files submitted to ftp site",
+                        action="append_const", const = EvidenceValidationActions.CHECKFILES)
+    parser.add_argument("--val", dest='val', help="check new json files submitted to ftp site, validate them and store them in postgres",
+                        action="append_const", const = EvidenceValidationActions.ALL)                        
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -132,6 +137,10 @@ if __name__ == '__main__':
                 EvidenceStringProcess(adapter).process_all()
             if (EvidenceStringActions.UPLOAD in args.evs) or do_all:
                 EvidenceStringUploader(adapter, loader).upload_all()
+        if args.val or run_full_pipeline:
+            do_all = (EvidenceValidationActions.ALL in args.val) or run_full_pipeline
+            if (EvidenceValidationActions.CHECKFILES in args.val) or do_all:
+                EvidenceValidationFileChecker(adapter).check_all()               
 
         '''only run if explicetely called'''
         if args.es:
