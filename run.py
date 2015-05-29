@@ -9,7 +9,7 @@ from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess,
 from modules.EvidenceValidation import EvidenceValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
-from modules.Reactome import ReactomeActions, ReactomeDataDownloader
+from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
 from modules.Uniprot import UniProtActions,UniprotDownloader
 import argparse
 from settings import Config, ElasticSearchConfiguration
@@ -104,11 +104,9 @@ if __name__ == '__main__':
             if (ReactomeActions.DOWNLOAD in args.rea) or do_all:
                 ReactomeDataDownloader(adapter).retrieve_all()
             if (ReactomeActions.PROCESS in args.rea) or do_all:
-                # ReactomeProcess(adapter).process_all()
-                pass
+                ReactomeProcess(adapter).process_all()
             if (ReactomeActions.UPLOAD in args.rea) or do_all:
-                # ReactomeUploader(adapter, loader).upload_all()
-                pass
+                ReactomeUploader(adapter, loader).upload_all()
         if args.uni or run_full_pipeline:
             do_all = (UniProtActions.ALL in args.uni) or run_full_pipeline
             if (UniProtActions.CACHE in args.uni) or do_all:

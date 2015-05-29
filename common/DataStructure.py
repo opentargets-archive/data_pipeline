@@ -17,7 +17,7 @@ class JSONSerializable():
         else:
             raise AttributeError("datatype %s is not supported"%str(type(data)))
 
-class NetworkNode():
+class TreeNode(object):
 
         def __init__(self,
                      id='',
@@ -26,7 +26,7 @@ class NetworkNode():
                      description='',
                      children=[],
                      parents=[],
-                     anchestors=[],
+                     ancestors=[],
                      descendant=[],
                      path=[],
                      is_root=False,
@@ -40,19 +40,20 @@ class NetworkNode():
             self.children = children
             self.has_children = bool(children)
             self.descendant = descendant
-            self.ancestors = anchestors
+            self.ancestors = ancestors
             self.parents = parents
             self.is_root = is_root
 
 
-class OntologyNode(NetworkNode):
+class OntologyNode(TreeNode):
 
         def __init__(self,
                      uri='',
                      uri_code='',
                      ontology_name='',
+                     **kwargs
                      ):
-            super(NetworkNode, self).__init__()
+            super(OntologyNode, self).__init__(**kwargs)
 
             self.uri = uri
             self.uri_code = uri_code

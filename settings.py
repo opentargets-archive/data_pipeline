@@ -20,6 +20,8 @@ class Config():
     ELASTICSEARCH_GENE_NAME_DOC_NAME = 'genedata'
     ELASTICSEARCH_EXPRESSION_INDEX_NAME = 'expression-data'
     ELASTICSEARCH_EXPRESSION_DOC_NAME = 'expression'
+    ELASTICSEARCH_REACTOME_INDEX_NAME = 'reactome-data'
+    ELASTICSEARCH_REACTOME_REACTION_DOC_NAME = 'reactome-reaction'
     DEBUG = True
     PROFILE = False
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'C=41d6xo]4940NP,9jwF@@v0KDdTtO'
@@ -370,12 +372,30 @@ class ElasticSearchConfiguration():
                                 "search_analyzer" : "whitespace_analyzer",
                                 "payloads" : True
                                 },
+                            "facets":{
+                                "type" : "object",
+                                "properties" : {
+                                    "reactome" : {
+                                        "type" : "object",
+                                        "properties" : {
+                                            "pathway_type_code" : {
+                                                "type" : "string",
+                                                "index" : "not_analyzed"
+                                            },
+                                            "pathway_code" : {
+                                                "type" : "string",
+                                                "index" : "not_analyzed"
+                                            }
+                                        }
+                                    }
+                                }
                             },
                         },
                     },
                 },
             },
         }
+    }
 
     expression_data_mapping = {
         "settings": {

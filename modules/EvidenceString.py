@@ -118,11 +118,12 @@ class EvidenceManager():
                 fixed = 'Probability in evidence chain malformed and as string'
 
         if 'pvalue' in evidence['evidence']["association_score"]:
-            if (isinstance(evidence['evidence']['association_score']['pvalue']['value'], unicode) or
-                    isinstance(evidence['evidence']['association_score']['pvalue']['value'], str)):
-                evidence['evidence']['association_score']['pvalue']['value'] = float(evidence['evidence']['association_score']['pvalue']['value'])
-                logging.warning("string instead of double in evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
-                fixed = 'malformed evidence.association_score.pvalue.value'
+            if evidence['evidence']["association_score"]['pvalue']:
+                if (isinstance(evidence['evidence']['association_score']['pvalue']['value'], unicode) or
+                        isinstance(evidence['evidence']['association_score']['pvalue']['value'], str)):
+                    evidence['evidence']['association_score']['pvalue']['value'] = float(evidence['evidence']['association_score']['pvalue']['value'])
+                    logging.warning("string instead of double in evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
+                    fixed = 'malformed evidence.association_score.pvalue.value'
 
         if 'properties' in evidence['evidence']:
             if 'evidence_chain' in evidence['evidence']['properties']:
@@ -466,6 +467,8 @@ class Evidence(JSONSerializable):
         translate_database['gwas'] = 'genetic_association'
         translate_database['cancer_gene_census'] = 'somatic_mutation'
         translate_database['chembl'] = 'known_drug'
+        translate_database['europmc'] = 'literature'
+        translate_database['disgenet'] = 'literature'
         try:
             self.database = self.evidence['evidence']['provenance_type']['database']['id'].lower()
         except KeyError:
@@ -515,6 +518,7 @@ class EvidenceStringProcess():
         self.adapter=adapter
         self.session=adapter.session
         self.data=OrderedDict()
+        self.loaded_entries_to_pg = 0
 
     def process_all(self):
         self._process_evidence_string_data()
@@ -551,11 +555,9 @@ class EvidenceStringProcess():
 
 
             except Exception, error:
-                # UploadError(ev, error, idev).save()
+                UploadError(ev, error, idev).save()
                 err += 1
-                logging.error("Error loading data for id %s: %s" % (idev, str(error)))
-                # if "string" in str(error):
-                #   raise
+                logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
                 # traceback.print_exc(limit=1, file=sys.stdout)
             if len(self.data)>1000:
                 self._store_evidence_string()
@@ -572,9 +574,8 @@ class EvidenceStringProcess():
                                                  Config.ELASTICSEARCH_DATA_INDEX_NAME)
 
     def _store_evidence_string(self):
-        c = 0
         for key, value in self.data.iteritems():
-            c += 1
+            self.loaded_entries_to_pg += 1
             self.session.add(ElasticsearchLoad(id=key,
                                           index=Config.ELASTICSEARCH_DATA_INDEX_NAME,
                                           type=value.get_doc_name(),
@@ -583,7 +584,7 @@ class EvidenceStringProcess():
                                           date_created=datetime.now(),
                                           date_modified=datetime.now(),
                                           ))
-        logging.info("%i rows of gene data inserted to elasticsearch_load" % c)
+        logging.info("%i rows of evidence strings inserted to elasticsearch_load" % self.loaded_entries_to_pg)
         self.session.flush()
         self.data=OrderedDict()
 

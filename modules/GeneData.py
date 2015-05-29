@@ -11,6 +11,7 @@ from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
 from common.PGAdapter import HgncGeneInfo, EnsemblGeneInfo, UniprotInfo, ElasticsearchLoad
 from common.UniprotIO import UniprotIterator
+from modules.Reactome import ReactomeRetriever
 from settings import Config
 
 __author__ = 'andreap'
@@ -77,6 +78,7 @@ class Gene(JSONSerializable):
         self.pfam = []
         self.interpro = []
         self.is_ensembl_reference = []
+        self._private ={}
 
 
     def _set_id(self):
@@ -106,7 +108,7 @@ class Gene(JSONSerializable):
         if data.previous_names:
             self.previous_names = data.previous_names.split(', ')
         if data.synonyms:
-            self.symbol_synonyms = data.synonyms.split(', ')
+            self.symbol_synonyms.extend(data.synonyms.split(', '))
         if data.name_synonyms:
             self.name_synonyms = data.name_synonyms.split(', ')
         # if data.chromosome :
@@ -151,7 +153,7 @@ class Gene(JSONSerializable):
             if 'prev_names' in data:
                 self.previous_names = data['prev_names']
             if 'alias_symbol' in data:
-                self.symbol_synonyms = data['alias_symbol']
+                self.symbol_synonyms.extend( data['alias_symbol'])
             if 'alias_name' in data:
                 self.name_synonyms = data['alias_name']
             if 'enzyme_ids' in data:
@@ -236,8 +238,9 @@ class Gene(JSONSerializable):
                     if v not in self.symbol_synonyms:
                         self.symbol_synonyms.append(v)
             if k == 'gene_name_synonym':
-                if v not in self.symbol_synonyms:
-                    self.symbol_synonyms.append(v)
+                for symbol in v:
+                    if symbol not in self.symbol_synonyms:
+                        self.symbol_synonyms.append(symbol)
             if k.startswith('recommendedName'):
                 self.name_synonyms.extend(v)
             if k.startswith('alternativeName'):
@@ -248,6 +251,7 @@ class Gene(JSONSerializable):
             self.go = seqrec.annotations['dbxref_extended']['GO']
         if 'Reactome' in  seqrec.annotations['dbxref_extended']:
             self.reactome = seqrec.annotations['dbxref_extended']['Reactome']
+            # self._extend_reactome_data()
         if 'PDB' in  seqrec.annotations['dbxref_extended']:
             self.pdb = seqrec.annotations['dbxref_extended']['PDB']
         if 'ChEMBL' in  seqrec.annotations['dbxref_extended']:
@@ -262,7 +266,11 @@ class Gene(JSONSerializable):
     def get_id_org(self):
         return ENS_ID_ORG_PREFIX + self.ensembl_gene_id
 
-    def create_suggestions(self):
+    def preprocess(self):
+        self._create_suggestions()
+        self._create_facets()
+
+    def _create_suggestions(self):
 
         field_order = [self.approved_symbol,
                        self.approved_name,
@@ -277,20 +285,43 @@ class Gene(JSONSerializable):
                        self.refseq_ids
                        ]
 
-        self._private = {'suggestions' : dict(input = [],
+        self._private['suggestions'] = dict(input = [],
                                               output = self.approved_symbol,
                                               payload = dict(gene_id = self.id,
                                                              gene_symbol = self.approved_symbol,
                                                              gene_name = self.approved_name),
                                               )
-        }
+
 
         for field in field_order:
             if isinstance(field, list):
                 self._private['suggestions']['input'].extend(field)
             else:
                 self._private['suggestions']['input'].append(field)
-        self._private['suggestions']['input'] = [x.lower() for x in self._private['suggestions']['input']]
+        try:
+            self._private['suggestions']['input'] = [x.lower() for x in self._private['suggestions']['input']]
+        except:
+            print "error", repr(self._private['suggestions']['input'])
+
+    def _create_facets(self):
+        self._private['facets'] = dict()
+        if self.reactome:
+            pathways=[]
+            pathway_types=[]
+            for reaction_code, reaction in self.reactome.items():
+                pathways.append(reaction_code)
+                if 'pathway types' in reaction:
+                    for ptype in reaction['pathway types']:
+                        pathway_types.append(ptype["pathway type"])
+            if not pathway_types:
+                pathway_types.append('other')
+            pathway_types=list(set(pathway_types))
+            self._private['facets']['reactome']=dict(pathway_code = pathways,
+                                                     # pathway_name=pathways,
+                                                     pathway_type_code=pathway_types,
+                                                     # pathway_type_name=pathway_types,
+                                                     )
+
 
 
 class GeneSet():
@@ -383,6 +414,7 @@ class GeneManager():
         self.adapter=adapter
         self.session=adapter.session
         self.genes = GeneSet()
+        self.reactome_retriever=ReactomeRetriever(adapter)
 
 
 
@@ -454,6 +486,8 @@ class GeneManager():
                     if ensembl_id in self.genes:
                         gene = self.genes.get_gene(ensembl_id)
                         gene.load_uniprot_entry(seqrec)
+                        if gene.reactome:
+                            gene = self._extend_reactome_data(gene)
                         self.genes.add_gene(gene)
                         success=True
                         break
@@ -465,6 +499,29 @@ class GeneManager():
 
         logging.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
 
+    def _extend_reactome_data(self, gene):
+        reaction_types = dict()
+        for key, reaction in gene.reactome.items():
+            for reaction_type in self._get_pathway_type(key):
+                reaction_types[reaction_type['pathway type']]=reaction_type
+        gene.reactome[key]['pathway types']=reaction_types.values()
+        return gene
+
+    def _get_pathway_type(self, reaction_id):
+        types = []
+        try:
+            reaction = self.reactome_retriever.get_reaction(reaction_id)
+            type_codes =[]
+            for path in reaction.path:
+                if len(path)>1:
+                    type_codes.append(path[1])
+            for type_code in type_codes:
+                types.append({'pathway type':type_code,
+                              'pathway type name': self.reactome_retriever.get_reaction(type_code).label
+                              })
+        except:
+            logging.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
+        return types
 
 
     def _store_data(self):
@@ -477,6 +534,7 @@ class GeneManager():
         c=0
         for geneid, gene in self.genes.iterate():
             if gene.is_ensembl_reference:
+                gene.preprocess()
                 c+=1
                 self.session.add(ElasticsearchLoad(id=gene.id,
                                                    index=Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,

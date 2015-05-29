@@ -1,4 +1,4 @@
-from common.DataStructure import NetworkNode
+from common.DataStructure import TreeNode
 
 __author__ = 'andreap'
 
@@ -26,7 +26,7 @@ class NetworkHandler():
         return True
 
     def _node_can_be_added(self, node):
-        if not isinstance(node, NetworkNode):
+        if not isinstance(node, TreeNode):
             raise AttributeError("Only instances of NetworkNode can be added to the network, not: %s",str(type(node)))
         if not self._node_has_valid_parents(node):
             return False
