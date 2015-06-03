@@ -12,4 +12,5 @@ six==1.9.0
 SQLAlchemy==1.0.2
 ujson==1.33
 urllib3==1.10.3
+iso8601>=0.1.10
 -e git+https://github.com/CTTV/cttvmodel.git#egg=cttvmodel-master
