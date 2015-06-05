@@ -551,7 +551,7 @@ class EvidenceStringProcess():
                     self.data[idev] = ev_string_to_load
 
                 else:
-                    raise AttributeError("Invalid %s Evidence String"%(row.data_source_name))
+                    raise AttributeError("Invalid %s Evidence String" % (row.data_source_name))
 
 
             except Exception, error:
