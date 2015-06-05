@@ -263,40 +263,40 @@ class EvidenceManager():
 
         return Evidence(evidence), fixed
 
-    def is_valid(self, evidence):
+    def is_valid(self, evidence, datasource):
         '''check consistency of the data in the evidence'''
 
         ev = evidence.evidence
         evidence_id = ev['id']
 
         if not ev['biological_subject']['about']:
-            logging.error("Evidence %s has no valid gene in biological_subject.about" % (evidence_id))
+            logging.error("%s Evidence %s has no valid gene in biological_subject.about" % (datasource, evidence_id))
             return False
         for gene_id in ev['biological_subject']['about']:
             if gene_id not in self.available_genes:
                 logging.error(
-                    "Evidence %s has an invalid gene id in biological_subject.about: %s" % (evidence_id, gene_id))
+                    "%s Evidence %s has an invalid gene id in biological_subject.about: %s" % (datasource, evidence_id, gene_id))
                 return False
         if not ev['biological_object']['about']:
-            logging.error("Evidence %s has no valid efo id in biological_object.about" % (evidence_id))
+            logging.error("%s Evidence %s has no valid efo id in biological_object.about" % (datasource, evidence_id))
             return False
         for efo_id in ev['biological_object']['about']:
             if efo_id not in self.available_efos:
                 logging.error(
-                    "Evidence %s has an invalid efo id in biological_object.about: %s" % (evidence_id, efo_id))
+                    "%s Evidence %s has an invalid efo id in biological_object.about: %s" % (datasource, evidence_id, efo_id))
                 return False
         for eco_id in ev['evidence']['evidence_codes']:
             if eco_id not in self.available_ecos:
                 logging.error(
-                    "Evidence %s has an invalid eco id in evidence.evidence_codes: %s" % (evidence_id, eco_id))
+                    "%s Evidence %s has an invalid eco id in evidence.evidence_codes: %s" % (datasource, evidence_id, eco_id))
                 return False
         if 'evidence_chain' in ev['evidence']:
             for ec in ev['evidence']['evidence_chain']:
                 for eco_id in ec['evidence']['evidence_codes']:
                     if eco_id not in self.available_ecos:
                         logging.error(
-                            "Evidence %s has an invalid eco id in evidence.evidence_chain.evidence.evidence_codes: %s" % (
-                            evidence_id, eco_id))
+                            "%s Evidence %s has an invalid eco id in evidence.evidence_chain.evidence.evidence_codes: %s" % (
+                            datasource, evidence_id, eco_id))
                         return False
         return True
 
@@ -544,14 +544,14 @@ class EvidenceStringProcess():
                 ev, fixed = evidence_manager.fix_evidence(ev)
                 if fixed:
                     fix += 1
-                if evidence_manager.is_valid(ev):
+                if evidence_manager.is_valid(ev, datasource=row.data_source_name):
                     '''extend data in evidencestring'''
                     ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
                     self.data[idev] = ev_string_to_load
 
                 else:
-                    raise AttributeError("Invalid Evidence String")
+                    raise AttributeError("Invalid %s Evidence String"%(row.data_source_name))
 
 
             except Exception, error:
