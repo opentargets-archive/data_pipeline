@@ -370,6 +370,7 @@ class EvidenceManager():
         extended_evidence['_private']['efo_codes'] = all_efo_codes
         extended_evidence['_private']['datasource']= evidence.datasource
         extended_evidence['_private']['datatype']= evidence.datatype
+        extended_evidence['_private']['facets']={}
         if pathway_data['pathway_code']:
             extended_evidence['_private']['facets']['reactome']= pathway_data
 
