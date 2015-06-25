@@ -314,10 +314,11 @@ class EvidenceManager():
             # try:
             gene = self._get_gene(aboutid)
             genes_info.append(ExtendedInfoGene(gene))
-            pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
-            pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
-            # except Exception:
-            #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
+            if 'reactome' in gene._private['facets']:
+                pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
+                pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
+                # except Exception:
+                #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
 
         if genes_info:
             data = []
@@ -325,8 +326,9 @@ class EvidenceManager():
                 data.append(gene_info.data)
             extended_evidence["biological_subject"][ExtendedInfoGene.root] = data
 
-        pathway_data['pathway_type_code']=list(set(pathway_data['pathway_type_code']))
-        pathway_data['pathway_code']=list(set(pathway_data['pathway_code']))
+        if pathway_data['pathway_code']:
+            pathway_data['pathway_type_code']=list(set(pathway_data['pathway_type_code']))
+            pathway_data['pathway_code']=list(set(pathway_data['pathway_code']))
 
 
         """get generic efo info"""
@@ -368,7 +370,8 @@ class EvidenceManager():
         extended_evidence['_private']['efo_codes'] = all_efo_codes
         extended_evidence['_private']['datasource']= evidence.datasource
         extended_evidence['_private']['datatype']= evidence.datatype
-        extended_evidence['_private']['facets']['reactome']= pathway_data
+        if pathway_data['pathway_code']:
+            extended_evidence['_private']['facets']['reactome']= pathway_data
 
         return Evidence(extended_evidence)
 
