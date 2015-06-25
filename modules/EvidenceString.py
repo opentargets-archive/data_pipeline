@@ -308,13 +308,13 @@ class EvidenceManager():
 
         """get generic gene info"""
         genes_info = []
-        pathway_data = dict(pathway_type=[],
+        pathway_data = dict(pathway_type_code=[],
                             pathway_code=[])
         for aboutid in extended_evidence['biological_subject']['about']:
             # try:
             gene = self._get_gene(aboutid)
             genes_info.append(ExtendedInfoGene(gene))
-            pathway_data['pathway_type'].extend(gene._private['facets']['reactome']['pathway_type'])
+            pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
             pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
             # except Exception:
             #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
@@ -325,7 +325,7 @@ class EvidenceManager():
                 data.append(gene_info.data)
             extended_evidence["biological_subject"][ExtendedInfoGene.root] = data
 
-        pathway_data['pathway_type']=list(set(pathway_data['pathway_type']))
+        pathway_data['pathway_type_code']=list(set(pathway_data['pathway_type_code']))
         pathway_data['pathway_code']=list(set(pathway_data['pathway_code']))
 
 
