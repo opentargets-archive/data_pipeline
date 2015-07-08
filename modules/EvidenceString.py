@@ -310,6 +310,12 @@ class EvidenceManager():
         genes_info = []
         pathway_data = dict(pathway_type_code=[],
                             pathway_code=[])
+        GO_terms = dict(biological_process = [],
+                        cellular_component=[],
+                        molecular_function=[],
+                        )
+        uniprot_keywords = []
+        #TODO: handle domains
         for aboutid in extended_evidence['biological_subject']['about']:
             # try:
             gene = self._get_gene(aboutid)
@@ -319,6 +325,21 @@ class EvidenceManager():
                 pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
                 # except Exception:
                 #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
+            if gene.go:
+                for go_code,data in gene.go.items():
+                    category,term = data['term'].split(':')
+                    if category =='P':
+                        GO_terms['biological_process'].append(dict(code=go_code,
+                                                                   term=term))
+                    elif category =='F':
+                        GO_terms['molecular_function'].append(dict(code=go_code,
+                                                                   term=term))
+                    elif category =='C':
+                        GO_terms['cellular_component'].append(dict(code=go_code,
+                                                                   term=term))
+            if gene.uniprot_keywords:
+                uniprot_keywords = gene.uniprot_keywords
+
 
         if genes_info:
             data = []
@@ -373,6 +394,13 @@ class EvidenceManager():
         extended_evidence['_private']['facets']={}
         if pathway_data['pathway_code']:
             extended_evidence['_private']['facets']['reactome']= pathway_data
+        if uniprot_keywords:
+            extended_evidence['_private']['facets']['uniprot_keywords'] = uniprot_keywords
+        if GO_terms['biological_process'] or \
+            GO_terms['molecular_function'] or \
+            GO_terms['cellular_component'] :
+            extended_evidence['_private']['facets']['go'] = GO_terms
+
 
         return Evidence(extended_evidence)
 
