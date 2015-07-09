@@ -91,15 +91,15 @@ def _get_evidence_string_generic_mapping():
                               "type" : "string",
                               "index" : "not_analyzed"
                          },
-                        "facets" : {
+                         "facets" : {
                             "type" : "object",
                             "properties" : {
                                 "uniprot_keywords": {
                                     "type" : "string",
-                                    "index" : "keyword"
+                                    "index" : "not_analyzed"
                                 }
                             }
-                        }
+                         }
                      }
                 },
                 "biological_object.efo_info" : {
