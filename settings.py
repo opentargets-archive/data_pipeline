@@ -91,6 +91,15 @@ def _get_evidence_string_generic_mapping():
                          "efo_codes" : {
                               "type" : "string",
                               "index" : "not_analyzed"
+                         },
+                         "facets" : {
+                            "type" : "object",
+                            "properties" : {
+                                "uniprot_keywords": {
+                                    "type" : "string",
+                                    "index" : "not_analyzed"
+                                }
+                            }
                          }
                      }
                 },

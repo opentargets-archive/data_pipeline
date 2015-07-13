@@ -308,18 +308,49 @@ class EvidenceManager():
 
         """get generic gene info"""
         genes_info = []
+        pathway_data = dict(pathway_type_code=[],
+                            pathway_code=[])
+        GO_terms = dict(biological_process = [],
+                        cellular_component=[],
+                        molecular_function=[],
+                        )
+        uniprot_keywords = []
+        #TODO: handle domains
         for aboutid in extended_evidence['biological_subject']['about']:
             # try:
             gene = self._get_gene(aboutid)
             genes_info.append(ExtendedInfoGene(gene))
-            # except Exception:
-            #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
+            if 'reactome' in gene._private['facets']:
+                pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
+                pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
+                # except Exception:
+                #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
+            if gene.go:
+                for go_code,data in gene.go.items():
+                    category,term = data['term'].split(':')
+                    if category =='P':
+                        GO_terms['biological_process'].append(dict(code=go_code,
+                                                                   term=term))
+                    elif category =='F':
+                        GO_terms['molecular_function'].append(dict(code=go_code,
+                                                                   term=term))
+                    elif category =='C':
+                        GO_terms['cellular_component'].append(dict(code=go_code,
+                                                                   term=term))
+            if gene.uniprot_keywords:
+                uniprot_keywords = gene.uniprot_keywords
+
 
         if genes_info:
             data = []
             for gene_info in genes_info:
                 data.append(gene_info.data)
             extended_evidence["biological_subject"][ExtendedInfoGene.root] = data
+
+        if pathway_data['pathway_code']:
+            pathway_data['pathway_type_code']=list(set(pathway_data['pathway_type_code']))
+            pathway_data['pathway_code']=list(set(pathway_data['pathway_code']))
+
 
         """get generic efo info"""
         all_efo_codes=[]
@@ -360,6 +391,16 @@ class EvidenceManager():
         extended_evidence['_private']['efo_codes'] = all_efo_codes
         extended_evidence['_private']['datasource']= evidence.datasource
         extended_evidence['_private']['datatype']= evidence.datatype
+        extended_evidence['_private']['facets']={}
+        if pathway_data['pathway_code']:
+            extended_evidence['_private']['facets']['reactome']= pathway_data
+        if uniprot_keywords:
+            extended_evidence['_private']['facets']['uniprot_keywords'] = uniprot_keywords
+        if GO_terms['biological_process'] or \
+            GO_terms['molecular_function'] or \
+            GO_terms['cellular_component'] :
+            extended_evidence['_private']['facets']['go'] = GO_terms
+
 
         return Evidence(extended_evidence)
 
