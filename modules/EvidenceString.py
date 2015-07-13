@@ -327,16 +327,19 @@ class EvidenceManager():
                 #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
             if gene.go:
                 for go_code,data in gene.go.items():
-                    category,term = data['term'].split(':')
-                    if category =='P':
-                        GO_terms['biological_process'].append(dict(code=go_code,
-                                                                   term=term))
-                    elif category =='F':
-                        GO_terms['molecular_function'].append(dict(code=go_code,
-                                                                   term=term))
-                    elif category =='C':
-                        GO_terms['cellular_component'].append(dict(code=go_code,
-                                                                   term=term))
+                    try:
+                        category,term = data['term'][0], data['term'][2:]
+                        if category =='P':
+                            GO_terms['biological_process'].append(dict(code=go_code,
+                                                                       term=term))
+                        elif category =='F':
+                            GO_terms['molecular_function'].append(dict(code=go_code,
+                                                                       term=term))
+                        elif category =='C':
+                            GO_terms['cellular_component'].append(dict(code=go_code,
+                                                                       term=term))
+                    except:
+                        pass
             if gene.uniprot_keywords:
                 uniprot_keywords = gene.uniprot_keywords
 
