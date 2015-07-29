@@ -181,12 +181,9 @@ class EvidenceManager():
 
         '''remove identifiers.org from efos'''
         disease_id = evidence['disease']['id'][0]
-        new_disease_id = None
-        for idorg_efo_uri in disease_id:
-            code = get_ontology_code_from_url(idorg_efo_uri)
-            if len(code.split('_')) != 2:
-                logging.warning("could not recognize disease.id: %s | added anyway" % idorg_efo_uri)
-            new_disease_id=code
+        new_disease_id = get_ontology_code_from_url(disease_id)
+        if len(new_disease_id.split('_')) != 2:
+            logging.warning("could not recognize disease.id: %s | added anyway" % disease_id)
         evidence['disease']['id'] = new_disease_id
         if not new_disease_id:
             logging.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s"%(evidence['id'], disease_id))
