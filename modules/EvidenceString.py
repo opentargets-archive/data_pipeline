@@ -162,10 +162,10 @@ class EvidenceManager():
                 ensemblid = target_id.split(self.ens_header)[1].strip()
                 new_target_id=self.get_reference_ensembl_id(ensemblid)
             else:
-                logging.warning("could not recognize target.id: %s | not added" % a)
+                logging.warning("could not recognize target.id: %s | not added" % target_id)
                 id_not_in_ensembl = True
         except KeyError:
-            logging.error("cannot find an ensembl ID for: %s" % a)
+            logging.error("cannot find an ensembl ID for: %s" % target_id)
             id_not_in_ensembl = True
 
         if id_not_in_ensembl:
