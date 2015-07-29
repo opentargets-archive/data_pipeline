@@ -189,7 +189,8 @@ class ElasticSearchConfiguration():
                           'chembl',
                           'other',
                           ]
-    if os.environ.get('CTTV_EL_LOADER')== 'prod':
+    if os.environ.get('CTTV_EL_LOADER')== 'prod' or \
+            os.environ.get('CTTV_EL_LOADER')== 'stag':
         generic_shard_number = 3
         generic_replicas_number = 1
         evidence_shard_number = 6
