@@ -9,7 +9,7 @@ from sqlalchemy import and_
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
-from common.PGAdapter import LatestEvidenceString, ElasticsearchLoad
+from common.PGAdapter import LatestEvidenceString, ElasticsearchLoad, EvidenceString121
 from modules import GeneData
 from modules.ECO import ECO, EcoRetriever
 from modules.EFO import EFO, get_ontology_code_from_url, EfoRetriever
@@ -100,166 +100,166 @@ class EvidenceManager():
 
         evidence = evidence.evidence
         fixed = False
-        '''Temporary,  fix errors in data'''
-        if 'probability' in evidence['evidence']["association_score"]:
-            if (isinstance(evidence['evidence']["association_score"]["probability"], int) or
-                    isinstance(evidence['evidence']["association_score"]["probability"], float)):
-                evidence['evidence']["association_score"]["probability"] = {
-                                                                    "value": evidence['evidence']["association_score"]["probability"],
-                                                                    "method": ""}
-                logging.warning("Malformed probability in evidence.association_score in entry %s | fixed to make it an object"%evidence['id'])
-                fixed = 'Probability in evidence malformed'
-            if (isinstance(evidence['evidence']["association_score"]["probability"], unicode) or
-                            isinstance(evidence['evidence']["association_score"]["probability"], str)):
-                evidence['evidence']["association_score"]["probability"] = {
-                                                                    "value": float(evidence['evidence']["association_score"]["probability"]),
-                                                                    "method": ""}
-                logging.warning("Malformed probability in evidence.association_score in entry %s | fixed to make it an object"%evidence['id'])
-                fixed = 'Probability in evidence chain malformed and as string'
-
-        if 'pvalue' in evidence['evidence']["association_score"]:
-            if evidence['evidence']["association_score"]['pvalue']:
-                if (isinstance(evidence['evidence']['association_score']['pvalue']['value'], unicode) or
-                        isinstance(evidence['evidence']['association_score']['pvalue']['value'], str)):
-                    evidence['evidence']['association_score']['pvalue']['value'] = float(evidence['evidence']['association_score']['pvalue']['value'])
-                    logging.warning("string instead of double in evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
-                    fixed = 'malformed evidence.association_score.pvalue.value'
-
-        if 'properties' in evidence['evidence']:
-            if 'evidence_chain' in evidence['evidence']['properties']:
-                evidence['evidence']['evidence_chain'] = evidence['evidence']['properties'].pop('evidence_chain')
-        if 'evidence_chain' in evidence['evidence']:
-            for i, ec in enumerate(evidence['evidence']['evidence_chain']):
-                if "probability" in ec['evidence']["association_score"]:
-                    if (isinstance(ec['evidence']["association_score"]["probability"], int) or
-                            isinstance(ec['evidence']["association_score"]["probability"], float)):
-                        evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["probability"] = {
-                        "value": ec['evidence']["association_score"]["probability"],
-                        "method": ""}
-                        logging.warning("Malformed probability in evidence.evidence_chainevidence.association_score in entry %s fixed to make it an object"%evidence['id'])
-                        fixed = 'Probability in evidence chain malformed'
-                    if (isinstance(ec['evidence']["association_score"]["probability"], unicode) or
-                            isinstance(ec['evidence']["association_score"]["probability"], str)):
-                        evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["probability"] = {
-                                                                                                                    "value": float(ec['evidence']["association_score"]["probability"]),
-                                                                                                                    "method": ""}
-                        logging.warning("Malformed probability in evidence.evidence_chain.evidence.association_score in entry %s | fixed to make it an object"%evidence['id'])
-                        fixed = 'Probability in evidence chain malformed and as string'
-                if "pvalue" in ec['evidence']["association_score"]:
-                    if (isinstance(ec['evidence']["association_score"]["pvalue"]['value'], unicode) or
-                            isinstance(ec['evidence']["association_score"]["pvalue"]['value'], str)):
-                        evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"] ['value']= float(ec['evidence']["association_score"]["pvalue"]['value'])
-                        logging.warning("string instead of double in evidence.evidence_chain.evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
-                        fixed = 'malformed evidence.evidence_chain.evidence.association_score.pvalue.value'
-                    pvalue = evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"]["value"]
-                    if  pvalue>1:
-                        logging.error("pvalue in entry %s is higher than 1 %f"%(evidence['id'], pvalue))
-                        raise AttributeError('Invalid pvalue value')
-
-                if 'date_asserted' in ec['evidence']:  # remove time, only load date
-                    if ec['evidence']['date_asserted']:
-                        date = smart_date_parser.parse(ec['evidence']['date_asserted'])
-                        evidence['evidence']['evidence_chain'][i]['evidence']['date_asserted'] = date.date().isoformat()
-
-        if 'type' in evidence['evidence']:
-            provenance_type = evidence['evidence'].pop('type')
-            evidence['evidence']['provenance_type'] = provenance_type
-            fixed = 'type instead of provenance_type'
-        if 'date_asserted' in evidence['evidence']:  # remove time, only load date
-            if evidence['evidence']['date_asserted']:
-                date = smart_date_parser.parse(evidence['evidence']['date_asserted'])
-                evidence['evidence']['date_asserted'] = date.date().isoformat()
-
-        '''remove identifiers.org from genes and map to ensembl ids'''
-        sbj_about = evidence['biological_subject']['about']
-        new_sbj_about = []
-        id_not_in_ensembl = []
-        for a in sbj_about:
-            try:
-                if a.startswith(self.uni_header):
-                    if '-' in a:
-                        a = a.split('-')[0]
-                    uniprotid = a.split(self.uni_header)[1].strip()
-                    ensemblid = self.uni2ens[uniprotid]
-                    new_sbj_about.append(self.get_reference_ensembl_id(ensemblid))
-                elif a.startswith(self.ens_header):
-                    ensemblid = a.split(self.ens_header)[1].strip()
-                    new_sbj_about.append(self.get_reference_ensembl_id(ensemblid))
-                else:
-                    logging.warning("could not recognize biological_subject: %s | not added" % a)
-                    id_not_in_ensembl.append(a)
-            except KeyError:
-                logging.error("cannot find an ensembl ID for: %s" % a)
-                id_not_in_ensembl.append(a)
-
-        if id_not_in_ensembl and not new_sbj_about:
-            logging.warning("cannot find any ensembl ID for evidence for: %s" % (evidence['id']))
-
-        evidence['biological_subject']['about'] = list(set(new_sbj_about))
-
-
-        '''remove identifiers.org from cttv activity  and target type ids'''
-        if 'properties' in evidence['biological_subject']:
-            if 'target_type' in evidence['biological_subject']['properties']:
-                evidence['biological_subject']['properties']['target_type'] = evidence['biological_subject']['properties']['target_type'].split('/')[-1]
-            if 'activity' in evidence['biological_subject']['properties']:
-                evidence['biological_subject']['properties']['activity'] = evidence['biological_subject']['properties']['activity'].split('/')[-1]
-
-
-        '''remove identifiers.org from efos'''
-        obj_about = evidence['biological_object']['about']
-        new_obj_about = []
-        for idorg_efo_uri in obj_about:
-            # if idorg_efo_uri in self.idorg2efos:
-            #     efo_uri = self.idorg2efos[idorg_efo_uri]
-            #     code = get_ontology_code_from_url(efo_uri.strip())
-                code = get_ontology_code_from_url(idorg_efo_uri)
-                if len(code.split('_')) != 2:
-                    logging.warning("could not recognize biological_object: %s | added anyway" % idorg_efo_uri)
-                new_obj_about.append(code)
-        evidence['biological_object']['about'] = list(set(new_obj_about))
-        if not new_obj_about:
-            logging.warning("No valid EFO could be found in evidence: %s. original EFO mapping: %s"%(evidence['id'], str(obj_about)[:100]))
-
-        '''remove identifiers.org from ecos'''
-        eco_ids = evidence['evidence']['evidence_codes']
-        new_eco_ids = []
-        for idorg_eco_uri in eco_ids:
-            # if idorg_eco_uri in self.idorg2ecos:
-            #     eco_id = self.idorg2ecos[idorg_eco_uri]
-            #     code = get_ontology_code_from_url(eco_id.strip())
-                code = get_ontology_code_from_url(idorg_eco_uri.strip())
-                if len(code.split('_')) != 2:
-                    logging.warning("could not recognize evidence code: %s in id %s | added anyway" %(evidence['id'],idorg_eco_uri))
-                new_eco_ids.append(code)
-        evidence['evidence']['evidence_codes'] = list(set(new_eco_ids))
-        if not new_eco_ids:
-            logging.warning("No valid ECO could be found in evidence: %s. original ECO mapping: %s"%(evidence['id'], str(eco_ids)[:100]))
-        ''' add GWAS as databse id'''
-        if 'GWAS' in evidence['evidence']['evidence_codes']:
-            if 'provenance_type' not in evidence['evidence']:
-                evidence['evidence']['provenance_type'] = {}
-            if 'database' not in evidence['evidence']['provenance_type']:
-                evidence['evidence']['provenance_type']['database'] = {}
-            evidence['evidence']['provenance_type']['database']['id'] = 'gwas'
-
-
-        if 'evidence_chain' in evidence['evidence']:
-            for i, ec in enumerate(evidence['evidence']['evidence_chain']):
-                ec_eco_ids = ec['evidence']['evidence_codes']
-                new_ec_eco_ids = []
-                for idorg_eco_uri in ec_eco_ids:
-                    # if idorg_eco_uri in self.idorg2ecos:
-                    #     eco_id = self.idorg2ecos[idorg_eco_uri]
-                    #     code = get_ontology_code_from_url(eco_id.strip())
-                        code = get_ontology_code_from_url(idorg_eco_uri.strip())
-                        if len(code.split('_')) != 2:
-                            logging.warning(
-                                "could not recognize evidence code in evidence chain: %s in id %s | added anyway" % (evidence['id'],idorg_eco_uri,))
-                        new_ec_eco_ids.append(code)
-                evidence['evidence']['evidence_chain'][i]['evidence']['evidence_codes'] = list(set(new_ec_eco_ids))
-                if not new_ec_eco_ids:
-                    logging.warning("No valid ECO could be found in evidence chain element %i of evidence: %s. original ECO mapping: %s"%(i, evidence['id'], str(ec_eco_ids)[:100]))
+        # '''Temporary,  fix errors in data'''
+        # if 'probability' in evidence['evidence']["association_score"]:
+        #     if (isinstance(evidence['evidence']["association_score"]["probability"], int) or
+        #             isinstance(evidence['evidence']["association_score"]["probability"], float)):
+        #         evidence['evidence']["association_score"]["probability"] = {
+        #                                                             "value": evidence['evidence']["association_score"]["probability"],
+        #                                                             "method": ""}
+        #         logging.warning("Malformed probability in evidence.association_score in entry %s | fixed to make it an object"%evidence['id'])
+        #         fixed = 'Probability in evidence malformed'
+        #     if (isinstance(evidence['evidence']["association_score"]["probability"], unicode) or
+        #                     isinstance(evidence['evidence']["association_score"]["probability"], str)):
+        #         evidence['evidence']["association_score"]["probability"] = {
+        #                                                             "value": float(evidence['evidence']["association_score"]["probability"]),
+        #                                                             "method": ""}
+        #         logging.warning("Malformed probability in evidence.association_score in entry %s | fixed to make it an object"%evidence['id'])
+        #         fixed = 'Probability in evidence chain malformed and as string'
+        #
+        # if 'pvalue' in evidence['evidence']["association_score"]:
+        #     if evidence['evidence']["association_score"]['pvalue']:
+        #         if (isinstance(evidence['evidence']['association_score']['pvalue']['value'], unicode) or
+        #                 isinstance(evidence['evidence']['association_score']['pvalue']['value'], str)):
+        #             evidence['evidence']['association_score']['pvalue']['value'] = float(evidence['evidence']['association_score']['pvalue']['value'])
+        #             logging.warning("string instead of double in evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
+        #             fixed = 'malformed evidence.association_score.pvalue.value'
+        #
+        # if 'properties' in evidence['evidence']:
+        #     if 'evidence_chain' in evidence['evidence']['properties']:
+        #         evidence['evidence']['evidence_chain'] = evidence['evidence']['properties'].pop('evidence_chain')
+        # if 'evidence_chain' in evidence['evidence']:
+        #     for i, ec in enumerate(evidence['evidence']['evidence_chain']):
+        #         if "probability" in ec['evidence']["association_score"]:
+        #             if (isinstance(ec['evidence']["association_score"]["probability"], int) or
+        #                     isinstance(ec['evidence']["association_score"]["probability"], float)):
+        #                 evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["probability"] = {
+        #                 "value": ec['evidence']["association_score"]["probability"],
+        #                 "method": ""}
+        #                 logging.warning("Malformed probability in evidence.evidence_chainevidence.association_score in entry %s fixed to make it an object"%evidence['id'])
+        #                 fixed = 'Probability in evidence chain malformed'
+        #             if (isinstance(ec['evidence']["association_score"]["probability"], unicode) or
+        #                     isinstance(ec['evidence']["association_score"]["probability"], str)):
+        #                 evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["probability"] = {
+        #                                                                                                             "value": float(ec['evidence']["association_score"]["probability"]),
+        #                                                                                                             "method": ""}
+        #                 logging.warning("Malformed probability in evidence.evidence_chain.evidence.association_score in entry %s | fixed to make it an object"%evidence['id'])
+        #                 fixed = 'Probability in evidence chain malformed and as string'
+        #         if "pvalue" in ec['evidence']["association_score"]:
+        #             if (isinstance(ec['evidence']["association_score"]["pvalue"]['value'], unicode) or
+        #                     isinstance(ec['evidence']["association_score"]["pvalue"]['value'], str)):
+        #                 evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"] ['value']= float(ec['evidence']["association_score"]["pvalue"]['value'])
+        #                 logging.warning("string instead of double in evidence.evidence_chain.evidence.association_score.pvalue.value in entry %s | fixed to comply Java parser"%evidence['id'])
+        #                 fixed = 'malformed evidence.evidence_chain.evidence.association_score.pvalue.value'
+        #             pvalue = evidence['evidence']['evidence_chain'][i]['evidence']["association_score"]["pvalue"]["value"]
+        #             if  pvalue>1:
+        #                 logging.error("pvalue in entry %s is higher than 1 %f"%(evidence['id'], pvalue))
+        #                 raise AttributeError('Invalid pvalue value')
+        #
+        #         if 'date_asserted' in ec['evidence']:  # remove time, only load date
+        #             if ec['evidence']['date_asserted']:
+        #                 date = smart_date_parser.parse(ec['evidence']['date_asserted'])
+        #                 evidence['evidence']['evidence_chain'][i]['evidence']['date_asserted'] = date.date().isoformat()
+        #
+        # if 'type' in evidence['evidence']:
+        #     provenance_type = evidence['evidence'].pop('type')
+        #     evidence['evidence']['provenance_type'] = provenance_type
+        #     fixed = 'type instead of provenance_type'
+        # if 'date_asserted' in evidence['evidence']:  # remove time, only load date
+        #     if evidence['evidence']['date_asserted']:
+        #         date = smart_date_parser.parse(evidence['evidence']['date_asserted'])
+        #         evidence['evidence']['date_asserted'] = date.date().isoformat()
+        #
+        # '''remove identifiers.org from genes and map to ensembl ids'''
+        # sbj_about = evidence['biological_subject']['about']
+        # new_sbj_about = []
+        # id_not_in_ensembl = []
+        # for a in sbj_about:
+        #     try:
+        #         if a.startswith(self.uni_header):
+        #             if '-' in a:
+        #                 a = a.split('-')[0]
+        #             uniprotid = a.split(self.uni_header)[1].strip()
+        #             ensemblid = self.uni2ens[uniprotid]
+        #             new_sbj_about.append(self.get_reference_ensembl_id(ensemblid))
+        #         elif a.startswith(self.ens_header):
+        #             ensemblid = a.split(self.ens_header)[1].strip()
+        #             new_sbj_about.append(self.get_reference_ensembl_id(ensemblid))
+        #         else:
+        #             logging.warning("could not recognize biological_subject: %s | not added" % a)
+        #             id_not_in_ensembl.append(a)
+        #     except KeyError:
+        #         logging.error("cannot find an ensembl ID for: %s" % a)
+        #         id_not_in_ensembl.append(a)
+        #
+        # if id_not_in_ensembl and not new_sbj_about:
+        #     logging.warning("cannot find any ensembl ID for evidence for: %s" % (evidence['id']))
+        #
+        # evidence['biological_subject']['about'] = list(set(new_sbj_about))
+        #
+        #
+        # '''remove identifiers.org from cttv activity  and target type ids'''
+        # if 'properties' in evidence['biological_subject']:
+        #     if 'target_type' in evidence['biological_subject']['properties']:
+        #         evidence['biological_subject']['properties']['target_type'] = evidence['biological_subject']['properties']['target_type'].split('/')[-1]
+        #     if 'activity' in evidence['biological_subject']['properties']:
+        #         evidence['biological_subject']['properties']['activity'] = evidence['biological_subject']['properties']['activity'].split('/')[-1]
+        #
+        #
+        # '''remove identifiers.org from efos'''
+        # obj_about = evidence['biological_object']['about']
+        # new_obj_about = []
+        # for idorg_efo_uri in obj_about:
+        #     # if idorg_efo_uri in self.idorg2efos:
+        #     #     efo_uri = self.idorg2efos[idorg_efo_uri]
+        #     #     code = get_ontology_code_from_url(efo_uri.strip())
+        #         code = get_ontology_code_from_url(idorg_efo_uri)
+        #         if len(code.split('_')) != 2:
+        #             logging.warning("could not recognize biological_object: %s | added anyway" % idorg_efo_uri)
+        #         new_obj_about.append(code)
+        # evidence['biological_object']['about'] = list(set(new_obj_about))
+        # if not new_obj_about:
+        #     logging.warning("No valid EFO could be found in evidence: %s. original EFO mapping: %s"%(evidence['id'], str(obj_about)[:100]))
+        #
+        # '''remove identifiers.org from ecos'''
+        # eco_ids = evidence['evidence']['evidence_codes']
+        # new_eco_ids = []
+        # for idorg_eco_uri in eco_ids:
+        #     # if idorg_eco_uri in self.idorg2ecos:
+        #     #     eco_id = self.idorg2ecos[idorg_eco_uri]
+        #     #     code = get_ontology_code_from_url(eco_id.strip())
+        #         code = get_ontology_code_from_url(idorg_eco_uri.strip())
+        #         if len(code.split('_')) != 2:
+        #             logging.warning("could not recognize evidence code: %s in id %s | added anyway" %(evidence['id'],idorg_eco_uri))
+        #         new_eco_ids.append(code)
+        # evidence['evidence']['evidence_codes'] = list(set(new_eco_ids))
+        # if not new_eco_ids:
+        #     logging.warning("No valid ECO could be found in evidence: %s. original ECO mapping: %s"%(evidence['id'], str(eco_ids)[:100]))
+        # ''' add GWAS as databse id'''
+        # if 'GWAS' in evidence['evidence']['evidence_codes']:
+        #     if 'provenance_type' not in evidence['evidence']:
+        #         evidence['evidence']['provenance_type'] = {}
+        #     if 'database' not in evidence['evidence']['provenance_type']:
+        #         evidence['evidence']['provenance_type']['database'] = {}
+        #     evidence['evidence']['provenance_type']['database']['id'] = 'gwas'
+        #
+        #
+        # if 'evidence_chain' in evidence['evidence']:
+        #     for i, ec in enumerate(evidence['evidence']['evidence_chain']):
+        #         ec_eco_ids = ec['evidence']['evidence_codes']
+        #         new_ec_eco_ids = []
+        #         for idorg_eco_uri in ec_eco_ids:
+        #             # if idorg_eco_uri in self.idorg2ecos:
+        #             #     eco_id = self.idorg2ecos[idorg_eco_uri]
+        #             #     code = get_ontology_code_from_url(eco_id.strip())
+        #                 code = get_ontology_code_from_url(idorg_eco_uri.strip())
+        #                 if len(code.split('_')) != 2:
+        #                     logging.warning(
+        #                         "could not recognize evidence code in evidence chain: %s in id %s | added anyway" % (evidence['id'],idorg_eco_uri,))
+        #                 new_ec_eco_ids.append(code)
+        #         evidence['evidence']['evidence_chain'][i]['evidence']['evidence_codes'] = list(set(new_ec_eco_ids))
+        #         if not new_ec_eco_ids:
+        #             logging.warning("No valid ECO could be found in evidence chain element %i of evidence: %s. original ECO mapping: %s"%(i, evidence['id'], str(ec_eco_ids)[:100]))
 
         return Evidence(evidence), fixed
 
@@ -268,36 +268,36 @@ class EvidenceManager():
 
         ev = evidence.evidence
         evidence_id = ev['id']
-
-        if not ev['biological_subject']['about']:
-            logging.error("%s Evidence %s has no valid gene in biological_subject.about" % (datasource, evidence_id))
-            return False
-        for gene_id in ev['biological_subject']['about']:
-            if gene_id not in self.available_genes:
-                logging.error(
-                    "%s Evidence %s has an invalid gene id in biological_subject.about: %s" % (datasource, evidence_id, gene_id))
-                return False
-        if not ev['biological_object']['about']:
-            logging.error("%s Evidence %s has no valid efo id in biological_object.about" % (datasource, evidence_id))
-            return False
-        for efo_id in ev['biological_object']['about']:
-            if efo_id not in self.available_efos:
-                logging.error(
-                    "%s Evidence %s has an invalid efo id in biological_object.about: %s" % (datasource, evidence_id, efo_id))
-                return False
-        for eco_id in ev['evidence']['evidence_codes']:
-            if eco_id not in self.available_ecos:
-                logging.error(
-                    "%s Evidence %s has an invalid eco id in evidence.evidence_codes: %s" % (datasource, evidence_id, eco_id))
-                return False
-        if 'evidence_chain' in ev['evidence']:
-            for ec in ev['evidence']['evidence_chain']:
-                for eco_id in ec['evidence']['evidence_codes']:
-                    if eco_id not in self.available_ecos:
-                        logging.error(
-                            "%s Evidence %s has an invalid eco id in evidence.evidence_chain.evidence.evidence_codes: %s" % (
-                            datasource, evidence_id, eco_id))
-                        return False
+        #
+        # if not ev['biological_subject']['about']:
+        #     logging.error("%s Evidence %s has no valid gene in biological_subject.about" % (datasource, evidence_id))
+        #     return False
+        # for gene_id in ev['biological_subject']['about']:
+        #     if gene_id not in self.available_genes:
+        #         logging.error(
+        #             "%s Evidence %s has an invalid gene id in biological_subject.about: %s" % (datasource, evidence_id, gene_id))
+        #         return False
+        # if not ev['biological_object']['about']:
+        #     logging.error("%s Evidence %s has no valid efo id in biological_object.about" % (datasource, evidence_id))
+        #     return False
+        # for efo_id in ev['biological_object']['about']:
+        #     if efo_id not in self.available_efos:
+        #         logging.error(
+        #             "%s Evidence %s has an invalid efo id in biological_object.about: %s" % (datasource, evidence_id, efo_id))
+        #         return False
+        # for eco_id in ev['evidence']['evidence_codes']:
+        #     if eco_id not in self.available_ecos:
+        #         logging.error(
+        #             "%s Evidence %s has an invalid eco id in evidence.evidence_codes: %s" % (datasource, evidence_id, eco_id))
+        #         return False
+        # if 'evidence_chain' in ev['evidence']:
+        #     for ec in ev['evidence']['evidence_chain']:
+        #         for eco_id in ec['evidence']['evidence_codes']:
+        #             if eco_id not in self.available_ecos:
+        #                 logging.error(
+        #                     "%s Evidence %s has an invalid eco id in evidence.evidence_chain.evidence.evidence_codes: %s" % (
+        #                     datasource, evidence_id, eco_id))
+        #                 return False
         return True
 
     def get_extended_evidence(self, evidence):
@@ -316,33 +316,32 @@ class EvidenceManager():
                         )
         uniprot_keywords = []
         #TODO: handle domains
-        for aboutid in extended_evidence['biological_subject']['about']:
-            # try:
-            gene = self._get_gene(aboutid)
-            genes_info.append(ExtendedInfoGene(gene))
-            if 'reactome' in gene._private['facets']:
-                pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
-                pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
-                # except Exception:
-                #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
-            if gene.go:
-                for go_code,data in gene.go.items():
-                    try:
-                        category,term = data['term'][0], data['term'][2:]
-                        if category =='P':
-                            GO_terms['biological_process'].append(dict(code=go_code,
-                                                                       term=term))
-                        elif category =='F':
-                            GO_terms['molecular_function'].append(dict(code=go_code,
-                                                                       term=term))
-                        elif category =='C':
-                            GO_terms['cellular_component'].append(dict(code=go_code,
-                                                                       term=term))
-                    except:
-                        pass
-            if gene.uniprot_keywords:
-                uniprot_keywords = gene.uniprot_keywords
-
+        # for aboutid in extended_evidence['biological_subject']['about']:
+        #     # try:
+        #     gene = self._get_gene(aboutid)
+        #     genes_info.append(ExtendedInfoGene(gene))
+        #     if 'reactome' in gene._private['facets']:
+        #         pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
+        #         pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
+        #         # except Exception:
+        #         #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
+        #     if gene.go:
+        #         for go_code,data in gene.go.items():
+        #             try:
+        #                 category,term = data['term'][0], data['term'][2:]
+        #                 if category =='P':
+        #                     GO_terms['biological_process'].append(dict(code=go_code,
+        #                                                                term=term))
+        #                 elif category =='F':
+        #                     GO_terms['molecular_function'].append(dict(code=go_code,
+        #                                                                term=term))
+        #                 elif category =='C':
+        #                     GO_terms['cellular_component'].append(dict(code=go_code,
+        #                                                                term=term))
+        #             except:
+        #                 pass
+        #     if gene.uniprot_keywords:
+        #         uniprot_keywords = gene.uniprot_keywords
 
         if genes_info:
             data = []
@@ -358,12 +357,12 @@ class EvidenceManager():
         """get generic efo info"""
         all_efo_codes=[]
         efos_info = []
-        for aboutid in extended_evidence['biological_object']['about']:
-            # try:
-            efo = self._get_efo(aboutid)
-            efos_info.append(ExtendedInfoEFO(efo))
-            # except Exception:
-            #     logging.warning("Cannot get generic info for efo: %s" % aboutid)
+        # for aboutid in extended_evidence['biological_object']['about']:
+        #     # try:
+        #     efo = self._get_efo(aboutid)
+        #     efos_info.append(ExtendedInfoEFO(efo))
+        #     # except Exception:
+        #     #     logging.warning("Cannot get generic info for efo: %s" % aboutid)
 
         if efos_info:
             data = []
@@ -376,12 +375,12 @@ class EvidenceManager():
         all_efo_codes = list(set(all_efo_codes))
         """get generic eco info"""
         ecos_info = []
-        for eco_id in extended_evidence['evidence']['evidence_codes']:
-            # try:
-            eco = self._get_eco(eco_id)
-            ecos_info.append(ExtendedInfoECO(eco))
-            # except Exception:
-            #     logging.warning("Cannot get generic info for eco: %s" % eco_id)
+        # for eco_id in extended_evidence['evidence']['evidence_codes']:
+        #     # try:
+        #     eco = self._get_eco(eco_id)
+        #     ecos_info.append(ExtendedInfoECO(eco))
+        #     # except Exception:
+        #     #     logging.warning("Cannot get generic info for eco: %s" % eco_id)
 
         if ecos_info:
             data = []
@@ -576,13 +575,14 @@ class EvidenceStringProcess():
         fix = 0
         evidence_manager = EvidenceManager(self.adapter)
         self._delete_prev_data()
-        for row in self.session.query(LatestEvidenceString).yield_per(1000):
+        # for row in self.session.query(LatestEvidenceString).yield_per(1000):
+        for row in self.session.query(EvidenceString121).yield_per(1000):
             ev = Evidence(row.evidence_string, datasource= row.data_source_name)
             idev = row.uniq_assoc_fields_hashdig
             ev.evidence['id'] = idev
             base_id += 1
-            try:
-            # if 1:
+            # try:
+            if 1:
                 # print idev, row.data_source_name
                 '''temporary: fix broken data '''
                 ev, fixed = evidence_manager.fix_evidence(ev)
@@ -597,11 +597,11 @@ class EvidenceStringProcess():
                 else:
                     raise AttributeError("Invalid %s Evidence String" % (row.data_source_name))
 
-
-            except Exception, error:
-                UploadError(ev, error, idev).save()
-                err += 1
-                logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
+            #
+            # except Exception, error:
+            #     UploadError(ev, error, idev).save()
+            #     err += 1
+            #     logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
                 # traceback.print_exc(limit=1, file=sys.stdout)
             if len(self.data)>1000:
                 self._store_evidence_string()
