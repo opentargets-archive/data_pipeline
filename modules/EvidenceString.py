@@ -5,7 +5,9 @@ import json
 import logging
 import os
 import pickle
+import traceback
 from sqlalchemy import and_
+import sys
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
@@ -190,7 +192,7 @@ class EvidenceManager():
 
         '''remove identifiers.org from ecos'''
         new_eco_ids = []
-        if ['evidence_codes'] in evidence['evidence']:
+        if 'evidence_codes' in evidence['evidence']:
             eco_ids = evidence['evidence']['evidence_codes']
         elif 'variant2disease' in evidence['evidence']:
             eco_ids = evidence['evidence']['variant2disease']['evidence_codes']
@@ -219,19 +221,19 @@ class EvidenceManager():
         if not ev['target']['id']:
             logging.error("%s Evidence %s has no valid gene in target.id" % (datasource, evidence_id))
             return False
-        for gene_id in ev['target']['id']:
-            if gene_id not in self.available_genes:
-                logging.error(
-                    "%s Evidence %s has an invalid gene id in target.id: %s" % (datasource, evidence_id, gene_id))
-                return False
+        gene_id = ev['target']['id']
+        if gene_id not in self.available_genes:
+            logging.error(
+                "%s Evidence %s has an invalid gene id in target.id: %s" % (datasource, evidence_id, gene_id))
+            return False
         if not ev['disease']['id']:
             logging.error("%s Evidence %s has no valid efo id in disease.id" % (datasource, evidence_id))
             return False
-        for efo_id in ev['disease']['id']:
-            if efo_id not in self.available_efos:
-                logging.error(
-                    "%s Evidence %s has an invalid efo id in disease.id: %s" % (datasource, evidence_id, efo_id))
-                return False
+        efo_id = ev['disease']['id']
+        if efo_id not in self.available_efos:
+            logging.error(
+                "%s Evidence %s has an invalid efo id in disease.id: %s" % (datasource, evidence_id, efo_id))
+            return False
         for eco_id in ev['evidence']['evidence_codes']:
             if eco_id not in self.available_ecos:
                 logging.error(
@@ -535,6 +537,7 @@ class EvidenceStringProcess():
                     self.data[idev] = ev_string_to_load
 
                 else:
+                    traceback.print_exc(limit=1, file=sys.stdout)
                     raise AttributeError("Invalid %s Evidence String" % (row.data_source_name))
 
             #
