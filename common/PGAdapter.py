@@ -1,4 +1,4 @@
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSON
 
 from settings import Config
 from sqlalchemy import create_engine, ForeignKey
@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine.url import URL
 from sqlalchemy import Column, Integer, String, Date, Text,TIMESTAMP, BOOLEAN, Float
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 __author__ = 'andreap'
@@ -52,7 +53,7 @@ class LatestEvidenceString(Base):
     __table_args__ = {'schema':'public'}
     uniq_assoc_fields_hashdig = Column(String(250), primary_key=True)
     json_doc_hashdig = Column(String(250))
-    evidence_string = Column(JSONB)
+    evidence_string = Column(Text)
     data_source_name = Column(Text)
     json_doc_version = Column(String(250))
     json_schema_version = Column(Integer)
@@ -70,7 +71,7 @@ class EFOPath(Base):
     __tablename__ = 'efo_path'
     __table_args__ = {'schema':'rdf_conversion'}
     uri = Column(Text)
-    tree_path = Column(JSONB)
+    tree_path = Column(JSON)
     id = Column(Integer, primary_key=True)
 
 class EFONames(Base):
@@ -89,6 +90,32 @@ class EFOFirstChild(Base):
     parent_uri = Column(Text)
     first_child_uri = Column(Text)
 
+class EFOObsoleteClass(Base):
+    __tablename__ = 'efo_obsolete_class'
+    __table_args__ = {'schema':'rdf_conversion'}
+    id = Column(Integer)
+    uri = Column(Text, primary_key=True)
+    reason = Column(Text)
+
+class HgncInfoLookup(Base):
+    '''
+    CREATE TABLE lookups.hgnc_gene_lookup
+    (
+      last_updated timestamp without time zone NOT NULL DEFAULT now(),
+      data jsonb NOT NULL,
+      CONSTRAINT hgnc_gene_lookup_pkey PRIMARY KEY (last_updated)
+    )
+    WITH (
+      OIDS=FALSE
+    );
+    ALTER TABLE lookups.hgnc_gene_lookup
+      OWNER TO tvdev;
+    '''
+    __tablename__ = 'hgnc_gene_lookup'
+    __table_args__ = {'schema':'lookups'}
+    last_updated = Column(TIMESTAMP, primary_key=True)
+    data = Column(JSONB)
+    
 class HgncGeneInfo(Base):
     __tablename__ = 'hgnc_gene_info'
     __table_args__ = {'schema':'lookups'}
@@ -162,7 +189,7 @@ class ElasticsearchLoad(Base):
     id = Column(Text, primary_key=True)
     index = Column(Text, primary_key=True)
     type = Column(Text)
-    data = Column(JSONB)
+    data = Column(JSON)
     date_created = Column(TIMESTAMP)
     date_modified = Column(TIMESTAMP)
     active = Column(BOOLEAN)
@@ -178,7 +205,12 @@ class EvidenceValidation(Base):
     date_modified = Column(TIMESTAMP)
     date_validated = Column(TIMESTAMP)
     nb_submission = Column(Integer)
+    nb_records = Column(Integer)
+    nb_errors = Column(Integer)
+    nb_duplicates = Column(Integer)
     successfully_validated = Column(BOOLEAN)
+    #email_sent = Column(BOOLEAN)
+    #loaded_to_public_schema = Column(BOOLEAN)
 
 class HPANormalTissue(Base):
     __tablename__ = 'hpa_normal_tissue'
