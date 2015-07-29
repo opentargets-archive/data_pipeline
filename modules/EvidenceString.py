@@ -200,6 +200,10 @@ class EvidenceManager():
         elif 'target2drug' in evidence['evidence']:
             eco_ids = evidence['evidence']['target2drug']['evidence_codes']
             eco_ids.extend(evidence['evidence']['drug2clinic']['evidence_codes'])
+        elif 'biological_model' in evidence['evidence']:
+            eco_ids = evidence['evidence']['biological_model']['evidence_codes']
+        else:
+            eco_ids =[] #something wrong here...
         eco_ids = list(set(eco_ids))
         for idorg_eco_uri in eco_ids:
             code = get_ontology_code_from_url(idorg_eco_uri.strip())
@@ -540,7 +544,7 @@ class EvidenceStringProcess():
                     # traceback.print_exc(limit=1, file=sys.stdout)
                     raise AttributeError("Invalid %s Evidence String" % (row.data_source_name))
 
-            
+
             except Exception, error:
                 UploadError(ev, error, idev).save()
                 err += 1
