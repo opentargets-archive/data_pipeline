@@ -261,38 +261,35 @@ class EvidenceManager():
                         )
         uniprot_keywords = []
         #TODO: handle domains
-        # for aboutid in extended_evidence['biological_subject']['about']:
-        #     # try:
-        #     gene = self._get_gene(aboutid)
-        #     genes_info.append(ExtendedInfoGene(gene))
-        #     if 'reactome' in gene._private['facets']:
-        #         pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
-        #         pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
-        #         # except Exception:
-        #         #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
-        #     if gene.go:
-        #         for go_code,data in gene.go.items():
-        #             try:
-        #                 category,term = data['term'][0], data['term'][2:]
-        #                 if category =='P':
-        #                     GO_terms['biological_process'].append(dict(code=go_code,
-        #                                                                term=term))
-        #                 elif category =='F':
-        #                     GO_terms['molecular_function'].append(dict(code=go_code,
-        #                                                                term=term))
-        #                 elif category =='C':
-        #                     GO_terms['cellular_component'].append(dict(code=go_code,
-        #                                                                term=term))
-        #             except:
-        #                 pass
-        #     if gene.uniprot_keywords:
-        #         uniprot_keywords = gene.uniprot_keywords
+        geneid =  extended_evidence['target']['id']
+        # try:
+        gene = self._get_gene(geneid)
+        genes_info=ExtendedInfoGene(gene)
+        if 'reactome' in gene._private['facets']:
+            pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
+            pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
+            # except Exception:
+            #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
+        if gene.go:
+            for go_code,data in gene.go.items():
+                try:
+                    category,term = data['term'][0], data['term'][2:]
+                    if category =='P':
+                        GO_terms['biological_process'].append(dict(code=go_code,
+                                                                   term=term))
+                    elif category =='F':
+                        GO_terms['molecular_function'].append(dict(code=go_code,
+                                                                   term=term))
+                    elif category =='C':
+                        GO_terms['cellular_component'].append(dict(code=go_code,
+                                                                   term=term))
+                except:
+                    pass
+        if gene.uniprot_keywords:
+            uniprot_keywords = gene.uniprot_keywords
 
         if genes_info:
-            data = []
-            for gene_info in genes_info:
-                data.append(gene_info.data)
-            extended_evidence["target"][ExtendedInfoGene.root] = data
+            extended_evidence["target"][ExtendedInfoGene.root] = genes_info.data
 
         if pathway_data['pathway_code']:
             pathway_data['pathway_type_code']=list(set(pathway_data['pathway_type_code']))
@@ -301,31 +298,27 @@ class EvidenceManager():
 
         """get generic efo info"""
         all_efo_codes=[]
-        efos_info = []
-        # for aboutid in extended_evidence['biological_object']['about']:
-        #     # try:
-        #     efo = self._get_efo(aboutid)
-        #     efos_info.append(ExtendedInfoEFO(efo))
-        #     # except Exception:
-        #     #     logging.warning("Cannot get generic info for efo: %s" % aboutid)
-
-        if efos_info:
-            data = []
-            for efo_info in efos_info:
-                data.append(efo_info.data)
-                for e in efo_info.data:
-                    for node in e['path']:
-                        all_efo_codes.extend(node)
-            extended_evidence["disease"][ExtendedInfoEFO.root] = data
+        efo_info = []
+        diseaseid = extended_evidence['disease']['id']
+        # try:
+        efo = self._get_efo(diseaseid)
+        efo_info=ExtendedInfoEFO(efo)
+        # except Exception:
+        #     logging.warning("Cannot get generic info for efo: %s" % aboutid)
+        if efo_info:
+            for e in efo_info.data:
+                for node in e['path']:
+                    all_efo_codes.extend(node)
+            extended_evidence["disease"][ExtendedInfoEFO.root] = efo_info.data
         all_efo_codes = list(set(all_efo_codes))
         """get generic eco info"""
         ecos_info = []
-        # for eco_id in extended_evidence['evidence']['evidence_codes']:
-        #     # try:
-        #     eco = self._get_eco(eco_id)
-        #     ecos_info.append(ExtendedInfoECO(eco))
-        #     # except Exception:
-        #     #     logging.warning("Cannot get generic info for eco: %s" % eco_id)
+        for eco_id in extended_evidence['evidence']['evidence_codes']:
+            # try:
+            eco = self._get_eco(eco_id)
+            ecos_info.append(ExtendedInfoECO(eco))
+            # except Exception:
+            #     logging.warning("Cannot get generic info for eco: %s" % eco_id)
 
         if ecos_info:
             data = []
