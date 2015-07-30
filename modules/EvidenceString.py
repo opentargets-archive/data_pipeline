@@ -543,7 +543,7 @@ class EvidenceStringProcess():
                 err += 1
                 logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
                 # traceback.print_exc(limit=1, file=sys.stdout)
-            if len(self.data)>1000:
+            if len(self.data)>=1000:
                 self._store_evidence_string()
                 logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         self._store_evidence_string()
