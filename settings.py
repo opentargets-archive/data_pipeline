@@ -51,7 +51,7 @@ class Config():
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
     EVIDENCEVALIDATION_PERCENT_SCALE = 20
-    
+    EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
 
 def _get_evidence_string_generic_mapping():
     return {
