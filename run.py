@@ -11,6 +11,7 @@ from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
 from modules.Uniprot import UniProtActions,UniprotDownloader
+from modules.HGNC import HGNCActions, HGNCUploader
 import argparse
 from settings import Config, ElasticSearchConfiguration
 
@@ -43,6 +44,8 @@ if __name__ == '__main__':
                         action="append_const", const = GeneActions.MERGE)
     parser.add_argument("--genu", dest='gen', help="upload the stored json gene object to elasticsearch",
                         action="append_const", const = GeneActions.UPLOAD)
+    parser.add_argument("--hgncu", dest='hgnc', help="upload the HGNC json file to the lookups schema in postgres",
+                        action="append_const", const = HGNCActions.UPLOAD)
     parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = GeneActions.ALL)
     parser.add_argument("--efop", dest='efo', help="process the efo information and store the resulting json objects in postgres",
@@ -111,12 +114,16 @@ if __name__ == '__main__':
             do_all = (UniProtActions.ALL in args.uni) or run_full_pipeline
             if (UniProtActions.CACHE in args.uni) or do_all:
                 UniprotDownloader(adapter).cache_human_entries()
+        if args.hgnc or run_full_pipeline:
+            do_all = (HGNCActions.ALL in args.hgnc) or run_full_pipeline
+            if (HGNCActions.UPLOAD in args.hgnc) or do_all:
+                HGNCUploader(adapter).upload()
         if args.gen or run_full_pipeline:
             do_all = (GeneActions.ALL in args.gen) or run_full_pipeline
             if (GeneActions.MERGE in args.gen) or do_all:
                 GeneManager(adapter).merge_all()
             if (GeneActions.UPLOAD in args.gen) or do_all:
-                GeneUploader(adapter, loader).upload_all()
+                GeneUploader(adapter, loader).upload_all()                
         if args.efo or run_full_pipeline:
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:
