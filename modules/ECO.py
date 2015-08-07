@@ -75,6 +75,18 @@ class EcoProcess():
                           # id_org=row.uri_id_org,
                           )
                 self.ecos[get_ontology_code_from_url(row.uri)] = eco
+        #TEMP FIX FOR MISSING ECO
+        missing_uris =['http://www.targevalidation.org/literature_mining']
+        for uri in missing_uris:
+            code = get_ontology_code_from_url(uri)
+            if code not in self.ecos:
+                eco = ECO(uri,
+                          [code],
+                          [{"uri": uri, "label":code}],
+                          [code],
+                          [code],
+                          )
+                self.ecos[code] = eco
 
 
 

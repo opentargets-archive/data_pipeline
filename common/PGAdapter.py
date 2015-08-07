@@ -73,7 +73,7 @@ class EvidenceString121(Base):
 class ECOPath(Base):
     __tablename__ = 'eco_path'
     __table_args__ = {'schema':'rdf_conversion'}
-    # id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True)
     uri = Column(Text,primary_key=True)
     tree_path = Column(Text)
     # uri_id_org = Column(Text)

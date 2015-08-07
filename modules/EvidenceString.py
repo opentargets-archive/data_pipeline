@@ -414,7 +414,7 @@ class EvidenceManager():
     def _map_to_reference_ensembl_gene(self, ensg):
         for symbol, data in self.non_reference_genes.items():
             if ensg in data['alternative']:
-                logging.info("Mapped non reference ensembl gene id %s to %s for gene %s"%(ensg, data['reference'], symbol ))
+                logging.warning("Mapped non reference ensembl gene id %s to %s for gene %s"%(ensg, data['reference'], symbol ))
                 return data['reference']
 
     def get_reference_ensembl_id(self, ensemblid):
@@ -466,6 +466,81 @@ class Evidence(JSONSerializable):
 
     def load_json(self, data):
         self.evidence = json.loads(data)
+
+    def score_evidence(self):
+        self.evidence['scores'] = dict(association_score=0.,
+                                    )
+        try:
+            if self.evidence['type']=='known_drug':
+                self.evidence['scores'] ['association_score']= \
+                    float(self.evidence['evidence']['drug2clinic']['resource_score']['value']) * \
+                    float(self.evidence['evidence']['target2drug']['resource_score']['value'])
+            elif self.evidence['type']=='rna_expression':
+                pvalue = self.evidence['evidence']['resource_score']['value']
+                self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(pvalue)
+
+            elif self.evidence['type']=='genetic_association':
+                pvalue_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
+                pvalue_v2d = self.evidence['evidence']['variant2disease']['resource_score']['value']
+                pvalue = pvalue_g2v+pvalue_v2d #worst case scenario
+                self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(pvalue)
+            elif self.evidence['type']=='animal_model':
+                self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['disease_model_association']['resource_score']['value'])
+            elif self.evidence['type']=='somatic_mutation':
+                self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
+            elif self.evidence['type']=='literature':
+                self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
+            elif self.evidence['type']=='affected_pathway':
+                self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
+            # if self.evidence['SourceID']=='expression_atlas':
+            #     pass
+            # elif self.evidence['SourceID']=='uniprot':
+            #     pass
+            # elif self.evidence['SourceID']=='reactome':
+            #     pass
+            # elif self.evidence['SourceID']=='eva':
+            #     pass
+            # elif self.evidence['SourceID']=='phenodigm':
+            #     pass
+            # elif self.evidence['SourceID']=='gwas_catalog':
+            #     pass
+            # elif self.evidence['SourceID']=='cancer_gene_census':
+            #     pass
+            # elif self.evidence['SourceID']=='chembl':
+            #     pass
+            # elif self.evidence['SourceID']=='europmc':
+            #     pass
+            # elif self.evidence['SourceID']=='disgenet':
+            #     pass
+        except:
+            logging.warn("Cannot score evidence %s of type %s"%(self.evidence['id'],self.evidence['type']))
+
+    def _get_score_from_pvalue(self, pvalue):
+        score = 0.
+        if pvalue <= 1e-10:
+            score=1.
+        elif pvalue <= 1e-9:
+            score=.9
+        elif pvalue <= 1e-8:
+            score=.8
+        elif pvalue <= 1e-7:
+            score=.7
+        elif pvalue <= 1e-6:
+            score=.6
+        elif pvalue <= 1e-5:
+            score=.5
+        elif pvalue <= 1e-4:
+            score=.4
+        elif pvalue <= 1e-3:
+            score=.3
+        elif pvalue <= 1e-2:
+            score=.2
+        elif pvalue <= 1e-1:
+            score=.1
+        elif pvalue <= 1:
+            score=0.
+        return score
+
 
 class UploadError():
     def __init__(self, evidence, trace, id, logdir='errorlogs'):
@@ -528,6 +603,8 @@ class EvidenceStringProcess():
                 if fixed:
                     fix += 1
                 if evidence_manager.is_valid(ev, datasource=row.data_source_name):
+                    '''add scoring to evidence string'''
+                    ev.score_evidence()
                     '''extend data in evidencestring'''
                     ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
