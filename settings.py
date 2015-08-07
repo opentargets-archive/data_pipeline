@@ -56,34 +56,28 @@ class Config():
 def _get_evidence_string_generic_mapping():
     return {
             "properties" : {
-                "biological_subject" : {
+                "target" : {
                     "type" : "object",
                      "properties" : {
-                         "about" : {
+                         "id" : {
                               "type" : "string",
                               "index" : "not_analyzed"
                          },
-                         "properties":{
-                             "type" : "object",
-                                 "properties" : {
-                                     "target_type" : {
-                                          "type" : "string",
-                                          "index" : "not_analyzed"
-                                     },
-                                     "activity" : {
-                                          "type" : "string",
-                                          "index" : "not_analyzed"
-                                     },
+                         "target_type" : {
+                              "type" : "string",
+                              "index" : "not_analyzed"
+                         },
+                         "activity" : {
+                              "type" : "string",
+                              "index" : "not_analyzed"
+                         },
 
-
-                                 }
-                         }
                      }
                 },
-                "biological_object" : {
+                "disease" : {
                     "type" : "object",
                      "properties" : {
-                         "about" : {
+                         "id" : {
                               "type" : "string",
                               "index" : "not_analyzed"
                          }
@@ -107,7 +101,7 @@ def _get_evidence_string_generic_mapping():
                          }
                      }
                 },
-                "biological_object.efo_info" : {
+                "disease.efo_info" : {
                     "type" : "object",
                      "properties" : {
                          "path" : {
@@ -123,41 +117,7 @@ def _get_evidence_string_generic_mapping():
                               "type" : "string",
                               "index" : "not_analyzed"
                          },
-                         "evidence_chain":{
-                             "type" : "object",
-                             "properties" : {
-                                 "evidence" : {
-                                     "type" : "object",
-                                     "properties" : {
-                                         "evidence_codes" : {
-                                              "type" : "string",
-                                              "index" : "not_analyzed"
-                                         },
-                                         "experiment_specific":{
-                                             "enabled" : False
-                                         },
-                                         # "association_score":{
-                                         #     "type" : "object",
-                                         #     "properties" : {
-                                         #         "probability" : {
-                                         #             "type" : "object",
-                                         #             "properties" : {
-                                         #                 "value" : {
-                                         #                    "type" : "double",
-                                         #                 },
-                                         #                 "method" : {
-                                         #                    "type" : "string",
-                                         #                 }
-                                         #
-                                         #             }
-                                         #         }
-                                         #     }
-                                         # }
-                                     }
 
-                                 }
-                             }
-                         },
                          "association_score":{
                              "type" : "object",
                              "properties" : {
@@ -189,7 +149,7 @@ class ElasticSearchConfiguration():
                           'reactome',
                           'eva',
                           'phenodigm',
-                          'gwas',
+                          'gwas_catalog',
                           'cancer_gene_census',
                           'chembl',
                           'other',
