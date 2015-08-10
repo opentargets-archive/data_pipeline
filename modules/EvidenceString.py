@@ -480,17 +480,17 @@ class Evidence(JSONSerializable):
                 self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(pvalue)
 
             elif self.evidence['type']=='genetic_association':
-                if self.evidence['sourceID']=='uniprot':
-                    score = float(self.evidence['evidence']['resource_score']['value'])
+                # if self.evidence['sourceID']=='uniprot':
+                #     score = float(self.evidence['evidence']['resource_score']['value'])
+                # else:
+                probability_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
+                pvalue_v2d = self.evidence['evidence']['variant2disease']['resource_score']['value']
+                if self.evidence['sourceID']=='gwascatalog' \
+                        or self.evidence['sourceID']=='gwas_catalog':
+                    sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
+                    score =self._score_gwascatalog(pvalue_v2d, sample_size,probability_g2v)
                 else:
-                    probability_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
-                    pvalue_v2d = self.evidence['evidence']['variant2disease']['resource_score']['value']
-                    if self.evidence['sourceID']=='gwascatalog' \
-                            or self.evidence['sourceID']=='gwas_catalog':
-                        sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
-                        score =self._score_gwascatalog(pvalue_v2d, sample_size,probability_g2v)
-                    else:
-                        score = probability_g2v*pvalue_v2d
+                    score = probability_g2v*pvalue_v2d
                 self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(score)
             elif self.evidence['type']=='animal_model':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['disease_model_association']['resource_score']['value'])
