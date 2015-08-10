@@ -480,10 +480,18 @@ class Evidence(JSONSerializable):
                 self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(pvalue)
 
             elif self.evidence['type']=='genetic_association':
-                pvalue_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
-                pvalue_v2d = self.evidence['evidence']['variant2disease']['resource_score']['value']
-                pvalue = pvalue_g2v+pvalue_v2d #worst case scenario
-                self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(pvalue)
+                if self.evidence['sourceID']=='uniprot':
+                    score = float(self.evidence['evidence']['resource_score']['value'])
+                else:
+                    probability_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
+                    pvalue_v2d = self.evidence['evidence']['variant2disease']['resource_score']['value']
+                    if self.evidence['sourceID']=='gwascatalog' \
+                            or self.evidence['sourceID']=='gwas_catalog':
+                        sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
+                        score =self._score_gwascatalog(pvalue_v2d, sample_size,probability_g2v)
+                    else:
+                        score = probability_g2v*pvalue_v2d
+                self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(score)
             elif self.evidence['type']=='animal_model':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['disease_model_association']['resource_score']['value'])
             elif self.evidence['type']=='somatic_mutation':
@@ -492,25 +500,25 @@ class Evidence(JSONSerializable):
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
             elif self.evidence['type']=='affected_pathway':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
-            # if self.evidence['SourceID']=='expression_atlas':
+            # if self.evidence['sourceID']=='expression_atlas':
             #     pass
-            # elif self.evidence['SourceID']=='uniprot':
+            # elif self.evidence['sourceID']=='uniprot':
             #     pass
-            # elif self.evidence['SourceID']=='reactome':
+            # elif self.evidence['sourceID']=='reactome':
             #     pass
-            # elif self.evidence['SourceID']=='eva':
+            # elif self.evidence['sourceID']=='eva':
             #     pass
-            # elif self.evidence['SourceID']=='phenodigm':
+            # elif self.evidence['sourceID']=='phenodigm':
             #     pass
-            # elif self.evidence['SourceID']=='gwas_catalog':
+            # elif self.evidence['sourceID']=='gwas_catalog':
             #     pass
-            # elif self.evidence['SourceID']=='cancer_gene_census':
+            # elif self.evidence['sourceID']=='cancer_gene_census':
             #     pass
-            # elif self.evidence['SourceID']=='chembl':
+            # elif self.evidence['sourceID']=='chembl':
             #     pass
-            # elif self.evidence['SourceID']=='europmc':
+            # elif self.evidence['sourceID']=='europmc':
             #     pass
-            # elif self.evidence['SourceID']=='disgenet':
+            # elif self.evidence['sourceID']=='disgenet':
             #     pass
         except:
             logging.warn("Cannot score evidence %s of type %s"%(self.evidence['id'],self.evidence['type']))
@@ -540,6 +548,60 @@ class Evidence(JSONSerializable):
         elif pvalue <= 1:
             score=0.
         return score
+
+    def _score_gwascatalog(self,pvalue,sample_size, frequency):
+
+        normalised_pvalue = 0.
+        if pvalue <= 1e-15:
+            normalised_pvalue=1.
+        elif pvalue <= 1e-10:
+            normalised_pvalue=7/8.
+        elif pvalue <= 1e-9:
+            normalised_pvalue=6/8.
+        elif pvalue <= 1e-8:
+            normalised_pvalue=5/8.
+        elif pvalue <= 1e-7:
+            normalised_pvalue=4/8.
+        elif pvalue <= 1e-6:
+            normalised_pvalue=3/8.
+        elif pvalue <= 1e-5:
+            normalised_pvalue=2/8.
+        elif pvalue <= 1:
+            normalised_pvalue=1/8.
+
+        normalised_sample_size = 0.
+        if sample_size >= 100000 :
+            normalised_sample_size=1.
+        elif sample_size  >= 75000 :
+            normalised_sample_size=13/14.
+        elif sample_size  >= 50000 :
+            normalised_sample_size=12/14.
+        elif sample_size  >= 25000 :
+            normalised_sample_size=11/14.
+        elif sample_size  >= 10000 :
+            normalised_sample_size=10/14.
+        elif sample_size  >= 7500 :
+            normalised_sample_size=9/14.
+        elif sample_size  >= 5000 :
+            normalised_sample_size=8/14.
+        elif sample_size  >= 4000 :
+            normalised_sample_size=7/14.
+        elif sample_size  >= 3000 :
+            normalised_sample_size=6/14.
+        elif sample_size  >= 2000 :
+            normalised_sample_size=5/14.
+        elif sample_size  >= 1000 :
+            normalised_sample_size=4/14.
+        elif sample_size  >= 750 :
+            normalised_sample_size=3/14.
+        elif sample_size  >= 500 :
+            normalised_sample_size=2/14.
+        elif sample_size  >= 1 :
+            normalised_sample_size=1/14.
+
+
+
+        return normalised_pvalue*normalised_sample_size*frequency
 
 
 class UploadError():
