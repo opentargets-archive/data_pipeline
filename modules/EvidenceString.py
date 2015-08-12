@@ -523,6 +523,12 @@ class Evidence(JSONSerializable):
         except:
             logging.warn("Cannot score evidence %s of type %s"%(self.evidence['id'],self.evidence['type']))
 
+        '''modify scores accodigng to weights'''
+        datasource_weight = Config.DATASOURCE_ASSOCIATION_SCORE_WEIGHT.get( self.evidence['sourceID'], 1.)
+        if datasource_weight !=1:
+             self.evidence['scores'] ['association_score'] =  self.evidence['scores'] ['association_score']*datasource_weight
+
+
     def _get_score_from_pvalue(self, pvalue):
         score = 0.
         if pvalue <= 1e-10:
