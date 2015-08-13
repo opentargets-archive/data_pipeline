@@ -52,9 +52,7 @@ class Config():
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
     EVIDENCEVALIDATION_PERCENT_SCALE = 20
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
-    DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(expression_atlas=0.33,
-                                             gwascatalog=2.5,
-                                             gwas_catalog=2.5)
+    DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
 
 def _get_evidence_string_generic_mapping():
     return {
