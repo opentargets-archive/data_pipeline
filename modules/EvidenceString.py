@@ -145,6 +145,9 @@ class EvidenceManager():
             except:
                 evidence['evidence']['gene2variant']['provenance_type']['database']['dbxref']['version']=''
                 fixed=True
+        if evidence['sourceID'] == 'gwascatalog':
+            evidence['sourceID'] = 'gwas_catalog'
+            fixed=True
 
 
         '''remove identifiers.org from genes and map to ensembl ids'''
