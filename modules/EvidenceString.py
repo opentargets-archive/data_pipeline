@@ -446,12 +446,12 @@ class EvidenceManager():
 
     def _get_eco_scoring_values(self):
         self.eco_scores=dict()
-        for line in file('resources/eco_scores.txt'):
+        for line in file('resources/eco_scores.tsv'):
             try:
-                uri, label, score = line.strip().split()
+                uri, label, score = line.strip().split('\t')
                 self.eco_scores[uri]=float(score)
             except:
-                logging.error("cannot parse line in eco_scores.txt: %s"%(line.strip()))
+                logging.error("cannot parse line in eco_scores.tsv: %s"%(line.strip()))
 
 
 
