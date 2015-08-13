@@ -446,7 +446,7 @@ class EvidenceManager():
 
     def _get_eco_scoring_values(self):
         self.eco_scores=dict()
-        for line in 'resources/eco_scores.txt':
+        for line in file('resources/eco_scores.txt'):
             try:
                 uri, label, score = line.strip().split()
                 self.eco_scores[uri]=float(score)
