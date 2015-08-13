@@ -108,6 +108,7 @@ class EvidenceManager():
         self._get_uni2ens()
         self._get_available_efos()
         self._get_available_ecos()
+        self._get_eco_scoring_values()
         self.uni_header=GeneData.UNI_ID_ORG_PREFIX
         self.ens_header=GeneData.ENS_ID_ORG_PREFIX
         self.gene_retriever = GeneRetriever(adapter)
@@ -148,6 +149,24 @@ class EvidenceManager():
         if evidence['sourceID'] == 'gwascatalog':
             evidence['sourceID'] = 'gwas_catalog'
             fixed=True
+        '''enforce eco-based score for genetic_association evidencestrings'''
+        if evidence['type']=='genetic_association':
+            available_score=None
+            try:
+                available_score = evidence['evidence']['gene2variant']['resource_score']['value']
+            except KeyError:
+                pass
+            eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
+
+            if eco_uri in self.eco_scores:
+                evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
+                evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
+                if available_score !=self.eco_scores[eco_uri]:
+                    fixed = True
+            else:
+                logging.warning("Cannot find a score for eco code %s in evidence id %s"%(eco_uri, evidence['id']))
+
+
 
 
         '''remove identifiers.org from genes and map to ensembl ids'''
@@ -425,6 +444,15 @@ class EvidenceManager():
             ensemblid = self._map_to_reference_ensembl_gene(ensemblid) or ensemblid
         return ensemblid
 
+    def _get_eco_scoring_values(self):
+        self.eco_scores=dict()
+        for line in 'resources/eco_scores.txt':
+            try:
+                uri, label, score = line.strip().split()
+                self.eco_scores[uri]=float(score)
+            except:
+                logging.error("cannot parse line in eco_scores.txt: %s"%(line.strip()))
+
 
 
 class Evidence(JSONSerializable):
@@ -561,7 +589,7 @@ class Evidence(JSONSerializable):
             score=0.
         return score
 
-    def _score_gwascatalog(self,pvalue,sample_size, frequency):
+    def _score_gwascatalog(self,pvalue,sample_size, severity):
 
         normalised_pvalue = 0.
         if pvalue <= 1e-15:
@@ -613,7 +641,7 @@ class Evidence(JSONSerializable):
 
 
 
-        return normalised_pvalue*normalised_sample_size*frequency
+        return normalised_pvalue*normalised_sample_size*severity
 
 
 class UploadError():
