@@ -114,6 +114,7 @@ class EvidenceManager():
         self.gene_retriever = GeneRetriever(adapter)
         self.efo_retriever = EfoRetriever(adapter)
         self.eco_retriever = EcoRetriever(adapter)
+        self._get_score_modifiers()
 
 
 
@@ -453,6 +454,10 @@ class EvidenceManager():
             except:
                 logging.error("cannot parse line in eco_scores.tsv: %s"%(line.strip()))
 
+    def _get_score_modifiers(self):
+        self.score_modifiers = {}
+        for datasource, values in Config.DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE.items():
+            self.score_modifiers[datasource]=DataNormaliser(values['min'],values['max'])
 
 
 class Evidence(JSONSerializable):
@@ -470,18 +475,7 @@ class Evidence(JSONSerializable):
 
     def _set_datatype(self,):
 
-        translate_database = defaultdict(lambda: "other")
-        translate_database['expression_atlas'] = 'rna_expression'
-        translate_database['uniprot'] = 'genetic_association'
-        translate_database['reactome'] = 'affected_pathway'
-        translate_database['eva'] = 'genetic_association'
-        translate_database['phenodigm'] = 'animal_model'
-        translate_database['gwas_catalog'] = 'genetic_association'
-        translate_database['gwascatalog'] = 'genetic_association'#temporary
-        translate_database['cancer_gene_census'] = 'somatic_mutation'
-        translate_database['chembl'] = 'known_drug'
-        translate_database['europmc'] = 'literature'
-        translate_database['disgenet'] = 'literature'
+        translate_database = Config.DATASOURCE_TO_DATATYPE_MAPPING
         try:
             self.database = self.evidence['sourceID'].lower()
         except KeyError:
@@ -498,7 +492,7 @@ class Evidence(JSONSerializable):
     def load_json(self, data):
         self.evidence = json.loads(data)
 
-    def score_evidence(self):
+    def score_evidence(self, modifiers = {}):
         self.evidence['scores'] = dict(association_score=0.,
                                     )
         try:
@@ -511,18 +505,14 @@ class Evidence(JSONSerializable):
                 self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(pvalue)
 
             elif self.evidence['type']=='genetic_association':
-                # if self.evidence['sourceID']=='uniprot':
-                #     score = float(self.evidence['evidence']['resource_score']['value'])
-                # else:
                 probability_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
                 pvalue_v2d = self.evidence['evidence']['variant2disease']['resource_score']['value']
-                if self.evidence['sourceID']=='gwascatalog' \
-                        or self.evidence['sourceID']=='gwas_catalog':
+                if self.evidence['sourceID']=='gwas_catalog':
                     sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
                     score =self._score_gwascatalog(pvalue_v2d, sample_size,probability_g2v)
                 else:
                     score = probability_g2v*pvalue_v2d
-                self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(score)
+                self.evidence['scores'] ['association_score']= score
             elif self.evidence['type']=='animal_model':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['disease_model_association']['resource_score']['value'])
             elif self.evidence['type']=='somatic_mutation':
@@ -557,10 +547,14 @@ class Evidence(JSONSerializable):
         '''modify scores accodigng to weights'''
         datasource_weight = Config.DATASOURCE_ASSOCIATION_SCORE_WEIGHT.get( self.evidence['sourceID'], 1.)
         if datasource_weight !=1:
-             weighted_score =  self.evidence['scores'] ['association_score']*datasource_weight
-             if weighted_score >1:
-                 weighted_score =1.
-             self.evidence['scores'] ['association_score'] =  weighted_score
+            weighted_score =  self.evidence['scores'] ['association_score']*datasource_weight
+            if weighted_score >1:
+               weighted_score = 1.
+            self.evidence['scores'] ['association_score'] =  weighted_score
+
+        '''applay rescaling to scores'''
+        if self.evidence['sourceID'] in modifiers:
+            self.evidence['scores'] ['association_score'] =  modifiers[self.evidence['sourceID']]( self.evidence['scores'] ['association_score'])
 
 
     def _get_score_from_pvalue(self, pvalue):
@@ -670,6 +664,19 @@ class UploadError():
         pickle.dump(self, open(filename + '.pkl', 'w'))
         json.dump(self.evidence, open(filename + '.json', 'w'))
 
+
+class DataNormaliser(object):
+    def __init__(self, min_value, max_value):
+        self.min = float(min_value)
+        self.max = float(max_value)
+    def __call__(self, value):
+        return (value-self.min)/(self.max-self.min)
+
+
+
+
+
+
 class EvidenceStringProcess():
 
     def __init__(self,
@@ -689,7 +696,7 @@ class EvidenceStringProcess():
         base_id = 0
         err = 0
         fix = 0
-        evidence_manager = EvidenceManager(self.adapter)
+        evidence_manager = EvidenceManager(self.adapter,)
         self._delete_prev_data()
         # for row in self.session.query(LatestEvidenceString).yield_per(1000):
         for row in self.session.query(EvidenceString121).yield_per(1000):
@@ -706,7 +713,7 @@ class EvidenceStringProcess():
                     fix += 1
                 if evidence_manager.is_valid(ev, datasource=row.data_source_name):
                     '''add scoring to evidence string'''
-                    ev.score_evidence()
+                    ev.score_evidence(evidence_manager.score_modifiers)
                     '''extend data in evidencestring'''
                     ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
