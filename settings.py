@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 __author__ = 'andreap'
 import os
 import ConfigParser
@@ -53,6 +55,34 @@ class Config():
     EVIDENCEVALIDATION_PERCENT_SCALE = 20
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
+    DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(phenodigm=dict(min=0.4, max= 1),
+                                                        )
+    DATASOURCE_INTERNAL_NAME_TRANSLATION = dict(reactome = 'CTTV006_Networks_Reactome',
+                                                intact = 'CTTV006_Networks_IntAct',
+                                                chembl = 'CTTV008_ChEMBL',
+                                                gwas_catalog = 'CTTV009_GWAS_Catalog',
+                                                uniprot = 'CTTV011_UniProt',
+                                                eva = 'CTTV012_Variation',
+                                                gwas_ibd = 'CTTV018_IBD_GWAS',
+                                                phenodigm = 'CTTV_External_MouseModels',
+                                                cancer_gene_census = 'CTTV_External_Cancer_Gene_Census',
+                                                europmc = 'CTTV025_Literature',
+                                                disgenet = 'CTTV_External_DisGeNet',
+                                                rare2common = 'CTTV005_Rare2Common',
+                                                tissue_specificity = 'CTTV010_Tissue_Specificity'
+                                                )
+    DATASOURCE_TO_DATATYPE_MAPPING = defaultdict(lambda: "other")
+    DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
+    DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
+    DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['gwascatalog'] = 'genetic_association'#temporary
+    DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
+    DATASOURCE_TO_DATATYPE_MAPPING['europmc'] = 'literature'
+    DATASOURCE_TO_DATATYPE_MAPPING['disgenet'] = 'literature'
 
 def _get_evidence_string_generic_mapping():
     return {
