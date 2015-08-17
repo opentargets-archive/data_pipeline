@@ -338,7 +338,7 @@ class EvidenceManager():
         """get generic eco info"""
         all_eco_codes =  extended_evidence['evidence']['evidence_codes']
         try:
-            all_eco_codes.append(evidence['evidence']['gene2variant']['functional_consequence'])
+            all_eco_codes.append(extended_evidence['evidence']['gene2variant']['functional_consequence'])
         except KeyError:
             pass
         ecos_info = []
