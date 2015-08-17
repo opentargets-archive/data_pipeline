@@ -25,6 +25,8 @@ def get_ontology_code_from_url(url):
         return "SO_"+base_code.replace('SO:','')
     if ('/identifiers.org/doid/' in url) and ('ECO:' in base_code):
         return "DOID_"+base_code.replace('SO:','')
+    if base_code is None:
+        return url
     return base_code
 
 class EFO(JSONSerializable):

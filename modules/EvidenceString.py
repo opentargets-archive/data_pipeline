@@ -230,9 +230,10 @@ class EvidenceManager():
         eco_ids = list(set(eco_ids))
         for idorg_eco_uri in eco_ids:
             code = get_ontology_code_from_url(idorg_eco_uri.strip())
-            # if len(code.split('_')) != 2:
-                # logging.warning("could not recognize evidence code: %s in id %s | added anyway" %(evidence['id'],idorg_eco_uri))
-            new_eco_ids.append(code)
+            if code is not None:
+                # if len(code.split('_')) != 2:
+                   # logging.warning("could not recognize evidence code: %s in id %s | added anyway" %(evidence['id'],idorg_eco_uri))
+                new_eco_ids.append(code)
         evidence['evidence']['evidence_codes'] = list(set(new_eco_ids))
         if not new_eco_ids:
             logging.warning("No valid ECO could be found in evidence: %s. original ECO mapping: %s"%(evidence['id'], str(eco_ids)[:100]))
