@@ -334,9 +334,15 @@ class EvidenceManager():
                     all_efo_codes.extend(node)
             extended_evidence["disease"][ExtendedInfoEFO.root] = efo_info.data
         all_efo_codes = list(set(all_efo_codes))
+
         """get generic eco info"""
+        all_eco_codes =  extended_evidence['evidence']['evidence_codes']
+        try:
+            all_eco_codes.append(evidence['evidence']['gene2variant']['functional_consequence'])
+        except KeyError:
+            pass
         ecos_info = []
-        for eco_id in extended_evidence['evidence']['evidence_codes']:
+        for eco_id in all_eco_codes:
             # try:
             eco = self._get_eco(eco_id)
             ecos_info.append(ExtendedInfoECO(eco))
@@ -352,6 +358,7 @@ class EvidenceManager():
         '''Add private objects used just for indexing'''
 
         extended_evidence['_private']['efo_codes'] = all_efo_codes
+        extended_evidence['_private']['eco_codes'] = all_eco_codes
         extended_evidence['_private']['datasource']= evidence.datasource
         extended_evidence['_private']['datatype']= evidence.datatype
         extended_evidence['_private']['facets']={}
