@@ -26,7 +26,6 @@ class Config():
     ELASTICSEARCH_REACTOME_REACTION_DOC_NAME = 'reactome-reaction'
     DEBUG = True
     PROFILE = False
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'C=41d6xo]4940NP,9jwF@@v0KDdTtO'
     PUBLIC_API_BASE_PATH = '/api/public/v'
     PRIVATE_API_BASE_PATH = '/api/private/v'
     API_VERSION = '0.2'
@@ -78,8 +77,8 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
     DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['gwascatalog'] = 'genetic_association'#temporary
     DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
     DATASOURCE_TO_DATATYPE_MAPPING['europmc'] = 'literature'
     DATASOURCE_TO_DATATYPE_MAPPING['disgenet'] = 'literature'
@@ -175,16 +174,9 @@ def _get_evidence_string_generic_mapping():
 class ElasticSearchConfiguration():
 
 
-    available_databases = ['expression_atlas',
-                          'uniprot',
-                          'reactome',
-                          'eva',
-                          'phenodigm',
-                          'gwas_catalog',
-                          'cancer_gene_census',
-                          'chembl',
-                          'other',
-                          ]
+    available_databases = Config().DATASOURCE_TO_DATATYPE_MAPPING.keys()
+    available_databases.append('other')
+
     if os.environ.get('CTTV_EL_LOADER')== 'prod' or \
             os.environ.get('CTTV_EL_LOADER')== 'stag':
         generic_shard_number = 3

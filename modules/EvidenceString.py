@@ -150,6 +150,11 @@ class EvidenceManager():
         if evidence['sourceID'] == 'gwascatalog':
             evidence['sourceID'] = 'gwas_catalog'
             fixed=True
+        '''split EVA in two datasources depending on the datatype'''
+        if (evidence['sourceID'] == 'eva') and \
+                (evidence['type']== 'somatic_mutation'):
+            evidence['sourceID'] = 'eva_somatic'
+            fixed=True
         '''enforce eco-based score for genetic_association evidencestrings'''
         if evidence['type']=='genetic_association':
             available_score=None
@@ -339,16 +344,16 @@ class EvidenceManager():
         """get generic eco info"""
         all_eco_codes =  extended_evidence['evidence']['evidence_codes']
         try:
-            all_eco_codes.append(extended_evidence['evidence']['gene2variant']['functional_consequence'])
+            all_eco_codes.append(get_ontology_code_from_url(extended_evidence['evidence']['gene2variant']['functional_consequence']))
         except KeyError:
             pass
         ecos_info = []
         for eco_id in all_eco_codes:
-            # try:
             eco = self._get_eco(eco_id)
-            ecos_info.append(ExtendedInfoECO(eco))
-            # except Exception:
-            #     logging.warning("Cannot get generic info for eco: %s" % eco_id)
+            if eco is not None:
+                ecos_info.append(ExtendedInfoECO(eco))
+            else:
+                logging.warning("Cannot get generic info for eco: %s" % eco_id)
 
         if ecos_info:
             data = []
