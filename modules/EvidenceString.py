@@ -514,8 +514,10 @@ class Evidence(JSONSerializable):
                     float(self.evidence['evidence']['drug2clinic']['resource_score']['value']) * \
                     float(self.evidence['evidence']['target2drug']['resource_score']['value'])
             elif self.evidence['type']=='rna_expression':
-                pvalue = self.evidence['evidence']['resource_score']['value']
-                self.evidence['scores'] ['association_score']= self._get_score_from_pvalue(pvalue)
+                pvalue = self._get_score_from_pvalue(self.evidence['evidence']['resource_score']['value'])
+                log2_fold_change = self.evidence['evidence']['log2_fold_change']['value']
+                fold_scale_factor = 5.-abs(log2_fold_change)#median of the distribution - the actual value
+                self.evidence['scores'] ['association_score']= pvalue/fold_scale_factor
 
             elif self.evidence['type']=='genetic_association':
                 probability_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
