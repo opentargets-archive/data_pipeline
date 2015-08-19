@@ -519,7 +519,7 @@ class Evidence(JSONSerializable):
 
             elif self.evidence['type']=='genetic_association':
                 probability_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
-                pvalue_v2d = self.evidence['evidence']['variant2disease']['resource_score']['value']
+                pvalue_v2d = self._get_score_from_pvalue(self.evidence['evidence']['variant2disease']['resource_score']['value'])
                 if self.evidence['sourceID']=='gwas_catalog':
                     sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
                     score =self._score_gwascatalog(pvalue_v2d, sample_size,probability_g2v)
