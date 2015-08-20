@@ -54,7 +54,8 @@ class Config():
     EVIDENCEVALIDATION_PERCENT_SCALE = 20
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
-    DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(phenodigm=dict(min=0.4, max= 1),
+    DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
+                                                        #phenodigm=dict(min=0.4, max= 1),
                                                         )
     DATASOURCE_INTERNAL_NAME_TRANSLATION = dict(reactome = 'CTTV006_Networks_Reactome',
                                                 intact = 'CTTV006_Networks_IntAct',
