@@ -516,8 +516,9 @@ class Evidence(JSONSerializable):
             elif self.evidence['type']=='rna_expression':
                 pvalue = self._get_score_from_pvalue(self.evidence['evidence']['resource_score']['value'])
                 log2_fold_change = self.evidence['evidence']['log2_fold_change']['value']
-                fold_scale_factor = 5.-abs(log2_fold_change)#median of the distribution - the actual value
-                self.evidence['scores'] ['association_score']= pvalue/fold_scale_factor
+                fold_scale_factor = abs(log2_fold_change)/10.
+                rank = self.evidence['evidence']['log2_fold_change']['percentile_rank']/100.
+                self.evidence['scores'] ['association_score']= pvalue*fold_scale_factor*rank
 
             elif self.evidence['type']=='genetic_association':
                 probability_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
