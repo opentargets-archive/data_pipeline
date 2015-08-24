@@ -521,13 +521,22 @@ class Evidence(JSONSerializable):
                 self.evidence['scores'] ['association_score']= pvalue*fold_scale_factor*rank
 
             elif self.evidence['type']=='genetic_association':
-                probability_g2v = self.evidence['evidence']['gene2variant']['resource_score']['value']
-                pvalue_v2d = self._get_score_from_pvalue(self.evidence['evidence']['variant2disease']['resource_score']['value'])
-                if self.evidence['sourceID']=='gwas_catalog':
-                    sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
-                    score =self._score_gwascatalog(pvalue_v2d, sample_size,probability_g2v)
+                if 'gene2variant' in  self.evidence['evidence']:
+                    g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
+                    if self.evidence['evidence']['variant2disease']['resource_score']['type'] =='pvalue':
+                        v2d_score = self._get_score_from_pvalue(self.evidence['evidence']['variant2disease']['resource_score']['value'])
+                    elif self.evidence['evidence']['variant2disease']['resource_score']['type'] =='probability':
+                        v2d_score = self.evidence['evidence']['variant2disease']['resource_score']['value']
+                    if self.evidence['sourceID']=='gwas_catalog':
+                        sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
+                        score =self._score_gwascatalog(v2d_score, sample_size,g2v_score)
+                    else:
+                        score = g2v_score*v2d_score
                 else:
-                    score = probability_g2v*pvalue_v2d
+                    if self.evidence['evidence']['resource_score']['type']=='probability':
+                        score=self.evidence['evidence']['resource_score']['value']
+                    elif self.evidence['evidence']['resource_score']['type']=='pvalue':
+                        score=self._get_score_from_pvalue(self.evidence['evidence']['resource_score']['value'])
                 self.evidence['scores'] ['association_score']= score
             elif self.evidence['type']=='animal_model':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['disease_model_association']['resource_score']['value'])
