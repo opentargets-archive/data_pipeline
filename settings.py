@@ -150,23 +150,23 @@ def _get_evidence_string_generic_mapping():
                               "type" : "string",
                               "index" : "not_analyzed"
                          },
-                     #
-                     #     "association_score":{
-                     #         "type" : "object",
-                     #         "properties" : {
-                     #             "probability" : {
-                     #                 "type" : "object",
-                     #                 "properties" : {
-                     #                     "value" : {
-                     #                        "type" : "double",
-                     #                     },
-                     #                     "method" : {
-                     #                        "type" : "string",
-                     #                     }
-                     #                 }
-                     #             }
-                     #         }
-                     #     },
+                #      #
+                #      #     "association_score":{
+                #      #         "type" : "object",
+                #      #         "properties" : {
+                #      #             "probability" : {
+                #      #                 "type" : "object",
+                #      #                 "properties" : {
+                #      #                     "value" : {
+                #      #                        "type" : "double",
+                #      #                     },
+                #      #                     "method" : {
+                #      #                        "type" : "string",
+                #      #                     }
+                #      #                 }
+                #      #             }
+                #      #         }
+                #      #     },
                      }
                 }
             },
@@ -184,6 +184,7 @@ def _get_evidence_string_generic_mapping():
             {
                 "do_not_index_evidence" : {
                     "path_match" : "evidence.*",
+                    "path_unmatch" : "evidence.evidence_codes*",
                     "mapping" : {
                         "index" : "no"
                     }
