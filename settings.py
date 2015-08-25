@@ -86,6 +86,7 @@ class Config():
 
 def _get_evidence_string_generic_mapping():
     return {
+            "_all" : {"enabled" : False},
             "properties" : {
                 "target" : {
                     "type" : "object",
@@ -143,29 +144,30 @@ def _get_evidence_string_generic_mapping():
                 },
                 "evidence" : {
                     "type" : "object",
-                     "properties" : {
-                         "evidence_codes" : {
-                              "type" : "string",
-                              "index" : "not_analyzed"
-                         },
-
-                         "association_score":{
-                             "type" : "object",
-                             "properties" : {
-                                 "probability" : {
-                                     "type" : "object",
-                                     "properties" : {
-                                         "value" : {
-                                            "type" : "double",
-                                         },
-                                         "method" : {
-                                            "type" : "string",
-                                         }
-                                     }
-                                 }
-                             }
-                         },
-                     }
+                    "index": "no",
+                     # "properties" : {
+                     #     "evidence_codes" : {
+                     #          "type" : "string",
+                     #          "index" : "not_analyzed"
+                     #     },
+                     #
+                     #     "association_score":{
+                     #         "type" : "object",
+                     #         "properties" : {
+                     #             "probability" : {
+                     #                 "type" : "object",
+                     #                 "properties" : {
+                     #                     "value" : {
+                     #                        "type" : "double",
+                     #                     },
+                     #                     "method" : {
+                     #                        "type" : "string",
+                     #                     }
+                     #                 }
+                     #             }
+                     #         }
+                     #     },
+                     # }
                 }
             }
        }
