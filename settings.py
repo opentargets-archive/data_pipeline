@@ -86,7 +86,7 @@ class Config():
 
 def _get_evidence_string_generic_mapping():
     return {
-            "_all" : {"enabled" : False},
+            "_all" : {"enabled" : True},
             "properties" : {
                 "target" : {
                     "type" : "object",
@@ -142,14 +142,14 @@ def _get_evidence_string_generic_mapping():
                          }
                      }
                 },
-                # "evidence" : {
-                #     "type" : "object",
-                #     "index": "no",
-                     # "properties" : {
-                     #     "evidence_codes" : {
-                     #          "type" : "string",
-                     #          "index" : "not_analyzed"
-                     #     },
+                "evidence" : {
+                    "type" : "object",
+                    # "index": "no",
+                     "properties" : {
+                         "evidence_codes" : {
+                              "type" : "string",
+                              "index" : "not_analyzed"
+                         },
                      #
                      #     "association_score":{
                      #         "type" : "object",
@@ -167,30 +167,32 @@ def _get_evidence_string_generic_mapping():
                      #             }
                      #         }
                      #     },
-                     # }
-                # }
+                     }
+                }
             },
         "dynamic_templates" : [
             {
                 "scores" : {
-                    "match" : "scores*",
+                    "path_match" : "scores.*",
                     "mapping" : {
                          "type" : "double",
                     }
                 }
             },
 
+
             {
                 "do_not_index_evidence" : {
-                    "match" : "evidence*",
+                    "path_match" : "evidence.*",
                     "mapping" : {
                         "index" : "no"
                     }
                 }
             },
+
             {
                 "do_not_index_drug" : {
-                    "match" : "drug*",
+                    "path_match" : "drug.*",
                     "mapping" : {
                         "index" : "no"
                     }
@@ -198,7 +200,7 @@ def _get_evidence_string_generic_mapping():
             },
             {
                 "do_not_index_unique_ass" : {
-                    "match" : "unique_association_fields*",
+                    "path_match" : "unique_association_fields.*",
                     "mapping" : {
                         "index" : "no"
                     }
