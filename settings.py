@@ -142,9 +142,9 @@ def _get_evidence_string_generic_mapping():
                          }
                      }
                 },
-                "evidence" : {
-                    "type" : "object",
-                    "index": "no",
+                # "evidence" : {
+                #     "type" : "object",
+                #     "index": "no",
                      # "properties" : {
                      #     "evidence_codes" : {
                      #          "type" : "string",
@@ -168,17 +168,43 @@ def _get_evidence_string_generic_mapping():
                      #         }
                      #     },
                      # }
-                }
+                # }
             },
         "dynamic_templates" : [
             {
-                "do_not_index_generigc" : {
-                    "match" : "*",
+                "scores" : {
+                    "match" : "scores*",
+                    "mapping" : {
+                         "type" : "double",
+                    }
+                }
+            },
+
+            {
+                "do_not_index_evidence" : {
+                    "match" : "evidence*",
                     "mapping" : {
                         "index" : "no"
                     }
                 }
-            }
+            },
+            {
+                "do_not_index_drug" : {
+                    "match" : "drug*",
+                    "mapping" : {
+                        "index" : "no"
+                    }
+                }
+            },
+            {
+                "do_not_index_unique_ass" : {
+                    "match" : "unique_association_fields*",
+                    "mapping" : {
+                        "index" : "no"
+                    }
+                }
+            },
+
         ]
        }
 
@@ -194,7 +220,7 @@ class ElasticSearchConfiguration():
             os.environ.get('CTTV_EL_LOADER')== 'stag':
         generic_shard_number = 3
         generic_replicas_number = 1
-        evidence_shard_number = 3
+        evidence_shard_number = 4
         evidence_replicas_number = 2
 
         bulk_load_chunk =1000
