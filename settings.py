@@ -169,7 +169,17 @@ def _get_evidence_string_generic_mapping():
                      #     },
                      # }
                 }
+            },
+        "dynamic_templates" : [
+            {
+                "do_not_index_generigc" : {
+                    "match" : "*",
+                    "mapping" : {
+                        "index" : "no"
+                    }
+                }
             }
+        ]
        }
 
 
@@ -184,8 +194,8 @@ class ElasticSearchConfiguration():
             os.environ.get('CTTV_EL_LOADER')== 'stag':
         generic_shard_number = 3
         generic_replicas_number = 1
-        evidence_shard_number = 6
-        evidence_replicas_number = 1
+        evidence_shard_number = 3
+        evidence_replicas_number = 2
 
         bulk_load_chunk =1000
     else:
