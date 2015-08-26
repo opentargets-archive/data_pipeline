@@ -24,6 +24,8 @@ class Config():
     ELASTICSEARCH_EXPRESSION_DOC_NAME = 'expression'
     ELASTICSEARCH_REACTOME_INDEX_NAME = 'reactome-data'
     ELASTICSEARCH_REACTOME_REACTION_DOC_NAME = 'reactome-reaction'
+    ELASTICSEARCH_DATA_SCORE_INDEX_NAME = 'evidence-score'
+    ELASTICSEARCH_DATA_SCORE_DOC_NAME = 'evidencescore'
     DEBUG = True
     PROFILE = False
     PUBLIC_API_BASE_PATH = '/api/public/v'

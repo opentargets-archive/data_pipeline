@@ -64,14 +64,14 @@ class JSONObjectStorage():
         # loader.create_new_index(index_name)
         if doc_name:
             for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.data, ).filter(and_(
-                            ElasticsearchLoad.index == index_name,
+                            ElasticsearchLoad.index.startswith(index_name),
                             ElasticsearchLoad.type == doc_name,
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
                 loader.put(index_name, doc_name, row.id, row.data)
         else:
             for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
-                            ElasticsearchLoad.index == index_name,
+                            ElasticsearchLoad.index.startswith(index_name),
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
                 if index_name == Config.ELASTICSEARCH_DATA_INDEX_NAME:#force split in different indexes

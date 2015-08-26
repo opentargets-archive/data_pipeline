@@ -502,6 +502,20 @@ class Evidence(JSONSerializable):
     def to_json(self):
         return json.dumps(self.evidence)
 
+    def score_to_json(self):
+        score = {}
+        score['id']=self.evidence['id']
+        score['sourceID']=self.evidence['sourceID']
+        score['type']=self.evidence['type']
+        score['target']={"id":self.evidence['target']['id'],
+                         "gene_info":self.evidence['target']['gene_info']}
+
+        score['disease']={"id":self.evidence['disease']['id'],
+                         "efo_info":self.evidence['target']['efo_info']}
+        score['scores']= self.evidence['scores']
+        score['_private']= {"efo_codes":self.evidence['_private']['efo_codes']}
+        return json.dumps(score)
+
     def load_json(self, data):
         self.evidence = json.loads(data)
 
@@ -772,7 +786,15 @@ class EvidenceStringProcess():
         for key, value in self.data.iteritems():
             self.loaded_entries_to_pg += 1
             self.session.add(ElasticsearchLoad(id=key,
-                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME,
+                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+value.get_doc_name(),
+                                          type=value.get_doc_name(),
+                                          data=value.to_json(),
+                                          active=True,
+                                          date_created=datetime.now(),
+                                          date_modified=datetime.now(),
+                                          ))
+            self.session.add(ElasticsearchLoad(id=key,
+                                          index=Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
                                           type=value.get_doc_name(),
                                           data=value.to_json(),
                                           active=True,
