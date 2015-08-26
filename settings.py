@@ -87,6 +87,8 @@ class Config():
 def _get_evidence_string_generic_mapping():
     return {
             "_all" : {"enabled" : True},
+            "_routing":{ "required":True,
+                         "path":"disease.id"},
             "properties" : {
                 "target" : {
                     "type" : "object",
@@ -223,8 +225,8 @@ class ElasticSearchConfiguration():
             os.environ.get('CTTV_EL_LOADER')== 'stag':
         generic_shard_number = 3
         generic_replicas_number = 1
-        evidence_shard_number = 4
-        evidence_replicas_number = 2
+        evidence_shard_number = 6
+        evidence_replicas_number = 1
 
         bulk_load_chunk =1000
     else:
