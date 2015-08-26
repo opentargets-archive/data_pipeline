@@ -74,7 +74,10 @@ class JSONObjectStorage():
                             ElasticsearchLoad.index == index_name,
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
-                loader.put(index_name, row.type, row.id, row.data)
+                if index_name == Config.ELASTICSEARCH_DATA_INDEX_NAME:#force split in different indexes
+                    loader.put(index_name+'-'+row.type, row.type, row.id, row.data)
+                else:
+                    loader.put(index_name, row.type, row.id, row.data)
         loader.flush()
 
     @staticmethod
@@ -185,8 +188,7 @@ class Loader():
             self.es.indices.delete(index_name, ignore=400)
         except NotFoundError:
             pass
-        if index_name == Config.ELASTICSEARCH_DATA_INDEX_NAME:
-            # TODO: set evidence_chain objects as nested so they don't mess with searches with the same key due to the reverse index
+        if index_name.startswith(Config.ELASTICSEARCH_DATA_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.evidence_data_mapping,
