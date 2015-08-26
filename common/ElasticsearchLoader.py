@@ -61,7 +61,7 @@ class JSONObjectStorage():
         - remove and recreate the index
         - load all the available data with that doc_name for that index
         """
-        loader.create_new_index(index_name)
+        # loader.create_new_index(index_name)
         if doc_name:
             for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.data, ).filter(and_(
                             ElasticsearchLoad.index == index_name,
@@ -121,8 +121,13 @@ class Loader():
         self.cache = []
         self.results = defaultdict(list)
         self.chunk_size = chunk_size
+        self.index_created=[]
 
     def put(self, index_name, doc_type, ID, body):
+
+        if not index_name in self.index_created:
+            self.create_new_index(index_name)
+            self.index_created.append(index_name)
 
         self.cache.append(dict(_index=index_name,
                                _type=doc_type,
