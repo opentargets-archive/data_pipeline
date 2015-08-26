@@ -496,7 +496,7 @@ class Evidence(JSONSerializable):
         self.datatype = translate_database[self.database]
 
     def get_doc_name(self):
-        return Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+self.database,
+        return Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+self.database
 
 
     def to_json(self):
