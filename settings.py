@@ -225,7 +225,7 @@ class ElasticSearchConfiguration():
             os.environ.get('CTTV_EL_LOADER')== 'stag':
         generic_shard_number = 3
         generic_replicas_number = 1
-        evidence_shard_number = 6
+        evidence_shard_number = 3
         evidence_replicas_number = 1
 
         bulk_load_chunk =1000
@@ -453,6 +453,7 @@ class ElasticSearchConfiguration():
 
     evidence_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                            "number_of_replicas" : evidence_replicas_number,
+                                           "index.store.type": "memory"
                                            },
                               "mappings": evidence_mappings,
                             }
