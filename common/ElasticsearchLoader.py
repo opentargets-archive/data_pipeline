@@ -198,6 +198,11 @@ class Loader():
                                    ignore=400,
                                    body=ElasticSearchConfiguration.evidence_data_mapping,
                                    )
+        elif index_name == Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME:
+            self.es.indices.create(index=index_name,
+                                   ignore=400,
+                                   body=ElasticSearchConfiguration.score_data_mapping,
+                                   )
         elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
             self.es.indices.create(index=index_name,
                                    ignore=400,

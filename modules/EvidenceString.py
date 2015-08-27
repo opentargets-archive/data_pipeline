@@ -488,12 +488,15 @@ class Evidence(JSONSerializable):
 
     def _set_datatype(self,):
 
-        translate_database = Config.DATASOURCE_TO_DATATYPE_MAPPING
-        try:
-            self.database = self.evidence['sourceID'].lower()
-        except KeyError:
-            self.database = self.datasource.lower()
-        self.datatype = translate_database[self.database]
+        if 'type' in self.evidence:
+            self.datatype = self.evidence['type']
+        else:
+            translate_database = Config.DATASOURCE_TO_DATATYPE_MAPPING
+            try:
+                self.database = self.evidence['sourceID'].lower()
+            except KeyError:
+                self.database = self.datasource.lower()
+            self.datatype = translate_database[self.database]
 
     def get_doc_name(self):
         return Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+self.database
@@ -786,7 +789,7 @@ class EvidenceStringProcess():
         for key, value in self.data.iteritems():
             self.loaded_entries_to_pg += 1
             self.session.add(ElasticsearchLoad(id=key,
-                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+value.get_doc_name(),
+                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+value.datatype,
                                           type=value.get_doc_name(),
                                           data=value.to_json(),
                                           active=True,
@@ -796,7 +799,7 @@ class EvidenceStringProcess():
             self.session.add(ElasticsearchLoad(id=key,
                                           index=Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
                                           type=value.get_doc_name(),
-                                          data=value.to_json(),
+                                          data=value.score_to_json(),
                                           active=True,
                                           date_created=datetime.now(),
                                           date_modified=datetime.now(),

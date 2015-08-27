@@ -455,7 +455,13 @@ class ElasticSearchConfiguration():
 
     evidence_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                            "number_of_replicas" : evidence_replicas_number,
-                                           "index.store.type": "memory"
+                                           # "index.store.type": "memory"
                                            },
+                              "mappings": evidence_mappings,
+                            }
+    score_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
+                                       "number_of_replicas" : evidence_replicas_number,
+                                       "index.store.type": "memory"
+                                       },
                               "mappings": evidence_mappings,
                             }
