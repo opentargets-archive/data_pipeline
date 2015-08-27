@@ -431,12 +431,61 @@ class ElasticSearchConfiguration():
                                                 "index" : "not_analyzed"
                                             }
                                         }
+                                    },
+                                    "uniprot_keywords" : {
+                                        "type" : "string",
+                                        "index" : "not_analyzed"
                                     }
+
                                 }
                             },
                         },
                     },
                 },
+                "dynamic_templates" : [
+
+                    {
+                        "do_not_index_drugbank" : {
+                            "path_match" : "drugbank.*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+
+                    {
+                        "do_not_index_go" : {
+                            "path_match" : "*go.*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+                    {
+                        "do_not_index_interpro" : {
+                            "path_match" : "interpro.*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+                    {
+                        "do_not_index_pdb" : {
+                            "path_match" : "pdb.*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+                    {
+                        "do_not_index_reactome" : {
+                            "path_match" : "reactome.*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+                ]
             },
         }
     }

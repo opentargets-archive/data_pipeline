@@ -21,10 +21,10 @@ class JSONObjectStorage():
             rows_deleted = session.query(
                 ElasticsearchLoad).filter(
                 and_(ElasticsearchLoad.index.startswith(index_name),
-                     ElasticsearchLoad.type == doc_name)).delete()
+                     ElasticsearchLoad.type == doc_name)).delete(synchronize_session='fetch')
         else:
             rows_deleted = session.query(
-                ElasticsearchLoad).filter(ElasticsearchLoad.index.startswith(index_name)).delete()
+                ElasticsearchLoad).filter(ElasticsearchLoad.index.startswith(index_name)).delete(synchronize_session='fetch')
         if rows_deleted:
             logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
 
@@ -86,12 +86,9 @@ class JSONObjectStorage():
         - remove and recreate each index
         - load all the available data with any for that index
         """
-        created_indexes =[]
+        #TODO: clear all data before uploading
 
         for row in session.query(ElasticsearchLoad).yield_per(loader.chunk_size):
-            if row.index not in created_indexes:
-                loader.create_new_index(row.index)
-                created_indexes.append(row.index)
             loader.put(row.index, row.type, row.id, row.data)
 
         loader.flush()
