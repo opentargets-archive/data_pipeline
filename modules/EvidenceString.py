@@ -488,15 +488,15 @@ class Evidence(JSONSerializable):
 
     def _set_datatype(self,):
 
-        if 'type' in self.evidence:
-            self.datatype = self.evidence['type']
-        else:
-            translate_database = Config.DATASOURCE_TO_DATATYPE_MAPPING
-            try:
-                self.database = self.evidence['sourceID'].lower()
-            except KeyError:
-                self.database = self.datasource.lower()
-            self.datatype = translate_database[self.database]
+        # if 'type' in self.evidence:
+        #     self.datatype = self.evidence['type']
+        # else:
+        translate_database = Config.DATASOURCE_TO_DATATYPE_MAPPING
+        try:
+            self.database = self.evidence['sourceID'].lower()
+        except KeyError:
+            self.database = self.datasource.lower()
+        self.datatype = translate_database[self.database]
 
     def get_doc_name(self):
         return Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+self.database
