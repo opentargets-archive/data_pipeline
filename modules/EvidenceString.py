@@ -784,6 +784,8 @@ class EvidenceStringProcess():
     def _delete_prev_data(self):
         JSONObjectStorage.delete_prev_data_in_pg(self.session,
                                                  Config.ELASTICSEARCH_DATA_INDEX_NAME)
+        JSONObjectStorage.delete_prev_data_in_pg(self.session,
+                                                 Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME)
 
     def _store_evidence_string(self):
         for key, value in self.data.iteritems():
