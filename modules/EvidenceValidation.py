@@ -211,13 +211,17 @@ class EvidenceValidationFileChecker():
         orphanet_pattern = "http://www.orpha.net/ORDO/Orphanet_%"
         hpo_pattern = "http://purl.obolibrary.org/obo/HP_%"
         mp_pattern = "http://purl.obolibrary.org/obo/MP_%"
+        do_pattern = "http://purl.obolibrary.org/obo/DOID_[0-9]{2,}"
+        go_pattern = "http://purl.obolibrary.org/obo/GO_[0-9]{4,}" 
         
         for row in self.session.query(EFONames).filter(
                 or_(
                     EFONames.uri.like(efo_pattern), 
                     EFONames.uri.like(mp_pattern), 
                     EFONames.uri.like(orphanet_pattern), 
-                    EFONames.uri.like(hpo_pattern)
+                    EFONames.uri.like(hpo_pattern), 
+                    EFONames.uri.like(do_pattern), 
+                    EFONames.uri.like(go_pattern)
                     )
                 ):
             #print row.uri
@@ -524,7 +528,7 @@ class EvidenceValidationFileChecker():
                 self.session.add(rowToUpdate)
     
             self.send_email(
-                True, 
+                False, 
                 provider_id, 
                 filename, 
                 (nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0), 
