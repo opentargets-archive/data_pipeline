@@ -253,15 +253,15 @@ class EvidenceValidationFileChecker():
         
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             for subdirname in dirnames:
-                #cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                cttv_match = re.match("^(cttv011)$", subdirname)
+                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
+                #cttv_match = re.match("^(cttv011)$", subdirname)
                 if cttv_match:
                     provider_id = cttv_match.groups()[0]
                     cttv_dir = os.path.join(dirname, subdirname)
                     print(cttv_dir)
                     for cttv_dirname, cttv_dirs, filenames in os.walk(os.path.join(cttv_dir, "upload/submissions")):
                         for filename in filenames:
-                            if filename.endswith(('.json.gz')) and filename == 'cttv011-01-07-2015.json.gz': #and filename == 'cttv009-14-07-2015.json.gz': #
+                            if filename.endswith(('.json.gz')): # and filename == 'cttv011-01-07-2015.json.gz': #and filename == 'cttv009-14-07-2015.json.gz': #
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 last_modified = os.path.getmtime(cttv_file)
                                 july = time.strptime("01 Jul 2015", "%d %b %Y")
@@ -561,7 +561,7 @@ class EvidenceValidationFileChecker():
                 self.session.add(rowToUpdate)
     
             self.send_email(
-                False, 
+                True, 
                 provider_id, 
                 filename, 
                 (nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0 and nb_uniprot_invalid == 0), 
