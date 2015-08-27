@@ -446,7 +446,7 @@ class ElasticSearchConfiguration():
 
                     {
                         "do_not_index_drugbank" : {
-                            "path_match" : "*drugbank*",
+                            "path_match" : "drugbank.*",
                             "mapping" : {
                                 "index" : "no"
                             }
@@ -462,24 +462,24 @@ class ElasticSearchConfiguration():
                         }
                     },
                     {
-                        "do_not_index_go" : {
-                            "path_match" : "*interpro.*",
+                        "do_not_index_interpro" : {
+                            "path_match" : "interpro.*",
                             "mapping" : {
                                 "index" : "no"
                             }
                         }
                     },
                     {
-                        "do_not_index_go" : {
-                            "path_match" : "*pdb.*",
+                        "do_not_index_pdb" : {
+                            "path_match" : "pdb.*",
                             "mapping" : {
                                 "index" : "no"
                             }
                         }
                     },
                     {
-                        "do_not_index_go" : {
-                            "path_match" : "reactome.REACT*",
+                        "do_not_index_reactome" : {
+                            "path_match" : "reactome.*",
                             "mapping" : {
                                 "index" : "no"
                             }
