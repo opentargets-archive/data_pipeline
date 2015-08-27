@@ -74,9 +74,6 @@ class JSONObjectStorage():
                             ElasticsearchLoad.index.startswith(index_name),
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
-                if index_name == Config.ELASTICSEARCH_DATA_INDEX_NAME:#force split in different indexes
-                    loader.put(index_name+'-'+row.type, row.type, row.id, row.data)
-                else:
                     loader.put(index_name, row.type, row.id, row.data)
         loader.flush()
 
