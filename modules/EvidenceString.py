@@ -514,7 +514,7 @@ class Evidence(JSONSerializable):
                          "gene_info":self.evidence['target']['gene_info']}
 
         score['disease']={"id":self.evidence['disease']['id'],
-                         "efo_info":self.evidence['target']['efo_info']}
+                         "efo_info":self.evidence['disease']['efo_info']}
         score['scores']= self.evidence['scores']
         score['_private']= {"efo_codes":self.evidence['_private']['efo_codes']}
         return json.dumps(score)
