@@ -442,6 +442,50 @@ class ElasticSearchConfiguration():
                         },
                     },
                 },
+                "dynamic_templates" : [
+
+                    {
+                        "do_not_index_drugbank" : {
+                            "path_match" : "*drugbank*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+
+                    {
+                        "do_not_index_go" : {
+                            "path_match" : "*go.*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+                    {
+                        "do_not_index_go" : {
+                            "path_match" : "*interpro.*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+                    {
+                        "do_not_index_go" : {
+                            "path_match" : "*pdb.*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+                    {
+                        "do_not_index_go" : {
+                            "path_match" : "reactome.REACT*",
+                            "mapping" : {
+                                "index" : "no"
+                            }
+                        }
+                    },
+                ]
             },
         }
     }
