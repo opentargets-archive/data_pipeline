@@ -225,8 +225,8 @@ class EvidenceValidationFileChecker():
         orphanet_pattern = "http://www.orpha.net/ORDO/Orphanet_%"
         hpo_pattern = "http://purl.obolibrary.org/obo/HP_%"
         mp_pattern = "http://purl.obolibrary.org/obo/MP_%"
-        do_pattern = "http://purl.obolibrary.org/obo/DOID_[0-9]{2,}"
-        go_pattern = "http://purl.obolibrary.org/obo/GO_[0-9]{4,}" 
+        do_pattern = "http://purl.obolibrary.org/obo/DOID_%"
+        go_pattern = "http://purl.obolibrary.org/obo/GO_%" 
         
         for row in self.session.query(EFONames).filter(
                 or_(
@@ -254,14 +254,14 @@ class EvidenceValidationFileChecker():
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             for subdirname in dirnames:
                 cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv011)$", subdirname)
+                #cttv_match = re.match("^(cttv007)$", subdirname)
                 if cttv_match:
                     provider_id = cttv_match.groups()[0]
                     cttv_dir = os.path.join(dirname, subdirname)
                     print(cttv_dir)
                     for cttv_dirname, cttv_dirs, filenames in os.walk(os.path.join(cttv_dir, "upload/submissions")):
                         for filename in filenames:
-                            if filename.endswith(('.json.gz')): # and filename == 'cttv011-01-07-2015.json.gz': #and filename == 'cttv009-14-07-2015.json.gz': #
+                            if filename.endswith(('.json.gz')): #and filename == 'cttv007-15-07-2015.json.gz': #and filename == 'cttv009-14-07-2015.json.gz': #
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 last_modified = os.path.getmtime(cttv_file)
                                 july = time.strptime("01 Jul 2015", "%d %b %Y")
@@ -352,104 +352,114 @@ class EvidenceValidationFileChecker():
                             obj = cttv.Literature_Mining.fromMap(python_raw)
                         elif data_type == 'animal_model':
                             obj = cttv.Animal_Models.fromMap(python_raw)
-
-                        if obj.target.id:
-                            for id in obj.target.id: 
-                                if id in targets:
-                                    targets[id] +=1
-                                else:
-                                    targets[id] = 1
-                                if not id in top_targets:
-                                    if len(top_targets) < Config.EVIDENCEVALIDATION_NB_TOP_TARGETS:
-                                        top_targets.append(id)
-                                    else:
-                                        # map,reduce
-                                        for n in range(0,len(top_targets)):
-                                            if targets[top_targets[n]] < targets[id]:
-                                                top_targets[n] = id;
-                                                break;
-                                        
-                        if obj.disease.id:
-                            for id in obj.disease.id:
-                                if id in diseases:
-                                    diseases[id] +=1
-                                else:
-                                    diseases[id] =1
-                                if not id in top_diseases:
-                                    if len(top_diseases) < Config.EVIDENCEVALIDATION_NB_TOP_DISEASES:
-                                        top_diseases.append(id)
-                                    else:
-                                        # map,reduce
-                                        for n in range(0,len(top_diseases)):
-                                            if diseases[top_diseases[n]] < diseases[id]:
-                                                top_diseases[n] = id;
-                                                break;
-                                        
-                        if not bGivingUp:  
-                            self.startCapture(logging.ERROR)
-                        uniq_elements = obj.unique_association_fields
-                        uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
-                        uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
-                        if not uniq_elements_flat_hexdig in hexdigest_map:
-                            hexdigest_map[uniq_elements_flat_hexdig] = [ lc+1 ]
-                        else:
-                            hexdigest_map[uniq_elements_flat_hexdig].append(lc+1)                          
-                            logger.error("Line {0}: Duplicated unique_association_fields on lines {1}".format(lc+1, ",".join(map(lambda x: "%i"%x,  hexdigest_map[uniq_elements_flat_hexdig]))))
-                            nb_duplicates = nb_duplicates + 1
-                            validation_failed = True
-  
-                        validation_result = obj.validate(logger)
-                        nb_errors = nb_errors + validation_result
                         
-                        '''
-                        Check EFO
-                        '''
-                        if obj.disease.id:
-                            for disease_id in obj.disease.id:
-                                if disease_id not in efo_current:
-                                    logger.error("Line {0}: Invalid disease term detected {1}. Please provide the correct EFO disease term".format(lc+1, disease_id))
-                                    if disease_id not in invalid_diseases:
-                                        invalid_diseases[disease_id] = 1
+                        if obj:
+
+                            if obj.target.id:
+                                for id in obj.target.id: 
+                                    if id in targets:
+                                        targets[id] +=1
                                     else:
-                                        invalid_diseases[disease_id] += 1
-                                    nb_efo_invalid +=1
-                                if disease_id in efo_obsolete:
-                                    logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, efo_current[disease_id], efo_obsolete[disease_id]))
-                                    if disease_id not in obsolete_diseases:
-                                        obsolete_diseases[disease_id] = 1
+                                        targets[id] = 1
+                                    if not id in top_targets:
+                                        if len(top_targets) < Config.EVIDENCEVALIDATION_NB_TOP_TARGETS:
+                                            top_targets.append(id)
+                                        else:
+                                            # map,reduce
+                                            for n in range(0,len(top_targets)):
+                                                if targets[top_targets[n]] < targets[id]:
+                                                    top_targets[n] = id;
+                                                    break;
+                                            
+                            if obj.disease.id:
+                                for id in obj.disease.id:
+                                    if id in diseases:
+                                        diseases[id] +=1
                                     else:
-                                        obsolete_diseases[disease_id] += 1
-                                    nb_efo_obsolete +=1
-                                
-                        '''
-                        Check Ensembl ID, UniProt ID (TODO)
-                        '''
-                        if obj.target.id:
-                            for id in obj.target.id:
-                                # http://identifiers.org/ensembl/ENSG00000178573
-                                ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', id)
-                                uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
-                                if ensemblMatch:
-                                    ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
-                                    if not ensembl_id in ensembl_current:
-                                        logger.error("Line {0}: Invalid Ensembl gene detected {1}. Please provide the correct identifier for assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                                        if not ensembl_id in invalid_ensembl_ids:
-                                            invalid_ensembl_ids[ensembl_id] = 1
+                                        diseases[id] =1
+                                    if not id in top_diseases:
+                                        if len(top_diseases) < Config.EVIDENCEVALIDATION_NB_TOP_DISEASES:
+                                            top_diseases.append(id)
                                         else:
-                                            invalid_ensembl_ids[ensembl_id] += 1
-                                        nb_ensembl_invalid +=1
-                                elif uniprotMatch:
-                                    uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                                    if not uniprot_id in uniprot_current:
-                                        logger.error("Line {0}: Invalid Uniprot entry detected {1}. Please provide a correct identifier for Uniprot entry".format(lc+1, uniprot_id))
-                                        if not uniprot_id in invalid_uniprot_ids:
-                                            invalid_uniprot_ids[uniprot_id] = 1
+                                            # map,reduce
+                                            for n in range(0,len(top_diseases)):
+                                                if diseases[top_diseases[n]] < diseases[id]:
+                                                    top_diseases[n] = id;
+                                                    break;
+                                            
+                            if not bGivingUp:  
+                                self.startCapture(logging.ERROR)
+                            uniq_elements = obj.unique_association_fields
+                            uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
+                            uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
+                            if not uniq_elements_flat_hexdig in hexdigest_map:
+                                hexdigest_map[uniq_elements_flat_hexdig] = [ lc+1 ]
+                            else:
+                                hexdigest_map[uniq_elements_flat_hexdig].append(lc+1)                          
+                                logger.error("Line {0}: Duplicated unique_association_fields on lines {1}".format(lc+1, ",".join(map(lambda x: "%i"%x,  hexdigest_map[uniq_elements_flat_hexdig]))))
+                                nb_duplicates = nb_duplicates + 1
+                                validation_failed = True
+      
+                            validation_result = obj.validate(logger)
+                            nb_errors = nb_errors + validation_result
+                            
+                            '''
+                            Check EFO
+                            '''
+                            if obj.disease.id:
+                                for disease_id in obj.disease.id:
+                                    if disease_id not in efo_current:
+                                        logger.error("Line {0}: Invalid disease term detected {1}. Please provide the correct EFO disease term".format(lc+1, disease_id))
+                                        if disease_id not in invalid_diseases:
+                                            invalid_diseases[disease_id] = 1
                                         else:
-                                            invalid_uniprot_ids[uniprot_id] += 1
-                                        nb_uniprot_invalid +=1
-                                
-                        if not bGivingUp:  
-                            logs = self.stopCapture()
+                                            invalid_diseases[disease_id] += 1
+                                        nb_efo_invalid +=1
+                                    if disease_id in efo_obsolete:
+                                        logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, efo_current[disease_id], efo_obsolete[disease_id]))
+                                        if disease_id not in obsolete_diseases:
+                                            obsolete_diseases[disease_id] = 1
+                                        else:
+                                            obsolete_diseases[disease_id] += 1
+                                        nb_efo_obsolete +=1
+                                    
+                            '''
+                            Check Ensembl ID, UniProt ID (TODO)
+                            '''
+                            if obj.target.id:
+                                for id in obj.target.id:
+                                    # http://identifiers.org/ensembl/ENSG00000178573
+                                    ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', id)
+                                    uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
+                                    if ensemblMatch:
+                                        ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
+                                        if not ensembl_id in ensembl_current:
+                                            logger.error("Line {0}: Invalid Ensembl gene detected {1}. Please provide the correct identifier for assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            if not ensembl_id in invalid_ensembl_ids:
+                                                invalid_ensembl_ids[ensembl_id] = 1
+                                            else:
+                                                invalid_ensembl_ids[ensembl_id] += 1
+                                            nb_ensembl_invalid +=1
+                                    elif uniprotMatch:
+                                        uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
+                                        if not uniprot_id in uniprot_current:
+                                            logger.error("Line {0}: Invalid Uniprot entry detected {1}. Please provide a correct identifier for Uniprot entry".format(lc+1, uniprot_id))
+                                            if not uniprot_id in invalid_uniprot_ids:
+                                                invalid_uniprot_ids[uniprot_id] = 1
+                                            else:
+                                                invalid_uniprot_ids[uniprot_id] += 1
+                                            nb_uniprot_invalid +=1
+                                    
+                            if not bGivingUp:  
+                                logs = self.stopCapture()
+                        else:
+                            if not bGivingUp:
+                                self.startCapture(logging.ERROR)
+                                logger.error("Line {0}: Not a valid 1.2.1 evidence string - There was an error parsing the JSON document. The document may contain an invalid field".format(lc+1))
+                                logs = self.stopCapture()
+                            nb_errors += 1
+                            validation_failed = True
+                                                
                     else:
                         if not bGivingUp:
                             self.startCapture(logging.ERROR)
@@ -457,6 +467,7 @@ class EvidenceValidationFileChecker():
                             logs = self.stopCapture()
                         nb_errors += 1
                         validation_failed = True
+                    
                 elif not 'validated_against_schema_version' in python_raw or ('validated_against_schema_version' in python_raw and python_raw['validated_against_schema_version'] != "1.2.1"):
                     if not bGivingUp:
                         self.startCapture(logging.ERROR)
@@ -525,7 +536,7 @@ class EvidenceValidationFileChecker():
 
             # report invalid Uniprot entries
             if nb_uniprot_invalid > 0:
-                text +="%i distinct invalid Ensembl identifiers found in %i (%.1f%s) of the records:\n"%(len(invalid_ensembl_ids), nb_uniprot_invalid, nb_uniprot_invalid*100/lc, '%' )
+                text +="%i distinct invalid Uniprot identifiers found in %i (%.1f%s) of the records:\n"%(len(invalid_uniprot_ids), nb_uniprot_invalid, nb_uniprot_invalid*100/lc, '%' )
                 for uniprot_id in invalid_uniprot_ids:
                     text += "\t%s\t(reported %i times)\n"%(uniprot_id, invalid_uniprot_ids[uniprot_id])
                 text +="\n"
@@ -561,7 +572,7 @@ class EvidenceValidationFileChecker():
                 self.session.add(rowToUpdate)
     
             self.send_email(
-                True, 
+                False, 
                 provider_id, 
                 filename, 
                 (nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0 and nb_uniprot_invalid == 0), 
