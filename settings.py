@@ -455,7 +455,7 @@ class ElasticSearchConfiguration():
 
                     {
                         "do_not_index_go" : {
-                            "path_match" : "*go.*",
+                            "path_match" : "go.*",
                             "mapping" : {
                                 "index" : "no"
                             }
