@@ -543,6 +543,9 @@ class EvidenceValidationFileChecker():
                 
             now = datetime.utcnow()
 
+            # A file is successfully validated if it meets the following conditions
+            successfully_validated = (nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0 and nb_uniprot_invalid == 0)
+            
             if count == 0:
                 # insert
                 f = EvidenceValidation(
@@ -556,7 +559,7 @@ class EvidenceValidationFileChecker():
                     nb_records = lc,
                     nb_errors = nb_errors,
                     nb_duplicates = nb_duplicates,
-                    successfully_validated = (nb_errors == 0 and nb_duplicates == 0)
+                    successfully_validated = successfully_validated
                 )
                 self.session.add(f)
                 logging.info('inserted %s file in the validation table'%file_on_disk)
@@ -568,14 +571,14 @@ class EvidenceValidationFileChecker():
                 rowToUpdate.nb_duplicates = nb_duplicates
                 rowToUpdate.date_modified = now
                 rowToUpdate.date_validated = now
-                rowToUpdate.successfully_validated = (nb_errors == 0 and nb_duplicates == 0)
+                rowToUpdate.successfully_validated = successfully_validated
                 self.session.add(rowToUpdate)
     
             self.send_email(
-                False, 
+                True, 
                 provider_id, 
                 filename, 
-                (nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0 and nb_uniprot_invalid == 0), 
+                successfully_validated, 
                 lc, 
                 { 'JSON errors': nb_errors, 'duplicates': nb_duplicates, 'invalid EFO terms': nb_efo_invalid, 'obsolete EFO terms': nb_efo_obsolete, 'invalid Ensembl ids': nb_ensembl_invalid, 'invalid Uniprot ids': nb_uniprot_invalid }, 
                 now, 
