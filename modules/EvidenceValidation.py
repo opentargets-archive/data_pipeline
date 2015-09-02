@@ -54,7 +54,7 @@ cttv_data_providers_e_mails = {
  "cttv006" : [ 'fabregat@ebi.ac.uk' ],
  "cttv007" : [ 'kl1@sanger.ac.uk' ],
  "cttv008" : [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ],
- "cttv009" : [ 'gautierk@targetvalidation.org', 'mmaguire@ebi.ac.uk'], #[ 'cleroy@ebi.ac.uk' ],
+ "cttv009" : [ 'cleroy@ebi.ac.uk' ],
  "cttv010" : [ 'mkeays@ebi.ac.uk' ],
  "cttv011" : [ 'eddturner@ebi.ac.uk' ],
  "cttv012" : [ 'fjlopez@ebi.ac.uk', 'garys@ebi.ac.uk' ],
