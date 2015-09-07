@@ -264,9 +264,11 @@ class EvidenceValidationFileChecker():
                             if filename.endswith(('.json.gz')): #and filename == 'cttv007-15-07-2015.json.gz': #and filename == 'cttv009-14-07-2015.json.gz': #
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 last_modified = os.path.getmtime(cttv_file)
-                                july = time.strptime("01 Jul 2015", "%d %b %Y")
-                                julyseconds = time.mktime(july)
-                                if( last_modified - julyseconds ) > 0:
+                                #july = time.strptime("01 Jul 2015", "%d %b %Y")
+                                #julyseconds = time.mktime(july)
+                                sep = time.strptime("07 Sep 2015", "%d %b %Y")
+                                sepseconds = time.mktime(sep)                                
+                                if( last_modified - sepseconds ) > 0:
                                     m = re.match("^(.+).json.gz$", filename)
                                     logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
                                     print(cttv_file)
