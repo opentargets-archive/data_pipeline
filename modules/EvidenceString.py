@@ -791,7 +791,7 @@ class EvidenceStringProcess():
         for key, value in self.data.iteritems():
             self.loaded_entries_to_pg += 1
             self.session.add(ElasticsearchLoad(id=key,
-                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value['evidence']['sourceID']],
+                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value.database],
                                           type=value.get_doc_name(),
                                           data=value.to_json(),
                                           active=True,
