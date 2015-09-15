@@ -791,7 +791,7 @@ class EvidenceStringProcess():
         for key, value in self.data.iteritems():
             self.loaded_entries_to_pg += 1
             self.session.add(ElasticsearchLoad(id=key,
-                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+value.datatype,
+                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value['evidence']['sourceID']],
                                           type=value.get_doc_name(),
                                           data=value.to_json(),
                                           active=True,
@@ -829,7 +829,7 @@ class EvidenceStringUploader():
 
 class EvidenceStringRetriever():
     """
-    Will retrieve a Gene object form the processed json stored in postgres
+    Will retrieve an evidence string object form the processed json stored in postgres
     """
     def __init__(self,
                  adapter):

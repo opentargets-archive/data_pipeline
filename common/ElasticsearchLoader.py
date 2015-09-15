@@ -68,13 +68,13 @@ class JSONObjectStorage():
                             ElasticsearchLoad.type == doc_name,
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
-                loader.put(index_name, doc_name, row.id, row.data)
+                loader.put(row.index, doc_name, row.id, row.data)
         else:
             for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
                             ElasticsearchLoad.index.startswith(index_name),
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
-                    loader.put(index_name, row.type, row.id, row.data)
+                    loader.put(row.index, row.type, row.id, row.data)
         loader.flush()
 
     @staticmethod
@@ -95,7 +95,7 @@ class JSONObjectStorage():
         """given an index and a doc_name and an id return the json object tore in postgres
         """
         row = session.query(ElasticsearchLoad.data).filter(and_(
-            ElasticsearchLoad.index == index_name,
+            ElasticsearchLoad.index.startswith(index_name),
             ElasticsearchLoad.type == doc_name,
             ElasticsearchLoad.active == True,
             ElasticsearchLoad.id == objid)
