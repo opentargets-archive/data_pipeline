@@ -561,7 +561,7 @@ class Evidence(JSONSerializable):
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
             elif self.evidence['type']=='literature':
                 score=  float(self.evidence['evidence']['resource_score']['value'])
-                if self.evidence['sourceID']=='europmc':
+                if self.evidence['sourceID']=='europepmc':
                     score = score/100.
                     if score >1:
                         score=1.

@@ -83,12 +83,12 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
-    DATASOURCE_TO_DATATYPE_MAPPING['europmc'] = 'literature'
+    DATASOURCE_TO_DATATYPE_MAPPING['europepmc'] = 'literature'
     DATASOURCE_TO_DATATYPE_MAPPING['disgenet'] = 'literature'
 
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
     DATASOURCE_TO_INDEX_KEY_MAPPING['disgenet'] = 'disgenet'
-    DATASOURCE_TO_INDEX_KEY_MAPPING['europmc'] = 'europmc'
+    DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
     DATASOURCE_TO_INDEX_KEY_MAPPING['phenodigm'] = DATASOURCE_TO_DATATYPE_MAPPING['phenodigm']
     DATASOURCE_TO_INDEX_KEY_MAPPING['expression_atlas'] = DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas']
 
