@@ -68,7 +68,7 @@ class Config():
                                                 gwas_ibd = 'CTTV018_IBD_GWAS',
                                                 phenodigm = 'CTTV_External_MouseModels',
                                                 cancer_gene_census = 'CTTV_External_Cancer_Gene_Census',
-                                                europmc = 'CTTV025_Literature',
+                                                europepmc = 'CTTV025_Literature',
                                                 disgenet = 'CTTV_External_DisGeNet',
                                                 rare2common = 'CTTV005_Rare2Common',
                                                 tissue_specificity = 'CTTV010_Tissue_Specificity'
