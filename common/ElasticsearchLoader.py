@@ -63,18 +63,18 @@ class JSONObjectStorage():
         """
         # loader.create_new_index(index_name)
         if doc_name:
-            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.data, ).filter(and_(
+            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.index, ElasticsearchLoad.data, ).filter(and_(
                             ElasticsearchLoad.index.startswith(index_name),
                             ElasticsearchLoad.type == doc_name,
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
                 loader.put(row.index, doc_name, row.id, row.data)
         else:
-            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
+            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.index, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
                             ElasticsearchLoad.index.startswith(index_name),
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
-                    loader.put(row.index, row.type, row.id, row.data)
+                loader.put(row.index, row.type, row.id, row.data)
         loader.flush()
 
     @staticmethod
