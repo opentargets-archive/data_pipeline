@@ -822,10 +822,13 @@ class EvidenceStringUploader():
         self.loader=loader
 
     def upload_all(self):
+        self.clear_old_data()
         JSONObjectStorage.refresh_index_data_in_es(self.loader,
                                          self.session,
                                          Config.ELASTICSEARCH_DATA_INDEX_NAME
                                          )
+    def clear_old_data(self):
+        self.loader.clear_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
 
 class EvidenceStringRetriever():
     """

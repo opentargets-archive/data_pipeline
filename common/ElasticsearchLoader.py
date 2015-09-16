@@ -220,3 +220,6 @@ class Loader():
         else:
             self.es.indices.create(index=index_name, ignore=400)
         return
+
+    def clear_index(self, index_name):
+        self.es.indices.delete(index=index_name)
