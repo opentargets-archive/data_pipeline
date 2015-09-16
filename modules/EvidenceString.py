@@ -165,6 +165,7 @@ class EvidenceManager():
             eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
 
             if eco_uri in self.eco_scores:
+                evidence['evidence']['gene2variant'] = dict(resource_score={})
                 evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
                 evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
                 if available_score !=self.eco_scores[eco_uri]:
