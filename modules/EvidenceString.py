@@ -560,7 +560,12 @@ class Evidence(JSONSerializable):
             elif self.evidence['type']=='somatic_mutation':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
             elif self.evidence['type']=='literature':
-                self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
+                score=  float(self.evidence['evidence']['resource_score']['value'])
+                if self.evidence['sourceID']=='europmc':
+                    score = score/100.
+                    if score >1:
+                        score=1.
+                self.evidence['scores'] ['association_score']= score
             elif self.evidence['type']=='affected_pathway':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
             # if self.evidence['sourceID']=='expression_atlas':
