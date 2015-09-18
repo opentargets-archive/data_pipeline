@@ -165,7 +165,8 @@ class EvidenceManager():
             eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
 
             if eco_uri in self.eco_scores:
-                evidence['evidence']['gene2variant'] = dict(resource_score={})
+                if 'resource_score' not in evidence['evidence']['gene2variant']:
+                    evidence['evidence']['gene2variant']['resource_score']={}
                 evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
                 evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
                 if available_score !=self.eco_scores[eco_uri]:
@@ -744,7 +745,7 @@ class EvidenceStringProcess():
         base_id = 0
         err = 0
         fix = 0
-        evidence_manager = EvidenceManager(self.adapter,)
+        evidence_manager = EvidenceManager(self.adapter)
         self._delete_prev_data()
         # for row in self.session.query(LatestEvidenceString).yield_per(1000):
         for row in self.session.query(EvidenceString121).yield_per(1000):
@@ -837,6 +838,8 @@ class EvidenceStringUploader():
                                          self.session,
                                          Config.ELASTICSEARCH_DATA_INDEX_NAME
                                          )
+        self.loader.optimize_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
+        self.loader.optimize_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
 
     def clear_old_data(self):
         self.loader.clear_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')

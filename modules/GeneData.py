@@ -569,6 +569,7 @@ class GeneUploader():
                                          self.session,
                                          Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                                          Config.ELASTICSEARCH_GENE_NAME_DOC_NAME)
+        self.loader.optimize_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
 
 
 class GeneRetriever():

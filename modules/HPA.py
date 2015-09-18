@@ -394,3 +394,4 @@ class HPAUploader():
                                          self.session,
                                          Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
                                          Config.ELASTICSEARCH_EXPRESSION_DOC_NAME)
+        self.loader.optimize_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)

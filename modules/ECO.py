@@ -114,6 +114,7 @@ class EcoUploader():
                                          Config.ELASTICSEARCH_ECO_INDEX_NAME,
                                          Config.ELASTICSEARCH_ECO_DOC_NAME,
                                          )
+        self.loader.optimize_all()
 
 
 class EcoRetriever():
