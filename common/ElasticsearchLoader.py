@@ -229,4 +229,4 @@ class Loader():
         self.es.indices.optimize(index='', max_num_segments=5, timeout=300)
 
     def optimize_index(self, index_name):
-        self.es.indices.optimize(index=index_name, max_num_segments=5,timeout=300)
+        self.es.indices.optimize(index=index_name, max_num_segments=5)
