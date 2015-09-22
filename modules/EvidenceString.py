@@ -225,8 +225,10 @@ class EvidenceManager():
         if 'evidence_codes' in evidence['evidence']:
             eco_ids = evidence['evidence']['evidence_codes']
         elif 'variant2disease' in evidence['evidence']:
-            eco_ids = evidence['evidence']['variant2disease']['evidence_codes']
-            eco_ids.extend(evidence['evidence']['gene2variant']['evidence_codes'])
+            if 'variant2disease' in evidence['evidence']:
+                eco_ids = evidence['evidence']['variant2disease']['evidence_codes']
+            if 'gene2variant' in evidence['evidence']:
+                eco_ids.extend(evidence['evidence']['gene2variant']['evidence_codes'])
         elif 'target2drug' in evidence['evidence']:
             eco_ids = evidence['evidence']['target2drug']['evidence_codes']
             eco_ids.extend(evidence['evidence']['drug2clinic']['evidence_codes'])
