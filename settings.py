@@ -89,8 +89,8 @@ class Config():
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
     DATASOURCE_TO_INDEX_KEY_MAPPING['disgenet'] = 'disgenet'
     DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
-    DATASOURCE_TO_INDEX_KEY_MAPPING['phenodigm'] = DATASOURCE_TO_DATATYPE_MAPPING['phenodigm']
-    DATASOURCE_TO_INDEX_KEY_MAPPING['expression_atlas'] = DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas']
+    # DATASOURCE_TO_INDEX_KEY_MAPPING['phenodigm'] = DATASOURCE_TO_DATATYPE_MAPPING['phenodigm']
+    # DATASOURCE_TO_INDEX_KEY_MAPPING['expression_atlas'] = DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas']
 
 
 
