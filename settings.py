@@ -85,7 +85,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
     DATASOURCE_TO_DATATYPE_MAPPING['europepmc'] = 'literature'
     DATASOURCE_TO_DATATYPE_MAPPING['disgenet'] = 'literature'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'literature'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
 
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
     DATASOURCE_TO_INDEX_KEY_MAPPING['disgenet'] = 'disgenet'
