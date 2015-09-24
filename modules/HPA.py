@@ -226,7 +226,7 @@ class HPAProcess():
             rows_deleted= self.session.query(
                 ElasticsearchLoad).filter(
                     and_(ElasticsearchLoad.index==Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                         ElasticsearchLoad.type==Config.ELASTICSEARCH_EXPRESSION_DOC_NAME)).delete()
+                         ElasticsearchLoad.type==Config.ELASTICSEARCH_EXPRESSION_DOC_NAME)).delete(synchronize_session='fetch')
             if rows_deleted:
                 logging.info('deleted %i rows of expression data from elasticsearch_load'%rows_deleted)
             c=0
