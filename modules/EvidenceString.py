@@ -165,6 +165,8 @@ class EvidenceManager():
             eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
 
             if eco_uri in self.eco_scores:
+                if 'resource_score' not in evidence['evidence']['gene2variant']:
+                    evidence['evidence']['gene2variant']['resource_score']={}
                 evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
                 evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
                 if available_score !=self.eco_scores[eco_uri]:
@@ -223,8 +225,10 @@ class EvidenceManager():
         if 'evidence_codes' in evidence['evidence']:
             eco_ids = evidence['evidence']['evidence_codes']
         elif 'variant2disease' in evidence['evidence']:
-            eco_ids = evidence['evidence']['variant2disease']['evidence_codes']
-            eco_ids.extend(evidence['evidence']['gene2variant']['evidence_codes'])
+            if 'variant2disease' in evidence['evidence']:
+                eco_ids = evidence['evidence']['variant2disease']['evidence_codes']
+            if 'gene2variant' in evidence['evidence']:
+                eco_ids.extend(evidence['evidence']['gene2variant']['evidence_codes'])
         elif 'target2drug' in evidence['evidence']:
             eco_ids = evidence['evidence']['target2drug']['evidence_codes']
             eco_ids.extend(evidence['evidence']['drug2clinic']['evidence_codes'])
@@ -560,7 +564,12 @@ class Evidence(JSONSerializable):
             elif self.evidence['type']=='somatic_mutation':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
             elif self.evidence['type']=='literature':
-                self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
+                score=  float(self.evidence['evidence']['resource_score']['value'])
+                if self.evidence['sourceID']=='europepmc':
+                    score = score/100.
+                    if score >1:
+                        score=1.
+                self.evidence['scores'] ['association_score']= score
             elif self.evidence['type']=='affected_pathway':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
             # if self.evidence['sourceID']=='expression_atlas':
@@ -738,7 +747,7 @@ class EvidenceStringProcess():
         base_id = 0
         err = 0
         fix = 0
-        evidence_manager = EvidenceManager(self.adapter,)
+        evidence_manager = EvidenceManager(self.adapter)
         self._delete_prev_data()
         # for row in self.session.query(LatestEvidenceString).yield_per(1000):
         for row in self.session.query(EvidenceString121).yield_per(1000):
@@ -791,7 +800,7 @@ class EvidenceStringProcess():
         for key, value in self.data.iteritems():
             self.loaded_entries_to_pg += 1
             self.session.add(ElasticsearchLoad(id=key,
-                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+value.datatype,
+                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value.database],
                                           type=value.get_doc_name(),
                                           data=value.to_json(),
                                           active=True,
@@ -822,14 +831,25 @@ class EvidenceStringUploader():
         self.loader=loader
 
     def upload_all(self):
+        self.clear_old_data()
+        JSONObjectStorage.refresh_index_data_in_es(self.loader,
+                                         self.session,
+                                         Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME
+                                         )
         JSONObjectStorage.refresh_index_data_in_es(self.loader,
                                          self.session,
                                          Config.ELASTICSEARCH_DATA_INDEX_NAME
                                          )
+        self.loader.optimize_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
+        self.loader.optimize_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
+
+    def clear_old_data(self):
+        self.loader.clear_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
+        self.loader.clear_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
 
 class EvidenceStringRetriever():
     """
-    Will retrieve a Gene object form the processed json stored in postgres
+    Will retrieve an evidence string object form the processed json stored in postgres
     """
     def __init__(self,
                  adapter):

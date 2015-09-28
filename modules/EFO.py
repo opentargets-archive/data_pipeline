@@ -171,6 +171,7 @@ class EfoUploader():
                                          Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                                          Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                                          )
+        self.loader.optimize_all()
 
 
 class EfoRetriever():

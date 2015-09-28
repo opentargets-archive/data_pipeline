@@ -76,7 +76,6 @@ if __name__ == '__main__':
 
     adapter = Adapter()
     '''init es client'''
-    print 'pointing to elasticsearch at:', Config.ELASTICSEARCH_URL
     es = Elasticsearch(Config.ELASTICSEARCH_URL)
     # es = Elasticsearch(["10.0.0.11:9200"],
     # # sniff before doing anything
@@ -90,6 +89,7 @@ if __name__ == '__main__':
     logging.getLogger('elasticsearch').setLevel(logging.ERROR)
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
+    logging.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
     with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
         run_full_pipeline = False
         if args.all  and (Actions.ALL in args.all):

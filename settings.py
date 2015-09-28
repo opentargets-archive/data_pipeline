@@ -68,7 +68,7 @@ class Config():
                                                 gwas_ibd = 'CTTV018_IBD_GWAS',
                                                 phenodigm = 'CTTV_External_MouseModels',
                                                 cancer_gene_census = 'CTTV_External_Cancer_Gene_Census',
-                                                europmc = 'CTTV025_Literature',
+                                                europepmc = 'CTTV025_Literature',
                                                 disgenet = 'CTTV_External_DisGeNet',
                                                 rare2common = 'CTTV005_Rare2Common',
                                                 tissue_specificity = 'CTTV010_Tissue_Specificity'
@@ -83,8 +83,17 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
-    DATASOURCE_TO_DATATYPE_MAPPING['europmc'] = 'literature'
+    DATASOURCE_TO_DATATYPE_MAPPING['europepmc'] = 'literature'
     DATASOURCE_TO_DATATYPE_MAPPING['disgenet'] = 'literature'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
+
+    DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
+    DATASOURCE_TO_INDEX_KEY_MAPPING['disgenet'] = 'disgenet'
+    DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
+    # DATASOURCE_TO_INDEX_KEY_MAPPING['phenodigm'] = DATASOURCE_TO_DATATYPE_MAPPING['phenodigm']
+    # DATASOURCE_TO_INDEX_KEY_MAPPING['expression_atlas'] = DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas']
+
+
 
 def _get_evidence_string_generic_mapping():
     return {
@@ -97,15 +106,24 @@ def _get_evidence_string_generic_mapping():
                      "properties" : {
                          "id" : {
                               "type" : "string",
-                              "index" : "not_analyzed"
+                              "index" : "not_analyzed",
+                              "fielddata": {
+                                 "format": "doc_values"
+                              },
                          },
                          "target_type" : {
                               "type" : "string",
-                              "index" : "not_analyzed"
+                              "index" : "not_analyzed",
+                              "fielddata": {
+                                 "format": "doc_values"
+                              },
                          },
                          "activity" : {
                               "type" : "string",
-                              "index" : "not_analyzed"
+                              "index" : "not_analyzed",
+                              "fielddata": {
+                                 "format": "doc_values"
+                              },
                          },
 
                      }
@@ -115,7 +133,10 @@ def _get_evidence_string_generic_mapping():
                      "properties" : {
                          "id" : {
                               "type" : "string",
-                              "index" : "not_analyzed"
+                              "index" : "not_analyzed",
+                              "fielddata": {
+                                 "format": "doc_values"
+                              },
                          }
                      }
                 },
@@ -124,14 +145,20 @@ def _get_evidence_string_generic_mapping():
                      "properties" : {
                          "efo_codes" : {
                               "type" : "string",
-                              "index" : "not_analyzed"
+                              "index" : "not_analyzed",
+                              "fielddata": {
+                                 "format": "doc_values"
+                              },
                          },
                          "facets" : {
                             "type" : "object",
                             "properties" : {
                                 "uniprot_keywords": {
                                     "type" : "string",
-                                    "index" : "not_analyzed"
+                                    "index" : "not_analyzed",
+                                      "fielddata": {
+                                         "format": "doc_values"
+                                      },
                                 }
                             }
                          }
@@ -142,7 +169,10 @@ def _get_evidence_string_generic_mapping():
                      "properties" : {
                          "path" : {
                               "type" : "string",
-                              "index" : "not_analyzed"
+                              "index" : "not_analyzed",
+                              "fielddata": {
+                                 "format": "doc_values"
+                              },
                          }
                      }
                 },
@@ -152,7 +182,10 @@ def _get_evidence_string_generic_mapping():
                      "properties" : {
                          "evidence_codes" : {
                               "type" : "string",
-                              "index" : "not_analyzed"
+                              "index" : "not_analyzed",
+                              "fielddata": {
+                                 "format": "doc_values"
+                              },
                          },
                 #      #
                 #      #     "association_score":{
@@ -180,6 +213,9 @@ def _get_evidence_string_generic_mapping():
                     "path_match" : "scores.*",
                     "mapping" : {
                          "type" : "double",
+                          "fielddata": {
+                             "format": "doc_values"
+                          },
                     }
                 }
             },
@@ -190,7 +226,10 @@ def _get_evidence_string_generic_mapping():
                     "path_match" : "evidence.*",
                     "path_unmatch" : "evidence.evidence_codes*",
                     "mapping" : {
-                        "index" : "no"
+                        "index" : "no",
+                        "fielddata": {
+                           "format": "doc_values"
+                        },
                     }
                 }
             },
@@ -199,7 +238,10 @@ def _get_evidence_string_generic_mapping():
                 "do_not_index_drug" : {
                     "path_match" : "drug.*",
                     "mapping" : {
-                        "index" : "no"
+                        "index" : "no",
+                        "fielddata": {
+                           "format": "doc_values"
+                        },
                     }
                 }
             },
@@ -207,7 +249,10 @@ def _get_evidence_string_generic_mapping():
                 "do_not_index_unique_ass" : {
                     "path_match" : "unique_association_fields.*",
                     "mapping" : {
-                        "index" : "no"
+                        "index" : "no",
+                        "fielddata": {
+                           "format": "doc_values"
+                        },
                     }
                 }
             },
@@ -230,7 +275,7 @@ class ElasticSearchConfiguration():
         evidence_shard_number = 3
         evidence_replicas_number = 1
 
-        bulk_load_chunk =1000
+        bulk_load_chunk =10000
     else:
         generic_shard_number = 2
         generic_replicas_number = 0
@@ -262,6 +307,7 @@ class ElasticSearchConfiguration():
                            },
                         "settings":  {"number_of_shards" : generic_shard_number,
                                       "number_of_replicas" : generic_replicas_number,
+                                      "refresh_interval" : "60s",
                                       },
                         }
 
@@ -302,6 +348,7 @@ class ElasticSearchConfiguration():
         "settings":  {
             "number_of_shards" : generic_shard_number,
             "number_of_replicas" : generic_replicas_number,
+            "refresh_interval" : "60s",
             "analysis": {
                  "filter": {
                     "edgeNGram_filter": {
@@ -349,6 +396,7 @@ class ElasticSearchConfiguration():
          "settings": {
                 "number_of_shards" : generic_shard_number,
                 "number_of_replicas" : generic_replicas_number,
+                "refresh_interval" : "60s",
                 "analysis": {
                     "filter": {
                          "edgeNGram_filter": {
@@ -494,6 +542,7 @@ class ElasticSearchConfiguration():
         "settings": {
                 "number_of_shards" : generic_shard_number,
                 "number_of_replicas" : generic_replicas_number,
+                "refresh_interval" : "60s"
                 }
 
     }
@@ -504,13 +553,15 @@ class ElasticSearchConfiguration():
 
     evidence_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                            "number_of_replicas" : evidence_replicas_number,
-                                           # "index.store.type": "memory"
+                                           # "index.store.type": "memory",
+                                           "refresh_interval" : "60s",
                                            },
                               "mappings": evidence_mappings,
                             }
     score_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                        "number_of_replicas" : evidence_replicas_number,
-                                       "index.store.type": "memory"
+                                       "index.store.type": "memory",
+                                       "refresh_interval" : "60s",
                                        },
                               "mappings": evidence_mappings,
                             }

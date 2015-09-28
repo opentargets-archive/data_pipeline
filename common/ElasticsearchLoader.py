@@ -63,18 +63,18 @@ class JSONObjectStorage():
         """
         # loader.create_new_index(index_name)
         if doc_name:
-            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.data, ).filter(and_(
+            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.index, ElasticsearchLoad.data, ).filter(and_(
                             ElasticsearchLoad.index.startswith(index_name),
                             ElasticsearchLoad.type == doc_name,
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
-                loader.put(index_name, doc_name, row.id, row.data)
+                loader.put(row.index, doc_name, row.id, row.data)
         else:
-            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
+            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.index, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
                             ElasticsearchLoad.index.startswith(index_name),
                             ElasticsearchLoad.active == True)
             ).yield_per(loader.chunk_size):
-                    loader.put(index_name, row.type, row.id, row.data)
+                loader.put(row.index, row.type, row.id, row.data)
         loader.flush()
 
     @staticmethod
@@ -95,7 +95,7 @@ class JSONObjectStorage():
         """given an index and a doc_name and an id return the json object tore in postgres
         """
         row = session.query(ElasticsearchLoad.data).filter(and_(
-            ElasticsearchLoad.index == index_name,
+            ElasticsearchLoad.index.startswith(index_name),
             ElasticsearchLoad.type == doc_name,
             ElasticsearchLoad.active == True,
             ElasticsearchLoad.id == objid)
@@ -116,6 +116,7 @@ class Loader():
         self.results = defaultdict(list)
         self.chunk_size = chunk_size
         self.index_created=[]
+        logging.info("loader chunk_size: %i"%chunk_size)
 
     def put(self, index_name, doc_type, ID, body):
 
@@ -142,7 +143,7 @@ class Loader():
             action, result = results.popitem()
             self.results[result['_index']].append(result['_id'])
             doc_id = '/%s/%s' % (result['_index'], result['_id'])
-            if (len(self.results[result['_index']]) % 1000) == 0:
+            if (len(self.results[result['_index']]) % self.chunk_size) == 0:
                 logging.info(
                     "%i entries uploaded in elasticsearch for index %s" % (len(self.results[result['_index']]), result['_index']))
             if not ok:
@@ -220,3 +221,12 @@ class Loader():
         else:
             self.es.indices.create(index=index_name, ignore=400)
         return
+
+    def clear_index(self, index_name):
+        self.es.indices.delete(index=index_name)
+
+    def optimize_all(self):
+        self.es.indices.optimize(index='', max_num_segments=5, timeout=300)
+
+    def optimize_index(self, index_name):
+        self.es.indices.optimize(index=index_name, max_num_segments=5)
