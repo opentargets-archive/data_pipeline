@@ -206,6 +206,7 @@ class ReactomeUploader():
                                          Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
                                          Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
                                          )
+        self.loader.optimize_index(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
 
 
 
