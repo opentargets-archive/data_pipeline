@@ -840,7 +840,7 @@ class EvidenceStringUploader():
                                          self.session,
                                          Config.ELASTICSEARCH_DATA_INDEX_NAME
                                          )
-        self.loader.optimize_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
+        # self.loader.optimize_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
         self.loader.optimize_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
 
     def clear_old_data(self):
