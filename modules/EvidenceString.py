@@ -807,14 +807,14 @@ class EvidenceStringProcess():
                                           date_created=datetime.now(),
                                           date_modified=datetime.now(),
                                           ))
-            self.session.add(ElasticsearchLoad(id=key,
-                                          index=Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-                                          type=value.get_doc_name(),
-                                          data=value.score_to_json(),
-                                          active=True,
-                                          date_created=datetime.now(),
-                                          date_modified=datetime.now(),
-                                          ))
+            # self.session.add(ElasticsearchLoad(id=key,
+            #                               index=Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+            #                               type=value.get_doc_name(),
+            #                               data=value.score_to_json(),
+            #                               active=True,
+            #                               date_created=datetime.now(),
+            #                               date_modified=datetime.now(),
+            #                               ))
         logging.info("%i rows of evidence strings inserted to elasticsearch_load" % self.loaded_entries_to_pg)
         self.session.flush()
         self.data=OrderedDict()
@@ -832,10 +832,10 @@ class EvidenceStringUploader():
 
     def upload_all(self):
         self.clear_old_data()
-        JSONObjectStorage.refresh_index_data_in_es(self.loader,
-                                         self.session,
-                                         Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME
-                                         )
+        # JSONObjectStorage.refresh_index_data_in_es(self.loader,
+        #                                  self.session,
+        #                                  Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME
+        #                                  )
         JSONObjectStorage.refresh_index_data_in_es(self.loader,
                                          self.session,
                                          Config.ELASTICSEARCH_DATA_INDEX_NAME
@@ -844,7 +844,7 @@ class EvidenceStringUploader():
         self.loader.optimize_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
 
     def clear_old_data(self):
-        self.loader.clear_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
+        # self.loader.clear_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
         self.loader.clear_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
 
 class EvidenceStringRetriever():
