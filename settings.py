@@ -275,7 +275,7 @@ class ElasticSearchConfiguration():
         evidence_shard_number = 3
         evidence_replicas_number = 1
 
-        bulk_load_chunk =10000
+        bulk_load_chunk =1000
     else:
         generic_shard_number = 2
         generic_replicas_number = 0
