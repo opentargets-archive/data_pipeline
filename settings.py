@@ -49,7 +49,7 @@ class Config():
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
     REACTOME_PATHWAY_RELATION = 'http://www.reactome.org/download/current/ReactomePathwaysRelation.txt'
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
-    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp'
+    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/home/gk680303/windows/data/ftp' #'/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp'
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
