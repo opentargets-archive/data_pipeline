@@ -211,7 +211,7 @@ class Gene(JSONSerializable):
 
 
     def load_uniprot_entry(self, seqrec):
-        self.uniprot_id = seqrec.name
+        self.uniprot_id = seqrec.id
         self.is_in_swissprot = True
         if seqrec.dbxrefs:
             self.dbxrefs.extend(seqrec.dbxrefs)
