@@ -10,6 +10,7 @@ from modules.EvidenceValidation import EvidenceValidationActions, EvidenceValida
 from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
+from modules.Scoring import ScoringActions, ScoringProcess, ScoringUploader
 from modules.Uniprot import UniProtActions,UniprotDownloader
 from modules.HGNC import HGNCActions, HGNCUploader
 import argparse
@@ -66,6 +67,12 @@ if __name__ == '__main__':
                         action="append_const", const = EvidenceStringActions.UPLOAD)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EvidenceStringActions.ALL)
+    parser.add_argument("--scop", dest='sco', help="precompute association scores",
+                        action="append_const", const = ScoringActions.PROCESS)
+    parser.add_argument("--scou", dest='sco', help="upload the stored precomputed score json object to elasticsearch",
+                        action="append_const", const = ScoringActions.UPLOAD)
+    parser.add_argument("--sco", dest='evs', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
+                        action="append_const", const = ScoringActions.ALL)
     parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
                         action="append_const", const = ElasticsearchActions.RELOAD)
     parser.add_argument("--valck", dest='val', help="check new json files submitted to ftp site",
@@ -142,6 +149,12 @@ if __name__ == '__main__':
                 EvidenceStringProcess(adapter).process_all()
             if (EvidenceStringActions.UPLOAD in args.evs) or do_all:
                 EvidenceStringUploader(adapter, loader).upload_all()
+        if args.sco or run_full_pipeline:
+            do_all = (ScoringActions.ALL in args.sco) or run_full_pipeline
+            if (ScoringActions.PROCESS in args.sco) or do_all:
+                ScoringProcess(adapter).process_all()
+            if (ScoringActions.UPLOAD in args.sco) or do_all:
+                ScoringUploader(adapter, loader).upload_all()
         if args.val or run_full_pipeline:
             do_all = (EvidenceValidationActions.ALL in args.val) or run_full_pipeline
             if (EvidenceValidationActions.CHECKFILES in args.val) or do_all:
