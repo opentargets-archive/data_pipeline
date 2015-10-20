@@ -10,7 +10,7 @@ from modules.EvidenceValidation import EvidenceValidationActions, EvidenceValida
 from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
-from modules.Scoring import ScoringActions, ScoringProcess, ScoringUploader
+from modules.Scoring import ScoringActions, ScoringProcess, ScoringUploader, ScoringExtract
 from modules.Uniprot import UniProtActions,UniprotDownloader
 from modules.HGNC import HGNCActions, HGNCUploader
 import argparse
@@ -67,6 +67,8 @@ if __name__ == '__main__':
                         action="append_const", const = EvidenceStringActions.UPLOAD)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EvidenceStringActions.ALL)
+    parser.add_argument("--scoe", dest='sco', help="extract data relevant to scoring",
+                        action="append_const", const = ScoringActions.EXTRACT)
     parser.add_argument("--scop", dest='sco', help="precompute association scores",
                         action="append_const", const = ScoringActions.PROCESS)
     parser.add_argument("--scou", dest='sco', help="upload the stored precomputed score json object to elasticsearch",
@@ -151,6 +153,8 @@ if __name__ == '__main__':
                 EvidenceStringUploader(adapter, loader).upload_all()
         if args.sco or run_full_pipeline:
             do_all = (ScoringActions.ALL in args.sco) or run_full_pipeline
+            if (ScoringActions.EXTRACT in args.sco) or do_all:
+                ScoringExtract(adapter).extract()
             if (ScoringActions.PROCESS in args.sco) or do_all:
                 ScoringProcess(adapter).process_all()
             if (ScoringActions.UPLOAD in args.sco) or do_all:
