@@ -304,7 +304,7 @@ class ScoringProcess():
                             ElasticsearchLoad.active==True,
                             # ElasticsearchLoad.id == 'ENSG00000113448',
                             )
-                        ).yield_per(100):
+                        ):
                 target = target_row.id
                 for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                             ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
@@ -312,7 +312,7 @@ class ScoringProcess():
                             ElasticsearchLoad.active==True,
                             # ElasticsearchLoad.id =='EFO_0000270',
                             )
-                        ).yield_per(100):
+                        ):
                     disease = disease_row.id
                     c+=1
                     evidence = self._get_evidence_for_pair(target, disease)
@@ -322,7 +322,7 @@ class ScoringProcess():
                         storer.put(score)
                         # print c,round(c/estimated_total,2), target, disease, len(evidence)
                     # if c%(estimated_total/1000) ==0:
-                    if c%10000 ==0:
+                    if c%1000 ==0:
                         logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total), combination_with_data))
                         logging.info('target-disease pair analysis rate: %1.2f pair per second'%(c/(time.time()-self.start_time)))
                         # print c,round(estimated_total/c,2) target, disease, len(evidence)
@@ -343,7 +343,7 @@ class ScoringProcess():
                 ) rs WHERE Rank <= 10
         '''
         # evidences =self.session.execute(query)
-        evidence_ids_subquery = self.session.query(
+        evidence_ids = [row.evidence_id for row in self.session.query(
                                                 TargetToDiseaseAssociationScoreMap.evidence_id
                                                    )\
                                             .filter(
@@ -351,16 +351,18 @@ class ScoringProcess():
                                                     TargetToDiseaseAssociationScoreMap.target_id == target,
                                                     TargetToDiseaseAssociationScoreMap.disease_id == disease,
                                                     )
-                                                )\
-                                            .order_by(
-                                                TargetToDiseaseAssociationScoreMap.association_score.desc()
-                                                )\
-                                            .subquery()
+                                                )
+                                            # .yield_per(10000)
+                        ]
 
-        evidences = [EvidenceScore(row.data)
-                        for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids_subquery)).yield_per(10000)
-                     ]
-        return evidences
+        evidence  =[]
+        if evidence_ids:
+
+            evidence = [EvidenceScore(row.data)
+                            for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids))\
+                            # .yield_per(10000)
+                         ]
+        return evidence
 
 
 
