@@ -322,7 +322,7 @@ class ScoringProcess():
                         storer.put(score)
                         # print c,round(c/estimated_total,2), target, disease, len(evidence)
                     # if c%(estimated_total/1000) ==0:
-                    if c%1000 ==0:
+                    if c%100000 ==0:
                         logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total), combination_with_data))
                         logging.info('target-disease pair analysis rate: %1.2f pair per second'%(c/(time.time()-self.start_time)))
                         # print c,round(estimated_total/c,2) target, disease, len(evidence)
