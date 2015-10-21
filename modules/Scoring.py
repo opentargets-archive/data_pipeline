@@ -174,7 +174,7 @@ class ScoreStorer():
 
         #TODO: store in postgres
         for i,data in enumerate(self.cache):
-            logging.info(data.to_json())
+            logging.debug(data.to_json())
 
         if (self.counter % self.chunk_size) == 0:
             logging.info("%i precalculated scores inserted in elasticsearch_load table" %(self.counter))
@@ -252,7 +252,7 @@ class ScoringProcess():
                         storer.put(score)
                         print c,round(c/estimated_total,2), target, disease, len(evidence)
                     if c%(estimated_total/1000) ==0:
-                        logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total)), combination_with_data)
+                        logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total), combination_with_data))
                         # print c,round(estimated_total/c,2) target, disease, len(evidence)
                         # exit(0)
             logging.info('%i%% combinations computed, %i with data, sparse ratio: %1.2f%%'%(int(round(c/estimated_total)),
