@@ -1,5 +1,7 @@
 import logging
-from sqlalchemy import and_
+import pprint
+from sqlalchemy import and_, func
+from sqlalchemy.orm import joinedload, subqueryload
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
@@ -51,27 +53,30 @@ class Scorer():
     def __init__(self):
         pass
 
-    def score(self,target, disease, evidence, method  = ScoringMethods.HARMONIC_SUM):
+    def score(self,target, disease, evidence, method  = None):
 
-        association_score = AssociationScoreSet(target,disease)
+        score = AssociationScoreSet(target,disease)
 
-        if method == ScoringMethods.HARMONIC_SUM:
-            self._harmonic_sum(evidence, association_score)
-        elif  method == ScoringMethods.SUM:
-            self._sum(evidence, association_score)
-        elif  method == ScoringMethods.MAX:
-            self._max(evidence, association_score)
-        else:
-            raise NotImplementedError
+        if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
+            score = self._harmonic_sum(evidence, score)
+        if (method == ScoringMethods.SUM) or (method is None):
+            score = self._sum(evidence, score)
+        if (method == ScoringMethods.MAX) or (method is None):
+            score = self._max(evidence, score)
 
-    def _harmonic_sum(self, evidence, association_score):
-        pass
+        return score
 
-    def _sum(self, evidence, association_score):
-        pass
+    def _harmonic_sum(self, evidence, score):
+        return score
 
-    def _max(self, evidence, association_score):
-        pass
+    def _sum(self, evidence, score):
+        return score
+
+    def _max(self, evidence, score):
+        return score
+
+
+
 
 class ScoringExtract():
 
@@ -86,14 +91,12 @@ class ScoringExtract():
         :return:
         '''
 
-        #TODO: delete old scoring data
         rows_deleted = self.session.query(
                 TargetToDiseaseAssociationScoreMap).delete(synchronize_session='fetch')
 
         if rows_deleted:
             logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
-        #TODO: iterate over every evidence string and extract relevant data
-        c=0
+        c, i = 0, 0
         for row in self.session.query(ElasticsearchLoad.data).filter(and_(
                         ElasticsearchLoad.index.like(Config.ELASTICSEARCH_DATA_INDEX_NAME+'%'),
                         ElasticsearchLoad.active==True,
@@ -102,6 +105,7 @@ class ScoringExtract():
             c+=1
             evidence = Evidence(row.data).evidence
             for efo in evidence['_private']['efo_codes']:
+                i+=1
                 self.session.add(TargetToDiseaseAssociationScoreMap(
                                               target_id=evidence['target']['id'],
                                               disease_id=efo,
@@ -112,17 +116,53 @@ class ScoringExtract():
                                               ))
             if c % 100 == 0:
                 self.session.flush()
-            if c % 10000 == 0:
-                logging.info("%i rows inserted to score-data table" %(c))
+            if i % 10000 == 0:
+                logging.info("%i rows inserted to score-data table, %i evidence strings analysed" %(i, c))
 
-         #TODO: commit
+        self.session.commit()
+
+class ScoreStorer():
+    def __init__(self, adapter, chunk_size=100):
+
+        self.adapter=adapter
+        self.session=adapter.session
+        self.chunk_size = chunk_size
+        self.cache = []
+        self.counter = 0
+
+    def put(self, score):
+
+        self.cache.append(score)
+        self.counter +=1
+        if (len(self.cache) % self.chunk_size) == 0:
+            self.flush()
+
+
+    def flush(self):
+
+        #TODO: store in postgres
+        for data in self.cache:
+            print data.to_json()
+
+        if (self.counter % self.chunk_size) == 0:
+            logging.info("%i precalculated scores inserted in elasticsearch_load table" %(self.counter))
+
+        self.session.flush()
+        self.cache = []
+
+
+    def close(self):
+
+        self.flush()
         self.session.commit()
 
 
+    def __enter__(self):
+        return self
 
 
-
-
+    def __exit__(self, type, value, traceback):
+        self.close()
 
 class ScoringProcess():
 
@@ -130,35 +170,65 @@ class ScoringProcess():
                  adapter):
         self.adapter=adapter
         self.session=adapter.session
+        self.scorer = Scorer()
 
     def process_all(self):
         self.score_target_disease_pairs()
 
     def score_target_disease_pairs(self):
-        c=0
-        for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                        ElasticsearchLoad.active==True,
-                        ElasticsearchLoad.id == 'ENSG00000113448')
-                    ).yield_per(10):
-            target = target_row.id
-            for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                        ElasticsearchLoad.active==True,
-                        ElasticsearchLoad.id =='EFO_0000270')
-                    ).yield_per(10):
-                disease = disease_row.id
-                c+=1
-                evidence = self._get_evidence_for_pair(target, disease)
+        with ScoreStorer(self.adapter) as storer:
+            target_total = self.session.query(ElasticsearchLoad.id).filter(and_(
+                            ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                            ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                            ElasticsearchLoad.active==True,
+                            )
+                        ).count()
+            disease_total = self.session.query(ElasticsearchLoad.id).filter(and_(
+                            ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                            ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+                            ElasticsearchLoad.active==True,
+                            )
+                        ).count()
+            estimated_total = target_total*disease_total
+            logging.info("%i targets available | %i diseases available | %iM estimated combination to precalculate"%(target_total,
+                                                                                                                    disease_total,
+                                                                                                                    estimated_total/1e6))
 
-                if evidence or (c%1000 ==0):
-                    print c, target, disease, evidence
-                    # exit(0)
+            c=0.
+            combination_with_data = 0.
+            for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
+                            ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                            ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                            ElasticsearchLoad.active==True,
+                            ElasticsearchLoad.id == 'ENSG00000113448',
+                            )
+                        ).yield_per(10):
+                target = target_row.id
+                for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
+                            ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                            ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+                            ElasticsearchLoad.active==True,
+                            ElasticsearchLoad.id =='EFO_0000270',
+                            )
+                        ).yield_per(10):
+                    disease = disease_row.id
+                    c+=1
+                    evidence = self._get_evidence_for_pair(target, disease)
+                    if evidence:
+                        score = self.scorer.score(target, disease, evidence)
+                        combination_with_data +=1
+                        storer.put(score)
+                        print c,round(c/estimated_total,2), target, disease, len(evidence)
+                    if c%(estimated_total/1000) ==0:
+                        logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total)), combination_with_data)
+                        # print c,round(estimated_total/c,2) target, disease, len(evidence)
+                        # exit(0)
+            logging.info('%i%% combinations computed, %i with data, sparse ratio: %1.2f%%'%(int(round(c/estimated_total)),
+                                                                                            combination_with_data,
+                                                                                            (estimated_total-combination_with_data)/estimated_total))
+
 
     def _get_evidence_for_pair(self, target, disease):
-        #TODO: MANUALLY HANDLE THE QUERY
         '''
         SELECT rs.Field1,rs.Field2
             FROM (
@@ -168,20 +238,25 @@ class ScoringProcess():
                 FROM table
                 ) rs WHERE Rank <= 10
         '''
-        query = """SELECT * from pipeline.elasticsearch_load WHERE  index  LIKE '%s%%' AND data #>> '{target,id}' ? '%s';"""%(Config.ELASTICSEARCH_DATA_INDEX_NAME, target)
-        print query
-        evidences =self.session.execute(query)
-        # evidences = [row.data for row in self.session.query(ElasticsearchLoad.data, ElasticsearchLoad.data[('target','id')]).filter(and_(
-        #                 ElasticsearchLoad.index.like(Config.ELASTICSEARCH_DATA_INDEX_NAME+'%'),
-        #                 ElasticsearchLoad.active==True,
-        #                 # ElasticsearchLoad.data[('target','id')].astext == target,
-        #                 # ElasticsearchLoad.data[('disease','id')].astext == disease,
-        #
-        #                 )
-        #
-        #             ).yield_per(100).limit(10)]
-        evidences =  evidences.fetchall()
-        return len(evidences)
+        # evidences =self.session.execute(query)
+        evidence_ids_subquery = self.session.query(
+                                                TargetToDiseaseAssociationScoreMap.evidence_id
+                                                   )\
+                                            .filter(
+                                                and_(
+                                                    TargetToDiseaseAssociationScoreMap.target_id == target,
+                                                    TargetToDiseaseAssociationScoreMap.disease_id == disease,
+                                                    )
+                                                )\
+                                            .order_by(
+                                                TargetToDiseaseAssociationScoreMap.association_score.desc()
+                                                )\
+                                            .subquery()
+
+        evidences = [row.data
+                        for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids_subquery))
+                     ]
+        return evidences
 
 
 

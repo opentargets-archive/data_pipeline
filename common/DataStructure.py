@@ -1,13 +1,23 @@
 import json
-
+from json import JSONEncoder
 
 __author__ = 'andreap'
 
-
+class PipelineEncoder(JSONEncoder):
+    def default(self, o):
+        try:
+            return o.to_json()
+        except AttributeError:
+            pass
+        return o.__dict__
 
 class JSONSerializable():
     def to_json(self):
-        return json.dumps(self.__dict__)
+        return json.dumps(self,
+                          default=lambda o: o.__dict__,
+                          sort_keys=True,
+                          indent=4,
+                          cls=PipelineEncoder)
 
     def load_json(self, data):
         if isinstance(data, str) or isinstance(data, unicode):
