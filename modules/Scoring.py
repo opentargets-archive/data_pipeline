@@ -372,14 +372,28 @@ class ScoringProcess():
             #                                         )
             #                                     )
             #             ]
-            query ="""SELECT pipeline.target_to_disease_association_score_map.evidence_id
-                        FROM pipeline.target_to_disease_association_score_map
-                        WHERE pipeline.target_to_disease_association_score_map.target_id = '%s'
-                        AND pipeline.target_to_disease_association_score_map.disease_id = '%s'"""%(target, disease)
-            evidence_ids = self.session.execute(query).fetchall()
+            # query ="""SELECT pipeline.target_to_disease_association_score_map.evidence_id
+            #             FROM pipeline.target_to_disease_association_score_map
+            #             WHERE pipeline.target_to_disease_association_score_map.target_id = '%s'
+            #             AND pipeline.target_to_disease_association_score_map.disease_id = '%s'"""%(target, disease)
+            # evidence_ids = self.session.execute(query).fetchall()
 
+            # evidence = [EvidenceScore(row.data)
+            #                     for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids))\
+            #                     .yield_per(10000)
+            #                 ]
+
+            evidence_id_subquery = self.session.query(
+                                                TargetToDiseaseAssociationScoreMap.evidence_id
+                                                   )\
+                                            .filter(
+                                                and_(
+                                                    TargetToDiseaseAssociationScoreMap.target_id == target,
+                                                    TargetToDiseaseAssociationScoreMap.disease_id == disease,
+                                                    )
+                                                ).subquery()
             evidence = [EvidenceScore(row.data)
-                                for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids))\
+                                for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_id_subquery))\
                                 .yield_per(10000)
                             ]
         return evidence
