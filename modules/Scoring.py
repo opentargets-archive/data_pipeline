@@ -44,8 +44,21 @@ class AssociationScoreSet(JSONSerializable):
     def __init__(self, target, disease):
         self.target = target
         self.disease = disease
-        for method in ScoringMethods.__dict__.values():
-            self.__dict__[method] = AssociationScore()
+        for method_key, method in ScoringMethods.__dict__.items():
+            if not method_key.startswith('_'):
+                self.set_method(method,AssociationScore())
+    def get_method(self, method):
+        if method not in ScoringMethods.__dict__.values():
+            raise AttributeError("method need to be a valid ScoringMethods")
+        return self.__dict__[method]
+
+    def set_method(self, method, score):
+        if method not in ScoringMethods.__dict__.values():
+            raise AttributeError("method need to be a valid ScoringMethods")
+        if not isinstance(score, AssociationScore):
+            raise AttributeError("score need to be an instance of AssociationScore")
+        self.__dict__[method] = score
+
 
 
 class Scorer():
@@ -58,11 +71,11 @@ class Scorer():
         score = AssociationScoreSet(target,disease)
 
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
-            score = self._harmonic_sum(evidence, score)
+            self._harmonic_sum(evidence, score)
         if (method == ScoringMethods.SUM) or (method is None):
-            score = self._sum(evidence, score)
+            self._sum(evidence, score)
         if (method == ScoringMethods.MAX) or (method is None):
-            score = self._max(evidence, score)
+            self._max(evidence, score)
 
         return score
 
@@ -70,10 +83,29 @@ class Scorer():
         return score
 
     def _sum(self, evidence, score):
-        return score
+        sum_score = score.get_method(ScoringMethods.SUM)
+        for e in evidence:
+            e = Evidence(e).evidence
+            e_score = e['scores']['association_score']
+            sum_score.overall+=e_score
+            sum_score.datatypes[e['type']]+=e_score
+            sum_score.datasources[e['sourceID']]+=e_score
+
+        return
 
     def _max(self, evidence, score):
-        return score
+        max_score = score.get_method(ScoringMethods.MAX)
+        for e in evidence:
+            e = Evidence(e).evidence
+            e_score = e['scores']['association_score']
+            if e_score > max_score.datasources[e['sourceID']]:
+                max_score.datasources[e['sourceID']] = e_score
+                if e_score > max_score.datatypes[e['type']]:
+                    max_score.datatypes[e['type']]=e_score
+                    if e_score > max_score.overall:
+                        max_score.overall=e_score
+
+        return
 
 
 
@@ -141,8 +173,8 @@ class ScoreStorer():
     def flush(self):
 
         #TODO: store in postgres
-        for data in self.cache:
-            print data.to_json()
+        for i,data in enumerate(self.cache):
+            logging.info(data.to_json())
 
         if (self.counter % self.chunk_size) == 0:
             logging.info("%i precalculated scores inserted in elasticsearch_load table" %(self.counter))
@@ -200,7 +232,7 @@ class ScoringProcess():
                             ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                             ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                             ElasticsearchLoad.active==True,
-                            # ElasticsearchLoad.id == 'ENSG00000113448',
+                            ElasticsearchLoad.id == 'ENSG00000113448',
                             )
                         ).yield_per(10):
                 target = target_row.id
@@ -208,7 +240,7 @@ class ScoringProcess():
                             ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                             ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                             ElasticsearchLoad.active==True,
-                            # ElasticsearchLoad.id =='EFO_0000270',
+                            ElasticsearchLoad.id =='EFO_0000270',
                             )
                         ).yield_per(10):
                     disease = disease_row.id
