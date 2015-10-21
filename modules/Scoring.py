@@ -2,6 +2,7 @@ import logging
 import pprint
 from sqlalchemy import and_, func
 from sqlalchemy.orm import joinedload, subqueryload
+import time
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
@@ -10,6 +11,8 @@ from modules.EvidenceString import Evidence
 from settings import Config
 
 __author__ = 'andreap'
+
+
 
 
 class ScoringActions(Actions):
@@ -29,15 +32,20 @@ class AssociationScore(JSONSerializable):
     def __init__(self):
 
         self.overall = 0.0
+        self.evidence_count = 0
         self.init_scores()
 
     def init_scores(self):
         self.datatypes={}
+        self.datatype_evidence_count={}
         self.datasources={}
+        self.datasource_evidence_count={}
 
         for ds,dt in Config.DATASOURCE_TO_DATATYPE_MAPPING.items():
             self.datasources[ds]=0.0
             self.datatypes[dt]=0.0
+            self.datasource_evidence_count[ds]=0
+            self.datatype_evidence_count[dt]=0
 
 class AssociationScoreSet(JSONSerializable):
 
@@ -59,6 +67,48 @@ class AssociationScoreSet(JSONSerializable):
             raise AttributeError("score need to be an instance of AssociationScore")
         self.__dict__[method] = score
 
+class EvidenceScore():
+    def __init__(self, evidence_string):
+        e = Evidence(evidence_string).evidence
+        self.score = e['scores']['association_score']
+        self.datatype = e['type']
+        self.datasource = e['sourceID']
+
+class HarmonicSumScorer():
+
+    def __init__(self, buffer = 1000):
+        '''
+        will get every score,
+        keep in memory the top max number
+        calculate the score on those
+        :return:calculated score
+        '''
+        self.buffer = buffer
+        self.data = [0.]*buffer
+        self.refresh()
+        self.total = 0
+
+    def add(self, score):
+        self.total+=1
+        if score >self.min:
+            for i, old_score in enumerate(self.data):
+                if old_score==self.min:
+                    self.data[i] = score
+                    break
+            self.refresh()
+
+    def refresh(self):
+        self.min = min(self.data)
+
+    def score(self):
+        return self.harmonic_sum(self.data)
+
+    @staticmethod
+    def harmonic_sum(data):
+        data.sort(reverse=True)
+        return sum(s/(i+1) for i,s in enumerate(data))
+
+
 
 
 class Scorer():
@@ -66,44 +116,63 @@ class Scorer():
     def __init__(self):
         pass
 
-    def score(self,target, disease, evidence, method  = None):
+    def score(self,target, disease, evidence_scores, method  = None):
 
         score = AssociationScoreSet(target,disease)
 
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
-            self._harmonic_sum(evidence, score)
+            self._harmonic_sum(evidence_scores, score)
         if (method == ScoringMethods.SUM) or (method is None):
-            self._sum(evidence, score)
+            self._sum(evidence_scores, score)
         if (method == ScoringMethods.MAX) or (method is None):
-            self._max(evidence, score)
+            self._max(evidence_scores, score)
 
         return score
 
-    def _harmonic_sum(self, evidence, score):
+    def _harmonic_sum(self, evidence_scores, score, max_entries = 1000):
+        har_sum_score = score.get_method(ScoringMethods.HARMONIC_SUM)
+        datasource_scorers = {}
+        for e in evidence_scores:
+            har_sum_score.evidence_count+=1
+            har_sum_score.datatype_evidence_count[e.datatype]+=1
+            har_sum_score.datasource_evidence_count[e.datasource]+=1
+            if e.datasource not in datasource_scorers:
+                datasource_scorers[e.datasource]=HarmonicSumScorer(buffer=max_entries)
+            datasource_scorers[e.datasource].add(e.score)
+        '''compute datasource scores'''
+        for datasource in datasource_scorers:
+            har_sum_score.datasources[e.datasource]=datasource_scorers[e.datasource].score()
+        '''compute datatype scores'''
+        #TODO
+        '''compute overall scores'''
+        #TODO
+
         return score
 
-    def _sum(self, evidence, score):
+    def _sum(self, evidence_scores, score):
         sum_score = score.get_method(ScoringMethods.SUM)
-        for e in evidence:
-            e = Evidence(e).evidence
-            e_score = e['scores']['association_score']
-            sum_score.overall+=e_score
-            sum_score.datatypes[e['type']]+=e_score
-            sum_score.datasources[e['sourceID']]+=e_score
+        for e in evidence_scores:
+            sum_score.overall+=e.score
+            sum_score.evidence_count+=1
+            sum_score.datatypes[e.datatype]+=e.score
+            sum_score.datatype_evidence_count[e.datatype]+=1
+            sum_score.datasources[e.datasource]+=e.score
+            sum_score.datasource_evidence_count[e.datasource]+=1
 
         return
 
-    def _max(self, evidence, score):
+    def _max(self, evidence_score, score):
         max_score = score.get_method(ScoringMethods.MAX)
-        for e in evidence:
-            e = Evidence(e).evidence
-            e_score = e['scores']['association_score']
-            if e_score > max_score.datasources[e['sourceID']]:
-                max_score.datasources[e['sourceID']] = e_score
-                if e_score > max_score.datatypes[e['type']]:
-                    max_score.datatypes[e['type']]=e_score
-                    if e_score > max_score.overall:
-                        max_score.overall=e_score
+        for e in evidence_score:
+            if e.score > max_score.datasources[e.datasource]:
+                max_score.datasources[e.datatype] = e.score
+                if e.score > max_score.datatypes[e.datatype]:
+                    max_score.datatypes[e.datatype]=e.score
+                    if e.score > max_score.overall:
+                        max_score.overall=e.score
+            max_score.evidence_count+=1
+            max_score.datatype_evidence_count[e.datatype]+=1
+            max_score.datasource_evidence_count[e.datasource]+=1
 
         return
 
@@ -203,6 +272,7 @@ class ScoringProcess():
         self.adapter=adapter
         self.session=adapter.session
         self.scorer = Scorer()
+        self.start_time = time.time()
 
     def process_all(self):
         self.score_target_disease_pairs()
@@ -234,7 +304,7 @@ class ScoringProcess():
                             ElasticsearchLoad.active==True,
                             # ElasticsearchLoad.id == 'ENSG00000113448',
                             )
-                        ).yield_per(10):
+                        ).yield_per(100):
                 target = target_row.id
                 for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                             ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
@@ -242,7 +312,7 @@ class ScoringProcess():
                             ElasticsearchLoad.active==True,
                             # ElasticsearchLoad.id =='EFO_0000270',
                             )
-                        ).yield_per(10):
+                        ).yield_per(100):
                     disease = disease_row.id
                     c+=1
                     evidence = self._get_evidence_for_pair(target, disease)
@@ -250,9 +320,11 @@ class ScoringProcess():
                         score = self.scorer.score(target, disease, evidence)
                         combination_with_data +=1
                         storer.put(score)
-                        print c,round(c/estimated_total,2), target, disease, len(evidence)
-                    if c%(estimated_total/1000) ==0:
+                        # print c,round(c/estimated_total,2), target, disease, len(evidence)
+                    # if c%(estimated_total/1000) ==0:
+                    if c%10000 ==0:
                         logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total), combination_with_data))
+                        logging.info('target-disease pair analysis rate: %1.2f pair per second'%(c/(time.time()-self.start_time)))
                         # print c,round(estimated_total/c,2) target, disease, len(evidence)
                         # exit(0)
             logging.info('%i%% combinations computed, %i with data, sparse ratio: %1.2f%%'%(int(round(c/estimated_total)),
@@ -285,8 +357,8 @@ class ScoringProcess():
                                                 )\
                                             .subquery()
 
-        evidences = [row.data
-                        for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids_subquery))
+        evidences = [EvidenceScore(row.data)
+                        for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids_subquery)).yield_per(10000)
                      ]
         return evidences
 
