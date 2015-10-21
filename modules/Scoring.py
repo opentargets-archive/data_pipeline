@@ -332,6 +332,7 @@ class EvidenceGetter(Process):
                                 ]
             if evidence:
                 target, disease, evidence
+            self.task_queue.task_done()
             self.result_q.put((target, disease, evidence))
 
 class ScoringProcess():
@@ -391,12 +392,12 @@ class ScoringProcess():
                         ):
                     disease = disease_row.id
                     tasks_q.put((target, disease))
-
+            logging.info("task loading done")
             ''' wait for all the jobs to complete'''
-            tasks_q.join()
+            # tasks_q.join()
 
             total_jobs = target_total * disease_total
-            while not tasks_q.empty():
+            while total_jobs:
                 c+=1
                 data = result_q.get()
                 target, disease, evidence = data
@@ -411,6 +412,7 @@ class ScoringProcess():
                     logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total), combination_with_data))
                     logging.info('target-disease pair analysis rate: %1.2f pair per second'%(c/(time.time()-self.start_time)))
                     # print c,round(estimated_total/c,2) target, disease, len(evidence)
+                total_jobs -=1
             logging.info('%i%% combinations computed, %i with data, sparse ratio: %1.2f%%'%(int(round(c/estimated_total)),
                                                                                             combination_with_data,
                                                                                             (estimated_total-combination_with_data)/estimated_total))
