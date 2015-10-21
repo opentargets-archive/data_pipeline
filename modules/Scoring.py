@@ -232,7 +232,7 @@ class ScoringProcess():
                             ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                             ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                             ElasticsearchLoad.active==True,
-                            ElasticsearchLoad.id == 'ENSG00000113448',
+                            # ElasticsearchLoad.id == 'ENSG00000113448',
                             )
                         ).yield_per(10):
                 target = target_row.id
@@ -240,7 +240,7 @@ class ScoringProcess():
                             ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                             ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                             ElasticsearchLoad.active==True,
-                            ElasticsearchLoad.id =='EFO_0000270',
+                            # ElasticsearchLoad.id =='EFO_0000270',
                             )
                         ).yield_per(10):
                     disease = disease_row.id
