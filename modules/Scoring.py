@@ -1,5 +1,6 @@
 import logging
 import pprint
+import multiprocessing
 from sqlalchemy import and_, func
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import joinedload, subqueryload
@@ -7,9 +8,10 @@ import time
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
-from common.PGAdapter import ElasticsearchLoad, TargetToDiseaseAssociationScoreMap
+from common.PGAdapter import ElasticsearchLoad, TargetToDiseaseAssociationScoreMap, Adapter
 from modules.EvidenceString import Evidence
 from settings import Config
+from multiprocessing import Pool, Process, Queue
 
 __author__ = 'andreap'
 
@@ -266,6 +268,72 @@ class ScoreStorer():
     def __exit__(self, type, value, traceback):
         self.close()
 
+class EvidenceGetterQueueReporter(Process):
+    def __init__(self, task_q, result_q, ):
+        super(EvidenceGetterQueueReporter, self).__init__()
+        self.task_q= task_q
+        self.result_q= result_q
+
+
+
+    def run(self):
+        logging.info("reporter worker started")
+        while 1:
+            try:
+                time.sleep(1)
+                logging.info("data to process: %i"%self.task_q.qsize())
+                logging.info("results processed: %i"%self.result_q.qsize())
+                if self.tasks_q.empty():
+                    break
+            except:
+                logging.error("reporter error")
+
+        logging.info("reporter worker stopped")
+
+
+class EvidenceGetter(Process):
+    def __init__(self, task_q, result_q, name):
+        super(EvidenceGetter, self).__init__()
+        self.task_q= task_q
+        self.result_q= result_q
+        self.adapter=Adapter()
+        self.session=self.adapter.session
+        # self.name = str(name)
+
+
+    def run(self):
+        logging.info("worker %s started"%self.name)
+        for data in iter(self.task_q.get, None):
+            target, disease = data
+
+            evidence  =[]
+
+            query ="""SELECT COUNT(pipeline.target_to_disease_association_score_map.evidence_id)
+                        FROM pipeline.target_to_disease_association_score_map
+                          WHERE pipeline.target_to_disease_association_score_map.target_id = '%s'
+                          AND pipeline.target_to_disease_association_score_map.disease_id = '%s'"""%(target, disease)
+            is_associated = self.session.execute(query).fetchone().count
+
+
+            if is_associated:
+
+                evidence_id_subquery = self.session.query(
+                                                    TargetToDiseaseAssociationScoreMap.evidence_id
+                                                       )\
+                                                .filter(
+                                                    and_(
+                                                        TargetToDiseaseAssociationScoreMap.target_id == target,
+                                                        TargetToDiseaseAssociationScoreMap.disease_id == disease,
+                                                        )
+                                                    ).subquery()
+                evidence = [EvidenceScore(row.data)
+                                    for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_id_subquery))\
+                                    .yield_per(10000)
+                                ]
+            if evidence:
+                target, disease, evidence
+            self.result_q.put((target, disease, evidence))
+
 class ScoringProcess():
 
     def __init__(self,
@@ -299,6 +367,13 @@ class ScoringProcess():
             c=0.
             combination_with_data = 0.
             self.start_time = time.time()
+            tasks_q = multiprocessing.JoinableQueue()
+            result_q = multiprocessing.Queue()
+            # reporter = EvidenceGetterQueueReporter(tasks_q, result_q)
+            # reporter.start()
+            consumers = [EvidenceGetter(tasks_q, result_q, i) for i in range(multiprocessing.cpu_count()*2)]
+            for w in consumers:
+                w.start()
             for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                             ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                             ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
@@ -315,19 +390,27 @@ class ScoringProcess():
                             )
                         ):
                     disease = disease_row.id
-                    c+=1
-                    evidence = self._get_evidence_for_pair(target, disease)
-                    if evidence:
-                        score = self.scorer.score(target, disease, evidence)
-                        combination_with_data +=1
-                        storer.put(score)
-                        # print c,round(c/estimated_total,2), target, disease, len(evidence)
-                    # if c%(estimated_total/1000) ==0:
-                    if c%10000 ==0:
-                        logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total), combination_with_data))
-                        logging.info('target-disease pair analysis rate: %1.2f pair per second'%(c/(time.time()-self.start_time)))
-                        # print c,round(estimated_total/c,2) target, disease, len(evidence)
-                        # exit(0)
+                    tasks_q.put((target, disease))
+
+            ''' wait for all the jobs to complete'''
+            tasks_q.join()
+
+            total_jobs = target_total * disease_total
+            while not tasks_q.empty():
+                c+=1
+                data = result_q.get()
+                target, disease, evidence = data
+                # evidence=evidence.get(timeout=180)
+                if evidence:
+                    score = self.scorer.score(target, disease, evidence)
+                    combination_with_data +=1
+                    storer.put(score)
+                    # print c,round(c/estimated_total,2), target, disease, len(evidence)
+                # if c%(estimated_total/1000) ==0:
+                if c%100 ==0:
+                    logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total), combination_with_data))
+                    logging.info('target-disease pair analysis rate: %1.2f pair per second'%(c/(time.time()-self.start_time)))
+                    # print c,round(estimated_total/c,2) target, disease, len(evidence)
             logging.info('%i%% combinations computed, %i with data, sparse ratio: %1.2f%%'%(int(round(c/estimated_total)),
                                                                                             combination_with_data,
                                                                                             (estimated_total-combination_with_data)/estimated_total))
