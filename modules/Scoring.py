@@ -292,7 +292,7 @@ class ScoringProcess():
                             )
                         ).count()
             estimated_total = target_total*disease_total
-            logging.info("%i targets available | %i diseases available | %iM estimated combination to precalculate"%(target_total,
+            logging.info("%i targets available | %i diseases available | %iM estimated combinations to precalculate"%(target_total,
                                                                                                                     disease_total,
                                                                                                                     estimated_total/1e6))
 
@@ -345,41 +345,42 @@ class ScoringProcess():
         '''
         evidence  =[]
 
-        # query ="""SELECT COUNT(pipeline.target_to_disease_association_score_map.evidence_id)
-        #             FROM pipeline.target_to_disease_association_score_map
-        #               WHERE pipeline.target_to_disease_association_score_map.target_id = '%s'
-        #               AND pipeline.target_to_disease_association_score_map.disease_id = '%s'"""%(target, disease)
-        # is_associated = self.session.execute(query).fetchone()
+        query ="""SELECT COUNT(pipeline.target_to_disease_association_score_map.evidence_id)
+                    FROM pipeline.target_to_disease_association_score_map
+                      WHERE pipeline.target_to_disease_association_score_map.target_id = '%s'
+                      AND pipeline.target_to_disease_association_score_map.disease_id = '%s'"""%(target, disease)
+        is_associated = self.session.execute(query).fetchone().count
 
-        is_associated = self.session.query(
-                                                TargetToDiseaseAssociationScoreMap.evidence_id
-                                                   )\
-                                            .filter(
-                                                and_(
-                                                    TargetToDiseaseAssociationScoreMap.target_id == target,
-                                                    TargetToDiseaseAssociationScoreMap.disease_id == disease,
-                                                    )
-                                                ).count()
+        # is_associated = self.session.query(
+        #                                         TargetToDiseaseAssociationScoreMap.evidence_id
+        #                                            )\
+        #                                     .filter(
+        #                                         and_(
+        #                                             TargetToDiseaseAssociationScoreMap.target_id == target,
+        #                                             TargetToDiseaseAssociationScoreMap.disease_id == disease,
+        #                                             )
+        #                                         ).count()
 
         if is_associated:
-            evidence_ids = [row.evidence_id for row in self.session.query(
-                                                TargetToDiseaseAssociationScoreMap.evidence_id
-                                                   )\
-                                            .filter(
-                                                and_(
-                                                    TargetToDiseaseAssociationScoreMap.target_id == target,
-                                                    TargetToDiseaseAssociationScoreMap.disease_id == disease,
-                                                    )
-                                                )
-                                            # .yield_per(10000)
-                        ]
+            # evidence_ids = [row.evidence_id for row in self.session.query(
+            #                                     TargetToDiseaseAssociationScoreMap.evidence_id
+            #                                        )\
+            #                                 .filter(
+            #                                     and_(
+            #                                         TargetToDiseaseAssociationScoreMap.target_id == target,
+            #                                         TargetToDiseaseAssociationScoreMap.disease_id == disease,
+            #                                         )
+            #                                     )
+            #             ]
+            query ="""SELECT pipeline.target_to_disease_association_score_map.evidence_id
+                        FROM pipeline.target_to_disease_association_score_map
+                        WHERE pipeline.target_to_disease_association_score_map.target_id = '%s'
+                        AND pipeline.target_to_disease_association_score_map.disease_id = '%s'"""%(target, disease)
+            evidence_ids = self.session.execute(query).fetchall()
 
-
-            if evidence_ids:
-
-                evidence = [EvidenceScore(row.data)
+            evidence = [EvidenceScore(row.data)
                                 for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids))\
-                                # .yield_per(10000)
+                                .yield_per(10000)
                             ]
         return evidence
 
