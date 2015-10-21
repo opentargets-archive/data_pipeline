@@ -1,6 +1,7 @@
 import logging
 import pprint
 from sqlalchemy import and_, func
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import joinedload, subqueryload
 import time
 from common import Actions
@@ -272,7 +273,6 @@ class ScoringProcess():
         self.adapter=adapter
         self.session=adapter.session
         self.scorer = Scorer()
-        self.start_time = time.time()
 
     def process_all(self):
         self.score_target_disease_pairs()
@@ -298,6 +298,7 @@ class ScoringProcess():
 
             c=0.
             combination_with_data = 0.
+            self.start_time = time.time()
             for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                             ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                             ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
@@ -322,7 +323,7 @@ class ScoringProcess():
                         storer.put(score)
                         # print c,round(c/estimated_total,2), target, disease, len(evidence)
                     # if c%(estimated_total/1000) ==0:
-                    if c%100000 ==0:
+                    if c%10000 ==0:
                         logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total), combination_with_data))
                         logging.info('target-disease pair analysis rate: %1.2f pair per second'%(c/(time.time()-self.start_time)))
                         # print c,round(estimated_total/c,2) target, disease, len(evidence)
@@ -342,8 +343,26 @@ class ScoringProcess():
                 FROM table
                 ) rs WHERE Rank <= 10
         '''
-        # evidences =self.session.execute(query)
-        evidence_ids = [row.evidence_id for row in self.session.query(
+        evidence  =[]
+
+        # query ="""SELECT COUNT(pipeline.target_to_disease_association_score_map.evidence_id)
+        #             FROM pipeline.target_to_disease_association_score_map
+        #               WHERE pipeline.target_to_disease_association_score_map.target_id = '%s'
+        #               AND pipeline.target_to_disease_association_score_map.disease_id = '%s'"""%(target, disease)
+        # is_associated = self.session.execute(query).fetchone()
+
+        is_associated = self.session.query(
+                                                TargetToDiseaseAssociationScoreMap.evidence_id
+                                                   )\
+                                            .filter(
+                                                and_(
+                                                    TargetToDiseaseAssociationScoreMap.target_id == target,
+                                                    TargetToDiseaseAssociationScoreMap.disease_id == disease,
+                                                    )
+                                                ).count()
+
+        if is_associated:
+            evidence_ids = [row.evidence_id for row in self.session.query(
                                                 TargetToDiseaseAssociationScoreMap.evidence_id
                                                    )\
                                             .filter(
@@ -355,13 +374,13 @@ class ScoringProcess():
                                             # .yield_per(10000)
                         ]
 
-        evidence  =[]
-        if evidence_ids:
 
-            evidence = [EvidenceScore(row.data)
-                            for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids))\
-                            # .yield_per(10000)
-                         ]
+            if evidence_ids:
+
+                evidence = [EvidenceScore(row.data)
+                                for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids))\
+                                # .yield_per(10000)
+                            ]
         return evidence
 
 
