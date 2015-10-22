@@ -350,7 +350,7 @@ class EvidenceGetter(Process):
             self.global_count.value +=1
             count = self.global_count.value
             if count %10000 == 0:
-               logging.info('target-disease pair analysed: %s \n analysis rate: %1.2f pair per second'%(millify(count), millify(count/(time.time()-self.start_time))))
+               logging.info('target-disease pair analysed: %s \n analysis rate: %s pair per second'%(millify(count), millify(count/(time.time()-self.start_time))))
 
 class ScoreStorerWorker(Process):
     def __init__(self, task_q, result_q, name):
@@ -393,6 +393,53 @@ class ScoreStorerWorker(Process):
                                 ]
             self.task_q.task_done()
             self.result_q.put((target, disease, evidence))
+
+class TargetDiseasePairProducer(Process):
+
+    def __init__(self, task_q, n_consumers, start_time):
+        super(TargetDiseasePairProducer, self).__init__()
+        self.task_q= task_q
+        self.adapter=Adapter()
+        self.session=self.adapter.session
+        self.n_consumers=n_consumers
+        self.start_time = start_time
+
+
+    def run(self):
+        logging.info("producer %s started"%self.name)
+        total_jobs = 0
+        for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
+                        ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                        ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                        ElasticsearchLoad.active==True,
+                        # ElasticsearchLoad.id == 'ENSG00000113448',
+                        )
+                    )[:1000]:
+            target = target_row.id
+            for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
+                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+                        ElasticsearchLoad.active==True,
+                        # ElasticsearchLoad.id =='EFO_0000270',
+                        )
+                    )[:1000]:
+                disease = disease_row.id
+                self.task_q.put((target, disease))
+                total_jobs +=1
+            if total_jobs % 100000 ==0:
+                logging.info('%s tasks loaded'%(millify(total_jobs)))
+                # try: #avoid mac os error
+                #     logging.info('queue size: %s'%(millify(tasks_q.qsize())))
+                # except NotImplementedError:
+                #     pass
+        for w in range(self.n_consumers):
+            self.task_q.put(None)#kill consumers when done
+        logging.info("task loading done: %s loaded in %is"%(millify(total_jobs), time.time()-self.start_time))
+        return total_jobs
+
+
+
+
 class ScoringProcess():
 
     def __init__(self,
@@ -430,6 +477,7 @@ class ScoringProcess():
         result_q = multiprocessing.Queue()
         # reporter = EvidenceGetterQueueReporter(tasks_q, result_q)
         # reporter.start()
+
         evidence_got_count =  Value('i', 0)
         consumers = [EvidenceGetter(tasks_q,
                                     result_q,
@@ -439,42 +487,17 @@ class ScoringProcess():
                                     ) for i in range(multiprocessing.cpu_count()*4)]
         for w in consumers:
             w.start()
-        total_jobs = 0
-        for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                        ElasticsearchLoad.active==True,
-                        # ElasticsearchLoad.id == 'ENSG00000113448',
-                        )
-                    )[:3000]:
-            target = target_row.id
-            for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                        ElasticsearchLoad.active==True,
-                        # ElasticsearchLoad.id =='EFO_0000270',
-                        )
-                    )[:2000]:
-                disease = disease_row.id
-                tasks_q.put((target, disease))
-                total_jobs +=1
-            if total_jobs % 10000 ==0:
-                logging.info('%s tasks loaded'%(millify(total_jobs)))
-                # try: #avoid mac os error
-                #     logging.info('queue size: %s'%(millify(tasks_q.qsize())))
-                # except NotImplementedError:
-                #     pass
-        for w in consumers:
-            tasks_q.put(None)#kill consumers when done
+        producer = TargetDiseasePairProducer(tasks_q, len(consumers), self.start_time)
+        producer.start()
+        total_jobs = 1000000
         confirmed_total = total_jobs
         logging.info("task loading done: %s loaded in %is"%(millify(total_jobs), time.time()-self.start_time))
         ''' wait for all the jobs to complete'''
         # tasks_q.join()
         with ScoreStorer(self.adapter) as storer:
-            while total_jobs:
+            for data in iter(result_q.get, None):
                 c+=1
                 total_jobs -=1
-                data = result_q.get()
                 target, disease, evidence = data
                 # evidence=evidence.get(timeout=180)
                 if evidence:
