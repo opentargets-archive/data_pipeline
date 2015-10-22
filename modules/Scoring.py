@@ -247,12 +247,12 @@ class ScoreStorer():
         self.adapter=adapter
         self.session=adapter.session
         self.chunk_size = chunk_size
-        self.cache = []
+        self.cache = {}
         self.counter = 0
 
     def put(self, id, score):
 
-        self.cache.append((id, score))
+        self.cache[id] = score
         self.counter +=1
         if (len(self.cache) % self.chunk_size) == 0:
             self.flush()
@@ -261,21 +261,19 @@ class ScoreStorer():
     def flush(self):
 
 
-        for i,data in enumerate(self.cache):
-            # pass
-            id, score = data
-            # logging.debug()
-            JSONObjectStorage.store_to_pg(self.session,
-                                        Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-                                          Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
-                                          score,
-                                          delete_prev=False
-                                         )
+
+        JSONObjectStorage.store_to_pg(self.session,
+                                      Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+                                      Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
+                                      self.cache,
+                                      delete_prev=False
+                                     )
+        self.counter+=len(self.cache)
         if (self.counter % 10000) == 0:
             logging.info("%s precalculated scores inserted in elasticsearch_load table" %(millify(self.counter)))
 
         self.session.flush()
-        self.cache = []
+        self.cache = {}
 
 
     def close(self):
@@ -469,7 +467,7 @@ class ScorerProducer(Process):
                 if evidence:
                     score = self.scorer.score(target, disease, evidence)
                     combination_with_data +=1
-                    self.score_q.put((target, disease,score.to_json()))
+                    self.score_q.put((target, disease,score))
                     # print c,round(c/estimated_total,2), target, disease, len(evidence)
                 if c%10000 ==0:
                     total_jobs = self.target_disease_pairs_generated_count.value
