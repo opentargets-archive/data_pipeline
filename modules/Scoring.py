@@ -237,7 +237,7 @@ class ScoringExtract():
         self.session.commit()
 
 class ScoreStorer():
-    def __init__(self, adapter, chunk_size=100):
+    def __init__(self, adapter, chunk_size=1000):
 
         self.adapter=adapter
         self.session=adapter.session
@@ -305,7 +305,13 @@ class EvidenceGetterQueueReporter(Process):
 
 
 class EvidenceGetter(Process):
-    def __init__(self, task_q, result_q, id, global_count, start_time):
+    def __init__(self,
+                 task_q,
+                 result_q,
+                 global_count,
+                 start_time,
+                 signal_finish,
+                 producer_done):
         super(EvidenceGetter, self).__init__()
         self.task_q= task_q
         self.result_q= result_q
@@ -314,6 +320,8 @@ class EvidenceGetter(Process):
         # self.name = str(name)
         self.global_count = global_count
         self.start_time = start_time
+        self.signal_finish = signal_finish
+        self.producer_done = producer_done
 
 
     def run(self):
@@ -350,11 +358,15 @@ class EvidenceGetter(Process):
             self.global_count.value +=1
             count = self.global_count.value
             if count %10000 == 0:
-               logging.info('target-disease pair analysed: %s \n analysis rate: %s pair per second'%(millify(count), millify(count/(time.time()-self.start_time))))
+               logging.info('target-disease pair analysed: %s | analysis rate: %s pairs per second'%(millify(count), millify(count/(time.time()-self.start_time))))
+
+        logging.info("worker %s finished"%self.name)
+        if self.producer_done.is_set():
+            self.signal_finish.set()
 
 class ScoreStorerWorker(Process):
     def __init__(self, task_q, result_q, name):
-        super(EvidenceGetter, self).__init__()
+        super(ScoreStorerWorker, self).__init__()
         self.task_q= task_q
         self.result_q= result_q
         self.adapter=Adapter()
@@ -396,13 +408,18 @@ class ScoreStorerWorker(Process):
 
 class TargetDiseasePairProducer(Process):
 
-    def __init__(self, task_q, n_consumers, start_time):
+    def __init__(self,
+                 task_q,
+                 n_consumers,
+                 start_time,
+                 signal_finish):
         super(TargetDiseasePairProducer, self).__init__()
         self.task_q= task_q
         self.adapter=Adapter()
         self.session=self.adapter.session
         self.n_consumers=n_consumers
         self.start_time = start_time
+        self.signal_finish = signal_finish
 
 
     def run(self):
@@ -435,7 +452,8 @@ class TargetDiseasePairProducer(Process):
         for w in range(self.n_consumers):
             self.task_q.put(None)#kill consumers when done
         logging.info("task loading done: %s loaded in %is"%(millify(total_jobs), time.time()-self.start_time))
-        return total_jobs
+        self.signal_finish.set()
+
 
 
 
@@ -473,29 +491,38 @@ class ScoringProcess():
         c=0.
         combination_with_data = 0.
         self.start_time = time.time()
+        '''create queues'''
         tasks_q = multiprocessing.JoinableQueue()
         result_q = multiprocessing.Queue()
+        '''create events'''
+        target_disease_pair_loading_finished = multiprocessing.Event()
+        evidence_data_retrieval_finished = multiprocessing.Event()
+        data_storage_finished = multiprocessing.Event()
         # reporter = EvidenceGetterQueueReporter(tasks_q, result_q)
         # reporter.start()
 
         evidence_got_count =  Value('i', 0)
         consumers = [EvidenceGetter(tasks_q,
                                     result_q,
-                                    i,
                                     evidence_got_count,
                                     self.start_time,
+                                    evidence_data_retrieval_finished,
+                                    target_disease_pair_loading_finished,
                                     ) for i in range(multiprocessing.cpu_count()*4)]
         for w in consumers:
             w.start()
-        producer = TargetDiseasePairProducer(tasks_q, len(consumers), self.start_time)
+        producer = TargetDiseasePairProducer(tasks_q,
+                                             len(consumers),
+                                             self.start_time,
+                                             target_disease_pair_loading_finished)
         producer.start()
         total_jobs = 1000000
         confirmed_total = total_jobs
-        logging.info("task loading done: %s loaded in %is"%(millify(total_jobs), time.time()-self.start_time))
         ''' wait for all the jobs to complete'''
         # tasks_q.join()
         with ScoreStorer(self.adapter) as storer:
-            for data in iter(result_q.get, None):
+            while not (result_q.empty() and target_disease_pair_loading_finished.is_set() and evidence_data_retrieval_finished.is_set()):
+                data = result_q.get()
                 c+=1
                 total_jobs -=1
                 target, disease, evidence = data
@@ -508,13 +535,21 @@ class ScoringProcess():
                 if c%10000 ==0:
                     logging.info('%1.1f%% combinations computed, %s with data, %s remaining'%(c/confirmed_total*100,
                                                                                               millify(combination_with_data),
-                                                                                              millify(total_jobs)))
+                                                                                              millify(confirmed_total)))
+                if target_disease_pair_loading_finished.is_set() and evidence_data_retrieval_finished.is_set():
+                    break
 
                     # print c,round(estimated_total/c,2) target, disease, len(evidence)
 
         logging.info('%1.1f%% combinations computed, %s with data, sparse ratio: %1.3f%%'%(c/confirmed_total*100,
                                                                                         millify(combination_with_data),
                                                                                         (confirmed_total-combination_with_data)/confirmed_total*100))
+        # for p in consumers:
+        #     if p.is_alive():
+        #         print "Terminating %s" % p
+        #         p.terminate()
+        #     else:
+        #         print " %s is dead" % p
 
 
     def _get_evidence_for_pair(self, target, disease):
