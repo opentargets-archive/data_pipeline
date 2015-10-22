@@ -370,7 +370,7 @@ class ScoringProcess():
             result_q = multiprocessing.Queue()
             # reporter = EvidenceGetterQueueReporter(tasks_q, result_q)
             # reporter.start()
-            consumers = [EvidenceGetter(tasks_q, result_q, i) for i in range(multiprocessing.cpu_count()*2)]
+            consumers = [EvidenceGetter(tasks_q, result_q, i) for i in range(multiprocessing.cpu_count()*4)]
             for w in consumers:
                 w.start()
             total_jobs = 0
