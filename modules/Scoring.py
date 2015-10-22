@@ -246,7 +246,9 @@ class ScoreStorer():
 
         #TODO: store in postgres
         for i,data in enumerate(self.cache):
-            logging.debug(data.to_json())
+            # pass
+            data = data.to_json()
+            # logging.debug()
 
         if (self.counter % self.chunk_size) == 0:
             logging.info("%i precalculated scores inserted in elasticsearch_load table" %(self.counter))
@@ -423,7 +425,7 @@ class ScoringProcess():
                                     i,
                                     evidence_got_count,
                                     self.start_time,
-                                    ) for i in range(multiprocessing.cpu_count()*4)]
+                                    ) for i in range(multiprocessing.cpu_count()*6)]
         for w in consumers:
             w.start()
         total_jobs = 0
@@ -433,7 +435,7 @@ class ScoringProcess():
                         ElasticsearchLoad.active==True,
                         # ElasticsearchLoad.id == 'ENSG00000113448',
                         )
-                    )[:200]:
+                    )[:1000]:
             target = target_row.id
             for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                         ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
@@ -441,7 +443,7 @@ class ScoringProcess():
                         ElasticsearchLoad.active==True,
                         # ElasticsearchLoad.id =='EFO_0000270',
                         )
-                    )[:200]:
+                    )[:1000]:
                 disease = disease_row.id
                 tasks_q.put((target, disease))
                 total_jobs +=1
@@ -462,13 +464,13 @@ class ScoringProcess():
                     storer.put(score)
                     # print c,round(c/estimated_total,2), target, disease, len(evidence)
                 if c%10000 ==0:
-                    logging.info('%1.2f%% combinations computed, %i with data, %i remaining'%(round(c/confirmed_total), combination_with_data, total_jobs))
+                    logging.info('%1.1f%% combinations computed, %i with data, %i remaining'%(c/confirmed_total*100, combination_with_data, total_jobs))
 
                     # print c,round(estimated_total/c,2) target, disease, len(evidence)
 
-        logging.info('%i%% combinations computed, %i with data, sparse ratio: %1.2f%%'%(int(round(c/confirmed_total)),
+        logging.info('%i%% combinations computed, %i with data, sparse ratio: %1.3f%%'%(int(round(c/confirmed_total)),
                                                                                         combination_with_data,
-                                                                                        (confirmed_total-combination_with_data)/confirmed_total)*100)
+                                                                                        (confirmed_total-combination_with_data)/confirmed_total*100))
 
 
     def _get_evidence_for_pair(self, target, disease):
