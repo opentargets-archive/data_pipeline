@@ -392,7 +392,7 @@ class ScoringProcess():
                     disease = disease_row.id
                     tasks_q.put((target, disease))
                     total_jobs +=1
-            logging.info("task loading done: %i loaded"%total_jobs)
+            logging.info("task loading done: %i loaded in %is"%(total_jobs, time.time()-self.start_time))
             ''' wait for all the jobs to complete'''
             # tasks_q.join()
 
@@ -407,8 +407,8 @@ class ScoringProcess():
                     storer.put(score)
                     # print c,round(c/estimated_total,2), target, disease, len(evidence)
                 # if c%(estimated_total/1000) ==0:
-                if c%100 ==0:
-                    logging.info('%1.2f%% combinations computed, %i with data'%(round(c/estimated_total), combination_with_data))
+                if c%10000 ==0:
+                    logging.info('%1.2f%% combinations computed, %i with data, %i remaining'%(round(c/estimated_total), combination_with_data, total_jobs))
                     logging.info('target-disease pair analysis rate: %1.2f pair per second'%(c/(time.time()-self.start_time)))
                     # print c,round(estimated_total/c,2) target, disease, len(evidence)
                 total_jobs -=1
