@@ -380,7 +380,7 @@ class ScoringProcess():
                             ElasticsearchLoad.active==True,
                             # ElasticsearchLoad.id == 'ENSG00000113448',
                             )
-                        )[:1000]:
+                        )[:2000]:
                 target = target_row.id
                 for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                             ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
@@ -388,7 +388,7 @@ class ScoringProcess():
                             ElasticsearchLoad.active==True,
                             # ElasticsearchLoad.id =='EFO_0000270',
                             )
-                        )[:1000]:
+                        )[:2000]:
                     disease = disease_row.id
                     tasks_q.put((target, disease))
                     total_jobs +=1
