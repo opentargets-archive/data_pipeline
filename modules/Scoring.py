@@ -425,22 +425,22 @@ class TargetDiseasePairProducer(Process):
     def run(self):
         logging.info("producer %s started"%self.name)
         total_jobs = 0
-        for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
+        targets = [target_row.id for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                         ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                         ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                         ElasticsearchLoad.active==True,
                         # ElasticsearchLoad.id == 'ENSG00000113448',
                         )
-                    )[:1000]:
-            target = target_row.id
-            for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
+                    )][:1000]
+        diseases = [disease_row.id for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                         ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                         ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                         ElasticsearchLoad.active==True,
                         # ElasticsearchLoad.id =='EFO_0000270',
                         )
-                    )[:1000]:
-                disease = disease_row.id
+                    )][:1000]
+        for target in targets:
+            for disease in diseases:
                 self.task_q.put((target, disease))
                 total_jobs +=1
             if total_jobs % 100000 ==0:
