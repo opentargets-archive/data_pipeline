@@ -66,6 +66,7 @@ class AssociationScoreSet(JSONSerializable):
     def __init__(self, target, disease):
         self.target = target
         self.disease = disease
+        self.set_id()
         for method_key, method in ScoringMethods.__dict__.items():
             if not method_key.startswith('_'):
                 self.set_method(method,AssociationScore())
@@ -80,6 +81,10 @@ class AssociationScoreSet(JSONSerializable):
         if not isinstance(score, AssociationScore):
             raise AttributeError("score need to be an instance of AssociationScore")
         self.__dict__[method] = score
+
+    def set_id(self):
+        self.id = '%s-%s'%(self.target, self.disease)
+
 
 class EvidenceScore():
     def __init__(self, evidence_string):
@@ -260,7 +265,12 @@ class ScoreStorer():
             # pass
             id, score = data
             # logging.debug()
-            #TODO: store in postgres
+            JSONObjectStorage.store_to_pg(self.session,
+                                        Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+                                          Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
+                                          score,
+                                          delete_prev=False
+                                         )
         if (self.counter % 10000) == 0:
             logging.info("%s precalculated scores inserted in elasticsearch_load table" %(millify(self.counter)))
 
@@ -275,6 +285,9 @@ class ScoreStorer():
 
 
     def __enter__(self):
+        JSONObjectStorage.delete_prev_data_in_pg(self.session,
+                                                 Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+                                                 )
         return self
 
 
