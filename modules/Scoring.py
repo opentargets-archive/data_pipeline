@@ -14,6 +14,8 @@ from settings import Config
 from multiprocessing import Pool, Process, Queue, Value
 
 __author__ = 'andreap'
+import math
+
 
 
 
@@ -29,6 +31,15 @@ class ScoringMethods():
     SUM = 'sum'
     MAX = 'max'
 
+def millify(n):
+    try:
+        n = float(n)
+        millnames=['','K','M','G','P']
+        millidx=max(0,min(len(millnames)-1,
+                          int(math.floor(math.log10(abs(n))/3))))
+        return '%.1f%s'%(n/10**(3*millidx),millnames[millidx])
+    except:
+        return n
 
 class AssociationScore(JSONSerializable):
 
@@ -339,7 +350,7 @@ class EvidenceGetter(Process):
             self.global_count.value +=1
             count = self.global_count.value
             if count %10000 == 0:
-               logging.info('target-disease pair analysed: %i \n analysis rate: %1.2f pair per second'%(count, count/(time.time()-self.start_time)))
+               logging.info('target-disease pair analysed: %s \n analysis rate: %1.2f pair per second'%(millify(count), millify(count/(time.time()-self.start_time))))
 
 class ScoreStorerWorker(Process):
     def __init__(self, task_q, result_q, name):
@@ -408,14 +419,14 @@ class ScoringProcess():
                         )
                     ).count()
         estimated_total = target_total*disease_total
-        logging.info("%i targets available | %i diseases available | %iM estimated combinations to precalculate"%(target_total,
-                                                                                                                disease_total,
-                                                                                                                estimated_total/1e6))
+        logging.info("%s targets available | %s diseases available | %s estimated combinations to precalculate"%(millify(target_total),
+                                                                                                                millify(disease_total),
+                                                                                                                millify(estimated_total)))
 
         c=0.
         combination_with_data = 0.
         self.start_time = time.time()
-        tasks_q = multiprocessing.JoinableQueue()
+        tasks_q = multiprocessing.JoinableQueue(maxsize=10*1000)
         result_q = multiprocessing.Queue()
         # reporter = EvidenceGetterQueueReporter(tasks_q, result_q)
         # reporter.start()
@@ -425,7 +436,7 @@ class ScoringProcess():
                                     i,
                                     evidence_got_count,
                                     self.start_time,
-                                    ) for i in range(multiprocessing.cpu_count()*6)]
+                                    ) for i in range(multiprocessing.cpu_count()*4)]
         for w in consumers:
             w.start()
         total_jobs = 0
@@ -435,7 +446,7 @@ class ScoringProcess():
                         ElasticsearchLoad.active==True,
                         # ElasticsearchLoad.id == 'ENSG00000113448',
                         )
-                    )[:1000]:
+                    ).yield_per(1000)[:1000]:
             target = target_row.id
             for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                         ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
@@ -443,12 +454,20 @@ class ScoringProcess():
                         ElasticsearchLoad.active==True,
                         # ElasticsearchLoad.id =='EFO_0000270',
                         )
-                    )[:1000]:
+                    ).yield_per(1000):
                 disease = disease_row.id
                 tasks_q.put((target, disease))
                 total_jobs +=1
+            if total_jobs % 1000 ==0:
+                logging.info('%s tasks loaded'%(millify(total_jobs)))
+                try: #avoid mac os error
+                    logging.info('queue size: %s'%(millify(tasks_q.qsize())))
+                except NotImplementedError:
+                    pass
+        for w in consumers:
+            tasks_q.put(None)#kill consumers when done
         confirmed_total = total_jobs
-        logging.info("task loading done: %i loaded in %is"%(total_jobs, time.time()-self.start_time))
+        logging.info("task loading done: %s loaded in %is"%(millify(total_jobs), time.time()-self.start_time))
         ''' wait for all the jobs to complete'''
         # tasks_q.join()
         with ScoreStorer(self.adapter) as storer:
@@ -464,12 +483,14 @@ class ScoringProcess():
                     storer.put(score)
                     # print c,round(c/estimated_total,2), target, disease, len(evidence)
                 if c%10000 ==0:
-                    logging.info('%1.1f%% combinations computed, %i with data, %i remaining'%(c/confirmed_total*100, combination_with_data, total_jobs))
+                    logging.info('%1.1f%% combinations computed, %s with data, %s remaining'%(c/confirmed_total*100,
+                                                                                              millify(combination_with_data),
+                                                                                              millify(total_jobs)))
 
                     # print c,round(estimated_total/c,2) target, disease, len(evidence)
 
-        logging.info('%i%% combinations computed, %i with data, sparse ratio: %1.3f%%'%(int(round(c/confirmed_total)),
-                                                                                        combination_with_data,
+        logging.info('%1.1f%% combinations computed, %s with data, sparse ratio: %1.3f%%'%(c/confirmed_total*100,
+                                                                                        millify(combination_with_data),
                                                                                         (confirmed_total-combination_with_data)/confirmed_total*100))
 
 
