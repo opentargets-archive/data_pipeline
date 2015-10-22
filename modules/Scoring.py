@@ -426,7 +426,7 @@ class ScoringProcess():
         c=0.
         combination_with_data = 0.
         self.start_time = time.time()
-        tasks_q = multiprocessing.JoinableQueue(maxsize=10*1000)
+        tasks_q = multiprocessing.JoinableQueue()
         result_q = multiprocessing.Queue()
         # reporter = EvidenceGetterQueueReporter(tasks_q, result_q)
         # reporter.start()
@@ -446,7 +446,7 @@ class ScoringProcess():
                         ElasticsearchLoad.active==True,
                         # ElasticsearchLoad.id == 'ENSG00000113448',
                         )
-                    ).yield_per(1000)[:1000]:
+                    )[:3000]:
             target = target_row.id
             for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
                         ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
@@ -454,16 +454,16 @@ class ScoringProcess():
                         ElasticsearchLoad.active==True,
                         # ElasticsearchLoad.id =='EFO_0000270',
                         )
-                    ).yield_per(1000):
+                    )[:2000]:
                 disease = disease_row.id
                 tasks_q.put((target, disease))
                 total_jobs +=1
-            if total_jobs % 1000 ==0:
+            if total_jobs % 10000 ==0:
                 logging.info('%s tasks loaded'%(millify(total_jobs)))
-                try: #avoid mac os error
-                    logging.info('queue size: %s'%(millify(tasks_q.qsize())))
-                except NotImplementedError:
-                    pass
+                # try: #avoid mac os error
+                #     logging.info('queue size: %s'%(millify(tasks_q.qsize())))
+                # except NotImplementedError:
+                #     pass
         for w in consumers:
             tasks_q.put(None)#kill consumers when done
         confirmed_total = total_jobs
