@@ -330,9 +330,7 @@ class EvidenceGetter(Process):
                                     for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_id_subquery))\
                                     .yield_per(10000)
                                 ]
-            if evidence:
-                target, disease, evidence
-            self.task_queue.task_done()
+            self.task_q.task_done()
             self.result_q.put((target, disease, evidence))
 
 class ScoringProcess():
