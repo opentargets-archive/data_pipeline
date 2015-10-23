@@ -425,7 +425,7 @@ class TargetDiseasePairProducer(Process):
                     self.produce_pairs()
                 else:
                     self.init_data_cache(row.target_id)
-            self.data_cache['diseases'].append(row.disease_id)
+            self.data_cache['diseases'].add(row.disease_id)
 
         self.produce_pairs()
         for w in range(self.n_consumers):
@@ -436,13 +436,14 @@ class TargetDiseasePairProducer(Process):
         logging.debug("%s finished"%self.name)
 
     def init_data_cache(self, target_key=''):
-        self.data_cache = dict(target=target_key, diseases = [])
+        self.data_cache = dict(target=target_key, diseases = set())
 
     def produce_pairs(self):
         for disease in self.data_cache['diseases']:
             self.q.put((self.data_cache['target'],disease))
+            # print self.data_cache['target'], disease
             self.total_jobs +=1
-            if self.total_jobs % 10000 ==0:
+            if self.total_jobs % 5e4 ==0:
                 logging.info('%s tasks loaded'%(millify( self.total_jobs)))
                 self.pairs_generated.value =  self.total_jobs
 
