@@ -397,7 +397,9 @@ class TargetDiseasePairProducer(Process):
 
     def run(self):
         logging.info("%s started"%self.name)
-        total_jobs = 0
+        total_assocaition_pairs = self.session.query(TargetToDiseaseAssociationScoreMap).count()
+        logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
+        self.total_jobs = 0
         # targets = [target_row.id for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
         #                 ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
         #                 ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
@@ -413,27 +415,36 @@ class TargetDiseasePairProducer(Process):
         #                 )
         #             )][:1000]
         distinct_pair_query='''select count(distinct (target_id, disease_id)) from pipeline.target_to_disease_association_score_map;'''
-        for row in self.session.query(TargetToDiseaseAssociationScoreMap).distinct(TargetToDiseaseAssociationScoreMap.target_id, TargetToDiseaseAssociationScoreMap.disease_id,):
-            total_jobs +=1
-            self.q.put((row.target_id, row.disease_id))
+        # for row in self.session.query(TargetToDiseaseAssociationScoreMap).distinct(TargetToDiseaseAssociationScoreMap.target_id, TargetToDiseaseAssociationScoreMap.disease_id,):
+        self.init_data_cache()
+        for row in self.session.query(TargetToDiseaseAssociationScoreMap.target_id,
+                                      TargetToDiseaseAssociationScoreMap.disease_id).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000):
+            if row.target_id != self.data_cache['target']:
+                if self.data_cache['diseases']:
+                    '''produce pairs'''
+                    self.produce_pairs()
+                else:
+                    self.init_data_cache(row.target_id)
+            self.data_cache['diseases'].append(row.disease_id)
 
-        # for target in targets:
-        #     for disease in diseases:
-        #         self.q.put((target, disease))
-        #         total_jobs +=1
-            if total_jobs % 1000 ==0:
-                logging.info('%s tasks loaded'%(millify(total_jobs)))
-                self.pairs_generated.value = total_jobs
-                # try: #avoid mac os error
-                #     logging.info('queue size: %s'%(millify(tasks_q.qsize())))
-                # except NotImplementedError:
-                #     pass
+        self.produce_pairs()
         for w in range(self.n_consumers):
             self.q.put(None)#kill consumers when done
-        logging.info("task loading done: %s loaded in %is"%(millify(total_jobs), time.time()-self.start_time))
+        logging.info("task loading done: %s loaded in %is"%(millify(self.total_jobs), time.time()-self.start_time))
         self.signal_finish.set()
-        self.pairs_generated.value = total_jobs
+        self.pairs_generated.value = self.total_jobs
         logging.debug("%s finished"%self.name)
+
+    def init_data_cache(self, target_key=''):
+        self.data_cache = dict(target=target_key, diseases = [])
+
+    def produce_pairs(self):
+        for disease in self.data_cache['diseases']:
+            self.q.put((self.data_cache['target'],disease))
+            self.total_jobs +=1
+            if self.total_jobs % 10000 ==0:
+                logging.info('%s tasks loaded'%(millify( self.total_jobs)))
+                self.pairs_generated.value =  self.total_jobs
 
 
 class ScorerProducer(Process):
