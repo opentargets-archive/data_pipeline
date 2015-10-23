@@ -1,13 +1,14 @@
 import logging
 import pprint
 import multiprocessing
+from elasticsearch import Elasticsearch
 from sqlalchemy import and_, func
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import joinedload, subqueryload
 import time
 from common import Actions
 from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import JSONObjectStorage
+from common.ElasticsearchLoader import JSONObjectStorage, Loader
 from common.PGAdapter import ElasticsearchLoad, TargetToDiseaseAssociationScoreMap, Adapter
 from modules.EvidenceString import Evidence
 from settings import Config
@@ -159,12 +160,14 @@ class Scorer():
                 datasource_scorers[e.datasource]=HarmonicSumScorer(buffer=max_entries)
             datasource_scorers[e.datasource].add(e.score)
         '''compute datasource scores'''
+        overall_scorer = HarmonicSumScorer(buffer=max_entries)
         for datasource in datasource_scorers:
-            har_sum_score.datasources[e.datasource]=datasource_scorers[e.datasource].score()
+            har_sum_score.datasources[datasource]=datasource_scorers[datasource].score()
+            overall_scorer.add(har_sum_score.datasources[datasource])
         '''compute datatype scores'''
         #TODO
         '''compute overall scores'''
-        #TODO
+        har_sum_score.overall = overall_scorer.score()
 
         return score
 
@@ -242,13 +245,14 @@ class ScoringExtract():
         self.session.commit()
 
 class ScoreStorer():
-    def __init__(self, adapter, chunk_size=1000):
+    def __init__(self, adapter, es_loader, chunk_size=10000):
 
         self.adapter=adapter
         self.session=adapter.session
         self.chunk_size = chunk_size
         self.cache = {}
         self.counter = 0
+        self.es_loader = es_loader
 
     def put(self, id, score):
 
@@ -256,6 +260,9 @@ class ScoreStorer():
         self.counter +=1
         if (len(self.cache) % self.chunk_size) == 0:
             self.flush()
+        self.es_loader.put(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+                           Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
+                           id, score.to_json())
 
 
     def flush(self):
@@ -490,20 +497,23 @@ class ScoreStorerWorker(Process):
     def __init__(self,
                  score_q,
                  signal_finish,
-                 score_computation_finished
+                 score_computation_finished,
+                 chunk_size = 1e4
                  ):
         super(ScoreStorerWorker, self).__init__()
         self.q= score_q
         self.signal_finish = signal_finish
         self.score_computation_finished = score_computation_finished
+        self.chunk_size=chunk_size
         self.adapter=Adapter()
         self.session=self.adapter.session
-
+        es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        self.loader = Loader(es, chunk_size=chunk_size)
 
     def run(self):
         logging.info("worker %s started"%self.name)
         c=0
-        with ScoreStorer(self.adapter) as storer:
+        with ScoreStorer(self.adapter, self.loader, self.chunk_size) as storer:
             while not (self.q.empty() and \
                                self.score_computation_finished.is_set()):
                 target, disease, score = self.q.get()
