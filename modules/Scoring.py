@@ -266,7 +266,8 @@ class ScoreStorer():
                                       Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
                                       Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
                                       self.cache,
-                                      delete_prev=False
+                                      delete_prev=False,
+                                      quiet=True,
                                      )
         self.counter+=len(self.cache)
         if (self.counter % 10000) == 0:

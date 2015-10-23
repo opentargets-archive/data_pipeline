@@ -34,7 +34,8 @@ class JSONObjectStorage():
                     doc_name,
                     data,
                     delete_prev=True,
-                    autocommit=True):
+                    autocommit=True,
+                    quiet = False):
         if delete_prev:
             JSONObjectStorage.delete_prev_data_in_pg(session, index_name, doc_name)
         c = 0
@@ -49,11 +50,13 @@ class JSONObjectStorage():
                                           date_modified=datetime.now(),
                                           ))
             if c % 1000 == 0:
-                logging.info("%i rows of %s inserted to elasticsearch_load" %(c, doc_name))
+                logging.debug("%i rows of %s inserted to elasticsearch_load" %(c, doc_name))
                 session.flush()
         if autocommit:
             session.commit()
-        logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(c, doc_name))
+        if not quiet:
+            logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(c, doc_name))
+        return c
 
     @staticmethod
     def refresh_index_data_in_es(loader, session, index_name, doc_name=None):
