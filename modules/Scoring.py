@@ -400,22 +400,6 @@ class TargetDiseasePairProducer(Process):
         total_assocaition_pairs = self.session.query(TargetToDiseaseAssociationScoreMap).count()
         logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
         self.total_jobs = 0
-        # targets = [target_row.id for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
-        #                 ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-        #                 ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-        #                 ElasticsearchLoad.active==True,
-        #                 # ElasticsearchLoad.id == 'ENSG00000113448',
-        #                 )
-        #             )][:3000]
-        # diseases = [disease_row.id for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
-        #                 ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-        #                 ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-        #                 ElasticsearchLoad.active==True,
-        #                 # ElasticsearchLoad.id =='EFO_0000270',
-        #                 )
-        #             )][:1000]
-        distinct_pair_query='''select count(distinct (target_id, disease_id)) from pipeline.target_to_disease_association_score_map;'''
-        # for row in self.session.query(TargetToDiseaseAssociationScoreMap).distinct(TargetToDiseaseAssociationScoreMap.target_id, TargetToDiseaseAssociationScoreMap.disease_id,):
         self.init_data_cache()
         for row in self.session.query(TargetToDiseaseAssociationScoreMap.target_id,
                                       TargetToDiseaseAssociationScoreMap.disease_id).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000):
@@ -423,8 +407,7 @@ class TargetDiseasePairProducer(Process):
                 if self.data_cache['diseases']:
                     '''produce pairs'''
                     self.produce_pairs()
-                else:
-                    self.init_data_cache(row.target_id)
+                self.init_data_cache(row.target_id)
             self.data_cache['diseases'].add(row.disease_id)
 
         self.produce_pairs()
@@ -441,9 +424,8 @@ class TargetDiseasePairProducer(Process):
     def produce_pairs(self):
         for disease in self.data_cache['diseases']:
             self.q.put((self.data_cache['target'],disease))
-            # print self.data_cache['target'], disease
             self.total_jobs +=1
-            if self.total_jobs % 5e4 ==0:
+            if self.total_jobs % 1e5 ==0:
                 logging.info('%s tasks loaded'%(millify( self.total_jobs)))
                 self.pairs_generated.value =  self.total_jobs
 
