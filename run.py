@@ -157,7 +157,7 @@ if __name__ == '__main__':
                 ScoringExtract(adapter).extract()
             if (ScoringActions.PROCESS in args.sco) or do_all:
                 ScoringProcess(adapter).process_all()
-            if (ScoringActions.UPLOAD in args.sco) or do_all:
+            if (ScoringActions.UPLOAD in args.sco):# data will be uploaded also by the proces step
                 ScoringUploader(adapter, loader).upload_all()
         if args.val or run_full_pipeline:
             do_all = (EvidenceValidationActions.ALL in args.val) or run_full_pipeline
