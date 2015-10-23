@@ -398,25 +398,30 @@ class TargetDiseasePairProducer(Process):
     def run(self):
         logging.info("%s started"%self.name)
         total_jobs = 0
-        targets = [target_row.id for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                        ElasticsearchLoad.active==True,
-                        # ElasticsearchLoad.id == 'ENSG00000113448',
-                        )
-                    )][:3000]
-        diseases = [disease_row.id for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                        ElasticsearchLoad.active==True,
-                        # ElasticsearchLoad.id =='EFO_0000270',
-                        )
-                    )][:1000]
-        for target in targets:
-            for disease in diseases:
-                self.q.put((target, disease))
-                total_jobs +=1
-            if total_jobs % 100000 ==0:
+        # targets = [target_row.id for target_row in self.session.query(ElasticsearchLoad.id).filter(and_(
+        #                 ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+        #                 ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+        #                 ElasticsearchLoad.active==True,
+        #                 # ElasticsearchLoad.id == 'ENSG00000113448',
+        #                 )
+        #             )][:3000]
+        # diseases = [disease_row.id for disease_row in self.session.query(ElasticsearchLoad.id).filter(and_(
+        #                 ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+        #                 ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+        #                 ElasticsearchLoad.active==True,
+        #                 # ElasticsearchLoad.id =='EFO_0000270',
+        #                 )
+        #             )][:1000]
+        distinct_pair_query='''select count(distinct (target_id, disease_id)) from pipeline.target_to_disease_association_score_map;'''
+        for row in self.session.query(TargetToDiseaseAssociationScoreMap).distinct(TargetToDiseaseAssociationScoreMap.target_id, TargetToDiseaseAssociationScoreMap.disease_id,):
+            total_jobs +=1
+            self.q.put((row.target_id, row.disease_id))
+
+        # for target in targets:
+        #     for disease in diseases:
+        #         self.q.put((target, disease))
+        #         total_jobs +=1
+            if total_jobs % 1000 ==0:
                 logging.info('%s tasks loaded'%(millify(total_jobs)))
                 self.pairs_generated.value = total_jobs
                 # try: #avoid mac os error
