@@ -17,7 +17,7 @@ __author__ = 'andreap'
 import math
 
 
-
+global_reporting_step = 1e5
 
 
 class ScoringActions(Actions):
@@ -236,7 +236,7 @@ class ScoringExtract():
                                               ))
             if c % 100 == 0:
                 self.session.flush()
-            if i % 10000 == 0:
+            if i % global_reporting_step == 0:
                 logging.info("%i rows inserted to score-data table, %i evidence strings analysed" %(i, c))
 
         self.session.commit()
@@ -270,7 +270,7 @@ class ScoreStorer():
                                       quiet=True,
                                      )
         self.counter+=len(self.cache)
-        if (self.counter % 10000) == 0:
+        if (self.counter % global_reporting_step) == 0:
             logging.info("%s precalculated scores inserted in elasticsearch_load table" %(millify(self.counter)))
 
         self.session.flush()
@@ -369,7 +369,7 @@ class EvidenceGetter(Process):
             self.result_q.put((target, disease, evidence))
             self.global_count.value +=1
             count = self.global_count.value
-            if count %10000 == 0:
+            if count %global_reporting_step == 0:
                logging.info('target-disease pair analysed: %s | analysis rate: %s pairs per second'%(millify(count), millify(count/(time.time()-self.start_time))))
 
         logging.debug("%s finished"%self.name)
@@ -426,7 +426,7 @@ class TargetDiseasePairProducer(Process):
         for disease in self.data_cache['diseases']:
             self.q.put((self.data_cache['target'],disease))
             self.total_jobs +=1
-            if self.total_jobs % 1e5 ==0:
+            if self.total_jobs % global_reporting_step ==0:
                 logging.info('%s tasks loaded'%(millify( self.total_jobs)))
                 self.pairs_generated.value =  self.total_jobs
 
@@ -469,7 +469,7 @@ class ScorerProducer(Process):
                     combination_with_data +=1
                     self.score_q.put((target, disease,score))
                     # print c,round(c/estimated_total,2), target, disease, len(evidence)
-                if c%10000 ==0:
+                if c % global_reporting_step ==0:
                     total_jobs = self.target_disease_pairs_generated_count.value
                     logging.info('%1.1f%% combinations computed, %s with data, %s remaining'%(c/total_jobs*100,
                                                                                               millify(combination_with_data),
