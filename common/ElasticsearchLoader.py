@@ -124,7 +124,7 @@ class Loader():
     def put(self, index_name, doc_type, ID, body):
 
         if not index_name in self.index_created:
-            self.create_new_index(index_name, timeout = 60)
+            self.create_new_index(index_name)
             self.index_created.append(index_name)
 
         self.cache.append(dict(_index=index_name,
