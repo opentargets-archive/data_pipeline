@@ -592,7 +592,6 @@ class ScoreStorerWorker(Process):
         self.adapter=Adapter()
         self.session=self.adapter.session
         self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
-        self.loader =
 
     def run(self):
         logging.info("worker %s started"%self.name)
