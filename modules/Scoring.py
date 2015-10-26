@@ -618,7 +618,7 @@ class ScoreStorerWorker(Process):
     def run(self):
         logging.info("worker %s started"%self.name)
         with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
-            with ScoreStorer(self.adapter, es_loader) as storer:
+            with ScoreStorer(self.adapter, es_loader, chunk_size=self.chunk_size) as storer:
                 while not ((self.global_counter.value >= self.total_loaded.value) and \
                         self.score_computation_finished.is_set()):
                     target, disease, score = self.q.get()
