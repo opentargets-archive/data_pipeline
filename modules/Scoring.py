@@ -19,7 +19,7 @@ __author__ = 'andreap'
 import math
 
 
-global_reporting_step = 10000
+global_reporting_step = 1000
 
 
 class ScoringActions(Actions):
@@ -485,15 +485,34 @@ class TargetDiseasePairProducer(Process):
         logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
         self.total_jobs = 0
         self.init_data_cache()
-        for row in self.session.query(TargetToDiseaseAssociationScoreMap).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000):
-            if row.target_id != self.data_cache['target']:
-                if self.data_cache['diseases']:
-                    '''produce pairs'''
-                    self.produce_pairs()
-                self.init_data_cache(row.target_id)
-            if row.disease_id not in self.data_cache['diseases']:
-                self.data_cache['diseases'][row.disease_id] = []
-            self.data_cache['diseases'][row.disease_id].append(self.get_score_from_row(row))
+
+        with self.adapter.engine.connect() as conn:
+            result = conn.execute(TargetToDiseaseAssociationScoreMap.__table__.select())
+            while True:
+                chunk = result.fetchmany(10000)
+                if not chunk:
+                    break
+                for row in chunk:
+                    if row['target_id'] != self.data_cache['target']:
+                        if self.data_cache['diseases']:
+                            '''produce pairs'''
+                            self.produce_pairs()
+                        self.init_data_cache(row.target_id)
+                    if row['disease_id'] not in self.data_cache['diseases']:
+                        self.data_cache['diseases'][row.disease_id] = []
+                    self.data_cache['diseases'][row.disease_id].append(self.get_score_from_row(row))
+
+
+
+        # for row in self.session.query(TargetToDiseaseAssociationScoreMap).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000):
+        #     if row.target_id != self.data_cache['target']:
+        #         if self.data_cache['diseases']:
+        #             '''produce pairs'''
+        #             self.produce_pairs()
+        #         self.init_data_cache(row.target_id)
+        #     if row.disease_id not in self.data_cache['diseases']:
+        #         self.data_cache['diseases'][row.disease_id] = []
+        #     self.data_cache['diseases'][row.disease_id].append(self.get_score_from_row(row))
 
         self.produce_pairs()
         # for w in range(self.n_consumers):
@@ -511,13 +530,13 @@ class TargetDiseasePairProducer(Process):
             self.q.put((self.data_cache['target'],disease, self.data_cache['diseases'][disease]))
             self.total_jobs +=1
             if self.total_jobs % global_reporting_step ==0:
-                logging.info('%s tasks loaded'%(millify( self.total_jobs)))
+                # logging.info('%s tasks loaded'%(millify( self.total_jobs)))
                 self.pairs_generated.value =  self.total_jobs
 
     def get_score_from_row(self, row):
-        return EvidenceScore(score = row.association_score,
-                             datatype= Config.DATASOURCE_TO_DATATYPE_MAPPING[row.datasource],
-                             datasource=row.datasource)
+        return EvidenceScore(score = row['association_score'],
+                             datatype= Config.DATASOURCE_TO_DATATYPE_MAPPING[row['datasource']],
+                             datasource=row['datasource'])
 
 
 class ScorerProducer(Process):
@@ -715,6 +734,7 @@ class ScoringProcess():
 
         ''' wait for all the jobs to complete'''
         while not data_storage_finished.is_set():
+
             time.sleep(10)
 
         logging.info("DONE")
