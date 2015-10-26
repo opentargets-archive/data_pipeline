@@ -121,11 +121,12 @@ class Loader():
         self.index_created=[]
         logging.info("loader chunk_size: %i"%chunk_size)
 
-    def put(self, index_name, doc_type, ID, body):
+    def put(self, index_name, doc_type, ID, body, create_index = True):
 
         if not index_name in self.index_created:
             self.create_new_index(index_name)
-            self.index_created.append(index_name)
+            if create_index:
+                self.index_created.append(index_name)
 
         self.cache.append(dict(_index=index_name,
                                _type=doc_type,

@@ -18,7 +18,7 @@ __author__ = 'andreap'
 import math
 
 
-global_reporting_step = 1e5
+global_reporting_step = 10000
 
 
 class ScoringActions(Actions):
@@ -88,11 +88,22 @@ class AssociationScoreSet(JSONSerializable):
 
 
 class EvidenceScore():
-    def __init__(self, evidence_string):
-        e = Evidence(evidence_string).evidence
-        self.score = e['scores']['association_score']
-        self.datatype = e['type']
-        self.datasource = e['sourceID']
+    def __init__(self,
+                 evidence_string = None,
+                 score= None,
+                 datatype = None,
+                 datasource = None):
+        if evidence_string is not None:
+            e = Evidence(evidence_string).evidence
+            self.score = e['scores']['association_score']
+            self.datatype = e['type']
+            self.datasource = e['sourceID']
+        if score is not None:
+            self.score = score
+        if datatype is not None:
+            self.datatype = datatype
+        if datasource is not None:
+            self.datasource = datasource
 
 class HarmonicSumScorer():
 
@@ -245,7 +256,7 @@ class ScoringExtract():
         self.session.commit()
 
 class ScoreStorer():
-    def __init__(self, adapter, es_loader, chunk_size=10000):
+    def __init__(self, adapter, es_loader, chunk_size=100):
 
         self.adapter=adapter
         self.session=adapter.session
@@ -262,7 +273,9 @@ class ScoreStorer():
             self.flush()
         self.es_loader.put(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
                            Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
-                           id, score.to_json())
+                           id,
+                           score.to_json(),
+                           create_index = False)
 
 
     def flush(self):
@@ -291,34 +304,62 @@ class ScoreStorer():
 
 
     def __enter__(self):
-        JSONObjectStorage.delete_prev_data_in_pg(self.session,
-                                                 Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-                                                 )
         return self
 
 
     def __exit__(self, type, value, traceback):
         self.close()
 
-class EvidenceGetterQueueReporter(Process):
-    def __init__(self, task_q, result_q, ):
-        super(EvidenceGetterQueueReporter, self).__init__()
-        self.task_q= task_q
-        self.result_q= result_q
+class StatusQueueReporter(Process):
+    def __init__(self,
+                 target_disease_pair_q,
+                 evidence_data_q,
+                 score_data_q,
+                 target_disease_pair_loading_finished,
+                 evidence_data_retrieval_finished,
+                 score_computation_finished,
+                 data_storage_finished,
+                 ):
+        super(StatusQueueReporter, self).__init__()
+        self.target_disease_pair_q= target_disease_pair_q
+        self.evidence_data_q= evidence_data_q
+        self.score_data_q = score_data_q
+        self.target_disease_pair_loading_finished = target_disease_pair_loading_finished
+        self.evidence_data_retrieval_finished = evidence_data_retrieval_finished
+        self.score_computation_finished = score_computation_finished
+        self.data_storage_finished = data_storage_finished
 
 
 
     def run(self):
         logging.info("reporter worker started")
-        while 1:
-            try:
-                time.sleep(1)
-                logging.info("data to process: %i"%self.task_q.qsize())
-                logging.info("results processed: %i"%self.result_q.qsize())
-                if self.tasks_q.empty():
-                    break
-            except:
-                logging.error("reporter error")
+        while not (self.target_disease_pair_loading_finished.is_set() and
+                    self.evidence_data_retrieval_finished.is_set() and
+                   self.score_computation_finished.is_set() and
+                   self.data_storage_finished.is_set()):
+            # try:
+            time.sleep(10)
+            logging.info("""QUEUES:
+target_disease_pair_q: %s
+evidence_data_q: %s
+score_data_q: %s
+target_disease_pair_loading_finished: %s
+evidence_data_retrieval_finished: %s
+score_computation_finished: %s
+data_storage_finished: %s
+"""%(not self.target_disease_pair_q.empty(),
+     not self.evidence_data_q.empty(),
+     not self.score_data_q.empty(),
+     self.target_disease_pair_loading_finished.is_set(),
+     self.evidence_data_retrieval_finished.is_set(),
+     self.score_computation_finished.is_set(),
+     self.data_storage_finished.is_set()))
+                # logging.info("data to process: %i"%self.task_q.qsize())
+                # logging.info("results processed: %i"%self.result_q.qsize())
+                # if self.tasks_q.empty():
+                #     break
+            # except:
+            #     logging.error("reporter error")
 
         logging.info("reporter worker stopped")
 
@@ -409,14 +450,15 @@ class TargetDiseasePairProducer(Process):
         logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
         self.total_jobs = 0
         self.init_data_cache()
-        for row in self.session.query(TargetToDiseaseAssociationScoreMap.target_id,
-                                      TargetToDiseaseAssociationScoreMap.disease_id).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000):
+        for row in self.session.query(TargetToDiseaseAssociationScoreMap).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000)[:100000]:
             if row.target_id != self.data_cache['target']:
                 if self.data_cache['diseases']:
                     '''produce pairs'''
                     self.produce_pairs()
                 self.init_data_cache(row.target_id)
-            self.data_cache['diseases'].add(row.disease_id)
+            if row.disease_id not in self.data_cache['diseases']:
+                self.data_cache['diseases'][row.disease_id] = []
+            self.data_cache['diseases'][row.disease_id].append(self.get_score_from_row(row))
 
         self.produce_pairs()
         for w in range(self.n_consumers):
@@ -427,15 +469,20 @@ class TargetDiseasePairProducer(Process):
         logging.debug("%s finished"%self.name)
 
     def init_data_cache(self, target_key=''):
-        self.data_cache = dict(target=target_key, diseases = set())
+        self.data_cache = dict(target=target_key, diseases = dict())
 
     def produce_pairs(self):
         for disease in self.data_cache['diseases']:
-            self.q.put((self.data_cache['target'],disease))
+            self.q.put((self.data_cache['target'],disease, self.data_cache['diseases'][disease]))
             self.total_jobs +=1
             if self.total_jobs % global_reporting_step ==0:
                 logging.info('%s tasks loaded'%(millify( self.total_jobs)))
                 self.pairs_generated.value =  self.total_jobs
+
+    def get_score_from_row(self, row):
+        return EvidenceScore(score = row.association_score,
+                             datatype= Config.DATASOURCE_TO_DATATYPE_MAPPING[row.datasource],
+                             datasource=row.datasource)
 
 
 class ScorerProducer(Process):
@@ -465,32 +512,44 @@ class ScorerProducer(Process):
         logging.info("%s started"%self.name)
         c=0
         combination_with_data = 0
-        while not (self.evidence_data_q.empty() and \
-                           self.target_disease_pair_loading_finished.is_set() and \
-                           self.evidence_data_retrieval_finished.is_set()):
-                data = self.evidence_data_q.get()
-                c+=1
-                target, disease, evidence = data
-                if evidence:
-                    score = self.scorer.score(target, disease, evidence)
-                    combination_with_data +=1
-                    self.score_q.put((target, disease,score))
-                    # print c,round(c/estimated_total,2), target, disease, len(evidence)
-                if c % global_reporting_step ==0:
-                    total_jobs = self.target_disease_pairs_generated_count.value
-                    logging.info('%1.1f%% combinations computed, %s with data, %s remaining'%(c/total_jobs*100,
-                                                                                              millify(combination_with_data),
-                                                                                              millify(total_jobs)))
+        self.data_processing_started = False
+        while True:
+
+            data = self.evidence_data_q.get()
+            if data is None:
+                break
+            if data:
+                self.signal_started()
+            c+=1
+            target, disease, evidence = data
+            if evidence:
+                score = self.scorer.score(target, disease, evidence)
+                combination_with_data +=1
+                self.score_q.put((target, disease,score))
+                # print c,round(c/estimated_total,2), target, disease, len(evidence)
+            if c % global_reporting_step ==0:
+                total_jobs = self.target_disease_pairs_generated_count.value
+                logging.info('%1.1f%% combinations computed, %s with data, %s remaining'%(c/total_jobs*100,
+                                                                                          millify(combination_with_data),
+                                                                                          millify(total_jobs)))
+            # if self.evidence_data_q.empty() and self.data_processing_started:
+            #     logging.info('calculating scores from %s DONE'%self.name)
 
 
-                    # print c,round(estimated_total/c,2) target, disease, len(evidence)
+                # print c,round(estimated_total/c,2) target, disease, len(evidence)
 
         logging.info('%1.1f%% combinations computed, %s with data, sparse ratio: %1.3f%%'%(c/total_jobs*100,
                                                                                         millify(combination_with_data),
                                                                                         (total_jobs-combination_with_data)/total_jobs*100))
         # for p in consumers:
+
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
+
+    def signal_started(self):
+        if self.data_processing_started == False:
+            self.data_processing_started = True
+            logging.info('starting calculating scores from %s'%self.name)
 
 
 class ScoreStorerWorker(Process):
@@ -508,18 +567,19 @@ class ScoreStorerWorker(Process):
         self.adapter=Adapter()
         self.session=self.adapter.session
         es = Elasticsearch(Config.ELASTICSEARCH_URL)
-        self.loader = Loader(es, chunk_size=chunk_size)
+        self.loader = Loader(es, chunk_size=100)
 
     def run(self):
         logging.info("worker %s started"%self.name)
         c=0
-        with ScoreStorer(self.adapter, self.loader, self.chunk_size) as storer:
+        with ScoreStorer(self.adapter, self.loader,) as storer:
             while not (self.q.empty() and \
                                self.score_computation_finished.is_set()):
                 target, disease, score = self.q.get()
                 c+=1
                 storer.put('%s-%s'%(target,disease),
                                 score)
+                print 'storing', c
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
@@ -527,9 +587,11 @@ class ScoreStorerWorker(Process):
 class ScoringProcess():
 
     def __init__(self,
-                 adapter):
+                 adapter,
+                 es_loader):
         self.adapter=adapter
         self.session=adapter.session
+        self.es_loader = es_loader
         # self.scorer = Scorer()
 
     def process_all(self):
@@ -566,28 +628,21 @@ class ScoringProcess():
         evidence_data_retrieval_finished = multiprocessing.Event()
         score_computation_finished = multiprocessing.Event()
         data_storage_finished = multiprocessing.Event()
-        # reporter = EvidenceGetterQueueReporter(tasks_q, result_q)
-        # reporter.start()
+        reporter = StatusQueueReporter(target_disease_pair_q,
+                                       evidence_data_q,
+                                       score_data_q,
+                                       target_disease_pair_loading_finished,
+                                       evidence_data_retrieval_finished,
+                                       score_computation_finished,data_storage_finished,
+                                       )
+        reporter.start()
         '''create shared memory objects'''
-        evidence_got_count =  Value('i', 0)
+        # evidence_got_count =  Value('i', 0)
         target_disease_pairs_generated_count =  Value('i', 0)
-        evidence_getters = [EvidenceGetter(target_disease_pair_q,
-                                    evidence_data_q,
-                                    evidence_got_count,
-                                    self.start_time,
-                                    evidence_data_retrieval_finished,
-                                    target_disease_pair_loading_finished
-                                    ) for i in range(multiprocessing.cpu_count()*4)]
-        for w in evidence_getters:
-            w.start()
-        target_disease_pair_producer = TargetDiseasePairProducer(target_disease_pair_q,
-                                             len(evidence_getters),
-                                             self.start_time,
-                                             target_disease_pair_loading_finished,
-                                             target_disease_pairs_generated_count)
-        target_disease_pair_producer.start()
 
-        scorers = [ScorerProducer(evidence_data_q,
+
+        '''create workers'''
+        scorers = [ScorerProducer(target_disease_pair_q,
                                   score_data_q,
                                   self.start_time,
                                   evidence_data_retrieval_finished,
@@ -598,9 +653,34 @@ class ScoringProcess():
         for w in scorers:
             w.start()
 
+        # evidence_getters = [EvidenceGetter(target_disease_pair_q,
+        #                             evidence_data_q,
+        #                             evidence_got_count,
+        #                             self.start_time,
+        #                             evidence_data_retrieval_finished,
+        #                             target_disease_pair_loading_finished
+        #                             ) for i in range(multiprocessing.cpu_count()*4)]
+        # for w in evidence_getters:
+        #     w.start()
+        target_disease_pair_producer = TargetDiseasePairProducer(target_disease_pair_q,
+                                             len(scorers),
+                                             self.start_time,
+                                             target_disease_pair_loading_finished,
+                                             target_disease_pairs_generated_count)
+        target_disease_pair_producer.start()
+
+
+
+
+        JSONObjectStorage.delete_prev_data_in_pg(self.session,
+                                         Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+                                         )
+        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME)
+
         storer = ScoreStorerWorker(score_data_q,
                                    data_storage_finished,
-                                   score_computation_finished)
+                                   score_computation_finished,
+                                   chunk_size=1000)
 
         storer.start()
 

@@ -156,7 +156,7 @@ if __name__ == '__main__':
             if (ScoringActions.EXTRACT in args.sco) or do_all:
                 ScoringExtract(adapter).extract()
             if (ScoringActions.PROCESS in args.sco) or do_all:
-                ScoringProcess(adapter).process_all()
+                ScoringProcess(adapter, loader).process_all()
             if (ScoringActions.UPLOAD in args.sco):# data will be uploaded also by the proces step
                 ScoringUploader(adapter, loader).upload_all()
         if args.val or run_full_pipeline:
