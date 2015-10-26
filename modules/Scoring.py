@@ -475,7 +475,7 @@ class TargetDiseasePairProducer(Process):
         logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
         self.total_jobs = 0
         self.init_data_cache()
-        for row in self.session.query(TargetToDiseaseAssociationScoreMap).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000):
+        for row in self.session.query(TargetToDiseaseAssociationScoreMap).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(10000):
             if row.target_id != self.data_cache['target']:
                 if self.data_cache['diseases']:
                     '''produce pairs'''
@@ -581,19 +581,20 @@ class ScoreStorerWorker(Process):
         self.total_loaded = target_disease_pairs_generated_count
         self.adapter=Adapter()
         self.session=self.adapter.session
-        es = Elasticsearch(Config.ELASTICSEARCH_URL)
-        self.loader = Loader(es, chunk_size=1e4)
+        self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        self.loader =
 
     def run(self):
         logging.info("worker %s started"%self.name)
-        with ScoreStorer(self.adapter, self.loader,) as storer:
-            while not ((self.global_counter.value >= self.total_loaded.value) and \
-                    self.score_computation_finished.is_set()):
-                target, disease, score = self.q.get()
-                if score:
-                    self.global_counter.value +=1
-                    storer.put('%s-%s'%(target,disease),
-                                    score)
+        with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
+            with ScoreStorer(self.adapter, es_loader) as storer:
+                while not ((self.global_counter.value >= self.total_loaded.value) and \
+                        self.score_computation_finished.is_set()):
+                    target, disease, score = self.q.get()
+                    if score:
+                        self.global_counter.value +=1
+                        storer.put('%s-%s'%(target,disease),
+                                        score)
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
@@ -693,14 +694,15 @@ class ScoringProcess():
         self.session.commit()
         self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME)
 
-        storer = ScoreStorerWorker(score_data_q,
+        storers = [ScoreStorerWorker(score_data_q,
                                    data_storage_finished,
                                    score_computation_finished,
                                    scores_submitted_to_storage,
                                    target_disease_pairs_generated_count,
-                                   chunk_size=1000)
+                                   chunk_size=1000) for i in range(multiprocessing.cpu_count())]
+        for w in storers:
+            w.start()
 
-        storer.start()
 
         ''' wait for all the jobs to complete'''
         while not data_storage_finished.is_set():
@@ -708,73 +710,6 @@ class ScoringProcess():
 
         logging.info("DONE")
 
-
-
-
-    def _get_evidence_for_pair(self, target, disease):
-        '''
-        SELECT rs.Field1,rs.Field2
-            FROM (
-                SELECT Field1,Field2, Rank()
-                  over (Partition BY Section
-                        ORDER BY RankCriteria DESC ) AS Rank
-                FROM table
-                ) rs WHERE Rank <= 10
-        '''
-        evidence  =[]
-
-        query ="""SELECT COUNT(pipeline.target_to_disease_association_score_map.evidence_id)
-                    FROM pipeline.target_to_disease_association_score_map
-                      WHERE pipeline.target_to_disease_association_score_map.target_id = '%s'
-                      AND pipeline.target_to_disease_association_score_map.disease_id = '%s'"""%(target, disease)
-        is_associated = self.session.execute(query).fetchone().count
-
-        # is_associated = self.session.query(
-        #                                         TargetToDiseaseAssociationScoreMap.evidence_id
-        #                                            )\
-        #                                     .filter(
-        #                                         and_(
-        #                                             TargetToDiseaseAssociationScoreMap.target_id == target,
-        #                                             TargetToDiseaseAssociationScoreMap.disease_id == disease,
-        #                                             )
-        #                                         ).count()
-
-        if is_associated:
-            # evidence_ids = [row.evidence_id for row in self.session.query(
-            #                                     TargetToDiseaseAssociationScoreMap.evidence_id
-            #                                        )\
-            #                                 .filter(
-            #                                     and_(
-            #                                         TargetToDiseaseAssociationScoreMap.target_id == target,
-            #                                         TargetToDiseaseAssociationScoreMap.disease_id == disease,
-            #                                         )
-            #                                     )
-            #             ]
-            # query ="""SELECT pipeline.target_to_disease_association_score_map.evidence_id
-            #             FROM pipeline.target_to_disease_association_score_map
-            #             WHERE pipeline.target_to_disease_association_score_map.target_id = '%s'
-            #             AND pipeline.target_to_disease_association_score_map.disease_id = '%s'"""%(target, disease)
-            # evidence_ids = self.session.execute(query).fetchall()
-
-            # evidence = [EvidenceScore(row.data)
-            #                     for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_ids))\
-            #                     .yield_per(10000)
-            #                 ]
-
-            evidence_id_subquery = self.session.query(
-                                                TargetToDiseaseAssociationScoreMap.evidence_id
-                                                   )\
-                                            .filter(
-                                                and_(
-                                                    TargetToDiseaseAssociationScoreMap.target_id == target,
-                                                    TargetToDiseaseAssociationScoreMap.disease_id == disease,
-                                                    )
-                                                ).subquery()
-            evidence = [EvidenceScore(row.data)
-                                for row in self.session.query(ElasticsearchLoad.data).filter(ElasticsearchLoad.id.in_(evidence_id_subquery))\
-                                .yield_per(10000)
-                            ]
-        return evidence
 
 
 
