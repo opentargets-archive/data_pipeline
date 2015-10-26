@@ -1,4 +1,5 @@
 import logging
+from multiprocessing.queues import SimpleQueue
 import pprint
 import multiprocessing
 from elasticsearch import Elasticsearch
@@ -282,20 +283,20 @@ class ScoreStorer():
     def flush(self):
 
 
+        if self.cache:
+            JSONObjectStorage.store_to_pg_core(self.adapter,
+                                              Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+                                              Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
+                                              self.cache,
+                                              delete_prev=False,
+                                              quiet=False,
+                                             )
+            self.counter+=len(self.cache)
+            if (self.counter % global_reporting_step) == 0:
+                logging.info("%s precalculated scores inserted in elasticsearch_load table" %(millify(self.counter)))
 
-        JSONObjectStorage.store_to_pg_core(self.adapter,
-                                          Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-                                          Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
-                                          self.cache,
-                                          delete_prev=False,
-                                          quiet=True,
-                                         )
-        self.counter+=len(self.cache)
-        if (self.counter % global_reporting_step) == 0:
-            logging.info("%s precalculated scores inserted in elasticsearch_load table" %(millify(self.counter)))
-
-        self.session.flush()
-        self.cache = {}
+            self.session.flush()
+            self.cache = {}
 
 
     def close(self):
@@ -474,7 +475,7 @@ class TargetDiseasePairProducer(Process):
         logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
         self.total_jobs = 0
         self.init_data_cache()
-        for row in self.session.query(TargetToDiseaseAssociationScoreMap).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000)[:100000]:
+        for row in self.session.query(TargetToDiseaseAssociationScoreMap).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000):
             if row.target_id != self.data_cache['target']:
                 if self.data_cache['diseases']:
                     '''produce pairs'''
@@ -537,17 +538,16 @@ class ScorerProducer(Process):
     def run(self):
         logging.info("%s started"%self.name)
         self.data_processing_started = False
-        while not ((self.global_counter.value >= self.total_loaded.value) and \
-                    self.target_disease_pair_loading_finished.is_set()):
+        while not (self.evidence_data_q.empty() and self.target_disease_pair_loading_finished.is_set()):
 
             data = self.evidence_data_q.get()
             if data:
                 self.signal_started()
             target, disease, evidence = data
-            self.global_counter.value +=1
-            score = self.scorer.score(target, disease, evidence)
-            self.score_q.put((target, disease,score))
-            # print self.global_counter.value, self.total_loaded.value, self.global_counter.value >= self.total_loaded.value,self.target_disease_pair_loading_finished.is_set()
+            if evidence:
+                self.global_counter.value +=1
+                score = self.scorer.score(target, disease, evidence)
+                self.score_q.put((target, disease,score))
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
@@ -590,14 +590,15 @@ class ScoreStorerWorker(Process):
             while not ((self.global_counter.value >= self.total_loaded.value) and \
                     self.score_computation_finished.is_set()):
                 target, disease, score = self.q.get()
-                self.global_counter.value +=1
-                storer.put('%s-%s'%(target,disease),
-                                score)
+                if score:
+                    self.global_counter.value +=1
+                    storer.put('%s-%s'%(target,disease),
+                                    score)
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
         try:
-            self.score_q.close()
+            self.q.close()
         except:
             pass
 
@@ -637,9 +638,9 @@ class ScoringProcess():
         combination_with_data = 0.
         self.start_time = time.time()
         '''create queues'''
-        target_disease_pair_q = multiprocessing.Queue(maxsize=1000)
-        # evidence_data_q = multiprocessing.JoinableQueue()
-        score_data_q = multiprocessing.Queue()
+        target_disease_pair_q = SimpleQueue()
+        # evidence_data_q = JoinableQueue()
+        score_data_q = SimpleQueue()
         '''create events'''
         target_disease_pair_loading_finished = multiprocessing.Event()
         # evidence_data_retrieval_finished = multiprocessing.Event()

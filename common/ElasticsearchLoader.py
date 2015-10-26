@@ -80,8 +80,8 @@ class JSONObjectStorage():
                                       ))
         adapter.engine.execute(ElasticsearchLoad.__table__.insert(),rows_to_insert)
 
-        if autocommit:
-            adapter.session.commit()
+        # if autocommit:
+        #     adapter.session.commit()
         if not quiet:
             logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(len(rows_to_insert), doc_name))
         return len(rows_to_insert)
