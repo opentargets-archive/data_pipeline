@@ -334,6 +334,7 @@ class StatusQueueReporter(Process):
         self.scores_computed = scores_computed
         self.scores_submitted_to_storage = scores_submitted_to_storage
         self.start_time = start_time
+        self.score_computation_finish_time = None
 
 
 
@@ -366,7 +367,7 @@ scores submitted for storage: %s
      self.data_storage_finished.is_set(),
      millify(self.target_disease_pairs_generated_count.value),
      millify(self.scores_computed.value),
-     millify(self.scores_computed.value/(time.time()-self.start_time)),
+     millify(self.get_score_speed()),
      millify(self.scores_submitted_to_storage.value),
      ))
                 # logging.info("data to process: %i"%self.task_q.qsize())
@@ -387,6 +388,15 @@ scores submitted for storage: %s
                 break
 
         logging.info("reporter worker stopped")
+
+    def get_score_speed(self):
+        if self.score_computation_finished.is_set():
+            if self.score_computation_finish_time is None:
+                self.score_computation_finish_time = time.time()
+            finish_time = self.score_computation_finish_time
+        else:
+            finish_time = time.time()
+        return self.scores_computed.value/(finish_time-self.start_time)
 
 
 class EvidenceGetter(Process):
