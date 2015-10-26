@@ -345,7 +345,7 @@ class StatusQueueReporter(Process):
                    self.score_computation_finished.is_set() and
                    self.data_storage_finished.is_set()):
             # try:
-            time.sleep(10)
+            time.sleep(30)
             logging.info("""
 =========== QUEUES ============
 target_disease_pair_q: %s
