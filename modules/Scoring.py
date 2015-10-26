@@ -727,7 +727,10 @@ class ScoringProcess():
                                    score_computation_finished,
                                    scores_submitted_to_storage,
                                    target_disease_pairs_generated_count,
-                                   chunk_size=1000) for i in range(multiprocessing.cpu_count()/2)]
+                                   chunk_size=1000,
+                                     # ) for i in range(multiprocessing.cpu_count()/2)]
+                                     ) for i in range(1)]
+
         for w in storers:
             w.start()
 
