@@ -502,8 +502,8 @@ class TargetDiseasePairProducer(Process):
                     if row['disease_id'] not in self.data_cache['diseases']:
                         self.data_cache['diseases'][row.disease_id] = []
                     self.data_cache['diseases'][row.disease_id].append(self.get_score_from_row(row))
-                    if c%100 ==0:
-                        print "\r%s"%millify(c),
+                    # if c%100 ==0:
+                    #     print "\r%s"%millify(c),
 
 
 
