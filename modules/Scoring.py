@@ -273,11 +273,11 @@ class ScoreStorer():
         self.counter +=1
         if (len(self.cache) % self.chunk_size) == 0:
             self.flush()
-        self.es_loader.put(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-                           Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
-                           id,
-                           score.to_json(),
-                           create_index = False)
+        # self.es_loader.put(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+        #                    Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
+        #                    id,
+        #                    score.to_json(),
+        #                    create_index = False)
 
 
     def flush(self):
@@ -485,7 +485,7 @@ class TargetDiseasePairProducer(Process):
         logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
         self.total_jobs = 0
         self.init_data_cache()
-
+        c=0
         with self.adapter.engine.connect() as conn:
             result = conn.execute(TargetToDiseaseAssociationScoreMap.__table__.select())
             while True:
@@ -493,6 +493,7 @@ class TargetDiseasePairProducer(Process):
                 if not chunk:
                     break
                 for row in chunk:
+                    c+=1
                     if row['target_id'] != self.data_cache['target']:
                         if self.data_cache['diseases']:
                             '''produce pairs'''
@@ -501,6 +502,8 @@ class TargetDiseasePairProducer(Process):
                     if row['disease_id'] not in self.data_cache['diseases']:
                         self.data_cache['diseases'][row.disease_id] = []
                     self.data_cache['diseases'][row.disease_id].append(self.get_score_from_row(row))
+                    if c%100 ==0:
+                        print "\r%s"%millify(c),
 
 
 
@@ -667,9 +670,9 @@ class ScoringProcess():
         combination_with_data = 0.
         self.start_time = time.time()
         '''create queues'''
-        target_disease_pair_q = SimpleQueue()
+        target_disease_pair_q = Queue()
         # evidence_data_q = JoinableQueue()
-        score_data_q = SimpleQueue()
+        score_data_q = Queue()
         '''create events'''
         target_disease_pair_loading_finished = multiprocessing.Event()
         # evidence_data_retrieval_finished = multiprocessing.Event()
