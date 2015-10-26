@@ -563,5 +563,5 @@ class ElasticSearchConfiguration():
                                        "index.store.type": "memory",
                                        "refresh_interval" : "60s",
                                        },
-                              "mappings": evidence_mappings,
+                              # "mappings": evidence_mappings,
                             }

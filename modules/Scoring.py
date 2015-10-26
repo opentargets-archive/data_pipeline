@@ -485,7 +485,7 @@ class TargetDiseasePairProducer(Process):
         logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
         self.total_jobs = 0
         self.init_data_cache()
-        for row in self.session.query(TargetToDiseaseAssociationScoreMap).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(10000):
+        for row in self.session.query(TargetToDiseaseAssociationScoreMap).order_by(TargetToDiseaseAssociationScoreMap.target_id).yield_per(1000):
             if row.target_id != self.data_cache['target']:
                 if self.data_cache['diseases']:
                     '''produce pairs'''
