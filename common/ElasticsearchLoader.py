@@ -41,6 +41,7 @@ class JSONObjectStorage():
         c = 0
         for key, value in data.iteritems():
             c += 1
+
             session.add(ElasticsearchLoad(id=key,
                                           index=index_name,
                                           type=doc_name,
@@ -52,11 +53,39 @@ class JSONObjectStorage():
             if c % 1000 == 0:
                 logging.debug("%i rows of %s inserted to elasticsearch_load" %(c, doc_name))
                 session.flush()
+        session.flush()
         if autocommit:
             session.commit()
         if not quiet:
             logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(c, doc_name))
         return c
+
+    @staticmethod
+    def store_to_pg_core(adapter,
+                    index_name,
+                    doc_name,
+                    data,
+                    delete_prev=True,
+                    autocommit=True,
+                    quiet = False):
+        if delete_prev:
+            JSONObjectStorage.delete_prev_data_in_pg(adapter.session, index_name, doc_name)
+        rows_to_insert =[]
+        for key, value in data.iteritems():
+            rows_to_insert.append(dict(id=key,
+                                      index=index_name,
+                                      type=doc_name,
+                                      data=value.to_json(),
+                                      active=True,
+                                      ))
+        adapter.engine.execute(ElasticsearchLoad.__table__.insert(),rows_to_insert)
+
+        if autocommit:
+            adapter.session.commit()
+        if not quiet:
+            logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(len(rows_to_insert), doc_name))
+        return len(rows_to_insert)
+
 
     @staticmethod
     def refresh_index_data_in_es(loader, session, index_name, doc_name=None):
@@ -144,6 +173,8 @@ class Loader():
                 chunk_size=self.chunk_size,
                 request_timeout=120,
         ):
+            logging.info("PUSHING DATA TO ES"
+                         "")
             action, result = results.popitem()
             self.results[result['_index']].append(result['_id'])
             doc_id = '/%s/%s' % (result['_index'], result['_id'])
