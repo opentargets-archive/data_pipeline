@@ -177,7 +177,14 @@ class Scorer():
             har_sum_score.datasources[datasource]=datasource_scorers[datasource].score()
             overall_scorer.add(har_sum_score.datasources[datasource])
         '''compute datatype scores'''
-        #TODO
+        datatypes_scorers = dict()
+        for ds in har_sum_score.datasources:
+            dt = Config.DATASOURCE_TO_DATATYPE_MAPPING[ds]
+            if dt not in datatypes_scorers:
+                datatypes_scorers[dt]=HarmonicSumScorer(buffer=max_entries)
+            datatypes_scorers[dt].add(har_sum_score.datasources[ds])
+        for datatype in datatypes_scorers:
+            har_sum_score.datatypes[datatype]=datatypes_scorers[datatype].score()
         '''compute overall scores'''
         har_sum_score.overall = overall_scorer.score()
 
@@ -269,15 +276,15 @@ class ScoreStorer():
 
     def put(self, id, score):
 
-        self.cache[id] = score
-        self.counter +=1
-        if (len(self.cache) % self.chunk_size) == 0:
-            self.flush()
-        # self.es_loader.put(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-        #                    Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
-        #                    id,
-        #                    score.to_json(),
-        #                    create_index = False)
+        # self.cache[id] = score
+        # self.counter +=1
+        # if (len(self.cache) % self.chunk_size) == 0:
+        #     self.flush()
+        self.es_loader.put(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+                           Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
+                           id,
+                           score.to_json(),
+                           create_index = False)
 
 
     def flush(self):
@@ -724,6 +731,9 @@ class ScoringProcess():
                                          )
         self.session.commit()
         self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME)
+        while 1:
+            data = score_data_q.get()
+
 
         storers = [ScoreStorerWorker(score_data_q,
                                    data_storage_finished,
