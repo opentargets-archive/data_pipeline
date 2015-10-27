@@ -65,9 +65,10 @@ class AssociationScore(JSONSerializable):
 
 class AssociationScoreSet(JSONSerializable):
 
-    def __init__(self, target, disease):
+    def __init__(self, target, disease, is_direct):
         self.target = {'id':target}
         self.disease = {'id':disease}
+        self.is_direct=is_direct
         self.set_id()
         for method_key, method in ScoringMethods.__dict__.items():
             if not method_key.startswith('_'):
@@ -93,7 +94,8 @@ class EvidenceScore():
                  evidence_string = None,
                  score= None,
                  datatype = None,
-                 datasource = None):
+                 datasource = None,
+                 is_direct = None):
         if evidence_string is not None:
             e = Evidence(evidence_string).evidence
             self.score = e['scores']['association_score']
@@ -105,6 +107,7 @@ class EvidenceScore():
             self.datatype = datatype
         if datasource is not None:
             self.datasource = datasource
+        self.is_direct = is_direct
 
 class HarmonicSumScorer():
 
@@ -148,9 +151,9 @@ class Scorer():
     def __init__(self):
         pass
 
-    def score(self,target, disease, evidence_scores, method  = None):
+    def score(self,target, disease, evidence_scores, is_direct, method  = None):
 
-        score = AssociationScoreSet(target,disease)
+        score = AssociationScoreSet(target,disease, is_direct)
 
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
             self._harmonic_sum(evidence_scores, score)
@@ -536,9 +539,14 @@ class TargetDiseasePairProducer(Process):
 
     def produce_pairs(self):
         c=0
-        for k,v in self.data_cache.items():
+        for key,evidence in self.data_cache.items():
             c+=1
-            self.q.put((k[0],k[1], v))
+            is_direct = False
+            for e in evidence:
+                if e.is_direct:
+                    is_direct = True
+                    break
+            self.q.put((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
         self.total_jobs +=c
         self.pairs_generated.value =  self.total_jobs
@@ -546,7 +554,8 @@ class TargetDiseasePairProducer(Process):
     def get_score_from_row(self, row):
         return EvidenceScore(score = row['association_score'],
                              datatype= Config.DATASOURCE_TO_DATATYPE_MAPPING[row['datasource']],
-                             datasource=row['datasource'])
+                             datasource=row['datasource'],
+                             is_direct=row['is_direct'])
 
 
 class ScorerProducer(Process):
@@ -582,10 +591,10 @@ class ScorerProducer(Process):
             data = self.evidence_data_q.get()
             if data:
                 self.signal_started()
-            target, disease, evidence = data
+            target, disease, evidence, is_direct = data
             if evidence:
                 self.global_counter.value +=1
-                score = self.scorer.score(target, disease, evidence)
+                score = self.scorer.score(target, disease, evidence, is_direct)
                 self.score_q.put((target, disease,score))
 
         self.signal_finish.set()
