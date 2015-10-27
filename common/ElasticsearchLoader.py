@@ -148,14 +148,13 @@ class Loader():
         self.results = defaultdict(list)
         self.chunk_size = chunk_size
         self.index_created=[]
-        logging.info("loader chunk_size: %i"%chunk_size)
+        logging.debug("loader chunk_size: %i"%chunk_size)
 
     def put(self, index_name, doc_type, ID, body, create_index = True):
 
         if (not index_name in self.index_created) and create_index:
                 self.create_new_index(index_name)
                 self.index_created.append(index_name)
-
         self.cache.append(dict(_index=index_name,
                                _type=doc_type,
                                _id=ID,
@@ -170,15 +169,14 @@ class Loader():
                 self.es,
                 self.cache,
                 chunk_size=self.chunk_size,
-                request_timeout=120,
+                request_timeout=1200,
         ):
-            logging.info("PUSHING DATA TO ES"
-                         "")
+
             action, result = results.popitem()
             self.results[result['_index']].append(result['_id'])
             doc_id = '/%s/%s' % (result['_index'], result['_id'])
             if (len(self.results[result['_index']]) % self.chunk_size) == 0:
-                logging.info(
+                logging.debug(
                     "%i entries uploaded in elasticsearch for index %s" % (len(self.results[result['_index']]), result['_index']))
             if not ok:
                 logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
