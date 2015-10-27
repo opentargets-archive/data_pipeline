@@ -493,22 +493,21 @@ class TargetDiseasePairProducer(Process):
         self.total_jobs = 0
         self.init_data_cache()
         c=0
+        last_gene = ''
         for row in self._get_data_stream():
             c+=1
+            if row['target_id'] != last_gene:
+                '''produce pairs'''
+                self.produce_pairs()
+                last_gene = row['target_id']
             key = (row['target_id'], row['disease_id'])
             if key not in self.data_cache:
                 self.data_cache[key] =[]
             self.data_cache[key].append(self.get_score_from_row(row))
             if c%5e5 == 0:
                 logging.info(('%s rows read'%millify(c)))
-            # if row['target_id'] != self.data_cache['target']:
-            #     if self.data_cache['diseases']:
-            #         '''produce pairs'''
-            #         self.produce_pairs()
-            #     self.init_data_cache(row.target_id)
-            # if row['disease_id'] not in self.data_cache['diseases']:
-            #     self.data_cache['diseases'][row.disease_id] = []
-            # self.data_cache['diseases'][row.disease_id].append(self.get_score_from_row(row))
+
+
 
         self.produce_pairs()
         # for w in range(self.n_consumers):
@@ -520,7 +519,7 @@ class TargetDiseasePairProducer(Process):
 
     def _get_data_stream(self,):
         with self.adapter.engine.connect() as conn:
-            query_string = """select * from pipeline.target_to_disease_association_score_map;"""
+            query_string = """select * from pipeline.target_to_disease_association_score_map ORDER BY target_id;"""
 
             result = conn.execute(query_string)
             while True:
@@ -539,19 +538,10 @@ class TargetDiseasePairProducer(Process):
         c=0
         for k,v in self.data_cache.items():
             c+=1
-            if c % 1000 ==0:
-                self.pairs_generated.value =  self.total_jobs
             self.q.put((k[0],k[1], v))
-        del self.data_cache
-        # for disease in self.data_cache['diseases']:
-        #     print self.data_cache['target'], disease, self.total_jobs +1
-        #     if self.total_jobs >=1000:
-        #         time.sleep(10)
-        #     # self.q.put((self.data_cache['target'],disease, self.data_cache['diseases'][disease]))
-        #     self.total_jobs +=1
-        #     if self.total_jobs % global_reporting_step ==0:
-        #         # logging.info('%s tasks loaded'%(millify( self.total_jobs)))
-        #         self.pairs_generated.value =  self.total_jobs
+        self.init_data_cache()
+        self.total_jobs +=c
+        self.pairs_generated.value =  self.total_jobs
 
     def get_score_from_row(self, row):
         return EvidenceScore(score = row['association_score'],
@@ -740,7 +730,7 @@ class ScoringProcess():
                                          Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
                                          )
         self.session.commit()
-        # self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME)
+        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME)
 
 
 
