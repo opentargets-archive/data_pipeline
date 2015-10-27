@@ -731,8 +731,8 @@ class ScoringProcess():
                                          )
         self.session.commit()
         self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME)
-        while 1:
-            data = score_data_q.get()
+        # while 1:
+        #     data = score_data_q.get()
 
 
         storers = [ScoreStorerWorker(score_data_q,
