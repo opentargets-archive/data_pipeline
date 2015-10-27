@@ -66,8 +66,8 @@ class AssociationScore(JSONSerializable):
 class AssociationScoreSet(JSONSerializable):
 
     def __init__(self, target, disease):
-        self.target = target
-        self.disease = disease
+        self.target = {'id':target}
+        self.disease = {'id':disease}
         self.set_id()
         for method_key, method in ScoringMethods.__dict__.items():
             if not method_key.startswith('_'):
@@ -85,7 +85,7 @@ class AssociationScoreSet(JSONSerializable):
         self.__dict__[method] = score
 
     def set_id(self):
-        self.id = '%s-%s'%(self.target, self.disease)
+        self.id = '%s-%s'%(self.target['id'], self.disease['id'])
 
 
 class EvidenceScore():
