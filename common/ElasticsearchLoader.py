@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, time
 import logging
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk
@@ -108,6 +108,8 @@ class JSONObjectStorage():
             ).yield_per(loader.chunk_size):
                 loader.put(row.index, row.type, row.id, row.data)
         loader.flush()
+        # loader.restore_after_bulk_indexing()
+
 
     @staticmethod
     def refresh_all_data_in_es(loader, session):
@@ -115,12 +117,14 @@ class JSONObjectStorage():
         - remove and recreate each index
         - load all the available data with any for that index
         """
-        #TODO: clear all data before uploading
+
 
         for row in session.query(ElasticsearchLoad).yield_per(loader.chunk_size):
             loader.put(row.index, row.type, row.id, row.data,create_index = True)
 
+
         loader.flush()
+        # loader.restore_after_bulk_indexing()
 
     @staticmethod
     def get_data_from_pg(session, index_name, doc_name, objid):
@@ -156,7 +160,12 @@ class Loader():
             if create_index:
                 self.create_new_index(index_name)
             self.index_created.append(index_name)
-            self.prepare_for_bulk_indexing(index_name)
+            try:
+                time.sleep(3)
+                self.prepare_for_bulk_indexing(index_name)
+            except:
+                logging.error("cannot prepare index %s for bulk indexing"%index_name)
+                pass
 
         self.cache.append(dict(_index=index_name,
                                _type=doc_type,
@@ -294,6 +303,9 @@ class Loader():
                                    )
         else:
             self.es.indices.create(index=index_name, ignore=400)
+
+        logging.info("%s index created"%index_name)
+
         return
 
     def clear_index(self, index_name):
