@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime, time
 import logging
 from elasticsearch.exceptions import NotFoundError
-from elasticsearch.helpers import streaming_bulk
+from elasticsearch.helpers import streaming_bulk, parallel_bulk
 from sqlalchemy import and_
 from common import Actions
 from common.PGAdapter import ElasticsearchLoad
@@ -177,7 +177,8 @@ class Loader():
             # self.load_single(index_name, doc_type, ID, body)
 
     def flush(self):
-        for ok, results in streaming_bulk(
+        # for ok, results in streaming_bulk(
+        for ok, results in parallel_bulk(
                 self.es,
                 self.cache,
                 chunk_size=self.chunk_size,
