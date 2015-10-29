@@ -237,7 +237,7 @@ class Loader():
         }
 
         def update_settings(base_settings, specific_settings):
-            for key in ["refresh_interval", "number_of_replicas"]
+            for key in ["refresh_interval", "number_of_replicas"]:
                 if key in specific_settings['settings']:
                     base_settings["index"][key]= specific_settings['settings'][key]
         if index_name.startswith(Config.ELASTICSEARCH_DATA_INDEX_NAME):
