@@ -235,18 +235,23 @@ class Loader():
                         "number_of_replicas" : 1
                     }
         }
+
+        def update_settings(base_settings, specific_settings):
+            for key in ["refresh_interval", "number_of_replicas"]
+                if key in specific_settings['settings']:
+                    base_settings["index"][key]= specific_settings['settings'][key]
         if index_name.startswith(Config.ELASTICSEARCH_DATA_INDEX_NAME):
-            settings["index"]=ElasticSearchConfiguration.evidence_data_mapping['settings']
+            settings=update_settings(settings,ElasticSearchConfiguration.evidence_data_mapping)
         elif index_name == Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME:
-            settings["index"]=ElasticSearchConfiguration.score_data_mapping['settings']
+            settings=update_settings(settings,ElasticSearchConfiguration.score_data_mapping)
         elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
-            settings["index"]=ElasticSearchConfiguration.efo_data_mapping['settings']
+            settings=update_settings(settings,ElasticSearchConfiguration.efo_data_mapping)
         elif index_name == Config.ELASTICSEARCH_ECO_INDEX_NAME:
-            settings["index"]=ElasticSearchConfiguration.eco_data_mapping['settings']
+            settings=update_settings(settings,ElasticSearchConfiguration.eco_data_mapping)
         elif index_name == Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME:
-            settings["index"]=ElasticSearchConfiguration.gene_data_mapping['settings']
+            settings=update_settings(settings,ElasticSearchConfiguration.gene_data_mapping)
         elif index_name == Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME:
-            settings["index"]=ElasticSearchConfiguration.expression_data_mapping['settings']
+            settings=update_settings(settings,ElasticSearchConfiguration.expression_data_mapping)
         self.es.indices.put_settings(index=index_name,
                                      body =settings)
 
