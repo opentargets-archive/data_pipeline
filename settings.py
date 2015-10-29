@@ -99,7 +99,7 @@ def _get_evidence_string_generic_mapping():
     return {
             "_all" : {"enabled" : True},
             "_routing":{ "required":True,
-                         "path":"disease.id"},
+                         "path":"target.id"},
             "properties" : {
                 "target" : {
                     "type" : "object",
@@ -560,8 +560,36 @@ class ElasticSearchConfiguration():
                             }
     score_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                        "number_of_replicas" : evidence_replicas_number,
-                                       "index.store.type": "memory",
+                                       # "index.store.type": "memory",
                                        "refresh_interval" : "60s",
                                        },
-                              "mappings": evidence_mappings,
+                              "mappings": {"_all" : {"enabled" : True},
+                                            "_routing":{ "required":True,
+                                                         "path":"target.id"},
+                                            "properties" : {
+                                                "target" : {
+                                                    "type" : "object",
+                                                     "properties" : {
+                                                         "id" : {
+                                                              "type" : "string",
+                                                              "index" : "not_analyzed",
+
+
+
+                                                     }
+                                                },
+                                                "disease" : {
+                                                    "type" : "object",
+                                                     "properties" : {
+                                                         "id" : {
+                                                              "type" : "string",
+                                                              "index" : "not_analyzed",
+
+                                                         }
+                                                     }
+                                                },
+
+                                                     }
+                                                }
+                                            },
                             }

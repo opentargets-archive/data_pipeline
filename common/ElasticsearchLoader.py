@@ -118,7 +118,7 @@ class JSONObjectStorage():
         #TODO: clear all data before uploading
 
         for row in session.query(ElasticsearchLoad).yield_per(loader.chunk_size):
-            loader.put(row.index, row.type, row.id, row.data)
+            loader.put(row.index, row.type, row.id, row.data,create_index = True)
 
         loader.flush()
 
@@ -152,9 +152,12 @@ class Loader():
 
     def put(self, index_name, doc_type, ID, body, create_index = True):
 
-        if (not index_name in self.index_created) and create_index:
+        if  index_name not in self.index_created:
+            if create_index:
                 self.create_new_index(index_name)
-                self.index_created.append(index_name)
+            self.index_created.append(index_name)
+            self.prepare_for_bulk_indexing(index_name)
+
         self.cache.append(dict(_index=index_name,
                                _type=doc_type,
                                _id=ID,
@@ -195,6 +198,8 @@ class Loader():
     def close(self):
 
         self.flush()
+        for index_name in self.index_created:
+            self.restore_after_bulk_indexing(index_name)
 
     #
     # def load_single(self, index_name, doc_type, ID, body):
@@ -212,8 +217,38 @@ class Loader():
 
 
     def __exit__(self, type, value, traceback):
-        self.flush()
+        self.close()
 
+    def prepare_for_bulk_indexing(self, index_name):
+        settings = {
+                    "index" : {
+                        "refresh_interval" : "-1",
+                        "number_of_replicas" : 0
+                    }
+        }
+        self.es.indices.put_settings(index=index_name,
+                                     body =settings)
+    def restore_after_bulk_indexing(self, index_name):
+        settings = {
+                    "index" : {
+                        "refresh_interval" : "60s",
+                        "number_of_replicas" : 1
+                    }
+        }
+        if index_name.startswith(Config.ELASTICSEARCH_DATA_INDEX_NAME):
+            settings["index"]=ElasticSearchConfiguration.evidence_data_mapping['settings']
+        elif index_name == Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME:
+            settings["index"]=ElasticSearchConfiguration.score_data_mapping['settings']
+        elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
+            settings["index"]=ElasticSearchConfiguration.efo_data_mapping['settings']
+        elif index_name == Config.ELASTICSEARCH_ECO_INDEX_NAME:
+            settings["index"]=ElasticSearchConfiguration.eco_data_mapping['settings']
+        elif index_name == Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME:
+            settings["index"]=ElasticSearchConfiguration.gene_data_mapping['settings']
+        elif index_name == Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME:
+            settings["index"]=ElasticSearchConfiguration.expression_data_mapping['settings']
+        self.es.indices.put_settings(index=index_name,
+                                     body =settings)
 
     def create_new_index(self, index_name):
         try:
