@@ -782,7 +782,10 @@ class ScoringUploader():
                                          self.session,
                                          Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME
                                          )
-        self.loader.optimize_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
+        try:
+            self.loader.optimize_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
+        except:
+            pass
 
     def clear_old_data(self):
         self.loader.clear_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')

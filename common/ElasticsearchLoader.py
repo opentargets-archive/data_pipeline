@@ -313,7 +313,7 @@ class Loader():
         self.es.indices.delete(index=index_name)
 
     def optimize_all(self):
-        self.es.indices.optimize(index='', max_num_segments=5, timeout=60*20)
+        self.es.indices.optimize(index='', max_num_segments=5)
 
     def optimize_index(self, index_name):
-        self.es.indices.optimize(index=index_name, max_num_segments=5, timeout=60*20)
+        self.es.indices.optimize(index=index_name, max_num_segments=5)
