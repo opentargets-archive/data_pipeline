@@ -78,6 +78,14 @@ class ECOPath(Base):
     tree_path = Column(Text)
     # uri_id_org = Column(Text)
 
+class ECONames(Base):
+    __tablename__ = 'eco_names'
+    __table_args__ = {'schema':'rdf_conversion'}
+    uri = Column(Text, primary_key=True)
+    # uri_id_org = Column(Text)
+    label = Column(Text)
+    description = Column(Text)
+    
 class EFOPath(Base):
     __tablename__ = 'efo_path'
     __table_args__ = {'schema':'rdf_conversion'}
