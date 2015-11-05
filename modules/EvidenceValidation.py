@@ -14,7 +14,7 @@ import json
 from json import JSONDecoder
 from json import JSONEncoder
 from datetime import datetime
-from sqlalchemy import and_, or_, table, column, select, update, insert
+from sqlalchemy import and_, or_, table, column, select, update, insert, desc
 from common import Actions
 from common.PGAdapter import *
 from common.UniprotIO import UniprotIterator, Parser
@@ -23,6 +23,10 @@ import cttv.model.flatten as flat
 #import cttv.model.flatten as flat
 from settings import Config
 import hashlib
+from lxml.etree import tostring
+from xml.etree import cElementTree as ElementTree
+from sqlalchemy.dialects.postgresql import JSON
+
 BLOCKSIZE = 65536
 
 
@@ -50,7 +54,8 @@ messageFailed='''
 '''
 
 cttv_data_providers_e_mails = {
- "cttv001" : [ 'gautierk@targetvalidation.org', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ],
+# "cttv001" : [ 'gautierk@targetvalidation.org', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ],
+ "cttv001" : [ 'gautierk@targetvalidation.org', 'samiulh@targetvalidation.org' ],
  "cttv006" : [ 'fabregat@ebi.ac.uk' ],
  "cttv007" : [ 'kl1@sanger.ac.uk' ],
  "cttv008" : [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ],
@@ -64,7 +69,8 @@ cttv_data_providers_e_mails = {
 efo_current = {}
 efo_obsolete = {}
 ensembl_current = {}
-uniprot_current = []
+uniprot_current = {}
+eco_current = {}
 
 class EvidenceValidationActions(Actions):
     CHECKFILES='checkfiles'
@@ -200,27 +206,55 @@ class EvidenceValidationFileChecker():
             mail.quit()
         return 0;
     
+    def load_HGNC(self):
+        logging.info("Loading HGNC entries and mapping from Ensembl Gene Id to UniProt")
+        c = 0
+        for row in self.session.query(HgncInfoLookup).order_by(desc(HgncInfoLookup.last_updated)).limit(1):
+            #data = json.loads(row.data);
+            for doc in row.data["response"]["docs"]:
+                if "ensembl_gene_id" in doc and "uniprot_ids" in doc:
+                    gene_id = doc["ensembl_gene_id"];
+                    for uniprot_id in doc["uniprot_ids"]:
+                        if uniprot_id in uniprot_current and uniprot_current[uniprot_id] is None:
+                            uniprot_current[uniprot_id] = gene_id;
+           
+        logging.info("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
+        
     def load_Uniprot(self):
-        logging.info("Loading Uniprot identifiers")
+        logging.info("Loading Uniprot identifiers and mapping to Ensembl Gene Id")
         c = 0
         for row in self.session.query(UniprotInfo).yield_per(1000):
-            seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
+            #
+            uniprot_accession = row.uniprot_accession
+            root = ElementTree.fromstring(row.uniprot_entry)
+            gene_id = None
+            for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
+                gene_id = crossref.get("value")
+                break;
+            uniprot_current[uniprot_accession] = gene_id
+            #seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
             if c % 5000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
-            for accession in seqrec.annotations['accessions']:
-                uniprot_current.append(accession)
+            #for accession in seqrec.annotations['accessions']:
+            #    uniprot_current.append(accession)
         logging.info("%i entries retrieved for uniprot" % c)
     
     def load_Ensembl(self):
-        logging.info("Loading Ensembl {0} asssembly genes".format(Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+        logging.info("Loading Ensembl {0} asssembly genes on the reference assembly".format(Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
         for row in self.session.query(EnsemblGeneInfo).filter_by(assembly_name = Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY).all():
             #print "%s %s"%(row.ensembl_gene_id, row.external_name)
-            ensembl_current[row.ensembl_gene_id] = row.external_name
+            ensembl_current[row.ensembl_gene_id] = row
             
+    def load_eco(self):
+
+        logging.info("Loading ECO current valid terms")
+        for row in self.session.query(ECONames):
+            eco_current[row.uri] = row.label
+    
     def load_efo(self):
         # Change this in favor of paths
-        logging.info("Loading EFO current and obsolete terms")
+        logging.info("Loading EFO current terms")
         efo_pattern = "http://www.ebi.ac.uk/efo/EFO_%"
         orphanet_pattern = "http://www.orpha.net/ORDO/Orphanet_%"
         hpo_pattern = "http://purl.obolibrary.org/obo/HP_%"
@@ -238,8 +272,10 @@ class EvidenceValidationFileChecker():
                     EFONames.uri.like(go_pattern)
                     )
                 ):
-            #print row.uri
+            #logging.info(row.uri)
             efo_current[row.uri] = row.label
+        #logging.info(len(efo_current))
+        #logging.info("Loading EFO obsolete terms")
         for row in self.session.query(EFOObsoleteClass):
             #print "obsolete %s"%(row.uri)
             efo_obsolete[row.uri] = row.reason
@@ -247,27 +283,31 @@ class EvidenceValidationFileChecker():
     def check_all(self):
     
         self.load_Uniprot();
+        self.load_HGNC();
         self.load_Ensembl();
         self.load_efo();
+        self.load_eco();
         #return;
         
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             for subdirname in dirnames:
                 cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv007)$", subdirname)
+                #cttv_match = re.match("^(cttv009)$", subdirname)
                 if cttv_match:
                     provider_id = cttv_match.groups()[0]
                     cttv_dir = os.path.join(dirname, subdirname)
                     print(cttv_dir)
                     for cttv_dirname, cttv_dirs, filenames in os.walk(os.path.join(cttv_dir, "upload/submissions")):
                         for filename in filenames:
+                            print filename;
                             if filename.endswith(('.json.gz')): #and filename == 'cttv007-15-07-2015.json.gz': #and filename == 'cttv009-14-07-2015.json.gz': #
                                 cttv_file = os.path.join(cttv_dirname, filename)
+                                print cttv_file;
                                 last_modified = os.path.getmtime(cttv_file)
                                 #july = time.strptime("01 Jul 2015", "%d %b %Y")
                                 #julyseconds = time.mktime(july)
-                                sep = time.strptime("07 Sep 2015", "%d %b %Y")
-                                sepseconds = time.mktime(sep)                                
+                                sep = time.strptime("20 Oct 2015", "%d %b %Y")
+                                sepseconds = time.mktime(sep)
                                 if( last_modified - sepseconds ) > 0:
                                     m = re.match("^(.+).json.gz$", filename)
                                     logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
@@ -309,7 +349,9 @@ class EvidenceValidationFileChecker():
         obsolete_diseases = {}
         invalid_diseases = {}
         invalid_ensembl_ids = {}
+        nonref_ensembl_ids = {}
         invalid_uniprot_ids = {}
+        invalid_uniprot_id_mappings = {}
         
         if bValidate == True:
             logging.info('Starting validation of %s'% (file_on_disk))
@@ -323,7 +365,9 @@ class EvidenceValidationFileChecker():
             nb_efo_invalid = 0
             nb_efo_obsolete = 0
             nb_ensembl_invalid = 0
+            nb_ensembl_nonref = 0
             nb_uniprot_invalid = 0
+            nb_uniprot_invalid_mapping = 0
             hexdigest_map = {}
             for line in fh:
                 #logging.info(line)
@@ -332,6 +376,9 @@ class EvidenceValidationFileChecker():
                 obj = None
                 validation_result = 0
                 validation_failed = False
+                disease_failed = False
+                gene_failed = False
+                
                 
                 if ('label' in python_raw  or 'type' in python_raw) and 'validated_against_schema_version' in python_raw and python_raw['validated_against_schema_version'] == "1.2.1":
                     if 'label' in python_raw:
@@ -391,6 +438,7 @@ class EvidenceValidationFileChecker():
                                             
                             if not bGivingUp:  
                                 self.startCapture(logging.ERROR)
+                                
                             uniq_elements = obj.unique_association_fields
                             uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
                             uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
@@ -412,6 +460,7 @@ class EvidenceValidationFileChecker():
                                 for disease_id in obj.disease.id:
                                     if disease_id not in efo_current:
                                         logger.error("Line {0}: Invalid disease term detected {1}. Please provide the correct EFO disease term".format(lc+1, disease_id))
+                                        disease_failed = True
                                         if disease_id not in invalid_diseases:
                                             invalid_diseases[disease_id] = 1
                                         else:
@@ -419,6 +468,7 @@ class EvidenceValidationFileChecker():
                                         nb_efo_invalid +=1
                                     if disease_id in efo_obsolete:
                                         logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, efo_current[disease_id], efo_obsolete[disease_id]))
+                                        disease_failed = True
                                         if disease_id not in obsolete_diseases:
                                             obsolete_diseases[disease_id] = 1
                                         else:
@@ -426,7 +476,7 @@ class EvidenceValidationFileChecker():
                                         nb_efo_obsolete +=1
                                     
                             '''
-                            Check Ensembl ID, UniProt ID (TODO)
+                            Check Ensembl ID, UniProt ID and UniProt ID mapping to a Gene ID
                             '''
                             if obj.target.id:
                                 for id in obj.target.id:
@@ -436,24 +486,43 @@ class EvidenceValidationFileChecker():
                                     if ensemblMatch:
                                         ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
                                         if not ensembl_id in ensembl_current:
-                                            logger.error("Line {0}: Invalid Ensembl gene detected {1}. Please provide the correct identifier for assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            gene_failed = True
+                                            logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not ensembl_id in invalid_ensembl_ids:
                                                 invalid_ensembl_ids[ensembl_id] = 1
                                             else:
                                                 invalid_ensembl_ids[ensembl_id] += 1
                                             nb_ensembl_invalid +=1
+                                        elif not ensembl_current[ensembl_id].is_reference:
+                                            gene_failed = True
+                                            logger.error("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. Please provide the corresponding gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            if not ensembl_id in invalid_ensembl_ids:
+                                                nonref_ensembl_ids[ensembl_id] = 1
+                                            else:
+                                                nonref_ensembl_ids[ensembl_id] += 1
+                                            nb_ensembl_nonref +=1                                            
                                     elif uniprotMatch:
                                         uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
                                         if not uniprot_id in uniprot_current:
-                                            logger.error("Line {0}: Invalid Uniprot entry detected {1}. Please provide a correct identifier for Uniprot entry".format(lc+1, uniprot_id))
+                                            gene_failed = True
+                                            logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier for Uniprot entry".format(lc+1, uniprot_id))
                                             if not uniprot_id in invalid_uniprot_ids:
                                                 invalid_uniprot_ids[uniprot_id] = 1
                                             else:
                                                 invalid_uniprot_ids[uniprot_id] += 1
                                             nb_uniprot_invalid +=1
-                                    
+                                        elif uniprot_current[uniprot_id] is None or not ensembl_current[uniprot_current[uniprot_id]].is_reference:
+                                            gene_failed = True
+                                            logger.error("Line {0}: Invalid UniProt entry detected {1}. This UniProt entry does not have an Ensembl Gene Id on the reference genome assembly {2}".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            if not uniprot_id in invalid_uniprot_id_mappings:
+                                                invalid_uniprot_id_mappings[uniprot_id] = 1
+                                            else:
+                                                invalid_uniprot_id_mappings[uniprot_id] += 1
+                                            nb_uniprot_invalid_mapping +=1
+                                            
                             if not bGivingUp:  
                                 logs = self.stopCapture()
+                                
                         else:
                             if not bGivingUp:
                                 self.startCapture(logging.ERROR)
@@ -485,7 +554,7 @@ class EvidenceValidationFileChecker():
                     nb_errors += 1
                     validation_failed = True
                     
-                if (validation_failed or  validation_result > 0) and not bGivingUp:
+                if (validation_failed or validation_result > 0 or disease_failed or gene_failed) and not bGivingUp:
                     if obj:
                         lfh.write("line {0} - {1}".format(lc+1, json.dumps(obj.unique_association_fields)))
                     else:
@@ -523,7 +592,7 @@ class EvidenceValidationFileChecker():
                 for disease_id in invalid_diseases:
                     text += "\t%s\t(reported %i times)\n"%(disease_id, invalid_diseases[disease_id])
                 text +="\n"
-            if nb_efo_invalid > 0:
+            if nb_efo_obsolete > 0:
                 text +="%i obsolete EFO terms found in %i (%.1f%s) of the records:\n"%(len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete*100/lc, '%' )
                 for disease_id in obsolete_diseases:
                     text += "\t%s\t(reported %i times)\t%s\n"%(disease_id, obsolete_diseases[disease_id], efo_obsolete[disease_id].replace("\n", " "))
@@ -531,22 +600,36 @@ class EvidenceValidationFileChecker():
 
             # report invalid Ensembl genes
             if nb_ensembl_invalid > 0:
-                text +="%i distinct invalid Ensembl identifiers found in %i (%.1f%s) of the records:\n"%(len(invalid_ensembl_ids), nb_ensembl_invalid, nb_ensembl_invalid*100/lc, '%' )
+                text +="%i distinct unknown Ensembl identifiers found in %i (%.1f%s) of the records:\n"%(len(invalid_ensembl_ids), nb_ensembl_invalid, nb_ensembl_invalid*100/lc, '%' )
                 for ensembl_id in invalid_ensembl_ids:
                     text += "\t%s\t(reported %i times)\n"%(ensembl_id, invalid_ensembl_ids[ensembl_id])
                 text +="\n"
 
+            # report Ensembl genes not on reference assembly
+            if nb_ensembl_nonref > 0:
+                text +="%i distinct Ensembl Human Alternative sequence Gene ids not mapped to the reference genome assembly %s found in %i (%.1f%s) of the records:\n"%(len(nonref_ensembl_ids), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_ensembl_nonref, nb_ensembl_nonref*100/lc, '%' )
+                for ensembl_id in nonref_ensembl_ids:
+                    text += "\t%s\t(reported %i times)\n"%(ensembl_id, nonref_ensembl_ids[ensembl_id])
+                text +="\n"
+                
             # report invalid Uniprot entries
             if nb_uniprot_invalid > 0:
                 text +="%i distinct invalid Uniprot identifiers found in %i (%.1f%s) of the records:\n"%(len(invalid_uniprot_ids), nb_uniprot_invalid, nb_uniprot_invalid*100/lc, '%' )
                 for uniprot_id in invalid_uniprot_ids:
                     text += "\t%s\t(reported %i times)\n"%(uniprot_id, invalid_uniprot_ids[uniprot_id])
                 text +="\n"
+
+            # report invalid Uniprot mapping entries
+            if nb_uniprot_invalid_mapping > 0:
+                text +="%i distinct Uniprot identifiers unmapped to to the reference genome assembly %s Ensembl Gene entries found in %i (%.1f%s) of the records:\n"%(Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, len(invalid_uniprot_id_mappings), nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping*100/lc, '%' )
+                for uniprot_id in invalid_uniprot_id_mappings:
+                    text += "\t%s\t(reported %i times)\n"%(uniprot_id, invalid_uniprot_id_mappings[uniprot_id])
+                text +="\n"
                 
             now = datetime.utcnow()
 
             # A file is successfully validated if it meets the following conditions
-            successfully_validated = (nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0 and nb_uniprot_invalid == 0)
+            successfully_validated = (nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0 and nb_uniprot_invalid == 0 and nb_uniprot_invalid_mapping == 0)
             
             if count == 0:
                 # insert
@@ -577,12 +660,12 @@ class EvidenceValidationFileChecker():
                 self.session.add(rowToUpdate)
     
             self.send_email(
-                True, 
+                Config.EVIDENCEVALIDATION_SEND_EMAIL, 
                 provider_id, 
                 filename, 
                 successfully_validated, 
                 lc, 
-                { 'JSON errors': nb_errors, 'duplicates': nb_duplicates, 'invalid EFO terms': nb_efo_invalid, 'obsolete EFO terms': nb_efo_obsolete, 'invalid Ensembl ids': nb_ensembl_invalid, 'invalid Uniprot ids': nb_uniprot_invalid }, 
+                { 'JSON errors': nb_errors, 'duplicates': nb_duplicates, 'invalid EFO terms': nb_efo_invalid, 'obsolete EFO terms': nb_efo_obsolete, 'invalid Ensembl ids': nb_ensembl_invalid, 'Human Alternative sequence Gene Ensembl ids': nb_ensembl_nonref, 'invalid Uniprot ids': nb_uniprot_invalid, 'Uniprot ids not mapped to Ensembl': nb_uniprot_invalid_mapping }, 
                 now, 
                 text, 
                 logfile
