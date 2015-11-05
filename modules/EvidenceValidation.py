@@ -215,23 +215,30 @@ class EvidenceValidationFileChecker():
                 if "ensembl_gene_id" in doc and "uniprot_ids" in doc:
                     gene_id = doc["ensembl_gene_id"];
                     for uniprot_id in doc["uniprot_ids"]:
-                        if uniprot_id in uniprot_current and uniprot_current[uniprot_id] is None:
-                            uniprot_current[uniprot_id] = gene_id;
+                        if uniprot_id in uniprot_current:
+                            if uniprot_current[uniprot_id] is None:
+                                uniprot_current[uniprot_id] = [gene_id];
+                            else:
+                                uniprot_current[uniprot_id].append(gene_id);
            
         logging.info("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
         
     def load_Uniprot(self):
-        logging.info("Loading Uniprot identifiers and mapping to Ensembl Gene Id")
+        logging.info("Loading Uniprot identifiers and mappings to Ensembl Gene Id")
         c = 0
         for row in self.session.query(UniprotInfo).yield_per(1000):
             #
             uniprot_accession = row.uniprot_accession
+            uniprot_current[uniprot_accession] = None;
             root = ElementTree.fromstring(row.uniprot_entry)
             gene_id = None
             for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
                 gene_id = crossref.get("value")
-                break;
-            uniprot_current[uniprot_accession] = gene_id
+                if uniprot_current[uniprot_accession] is None:
+                    uniprot_current[uniprot_accession] = [gene_id];
+                else:
+                    uniprot_current[uniprot_accession].append(gene_id)
+                    
             #seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
             if c % 5000 == 0:
@@ -292,7 +299,7 @@ class EvidenceValidationFileChecker():
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             for subdirname in dirnames:
                 cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv009)$", subdirname)
+                #cttv_match = re.match("^(cttv011)$", subdirname)
                 if cttv_match:
                     provider_id = cttv_match.groups()[0]
                     cttv_dir = os.path.join(dirname, subdirname)
@@ -300,7 +307,7 @@ class EvidenceValidationFileChecker():
                     for cttv_dirname, cttv_dirs, filenames in os.walk(os.path.join(cttv_dir, "upload/submissions")):
                         for filename in filenames:
                             print filename;
-                            if filename.endswith(('.json.gz')): #and filename == 'cttv007-15-07-2015.json.gz': #and filename == 'cttv009-14-07-2015.json.gz': #
+                            if filename.endswith(('.json.gz')): #and filename == 'cttv011-02-11-2015.json.gz':
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 print cttv_file;
                                 last_modified = os.path.getmtime(cttv_file)
@@ -511,9 +518,9 @@ class EvidenceValidationFileChecker():
                                             else:
                                                 invalid_uniprot_ids[uniprot_id] += 1
                                             nb_uniprot_invalid +=1
-                                        elif uniprot_current[uniprot_id] is None or not ensembl_current[uniprot_current[uniprot_id]].is_reference:
+                                        elif uniprot_current[uniprot_id] is None or not reduce( (lambda x, y: x or y), map(lambda x: ensembl_current[x].is_reference, uniprot_current[uniprot_id]) ):
                                             gene_failed = True
-                                            logger.error("Line {0}: Invalid UniProt entry detected {1}. This UniProt entry does not have an Ensembl Gene Id on the reference genome assembly {2}".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            logger.error("Line {0}: Invalid UniProt entry detected {1}. This UniProt entry does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not uniprot_id in invalid_uniprot_id_mappings:
                                                 invalid_uniprot_id_mappings[uniprot_id] = 1
                                             else:
@@ -621,7 +628,7 @@ class EvidenceValidationFileChecker():
 
             # report invalid Uniprot mapping entries
             if nb_uniprot_invalid_mapping > 0:
-                text +="%i distinct Uniprot identifiers unmapped to to the reference genome assembly %s Ensembl Gene entries found in %i (%.1f%s) of the records:\n"%(Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, len(invalid_uniprot_id_mappings), nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping*100/lc, '%' )
+                text +="%i distinct Uniprot identifiers unmapped to the reference genome assembly %s Ensembl Gene entries found in %i (%.1f%s) of the records:\n"%(len(invalid_uniprot_id_mappings), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping*100/lc, '%' )
                 for uniprot_id in invalid_uniprot_id_mappings:
                     text += "\t%s\t(reported %i times)\n"%(uniprot_id, invalid_uniprot_id_mappings[uniprot_id])
                 text +="\n"
