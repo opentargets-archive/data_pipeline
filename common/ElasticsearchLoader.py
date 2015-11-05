@@ -1,8 +1,8 @@
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, time
 import logging
 from elasticsearch.exceptions import NotFoundError
-from elasticsearch.helpers import streaming_bulk
+from elasticsearch.helpers import streaming_bulk, parallel_bulk
 from sqlalchemy import and_
 from common import Actions
 from common.PGAdapter import ElasticsearchLoad
@@ -34,12 +34,14 @@ class JSONObjectStorage():
                     doc_name,
                     data,
                     delete_prev=True,
-                    autocommit=True):
+                    autocommit=True,
+                    quiet = False):
         if delete_prev:
             JSONObjectStorage.delete_prev_data_in_pg(session, index_name, doc_name)
         c = 0
         for key, value in data.iteritems():
             c += 1
+
             session.add(ElasticsearchLoad(id=key,
                                           index=index_name,
                                           type=doc_name,
@@ -49,11 +51,41 @@ class JSONObjectStorage():
                                           date_modified=datetime.now(),
                                           ))
             if c % 1000 == 0:
-                logging.info("%i rows of %s inserted to elasticsearch_load" %(c, doc_name))
+                logging.debug("%i rows of %s inserted to elasticsearch_load" %(c, doc_name))
                 session.flush()
+        session.flush()
         if autocommit:
             session.commit()
-        logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(c, doc_name))
+        if not quiet:
+            logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(c, doc_name))
+        return c
+
+    @staticmethod
+    def store_to_pg_core(adapter,
+                    index_name,
+                    doc_name,
+                    data,
+                    delete_prev=True,
+                    autocommit=True,
+                    quiet = False):
+        if delete_prev:
+            JSONObjectStorage.delete_prev_data_in_pg(adapter.session, index_name, doc_name)
+        rows_to_insert =[]
+        for key, value in data.iteritems():
+            rows_to_insert.append(dict(id=key,
+                                      index=index_name,
+                                      type=doc_name,
+                                      data=value.to_json(),
+                                      active=True,
+                                      ))
+        adapter.engine.execute(ElasticsearchLoad.__table__.insert(),rows_to_insert)
+
+        # if autocommit:
+        #     adapter.session.commit()
+        if not quiet:
+            logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(len(rows_to_insert), doc_name))
+        return len(rows_to_insert)
+
 
     @staticmethod
     def refresh_index_data_in_es(loader, session, index_name, doc_name=None):
@@ -76,6 +108,8 @@ class JSONObjectStorage():
             ).yield_per(loader.chunk_size):
                 loader.put(row.index, row.type, row.id, row.data)
         loader.flush()
+        # loader.restore_after_bulk_indexing()
+
 
     @staticmethod
     def refresh_all_data_in_es(loader, session):
@@ -83,12 +117,14 @@ class JSONObjectStorage():
         - remove and recreate each index
         - load all the available data with any for that index
         """
-        #TODO: clear all data before uploading
+
 
         for row in session.query(ElasticsearchLoad).yield_per(loader.chunk_size):
-            loader.put(row.index, row.type, row.id, row.data)
+            loader.put(row.index, row.type, row.id, row.data,create_index = True)
+
 
         loader.flush()
+        # loader.restore_after_bulk_indexing()
 
     @staticmethod
     def get_data_from_pg(session, index_name, doc_name, objid):
@@ -116,13 +152,20 @@ class Loader():
         self.results = defaultdict(list)
         self.chunk_size = chunk_size
         self.index_created=[]
-        logging.info("loader chunk_size: %i"%chunk_size)
+        logging.debug("loader chunk_size: %i"%chunk_size)
 
-    def put(self, index_name, doc_type, ID, body):
+    def put(self, index_name, doc_type, ID, body, create_index = True):
 
-        if not index_name in self.index_created:
-            self.create_new_index(index_name)
+        if  index_name not in self.index_created:
+            if create_index:
+                self.create_new_index(index_name)
             self.index_created.append(index_name)
+            try:
+                time.sleep(3)
+                self.prepare_for_bulk_indexing(index_name)
+            except:
+                logging.error("cannot prepare index %s for bulk indexing"%index_name)
+                pass
 
         self.cache.append(dict(_index=index_name,
                                _type=doc_type,
@@ -134,12 +177,14 @@ class Loader():
             # self.load_single(index_name, doc_type, ID, body)
 
     def flush(self):
-        for ok, results in streaming_bulk(
+        # for ok, results in streaming_bulk(
+        for ok, results in parallel_bulk(
                 self.es,
                 self.cache,
                 chunk_size=self.chunk_size,
-                request_timeout=120,
+                request_timeout=1200,
         ):
+
             action, result = results.popitem()
             self.results[result['_index']].append(result['_id'])
             doc_id = '/%s/%s' % (result['_index'], result['_id'])
@@ -163,6 +208,8 @@ class Loader():
     def close(self):
 
         self.flush()
+        for index_name in self.index_created:
+            self.restore_after_bulk_indexing(index_name)
 
     #
     # def load_single(self, index_name, doc_type, ID, body):
@@ -180,8 +227,45 @@ class Loader():
 
 
     def __exit__(self, type, value, traceback):
-        self.flush()
+        self.close()
 
+    def prepare_for_bulk_indexing(self, index_name):
+        settings = {
+                    "index" : {
+                        "refresh_interval" : "-1",
+                        "number_of_replicas" : 0
+                    }
+        }
+        self.es.indices.put_settings(index=index_name,
+                                     body =settings)
+    def restore_after_bulk_indexing(self, index_name):
+        settings = {
+                    "index" : {
+                        "refresh_interval" : "60s",
+                        "number_of_replicas" : 1
+                    }
+        }
+
+        def update_settings(base_settings, specific_settings):
+            for key in ["refresh_interval", "number_of_replicas"]:
+                if key in specific_settings['settings']:
+                    base_settings["index"][key]= specific_settings['settings'][key]
+            return base_settings
+        if index_name.startswith(Config.ELASTICSEARCH_DATA_INDEX_NAME):
+            settings=update_settings(settings,ElasticSearchConfiguration.evidence_data_mapping)
+        elif index_name == Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME:
+            settings=update_settings(settings,ElasticSearchConfiguration.score_data_mapping)
+        elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
+            settings=update_settings(settings,ElasticSearchConfiguration.efo_data_mapping)
+        elif index_name == Config.ELASTICSEARCH_ECO_INDEX_NAME:
+            settings=update_settings(settings,ElasticSearchConfiguration.eco_data_mapping)
+        elif index_name == Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME:
+            settings=update_settings(settings,ElasticSearchConfiguration.gene_data_mapping)
+        elif index_name == Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME:
+            settings=update_settings(settings,ElasticSearchConfiguration.expression_data_mapping)
+
+        self.es.indices.put_settings(index=index_name,
+                                     body =settings)
 
     def create_new_index(self, index_name):
         try:
@@ -220,13 +304,16 @@ class Loader():
                                    )
         else:
             self.es.indices.create(index=index_name, ignore=400)
+
+        logging.info("%s index created"%index_name)
+
         return
 
     def clear_index(self, index_name):
         self.es.indices.delete(index=index_name)
 
     def optimize_all(self):
-        self.es.indices.optimize(index='', max_num_segments=5, timeout=60*20)
+        self.es.indices.optimize(index='', max_num_segments=5)
 
     def optimize_index(self, index_name):
-        self.es.indices.optimize(index=index_name, max_num_segments=5, timeout=60*20)
+        self.es.indices.optimize(index=index_name, max_num_segments=5)

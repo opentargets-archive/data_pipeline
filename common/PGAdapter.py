@@ -1,7 +1,7 @@
 from sqlalchemy.dialects.postgresql import JSON
 
 from settings import Config
-from sqlalchemy import create_engine, ForeignKey
+from sqlalchemy import create_engine, ForeignKey, FLOAT
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine.url import URL
 from sqlalchemy import Column, Integer, String, Date, Text,TIMESTAMP, BOOLEAN, Float
@@ -213,6 +213,16 @@ class ElasticsearchLoad(Base):
     date_modified = Column(TIMESTAMP)
     active = Column(BOOLEAN)
     successfully_loaded = Column(BOOLEAN)
+class TargetToDiseaseAssociationScoreMap(Base):
+    __tablename__ = 'target_to_disease_association_score_map'
+    __table_args__ = {'schema':'pipeline'}
+    target_id = Column(Text, primary_key=True)
+    disease_id = Column(Text, primary_key=True)
+    evidence_id = Column(Text, primary_key=True)
+    is_direct = Column(BOOLEAN)
+    association_score = Column(FLOAT)
+    datasource = Column(Text)
+
 
 class EvidenceValidation(Base):
     __tablename__ = 'evidence_validation'
