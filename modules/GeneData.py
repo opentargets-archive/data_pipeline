@@ -208,7 +208,7 @@ class Gene(JSONSerializable):
         if data.ensembl_release:
             self.ensembl_release = data.ensembl_release
         is_reference = (data.is_reference and data.ensembl_gene_id.startswith('ENSG'))
-        self.is_ensembl_reference = data.is_reference
+        self.is_ensembl_reference = is_reference
 
 
     def load_uniprot_entry(self, seqrec):
