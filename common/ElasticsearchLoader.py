@@ -313,7 +313,13 @@ class Loader():
         self.es.indices.delete(index=index_name)
 
     def optimize_all(self):
-        self.es.indices.optimize(index='', max_num_segments=5)
+        try:
+            self.es.indices.optimize(index='', max_num_segments=5, wait_for_merge = False)
+        except:
+            logging.warn('optimisation of all indexes failed')
 
     def optimize_index(self, index_name):
-        self.es.indices.optimize(index=index_name, max_num_segments=5)
+        try:
+            self.es.indices.optimize(index=index_name, max_num_segments=5, wait_for_merge = False)
+        except:
+            logging.warn('optimisation of index %s failed'%index_name)
