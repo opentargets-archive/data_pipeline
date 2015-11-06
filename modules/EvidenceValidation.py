@@ -235,12 +235,12 @@ class EvidenceValidationFileChecker():
             root = ElementTree.fromstring(row.uniprot_entry)
             gene_id = None
             for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
-                gene_id = crossref.get("value")
-                if gene_id in ensembl_current:
+                ensembl_gene_id = crossref.get("value")
+                if ensembl_gene_id in ensembl_current:
                     if uniprot_current[uniprot_accession] is None:
-                        uniprot_current[uniprot_accession] = [gene_id];
+                        uniprot_current[uniprot_accession] = [ensembl_gene_id];
                     else:
-                        uniprot_current[uniprot_accession].append(gene_id)
+                        uniprot_current[uniprot_accession].append(ensembl_gene_id)
                     
             #seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
@@ -251,8 +251,8 @@ class EvidenceValidationFileChecker():
         logging.info("%i entries retrieved for uniprot" % c)
     
     def load_Ensembl(self):
-        logging.info("Loading Ensembl {0} asssembly genes on the reference assembly".format(Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-        for row in self.session.query(EnsemblGeneInfo).filter_by(assembly_name = Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY).all():
+        logging.info("Loading Ensembl {0} assembly genes and non reference assembly".format(Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+        for row in self.session.query(EnsemblGeneInfo).all(): #filter_by(assembly_name = Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY).all():
             #print "%s %s"%(row.ensembl_gene_id, row.external_name)
             ensembl_current[row.ensembl_gene_id] = row
             
