@@ -215,13 +215,14 @@ class EvidenceValidationFileChecker():
             #data = json.loads(row.data);
             for doc in row.data["response"]["docs"]:
                 if "ensembl_gene_id" in doc and "uniprot_ids" in doc:
-                    gene_id = doc["ensembl_gene_id"];
+                    ensembl_gene_id = doc["ensembl_gene_id"];
                     for uniprot_id in doc["uniprot_ids"]:
-                        if uniprot_id in uniprot_current and gene_id in ensembl_current:
+                        if uniprot_id in uniprot_current and ensembl_gene_id in ensembl_current:
+                            #print uniprot_id, " ", ensembl_gene_id, "\n"
                             if uniprot_current[uniprot_id] is None:
-                                uniprot_current[uniprot_id] = [gene_id];
+                                uniprot_current[uniprot_id] = [ensembl_gene_id];
                             else:
-                                uniprot_current[uniprot_id].append(gene_id);
+                                uniprot_current[uniprot_id].append(ensembl_gene_id);
            
         logging.info("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
         
@@ -237,6 +238,7 @@ class EvidenceValidationFileChecker():
             for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
                 ensembl_gene_id = crossref.get("value")
                 if ensembl_gene_id in ensembl_current:
+                    #print uniprot_accession, " ", ensembl_gene_id, "\n"
                     if uniprot_current[uniprot_accession] is None:
                         uniprot_current[uniprot_accession] = [ensembl_gene_id];
                     else:
@@ -303,13 +305,13 @@ class EvidenceValidationFileChecker():
         return symbol + " (non reference assembly)"
         
     def check_all(self):
-    
+ 
+        self.load_Ensembl(); 
         self.load_Uniprot();
         self.load_HGNC();
-        self.load_Ensembl();
+
         self.load_efo();
         self.load_eco();
-        #return;
         
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             for subdirname in dirnames:
