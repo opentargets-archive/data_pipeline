@@ -217,7 +217,7 @@ class EvidenceValidationFileChecker():
                 if "ensembl_gene_id" in doc and "uniprot_ids" in doc:
                     gene_id = doc["ensembl_gene_id"];
                     for uniprot_id in doc["uniprot_ids"]:
-                        if uniprot_id in uniprot_current:
+                        if uniprot_id in uniprot_current and gene_id in ensembl_current:
                             if uniprot_current[uniprot_id] is None:
                                 uniprot_current[uniprot_id] = [gene_id];
                             else:
@@ -236,10 +236,11 @@ class EvidenceValidationFileChecker():
             gene_id = None
             for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
                 gene_id = crossref.get("value")
-                if uniprot_current[uniprot_accession] is None:
-                    uniprot_current[uniprot_accession] = [gene_id];
-                else:
-                    uniprot_current[uniprot_accession].append(gene_id)
+                if gene_id in ensembl_current:
+                    if uniprot_current[uniprot_accession] is None:
+                        uniprot_current[uniprot_accession] = [gene_id];
+                    else:
+                        uniprot_current[uniprot_accession].append(gene_id)
                     
             #seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
@@ -312,18 +313,18 @@ class EvidenceValidationFileChecker():
         
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             for subdirname in dirnames:
-                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv012)$", subdirname)
+                #cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
+                cttv_match = re.match("^(cttv025)$", subdirname)
                 if cttv_match:
                     provider_id = cttv_match.groups()[0]
                     cttv_dir = os.path.join(dirname, subdirname)
-                    print(cttv_dir)
+                    logging.info(cttv_dir)
                     for cttv_dirname, cttv_dirs, filenames in os.walk(os.path.join(cttv_dir, "upload/submissions")):
                         for filename in filenames:
-                            print filename;
-                            if filename.endswith(('.json.gz')): #and filename == 'cttv011-02-11-2015.json.gz':
+                            logging.info(filename);
+                            if filename.endswith(('.json.gz')) and filename == 'cttv025-03-11-2015.json.gz':
                                 cttv_file = os.path.join(cttv_dirname, filename)
-                                print cttv_file;
+                                logging.info(cttv_file);
                                 last_modified = os.path.getmtime(cttv_file)
                                 #july = time.strptime("01 Jul 2015", "%d %b %Y")
                                 #julyseconds = time.mktime(july)
@@ -332,7 +333,7 @@ class EvidenceValidationFileChecker():
                                 if( last_modified - sepseconds ) > 0:
                                     m = re.match("^(.+).json.gz$", filename)
                                     logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
-                                    print(cttv_file)
+                                    logging.info((cttv_file)
                                     md5_hash = self.check_gzipfile(cttv_file)
                                     self.validate_gzipfile(cttv_file, filename, provider_id, md5_hash, logfile = logfile)
 
@@ -540,7 +541,8 @@ class EvidenceValidationFileChecker():
                                                 invalid_uniprot_ids[uniprot_id] = 1
                                             else:
                                                 invalid_uniprot_ids[uniprot_id] += 1
-                                            nb_uniprot_invalid +=1                                        
+                                            nb_uniprot_invalid +=1
+                                            #This identifier is not in the current EnsEMBL database 
                                         elif not reduce( (lambda x, y: x or y), map(lambda x: ensembl_current[x].is_reference, uniprot_current[uniprot_id]) ):
                                             gene_mapping_failed = True
                                             logger.error("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
