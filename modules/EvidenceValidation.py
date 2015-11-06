@@ -333,7 +333,7 @@ class EvidenceValidationFileChecker():
                                 if( last_modified - sepseconds ) > 0:
                                     m = re.match("^(.+).json.gz$", filename)
                                     logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
-                                    logging.info((cttv_file)
+                                    logging.info(cttv_file)
                                     md5_hash = self.check_gzipfile(cttv_file)
                                     self.validate_gzipfile(cttv_file, filename, provider_id, md5_hash, logfile = logfile)
 
