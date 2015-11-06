@@ -171,7 +171,7 @@ class EvidenceValidationFileChecker():
             text += messageFailed
             text += "See details in the attachment {0}\n\n".format(os.path.basename(logfile))
         text += "JSON schema version:\t1.2.1\n"
-        text += "Number of evidence strings:\t{0}\n".format(nb_records)
+        text += "Number of records parsed:\t{0}\n".format(nb_records)
         for key in errors:
             text += "Number of {0}:\t{1}\n".format(key, errors[key])
         text += "\n"
@@ -314,9 +314,10 @@ class EvidenceValidationFileChecker():
         self.load_eco();
         
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
-            for subdirname in dirnames.sort():
-                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv025)$", subdirname)
+            dirnames.sort()
+            for subdirname in dirnames:
+                #cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
+                cttv_match = re.match("^(cttv011)$", subdirname)
                 if cttv_match:
                     provider_id = cttv_match.groups()[0]
                     cttv_dir = os.path.join(dirname, subdirname)
@@ -375,6 +376,7 @@ class EvidenceValidationFileChecker():
         invalid_ensembl_ids = {}
         nonref_ensembl_ids = {}
         invalid_uniprot_ids = {}
+        missing_uniprot_id_xrefs = {}
         invalid_uniprot_id_mappings = {}
         
         if bValidate == True:
@@ -384,6 +386,7 @@ class EvidenceValidationFileChecker():
             lfh = open(logfile, 'wb')
             cc = 0
             lc = 0
+            nb_valid = 0
             nb_errors = 0
             nb_duplicates = 0
             nb_efo_invalid = 0
@@ -391,6 +394,7 @@ class EvidenceValidationFileChecker():
             nb_ensembl_invalid = 0
             nb_ensembl_nonref = 0
             nb_uniprot_invalid = 0
+            nb_missing_uniprot_id_xrefs = 0
             nb_uniprot_invalid_mapping = 0
             hexdigest_map = {}
             for line in fh:
@@ -411,22 +415,25 @@ class EvidenceValidationFileChecker():
                     data_type = python_raw['type']
                     #logging.info('type %s'%data_type)
                     if data_type in ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']:
-                        if data_type == 'genetic_association':
-                            obj = cttv.Genetics.fromMap(python_raw)
-                        elif data_type == 'rna_expression':
-                            obj = cttv.Expression.fromMap(python_raw)
-                        elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
-                            obj = cttv.Literature_Curated.fromMap(python_raw)
-                        elif data_type == 'known_drug':
-                            obj = cttv.Drug.fromMap(python_raw)
-                            #logging.info(obj.evidence.association_score.__class__.__name__)
-                            #logging.info(obj.evidence.target2drug.association_score.__class__.__name__)
-                            #logging.info(obj.evidence.drug2clinic.association_score.__class__.__name__)
-                        elif data_type == 'literature':
-                            obj = cttv.Literature_Mining.fromMap(python_raw)
-                        elif data_type == 'animal_model':
-                            obj = cttv.Animal_Models.fromMap(python_raw)
-                        
+                        try:
+                            if data_type == 'genetic_association':
+                                obj = cttv.Genetics.fromMap(python_raw)
+                            elif data_type == 'rna_expression':
+                                obj = cttv.Expression.fromMap(python_raw)
+                            elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
+                                obj = cttv.Literature_Curated.fromMap(python_raw)
+                            elif data_type == 'known_drug':
+                                obj = cttv.Drug.fromMap(python_raw)
+                                #logging.info(obj.evidence.association_score.__class__.__name__)
+                                #logging.info(obj.evidence.target2drug.association_score.__class__.__name__)
+                                #logging.info(obj.evidence.drug2clinic.association_score.__class__.__name__)
+                            elif data_type == 'literature':
+                                obj = cttv.Literature_Mining.fromMap(python_raw)
+                            elif data_type == 'animal_model':
+                                obj = cttv.Animal_Models.fromMap(python_raw)
+                        except e:
+                            obj = None
+
                         if obj:
 
                             if obj.target.id:
@@ -462,7 +469,7 @@ class EvidenceValidationFileChecker():
                                                     break;
                                             
                             if not bGivingUp:  
-                                self.startCapture(logging.ERROR)
+                                self.startCapture(logging.WARNING)
                                 
                             uniq_elements = obj.unique_association_fields
                             uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
@@ -520,7 +527,7 @@ class EvidenceValidationFileChecker():
                                             nb_ensembl_invalid +=1
                                         elif not ensembl_current[ensembl_id].is_reference:
                                             gene_mapping_failed = True
-                                            logger.error("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            logger.warning("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not ensembl_id in invalid_ensembl_ids:
                                                 nonref_ensembl_ids[ensembl_id] = 1
                                             else:
@@ -528,26 +535,26 @@ class EvidenceValidationFileChecker():
                                             nb_ensembl_nonref +=1                                            
                                     elif uniprotMatch:
                                         uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                                        if not uniprot_id in uniprot_current:
+                                        if uniprot_id not in uniprot_current:
                                             gene_failed = True
                                             logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier".format(lc+1, uniprot_id))
-                                            if not uniprot_id in invalid_uniprot_ids:
+                                            if uniprot_id not in invalid_uniprot_ids:
                                                 invalid_uniprot_ids[uniprot_id] = 1
                                             else:
                                                 invalid_uniprot_ids[uniprot_id] += 1
                                             nb_uniprot_invalid +=1
                                         elif uniprot_current[uniprot_id] is None:
-                                            gene_failed = True
-                                            logger.error("Line {0}: Invalid UniProt entry detected {1}. This UniProt entry does not have any cross-reference to an Ensembl Gene Id.".format(lc+1, uniprot_id))
-                                            if not uniprot_id in invalid_uniprot_ids:
-                                                invalid_uniprot_ids[uniprot_id] = 1
+                                            gene_mapping_failed = True
+                                            logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
+                                            if not uniprot_id in missing_uniprot_id_xrefs:
+                                                missing_uniprot_id_xrefs[uniprot_id] = 1
                                             else:
-                                                invalid_uniprot_ids[uniprot_id] += 1
-                                            nb_uniprot_invalid +=1
-                                            #This identifier is not in the current EnsEMBL database 
+                                                missing_uniprot_id_xrefs[uniprot_id] += 1
+                                            nb_missing_uniprot_id_xrefs +=1
+                                            #This identifier is not in the current EnsEMBL database
                                         elif not reduce( (lambda x, y: x or y), map(lambda x: ensembl_current[x].is_reference, uniprot_current[uniprot_id]) ):
                                             gene_mapping_failed = True
-                                            logger.error("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not uniprot_id in invalid_uniprot_id_mappings:
                                                 invalid_uniprot_id_mappings[uniprot_id] = 1
                                             else:
@@ -597,7 +604,8 @@ class EvidenceValidationFileChecker():
                     if nb_errors > Config.EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED or nb_duplicates > Config.EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED:
                         lfh.write("Too many errors: giving up.\n")
                         bGivingUp = True
-                    
+                if not validation_failed and validation_result == 0 and not disease_failed and not gene_failed:
+                    nb_valid +=1;
                 lc += 1
                 cc += len(line)
             logging.info('nb line parsed %i (size %i)'% (lc, cc))
@@ -686,10 +694,22 @@ class EvidenceValidationFileChecker():
                         text += "\t%s\t(reported %i times)\n"%(uniprot_id, invalid_uniprot_ids[uniprot_id])
                 text +="\n"
 
+            # report UniProt ids with no mapping to Ensembl
+            # missing_uniprot_id_xrefs
+            if nb_missing_uniprot_id_xrefs > 0:            
+                text +="Warnings:\n"
+                text +="\t%i UniProt identifier(s) without cross-references to Ensembl found in %i (%.1f%s) of the records.\n"%(len(missing_uniprot_id_xrefs), nb_missing_uniprot_id_xrefs, nb_missing_uniprot_id_xrefs*100/lc, '%' )
+                text +="\tThe corresponding evidence strings have been discarded.\n"
+                for uniprot_id in missing_uniprot_id_xrefs:
+                    if missing_uniprot_id_xrefs[uniprot_id] == 1:
+                        text += "\t%s\t(reported once)\n"%(uniprot_id)
+                    else:
+                        text += "\t%s\t(reported %i times)\n"%(uniprot_id, missing_uniprot_id_xrefs[uniprot_id])
+                text +="\n"            
             # report invalid Uniprot mapping entries
             if nb_uniprot_invalid_mapping > 0:
                 text +="Warnings:\n"
-                text +="\t%i distinct UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (%.1f%s) of the records.\n"%(len(invalid_uniprot_id_mappings), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping*100/lc, '%' )
+                text +="\t%i UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (%.1f%s) of the records.\n"%(len(invalid_uniprot_id_mappings), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping*100/lc, '%' )
                 text +="\tIf you think that might be an error in your submission, please use a UniProt identifier that will map to a reference assembly gene identifier.\n"
                 text +="\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifiers.\n"
                 for uniprot_id in invalid_uniprot_id_mappings:
@@ -715,6 +735,7 @@ class EvidenceValidationFileChecker():
                     date_validated = now,
                     nb_submission = 1,
                     nb_records = lc,
+                    #nb_valid = nb_valid,
                     nb_errors = nb_errors,
                     nb_duplicates = nb_duplicates,
                     successfully_validated = successfully_validated
@@ -738,7 +759,17 @@ class EvidenceValidationFileChecker():
                 filename, 
                 successfully_validated, 
                 lc, 
-                { 'JSON errors': nb_errors, 'duplicates': nb_duplicates, 'invalid EFO terms': nb_efo_invalid, 'obsolete EFO terms': nb_efo_obsolete, 'invalid Ensembl ids': nb_ensembl_invalid, 'Human Alternative sequence Gene Ensembl ids (warning)': nb_ensembl_nonref, 'invalid Uniprot ids': nb_uniprot_invalid, 'Uniprot ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping }, 
+                {   'valid records': nb_valid,
+                    'JSON errors': nb_errors, 
+                    'records with duplicates': nb_duplicates, 
+                    'records with invalid EFO terms': nb_efo_invalid, 
+                    'records with obsolete EFO terms': nb_efo_obsolete, 
+                    'records with invalid Ensembl ids': nb_ensembl_invalid, 
+                    'records with Human Alternative sequence Gene Ensembl ids (warning)': nb_ensembl_nonref, 
+                    'records with invalid UniProt ids': nb_uniprot_invalid, 
+                    'records with UniProt entries without x-refs to Ensembl (warning)': nb_missing_uniprot_id_xrefs,                     
+                    'records with UniProt ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping 
+                }, 
                 now, 
                 text, 
                 logfile
