@@ -322,7 +322,7 @@ class EvidenceValidationFileChecker():
                     for cttv_dirname, cttv_dirs, filenames in os.walk(os.path.join(cttv_dir, "upload/submissions")):
                         for filename in filenames:
                             logging.info(filename);
-                            if filename.endswith(('.json.gz')) and filename == 'cttv025-03-11-2015.json.gz':
+                            if filename.endswith(('.json.gz')): # and filename == 'cttv025-03-11-2015.json.gz':
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 logging.info(cttv_file);
                                 last_modified = os.path.getmtime(cttv_file)
