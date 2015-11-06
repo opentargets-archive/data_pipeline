@@ -316,8 +316,8 @@ class EvidenceValidationFileChecker():
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             dirnames.sort()
             for subdirname in dirnames:
-                #cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                cttv_match = re.match("^(cttv011)$", subdirname)
+                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
+                #cttv_match = re.match("^(cttv011)$", subdirname)
                 if cttv_match:
                     provider_id = cttv_match.groups()[0]
                     cttv_dir = os.path.join(dirname, subdirname)
