@@ -160,6 +160,25 @@ def _get_evidence_string_generic_mapping():
                                       "fielddata": {
                                          "format": "doc_values"
                                       },
+                                },
+                                "reactome": {
+                                     "type" : "object",
+                                          "properties" : {
+                                               "pathway_type_code": {
+                                                    "type" : "string",
+                                                    "index" : "not_analyzed",
+                                                        "fielddata": {
+                                                            "format": "doc_values"
+                                                        },
+                                               },
+                                               "pathway_code": {
+                                                    "type" : "string",
+                                                    "index" : "not_analyzed",
+                                                        "fielddata": {
+                                                            "format": "doc_values"
+                                                        },
+                                               },
+                                          }
                                 }
                             }
                          }
