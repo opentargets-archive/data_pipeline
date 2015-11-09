@@ -22,10 +22,10 @@ class JSONObjectStorage():
             rows_deleted = session.query(
                 ElasticsearchLoad).filter(
                 and_(ElasticsearchLoad.index.startswith(index_name),
-                     ElasticsearchLoad.type == doc_name)).delete(synchronize_session='fetch')
+                     ElasticsearchLoad.type == doc_name)).delete(synchronize_session=False)
         else:
             rows_deleted = session.query(
-                ElasticsearchLoad).filter(ElasticsearchLoad.index.startswith(index_name)).delete(synchronize_session='fetch')
+                ElasticsearchLoad).filter(ElasticsearchLoad.index.startswith(index_name)).delete(synchronize_session=False)
         if rows_deleted:
             logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
 

@@ -313,11 +313,11 @@ class ScoringExtract():
         iterate over all evidence strings available and extract the target to disease mappings used to calculate the scoring
         :return:
         '''
-
+        logging.info('removing data')
         rows_deleted = self.session.query(
-                TargetToDiseaseAssociationScoreMap).delete(synchronize_session='fetch')
+                TargetToDiseaseAssociationScoreMap).delete(synchronize_session=False)
 
-
+        logging.info('removing data finished')
         if rows_deleted:
             logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
         c, i = 0, 0
@@ -351,7 +351,10 @@ class ScoringExtract():
         logging.info("%i rows inserted to score-data table, %i evidence strings analysed" %(i, c))
 
 
-        self.session.commit()
+        try:
+            self.session.commit()
+        except:
+            self.session.rollback()
 
 class ScoreStorer():
     def __init__(self, adapter, es_loader, chunk_size=1e4):
