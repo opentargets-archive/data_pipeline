@@ -159,11 +159,16 @@ class EvidenceManager():
         '''enforce eco-based score for genetic_association evidencestrings'''
         if evidence['type']=='genetic_association':
             available_score=None
+            eco_uri = None
             try:
                 available_score = evidence['evidence']['gene2variant']['resource_score']['value']
             except KeyError:
-                pass
-            eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
+                logging.debug("malformed evidence string %i: KeyError in  evidence['evidence']['gene2variant']['resource_score']['value']"%evidence['id'])
+            try:
+                eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
+            except KeyError:
+                logging.debug("malformed evidence string %i: KeyError in  evidence['evidence']['gene2variant']['functional_consequence']"%evidence['id'])
+
 
             if eco_uri in self.eco_scores:
                 if 'resource_score' not in evidence['evidence']['gene2variant']:
