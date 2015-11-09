@@ -143,7 +143,7 @@ class JSONObjectStorage():
     @staticmethod
     def paginated_query(q, page_size = 1000):
         offset = 0
-        @processify
+        # @processify
         def get_results():
             return q.limit(page_size).offset(offset)
         while True:
