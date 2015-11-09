@@ -67,11 +67,11 @@ if __name__ == '__main__':
                         action="append_const", const = EvidenceStringActions.UPLOAD)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EvidenceStringActions.ALL)
-    parser.add_argument("--asse", dest='sco', help="extract data relevant to scoring",
+    parser.add_argument("--asse", dest='ass', help="extract data relevant to scoring",
                         action="append_const", const = AssociationActions.EXTRACT)
-    parser.add_argument("--assp", dest='sco', help="precompute association scores",
+    parser.add_argument("--assp", dest='ass', help="precompute association scores",
                         action="append_const", const = AssociationActions.PROCESS)
-    parser.add_argument("--assu", dest='sco', help="upload the stored precomputed score json object to elasticsearch",
+    parser.add_argument("--assu", dest='ass', help="upload the stored precomputed score json object to elasticsearch",
                         action="append_const", const = AssociationActions.UPLOAD)
     parser.add_argument("--ass", dest='evs', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = AssociationActions.ALL)
