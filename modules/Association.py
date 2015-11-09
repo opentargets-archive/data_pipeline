@@ -322,12 +322,11 @@ class ScoringExtract():
             logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
         c, i = 0, 0
         rows_to_insert =[]
-        for row in JSONObjectStorage.paginated_query(
-                self.session.query(ElasticsearchLoad.data).filter(and_(
+        for row in self.session.query(ElasticsearchLoad.data).filter(and_(
                         ElasticsearchLoad.index.like(Config.ELASTICSEARCH_DATA_INDEX_NAME+'%'),
                         ElasticsearchLoad.active==True,
                         )
-                    ),100):
+                    ).yield_per(1000):
             c+=1
 
             evidence = Evidence(row.data).evidence
@@ -341,7 +340,7 @@ class ScoringExtract():
                                               datasource=evidence['sourceID'],
                                               ))
 
-            if i%100 == 0:
+            if i%1000 == 0:
                 self.adapter.engine.execute(TargetToDiseaseAssociationScoreMap.__table__.insert(),rows_to_insert)
                 del rows_to_insert
                 rows_to_insert = []
