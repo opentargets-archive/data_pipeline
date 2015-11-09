@@ -326,7 +326,7 @@ class ScoringExtract():
                         ElasticsearchLoad.index.like(Config.ELASTICSEARCH_DATA_INDEX_NAME+'%'),
                         ElasticsearchLoad.active==True,
                         )
-                    )):
+                    ),1000):
             c+=1
 
             rows_to_insert =[]
@@ -340,9 +340,15 @@ class ScoringExtract():
                                               association_score=evidence['scores']['association_score'],
                                               datasource=evidence['sourceID'],
                                               ))
+
+            if i%1000 == 0:
                 self.adapter.engine.execute(TargetToDiseaseAssociationScoreMap.__table__.insert(),rows_to_insert)
+                rows_to_insert =[]
             if i % global_reporting_step == 0:
                 logging.info("%i rows inserted to score-data table, %i evidence strings analysed" %(i, c))
+        self.adapter.engine.execute(TargetToDiseaseAssociationScoreMap.__table__.insert(),rows_to_insert)
+        logging.info("%i rows inserted to score-data table, %i evidence strings analysed" %(i, c))
+
 
         self.session.commit()
 
