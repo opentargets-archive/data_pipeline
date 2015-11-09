@@ -1,3 +1,4 @@
+import json
 import logging
 from multiprocessing.queues import SimpleQueue
 import pprint
@@ -10,8 +11,11 @@ import time
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage, Loader
-from common.PGAdapter import ElasticsearchLoad, TargetToDiseaseAssociationScoreMap, Adapter
-from modules.EvidenceString import Evidence
+from common.PGAdapter import ElasticsearchLoad, TargetToDiseaseAssociationScoreMap, Adapter, \
+    TargetToDiseaseAssociationScoreMapAnalysed
+from modules.EFO import EfoRetriever
+from modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
+from modules.GeneData import GeneRetriever
 from settings import Config
 from multiprocessing import Pool, Process, Queue, Value
 
@@ -22,7 +26,7 @@ import math
 global_reporting_step = 5e5
 
 
-class ScoringActions(Actions):
+class AssociationActions(Actions):
     EXTRACT='extract'
     PROCESS='process'
     UPLOAD='upload'
@@ -63,7 +67,7 @@ class AssociationScore(JSONSerializable):
             self.datasource_evidence_count[ds]=0
             self.datatype_evidence_count[dt]=0
 
-class AssociationScoreSet(JSONSerializable):
+class Association(JSONSerializable):
 
     def __init__(self, target, disease, is_direct):
         self.target = {'id':target}
@@ -73,6 +77,7 @@ class AssociationScoreSet(JSONSerializable):
         for method_key, method in ScoringMethods.__dict__.items():
             if not method_key.startswith('_'):
                 self.set_method(method,AssociationScore())
+        self.private = {}
     def get_method(self, method):
         if method not in ScoringMethods.__dict__.values():
             raise AttributeError("method need to be a valid ScoringMethods")
@@ -87,6 +92,79 @@ class AssociationScoreSet(JSONSerializable):
 
     def set_id(self):
         self.id = '%s-%s'%(self.target['id'], self.disease['id'])
+
+    def set_target_data(self, geneid):
+        #TODO: add facet data
+        """get generic gene info"""
+        genes_info = []
+        pathway_data = dict(pathway_type_code=[],
+                            pathway_code=[])
+        GO_terms = dict(biological_process = [],
+                        cellular_component=[],
+                        molecular_function=[],
+                        )
+        uniprot_keywords = []
+        #TODO: handle domains
+        gene = self._get_gene(geneid)
+        genes_info=ExtendedInfoGene(gene)
+
+        if 'reactome' in gene._private['facets']:
+            pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
+            pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
+            # except Exception:
+            #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
+        if gene.go:
+            for go_code,data in gene.go.items():
+                try:
+                    category,term = data['term'][0], data['term'][2:]
+                    if category =='P':
+                        GO_terms['biological_process'].append(dict(code=go_code,
+                                                                   term=term))
+                    elif category =='F':
+                        GO_terms['molecular_function'].append(dict(code=go_code,
+                                                                   term=term))
+                    elif category =='C':
+                        GO_terms['cellular_component'].append(dict(code=go_code,
+                                                                   term=term))
+                except:
+                    pass
+        if gene.uniprot_keywords:
+            uniprot_keywords = gene.uniprot_keywords
+
+        if genes_info:
+            self.target[ExtendedInfoGene.root] = genes_info.data
+
+        if pathway_data['pathway_code']:
+            pathway_data['pathway_type_code']=list(set(pathway_data['pathway_type_code']))
+            pathway_data['pathway_code']=list(set(pathway_data['pathway_code']))
+
+
+
+        '''Add private objects used just for indexing'''
+
+        self.private['facets']={}
+        if pathway_data['pathway_code']:
+            self.private['facets']['reactome']= pathway_data
+        if uniprot_keywords:
+            self.private['facets']['uniprot_keywords'] = uniprot_keywords
+        if GO_terms['biological_process'] or \
+            GO_terms['molecular_function'] or \
+            GO_terms['cellular_component'] :
+            self.private['facets']['go'] = GO_terms
+
+    def set_disease_data(self, diseaseid):
+        #TODO: add facet data
+        """get generic efo info"""
+        all_efo_codes=[]
+        efo = self._get_efo(diseaseid)
+        efo_info=ExtendedInfoEFO(efo)
+
+        if efo_info:
+            for e in efo_info.data:
+                for node in e['path']:
+                    all_efo_codes.extend(node)
+            self.disease[ExtendedInfoEFO.root] = efo_info.data
+
 
 
 class EvidenceScore():
@@ -153,7 +231,7 @@ class Scorer():
 
     def score(self,target, disease, evidence_scores, is_direct, method  = None):
 
-        score = AssociationScoreSet(target,disease, is_direct)
+        score = Association(target,disease, is_direct)
 
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
             self._harmonic_sum(evidence_scores, score)
@@ -283,8 +361,8 @@ class ScoreStorer():
         self.counter +=1
         if (len(self.cache) % self.chunk_size) == 0:
             self.flush()
-        self.es_loader.put(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-                           Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
+        self.es_loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+                           Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                            id,
                            score.to_json(),
                            create_index = False)
@@ -295,8 +373,8 @@ class ScoreStorer():
 
         if self.cache:
             JSONObjectStorage.store_to_pg_core(self.adapter,
-                                              Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-                                              Config.ELASTICSEARCH_DATA_SCORE_DOC_NAME,
+                                              Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+                                              Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                               self.cache,
                                               delete_prev=False,
                                               quiet=True,
@@ -552,7 +630,7 @@ class TargetDiseasePairProducer(Process):
         self.pairs_generated.value =  self.total_jobs
 
     def get_score_from_row(self, row):
-        return EvidenceScore(score = row['association_score'],
+        return EvidenceScore(score = row['association_score']*Config.SCORING_WEIGHTS[row['datasource']],
                              datatype= Config.DATASOURCE_TO_DATATYPE_MAPPING[row['datasource']],
                              datasource=row['datasource'],
                              is_direct=row['is_direct'])
@@ -581,6 +659,8 @@ class ScorerProducer(Process):
         self.global_counter = global_counter
         self.total_loaded = total_loaded
         self.scorer = Scorer()
+        self.gene_retriever = GeneRetriever(self.adapter)
+        self.efo_retriever = EfoRetriever(self.adapter)
 
 
     def run(self):
@@ -595,6 +675,8 @@ class ScorerProducer(Process):
             if evidence:
                 self.global_counter.value +=1
                 score = self.scorer.score(target, disease, evidence, is_direct)
+                score.set_target_data(self.gene_retriever(target))
+                score.set_disease_data(self.efo_retriever(disease))
                 self.score_q.put((target, disease,score))
 
         self.signal_finish.set()
@@ -736,10 +818,10 @@ class ScoringProcess():
 
 
         JSONObjectStorage.delete_prev_data_in_pg(self.session,
-                                         Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+                                         Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
                                          )
         self.session.commit()
-        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME)
+        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
 
 
 
@@ -777,15 +859,36 @@ class ScoringUploader():
         self.loader=loader
 
     def upload_all(self):
+        # store a syntetic dump
+        # data =[]
+        # c=0
+        # for row in self.session.query(ElasticsearchLoad.id, ElasticsearchLoad.index, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
+        #                     ElasticsearchLoad.index.startswith(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME),
+        #                     ElasticsearchLoad.active == True)
+        #     ).yield_per(10000):
+        #         c+=1
+        #         parsed_data = json.loads(row.data)
+        #         data.append(dict(target_id=parsed_data['target']['id'],
+        #                        disease_id=parsed_data['disease']['id'],
+        #                        association_score=parsed_data['harmonic-sum']['overall'],
+        #
+        #                                       ))
+        #         if len(data)>=10000:
+        #             print c
+        #             self.adapter.engine.execute(TargetToDiseaseAssociationScoreMapAnalysed.__table__.insert(),data)
+        #             data =[]
+        # if data:
+        #     self.adapter.engine.execute(TargetToDiseaseAssociationScoreMapAnalysed.__table__.insert(),data)
+
         self.clear_old_data()
         JSONObjectStorage.refresh_index_data_in_es(self.loader,
                                          self.session,
-                                         Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME
+                                         Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME
                                          )
         try:
-            self.loader.optimize_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
+            self.loader.optimize_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME+'*')
         except:
             pass
 
     def clear_old_data(self):
-        self.loader.clear_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
+        self.loader.clear_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME+'*')

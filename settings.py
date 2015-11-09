@@ -24,8 +24,8 @@ class Config():
     ELASTICSEARCH_EXPRESSION_DOC_NAME = 'expression'
     ELASTICSEARCH_REACTOME_INDEX_NAME = 'reactome-data'
     ELASTICSEARCH_REACTOME_REACTION_DOC_NAME = 'reactome-reaction'
-    ELASTICSEARCH_DATA_SCORE_INDEX_NAME = 'evidence-score'
-    ELASTICSEARCH_DATA_SCORE_DOC_NAME = 'evidencescore'
+    ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME = 'association-data'
+    ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME = 'association'
     DEBUG = True
     PROFILE = False
     PUBLIC_API_BASE_PATH = '/api/public/v'
@@ -93,6 +93,11 @@ class Config():
     DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
     # DATASOURCE_TO_INDEX_KEY_MAPPING['phenodigm'] = DATASOURCE_TO_DATATYPE_MAPPING['phenodigm']
     # DATASOURCE_TO_INDEX_KEY_MAPPING['expression_atlas'] = DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas']
+    SCORING_WEIGHTS = defaultdict(lambda: 1)
+    SCORING_WEIGHTS['phenodigm'] = 0.33333333
+    # SCORING_WEIGHTS['expression_atlas'] = 0.2
+    SCORING_WEIGHTS['europepmc'] = 0.2
+    SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
 
 

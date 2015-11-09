@@ -253,7 +253,7 @@ class Loader():
             return base_settings
         if index_name.startswith(Config.ELASTICSEARCH_DATA_INDEX_NAME):
             settings=update_settings(settings,ElasticSearchConfiguration.evidence_data_mapping)
-        elif index_name == Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME:
+        elif index_name == Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME:
             settings=update_settings(settings,ElasticSearchConfiguration.score_data_mapping)
         elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
             settings=update_settings(settings,ElasticSearchConfiguration.efo_data_mapping)
@@ -277,7 +277,7 @@ class Loader():
                                    ignore=400,
                                    body=ElasticSearchConfiguration.evidence_data_mapping,
                                    )
-        elif index_name == Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME:
+        elif index_name == Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME:
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.score_data_mapping,
