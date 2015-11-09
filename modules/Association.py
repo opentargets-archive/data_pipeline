@@ -6,7 +6,7 @@ import multiprocessing
 from elasticsearch import Elasticsearch
 from sqlalchemy import and_, func
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import joinedload, subqueryload
+from sqlalchemy.orm import joinedload, subqueryload, defer
 import time
 from common import Actions
 from common.DataStructure import JSONSerializable
@@ -325,9 +325,9 @@ class ScoringExtract():
                         ElasticsearchLoad.index.like(Config.ELASTICSEARCH_DATA_INDEX_NAME+'%'),
                         ElasticsearchLoad.active==True,
                         )
-                    ).yield_per(1000):
+                    ).options(defer("elasticsearc_load")).yield_per(100):
             c+=1
-            
+
             rows_to_insert =[]
             evidence = Evidence(row.data).evidence
             for efo in evidence['_private']['efo_codes']:
