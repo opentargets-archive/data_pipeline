@@ -163,11 +163,11 @@ class EvidenceManager():
             try:
                 available_score = evidence['evidence']['gene2variant']['resource_score']['value']
             except KeyError:
-                logging.debug("malformed evidence string %i: KeyError in  evidence['evidence']['gene2variant']['resource_score']['value']"%evidence['id'])
+                logging.debug("malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']['resource_score']['value']"%evidence['id'])
             try:
                 eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
             except KeyError:
-                logging.debug("malformed evidence string %i: KeyError in  evidence['evidence']['gene2variant']['functional_consequence']"%evidence['id'])
+                logging.debug("malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']['functional_consequence']"%evidence['id'])
 
 
             if eco_uri in self.eco_scores:
