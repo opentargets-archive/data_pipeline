@@ -327,19 +327,19 @@ class ScoringExtract():
                         )
                     ).yield_per(1000):
             c+=1
+            
+            rows_to_insert =[]
             evidence = Evidence(row.data).evidence
             for efo in evidence['_private']['efo_codes']:
                 i+=1
-                self.session.add(TargetToDiseaseAssociationScoreMap(
-                                              target_id=evidence['target']['id'],
+                rows_to_insert.append(dict(target_id=evidence['target']['id'],
                                               disease_id=efo,
                                               evidence_id=evidence['id'],
                                               is_direct=efo==evidence['disease']['id'],
                                               association_score=evidence['scores']['association_score'],
                                               datasource=evidence['sourceID'],
                                               ))
-            if c % 1000 == 0:
-                self.session.flush()
+                self.adapter.engine.execute(TargetToDiseaseAssociationScoreMap.__table__.insert(),rows_to_insert)
             if i % global_reporting_step == 0:
                 logging.info("%i rows inserted to score-data table, %i evidence strings analysed" %(i, c))
 
