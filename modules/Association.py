@@ -321,11 +321,12 @@ class ScoringExtract():
         if rows_deleted:
             logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
         c, i = 0, 0
-        for row in self.session.query(ElasticsearchLoad.data).filter(and_(
+        for row in JSONObjectStorage.paginated_query(
+                self.session.query(ElasticsearchLoad.data).filter(and_(
                         ElasticsearchLoad.index.like(Config.ELASTICSEARCH_DATA_INDEX_NAME+'%'),
                         ElasticsearchLoad.active==True,
                         )
-                    ).options(defer("elasticsearc_load")).yield_per(100):
+                    )):
             c+=1
 
             rows_to_insert =[]
