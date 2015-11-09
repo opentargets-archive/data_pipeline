@@ -321,6 +321,7 @@ class ScoringExtract():
         if rows_deleted:
             logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
         c, i = 0, 0
+        rows_to_insert =[]
         for row in JSONObjectStorage.paginated_query(
                 self.session.query(ElasticsearchLoad.data).filter(and_(
                         ElasticsearchLoad.index.like(Config.ELASTICSEARCH_DATA_INDEX_NAME+'%'),
@@ -329,7 +330,6 @@ class ScoringExtract():
                     ),1000):
             c+=1
 
-            rows_to_insert =[]
             evidence = Evidence(row.data).evidence
             for efo in evidence['_private']['efo_codes']:
                 i+=1
