@@ -139,6 +139,17 @@ class JSONObjectStorage():
         if row:
             return row.data
 
+    @staticmethod
+    def paginated_query(q, page_size = 1000):
+        offset = 0
+        while True:
+            r = False
+            for elem in q.limit(page_size).offset(offset):
+               r = True
+               yield elem
+            offset += page_size
+            if not r:
+                break
 
 class Loader():
     """
