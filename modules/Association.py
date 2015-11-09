@@ -325,7 +325,7 @@ class ScoringExtract():
                         ElasticsearchLoad.index.like(Config.ELASTICSEARCH_DATA_INDEX_NAME+'%'),
                         ElasticsearchLoad.active==True,
                         )
-                    ).yield_per(100):
+                    ).yield_per(1000):
             c+=1
             evidence = Evidence(row.data).evidence
             for efo in evidence['_private']['efo_codes']:
@@ -338,7 +338,7 @@ class ScoringExtract():
                                               association_score=evidence['scores']['association_score'],
                                               datasource=evidence['sourceID'],
                                               ))
-            if c % 100 == 0:
+            if c % 1000 == 0:
                 self.session.flush()
             if i % global_reporting_step == 0:
                 logging.info("%i rows inserted to score-data table, %i evidence strings analysed" %(i, c))
