@@ -6,6 +6,7 @@ from elasticsearch.helpers import streaming_bulk, parallel_bulk
 from sqlalchemy import and_
 from common import Actions
 from common.PGAdapter import ElasticsearchLoad
+from common.processify import processify
 from settings import ElasticSearchConfiguration, Config
 
 __author__ = 'andreap'
@@ -142,9 +143,12 @@ class JSONObjectStorage():
     @staticmethod
     def paginated_query(q, page_size = 1000):
         offset = 0
+        @processify
+        def get_results():
+            return q.limit(page_size).offset(offset)
         while True:
             r = False
-            for elem in q.limit(page_size).offset(offset):
+            for elem in get_results():
                r = True
                yield elem
             offset += page_size
