@@ -686,8 +686,8 @@ class ScorerProducer(Process):
             if evidence:
                 self.global_counter.value +=1
                 score = self.scorer.score(target, disease, evidence, is_direct)
-                score.set_target_data(self.gene_retriever(target))
-                score.set_disease_data(self.efo_retriever(disease))
+                score.set_target_data(self.gene_retriever.get_gene(target))
+                score.set_disease_data(self.efo_retriever.get_efo(disease))
                 self.score_q.put((target, disease,score))
 
         self.signal_finish.set()
