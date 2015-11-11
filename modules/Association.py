@@ -93,7 +93,7 @@ class Association(JSONSerializable):
     def set_id(self):
         self.id = '%s-%s'%(self.target['id'], self.disease['id'])
 
-    def set_target_data(self, geneid):
+    def set_target_data(self, gene):
         #TODO: add facet data
         """get generic gene info"""
         genes_info = []
@@ -105,7 +105,6 @@ class Association(JSONSerializable):
                         )
         uniprot_keywords = []
         #TODO: handle domains
-        gene = self._get_gene(geneid)
         genes_info=ExtendedInfoGene(gene)
 
         if 'reactome' in gene._private['facets']:
@@ -152,11 +151,10 @@ class Association(JSONSerializable):
             GO_terms['cellular_component'] :
             self.private['facets']['go'] = GO_terms
 
-    def set_disease_data(self, diseaseid):
+    def set_disease_data(self, efo):
         #TODO: add facet data
         """get generic efo info"""
         all_efo_codes=[]
-        efo = self._get_efo(diseaseid)
         efo_info=ExtendedInfoEFO(efo)
 
         if efo_info:
