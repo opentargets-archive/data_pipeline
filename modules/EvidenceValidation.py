@@ -73,6 +73,7 @@ efo_obsolete = {}
 ensembl_current = {}
 uniprot_current = {}
 eco_current = {}
+symbols = {}
 
 class EvidenceValidationActions(Actions):
     CHECKFILES='checkfiles'
@@ -207,35 +208,82 @@ class EvidenceValidationFileChecker():
             mail.sendmail(me, rcpt, msg.as_string())
             mail.quit()
         return 0;
-    
+        
     def load_HGNC(self):
         logging.info("Loading HGNC entries and mapping from Ensembl Gene Id to UniProt")
         c = 0
         for row in self.session.query(HgncInfoLookup).order_by(desc(HgncInfoLookup.last_updated)).limit(1):
             #data = json.loads(row.data);
             for doc in row.data["response"]["docs"]:
-                if "ensembl_gene_id" in doc and "uniprot_ids" in doc:
+                gene_symbol = None;
+                ensembl_gene_id = None;
+                if "symbol" in doc:
+                    gene_symbol = doc["symbol"];
+                    if gene_symbol not in symbols:
+                        logging.info("Adding missing symbol from Ensembl %s" % gene_symbol)
+                        symbols[gene_symbol] = {};
+                        
+                if "ensembl_gene_id" in doc: 
                     ensembl_gene_id = doc["ensembl_gene_id"];
+                        
+                if "uniprot_ids" in doc:
+                    if "uniprot_ids" not in symbols[gene_symbol]:
+                        symbols[gene_symbol]["uniprot_ids"] = [];
                     for uniprot_id in doc["uniprot_ids"]:
-                        if uniprot_id in uniprot_current and ensembl_gene_id in ensembl_current:
+                        if uniprot_id in uniprot_current and ensembl_gene_id is not None and ensembl_gene_id in ensembl_current:
                             #print uniprot_id, " ", ensembl_gene_id, "\n"
                             if uniprot_current[uniprot_id] is None:
                                 uniprot_current[uniprot_id] = [ensembl_gene_id];
                             else:
                                 uniprot_current[uniprot_id].append(ensembl_gene_id);
-           
+
+                        if uniprot_id not in symbols[gene_symbol]["uniprot_ids"]:
+                            symbols[gene_symbol]["uniprot_ids"].append(uniprot_id)               
+                
         logging.info("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
         
     def load_Uniprot(self):
-        logging.info("Loading Uniprot identifiers and mappings to Ensembl Gene Id")
+        logging.info("Loading Uniprot identifiers and mappings to Gene Symbol and Ensembl Gene Id")
         c = 0
         for row in self.session.query(UniprotInfo).yield_per(1000):
-            #
+            # get the symbol too
             uniprot_accession = row.uniprot_accession
             uniprot_current[uniprot_accession] = None;
             root = ElementTree.fromstring(row.uniprot_entry)
+            protein_name = None
+            for name in root.findall("./ns0:name", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
+                protein_name = name.text
+                break;
+            gene_symbol = None
+            for gene_name_el in root.findall(".//ns0:gene/ns0:name[@type='primary']", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
+                gene_symbol = gene_name_el.text
+                break;
+                
+            if gene_symbol is not None:
+                # some protein have to be remapped to another symbol
+                # PLSCR3 => TMEM256-PLSCR3
+                # LPPR4 => PLPPR4
+                # Q9Y328 => NSG2 => Nsg2 => HMP19 (in Human)
+                # 
+                if gene_symbol == 'PLSCR3':
+                    gene_symbol = 'TMEM256-PLSCR3';
+                    logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
+                elif gene_symbol == 'LPPR4':
+                    gene_symbol = 'PLPPR4';
+                    logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
+                elif gene_symbol == 'NSG2':
+                    gene_symbol = 'HMP19';
+                    logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
+                    
+                if gene_symbol not in symbols:
+                    symbols[gene_symbol] = {};
+                if "uniprot_ids" not in symbols[gene_symbol]:
+                    symbols[gene_symbol]["uniprot_ids"] = [ uniprot_accession ]
+                elif uniprot_accession not in symbols[gene_symbol]["uniprot_ids"]:
+                    symbols[gene_symbol]["uniprot_ids"].append(uniprot_accession)
+                
             gene_id = None
-            for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
+            for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):
                 ensembl_gene_id = crossref.get("value")
                 if ensembl_gene_id in ensembl_current:
                     #print uniprot_accession, " ", ensembl_gene_id, "\n"
@@ -243,7 +291,15 @@ class EvidenceValidationFileChecker():
                         uniprot_current[uniprot_accession] = [ensembl_gene_id];
                     else:
                         uniprot_current[uniprot_accession].append(ensembl_gene_id)
-                    
+                        
+            # create a mapping from the symbol instead to link to Ensembl
+            if uniprot_current[uniprot_accession] is None:
+                if gene_symbol and gene_symbol in symbols:
+                    if "ensembl_primary_id" in symbols[gene_symbol]:
+                        uniprot_current[uniprot_accession] = [symbols[gene_symbol]["ensembl_primary_id"]];
+                    elif "ensembl_secondary_id" in symbols[gene_symbol]:
+                        uniprot_current[uniprot_accession] = [symbols[gene_symbol]["ensembl_secondary_id"]];
+
             #seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
             if c % 5000 == 0:
@@ -257,7 +313,15 @@ class EvidenceValidationFileChecker():
         for row in self.session.query(EnsemblGeneInfo).all(): #filter_by(assembly_name = Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY).all():
             #print "%s %s"%(row.ensembl_gene_id, row.external_name)
             ensembl_current[row.ensembl_gene_id] = row
-            
+            # put the ensembl_id in symbols too
+            if row.external_name not in symbols:
+                symbols[row.external_name] = {}
+            if row.is_reference:
+                symbols[row.external_name]["ensembl_primary_id"] = row.ensembl_gene_id
+            else:
+                if "ensembl_secondary_id" not in symbols[row.external_name] or row.ensembl_gene_id < symbols[row.external_name]["ensembl_secondary_id"]:
+                    symbols[row.external_name]["ensembl_secondary_id"] = row.ensembl_gene_id;
+                
     def load_eco(self):
 
         logging.info("Loading ECO current valid terms")
@@ -309,15 +373,15 @@ class EvidenceValidationFileChecker():
         self.load_Ensembl(); 
         self.load_Uniprot();
         self.load_HGNC();
-
+        return;
         self.load_efo();
         self.load_eco();
         
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             dirnames.sort()
             for subdirname in dirnames:
-                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv011)$", subdirname)
+                #cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
+                cttv_match = re.match("^(cttv009)$", subdirname)
                 if cttv_match:
                     provider_id = cttv_match.groups()[0]
                     cttv_dir = os.path.join(dirname, subdirname)
