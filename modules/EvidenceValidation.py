@@ -8,7 +8,7 @@ import smtplib
 import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.MIMEBase import MIMEBase
+from email import MIMEBase
 from email import Encoders
 import logging
 from StringIO import StringIO
@@ -431,7 +431,7 @@ class EvidenceValidationFileChecker():
                                 obj = cttv.Literature_Mining.fromMap(python_raw)
                             elif data_type == 'animal_model':
                                 obj = cttv.Animal_Models.fromMap(python_raw)
-                        except e:
+                        except:
                             obj = None
 
                         if obj:
