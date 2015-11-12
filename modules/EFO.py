@@ -50,7 +50,8 @@ class EFO(JSONSerializable):
         self.children=[]
 
     def get_id(self):
-        return get_ontology_code_from_url(self.path_codes[0][-1])
+        return self.code
+        # return get_ontology_code_from_url(self.path_codes[0][-1])
 
     def creat_suggestions(self):
 
@@ -202,7 +203,8 @@ class EfoRetriever():
                                                        Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                                                        efoid)
         efo = EFO(efoid)
-        efo.load_json(json_data)
+        if json_data:
+            efo.load_json(json_data)
         return efo
 
     def _add_to_cache(self, efoid, efo):

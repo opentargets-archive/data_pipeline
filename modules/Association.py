@@ -57,15 +57,8 @@ class AssociationScore(JSONSerializable):
 
     def init_scores(self):
         self.datatypes={}
-        self.datatype_evidence_count={}
         self.datasources={}
-        self.datasource_evidence_count={}
 
-        for ds,dt in Config.DATASOURCE_TO_DATATYPE_MAPPING.items():
-            self.datasources[ds]=0.0
-            self.datatypes[dt]=0.0
-            self.datasource_evidence_count[ds]=0
-            self.datatype_evidence_count[dt]=0
 
 class Association(JSONSerializable):
 
@@ -76,14 +69,23 @@ class Association(JSONSerializable):
         self.set_id()
         for method_key, method in ScoringMethods.__dict__.items():
             if not method_key.startswith('_'):
-                self.set_method(method,AssociationScore())
+                self.set_scoring_method(method,AssociationScore())
+        self.evidence_count = dict(total = 0.0,
+                                   datatype = [],
+                                   datasource = [])
+        for ds,dt in Config.DATASOURCE_TO_DATATYPE_MAPPING.items():
+            self.evidence_count['datasource'][ds]=0.0
+            self.evidence_count['datatype'][dt]= 0.0
         self.private = {}
-    def get_method(self, method):
+        self.private['facets']=dict(datatype = [],
+                                    datasource = [])
+
+    def get_scoring_method(self, method):
         if method not in ScoringMethods.__dict__.values():
             raise AttributeError("method need to be a valid ScoringMethods")
         return self.__dict__[method]
 
-    def set_method(self, method, score):
+    def set_scoring_method(self, method, score):
         if method not in ScoringMethods.__dict__.values():
             raise AttributeError("method need to be a valid ScoringMethods")
         if not isinstance(score, AssociationScore):
@@ -94,9 +96,7 @@ class Association(JSONSerializable):
         self.id = '%s-%s'%(self.target['id'], self.disease['id'])
 
     def set_target_data(self, gene):
-        #TODO: add facet data
         """get generic gene info"""
-        genes_info = []
         pathway_data = dict(pathway_type_code=[],
                             pathway_code=[])
         GO_terms = dict(biological_process = [],
@@ -141,7 +141,6 @@ class Association(JSONSerializable):
 
         '''Add private objects used just for indexing'''
 
-        self.private['facets']={}
         if pathway_data['pathway_code']:
             self.private['facets']['reactome']= pathway_data
         if uniprot_keywords:
@@ -152,7 +151,6 @@ class Association(JSONSerializable):
             self.private['facets']['go'] = GO_terms
 
     def set_disease_data(self, efo):
-        #TODO: add facet data
         """get generic efo info"""
         all_efo_codes=[]
         efo_info=ExtendedInfoEFO(efo)
@@ -163,6 +161,12 @@ class Association(JSONSerializable):
                     all_efo_codes.extend(node)
             self.disease[ExtendedInfoEFO.root] = efo_info.data
 
+    def set_available_datasource(self, ds):
+        if ds not in self.facets['datasource']:
+            self.facets['datasource'].append(ds)
+    def set_available_datatype(self, dt):
+        if dt not in self.facets['datatype']:
+            self.facets['datatype'].append(dt)
 
 
 class EvidenceScore():
@@ -229,24 +233,32 @@ class Scorer():
 
     def score(self,target, disease, evidence_scores, is_direct, method  = None):
 
-        score = Association(target,disease, is_direct)
+        ass = Association(target,disease, is_direct)
 
+        for e in evidence_scores:
+            "set evidence counts"
+            ass.evidence_count['total']+=1
+            ass.evidence_count['datatype'][e.datatype]+=1
+            ass.evidence_count['datasource'][e.datasource]+=1
+
+            "set facet data"
+            ass.set_available_datatype(e.datatype)
+            ass.set_available_datatype(e.datasource)
+
+        "compute scores"
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
-            self._harmonic_sum(evidence_scores, score)
+            self._harmonic_sum(evidence_scores, ass)
         if (method == ScoringMethods.SUM) or (method is None):
-            self._sum(evidence_scores, score)
+            self._sum(evidence_scores, ass)
         if (method == ScoringMethods.MAX) or (method is None):
-            self._max(evidence_scores, score)
+            self._max(evidence_scores, ass)
 
-        return score
+        return ass
 
-    def _harmonic_sum(self, evidence_scores, score, max_entries = 1000):
-        har_sum_score = score.get_method(ScoringMethods.HARMONIC_SUM)
+    def _harmonic_sum(self, evidence_scores, ass, max_entries = 1000):
+        har_sum_score = ass.get_scoring_method(ScoringMethods.HARMONIC_SUM)
         datasource_scorers = {}
         for e in evidence_scores:
-            har_sum_score.evidence_count+=1
-            har_sum_score.datatype_evidence_count[e.datatype]+=1
-            har_sum_score.datasource_evidence_count[e.datasource]+=1
             if e.datasource not in datasource_scorers:
                 datasource_scorers[e.datasource]=HarmonicSumScorer(buffer=max_entries)
             datasource_scorers[e.datasource].add(e.score)
@@ -267,22 +279,19 @@ class Scorer():
         '''compute overall scores'''
         har_sum_score.overall = overall_scorer.score()
 
-        return score
+        return ass
 
-    def _sum(self, evidence_scores, score):
-        sum_score = score.get_method(ScoringMethods.SUM)
+    def _sum(self, evidence_scores, ass):
+        sum_score = ass.get_scoring_method(ScoringMethods.SUM)
         for e in evidence_scores:
             sum_score.overall+=e.score
-            sum_score.evidence_count+=1
             sum_score.datatypes[e.datatype]+=e.score
-            sum_score.datatype_evidence_count[e.datatype]+=1
             sum_score.datasources[e.datasource]+=e.score
-            sum_score.datasource_evidence_count[e.datasource]+=1
 
         return
 
-    def _max(self, evidence_score, score):
-        max_score = score.get_method(ScoringMethods.MAX)
+    def _max(self, evidence_score, ass):
+        max_score = ass.get_scoring_method(ScoringMethods.MAX)
         for e in evidence_score:
             if e.score > max_score.datasources[e.datasource]:
                 max_score.datasources[e.datatype] = e.score
@@ -290,9 +299,6 @@ class Scorer():
                     max_score.datatypes[e.datatype]=e.score
                     if e.score > max_score.overall:
                         max_score.overall=e.score
-            max_score.evidence_count+=1
-            max_score.datatype_evidence_count[e.datatype]+=1
-            max_score.datasource_evidence_count[e.datasource]+=1
 
         return
 
@@ -831,9 +837,9 @@ class ScoringProcess():
                                          )
         self.session.commit()
         self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
-
-
-
+        #
+        #
+        #
         storers = [ScoreStorerWorker(score_data_q,
                                    data_storage_finished,
                                    score_computation_finished,

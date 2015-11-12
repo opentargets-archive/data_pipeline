@@ -283,6 +283,7 @@ class Loader():
                                      body =settings)
 
     def create_new_index(self, index_name):
+        index_name +='_'+Config.RELEASE_VERSION
         try:
             self.es.indices.delete(index_name, ignore=400)
         except NotFoundError:
@@ -292,27 +293,27 @@ class Loader():
                                    ignore=400,
                                    body=ElasticSearchConfiguration.evidence_data_mapping,
                                    )
-        elif index_name == Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.score_data_mapping,
                                    )
-        elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.efo_data_mapping
                                    )
-        elif index_name == Config.ELASTICSEARCH_ECO_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_ECO_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.eco_data_mapping
                                    )
-        elif index_name == Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.gene_data_mapping
                                    )
-        elif index_name == Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.expression_data_mapping

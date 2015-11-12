@@ -99,6 +99,8 @@ class Config():
     SCORING_WEIGHTS['europepmc'] = 0.2
     SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
+    RELEASE_VERSION='1'
+
 
 
 def _get_evidence_string_generic_mapping():
@@ -302,11 +304,11 @@ class ElasticSearchConfiguration():
 
         bulk_load_chunk =1000
     else:
-        generic_shard_number = 2
-        generic_replicas_number = 0
+        generic_shard_number = 3
+        generic_replicas_number = 1
         evidence_shard_number = 3
-        evidence_replicas_number = 0
-        bulk_load_chunk =100
+        evidence_replicas_number = 1
+        bulk_load_chunk =1000
 
     eco_data_mapping = {"mappings": {
                            Config.ELASTICSEARCH_ECO_DOC_NAME : {
@@ -588,33 +590,55 @@ class ElasticSearchConfiguration():
                                        # "index.store.type": "memory",
                                        "refresh_interval" : "60s",
                                        },
-                              "mappings": {"_all" : {"enabled" : True},
-                                            "_routing":{ "required":True,
-                                                         "path":"target.id"},
-                                            "properties" : {
-                                                "target" : {
-                                                    "type" : "object",
-                                                     "properties" : {
-                                                         "id" : {
-                                                              "type" : "string",
-                                                              "index" : "not_analyzed",
+                            "mappings": {
+                                Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {
+                                        "_all" : {"enabled" : True},
+                                        "_routing":{ "required":True,
+                                                     "path":"target.id"},
+                                         "properties" : {
+                                            "target" : {
+                                                "type" : "object",
+                                                 "properties" : {
+                                                     "id" : {
+                                                          "type" : "string",
+                                                          "index" : "not_analyzed",
+                                                          "fielddata": {
+                                                             "format": "doc_values"
+                                                          },
+                                                     },
+                                                     "target_type" : {
+                                                          "type" : "string",
+                                                          "index" : "not_analyzed",
+                                                          "fielddata": {
+                                                             "format": "doc_values"
+                                                          },
+                                                     },
+                                                     "activity" : {
+                                                          "type" : "string",
+                                                          "index" : "not_analyzed",
+                                                          "fielddata": {
+                                                             "format": "doc_values"
+                                                          },
+                                                     },
 
-
-
-                                                     }
-                                                },
-                                                "disease" : {
-                                                    "type" : "object",
-                                                     "properties" : {
-                                                         "id" : {
-                                                              "type" : "string",
-                                                              "index" : "not_analyzed",
-
-                                                         }
-                                                     }
-                                                },
-
-                                                     }
-                                                }
+                                                 }
                                             },
+                                            "disease" : {
+                                                "type" : "object",
+                                                 "properties" : {
+                                                     "id" : {
+                                                          "type" : "string",
+                                                          "index" : "not_analyzed",
+                                                          "fielddata": {
+                                                             "format": "doc_values"
+                                                          },
+                                                     }
+                                                 }
+
+
+
+                                            }
+                                        },
+                                    }
+                                }
                             }

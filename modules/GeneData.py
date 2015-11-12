@@ -600,7 +600,8 @@ class GeneRetriever():
                                                        Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                                                        geneid)
         gene = Gene(geneid)
-        gene.load_json(json_data)
+        if json_data:
+            gene.load_json(json_data)
         return gene
 
     def _add_to_cache(self, geneid, gene):
