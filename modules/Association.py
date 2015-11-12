@@ -162,10 +162,10 @@ class Association(JSONSerializable):
             self.disease[ExtendedInfoEFO.root] = efo_info.data
 
     def set_available_datasource(self, ds):
-        if ds not in self.facets['datasource']:
+        if ds not in self.private['facets']['datasource']:
             self.private['facets']['datasource'].append(ds)
     def set_available_datatype(self, dt):
-        if dt not in self.facets['datatype']:
+        if dt not in self.private['facets']['datatype']:
             self.private['facets']['datatype'].append(dt)
 
 
