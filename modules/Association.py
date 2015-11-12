@@ -163,10 +163,10 @@ class Association(JSONSerializable):
 
     def set_available_datasource(self, ds):
         if ds not in self.facets['datasource']:
-            self.facets['datasource'].append(ds)
+            self.private['facets']['datasource'].append(ds)
     def set_available_datatype(self, dt):
         if dt not in self.facets['datatype']:
-            self.facets['datatype'].append(dt)
+            self.private['facets']['datatype'].append(dt)
 
 
 class EvidenceScore():
