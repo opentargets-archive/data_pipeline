@@ -26,13 +26,8 @@ class Config():
     ELASTICSEARCH_REACTOME_REACTION_DOC_NAME = 'reactome-reaction'
     ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME = 'association-data'
     ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME = 'association'
-    DEBUG = True
+    DEBUG = ENV == 'dev'
     PROFILE = False
-    PUBLIC_API_BASE_PATH = '/api/public/v'
-    PRIVATE_API_BASE_PATH = '/api/private/v'
-    API_VERSION = '0.2'
-    SQLALCHEMY_COMMIT_ON_TEARDOWN = True
-    SQLALCHEMY_RECORD_QUERIES = True
     ERROR_IDS_FILE = 'errors.txt'
     POSTGRES_DATABASE = {'drivername': 'postgres',
             'host': iniparser.get(ENV, 'host'),

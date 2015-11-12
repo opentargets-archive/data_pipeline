@@ -71,8 +71,8 @@ class Association(JSONSerializable):
             if not method_key.startswith('_'):
                 self.set_scoring_method(method,AssociationScore())
         self.evidence_count = dict(total = 0.0,
-                                   datatype = [],
-                                   datasource = [])
+                                   datatype = {},
+                                   datasource = {})
         for ds,dt in Config.DATASOURCE_TO_DATATYPE_MAPPING.items():
             self.evidence_count['datasource'][ds]=0.0
             self.evidence_count['datatype'][dt]= 0.0
@@ -449,7 +449,7 @@ class StatusQueueReporter(Process):
                    self.score_computation_finished.is_set() and
                    self.data_storage_finished.is_set()):
             # try:
-            time.sleep(30)
+            time.sleep(60*3)
             logging.info("""
 =========== QUEUES ============
 target_disease_pair_q: %s
@@ -485,9 +485,7 @@ scores submitted for storage: %s
             #     logging.info('%1.1f%% combinations computed, %s with data, %s remaining'%(c/total_jobs*100,
             #                                                                               millify(combination_with_data),
             #                                                                               millify(total_jobs)))
-            if self.target_disease_pair_loading_finished.is_set() and \
-                   self.score_computation_finished.is_set() and \
-                   self.data_storage_finished.is_set():
+            if self.data_storage_finished.is_set():
                 break
 
         logging.info("reporter worker stopped")
