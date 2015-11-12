@@ -52,13 +52,15 @@ class AssociationScore(JSONSerializable):
     def __init__(self):
 
         self.overall = 0.0
-        self.evidence_count = 0
         self.init_scores()
 
     def init_scores(self):
         self.datatypes={}
         self.datasources={}
 
+        for ds,dt in Config.DATASOURCE_TO_DATATYPE_MAPPING.items():
+            self.datasources[ds]=0.0
+            self.datatypes[dt]=0.0
 
 class Association(JSONSerializable):
 
