@@ -170,7 +170,7 @@ class Loader():
         logging.debug("loader chunk_size: %i"%chunk_size)
 
     def _get_versioned_index(self,index_name):
-        return index_name +='_'+Config.RELEASE_VERSION
+        return index_name +'_'+Config.RELEASE_VERSION
 
 
 
