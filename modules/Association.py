@@ -245,7 +245,7 @@ class Scorer():
 
             "set facet data"
             ass.set_available_datatype(e.datatype)
-            ass.set_available_datatype(e.datasource)
+            ass.set_available_datasource(e.datasource)
 
         "compute scores"
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
