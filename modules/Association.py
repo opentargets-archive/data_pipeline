@@ -626,11 +626,11 @@ class TargetDiseasePairProducer(Process):
                 chunk = result.fetchall()
                 if not chunk:
                     break
-                while True:
-                    if self.q.empty():
-                        break
-                    else:
-                        time.sleep(5)
+                # while True:
+                #     if self.q.empty():
+                #         break
+                #     else:
+                #         time.sleep(5)
                 for row in chunk:
                     yield row
                 offset += page_size
