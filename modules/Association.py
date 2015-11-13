@@ -451,7 +451,7 @@ class StatusQueueReporter(Process):
                    self.score_computation_finished.is_set() and
                    self.data_storage_finished.is_set()):
             # try:
-            time.sleep(60*3)
+            time.sleep(60*5)
             logging.info("""
 =========== QUEUES ============
 target_disease_pair_q: %s
@@ -613,21 +613,33 @@ class TargetDiseasePairProducer(Process):
         self.pairs_generated.value = self.total_jobs
         logging.debug("%s finished"%self.name)
 
-    def _get_data_stream(self,):
-        with self.adapter.engine.connect() as conn:
-            query_string = """select * from pipeline.target_to_disease_association_score_map ORDER BY target_id;"""
+    def _get_data_stream(self,page_size = 10000):
+        offset=0
 
-            result = conn.execute(query_string)
+
+
+        with self.adapter.engine.connect() as conn:
+
             while True:
-                chunk = result.fetchmany(10000)
+                query_string = """select * from pipeline.target_to_disease_association_score_map ORDER BY target_id LIMIT %i OFFSET %i;"""%(page_size, offset)
+                result = conn.execute(query_string)
+                chunk = result.fetchall()
                 if not chunk:
                     break
+                while True:
+                    if self.q.empty():
+                        break
+                    else:
+                        time.sleep(5)
                 for row in chunk:
                     yield row
+                offset += page_size
 
 
-    def init_data_cache(self, target_key=''):
-        # self.data_cache = dict(target=target_key, diseases = dict())
+    def init_data_cache(self,):
+        try:
+            del self.data_cache
+        except: pass
         self.data_cache = dict()
 
     def produce_pairs(self):
