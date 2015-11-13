@@ -169,6 +169,11 @@ class Loader():
         self.index_created=[]
         logging.debug("loader chunk_size: %i"%chunk_size)
 
+    def _get_versioned_index(self,index_name):
+        return index_name +='_'+Config.RELEASE_VERSION
+
+
+
     def put(self, index_name, doc_type, ID, body, create_index = True):
 
         if  index_name not in self.index_created:
@@ -182,7 +187,7 @@ class Loader():
                 logging.error("cannot prepare index %s for bulk indexing"%index_name)
                 pass
 
-        self.cache.append(dict(_index=index_name,
+        self.cache.append(dict(_index=self._get_versioned_index(index_name),
                                _type=doc_type,
                                _id=ID,
                                _source=body))
@@ -260,6 +265,7 @@ class Loader():
                         "number_of_replicas" : 1
                     }
         }
+        index_name = self._get_versioned_index(index_name)
 
         def update_settings(base_settings, specific_settings):
             for key in ["refresh_interval", "number_of_replicas"]:
@@ -283,7 +289,7 @@ class Loader():
                                      body =settings)
 
     def create_new_index(self, index_name):
-        index_name +='_'+Config.RELEASE_VERSION
+        index_name = self._get_versioned_index(index_name)
         try:
             self.es.indices.delete(index_name, ignore=400)
         except NotFoundError:
