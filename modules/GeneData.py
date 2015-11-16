@@ -578,15 +578,34 @@ class GeneRetriever():
     Will retrieve a Gene object form the processed json stored in postgres
     """
     def __init__(self,
-                 adapter):
+                 adapter,
+                 cache_size = 25):
         self.adapter=adapter
         self.session=adapter.session
+        self.cache = OrderedDict()
+        self.cache_size = cache_size
 
     def get_gene(self, geneid):
+        if geneid in self.cache:
+            gene = self.cache[geneid]
+        else:
+            gene = self._get_from_db(geneid)
+            self._add_to_cache(geneid, gene)
+
+        return gene
+
+    def _get_from_db(self, geneid):
         json_data = JSONObjectStorage.get_data_from_pg(self.session,
                                                        Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                                                        Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                                                        geneid)
         gene = Gene(geneid)
-        gene.load_json(json_data)
+        if json_data:
+            gene.load_json(json_data)
         return gene
+
+    def _add_to_cache(self, geneid, gene):
+        self.cache[geneid]=gene
+        while len(self.cache) >self.cache_size:
+            self.cache.popitem(last=False)
+

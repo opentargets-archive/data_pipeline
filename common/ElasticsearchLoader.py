@@ -6,6 +6,7 @@ from elasticsearch.helpers import streaming_bulk, parallel_bulk
 from sqlalchemy import and_
 from common import Actions
 from common.PGAdapter import ElasticsearchLoad
+from common.processify import processify
 from settings import ElasticSearchConfiguration, Config
 
 __author__ = 'andreap'
@@ -21,10 +22,10 @@ class JSONObjectStorage():
             rows_deleted = session.query(
                 ElasticsearchLoad).filter(
                 and_(ElasticsearchLoad.index.startswith(index_name),
-                     ElasticsearchLoad.type == doc_name)).delete(synchronize_session='fetch')
+                     ElasticsearchLoad.type == doc_name)).delete(synchronize_session=False)
         else:
             rows_deleted = session.query(
-                ElasticsearchLoad).filter(ElasticsearchLoad.index.startswith(index_name)).delete(synchronize_session='fetch')
+                ElasticsearchLoad).filter(ElasticsearchLoad.index.startswith(index_name)).delete(synchronize_session=False)
         if rows_deleted:
             logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
 
@@ -139,6 +140,20 @@ class JSONObjectStorage():
         if row:
             return row.data
 
+    @staticmethod
+    def paginated_query(q, page_size = 1000):
+        offset = 0
+        # @processify
+        def get_results():
+            return q.limit(page_size).offset(offset)
+        while True:
+            r = False
+            for elem in get_results():
+               r = True
+               yield elem
+            offset += page_size
+            if not r:
+                break
 
 class Loader():
     """
@@ -154,6 +169,11 @@ class Loader():
         self.index_created=[]
         logging.debug("loader chunk_size: %i"%chunk_size)
 
+    def _get_versioned_index(self,index_name):
+        return index_name +'_'+Config.RELEASE_VERSION
+
+
+
     def put(self, index_name, doc_type, ID, body, create_index = True):
 
         if  index_name not in self.index_created:
@@ -167,7 +187,7 @@ class Loader():
                 logging.error("cannot prepare index %s for bulk indexing"%index_name)
                 pass
 
-        self.cache.append(dict(_index=index_name,
+        self.cache.append(dict(_index=self._get_versioned_index(index_name),
                                _type=doc_type,
                                _id=ID,
                                _source=body))
@@ -245,6 +265,7 @@ class Loader():
                         "number_of_replicas" : 1
                     }
         }
+        index_name = self._get_versioned_index(index_name)
 
         def update_settings(base_settings, specific_settings):
             for key in ["refresh_interval", "number_of_replicas"]:
@@ -253,7 +274,7 @@ class Loader():
             return base_settings
         if index_name.startswith(Config.ELASTICSEARCH_DATA_INDEX_NAME):
             settings=update_settings(settings,ElasticSearchConfiguration.evidence_data_mapping)
-        elif index_name == Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME:
+        elif index_name == Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME:
             settings=update_settings(settings,ElasticSearchConfiguration.score_data_mapping)
         elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
             settings=update_settings(settings,ElasticSearchConfiguration.efo_data_mapping)
@@ -268,6 +289,7 @@ class Loader():
                                      body =settings)
 
     def create_new_index(self, index_name):
+        index_name = self._get_versioned_index(index_name)
         try:
             self.es.indices.delete(index_name, ignore=400)
         except NotFoundError:
@@ -277,27 +299,27 @@ class Loader():
                                    ignore=400,
                                    body=ElasticSearchConfiguration.evidence_data_mapping,
                                    )
-        elif index_name == Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.score_data_mapping,
                                    )
-        elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.efo_data_mapping
                                    )
-        elif index_name == Config.ELASTICSEARCH_ECO_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_ECO_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.eco_data_mapping
                                    )
-        elif index_name == Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.gene_data_mapping
                                    )
-        elif index_name == Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME:
+        elif index_name.startswith(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME):
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.expression_data_mapping

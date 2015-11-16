@@ -11,7 +11,8 @@ import sys
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
-from common.PGAdapter import LatestEvidenceString, ElasticsearchLoad, EvidenceString121
+from common.PGAdapter import LatestEvidenceString, ElasticsearchLoad, EvidenceString121, \
+    TargetToDiseaseAssociationScoreMap
 from modules import GeneData
 from modules.ECO import ECO, EcoRetriever
 from modules.EFO import EFO, get_ontology_code_from_url, EfoRetriever
@@ -158,11 +159,16 @@ class EvidenceManager():
         '''enforce eco-based score for genetic_association evidencestrings'''
         if evidence['type']=='genetic_association':
             available_score=None
+            eco_uri = None
             try:
                 available_score = evidence['evidence']['gene2variant']['resource_score']['value']
             except KeyError:
-                pass
-            eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
+                logging.debug("malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']['resource_score']['value']"%evidence['id'])
+            try:
+                eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
+            except KeyError:
+                logging.debug("malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']['functional_consequence']"%evidence['id'])
+
 
             if eco_uri in self.eco_scores:
                 if 'resource_score' not in evidence['evidence']['gene2variant']:
@@ -793,8 +799,13 @@ class EvidenceStringProcess():
     def _delete_prev_data(self):
         JSONObjectStorage.delete_prev_data_in_pg(self.session,
                                                  Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        JSONObjectStorage.delete_prev_data_in_pg(self.session,
-                                                 Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME)
+        # JSONObjectStorage.delete_prev_data_in_pg(self.session,
+        #                                          Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
+        rows_deleted = self.session.query(
+                TargetToDiseaseAssociationScoreMap).delete(synchronize_session=False)
+
+        if rows_deleted:
+            logging.info('deleted %i rows from target_to_disease_associaiton_score_map' % rows_deleted)
 
     def _store_evidence_string(self):
         for key, value in self.data.iteritems():
@@ -807,6 +818,14 @@ class EvidenceStringProcess():
                                           date_created=datetime.now(),
                                           date_modified=datetime.now(),
                                           ))
+            for efo in value.evidence['_private']['efo_codes']:
+                self.session.add(TargetToDiseaseAssociationScoreMap(
+                                                  target_id=value.evidence['target']['id'],
+                                                  disease_id=efo,
+                                                  evidence_id=value.evidence['id'],
+                                                  is_direct=efo==value.evidence['disease']['id'],
+                                                  association_score=value.evidence['scores']['association_score'],
+                                                  datasource=value.evidence['sourceID'],))
             # self.session.add(ElasticsearchLoad(id=key,
             #                               index=Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
             #                               type=value.get_doc_name(),

@@ -213,6 +213,7 @@ class ElasticsearchLoad(Base):
     date_modified = Column(TIMESTAMP)
     active = Column(BOOLEAN)
     successfully_loaded = Column(BOOLEAN)
+
 class TargetToDiseaseAssociationScoreMap(Base):
     __tablename__ = 'target_to_disease_association_score_map'
     __table_args__ = {'schema':'pipeline'}
@@ -222,6 +223,13 @@ class TargetToDiseaseAssociationScoreMap(Base):
     is_direct = Column(BOOLEAN)
     association_score = Column(FLOAT)
     datasource = Column(Text)
+
+class TargetToDiseaseAssociationScoreMapAnalysed(Base):
+    __tablename__ = 'target_to_disease_association_score_map_analysed'
+    __table_args__ = {'schema':'pipeline'}
+    target_id = Column(Text, primary_key=True)
+    disease_id = Column(Text, primary_key=True)
+    association_score = Column(FLOAT)
 
 
 class EvidenceValidation(Base):

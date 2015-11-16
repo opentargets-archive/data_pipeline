@@ -50,7 +50,8 @@ class EFO(JSONSerializable):
         self.children=[]
 
     def get_id(self):
-        return get_ontology_code_from_url(self.path_codes[0][-1])
+        return self.code
+        # return get_ontology_code_from_url(self.path_codes[0][-1])
 
     def creat_suggestions(self):
 
@@ -174,20 +175,39 @@ class EfoUploader():
         self.loader.optimize_all()
 
 
+
 class EfoRetriever():
     """
     Will retrieve a EFO object form the processed json stored in postgres
     """
     def __init__(self,
-                 adapter):
+                 adapter,
+                 cache_size = 25):
         self.adapter=adapter
         self.session=adapter.session
+        self.cache = OrderedDict()
+        self.cache_size = cache_size
 
     def get_efo(self, efoid):
+        if efoid in self.cache:
+            efo = self.cache[efoid]
+        else:
+            efo = self._get_from_db(efoid)
+            self._add_to_cache(efoid, efo)
+
+        return efo
+
+    def _get_from_db(self, efoid):
         json_data = JSONObjectStorage.get_data_from_pg(self.session,
                                                        Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                                                        Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                                                        efoid)
         efo = EFO(efoid)
-        efo.load_json(json_data)
+        if json_data:
+            efo.load_json(json_data)
         return efo
+
+    def _add_to_cache(self, efoid, efo):
+        self.cache[efoid]=efo
+        while len(self.cache) >self.cache_size:
+            self.cache.popitem(last=False)
