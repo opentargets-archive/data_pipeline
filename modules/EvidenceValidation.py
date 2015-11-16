@@ -232,10 +232,10 @@ class EvidenceValidationFileChecker():
                     for uniprot_id in doc["uniprot_ids"]:
                         if uniprot_id in uniprot_current and ensembl_gene_id is not None and ensembl_gene_id in ensembl_current:
                             #print uniprot_id, " ", ensembl_gene_id, "\n"
-                            if uniprot_current[uniprot_id] is None:
-                                uniprot_current[uniprot_id] = [ensembl_gene_id];
+                            if "gene_ids" not in uniprot_current[uniprot_id]:
+                                uniprot_current[uniprot_id]["gene_ids"] = [ensembl_gene_id];
                             else:
-                                uniprot_current[uniprot_id].append(ensembl_gene_id);
+                                uniprot_current[uniprot_id]["gene_ids"].append(ensembl_gene_id);
 
                         if uniprot_id not in symbols[gene_symbol]["uniprot_ids"]:
                             symbols[gene_symbol]["uniprot_ids"].append(uniprot_id)               
@@ -248,7 +248,7 @@ class EvidenceValidationFileChecker():
         for row in self.session.query(UniprotInfo).yield_per(1000):
             # get the symbol too
             uniprot_accession = row.uniprot_accession
-            uniprot_current[uniprot_accession] = None;
+            uniprot_current[uniprot_accession] = {};
             root = ElementTree.fromstring(row.uniprot_entry)
             protein_name = None
             for name in root.findall("./ns0:name", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
@@ -275,6 +275,8 @@ class EvidenceValidationFileChecker():
                     gene_symbol = 'HMP19';
                     logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
                     
+                uniprot_current[uniprot_accession]["gene_symbol"] = gene_symbol;
+                
                 if gene_symbol not in symbols:
                     symbols[gene_symbol] = {};
                 if "uniprot_ids" not in symbols[gene_symbol]:
@@ -287,18 +289,18 @@ class EvidenceValidationFileChecker():
                 ensembl_gene_id = crossref.get("value")
                 if ensembl_gene_id in ensembl_current:
                     #print uniprot_accession, " ", ensembl_gene_id, "\n"
-                    if uniprot_current[uniprot_accession] is None:
-                        uniprot_current[uniprot_accession] = [ensembl_gene_id];
+                    if "gene_ids" not in uniprot_current[uniprot_accession]:
+                        uniprot_current[uniprot_accession]["gene_ids"] = [ensembl_gene_id];
                     else:
-                        uniprot_current[uniprot_accession].append(ensembl_gene_id)
+                        uniprot_current[uniprot_accession]["gene_ids"].append(ensembl_gene_id)
                         
             # create a mapping from the symbol instead to link to Ensembl
-            if uniprot_current[uniprot_accession] is None:
+            if "gene_ids" not in uniprot_current[uniprot_accession]:
                 if gene_symbol and gene_symbol in symbols:
                     if "ensembl_primary_id" in symbols[gene_symbol]:
-                        uniprot_current[uniprot_accession] = [symbols[gene_symbol]["ensembl_primary_id"]];
+                        uniprot_current[uniprot_accession]["gene_ids"] = [symbols[gene_symbol]["ensembl_primary_id"]];
                     elif "ensembl_secondary_id" in symbols[gene_symbol]:
-                        uniprot_current[uniprot_accession] = [symbols[gene_symbol]["ensembl_secondary_id"]];
+                        uniprot_current[uniprot_accession]["gene_ids"] = [symbols[gene_symbol]["ensembl_secondary_id"]];
 
             #seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
@@ -608,6 +610,7 @@ class EvidenceValidationFileChecker():
                                                 invalid_uniprot_ids[uniprot_id] += 1
                                             nb_uniprot_invalid +=1
                                         elif uniprot_current[uniprot_id] is None:
+                                            # check symbol mapping (get symbol first)
                                             gene_mapping_failed = True
                                             logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
                                             if not uniprot_id in missing_uniprot_id_xrefs:
