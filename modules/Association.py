@@ -154,13 +154,9 @@ class Association(JSONSerializable):
 
     def set_disease_data(self, efo):
         """get generic efo info"""
-        all_efo_codes=[]
         efo_info=ExtendedInfoEFO(efo)
 
         if efo_info:
-            for e in efo_info.data:
-                for node in e['path']:
-                    all_efo_codes.extend(node)
             self.disease[ExtendedInfoEFO.root] = efo_info.data
 
     def set_available_datasource(self, ds):
