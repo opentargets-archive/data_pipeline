@@ -613,15 +613,22 @@ class TargetDiseasePairProducer(Process):
         self.pairs_generated.value = self.total_jobs
         logging.debug("%s finished"%self.name)
 
-    def _get_data_stream(self,page_size = 10000):
+    def _get_data_stream(self,page_size = 50000):
         offset=0
 
 
 
         with self.adapter.engine.connect() as conn:
 
-            while True:
-                query_string = """select * from pipeline.target_to_disease_association_score_map ORDER BY target_id LIMIT %i OFFSET %i;"""%(page_size, offset)
+            target_query_string ="""SELECT DISTINCT target_id FROM pipeline.target_to_disease_association_score_map;"""
+            result = conn.execute(target_query_string)
+            target_ids = list(set([i[0] for i in result.fetchall()]))
+            print "target_ids:",len(target_ids)
+
+            for target_id in target_ids:
+                query_string = """SELECT * FROM pipeline.target_to_disease_association_score_map WHERE target_id = '%s';"""%(target_id)
+
+
                 result = conn.execute(query_string)
                 chunk = result.fetchall()
                 if not chunk:
@@ -633,7 +640,25 @@ class TargetDiseasePairProducer(Process):
                 #         time.sleep(5)
                 for row in chunk:
                     yield row
-                offset += page_size
+
+            # while True:
+            #     # query_string = """select * from pipeline.target_to_disease_association_score_map ORDER BY target_id LIMIT %i OFFSET %i;"""%(page_size, offset)
+            #     query_string = """select *  OVER (PARTITION BY target_id)from pipeline.target_to_disease_association_score_map;"""
+            #
+            #     logging.info("sending query: "+query_string)
+            #     result = conn.execute(query_string)
+            #     chunk = result.fetchall()
+            #     print len(chunk)
+            #     if not chunk:
+            #         break
+            #     # while True:
+            #     #     if self.q.empty():
+            #     #         break
+            #     #     else:
+            #     #         time.sleep(5)
+            #     for row in chunk:
+            #         yield row
+            #     offset += page_size
 
 
     def init_data_cache(self,):
