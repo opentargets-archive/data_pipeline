@@ -6,6 +6,7 @@ import re
 import gzip
 import smtplib
 import time
+from collections import defaultdict
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email import MIMEBase
@@ -55,34 +56,86 @@ messageFailed='''
 
 '''
 
-cttv_data_providers_e_mails = {
-# "cttv001" : [ 'gautierk@targetvalidation.org', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ],
- "cttv001" : [ 'gautierk@targetvalidation.org', 'samiulh@targetvalidation.org' ],
- "cttv006" : [ 'fabregat@ebi.ac.uk' ],
- "cttv007" : [ 'kl1@sanger.ac.uk' ],
- "cttv008" : [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ],
- "cttv009" : [ 'cleroy@ebi.ac.uk' ],
- "cttv010" : [ 'mkeays@ebi.ac.uk' ],
- "cttv011" : [ 'eddturner@ebi.ac.uk' ],
- "cttv012" : [ 'fjlopez@ebi.ac.uk', 'garys@ebi.ac.uk' ],
- "cttv025" : [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ] 
-}
-
 efo_current = {}
 efo_obsolete = {}
 ensembl_current = {}
 uniprot_current = {}
 eco_current = {}
+symbols = {}
 
 class EvidenceValidationActions(Actions):
     CHECKFILES='checkfiles'
     VALIDATE='validate'
 
+class EvidenceStringStorage():
+
+    @staticmethod
+    def delete_prev_data_in_pg(session, data_source_name):
+        rows_deleted = session.query(
+            EvidenceString10).filter(
+                EvidenceString10.data_source_name == data_source_name).delete(synchronize_session=False)
+        if rows_deleted:
+            logging.info('deleted %i rows from evidence_string' % rows_deleted)
+
+    @staticmethod
+    def store_to_pg(session,
+                    data_source_name,
+                    data,
+                    delete_prev=True,
+                    autocommit=True,
+                    quiet = False):
+        if delete_prev:
+            EvidenceStringStorage.delete_prev_data_in_pg(session, data_source_name)
+        c = 0
+        for key, value in data.iteritems():
+            c += 1
+
+            session.add(value)
+            if c % 1000 == 0:
+                logging.debug("%i rows of %s inserted to evidence_string" %(c, data_source_name))
+                session.flush()
+        session.flush()
+        if autocommit:
+            session.commit()
+        if not quiet:
+            logging.info('inserted %i rows of %s inserted in evidence_string' %(c, data_source_name))
+        return c
+
+    @staticmethod
+    def store_to_pg_core(adapter,
+                    data_source_name,
+                    data,
+                    delete_prev=True,
+                    autocommit=True,
+                    quiet = False):
+        if delete_prev:
+            EvidenceStringStorage.delete_prev_data_in_pg(adapter.session, data_source_name)
+        rows_to_insert =[]
+        for key, value in data.iteritems():
+            rows_to_insert.append(dict(uniq_assoc_fields_hashdig = key,
+                                        json_doc_hashdig = value.json_doc_hashdig,
+                                        evidence_string = value.evidence_string,
+                                        data_source_name = value.data_source_name,
+                                        json_schema_version = value.json_schema_version,
+                                        json_doc_version = value.json_doc_version,
+                                        release_date = value.release_date
+                                      ))
+        adapter.engine.execute(EvidenceString10.__table__.insert(),rows_to_insert)
+
+        # if autocommit:
+        #     adapter.session.commit()
+        if not quiet:
+            logging.info('inserted %i rows of %s inserted in evidence_string' %(len(rows_to_insert), data_source_name))
+        return len(rows_to_insert)
+
 class EvidenceValidationFileChecker():
 
-    def __init__(self, adapter):
+    def __init__(self, adapter, chunk_size=1e4):
         self.adapter = adapter
         self.session = adapter.session
+        self.chunk_size = chunk_size
+        self.cache = {}
+        self.counter = 0        
         #formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         #self.buffer = StringIO()
         #streamhandler = logging.StreamHandler(self.buffer)
@@ -97,6 +150,49 @@ class EvidenceValidationFileChecker():
         #LOGGER = logging.getLogger('cttv.model.evidence.association_score')
         #LOGGER.setLevel(logging.ERROR)
         #LOGGER.addHandler(memoryhandler)
+
+    def storage_reset(self):
+        self.cache = {}
+        self.counter = 0
+    
+    def storage_add(self, id, evidence_string, data_source_name):
+
+        self.cache[id] = evidence_string
+        self.counter +=1
+        if (len(self.cache) % self.chunk_size) == 0:
+            self.storage_flush(data_source_name)
+
+    def storage_delete(self, data_source_name):
+        EvidenceStringStorage.delete_prev_data_in_pg(self.adapter.session, data_source_name)
+        self.session.commit()
+        self.cache = {}
+        self.counter = 0
+        
+    def storage_flush(self, data_source_name):
+
+        if self.cache:
+            EvidenceStringStorage.store_to_pg_core(self.adapter,
+                                              data_source_name,
+                                              self.cache,
+                                              delete_prev=False,
+                                              quiet=True
+                                             )
+            self.counter+=len(self.cache)
+            # if (self.counter % global_reporting_step) == 0:
+            #     logging.info("%s precalculated scores inserted in elasticsearch_load table" %(millify(self.counter)))
+
+            self.session.flush()
+            self.cache = {}
+
+    def storage_commit(self):
+        self.session.flush()
+        self.session.commit()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.storage_commit()
 
     def startCapture(self, newLogLevel = None):
         """ Start capturing log output to a string buffer.
@@ -147,7 +243,7 @@ class EvidenceValidationFileChecker():
     
     def send_email(self, bSend, provider_id, filename, bValidated, nb_records, errors, when, extra_text, logfile):
         me = "support@targetvalidation.org"
-        you = ",".join(cttv_data_providers_e_mails[provider_id])
+        you = ",".join(Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id])
         status = "passed"
         if not bValidated:
             status = "failed"
@@ -157,10 +253,10 @@ class EvidenceValidationFileChecker():
         msg['Subject'] = "CTTV: Validation of submitted file {0} {1}".format(filename, status)
         msg['From'] = me
         msg['To'] = you
-        rcpt = cttv_data_providers_e_mails[provider_id]
+        rcpt = Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id]
         if provider_id != 'cttv001':
-            rcpt.extend(cttv_data_providers_e_mails['cttv001'])
-            msg['Cc'] = ",".join(cttv_data_providers_e_mails['cttv001'])
+            rcpt.extend(Config.EVIDENCEVALIDATION_PROVIDER_EMAILS['cttv001'])
+            msg['Cc'] = ",".join(Config.EVIDENCEVALIDATION_PROVIDER_EMAILS['cttv001'])
 
         text = "This is an automated message generated by the CTTV Core Platform Pipeline on {0}\n".format(when)
 
@@ -207,43 +303,100 @@ class EvidenceValidationFileChecker():
             mail.sendmail(me, rcpt, msg.as_string())
             mail.quit()
         return 0;
-    
+        
     def load_HGNC(self):
         logging.info("Loading HGNC entries and mapping from Ensembl Gene Id to UniProt")
         c = 0
         for row in self.session.query(HgncInfoLookup).order_by(desc(HgncInfoLookup.last_updated)).limit(1):
             #data = json.loads(row.data);
             for doc in row.data["response"]["docs"]:
-                if "ensembl_gene_id" in doc and "uniprot_ids" in doc:
+                gene_symbol = None;
+                ensembl_gene_id = None;
+                if "symbol" in doc:
+                    gene_symbol = doc["symbol"];
+                    if gene_symbol not in symbols:
+                        logging.info("Adding missing symbol from Ensembl %s" % gene_symbol)
+                        symbols[gene_symbol] = {};
+                        
+                if "ensembl_gene_id" in doc: 
                     ensembl_gene_id = doc["ensembl_gene_id"];
+                        
+                if "uniprot_ids" in doc:
+                    if "uniprot_ids" not in symbols[gene_symbol]:
+                        symbols[gene_symbol]["uniprot_ids"] = [];
                     for uniprot_id in doc["uniprot_ids"]:
-                        if uniprot_id in uniprot_current and ensembl_gene_id in ensembl_current:
+                        if uniprot_id in uniprot_current and ensembl_gene_id is not None and ensembl_gene_id in ensembl_current:
                             #print uniprot_id, " ", ensembl_gene_id, "\n"
-                            if uniprot_current[uniprot_id] is None:
-                                uniprot_current[uniprot_id] = [ensembl_gene_id];
+                            if "gene_ids" not in uniprot_current[uniprot_id]:
+                                uniprot_current[uniprot_id]["gene_ids"] = [ensembl_gene_id];
                             else:
-                                uniprot_current[uniprot_id].append(ensembl_gene_id);
-           
+                                uniprot_current[uniprot_id]["gene_ids"].append(ensembl_gene_id);
+
+                        if uniprot_id not in symbols[gene_symbol]["uniprot_ids"]:
+                            symbols[gene_symbol]["uniprot_ids"].append(uniprot_id)               
+                
         logging.info("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
         
     def load_Uniprot(self):
-        logging.info("Loading Uniprot identifiers and mappings to Ensembl Gene Id")
+        logging.info("Loading Uniprot identifiers and mappings to Gene Symbol and Ensembl Gene Id")
         c = 0
         for row in self.session.query(UniprotInfo).yield_per(1000):
-            #
+            # get the symbol too
             uniprot_accession = row.uniprot_accession
-            uniprot_current[uniprot_accession] = None;
+            uniprot_current[uniprot_accession] = {};
             root = ElementTree.fromstring(row.uniprot_entry)
+            protein_name = None
+            for name in root.findall("./ns0:name", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
+                protein_name = name.text
+                break;
+            gene_symbol = None
+            for gene_name_el in root.findall(".//ns0:gene/ns0:name[@type='primary']", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
+                gene_symbol = gene_name_el.text
+                break;
+                
+            if gene_symbol is not None:
+                # some protein have to be remapped to another symbol
+                # PLSCR3 => TMEM256-PLSCR3
+                # LPPR4 => PLPPR4
+                # Q9Y328 => NSG2 => Nsg2 => HMP19 (in Human)
+                # 
+                if gene_symbol == 'PLSCR3':
+                    gene_symbol = 'TMEM256-PLSCR3';
+                    logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
+                elif gene_symbol == 'LPPR4':
+                    gene_symbol = 'PLPPR4';
+                    logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
+                elif gene_symbol == 'NSG2':
+                    gene_symbol = 'HMP19';
+                    logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
+                    
+                uniprot_current[uniprot_accession]["gene_symbol"] = gene_symbol;
+                
+                if gene_symbol not in symbols:
+                    symbols[gene_symbol] = {};
+                if "uniprot_ids" not in symbols[gene_symbol]:
+                    symbols[gene_symbol]["uniprot_ids"] = [ uniprot_accession ]
+                elif uniprot_accession not in symbols[gene_symbol]["uniprot_ids"]:
+                    symbols[gene_symbol]["uniprot_ids"].append(uniprot_accession)
+                
             gene_id = None
-            for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
+            for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):
                 ensembl_gene_id = crossref.get("value")
                 if ensembl_gene_id in ensembl_current:
                     #print uniprot_accession, " ", ensembl_gene_id, "\n"
-                    if uniprot_current[uniprot_accession] is None:
-                        uniprot_current[uniprot_accession] = [ensembl_gene_id];
+                    if "gene_ids" not in uniprot_current[uniprot_accession]:
+                        uniprot_current[uniprot_accession]["gene_ids"] = [ensembl_gene_id];
                     else:
-                        uniprot_current[uniprot_accession].append(ensembl_gene_id)
-                    
+                        uniprot_current[uniprot_accession]["gene_ids"].append(ensembl_gene_id)
+                        
+            # create a mapping from the symbol instead to link to Ensembl
+            if "gene_ids" not in uniprot_current[uniprot_accession]:
+                if gene_symbol and gene_symbol in symbols:
+                    if "ensembl_primary_id" in symbols[gene_symbol]:
+                        uniprot_current[uniprot_accession]["gene_ids"] = [symbols[gene_symbol]["ensembl_primary_id"]];
+                    elif "ensembl_secondary_id" in symbols[gene_symbol]:
+                        uniprot_current[uniprot_accession]["gene_ids"] = [symbols[gene_symbol]["ensembl_secondary_id"]];
+
             #seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
             if c % 5000 == 0:
@@ -257,7 +410,15 @@ class EvidenceValidationFileChecker():
         for row in self.session.query(EnsemblGeneInfo).all(): #filter_by(assembly_name = Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY).all():
             #print "%s %s"%(row.ensembl_gene_id, row.external_name)
             ensembl_current[row.ensembl_gene_id] = row
-            
+            # put the ensembl_id in symbols too
+            if row.external_name not in symbols:
+                symbols[row.external_name] = {}
+            if row.is_reference:
+                symbols[row.external_name]["ensembl_primary_id"] = row.ensembl_gene_id
+            else:
+                if "ensembl_secondary_id" not in symbols[row.external_name] or row.ensembl_gene_id < symbols[row.external_name]["ensembl_secondary_id"]:
+                    symbols[row.external_name]["ensembl_secondary_id"] = row.ensembl_gene_id;
+                
     def load_eco(self):
 
         logging.info("Loading ECO current valid terms")
@@ -309,7 +470,7 @@ class EvidenceValidationFileChecker():
         self.load_Ensembl(); 
         self.load_Uniprot();
         self.load_HGNC();
-
+        #return;
         self.load_efo();
         self.load_eco();
         
@@ -317,17 +478,26 @@ class EvidenceValidationFileChecker():
             dirnames.sort()
             for subdirname in dirnames:
                 cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv011)$", subdirname)
+                #cttv_match = re.match("^(cttv009)$", subdirname)
                 if cttv_match:
+                    # get provider id
                     provider_id = cttv_match.groups()[0]
+                    
                     cttv_dir = os.path.join(dirname, subdirname)
                     logging.info(cttv_dir)
-                    for cttv_dirname, cttv_dirs, filenames in os.walk(os.path.join(cttv_dir, "upload/submissions")):
+                    path = os.path.join(cttv_dir, "upload/submissions")
+                    for cttv_dirname, cttv_dirs, filenames in os.walk(path):
+                        # sort by the last modified time of the files
+                        filenames.sort(key=lambda x: os.stat(os.path.join(path, x)).st_mtime)
                         for filename in filenames:
                             logging.info(filename);
-                            if filename.endswith(('.json.gz')): # and filename == 'cttv025-03-11-2015.json.gz':
+                            cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
+                            # cttv_filename_match = re.match("cttv025-03-11-2015.json.gz", filename);
+                            if cttv_filename_match:
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 logging.info(cttv_file);
+                                data_source_name = Config.JSON_FILE_TO_DATASOURCE_MAPPING[cttv_filename_match.groups()[0]]
+                                logging.info(data_source_name);
                                 last_modified = os.path.getmtime(cttv_file)
                                 #july = time.strptime("01 Jul 2015", "%d %b %Y")
                                 #julyseconds = time.mktime(july)
@@ -338,11 +508,11 @@ class EvidenceValidationFileChecker():
                                     logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
                                     logging.info(cttv_file)
                                     md5_hash = self.check_gzipfile(cttv_file)
-                                    self.validate_gzipfile(cttv_file, filename, provider_id, md5_hash, logfile = logfile)
+                                    self.validate_gzipfile(cttv_file, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
 
         self.session.commit()
         
-    def validate_gzipfile(self, file_on_disk, filename, provider_id, md5_hash, logfile = None):
+    def validate_gzipfile(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = None):
         '''
         check if the file was already processed
         '''
@@ -380,7 +550,12 @@ class EvidenceValidationFileChecker():
         invalid_uniprot_id_mappings = {}
         
         if bValidate == True:
+
+            logging.info('Delete previous data for %s'% (data_source_name))
+            self.storage_delete(data_source_name);
+            
             logging.info('Starting validation of %s'% (file_on_disk))
+            
             fh = gzip.GzipFile(file_on_disk, "r")
             #lfh = gzip.open(logfile, 'wb', compresslevel=5)
             lfh = open(logfile, 'wb')
@@ -407,7 +582,7 @@ class EvidenceValidationFileChecker():
                 disease_failed = False
                 gene_failed = False
                 gene_mapping_failed = False
-                
+                uniq_elements_flat_hexdig = None
                 
                 if ('label' in python_raw  or 'type' in python_raw) and 'validated_against_schema_version' in python_raw and python_raw['validated_against_schema_version'] == "1.2.1":
                     if 'label' in python_raw:
@@ -470,10 +645,12 @@ class EvidenceValidationFileChecker():
                                             
                             if not bGivingUp:  
                                 self.startCapture(logging.WARNING)
-                                
+                            
+                            # flatten 
                             uniq_elements = obj.unique_association_fields
                             uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
                             uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
+                            
                             if not uniq_elements_flat_hexdig in hexdigest_map:
                                 hexdigest_map[uniq_elements_flat_hexdig] = [ lc+1 ]
                             else:
@@ -543,7 +720,8 @@ class EvidenceValidationFileChecker():
                                             else:
                                                 invalid_uniprot_ids[uniprot_id] += 1
                                             nb_uniprot_invalid +=1
-                                        elif uniprot_current[uniprot_id] is None:
+                                        elif "gene_ids" not in uniprot_current[uniprot_id]:
+                                            # check symbol mapping (get symbol first)
                                             gene_mapping_failed = True
                                             logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
                                             if not uniprot_id in missing_uniprot_id_xrefs:
@@ -552,7 +730,7 @@ class EvidenceValidationFileChecker():
                                                 missing_uniprot_id_xrefs[uniprot_id] += 1
                                             nb_missing_uniprot_id_xrefs +=1
                                             #This identifier is not in the current EnsEMBL database
-                                        elif not reduce( (lambda x, y: x or y), map(lambda x: ensembl_current[x].is_reference, uniprot_current[uniprot_id]) ):
+                                        elif not reduce( (lambda x, y: x or y), map(lambda x: ensembl_current[x].is_reference, uniprot_current[uniprot_id]["gene_ids"]) ):
                                             gene_mapping_failed = True
                                             logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not uniprot_id in invalid_uniprot_id_mappings:
@@ -606,6 +784,18 @@ class EvidenceValidationFileChecker():
                         bGivingUp = True
                 if not validation_failed and validation_result == 0 and not disease_failed and not gene_failed:
                     nb_valid +=1;
+                    # flatten data structure
+                    json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest();
+                    self.storage_add(uniq_elements_flat_hexdig, 
+                                    EvidenceString10(uniq_assoc_fields_hashdig = uniq_elements_flat_hexdig,
+                                                    json_doc_hashdig = json_doc_hashdig,
+                                                    evidence_string = python_raw,
+                                                    data_source_name = data_source_name,
+                                                    json_schema_version = "1.2.1", 
+                                                    json_doc_version = 1,
+                                                    release_date = datetime.utcnow()), 
+                                    data_source_name);
+                    
                 lc += 1
                 cc += len(line)
             logging.info('nb line parsed %i (size %i)'% (lc, cc))
@@ -634,7 +824,7 @@ class EvidenceValidationFileChecker():
                         id_text = self.get_reference_gene_from_Ensembl(ensembl_id);
                     elif uniprotMatch:
                         uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                        id_text = self.get_reference_gene_from_list(uniprot_current[uniprot_id]);
+                        id_text = self.get_reference_gene_from_list(uniprot_current[uniprot_id]["gene_ids"]);
                     text +="\t-{0}:\t{1} ({2:.1f}%) {3}\n".format(top_targets[n], targets[top_targets[n]], targets[top_targets[n]]*100/lc, id_text)
                 text +="\n"
 
@@ -714,9 +904,9 @@ class EvidenceValidationFileChecker():
                 text +="\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifiers.\n"
                 for uniprot_id in invalid_uniprot_id_mappings:
                     if invalid_uniprot_id_mappings[uniprot_id] == 1:
-                        text += "\t%s\t(reported once) maps to %s\n"%(uniprot_id, self.get_reference_gene_from_list(uniprot_current[uniprot_id]))
+                        text += "\t%s\t(reported once) maps to %s\n"%(uniprot_id, self.get_reference_gene_from_list(uniprot_current[uniprot_id]["gene_ids"]))
                     else:
-                        text += "\t%s\t(reported %i times) maps to %s\n"%(uniprot_id, invalid_uniprot_id_mappings[uniprot_id], self.get_reference_gene_from_list(uniprot_current[uniprot_id]))
+                        text += "\t%s\t(reported %i times) maps to %s\n"%(uniprot_id, invalid_uniprot_id_mappings[uniprot_id], self.get_reference_gene_from_list(uniprot_current[uniprot_id]["gene_ids"]))
                 text +="\n"
                 
             now = datetime.utcnow()
@@ -752,7 +942,11 @@ class EvidenceValidationFileChecker():
                 rowToUpdate.date_validated = now
                 rowToUpdate.successfully_validated = successfully_validated
                 self.session.add(rowToUpdate)
-    
+
+            # write
+            self.storage_flush(data_source_name);
+            self.storage_commit();
+            
             self.send_email(
                 Config.EVIDENCEVALIDATION_SEND_EMAIL, 
                 provider_id, 

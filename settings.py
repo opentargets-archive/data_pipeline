@@ -44,13 +44,42 @@ class Config():
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
     REACTOME_PATHWAY_RELATION = 'http://www.reactome.org/download/current/ReactomePathwaysRelation.txt'
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
+    # path to the FTP files on the processing machine
     EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp'
+    EVIDENCEVALIDATION_FILENAME_REGEX = '^(cttv[0-9]{3}|cttv_external_mousemodels)\-\d{2}\-\d{2}\-\d{4}\.json\.gz$'
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
     EVIDENCEVALIDATION_PERCENT_SCALE = 20
+    # Current genome Assembly
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
-    EVIDENCEVALIDATION_SEND_EMAIL = True
+    # Change this if you don't want to send e-mails
+    EVIDENCEVALIDATION_SEND_EMAIL = False
+    # Change this if you want to change the list of recipients
+    EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'kl1@sanger.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'cleroy@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'mkeays@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'fjlopez@ebi.ac.uk', 'garys@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ] 
+    # This is a mapping from the file prefix to the data source name in the system
+    JSON_FILE_TO_DATASOURCE_MAPPING = defaultdict(lambda: "other")
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv005'] = 'CTTV005_Rare2Common'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv006'] = 'CTTV006_Networks_Reactome'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv007'] = 'CTTV007_Cancer_Gene_Census'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv008'] = 'CTTV008_ChEMBL'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv009'] = 'CTTV009_GWAS_Catalog'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv010'] = 'CTTV010_Tissue_Specificity'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv011'] = 'CTTV011_UniProt'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv012'] = 'CTTV012_Variation'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv018'] = 'CTTV018_IBD_GWAS'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv025'] = 'CTTV025_Literature'
+    JSON_FILE_TO_DATASOURCE_MAPPING['cttv_external_mousemodels'] = 'CTTV_External_MouseModels'
+ 
     DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
     DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
                                                         #phenodigm=dict(min=0.4, max= 1),
