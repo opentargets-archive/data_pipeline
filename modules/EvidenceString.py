@@ -87,7 +87,7 @@ class ExtendedInfoEFO(ExtendedInfo):
         therapeutic_area_codes = set()
         therapeutic_area_labels = set()
         for path in efo.path:
-            if len(path) >1:
+            if len(path) >2:
                 therapeutic_area_codes.add(get_ontology_code_from_url(path[1]['uri']))
                 therapeutic_area_labels.add(get_ontology_code_from_url(path[1]['label']))
         self.data = dict( efo_id = efo.get_id(),
