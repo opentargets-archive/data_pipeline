@@ -84,9 +84,17 @@ class ExtendedInfoEFO(ExtendedInfo):
             raise AttributeError("you need to pass a EFO not a: " + type(efo))
 
     def extract_info(self, efo):
+        therapeutic_area_codes = set()
+        therapeutic_area_labels = set()
+        for path in efo.path:
+            if len(path) >1:
+                therapeutic_area_codes.add(get_ontology_code_from_url(path[1]['uri']))
+                therapeutic_area_labels.add(get_ontology_code_from_url(path[1]['label']))
         self.data = dict( efo_id = efo.get_id(),
                           label=efo.label,
-                          path=efo.path_codes),
+                          path=efo.path_codes,
+                          therapeutic_area= dict(codes = list(therapeutic_area_codes),
+                                                 labels = list(therapeutic_area_labels)))
 
 class ExtendedInfoECO(ExtendedInfo):
     root = "evidence_codes_info"
