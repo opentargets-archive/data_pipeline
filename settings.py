@@ -619,7 +619,7 @@ class ElasticSearchConfiguration():
                                         "_all" : {"enabled" : True},
                                         "_routing":{ "required":True,
                                                      "path":"target.id"},
-                                         "properties" : {
+                                        "properties" : {
                                             "target" : {
                                                 "type" : "object",
                                                  "properties" : {
@@ -661,7 +661,50 @@ class ElasticSearchConfiguration():
 
 
 
-                                            }
+                                            },
+                                            "private" : {
+                                                "type" : "object",
+                                                 "properties" : {
+                                                     "efo_codes" : {
+                                                          "type" : "string",
+                                                          "index" : "not_analyzed",
+                                                          "fielddata": {
+                                                             "format": "doc_values"
+                                                          },
+                                                     },
+                                                     "facets" : {
+                                                        "type" : "object",
+                                                        "properties" : {
+                                                            "uniprot_keywords": {
+                                                                "type" : "string",
+                                                                "index" : "not_analyzed",
+                                                                  "fielddata": {
+                                                                     "format": "doc_values"
+                                                                  },
+                                                            },
+                                                            "reactome": {
+                                                                 "type" : "object",
+                                                                      "properties" : {
+                                                                           "pathway_type_code": {
+                                                                                "type" : "string",
+                                                                                "index" : "not_analyzed",
+                                                                                    "fielddata": {
+                                                                                        "format": "doc_values"
+                                                                                    },
+                                                                           },
+                                                                           "pathway_code": {
+                                                                                "type" : "string",
+                                                                                "index" : "not_analyzed",
+                                                                                    "fielddata": {
+                                                                                        "format": "doc_values"
+                                                                                    },
+                                                                           },
+                                                                      }
+                                                            }
+                                                        }
+                                                     }
+                                                 }
+                                            },
                                         },
                                     }
                                 }
