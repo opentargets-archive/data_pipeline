@@ -434,6 +434,7 @@ class EvidenceValidationFileChecker():
         mp_pattern = "http://purl.obolibrary.org/obo/MP_%"
         do_pattern = "http://purl.obolibrary.org/obo/DOID_%"
         go_pattern = "http://purl.obolibrary.org/obo/GO_%" 
+        omim_pattern = "http://purl.bioontology.org/omim/OMIM_%"
         
         for row in self.session.query(EFONames).filter(
                 or_(
