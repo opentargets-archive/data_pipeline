@@ -443,7 +443,8 @@ class EvidenceValidationFileChecker():
                     EFONames.uri.like(orphanet_pattern), 
                     EFONames.uri.like(hpo_pattern), 
                     EFONames.uri.like(do_pattern), 
-                    EFONames.uri.like(go_pattern)
+                    EFONames.uri.like(go_pattern),
+                    EFONames.uri.like(omim_pattern)
                     )
                 ):
             #logging.info(row.uri)
