@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email import MIMEBase
+from email.mime.base import MIMEBase
 from email import Encoders
 import logging
 from StringIO import StringIO
