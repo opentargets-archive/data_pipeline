@@ -9,7 +9,7 @@ import time
 from collections import defaultdict
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email import MIMEBase
+from email.mime.base import MIMEBase
 from email import Encoders
 import logging
 from StringIO import StringIO
@@ -434,6 +434,7 @@ class EvidenceValidationFileChecker():
         mp_pattern = "http://purl.obolibrary.org/obo/MP_%"
         do_pattern = "http://purl.obolibrary.org/obo/DOID_%"
         go_pattern = "http://purl.obolibrary.org/obo/GO_%" 
+        omim_pattern = "http://purl.bioontology.org/omim/OMIM_%"
         
         for row in self.session.query(EFONames).filter(
                 or_(
@@ -442,7 +443,8 @@ class EvidenceValidationFileChecker():
                     EFONames.uri.like(orphanet_pattern), 
                     EFONames.uri.like(hpo_pattern), 
                     EFONames.uri.like(do_pattern), 
-                    EFONames.uri.like(go_pattern)
+                    EFONames.uri.like(go_pattern),
+                    EFONames.uri.like(omim_pattern)
                     )
                 ):
             #logging.info(row.uri)
