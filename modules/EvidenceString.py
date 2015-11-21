@@ -762,9 +762,9 @@ class EvidenceStringProcess():
         err = 0
         fix = 0
         evidence_manager = EvidenceManager(self.adapter)
-        # self._delete_prev_data()
+        self._delete_prev_data()
         # for row in self.session.query(LatestEvidenceString).yield_per(1000):
-        for row in self.session.query(EvidenceString121).yield_per(1000)[:10]:
+        for row in self.session.query(EvidenceString121).yield_per(1000):
             ev = Evidence(row.evidence_string, datasource= row.data_source_name)
             idev = row.uniq_assoc_fields_hashdig
             ev.evidence['id'] = idev
