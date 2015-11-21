@@ -353,9 +353,9 @@ class EvidenceManager():
         # except Exception:
         #     logging.warning("Cannot get generic info for efo: %s" % aboutid)
         if efo_info:
-            for e in efo_info.data:
-                for node in e['path']:
-                    all_efo_codes.extend(node)
+            for e in efo_info.data['path']:
+                for path in e:
+                    all_efo_codes.extend(path)
             extended_evidence["disease"][ExtendedInfoEFO.root] = efo_info.data
         all_efo_codes = list(set(all_efo_codes))
 
@@ -762,9 +762,9 @@ class EvidenceStringProcess():
         err = 0
         fix = 0
         evidence_manager = EvidenceManager(self.adapter)
-        self._delete_prev_data()
+        # self._delete_prev_data()
         # for row in self.session.query(LatestEvidenceString).yield_per(1000):
-        for row in self.session.query(EvidenceString121).yield_per(1000):
+        for row in self.session.query(EvidenceString121).yield_per(1000)[:10]:
             ev = Evidence(row.evidence_string, datasource= row.data_source_name)
             idev = row.uniq_assoc_fields_hashdig
             ev.evidence['id'] = idev
