@@ -295,7 +295,7 @@ class EvidenceManager():
     def get_extended_evidence(self, evidence):
 
         extended_evidence = copy.copy(evidence.evidence)
-        extended_evidence['_private'] = dict()
+        extended_evidence['private'] = dict()
 
 
         """get generic gene info"""
@@ -381,19 +381,19 @@ class EvidenceManager():
 
         '''Add private objects used just for indexing'''
 
-        extended_evidence['_private']['efo_codes'] = all_efo_codes
-        extended_evidence['_private']['eco_codes'] = all_eco_codes
-        extended_evidence['_private']['datasource']= evidence.datasource
-        extended_evidence['_private']['datatype']= evidence.datatype
-        extended_evidence['_private']['facets']={}
+        extended_evidence['private']['efo_codes'] = all_efo_codes
+        extended_evidence['private']['eco_codes'] = all_eco_codes
+        extended_evidence['private']['datasource']= evidence.datasource
+        extended_evidence['private']['datatype']= evidence.datatype
+        extended_evidence['private']['facets']={}
         if pathway_data['pathway_code']:
-            extended_evidence['_private']['facets']['reactome']= pathway_data
+            extended_evidence['private']['facets']['reactome']= pathway_data
         if uniprot_keywords:
-            extended_evidence['_private']['facets']['uniprot_keywords'] = uniprot_keywords
+            extended_evidence['private']['facets']['uniprot_keywords'] = uniprot_keywords
         if GO_terms['biological_process'] or \
             GO_terms['molecular_function'] or \
             GO_terms['cellular_component'] :
-            extended_evidence['_private']['facets']['go'] = GO_terms
+            extended_evidence['private']['facets']['go'] = GO_terms
 
 
         return Evidence(extended_evidence)
@@ -534,7 +534,7 @@ class Evidence(JSONSerializable):
         score['disease']={"id":self.evidence['disease']['id'],
                          "efo_info":self.evidence['disease']['efo_info']}
         score['scores']= self.evidence['scores']
-        score['_private']= {"efo_codes":self.evidence['_private']['efo_codes']}
+        score['private']= {"efo_codes":self.evidence['private']['efo_codes']}
         return json.dumps(score)
 
     def load_json(self, data):
@@ -826,7 +826,7 @@ class EvidenceStringProcess():
                                           date_created=datetime.now(),
                                           date_modified=datetime.now(),
                                           ))
-            for efo in value.evidence['_private']['efo_codes']:
+            for efo in value.evidence['private']['efo_codes']:
                 self.session.add(TargetToDiseaseAssociationScoreMap(
                                                   target_id=value.evidence['target']['id'],
                                                   disease_id=efo,
