@@ -109,6 +109,64 @@ class ExtendedInfoECO(ExtendedInfo):
         self.data = dict(eco_id = eco.get_id(),
                           label=eco.label),
 
+class ProcessedEvidenceStorer():
+    def __init__(self, adapter, chunk_size=1e5, quiet = False):
+
+        self.adapter=adapter
+        self.session=adapter.session
+        self.chunk_size = chunk_size
+        self.cache = {}
+        self.counter = 0
+        self.quiet = quiet
+
+    def put(self, id, ev_string):
+
+        self.cache[id] = ev_string
+        self.counter +=1
+        if (len(self.cache) % self.chunk_size) == 0:
+            self.flush()
+
+
+
+    def flush(self):
+
+
+        if self.cache:
+
+            rows_to_insert =[]
+            for key, value in self.cache.iteritems():
+                rows_to_insert.append(dict(id=key,
+                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value.database],
+                                          type=value.get_doc_name(),
+                                          data=value.to_json(),
+                                          active=True,
+                                          ))
+            self.adapter.engine.execute(ElasticsearchLoad.__table__.insert(),rows_to_insert)
+
+            # if autocommit:
+            #     adapter.session.commit()
+            if not self.quiet:
+                logging.info('inserted %i rows inserted in elasticsearch_load table' %(len(rows_to_insert)))
+
+            self.counter+=len(self.cache)
+
+            self.session.flush()
+            self.cache = {}
+
+
+    def close(self):
+
+        self.flush()
+        self.session.commit()
+
+
+    def __enter__(self):
+        return self
+
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
 class EvidenceManager():
     def __init__(self, adapter):
         self.adapter = adapter
@@ -757,46 +815,47 @@ class EvidenceStringProcess():
 
     def _process_evidence_string_data(self):
 
-        base_id = 0
-        err = 0
-        fix = 0
-        evidence_manager = EvidenceManager(self.adapter)
-        self._delete_prev_data()
-        # for row in self.session.query(LatestEvidenceString).yield_per(1000):
-        for row in self.session.query(EvidenceString121).yield_per(1000):
-            ev = Evidence(row.evidence_string, datasource= row.data_source_name)
-            idev = row.uniq_assoc_fields_hashdig
-            ev.evidence['id'] = idev
-            base_id += 1
-            try:
-            # if 1:
-                # print idev, row.data_source_name
-                '''temporary: fix broken data '''
-                ev, fixed = evidence_manager.fix_evidence(ev)
-                if fixed:
-                    fix += 1
-                if evidence_manager.is_valid(ev, datasource=row.data_source_name):
-                    '''add scoring to evidence string'''
-                    ev.score_evidence(evidence_manager.score_modifiers)
-                    '''extend data in evidencestring'''
-                    ev_string_to_load = evidence_manager.get_extended_evidence(ev)
+        with ProcessedEvidenceStorer(self.adapter) as storer:
 
-                    self.data[idev] = ev_string_to_load
+            base_id = 0
+            err = 0
+            fix = 0
+            evidence_manager = EvidenceManager(self.adapter)
+            self._delete_prev_data()
+            # for row in self.session.query(LatestEvidenceString).yield_per(1000):
+            for row in self.session.query(EvidenceString121).yield_per(1000):
+                ev = Evidence(row.evidence_string, datasource= row.data_source_name)
+                idev = row.uniq_assoc_fields_hashdig
+                ev.evidence['id'] = idev
+                base_id += 1
+                try:
+                # if 1:
+                    # print idev, row.data_source_name
+                    '''temporary: fix broken data '''
+                    ev, fixed = evidence_manager.fix_evidence(ev)
+                    if fixed:
+                        fix += 1
+                    if evidence_manager.is_valid(ev, datasource=row.data_source_name):
+                        '''add scoring to evidence string'''
+                        ev.score_evidence(evidence_manager.score_modifiers)
+                        '''extend data in evidencestring'''
+                        ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
-                else:
+                        # self.data[idev] = ev_string_to_load
+                        self.storer.put(ev_string_to_load)
+
+                    else:
+                        # traceback.print_exc(limit=1, file=sys.stdout)
+                        raise AttributeError("Invalid %s Evidence String" % (row.data_source_name))
+
+
+                except Exception, error:
+                    UploadError(ev, error, idev).save()
+                    err += 1
+                    logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
-                    raise AttributeError("Invalid %s Evidence String" % (row.data_source_name))
-
-
-            except Exception, error:
-                UploadError(ev, error, idev).save()
-                err += 1
-                logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
-                # traceback.print_exc(limit=1, file=sys.stdout)
-            if len(self.data)>=1000:
-                self._store_evidence_string()
-                logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
-        self._store_evidence_string()
+                if len(self.data)>=1000:
+                    logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         self.session.commit()
         logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
@@ -810,40 +869,41 @@ class EvidenceStringProcess():
         #                                          Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
         rows_deleted = self.session.query(
                 TargetToDiseaseAssociationScoreMap).delete(synchronize_session=False)
+        self.session.commit()
 
         if rows_deleted:
             logging.info('deleted %i rows from target_to_disease_associaiton_score_map' % rows_deleted)
 
-    def _store_evidence_string(self):
-        for key, value in self.data.iteritems():
-            self.loaded_entries_to_pg += 1
-            self.session.add(ElasticsearchLoad(id=key,
-                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value.database],
-                                          type=value.get_doc_name(),
-                                          data=value.to_json(),
-                                          active=True,
-                                          date_created=datetime.now(),
-                                          date_modified=datetime.now(),
-                                          ))
-            for efo in value.evidence['private']['efo_codes']:
-                self.session.add(TargetToDiseaseAssociationScoreMap(
-                                                  target_id=value.evidence['target']['id'],
-                                                  disease_id=efo,
-                                                  evidence_id=value.evidence['id'],
-                                                  is_direct=efo==value.evidence['disease']['id'],
-                                                  association_score=value.evidence['scores']['association_score'],
-                                                  datasource=value.evidence['sourceID'],))
-            # self.session.add(ElasticsearchLoad(id=key,
-            #                               index=Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-            #                               type=value.get_doc_name(),
-            #                               data=value.score_to_json(),
-            #                               active=True,
-            #                               date_created=datetime.now(),
-            #                               date_modified=datetime.now(),
-            #                               ))
-        logging.info("%i rows of evidence strings inserted to elasticsearch_load" % self.loaded_entries_to_pg)
-        self.session.flush()
-        self.data=OrderedDict()
+    # def _store_evidence_string(self):
+    #     for key, value in self.data.iteritems():
+    #         self.loaded_entries_to_pg += 1
+    #         self.session.add(ElasticsearchLoad(id=key,
+    #                                       index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value.database],
+    #                                       type=value.get_doc_name(),
+    #                                       data=value.to_json(),
+    #                                       active=True,
+    #                                       date_created=datetime.now(),
+    #                                       date_modified=datetime.now(),
+    #                                       ))
+    #         # for efo in value.evidence['private']['efo_codes']:
+    #         #     self.session.add(TargetToDiseaseAssociationScoreMap(
+    #         #                                       target_id=value.evidence['target']['id'],
+    #         #                                       disease_id=efo,
+    #         #                                       evidence_id=value.evidence['id'],
+    #         #                                       is_direct=efo==value.evidence['disease']['id'],
+    #         #                                       association_score=value.evidence['scores']['association_score'],
+    #         #                                       datasource=value.evidence['sourceID'],))
+    #         # self.session.add(ElasticsearchLoad(id=key,
+    #         #                               index=Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
+    #         #                               type=value.get_doc_name(),
+    #         #                               data=value.score_to_json(),
+    #         #                               active=True,
+    #         #                               date_created=datetime.now(),
+    #         #                               date_modified=datetime.now(),
+    #         #                               ))
+    #     logging.info("%i rows of evidence strings inserted to elasticsearch_load" % self.loaded_entries_to_pg)
+    #     self.session.flush()
+    #     self.data=OrderedDict()
 
 
 
