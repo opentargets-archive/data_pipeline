@@ -353,8 +353,7 @@ class EvidenceManager():
         # except Exception:
         #     logging.warning("Cannot get generic info for efo: %s" % aboutid)
         if efo_info:
-            for e in efo_info.data['path']:
-                for path in e:
+            for path in efo_info.data['path']:
                     all_efo_codes.extend(path)
             extended_evidence["disease"][ExtendedInfoEFO.root] = efo_info.data
         all_efo_codes = list(set(all_efo_codes))
