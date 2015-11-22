@@ -134,6 +134,7 @@ class ProcessedEvidenceStorer():
         if self.cache:
 
             rows_to_insert =[]
+            map_rows_to_insert = []
             for key, value in self.cache.iteritems():
                 rows_to_insert.append(dict(id=key,
                                           index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value.database],
@@ -141,7 +142,18 @@ class ProcessedEvidenceStorer():
                                           data=value.to_json(),
                                           active=True,
                                           ))
+                for efo in value.evidence['private']['efo_codes']:
+                    map_rows_to_insert.append(dict(target_id=value.evidence['target']['id'],
+                                                  disease_id=efo,
+                                                  evidence_id=value.evidence['id'],
+                                                  is_direct=efo==value.evidence['disease']['id'],
+                                                  association_score=value.evidence['scores']['association_score'],
+                                                  datasource=value.evidence['sourceID'],))
             self.adapter.engine.execute(ElasticsearchLoad.__table__.insert(),rows_to_insert)
+            self.adapter.engine.execute(TargetToDiseaseAssociationScoreMap.__table__.insert(),map_rows_to_insert)
+
+
+
 
             # if autocommit:
             #     adapter.session.commit()
@@ -842,7 +854,7 @@ class EvidenceStringProcess():
                         ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
                         # self.data[idev] = ev_string_to_load
-                        self.storer.put(ev_string_to_load)
+                        storer.put(row.id, ev_string_to_load)
 
                     else:
                         # traceback.print_exc(limit=1, file=sys.stdout)
