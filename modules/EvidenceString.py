@@ -110,7 +110,7 @@ class ExtendedInfoECO(ExtendedInfo):
                           label=eco.label),
 
 class ProcessedEvidenceStorer():
-    def __init__(self, adapter, chunk_size=1e5, quiet = False):
+    def __init__(self, adapter, chunk_size=1e4, quiet = False):
 
         self.adapter=adapter
         self.session=adapter.session
@@ -856,7 +856,6 @@ class EvidenceStringProcess():
                         '''extend data in evidencestring'''
                         ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
-                        # self.data[idev] = ev_string_to_load
                         storer.put(idev, ev_string_to_load)
 
                     else:
@@ -881,10 +880,11 @@ class EvidenceStringProcess():
 
 
     def _delete_prev_data(self):
+        logging.info("deleting old evidence-data objects")
         JSONObjectStorage.delete_prev_data_in_pg(self.session,
                                                  Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        # JSONObjectStorage.delete_prev_data_in_pg(self.session,
-        #                                          Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
+
+        logging.info("deleting old target-to-disease map objects")
         rows_deleted = self.session.query(
                 TargetToDiseaseAssociationScoreMap).delete(synchronize_session=False)
         self.session.commit()
