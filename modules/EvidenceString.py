@@ -588,6 +588,8 @@ class Evidence(JSONSerializable):
     def get_doc_name(self):
         return Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+self.database
 
+    def get_id(self):
+        return self.evidence['id']
 
     def to_json(self):
         return json.dumps(self.evidence)
@@ -854,7 +856,7 @@ class EvidenceStringProcess():
                         ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
                         # self.data[idev] = ev_string_to_load
-                        storer.put(row.id, ev_string_to_load)
+                        storer.put(ev.get_id(), ev_string_to_load)
 
                     else:
                         # traceback.print_exc(limit=1, file=sys.stdout)
