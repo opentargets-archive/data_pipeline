@@ -856,7 +856,7 @@ class EvidenceStringProcess():
                         '''extend data in evidencestring'''
                         ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
-                        # storer.put(idev, ev_string_to_load)
+                        storer.put(idev, ev_string_to_load)
 
                     else:
                         # traceback.print_exc(limit=1, file=sys.stdout)
@@ -871,7 +871,7 @@ class EvidenceStringProcess():
                     else:
                         logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
-                if base_id %1000 ==0:
+                if base_id %1e4 ==0:
                     logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         self.session.commit()
         logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
