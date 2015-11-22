@@ -791,14 +791,15 @@ class UploadError():
         self.logdir = logdir
 
     def save(self):
-        dir = os.path.join(self.logdir, self.database)
-        if not os.path.exists(self.logdir):
-            os.mkdir(self.logdir)
-        if not os.path.exists(dir):
-            os.mkdir(dir)
-        filename = str(os.path.join(dir, self.id))
-        pickle.dump(self, open(filename + '.pkl', 'w'))
-        json.dump(self.evidence, open(filename + '.json', 'w'))
+        pass
+        # dir = os.path.join(self.logdir, self.database)
+        # if not os.path.exists(self.logdir):
+        #     os.mkdir(self.logdir)
+        # if not os.path.exists(dir):
+        #     os.mkdir(dir)
+        # filename = str(os.path.join(dir, self.id))
+        # pickle.dump(self, open(filename + '.pkl', 'w'))
+        # json.dump(self.evidence, open(filename + '.json', 'w'))
 
 
 class DataNormaliser(object):
@@ -819,7 +820,6 @@ class EvidenceStringProcess():
                  adapter):
         self.adapter=adapter
         self.session=adapter.session
-        self.data=OrderedDict()
         self.loaded_entries_to_pg = 0
 
     def process_all(self):
@@ -868,8 +868,6 @@ class EvidenceStringProcess():
                     err += 1
                     logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
-                if len(self.data)>=1000:
-                    logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         self.session.commit()
         logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
@@ -931,7 +929,7 @@ class EvidenceStringUploader():
         self.loader=loader
 
     def upload_all(self):
-        self.clear_old_data()
+        # self.clear_old_data()
         # JSONObjectStorage.refresh_index_data_in_es(self.loader,
         #                                  self.session,
         #                                  Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME
