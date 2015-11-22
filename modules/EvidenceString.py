@@ -856,7 +856,7 @@ class EvidenceStringProcess():
                         '''extend data in evidencestring'''
                         ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
-                        storer.put(idev, ev_string_to_load)
+                        # storer.put(idev, ev_string_to_load)
 
                     else:
                         # traceback.print_exc(limit=1, file=sys.stdout)
@@ -940,7 +940,7 @@ class EvidenceStringProcess():
                 for row in chunk:
                     yield row
                 offset += page_size
-
+                result.close()
 
 class EvidenceStringUploader():
 
