@@ -342,6 +342,6 @@ class Loader():
 
     def optimize_index(self, index_name):
         try:
-            self.es.indices.optimize(index=index_name, max_num_segments=5, wait_for_merge = False)
+            self.es.indices.optimize(index=self._get_versioned_index(index_name), max_num_segments=5, wait_for_merge = False)
         except:
             logging.warn('optimisation of index %s failed'%index_name)

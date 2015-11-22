@@ -837,11 +837,11 @@ class EvidenceStringProcess():
             evidence_manager = EvidenceManager(self.adapter)
             self._delete_prev_data()
             # for row in self.session.query(LatestEvidenceString).yield_per(1000):
-            for row in self.session.query(EvidenceString121).yield_per(1000):
+            for row in self.get_evidence():
+                base_id +=1
                 ev = Evidence(row.evidence_string, datasource= row.data_source_name)
                 idev = row.uniq_assoc_fields_hashdig
                 ev.evidence['id'] = idev
-                base_id += 1
                 try:
                 # if 1:
                     # print idev, row.data_source_name
@@ -856,7 +856,7 @@ class EvidenceStringProcess():
                         ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
                         # self.data[idev] = ev_string_to_load
-                        storer.put(ev.get_id(), ev_string_to_load)
+                        storer.put(idev, ev_string_to_load)
 
                     else:
                         # traceback.print_exc(limit=1, file=sys.stdout)
@@ -866,8 +866,13 @@ class EvidenceStringProcess():
                 except Exception, error:
                     UploadError(ev, error, idev).save()
                     err += 1
-                    logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
+                    if isinstance(error,AttributeError):
+                        logging.error("Error loading data for id %s: %s" % (idev, str(error)))
+                    else:
+                        logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
+                if base_id %1000 ==0:
+                    logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         self.session.commit()
         logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
@@ -917,6 +922,23 @@ class EvidenceStringProcess():
     #     self.session.flush()
     #     self.data=OrderedDict()
 
+    def get_evidence(self):
+        for row in self.session.query(EvidenceString121).yield_per(10000):
+            yield row
+
+        offset = 0
+        page_size = 1e4
+        while True:
+                # query_string = """select * from pipeline.target_to_disease_association_score_map ORDER BY target_id LIMIT %i OFFSET %i;"""%(page_size, offset)
+
+                result = self.session.query(EvidenceString121).limit(page_size).offset(offset)
+                chunk = result.fetchall()
+                print len(chunk)
+                if not chunk:
+                    break
+                for row in chunk:
+                    yield row
+                offset += page_size
 
 
 class EvidenceStringUploader():
