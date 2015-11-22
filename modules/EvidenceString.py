@@ -157,10 +157,11 @@ class ProcessedEvidenceStorer():
 
             # if autocommit:
             #     adapter.session.commit()
-            if not self.quiet:
-                logging.info('inserted %i rows inserted in elasticsearch_load table' %(len(rows_to_insert)))
-
             self.counter+=len(self.cache)
+
+            if not self.quiet:
+                logging.info('inserted %i rows inserted in elasticsearch_load table' %(self.counter))
+
 
             self.session.flush()
             self.cache = {}
