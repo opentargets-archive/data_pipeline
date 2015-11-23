@@ -12,14 +12,45 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
 from common.PGAdapter import LatestEvidenceString, ElasticsearchLoad, EvidenceString121, \
-    TargetToDiseaseAssociationScoreMap
+    TargetToDiseaseAssociationScoreMap, Adapter
 from modules import GeneData
 from modules.ECO import ECO, EcoRetriever
 from modules.EFO import EFO, get_ontology_code_from_url, EfoRetriever
 from modules.GeneData import Gene, GeneRetriever
 from settings import Config
 from dateutil import parser as smart_date_parser
+import time
+import multiprocessing
 
+
+'''line profiler code'''
+try:
+    from line_profiler import LineProfiler
+
+    def do_profile(follow=[]):
+        def inner(func):
+            def profiled_func(*args, **kwargs):
+                try:
+                    profiler = LineProfiler()
+                    profiler.add_function(func)
+                    for f in follow:
+                        profiler.add_function(f)
+                    profiler.enable_by_count()
+                    return func(*args, **kwargs)
+                finally:
+                    profiler.print_stats()
+            return profiled_func
+        return inner
+
+except ImportError:
+    def do_profile(follow=[]):
+        "Helpful if you accidentally leave in production!"
+        def inner(func):
+            def nothing(*args, **kwargs):
+                return func(*args, **kwargs)
+            return nothing
+        return inner
+'''end of line profiler code'''
 
 __author__ = 'andreap'
 
@@ -180,24 +211,137 @@ class ProcessedEvidenceStorer():
     def __exit__(self, type, value, traceback):
         self.close()
 
-class EvidenceManager():
-    def __init__(self, adapter):
+class EvidenceManagerLookUpData():
+    def __init__(self):
+        self.available_genes = None
+        self.available_efos = None
+        self.available_ecos = None
+        self.uni2ens = None
+        self.non_reference_genes = None
+        self.available_gene_objects = None
+        self.available_efo_objects = None
+        self.available_eco_objects = None
+
+
+
+class EvidenceManagerLookUpDataRetrieval():
+    def __init__(self, adapter = Adapter()):
         self.adapter = adapter
         self.session = adapter.session
-        self._get_available_genes()
-        self._get_uni2ens()
+        self.lookup = EvidenceManagerLookUpData()
+        start_time = time.time()
+        self._get_gene_info()
+        logging.debug("finished self._get_gene_info(), took %ss"%str(time.time()-start_time))
         self._get_available_efos()
+        logging.debug("finished self._get_available_efos(), took %ss"%str(time.time()-start_time))
         self._get_available_ecos()
+        logging.debug("finished self._get_available_ecos(), took %ss"%str(time.time()-start_time))
+
+
+    def _get_available_efos(self):
+        self.lookup.available_efo_objects = dict()
+        for row in self.session.query(ElasticsearchLoad.id,
+                                      ElasticsearchLoad.data).filter(and_(
+                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+                        ElasticsearchLoad.active==True)):
+            efo_obj = EFO(get_ontology_code_from_url(row.id))
+            efo_obj.load_json(row.data)
+            self.lookup.available_efo_objects[get_ontology_code_from_url(row.id)]= efo_obj
+        self.lookup.available_efos = frozenset(self.lookup.available_efo_objects.keys())
+
+    def _get_available_ecos(self):
+        self.lookup.available_eco_objects = dict()
+        for row in self.session.query(ElasticsearchLoad.id,
+                                      ElasticsearchLoad.data).filter(and_(
+                        ElasticsearchLoad.index==Config.ELASTICSEARCH_ECO_INDEX_NAME,
+                        ElasticsearchLoad.type==Config.ELASTICSEARCH_ECO_DOC_NAME,
+                        ElasticsearchLoad.active==True)):
+            eco_obj = ECO(row.id)
+            eco_obj.load_json(row.data)
+            self.lookup.available_eco_objects[eco_obj.get_id()]= eco_obj
+
+        self.lookup.available_ecos = frozenset(self.lookup.available_eco_objects.keys())
+
+
+    def _get_gene_info(self):
+        self.lookup.uni2ens = {}
+        self.lookup.available_gene_objects={}
+        for gene_id, gene in self._get_all_stored_genes():
+            gene_obj = Gene(gene_id)
+            gene_obj.load_json(gene)
+            self.lookup.available_gene_objects[gene_obj.id]=gene_obj
+            if gene['uniprot_id']:
+                self.lookup.uni2ens[gene['uniprot_id']] = gene_id
+            for accession in gene['uniprot_accessions']:
+                self.lookup.uni2ens[accession]=gene_id
+        self.lookup.available_genes = frozenset(self.lookup.available_gene_objects.keys())
+        self._get_non_reference_gene_mappings()
+
+    def _get_non_reference_gene_mappings(self):
+        self.lookup.non_reference_genes = {}
+        skip_header=True
+        for line in file('resources/genes_with_non_reference_ensembl_ids.tsv'):
+            if skip_header:
+                skip_header=False
+            symbol, ensg, assembly, chr, is_ref = line.split()
+            if symbol not in self.lookup.non_reference_genes:
+                self.lookup.non_reference_genes[symbol]=dict(reference='',
+                                                      alternative=[])
+            if is_ref == 't':
+                self.lookup.non_reference_genes[symbol]['reference']=ensg
+            else:
+                self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
+
+    def _get_all_stored_genes(self):
+        with self.adapter.engine.connect() as conn:
+                offset = 0
+                page_size = 5e3
+                while True:
+                    query_string = """select id, data from pipeline.elasticsearch_load WHERE type = '%s' LIMIT %i OFFSET %i;"""%(Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,page_size, offset)
+
+                    result = conn.execute(query_string)
+                    chunk = result.fetchall()
+                    if not chunk:
+                        break
+                    for row in chunk:
+                        yield row['id'], json.loads(row['data'])
+                    # break#TODO: just to speed up test debugging- REMOVE THIS BREAK!
+                    offset += page_size
+                    logging.debug("retrieved %i gene objects"%offset)
+                    result.close()
+
+
+class EvidenceManager():
+    def __init__(self, lookup_data, adapter = Adapter()):
+        self.adapter = adapter
+        self.session = adapter.session
+        self.available_genes = lookup_data.available_genes
+        self.available_gene_objects = lookup_data.available_gene_objects
+        self.available_efos =  lookup_data.available_efos
+        self.available_efo_objects = lookup_data.available_efo_objects
+        self.available_ecos =  lookup_data.available_ecos
+        self.available_eco_objects = lookup_data.available_eco_objects
+        self.uni2ens =  lookup_data.uni2ens
+        self.non_reference_genes =  lookup_data.non_reference_genes
         self._get_eco_scoring_values()
+        # logging.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header=GeneData.UNI_ID_ORG_PREFIX
         self.ens_header=GeneData.ENS_ID_ORG_PREFIX
         self.gene_retriever = GeneRetriever(adapter)
+        # logging.debug("finished self.gene_retriever(), took %ss"%str(time.time()-start_time))
         self.efo_retriever = EfoRetriever(adapter)
+        # logging.debug("finished self.efo_retriever(), took %ss"%str(time.time()-start_time))
         self.eco_retriever = EcoRetriever(adapter)
+        # logging.debug("finished self.eco_retriever(), took %ss"%str(time.time()-start_time))
         self._get_score_modifiers()
+        # logging.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
 
+    def make_pickable(self):
+        self.adapter = None
+        self.session = None
 
-
+    # @do_profile()#follow=[])
     def fix_evidence(self, evidence):
 
         evidence = evidence.evidence
@@ -286,6 +430,8 @@ class EvidenceManager():
         if id_not_in_ensembl:
             logging.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s" % (evidence['id'], target_id))
 
+        # if new_target_id is None:
+        #     raise AttributeError('cannot find any valid target id for evidence %s'%evidence['id'])
         evidence['target']['id'] = new_target_id
 
 
@@ -470,55 +616,19 @@ class EvidenceManager():
 
 
 
-    def _get_available_genes(self):
-        self.available_genes = []
-        for row in self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                        ElasticsearchLoad.active==True)
-                    ).yield_per(1000):
-            self.available_genes.append(row.id)
-        self._get_non_reference_gene_mappings()
-
-    def _get_available_efos(self):
-        self.available_efos = []
-        for row in self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                        ElasticsearchLoad.active==True)
-                    ).yield_per(1000):
-            self.available_efos.append(row.id)
-
-    def _get_available_ecos(self):
-        self.available_ecos = []
-        for row in self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_ECO_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_ECO_DOC_NAME,
-                        ElasticsearchLoad.active==True)
-                    ).yield_per(1000):
-            self.available_ecos.append(row.id)
 
     def _get_gene(self, geneid):
-        return self.gene_retriever.get_gene(geneid)
+        return self.available_gene_objects[geneid]
+        # return self.gene_retriever.get_gene(geneid)
 
     def _get_efo(self, efoid):
-        return self.efo_retriever.get_efo(efoid)
+        return self.available_efo_objects[efoid]
+        # return self.efo_retriever.get_efo(efoid)
 
     def _get_eco(self, ecoid):
-        return self.eco_retriever.get_eco(ecoid)
+        return self.available_eco_objects[ecoid]
+        # return self.eco_retriever.get_eco(ecoid)
 
-    def _get_uni2ens(self):
-        self.uni2ens = {}
-        for row in self.session.query(ElasticsearchLoad.id, ElasticsearchLoad.data).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                        ElasticsearchLoad.active==True)
-                    ).yield_per(1000):
-            data = json.loads(row.data)
-            if data['uniprot_id']:
-                self.uni2ens[data['uniprot_id']] = row.id
-            for accession in data['uniprot_accessions']:
-                self.uni2ens[accession]=row.id
 
     def _get_non_reference_gene_mappings(self):
         self.non_reference_genes = {}
@@ -559,6 +669,25 @@ class EvidenceManager():
         self.score_modifiers = {}
         for datasource, values in Config.DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE.items():
             self.score_modifiers[datasource]=DataNormaliser(values['min'],values['max'])
+
+    def _get_all_stored_genes(self):
+        with self.adapter.engine.connect() as conn:
+                offset = 0
+                page_size = 5e3
+                while True:
+                    query_string = """select id, data from pipeline.elasticsearch_load WHERE type = '%s' LIMIT %i OFFSET %i;"""%(Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,page_size, offset)
+
+                    result = conn.execute(query_string)
+                    chunk = result.fetchall()
+                    if not chunk:
+                        break
+                    for row in chunk:
+                        yield row['id'], json.loads(row['data'])
+                    # break#TODO: just to speed up test debugging- REMOVE THIS BREAK!
+                    offset += page_size
+                    logging.debug("retrieved %i gene objects"%offset)
+                    result.close()
+
 
 
 class Evidence(JSONSerializable):
@@ -786,7 +915,7 @@ class UploadError():
             self.evidence = repr(evidence)
         self.id = id
         try:
-            self.database = evidence['evidence']['sourceID']
+            self.database = evidence['sourceID']
         except:
             self.database = 'unknown'
         self.logdir = logdir
@@ -811,8 +940,75 @@ class DataNormaliser(object):
         return (value-self.min)/(self.max-self.min)
 
 
+class EvidenceProcesser(multiprocessing.Process):
+
+    def __init__(self,
+                 input_q,
+                 output_q,
+                 lookup_data,
+                 input_loading_finished,
+                 output_computation_finished,
+                 input_generated_count,
+                 output_computed_count,
+                 processing_errors_count):
+        super(EvidenceProcesser, self).__init__()
+        self.input_q = input_q
+        self.output_q = output_q
+        self.start_time = time.time()
+        self.evidence_manager = EvidenceManager(lookup_data)
+        self.input_loading_finished = input_loading_finished
+        self.output_computation_finished = output_computation_finished
+        self.input_generated_count = input_generated_count
+        self.output_computed_count = output_computed_count
+        self.processing_errors_count = processing_errors_count
+        self.start_time = time.time()#reset timer start
 
 
+
+    def run(self):
+        logging.info("%s started"%self.name)
+        self.data_processing_started = False
+        while not (self.input_q.empty() and self.input_loading_finished.is_set()):
+
+            idev, ev = self.input_q.get()
+            try:
+                ev, fixed = self.evidence_manager.fix_evidence(ev)
+                # logging.critical("%i processed"%self.output_computed_count.value)
+                if self.evidence_manager.is_valid(ev, datasource=ev.datasource):
+                    '''add scoring to evidence string'''
+                    ev.score_evidence(self.evidence_manager.score_modifiers)
+                    '''extend data in evidencestring'''
+                    ev_string_to_load = self.evidence_manager.get_extended_evidence(ev)
+                    # logging.info('%s processed'%idev)
+                else:
+                    # traceback.print_exc(limit=1, file=sys.stdout)
+                    raise AttributeError("Invalid %s Evidence String" % (ev.datasource))
+                # if fixed:
+                #     fix+=1
+                self.output_q.put((idev, ev))
+
+            except Exception, error:
+                self.processing_errors_count.value +=1
+                # UploadError(ev, error, idev).save()
+                # err += 1
+
+                if isinstance(error,AttributeError):
+                    logging.error("Error loading data for id %s: %s" % (idev, str(error)))
+                else:
+                    logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
+                # traceback.print_exc(limit=1, file=sys.stdout)
+            self.output_computed_count.value +=1
+            if self.output_computed_count.value %1e3 ==0:
+                logging.critical("%i processed | %i errors | processing %1.2f evidence per second"%(self.output_computed_count.value,
+                                                                                                       self.processing_errors_count.value,
+                                                                                                       float(self.output_computed_count.value)/(time.time()-self.start_time)))
+
+
+        logging.debug("%s finished"%self.name)
+        # try:
+        #     self.output_q.close()
+        # except:
+        #     pass
 
 
 class EvidenceStringProcess():
@@ -830,49 +1026,69 @@ class EvidenceStringProcess():
 
     def _process_evidence_string_data(self):
 
-        with ProcessedEvidenceStorer(self.adapter) as storer:
 
-            base_id = 0
-            err = 0
-            fix = 0
-            evidence_manager = EvidenceManager(self.adapter)
-            self._delete_prev_data()
+        base_id = 0
+        err = 0
+        fix = 0
+
+
+        with ProcessedEvidenceStorer(self.adapter) as storer:
+            logging.debug("Starting Evidence Manager")
+
+            # self._delete_prev_data()
             # for row in self.session.query(LatestEvidenceString).yield_per(1000):
+            evidence_start_time = time.time()
+            lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter).lookup
+
+            '''create queues'''
+            input_q = multiprocessing.Queue()
+            output_q = multiprocessing.Queue()
+            '''create events'''
+            input_loading_finished = multiprocessing.Event()
+            output_computation_finished = multiprocessing.Event()
+            data_storage_finished = multiprocessing.Event()
+            '''create shared memory objects'''
+
+            input_generated_count =  multiprocessing.Value('i', 0)
+            processing_errors_count =  multiprocessing.Value('i', 0)
+            output_computed_count =  multiprocessing.Value('i', 0)
+            submitted_to_storage_count =  multiprocessing.Value('i', 0)
+
+
+
+
+            '''create workers'''
+            scorers = [EvidenceProcesser(input_q,
+                                         output_q,
+                                         lookup_data,
+                                         input_loading_finished,
+                                         output_computation_finished,
+                                         input_generated_count,
+                                         output_computed_count,
+                                         processing_errors_count,
+                                         ) for i in range(multiprocessing.cpu_count())]
+                                      # ) for i in range(1)]
+            for w in scorers:
+                w.start()
+
+
+
             for row in self.get_evidence():
                 base_id +=1
-                ev = Evidence(row.evidence_string, datasource= row.data_source_name)
-                idev = row.uniq_assoc_fields_hashdig
+                single_evidence_start_time = time.time()
+                ev = Evidence(row['evidence_string'], datasource= row['data_source_name'])
+                # logging.debug("finished getting Evidence %i, took %ss"%(base_id,str(time.time()-single_evidence_start_time)))
+                idev = row['uniq_assoc_fields_hashdig']
                 ev.evidence['id'] = idev
-                try:
-                # if 1:
-                    # print idev, row.data_source_name
-                    '''temporary: fix broken data '''
-                    ev, fixed = evidence_manager.fix_evidence(ev)
-                    if fixed:
-                        fix += 1
-                    if evidence_manager.is_valid(ev, datasource=row.data_source_name):
-                        '''add scoring to evidence string'''
-                        ev.score_evidence(evidence_manager.score_modifiers)
-                        '''extend data in evidencestring'''
-                        ev_string_to_load = evidence_manager.get_extended_evidence(ev)
 
-                        storer.put(idev, ev_string_to_load)
-
-                    else:
-                        # traceback.print_exc(limit=1, file=sys.stdout)
-                        raise AttributeError("Invalid %s Evidence String" % (row.data_source_name))
+                input_q.put((idev, ev))
 
 
-                except Exception, error:
-                    UploadError(ev, error, idev).save()
-                    err += 1
-                    if isinstance(error,AttributeError):
-                        logging.error("Error loading data for id %s: %s" % (idev, str(error)))
-                    else:
-                        logging.exception("Error loading data for id %s: %s" % (idev, str(error)))
-                    # traceback.print_exc(limit=1, file=sys.stdout)
                 if base_id %1e4 ==0:
-                    logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
+                    logging.info("%i entries submitted for process" % (base_id))
+
+
+
         self.session.commit()
         logging.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
@@ -924,23 +1140,37 @@ class EvidenceStringProcess():
     #     self.data=OrderedDict()
 
     def get_evidence(self):
-        for row in self.session.query(EvidenceString121).yield_per(10000):
-            yield row
+         with self.adapter.engine.connect() as conn:
+                offset = 0
+                page_size = 1e3
+                while True:
+                    query_string = """select * from public.evidence_strings_1pt2pt1 LIMIT %i OFFSET %i;"""%(page_size, offset)
 
-        offset = 0
-        page_size = 1e4
-        while True:
-                # query_string = """select * from pipeline.target_to_disease_association_score_map ORDER BY target_id LIMIT %i OFFSET %i;"""%(page_size, offset)
+                    result = conn.execute(query_string)
+                    chunk = result.fetchall()
+                    if not chunk:
+                        break
+                    for row in chunk:
+                        yield row
+                    offset += page_size
+                    logging.info("loaded %i ev from db to process"%offset)
+                    result.close()
 
-                result = self.session.query(EvidenceString121).limit(page_size).offset(offset)
-                chunk = result.fetchall()
-                print len(chunk)
-                if not chunk:
-                    break
-                for row in chunk:
-                    yield row
-                offset += page_size
-                result.close()
+    def _process_evidence(self, ev, storer):
+        ev, fixed = self.evidence_manager.fix_evidence(ev)
+        if self.evidence_manager.is_valid(ev, datasource=ev.datasource):
+            '''add scoring to evidence string'''
+            ev.score_evidence(self.evidence_manager.score_modifiers)
+            '''extend data in evidencestring'''
+            ev_string_to_load = self.evidence_manager.get_extended_evidence(ev)
+
+        else:
+            # traceback.print_exc(limit=1, file=sys.stdout)
+            raise AttributeError("Invalid %s Evidence String" % (ev.datasource))
+        return ev, fixed
+
+
+
 
 class EvidenceStringUploader():
 

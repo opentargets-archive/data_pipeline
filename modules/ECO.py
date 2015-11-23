@@ -33,6 +33,7 @@ class ECO(JSONSerializable):
         # self.id_org = id_org
 
     def get_id(self):
+        # return self.code
         return get_ontology_code_from_url(self.path_codes[-1])
 
 
