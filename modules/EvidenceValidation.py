@@ -22,7 +22,7 @@ from common import Actions
 from common.PGAdapter import *
 from common.UniprotIO import UniprotIterator, Parser
 import cttv.model.core as cttv
-import cttv.model.flatten as flat
+# import cttv.model.flatten as flat
 #import cttv.model.flatten as flat
 from settings import Config
 import hashlib

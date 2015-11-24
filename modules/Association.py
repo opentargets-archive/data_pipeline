@@ -619,7 +619,6 @@ class TargetDiseasePairProducer(Process):
             target_query_string ="""SELECT DISTINCT target_id FROM pipeline.target_to_disease_association_score_map;"""
             result = conn.execute(target_query_string)
             target_ids = list(set([i[0] for i in result.fetchall()]))
-            print "target_ids:",len(target_ids)
 
             for target_id in target_ids:
                 query_string = """SELECT * FROM pipeline.target_to_disease_association_score_map WHERE target_id = '%s';"""%(target_id)

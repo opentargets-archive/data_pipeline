@@ -173,7 +173,7 @@ def _get_evidence_string_generic_mapping():
                          }
                      }
                 },
-                "_private" : {
+                "private" : {
                     "type" : "object",
                      "properties" : {
                          "efo_codes" : {
