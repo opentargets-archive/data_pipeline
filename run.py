@@ -94,11 +94,17 @@ if __name__ == '__main__':
     #                     # and also every 60 seconds
     #                     sniffer_timeout=60)
     #
-    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.CRITICAL)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    for handler in logger.handlers:
+        handler.setFormatter(formatter)
+
+    # logging.basicConfig(level=logging.CRITICAL)
     logging.getLogger('elasticsearch').setLevel(logging.ERROR)
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
-    logging.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
+    logger.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
     with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
         run_full_pipeline = False
         if args.all  and (Actions.ALL in args.all):

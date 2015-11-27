@@ -170,7 +170,7 @@ class Loader():
         logging.debug("loader chunk_size: %i"%chunk_size)
 
     def _get_versioned_index(self,index_name):
-        return index_name +'_'+Config.RELEASE_VERSION
+        return Config.RELEASE_VERSION + '_' + index_name
 
 
 
@@ -182,7 +182,7 @@ class Loader():
             self.index_created.append(index_name)
             try:
                 time.sleep(3)
-                self.prepare_for_bulk_indexing(index_name)
+                self.prepare_for_bulk_indexing(self._get_versioned_index(index_name))
             except:
                 logging.error("cannot prepare index %s for bulk indexing"%index_name)
                 pass
@@ -272,17 +272,17 @@ class Loader():
                 if key in specific_settings['settings']:
                     base_settings["index"][key]= specific_settings['settings'][key]
             return base_settings
-        if index_name.startswith(Config.ELASTICSEARCH_DATA_INDEX_NAME):
+        if Config.ELASTICSEARCH_DATA_INDEX_NAME in index_name:
             settings=update_settings(settings,ElasticSearchConfiguration.evidence_data_mapping)
-        elif index_name == Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME:
+        elif Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME in index_name:
             settings=update_settings(settings,ElasticSearchConfiguration.score_data_mapping)
-        elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
+        elif Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME in index_name:
             settings=update_settings(settings,ElasticSearchConfiguration.efo_data_mapping)
-        elif index_name == Config.ELASTICSEARCH_ECO_INDEX_NAME:
+        elif Config.ELASTICSEARCH_ECO_INDEX_NAME in index_name:
             settings=update_settings(settings,ElasticSearchConfiguration.eco_data_mapping)
-        elif index_name == Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME:
+        elif Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME in index_name:
             settings=update_settings(settings,ElasticSearchConfiguration.gene_data_mapping)
-        elif index_name == Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME:
+        elif Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME in index_name:
             settings=update_settings(settings,ElasticSearchConfiguration.expression_data_mapping)
 
         self.es.indices.put_settings(index=index_name,
@@ -294,32 +294,32 @@ class Loader():
             self.es.indices.delete(index_name, ignore=400)
         except NotFoundError:
             pass
-        if index_name.startswith(Config.ELASTICSEARCH_DATA_INDEX_NAME):
+        if Config.ELASTICSEARCH_DATA_INDEX_NAME in index_name:
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.evidence_data_mapping,
                                    )
-        elif index_name.startswith(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME):
+        elif Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME in index_name:
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.score_data_mapping,
                                    )
-        elif index_name.startswith(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME):
+        elif Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME in index_name:
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.efo_data_mapping
                                    )
-        elif index_name.startswith(Config.ELASTICSEARCH_ECO_INDEX_NAME):
+        elif Config.ELASTICSEARCH_ECO_INDEX_NAME in index_name:
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.eco_data_mapping
                                    )
-        elif index_name.startswith(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME):
+        elif Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME in index_name:
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.gene_data_mapping
                                    )
-        elif index_name.startswith(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME):
+        elif Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME in index_name:
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.expression_data_mapping
