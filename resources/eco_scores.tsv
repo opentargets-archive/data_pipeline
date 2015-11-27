@@ -21,6 +21,7 @@ http://purl.obolibrary.org/obo/SO_0001895	TFBS_ablation	0.6
 http://purl.obolibrary.org/obo/SO_0001906	feature_truncation	0.6
 http://purl.obolibrary.org/obo/SO_0001907	feature_elongation	0.6
 http://targetvalidation.org/sequence/nearest_gene_five_prime_end	Nearest gene counting from 5' end	0.5
+http://targetvalidation.org/sequence/regulatory_nearest_gene_five_prime_end	Regulatory nearest gene 5' end	0.6
 http://purl.obolibrary.org/obo/SO_0001574	splice_acceptor_variant	0.95
 http://purl.obolibrary.org/obo/SO_0001575	splice_donor_variant	0.95
 http://purl.obolibrary.org/obo/SO_0001580	coding_sequence_variant	0.95
