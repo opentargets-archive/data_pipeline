@@ -15,7 +15,7 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage, Loader
 from common.PGAdapter import LatestEvidenceString, ElasticsearchLoad, EvidenceString121, \
-    TargetToDiseaseAssociationScoreMap, Adapter
+    TargetToDiseaseAssociationScoreMap, Adapter, EvidenceString10
 from modules import GeneData
 from modules.ECO import ECO, EcoRetriever
 from modules.EFO import EFO, get_ontology_code_from_url, EfoRetriever
@@ -1186,6 +1186,7 @@ class EvidenceStringProcess():
                 if input_generated_count.value % 1e4 == 0:
                     logger.info("%i entries submitted for process" % (input_generated_count.value))
 
+        output_q.join()
         self.session.commit()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
@@ -1255,7 +1256,7 @@ class EvidenceStringProcess():
         #         logger.info("loaded %i ev from db to process"%offset)
         #         result.close()
         c=0
-        for row in self.session.query(EvidenceString121).yield_per(5000):
+        for row in self.session.query(EvidenceString10).yield_per(5000):
             c+=1
             if c%5000==0:
                 logger.info("loaded %i ev from db to process"%c)
