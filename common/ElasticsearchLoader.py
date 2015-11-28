@@ -198,23 +198,26 @@ class Loader():
 
     def flush(self):
         # for ok, results in streaming_bulk(
-        for ok, results in parallel_bulk(
-                self.es,
-                self.cache,
-                chunk_size=self.chunk_size,
-                request_timeout=1200,
-        ):
+        try:
+            for ok, results in parallel_bulk(
+                    self.es,
+                    self.cache,
+                    chunk_size=self.chunk_size,
+                    request_timeout=1200,
+            ):
 
-            action, result = results.popitem()
-            self.results[result['_index']].append(result['_id'])
-            doc_id = '/%s/%s' % (result['_index'], result['_id'])
-            if (len(self.results[result['_index']]) % self.chunk_size) == 0:
-                logging.debug(
-                    "%i entries uploaded in elasticsearch for index %s" % (len(self.results[result['_index']]), result['_index']))
-            if not ok:
-                logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
-            else:
-                pass
+                action, result = results.popitem()
+                self.results[result['_index']].append(result['_id'])
+                doc_id = '/%s/%s' % (result['_index'], result['_id'])
+                if (len(self.results[result['_index']]) % self.chunk_size) == 0:
+                    logging.debug(
+                        "%i entries uploaded in elasticsearch for index %s" % (len(self.results[result['_index']]), result['_index']))
+                if not ok:
+                    logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
+                else:
+                    pass
+        except:
+            logging.exception("push to elasticsearch failed for chunk")
         self.cache = []
 
 
