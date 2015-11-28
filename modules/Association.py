@@ -610,9 +610,6 @@ class TargetDiseasePairProducer(Process):
         logging.debug("%s finished"%self.name)
 
     def _get_data_stream(self,page_size = 50000):
-        offset=0
-
-
 
         with self.adapter.engine.connect() as conn:
 
@@ -621,39 +618,20 @@ class TargetDiseasePairProducer(Process):
             target_ids = list(set([i[0] for i in result.fetchall()]))
 
             for target_id in target_ids:
-                query_string = """SELECT * FROM pipeline.target_to_disease_association_score_map WHERE target_id = '%s';"""%(target_id)
+                # query_string = """SELECT * FROM pipeline.target_to_disease_association_score_map WHERE target_id = '%s';"""%(target_id)
+                #
+                #
+                # result = conn.execute(query_string)
+                # chunk = result.fetchall()
+                # if not chunk:
+                #     break
+                # for row in chunk:
+                #     yield row
 
+                for row in self.session.query(TargetToDiseaseAssociationScoreMap).filter(
+                                TargetToDiseaseAssociationScoreMap.target_id == target_id).yield_per(5000):
+                    yield row.__dict__
 
-                result = conn.execute(query_string)
-                chunk = result.fetchall()
-                if not chunk:
-                    break
-                # while True:
-                #     if self.q.empty():
-                #         break
-                #     else:
-                #         time.sleep(5)
-                for row in chunk:
-                    yield row
-
-            # while True:
-            #     # query_string = """select * from pipeline.target_to_disease_association_score_map ORDER BY target_id LIMIT %i OFFSET %i;"""%(page_size, offset)
-            #     query_string = """select *  OVER (PARTITION BY target_id)from pipeline.target_to_disease_association_score_map;"""
-            #
-            #     logging.info("sending query: "+query_string)
-            #     result = conn.execute(query_string)
-            #     chunk = result.fetchall()
-            #     print len(chunk)
-            #     if not chunk:
-            #         break
-            #     # while True:
-            #     #     if self.q.empty():
-            #     #         break
-            #     #     else:
-            #     #         time.sleep(5)
-            #     for row in chunk:
-            #         yield row
-            #     offset += page_size
 
 
     def init_data_cache(self,):

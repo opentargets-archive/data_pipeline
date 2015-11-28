@@ -1158,8 +1158,8 @@ class EvidenceStringProcess():
                                          input_generated_count,
                                          output_computed_count,
                                          processing_errors_count,
-                                         ) for i in range(multiprocessing.cpu_count())]
-                                      # ) for i in range(1)]
+                                         # ) for i in range(multiprocessing.cpu_count())]
+                                      ) for i in range(2)]
             for w in scorers:
                 w.start()
 
@@ -1255,11 +1255,12 @@ class EvidenceStringProcess():
         #         logger.info("loaded %i ev from db to process"%offset)
         #         result.close()
         c=0
-        for row in self.session.query(EvidenceString121).yield_per(1000):
+        for row in self.session.query(EvidenceString121).yield_per(5000):
             c+=1
-            if c%1000==0:
+            if c%5000==0:
                 logger.info("loaded %i ev from db to process"%c)
             yield row
+        logger.info("loaded %i ev from db to process"%c)
 
 
 
