@@ -1063,10 +1063,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
 
                         self.global_counter.value +=1
                         idev, ev = output
-                        storer.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
-                           ev.get_doc_name(),
-                           idev,
-                           ev.to_json())
+                        storer.put(idev,
+                           ev)
                         self.total_loaded.value+=1
                         # storer.put('%s-%s'%(target,disease),
                         #                 score)
