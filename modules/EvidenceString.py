@@ -1002,7 +1002,7 @@ class EvidenceProcesser(multiprocessing.Process):
                         raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
                     # if fixed:
                     #     fix+=1
-                    self.output_q.put((idev, fixed_ev))
+                    self.output_q.put((idev, ev_string_to_load))
 
                 except Exception, error:
                     self.processing_errors_count.value +=1
