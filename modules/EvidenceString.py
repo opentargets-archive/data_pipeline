@@ -202,7 +202,7 @@ class ProcessedEvidenceStorer():
             self.counter+=len(self.cache)
 
             if not self.quiet:
-                logger.info('inserted %i rows inserted in elasticsearch_load table' %(self.counter))
+                logger.info('%i rows inserted in elasticsearch_load table' %(self.counter))
 
 
             self.session.flush()
@@ -1139,8 +1139,8 @@ class EvidenceStringProcess():
         lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter).lookup
 
         '''create queues'''
-        input_q = multiprocessing.Queue(maxsize=20000)
-        output_q = multiprocessing.Queue(maxsize=20000)
+        input_q = multiprocessing.Queue(maxsize=5000)
+        output_q = multiprocessing.Queue(maxsize=5000)
         '''create events'''
         input_loading_finished = multiprocessing.Event()
         output_computation_finished = multiprocessing.Event()
@@ -1164,7 +1164,7 @@ class EvidenceStringProcess():
                                      output_computed_count,
                                      processing_errors_count,
                                      # ) for i in range(multiprocessing.cpu_count())]
-                                  ) for i in range(2)]
+                                  ) for i in range(1)]
         for w in scorers:
             w.start()
 
