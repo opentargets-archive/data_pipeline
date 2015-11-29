@@ -146,7 +146,7 @@ class ExtendedInfoECO(ExtendedInfo):
                           label=eco.label),
 
 class ProcessedEvidenceStorer():
-    def __init__(self, adapter, chunk_size=1e4, quiet = False):
+    def __init__(self, adapter, es_loader, chunk_size=1e4, quiet = False):
 
         self.adapter=adapter
         self.session=adapter.session
@@ -154,13 +154,19 @@ class ProcessedEvidenceStorer():
         self.cache = {}
         self.counter = 0
         self.quiet = quiet
+        self.es_loader=es_loader
 
-    def put(self, id, ev_string):
+    def put(self, id, ev):
 
-        self.cache[id] = ev_string
+        self.cache[id] = ev
         self.counter +=1
         if (len(self.cache) % self.chunk_size) == 0:
             self.flush()
+        self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+                           ev.get_doc_name(),
+                           id,
+                           ev.to_json(),
+                           create_index = True)
 
 
 
@@ -1023,6 +1029,9 @@ class EvidenceProcesser(multiprocessing.Process):
         #     pass
 
 
+
+
+
 class EvidenceStorerWorker(multiprocessing.Process):
     def __init__(self,
                  processing_output_q,
@@ -1046,7 +1055,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
     def run(self):
         logger.info("worker %s started"%self.name)
         with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
-            # with ScoreStorer(self.adapter, es_loader, chunk_size=self.chunk_size) as storer:
+            with ProcessedEvidenceStorer(self.adapter, es_loader, chunk_size=self.chunk_size) as storer:
                 while not ((self.global_counter.value >= self.total_loaded.value) and \
                         self.processing_finished.is_set()):
                     output = self.q.get()
@@ -1054,11 +1063,10 @@ class EvidenceStorerWorker(multiprocessing.Process):
 
                         self.global_counter.value +=1
                         idev, ev = output
-                        es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+                        storer.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
                            ev.get_doc_name(),
                            idev,
-                           ev.to_json(),
-                           create_index = True)
+                           ev.to_json())
                         self.total_loaded.value+=1
                         # storer.put('%s-%s'%(target,disease),
                         #                 score)
@@ -1128,14 +1136,14 @@ class EvidenceStringProcess():
         with ProcessedEvidenceStorer(self.adapter) as storer:
             logger.debug("Starting Evidence Manager")
 
-            # self._delete_prev_data()
+            self._delete_prev_data()
             # for row in self.session.query(LatestEvidenceString).yield_per(1000):
             evidence_start_time = time.time()
             lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter).lookup
 
             '''create queues'''
-            input_q = multiprocessing.Queue(maxsize=1000)
-            output_q = multiprocessing.Queue(maxsize=2000)
+            input_q = multiprocessing.Queue(maxsize=5000)
+            output_q = multiprocessing.Queue(maxsize=5000)
             '''create events'''
             input_loading_finished = multiprocessing.Event()
             output_computation_finished = multiprocessing.Event()
@@ -1186,7 +1194,7 @@ class EvidenceStringProcess():
                 if input_generated_count.value % 1e4 == 0:
                     logger.info("%i entries submitted for process" % (input_generated_count.value))
 
-        output_q.join()
+        output_q.join_thread()
         self.session.commit()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
