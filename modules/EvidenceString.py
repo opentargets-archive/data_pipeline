@@ -1133,66 +1133,65 @@ class EvidenceStringProcess():
         fix = 0
 
 
-        with ProcessedEvidenceStorer(self.adapter) as storer:
-            logger.debug("Starting Evidence Manager")
+        logger.debug("Starting Evidence Manager")
 
-            self._delete_prev_data()
-            # for row in self.session.query(LatestEvidenceString).yield_per(1000):
-            evidence_start_time = time.time()
-            lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter).lookup
+        self._delete_prev_data()
+        # for row in self.session.query(LatestEvidenceString).yield_per(1000):
+        evidence_start_time = time.time()
+        lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter).lookup
 
-            '''create queues'''
-            input_q = multiprocessing.Queue(maxsize=5000)
-            output_q = multiprocessing.Queue(maxsize=5000)
-            '''create events'''
-            input_loading_finished = multiprocessing.Event()
-            output_computation_finished = multiprocessing.Event()
-            data_storage_finished = multiprocessing.Event()
-            '''create shared memory objects'''
+        '''create queues'''
+        input_q = multiprocessing.Queue(maxsize=5000)
+        output_q = multiprocessing.Queue(maxsize=5000)
+        '''create events'''
+        input_loading_finished = multiprocessing.Event()
+        output_computation_finished = multiprocessing.Event()
+        data_storage_finished = multiprocessing.Event()
+        '''create shared memory objects'''
 
-            input_generated_count =  multiprocessing.Value('i', 0)
-            processing_errors_count =  multiprocessing.Value('i', 0)
-            output_computed_count =  multiprocessing.Value('i', 0)
-            submitted_to_storage_count =  multiprocessing.Value('i', 0)
-
-
-
-            '''create workers'''
-            scorers = [EvidenceProcesser(input_q,
-                                         output_q,
-                                         lookup_data,
-                                         input_loading_finished,
-                                         output_computation_finished,
-                                         input_generated_count,
-                                         output_computed_count,
-                                         processing_errors_count,
-                                         # ) for i in range(multiprocessing.cpu_count())]
-                                      ) for i in range(2)]
-            for w in scorers:
-                w.start()
-
-            storers = [EvidenceStorerWorker(output_q,
-                                            output_computation_finished,
-                                            data_storage_finished,
-                                            output_computed_count,
-                                            input_generated_count,
-                                         ) for i in range(1)]
-                                      # ) for i in range(1)]
-            for w in storers:
-                w.start()
+        input_generated_count =  multiprocessing.Value('i', 0)
+        processing_errors_count =  multiprocessing.Value('i', 0)
+        output_computed_count =  multiprocessing.Value('i', 0)
+        submitted_to_storage_count =  multiprocessing.Value('i', 0)
 
 
 
-            for row in self.get_evidence():
-                ev = Evidence(row.evidence_string, datasource= row.data_source_name)
-                idev = row.uniq_assoc_fields_hashdig
-                ev.evidence['id'] = idev
-                input_generated_count.value += 1
-                input_q.put((idev, ev))
-                input_generated_count.value += 1
+        '''create workers'''
+        scorers = [EvidenceProcesser(input_q,
+                                     output_q,
+                                     lookup_data,
+                                     input_loading_finished,
+                                     output_computation_finished,
+                                     input_generated_count,
+                                     output_computed_count,
+                                     processing_errors_count,
+                                     # ) for i in range(multiprocessing.cpu_count())]
+                                  ) for i in range(2)]
+        for w in scorers:
+            w.start()
 
-                if input_generated_count.value % 1e4 == 0:
-                    logger.info("%i entries submitted for process" % (input_generated_count.value))
+        storers = [EvidenceStorerWorker(output_q,
+                                        output_computation_finished,
+                                        data_storage_finished,
+                                        output_computed_count,
+                                        input_generated_count,
+                                     ) for i in range(1)]
+                                  # ) for i in range(1)]
+        for w in storers:
+            w.start()
+
+
+
+        for row in self.get_evidence():
+            ev = Evidence(row.evidence_string, datasource= row.data_source_name)
+            idev = row.uniq_assoc_fields_hashdig
+            ev.evidence['id'] = idev
+            input_generated_count.value += 1
+            input_q.put((idev, ev))
+            input_generated_count.value += 1
+
+            if input_generated_count.value % 1e4 == 0:
+                logger.info("%i entries submitted for process" % (input_generated_count.value))
 
         output_q.join_thread()
         self.session.commit()
