@@ -158,7 +158,7 @@ class ProcessedEvidenceStorer():
 
     def put(self, id, ev):
 
-        self.cache[id] = ev
+        # self.cache[id] = ev
         self.counter +=1
         if (len(self.cache) % self.chunk_size) == 0:
             self.flush()
@@ -1055,9 +1055,10 @@ class EvidenceStorerWorker(multiprocessing.Process):
     def run(self):
         logger.info("worker %s started"%self.name)
         with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
-            with ProcessedEvidenceStorer(self.adapter, es_loader, chunk_size=self.chunk_size) as storer:
-                while not ((self.global_counter.value >= self.total_loaded.value) and \
-                        self.processing_finished.is_set()):
+            with ProcessedEvidenceStorer(self.adapter, es_loader, chunk_size=self.chunk_size, quiet=True) as storer:
+                # while not ((self.global_counter.value >= self.total_loaded.value) and \
+                #         self.processing_finished.is_set()):
+                while 1:
                     output = self.q.get()
                     if output:
 
@@ -1140,7 +1141,7 @@ class EvidenceStringProcess():
 
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=5000)
-        output_q = multiprocessing.Queue(maxsize=5000)
+        output_q = multiprocessing.Queue(maxsize=15000)
         '''create events'''
         input_loading_finished = multiprocessing.Event()
         output_computation_finished = multiprocessing.Event()
@@ -1164,7 +1165,7 @@ class EvidenceStringProcess():
                                      output_computed_count,
                                      processing_errors_count,
                                      # ) for i in range(multiprocessing.cpu_count())]
-                                  ) for i in range(1)]
+                                  ) for i in range(2)]
         for w in scorers:
             w.start()
 
@@ -1173,8 +1174,8 @@ class EvidenceStringProcess():
                                         data_storage_finished,
                                         output_computed_count,
                                         input_generated_count,
-                                     )  for i in range(multiprocessing.cpu_count())]
-                                  # ) for i in range(1)]
+                                     # )  for i in range(multiprocessing.cpu_count())]
+                                  ) for i in range(1)]
         for w in storers:
             w.start()
 
@@ -1261,7 +1262,7 @@ class EvidenceStringProcess():
         #         logger.info("loaded %i ev from db to process"%offset)
         #         result.close()
         c=0
-        for row in self.session.query(EvidenceString10).yield_per(5000):
+        for row in self.session.query(EvidenceString10).yield_per(1000):
             c+=1
             if c%5000==0:
                 logger.info("loaded %i ev from db to process"%c)
