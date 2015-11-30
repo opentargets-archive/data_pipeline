@@ -158,15 +158,15 @@ class ProcessedEvidenceStorer():
 
     def put(self, id, ev):
 
-        # self.cache[id] = ev
+        self.cache[id] = ev
         self.counter +=1
         if (len(self.cache) % self.chunk_size) == 0:
             self.flush()
-        self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
-                           ev.get_doc_name(),
-                           id,
-                           ev.to_json(),
-                           create_index = True)
+        # self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+        #                    ev.get_doc_name(),
+        #                    id,
+        #                    ev.to_json(),
+        #                    create_index = True)
 
 
 
