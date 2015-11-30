@@ -100,7 +100,7 @@ if __name__ == '__main__':
     for handler in logger.handlers:
         handler.setFormatter(formatter)
 
-    # logging.basicConfig(level=logging.CRITICAL)
+    logging.basicConfig(level=logging.INFO)
     logging.getLogger('elasticsearch').setLevel(logging.ERROR)
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)

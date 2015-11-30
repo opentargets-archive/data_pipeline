@@ -158,15 +158,15 @@ class ProcessedEvidenceStorer():
 
     def put(self, id, ev):
 
-        self.cache[id] = ev
+        # self.cache[id] = ev
         self.counter +=1
         if (len(self.cache) % self.chunk_size) == 0:
             self.flush()
-        # self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
-        #                    ev.get_doc_name(),
-        #                    id,
-        #                    ev.to_json(),
-        #                    create_index = True)
+        self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+                           ev.get_doc_name(),
+                           id,
+                           ev.to_json(),
+                           create_index = True)
 
 
 
@@ -202,7 +202,7 @@ class ProcessedEvidenceStorer():
             self.counter+=len(self.cache)
 
             if not self.quiet:
-                logger.info('%i rows inserted in elasticsearch_load table' %(self.counter))
+                logger.critical('%i rows inserted in elasticsearch_load table' %(self.counter))
 
 
             self.session.flush()
@@ -1055,7 +1055,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
     def run(self):
         logger.info("worker %s started"%self.name)
         with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
-            with ProcessedEvidenceStorer(self.adapter, es_loader, chunk_size=self.chunk_size, quiet=True) as storer:
+            with ProcessedEvidenceStorer(self.adapter, es_loader, chunk_size=self.chunk_size, quiet=False) as storer:
                 # while not ((self.global_counter.value >= self.total_loaded.value) and \
                 #         self.processing_finished.is_set()):
                 while 1:
@@ -1067,10 +1067,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
                         storer.put(idev,
                            ev)
                         self.total_loaded.value+=1
-                        # storer.put('%s-%s'%(target,disease),
-                        #                 score)
-
-                        if self.total_loaded.value %1e3 ==0:
+                        if self.total_loaded.value % self.chunk_size ==0:
                             logger.critical("pushed %i entries to es"%self.total_loaded.value)
 
         self.signal_finish.set()
@@ -1138,10 +1135,11 @@ class EvidenceStringProcess():
         # for row in self.session.query(LatestEvidenceString).yield_per(1000):
         evidence_start_time = time.time()
         lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter).lookup
+        get_evidence_page_size = 25000
 
         '''create queues'''
-        input_q = multiprocessing.Queue(maxsize=5000)
-        output_q = multiprocessing.Queue(maxsize=15000)
+        input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
+        output_q = multiprocessing.Queue(maxsize=get_evidence_page_size)
         '''create events'''
         input_loading_finished = multiprocessing.Event()
         output_computation_finished = multiprocessing.Event()
@@ -1164,28 +1162,27 @@ class EvidenceStringProcess():
                                      input_generated_count,
                                      output_computed_count,
                                      processing_errors_count,
-                                     # ) for i in range(multiprocessing.cpu_count())]
-                                  ) for i in range(2)]
+                                     ) for i in range(multiprocessing.cpu_count())]
+                                  # ) for i in range(2)]
         for w in scorers:
             w.start()
 
         storers = [EvidenceStorerWorker(output_q,
                                         output_computation_finished,
                                         data_storage_finished,
-                                        output_computed_count,
+                                        submitted_to_storage_count,
                                         input_generated_count,
-                                     # )  for i in range(multiprocessing.cpu_count())]
-                                  ) for i in range(1)]
+                                     )  for i in range(multiprocessing.cpu_count())]
+                                  # ) for i in range(1)]
         for w in storers:
             w.start()
 
 
 
-        for row in self.get_evidence():
+        for row in self.get_evidence(page_size = get_evidence_page_size):
             ev = Evidence(row.evidence_string, datasource= row.data_source_name)
             idev = row.uniq_assoc_fields_hashdig
             ev.evidence['id'] = idev
-            input_generated_count.value += 1
             input_q.put((idev, ev))
             input_generated_count.value += 1
 
@@ -1243,7 +1240,7 @@ class EvidenceStringProcess():
     #     self.session.flush()
     #     self.data=OrderedDict()
 
-    def get_evidence(self):
+    def get_evidence(self, page_size = 25000):
         # with self.adapter.engine.connect() as conn:
         #     # total = conn.execute("""select count(*) from public.evidence_strings_1pt2pt1;""").fetchone()['count']
         #     # logger.critical("preparing to fetch %i evidence string rows"%total)
@@ -1262,10 +1259,10 @@ class EvidenceStringProcess():
         #         logger.info("loaded %i ev from db to process"%offset)
         #         result.close()
         c=0
-        for row in self.session.query(EvidenceString10).yield_per(1000):
+        for row in self.session.query(EvidenceString10).yield_per(page_size):
             c+=1
-            if c%5000==0:
-                logger.info("loaded %i ev from db to process"%c)
+            if c%page_size==0:
+                logger.critical("loaded %i ev from db to process"%c)
             yield row
         logger.info("loaded %i ev from db to process"%c)
 

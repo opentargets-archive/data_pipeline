@@ -3,7 +3,8 @@ import logging
 from multiprocessing.queues import SimpleQueue
 import pprint
 import multiprocessing
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, helpers
+from elasticsearch.exceptions import ConnectionTimeout
 from sqlalchemy import and_, func
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import joinedload, subqueryload, defer
@@ -370,7 +371,7 @@ class ScoreStorer():
 
     def put(self, id, score):
 
-        self.cache[id] = score
+        # self.cache[id] = score
         self.counter +=1
         if (len(self.cache) % self.chunk_size) == 0:
             self.flush()
@@ -447,7 +448,7 @@ class StatusQueueReporter(Process):
                    self.score_computation_finished.is_set() and
                    self.data_storage_finished.is_set()):
             # try:
-            time.sleep(60*5)
+            time.sleep(60*1)
             logging.info("""
 =========== QUEUES ============
 target_disease_pair_q: %s
@@ -572,6 +573,7 @@ class TargetDiseasePairProducer(Process):
         self.q= task_q
         self.adapter=Adapter()
         self.session=self.adapter.session
+        self.es = Elasticsearch(Config.ELASTICSEARCH_URL, timeout = 10*60)
         self.n_consumers=n_consumers
         self.start_time = start_time
         self.signal_finish = signal_finish
@@ -609,28 +611,140 @@ class TargetDiseasePairProducer(Process):
         self.pairs_generated.value = self.total_jobs
         logging.debug("%s finished"%self.name)
 
-    def _get_data_stream(self,page_size = 50000):
+    # def _get_data_stream(self,page_size = 50000):
+    #
+    #     with self.adapter.engine.connect() as conn:
+    #
+    #         target_query_string ="""SELECT DISTINCT target_id FROM pipeline.target_to_disease_association_score_map;"""
+    #         result = conn.execute(target_query_string)
+    #         target_ids = list(set([i[0] for i in result.fetchall()]))
+    #
+    #         for target_id in target_ids:
+    #             # query_string = """SELECT * FROM pipeline.target_to_disease_association_score_map WHERE target_id = '%s';"""%(target_id)
+    #             #
+    #             #
+    #             # result = conn.execute(query_string)
+    #             # chunk = result.fetchall()
+    #             # if not chunk:
+    #             #     break
+    #             # for row in chunk:
+    #             #     yield row
+    #
+    #             for row in self.session.query(TargetToDiseaseAssociationScoreMap).filter(
+    #                             TargetToDiseaseAssociationScoreMap.target_id == target_id).yield_per(5000):
+    #                 yield row.__dict__
 
-        with self.adapter.engine.connect() as conn:
+    # def _get_data_stream(self,page_size = 10000):
+    #     offset = 0
+    #
+    #
+    #
+    #     gene_res =self.es.search(index=Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+    #                              body={ "query": { "match_all" :{}},
+    #                                       'size': 100000,
+    #                                       '_source': False,
+    #                                     },
+    #                              timeout="10m"
+    #     )
+    #     logging.info("getting info for %i targets"%gene_res['hits']['total'])
+    #
+    #     for target_hit in gene_res['hits']['hits']:
+    #         target_id = target_hit['_id']
+    #         logging.debug("getting info for target: %s"%target_id)
+    #         query_body = {
+    #               "query": {
+    #                   "filtered": {
+    #                       "query": {
+    #                           "match_all": {}
+    #                       },
+    #                       "filter": {
+    #                           "terms": {
+    #                               "target.id": [target_id]
+    #
+    #                           }
+    #                       }
+    #                   }
+    #               },
+    #               'size': 1e6,
+    #               '_source': "*",
+    #           }
+    #
+    #
+    #         res = helpers.scan(client=self.es,
+    #                            query=query_body,
+    #                            scroll='10m',
+    #                            index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
+    #                            timeout="10m",
+    #                            request_timeout=10*60
+    #         )
+    #         # except ConnectionTimeout:
+    #         #     logging.error("Connection timed out for gene_id: 5s | trying again..."%target_id)
+    #
+    #         for hit in res:
+    #             hit = hit['_source']
+    #             for efo in hit['private']['efo_codes']:
+    #                 yield dict(target_id = hit['target']['id'],
+    #                            disease_id = efo,
+    #                            association_score = hit['scores']['association_score'],
+    #                            datasource = hit['sourceID'],
+    #                            is_direct = efo == hit['disease']['id'],
+    #                            )
 
-            target_query_string ="""SELECT DISTINCT target_id FROM pipeline.target_to_disease_association_score_map;"""
-            result = conn.execute(target_query_string)
-            target_ids = list(set([i[0] for i in result.fetchall()]))
+    def _get_data_stream(self,page_size = 10000):
+        local_data =dict()
 
-            for target_id in target_ids:
-                # query_string = """SELECT * FROM pipeline.target_to_disease_association_score_map WHERE target_id = '%s';"""%(target_id)
-                #
-                #
-                # result = conn.execute(query_string)
-                # chunk = result.fetchall()
-                # if not chunk:
-                #     break
-                # for row in chunk:
-                #     yield row
+        query_body = {
+              "query": {"match_all": {} },
+              '_source':  {"include": ["target.id",
+                                       "private.efo_codes",
+                                       "disease.id",
+                                       "scores.association_score",
+                                       "sourceID",
+                                       "id",
+                                       ],
+                           }
+          }
 
-                for row in self.session.query(TargetToDiseaseAssociationScoreMap).filter(
-                                TargetToDiseaseAssociationScoreMap.target_id == target_id).yield_per(5000):
-                    yield row.__dict__
+
+        res = helpers.scan(client=self.es,
+                           query=query_body,
+                           scroll='2h',
+                           index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
+                           timeout="2h",
+                           request_timeout=2*60*60,
+                           size = 50000,
+        )
+
+        c=0
+        e=0
+        for hit in res:
+            hit = hit['_source']
+            c+=1
+            e+=len( hit['private']['efo_codes'])
+            target_id = hit['target']['id']
+            if target_id not in local_data:
+                local_data[target_id] =[]
+
+            local_data[target_id].append( dict(target_id = target_id,
+                                                       disease_id = hit['disease']['id'],
+                                                       association_score = hit['scores']['association_score'],
+                                                       datasource = hit['sourceID'],
+                                                       efo_codes = hit['private']['efo_codes'],
+                                                       )
+                                )
+            if c%1e4==0:
+                logging.debug("loaded %s evidencestrings and expanded to %s"%(millify(c),millify(e)))
+        logging.info("finished loading %s evidencestrings and expanded to %s"%(millify(c),millify(e)))
+
+        for v in local_data.values():
+            for row in v:
+                for efo in row['efo_codes']:
+                    yield dict(target_id = row['target_id'],
+                               disease_id = efo,
+                               association_score = row['association_score'],
+                               datasource = row['datasource'],
+                               is_direct = efo == row['disease_id'],
+                               )
 
 
 
@@ -793,8 +907,8 @@ class ScoringProcess():
         combination_with_data = 0.
         self.start_time = time.time()
         '''create queues'''
-        target_disease_pair_q = Queue()
-        score_data_q = Queue()
+        target_disease_pair_q = Queue(maxsize=10001)
+        score_data_q = Queue(maxsize=10000)
         '''create events'''
         target_disease_pair_loading_finished = multiprocessing.Event()
         # evidence_data_retrieval_finished = multiprocessing.Event()
@@ -842,9 +956,9 @@ class ScoringProcess():
 
 
 
-        JSONObjectStorage.delete_prev_data_in_pg(self.session,
-                                         Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-                                         )
+        # JSONObjectStorage.delete_prev_data_in_pg(self.session,
+        #                                  Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+        #                                  )
         self.session.commit()
         self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
         #
