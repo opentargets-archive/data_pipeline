@@ -26,6 +26,8 @@ import time
 import multiprocessing
 
 logger = logging.getLogger(__name__)
+# logger = multiprocessing.get_logger()
+
 
 
 '''line profiler code'''
@@ -394,6 +396,10 @@ class EvidenceManager():
                 (evidence['type']== 'somatic_mutation'):
             evidence['sourceID'] = 'eva_somatic'
             fixed=True
+        '''move genetic_literature to genetic_association'''
+        if evidence['type']=='genetic_literature':
+            evidence['type']='genetic_association'
+
         '''enforce eco-based score for genetic_association evidencestrings'''
         if evidence['type']=='genetic_association':
             available_score=None

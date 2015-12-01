@@ -124,7 +124,7 @@ class Config():
     SCORING_WEIGHTS['europepmc'] = 0.2
     SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
-    RELEASE_VERSION='2.1'
+    RELEASE_VERSION='2.1.1'
 
 
 
