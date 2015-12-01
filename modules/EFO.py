@@ -135,7 +135,23 @@ class EfoProcess():
                 del self.efos[k]
                 logging.warning("removed efo %s since it has an empty path, add it in postgres"%k)
 
+        """temporary drop genetic_disorder uncharectized fields"""
+        keys = self.efos.keys()
+        for k in keys:
+            efo = self.efos[k]
+            if k == 'genetic_disorder_uncategorized':
+                del self.efos[k]
+            else:
+                for path in efo.path_codes:
+                    if 'genetic_disorder_uncategorized' in path:
+                        del self.efos[k]
+                        logging.warning("removed efo %s it is mapped to genetic_disorder_uncategorized bucket"%k)
+                        break
+
+
         for row in self.session.query(EFOFirstChild).yield_per(1000):
+            if get_ontology_code_from_url(row.first_child_uri) == 'genetic_disorder_uncategorized':
+                continue
             efo_code_parent = get_ontology_code_from_url(row.parent_uri)
             efo_code_child = get_ontology_code_from_url(row.first_child_uri)
             if efo_code_parent in self.efos:
