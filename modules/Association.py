@@ -919,6 +919,24 @@ class ScoringProcess():
         target_disease_pairs_generated_count =  Value('i', 0)
         scores_computed =  Value('i', 0)
         scores_submitted_to_storage =  Value('i', 0)
+
+
+        number_of_workers = multiprocessing.cpu_count()
+
+        '''start target-disease pair producer'''
+        target_disease_pair_producer = TargetDiseasePairProducer(target_disease_pair_q,
+                                             number_of_workers,
+                                             self.start_time,
+                                             target_disease_pair_loading_finished,
+                                             target_disease_pairs_generated_count)
+        target_disease_pair_producer.start()
+
+        '''wait for preprocessing to finish'''
+        while 1:
+            if target_disease_pairs_generated_count.value >0:
+                break
+            time.sleep(1)
+        '''start reporting worker'''
         reporter = StatusQueueReporter(target_disease_pair_q,
                                        score_data_q,
                                        target_disease_pair_loading_finished,
@@ -930,9 +948,7 @@ class ScoringProcess():
                                        )
         reporter.start()
 
-
-
-        '''create workers'''
+        '''create scoring workers'''
         scorers = [ScorerProducer(target_disease_pair_q,
                                   score_data_q,
                                   self.start_time,
@@ -941,18 +957,9 @@ class ScoringProcess():
                                   target_disease_pairs_generated_count,
                                   scores_computed,
                                   target_disease_pairs_generated_count,
-                                  ) for i in range(multiprocessing.cpu_count())]
-                                  # ) for i in range(1)]
+                                  ) for i in range(number_of_workers)]
         for w in scorers:
             w.start()
-
-        target_disease_pair_producer = TargetDiseasePairProducer(target_disease_pair_q,
-                                             len(scorers),
-                                             self.start_time,
-                                             target_disease_pair_loading_finished,
-                                             target_disease_pairs_generated_count)
-        target_disease_pair_producer.start()
-
 
 
 
@@ -964,14 +971,14 @@ class ScoringProcess():
         #
         #
         #
+        '''create data storage workers'''
         storers = [ScoreStorerWorker(score_data_q,
                                    data_storage_finished,
                                    score_computation_finished,
                                    scores_submitted_to_storage,
                                    target_disease_pairs_generated_count,
                                    chunk_size=1000,
-                                     ) for i in range(multiprocessing.cpu_count())]
-                                     # ) for i in range(1)]
+                                     ) for i in range(number_of_workers)]
 
         for w in storers:
             w.start()
