@@ -55,8 +55,73 @@ messageFailed='''
 
 '''
 
+eva_curated = {
+"http://www.orpha.net/ORDO/Orphanet_1838" : "http://www.orpha.net/ORDO/Orphanet_175",
+"http://www.orpha.net/ORDO/Orphanet_68381" : "http://www.orpha.net/ORDO/Orphanet_183497",
+"http://www.orpha.net/ORDO/Orphanet_120487" : "http://www.orpha.net/ORDO/Orphanet_903",
+"http://www.orpha.net/ORDO/Orphanet_91414" : "http://www.orpha.net/ORDO/Orphanet_183487",
+"http://www.orpha.net/ORDO/Orphanet_1047" : "http://www.orpha.net/ORDO/Orphanet_98362",
+"http://www.orpha.net/ORDO/Orphanet_121066" : "http://www.orpha.net/ORDO/Orphanet_818", #http://www.orpha.net/ORDO/Orphanet_818
+"http://www.orpha.net/ORDO/Orphanet_216675" : "http://www.ebi.ac.uk/efo/EFO_0005269",
+"http://www.orpha.net/ORDO/Orphanet_117623" : "http://www.orpha.net/ORDO/Orphanet_827",
+"http://www.orpha.net/ORDO/Orphanet_306773" : "http://www.orpha.net/ORDO/Orphanet_3197",
+"http://www.orpha.net/ORDO/Orphanet_137646" : "http://www.orpha.net/ORDO/Orphanet_110",
+"http://www.orpha.net/ORDO/Orphanet_121730" : "http://www.orpha.net/ORDO/Orphanet_84",
+"http://www.orpha.net/ORDO/Orphanet_211247" : "http://www.ebi.ac.uk/efo/EFO_0006888",
+"http://www.orpha.net/ORDO/Orphanet_98867" : "http://www.orpha.net/ORDO/Orphanet_288", # obsolete
+"http://www.orpha.net/ORDO/Orphanet_99977" : "http://www.ebi.ac.uk/efo/EFO_0005922",
+"http://www.orpha.net/ORDO/Orphanet_118746" : "http://www.orpha.net/ORDO/Orphanet_59", # Allan-Herndon-Dudley syndrome
+"http://www.orpha.net/ORDO/Orphanet_86834" : "http://www.ebi.ac.uk/efo/EFO_1000309",
+"http://www.orpha.net/ORDO/Orphanet_120431" : "http://www.orpha.net/ORDO/Orphanet_79277",
+"http://www.orpha.net/ORDO/Orphanet_120935" : "http://www.orpha.net/ORDO/Orphanet_379",
+"http://www.orpha.net/ORDO/Orphanet_121722" : "http://www.orpha.net/ORDO/Orphanet_84",
+"http://www.orpha.net/ORDO/Orphanet_120345" : "http://www.orpha.net/ORDO/Orphanet_794",
+"http://www.orpha.net/ORDO/Orphanet_364559" : "http://www.orpha.net/ORDO/Orphanet_183524",
+"http://www.orpha.net/ORDO/Orphanet_122492" : "http://www.orpha.net/ORDO/Orphanet_79430",
+"http://www.orpha.net/ORDO/Orphanet_123772" : "http://www.orpha.net/ORDO/Orphanet_636",
+"http://www.orpha.net/ORDO/Orphanet_120309": "http://www.orpha.net/ORDO/Orphanet_805",
+"http://www.orpha.net/ORDO/Orphanet_117820": "http://www.orpha.net/ORDO/Orphanet_397596", #not mapped. -- a gene only valid this time Activated PI3K-delta syndrome Orphanet_397596
+"http://www.orpha.net/ORDO/Orphanet_449": "http://www.ebi.ac.uk/efo/EFO_1000292",
+"http://www.orpha.net/ORDO/Orphanet_52416": "http://www.ebi.ac.uk/efo/EFO_0000096", # Mantle cell lymphoma (climbed up ontology)
+"http://www.orpha.net/ORDO/Orphanet_251612": "http://www.ebi.ac.uk/efo/EFO_0000272", #(climbed up ontology)
+"http://www.orpha.net/ORDO/Orphanet_2965": "http://www.ebi.ac.uk/efo/EFO_0004125", #(climbed up ontology)
+"http://www.orpha.net/ORDO/Orphanet_121715": "http://www.orpha.net/ORDO/Orphanet_84",
+"http://www.orpha.net/ORDO/Orphanet_121719": "http://www.orpha.net/ORDO/Orphanet_84", #(this and record above are mapped to versions of complementation group)
+"http://www.orpha.net/ORDO/Orphanet_767": "http://www.ebi.ac.uk/efo/EFO_0006803", #(Polyarteritis nodosa ->climbed up ontology)
+"http://www.orpha.net/ORDO/Orphanet_282196": "http://www.orpha.net/ORDO/Orphanet_3453",
+"http://www.orpha.net/ORDO/Orphanet_99927": "http://www.ebi.ac.uk/efo/EFO_1000298",
+"http://www.orpha.net/ORDO/Orphanet_803": "http://www.ebi.ac.uk/efo/EFO_0000253",
+"http://www.orpha.net/ORDO/Orphanet_1501": "http://www.ebi.ac.uk/efo/EFO_0003093",
+"http://www.orpha.net/ORDO/Orphanet_123411": "http://www.ebi.ac.uk/efo/EFO_1000642",
+"http://www.orpha.net/ORDO/Orphanet_118978": "http://www.orpha.net/ORDO/Orphanet_110",
+"http://www.orpha.net/ORDO/Orphanet_547": "http://www.ebi.ac.uk/efo/EFO_0005952",
+"http://www.orpha.net/ORDO/Orphanet_123257": "http://www.orpha.net/ORDO/Orphanet_2478",
+"http://www.orpha.net/ORDO/Orphanet_79358": "http://www.orpha.net/ORDO/Orphanet_183444",
+"http://www.orpha.net/ORDO/Orphanet_553": "http://www.ebi.ac.uk/efo/EFO_0003099",
+"http://www.orpha.net/ORDO/Orphanet_88" : "http://www.ebi.ac.uk/efo/EFO_0006926", # 
+"http://www.orpha.net/ORDO/Orphanet_120353" : "http://www.orpha.net/ORDO/Orphanet_79431", # tyrosinase, oculocutaneous albinism IA => Oculocutaneous albinism type 1A
+"http://www.orpha.net/ORDO/Orphanet_120795" : "http://www.orpha.net/ORDO/Orphanet_157", # carnitine palmitoyltransferase 2 => Carnitine palmitoyltransferase II deficiency
+"http://www.orpha.net/ORDO/Orphanet_121802" : "http://www.orpha.net/ORDO/Orphanet_710", # fibroblast growth factor receptor 1 => Pfeiffer syndrome
+"http://www.orpha.net/ORDO/Orphanet_178826" : "http://www.orpha.net/ORDO/Orphanet_65", # spermatogenesis associated 7 => Leber congenital amaurosis
+#"Orphanet_132262" : "Orphanet_93262" # Crouzon syndrome with acanthosis nigricans, Crouzon syndrome => need intermediate Crouzon Syndrome in EFO!!!
+"http://www.orpha.net/ORDO/Orphanet_123572" : "http://www.orpha.net/ORDO/Orphanet_2170", # 5-methyltetrahydrofolate-homocysteine methyltransferase => METHYLCOBALAMIN DEFICIENCY, cblG TYPE => Methylcobalamin deficiency type cblG
+"http://www.orpha.net/ORDO/Orphanet_189330" : "http://www.orpha.net/ORDO/Orphanet_250", # ALX3 mutations leading to Frontonasal dysplasia
+"http://www.orpha.net/ORDO/Orphanet_121400" : "http://www.orpha.net/ORDO/Orphanet_976", # APRT mutations leading to Adenine phosphoribosyltransferase deficiency
+"http://www.orpha.net/ORDO/Orphanet_1984" : "http://www.orpha.net/ORDO/Orphanet_182050", # obsolete Fechtner syndrome => http://www.orpha.net/ORDO/Orphanet_182050 with label: MYH9-related disease
+"http://www.orpha.net/ORDO/Orphanet_79354" : "http://www.orpha.net/ORDO/Orphanet_183426", # map to upper term as EFO does not have this one, should request it!
+"http://www.orpha.net/ORDO/Orphanet_850" : "http://www.orpha.net/ORDO/Orphanet_182050", # May-Hegglin thrombocytopenia deprecated => The preferred class is use http://www.orpha.net/ORDO/Orphanet_182050 with label: MYH9-related disease
+"http://www.orpha.net/ORDO/Orphanet_123524" : "http://www.orpha.net/ORDO/Orphanet_379", # Granulomatous disease, chronic, autosomal recessive, cytochrome b-negative => Chronic granulomatous disease
+"http://www.orpha.net/ORDO/Orphanet_69" : "http://www.orpha.net/ORDO/Orphanet_2118", # wrong eVA mapping!! should be 4-Hydroxyphenylpyruvate dioxygenase deficiency 
+"http://www.orpha.net/ORDO/Orphanet_123334" : "http://www.orpha.net/ORDO/Orphanet_99901", # wrong mapping should be Acyl-CoA dehydrogenase 9 deficiency 
+"http://www.orpha.net/ORDO/Orphanet_123421" : "http://www.orpha.net/ORDO/Orphanet_361", # wrong mapping in eVA for this gene: mutations lead to ACTH resistance
+#"http://www.orpha.net/ORDO/Orphanet_171059" # needs to be refined variant by variant, terms exists in EFO for each of the conditions : methylmalonic aciduria (cobalamin deficiency) cblD type, with homocystinuria in CLinVAR: Homocystinuria, cblD type, variant 1 OR Methylmalonic aciduria, cblD type, variant 2
+"http://www.orpha.net/ORDO/Orphanet_158032" : "http://www.orpha.net/ORDO/Orphanet_540", # STX11, STXBP2 => Familial hemophagocytic lymphohistiocytosis 
+"http://www.orpha.net/ORDO/Orphanet_159550" : "http://www.orpha.net/ORDO/Orphanet_35698" #POLG : Mitochondrial DNA depletion syndrome
+} 
+
 efo_current = {}
 efo_obsolete = {}
+efo_uncat = []
 ensembl_current = {}
 uniprot_current = {}
 eco_current = {}
@@ -435,6 +500,14 @@ class EvidenceValidationFileChecker():
         go_pattern = "http://purl.obolibrary.org/obo/GO_%" 
         omim_pattern = "http://purl.bioontology.org/omim/OMIM_%"
         
+        '''
+        Temp: store the uncharactered diseases to fitler them
+        https://alpha.targetvalidation.org/disease/genetic_disorder_uncategorized
+        '''
+        for row in self.session.query(EFOPath):
+            if any(map(lambda x: x["uri"] == 'http://www.targetvalidation.org/genetic_disorder_uncategorized', row.tree_path)):
+                efo_uncat.append(row.uri);
+        
         for row in self.session.query(EFONames).filter(
                 or_(
                     EFONames.uri.like(efo_pattern), 
@@ -447,6 +520,7 @@ class EvidenceValidationFileChecker():
                     )
                 ):
             #logging.info(row.uri)
+            #if row.uri not in uncat:
             efo_current[row.uri] = row.label
         #logging.info(len(efo_current))
         #logging.info("Loading EFO obsolete terms")
@@ -478,8 +552,8 @@ class EvidenceValidationFileChecker():
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             dirnames.sort()
             for subdirname in dirnames:
-                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv009)$", subdirname)
+                #cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
+                cttv_match = re.match("^(cttv012|cttv011)$", subdirname)
                 if cttv_match:
                     # get provider id
                     provider_id = cttv_match.groups()[0]
@@ -667,15 +741,21 @@ class EvidenceValidationFileChecker():
                             Check EFO
                             '''
                             if obj.disease.id:
+                                index = 0
                                 for disease_id in obj.disease.id:
-                                    if disease_id not in efo_current:
+                                    # fix for EVA data
+                                    if disease_id in eva_curated:
+                                        obj.disease.id[index] = eva_curated[disease_id];
+                                        disease_id = obj.disease.id[index];
+                                    index +=1
+                                    if disease_id not in efo_current or disease_id in efo_uncat:
                                         logger.error("Line {0}: Invalid disease term detected {1}. Please provide the correct EFO disease term".format(lc+1, disease_id))
                                         disease_failed = True
                                         if disease_id not in invalid_diseases:
                                             invalid_diseases[disease_id] = 1
                                         else:
                                             invalid_diseases[disease_id] += 1
-                                        nb_efo_invalid +=1
+                                        nb_efo_invalid +=1              
                                     if disease_id in efo_obsolete:
                                         logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, efo_current[disease_id], efo_obsolete[disease_id]))
                                         disease_failed = True
