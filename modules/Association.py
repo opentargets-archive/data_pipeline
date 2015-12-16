@@ -717,7 +717,6 @@ class ScorerProducer(Process):
                  signal_finish,
                  target_disease_pairs_generated_count,
                  global_counter,
-                 total_loaded,
                  lock):
         super(ScorerProducer, self).__init__()
         self.evidence_data_q = evidence_data_q
@@ -730,7 +729,6 @@ class ScorerProducer(Process):
         self.signal_finish = signal_finish
         self.target_disease_pairs_generated_count = target_disease_pairs_generated_count
         self.global_counter = global_counter
-        self.total_loaded = total_loaded
         self.scorer = Scorer()
         self.gene_retriever = GeneRetriever(self.adapter)
         self.efo_retriever = EfoRetriever(self.adapter)
@@ -739,7 +737,8 @@ class ScorerProducer(Process):
     def run(self):
         logging.info("%s started"%self.name)
         self.data_processing_started = False
-        while not (self.evidence_data_q.empty() and self.target_disease_pair_loading_finished.is_set()):
+        while not (((self.target_disease_pairs_generated_count ==  self.global_counter.value ) and
+                        self.target_disease_pair_loading_finished.is_set()) or self.signal_finish.is_set()):
 
             data = self.evidence_data_q.get()
             if data:
@@ -755,11 +754,6 @@ class ScorerProducer(Process):
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
-        try:
-            self.evidence_data_q.close()
-        except:
-            pass
-
 
     def signal_started(self):
         if self.data_processing_started == False:
@@ -793,8 +787,8 @@ class ScoreStorerWorker(Process):
         logging.info("worker %s started"%self.name)
         with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
             with ScoreStorer(self.adapter, es_loader, chunk_size=self.chunk_size) as storer:
-                while not ((self.global_counter.value >= self.total_loaded.value) and \
-                        self.score_computation_finished.is_set()):
+                while not (((self.target_disease_pairs_generated_count ==  self.global_counter.value ) and
+                        self.score_computation_finished.is_set()) or self.signal_finish.is_set()):
                     target, disease, score = self.q.get()
                     if score:
                         with self.lock:
@@ -804,10 +798,7 @@ class ScoreStorerWorker(Process):
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
-        try:
-            self.q.close()
-        except:
-            pass
+
 
 class ScoringProcess():
 
@@ -863,7 +854,8 @@ class ScoringProcess():
         scores_submitted_to_storage_lock =  multiprocessing.Lock()
 
 
-        number_of_workers = multiprocessing.cpu_count()
+        number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+
 
         '''start target-disease pair producer'''
         target_disease_pair_producer = TargetDiseasePairProducer(target_disease_pair_q,
@@ -899,7 +891,6 @@ class ScoringProcess():
                                   score_computation_finished,
                                   target_disease_pairs_generated_count,
                                   scores_computed,
-                                  target_disease_pairs_generated_count,
                                   scores_computed_lock,
                                   ) for i in range(number_of_workers)]
         for w in scorers:
