@@ -754,7 +754,7 @@ class ScoreProducer(Process):
                 with self.lock:
                     self.global_counter.value +=1
             except Empty:
-                        time.sleep(1)
+                time.sleep(0.1)
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
@@ -805,7 +805,7 @@ class ScoreStorerWorker(Process):
                         with self.lock:
                                 self.global_counter.value +=1
                     except Empty:
-                        time.sleep(1)
+                        time.sleep(0.1)
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
