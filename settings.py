@@ -124,7 +124,7 @@ class Config():
     SCORING_WEIGHTS['europepmc'] = 0.2
     SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
-    WORKERS_NUMBER = 2
+    WORKERS_NUMBER = 1 # if None defaults to cpu count
 
     RELEASE_VERSION='2.test'
 
