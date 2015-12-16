@@ -971,7 +971,9 @@ class EvidenceProcesser(multiprocessing.Process):
                  output_computation_finished,
                  input_generated_count,
                  output_computed_count,
-                 processing_errors_count):
+                 processing_errors_count,
+                 input_processed_count,
+                 lock):
         super(EvidenceProcesser, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
@@ -982,16 +984,19 @@ class EvidenceProcesser(multiprocessing.Process):
         self.input_generated_count = input_generated_count
         self.output_computed_count = output_computed_count
         self.processing_errors_count = processing_errors_count
+        self.input_processed_count = input_processed_count
         self.start_time = time.time()#reset timer start
+        self.lock = lock
 
 
 
     def run(self):
         logger.info("%s started"%self.name)
         self.data_processing_started = False
-        while not (self.input_q.empty() and self.input_loading_finished.is_set()):
-
+        while not ((self.input_generated_count.value == self.input_processed_count.value) and self.input_loading_finished.is_set()):
             data = self.input_q.get()
+            with self.lock:
+                self.input_processed_count.value +=1
             if data:
                 idev, ev = data
                 try:
@@ -1009,9 +1014,12 @@ class EvidenceProcesser(multiprocessing.Process):
                     # if fixed:
                     #     fix+=1
                     self.output_q.put((idev, ev_string_to_load))
+                    with self.lock:
+                        self.output_computed_count.value +=1
 
                 except Exception, error:
-                    self.processing_errors_count.value +=1
+                    with self.lock:
+                        self.processing_errors_count.value +=1
                     # UploadError(ev, error, idev).save()
                     # err += 1
 
@@ -1021,18 +1029,15 @@ class EvidenceProcesser(multiprocessing.Process):
                     else:
                         logger.exception("Error loading data for id %s: %s" % (idev, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
-                self.output_computed_count.value +=1
-                if self.output_computed_count.value %1e3 ==0:
+
+                if self.input_processed_count.value %1e3 ==0:
                     logger.critical("%i processed | %i errors | processing %1.2f evidence per second"%(self.output_computed_count.value,
                                                                                                            self.processing_errors_count.value,
-                                                                                                       float(self.output_computed_count.value)/(time.time()-self.start_time)))
+                                                                                                       float(self.input_processed_count.value)/(time.time()-self.start_time)))
 
+        self.output_computation_finished.set()
+        logger.info("%s finished"%self.name)
 
-        logger.debug("%s finished"%self.name)
-        # try:
-        #     self.output_q.close()
-        # except:
-        #     pass
 
 
 
@@ -1044,75 +1049,44 @@ class EvidenceStorerWorker(multiprocessing.Process):
                  processing_finished,
                  signal_finish,
                  submitted_to_storage,
-                 input_generated_count,
-                 chunk_size = 1e4
+                 output_generated_count,
+                 lock,
+                 chunk_size = 1e4,
                  ):
         super(EvidenceStorerWorker, self).__init__()
         self.q= processing_output_q
         self.signal_finish = signal_finish
         self.chunk_size=chunk_size
         self.processing_finished = processing_finished
-        self.global_counter = input_generated_count
+        self.output_generated_count = output_generated_count
         self.total_loaded = submitted_to_storage
         self.adapter=Adapter()
         self.session=self.adapter.session
         self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        self.lock = lock
 
     def run(self):
         logger.info("worker %s started"%self.name)
         with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
             with ProcessedEvidenceStorer(self.adapter, es_loader, chunk_size=self.chunk_size, quiet=False) as storer:
-                # while not ((self.global_counter.value >= self.total_loaded.value) and \
-                #         self.processing_finished.is_set()):
-                while 1:
-                    output = self.q.get()
-                    if output:
-
-                        self.global_counter.value +=1
+                while not (((self.output_generated_count.value == self.total_loaded.value) and \
+                        self.processing_finished.is_set()) or self.signal_finish.is_set()):
+                    if not self.q.empty():
+                        output = self.q.get()
                         idev, ev = output
                         storer.put(idev,
                            ev)
-                        self.total_loaded.value+=1
+                        with self.lock:
+                            self.total_loaded.value+=1
                         if self.total_loaded.value % self.chunk_size ==0:
                             logger.critical("pushed %i entries to es"%self.total_loaded.value)
+                    # print self.name, (((self.output_generated_count.value == self.total_loaded.value) and \
+                    #         self.processing_finished.is_set()) or self.signal_finish.is_set()), self.output_generated_count.value == self.total_loaded.value,self.processing_finished.is_set(),  self.signal_finish.is_set(), self.total_loaded.value
+
 
         self.signal_finish.set()
-        logger.debug("%s finished"%self.name)
-        try:
-            self.q.close()
-        except:
-            pass
+        logger.info("%s finished"%self.name)
 
-        #  def _store_evidence_string(self):
-        # for key, value in self.data.iteritems():
-        #     self.loaded_entries_to_pg += 1
-        #     self.session.add(ElasticsearchLoad(id=key,
-        #                                   index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value.database],
-        #                                   type=value.get_doc_name(),
-        #                                   data=value.to_json(),
-        #                                   active=True,
-        #                                   date_created=datetime.now(),
-        #                                   date_modified=datetime.now(),
-        #                                   ))
-        #     # for efo in value.evidence['private']['efo_codes']:
-        #     #     self.session.add(TargetToDiseaseAssociationScoreMap(
-        #     #                                       target_id=value.evidence['target']['id'],
-        #     #                                       disease_id=efo,
-        #     #                                       evidence_id=value.evidence['id'],
-        #     #                                       is_direct=efo==value.evidence['disease']['id'],
-        #     #                                       association_score=value.evidence['scores']['association_score'],
-        #     #                                       datasource=value.evidence['sourceID'],))
-        #     # self.session.add(ElasticsearchLoad(id=key,
-        #     #                               index=Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-        #     #                               type=value.get_doc_name(),
-        #     #                               data=value.score_to_json(),
-        #     #                               active=True,
-        #     #                               date_created=datetime.now(),
-        #     #                               date_modified=datetime.now(),
-        #     #                               ))
-        # logger.info("%i rows of evidence strings inserted to elasticsearch_load" % self.loaded_entries_to_pg)
-        # self.session.flush()
-        # self.data=OrderedDict()
 
 class EvidenceStringProcess():
 
@@ -1137,7 +1111,7 @@ class EvidenceStringProcess():
 
         logger.debug("Starting Evidence Manager")
 
-        self._delete_prev_data()
+        # self._delete_prev_data()
         # for row in self.session.query(LatestEvidenceString).yield_per(1000):
         evidence_start_time = time.time()
         lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter).lookup
@@ -1155,7 +1129,12 @@ class EvidenceStringProcess():
         input_generated_count =  multiprocessing.Value('i', 0)
         processing_errors_count =  multiprocessing.Value('i', 0)
         output_computed_count =  multiprocessing.Value('i', 0)
+        input_processed_count = multiprocessing.Value('i', 0)
         submitted_to_storage_count =  multiprocessing.Value('i', 0)
+
+        '''create locks'''
+        data_processing_lock =  multiprocessing.Lock()
+        data_storage_lock =  multiprocessing.Lock()
 
 
 
@@ -1168,6 +1147,8 @@ class EvidenceStringProcess():
                                      input_generated_count,
                                      output_computed_count,
                                      processing_errors_count,
+                                     input_processed_count,
+                                     data_processing_lock
                                      ) for i in range(multiprocessing.cpu_count())]
                                   # ) for i in range(2)]
         for w in scorers:
@@ -1177,7 +1158,8 @@ class EvidenceStringProcess():
                                         output_computation_finished,
                                         data_storage_finished,
                                         submitted_to_storage_count,
-                                        input_generated_count,
+                                        output_computed_count,
+                                        data_storage_lock
                                      )  for i in range(multiprocessing.cpu_count())]
                                   # ) for i in range(1)]
         for w in storers:
@@ -1194,9 +1176,19 @@ class EvidenceStringProcess():
 
             if input_generated_count.value % 1e4 == 0:
                 logger.info("%i entries submitted for process" % (input_generated_count.value))
+        input_loading_finished.set()
 
-        output_q.join_thread()
-        self.session.commit()
+        '''wait for other processes to finish'''
+        while not data_storage_finished.is_set():
+                time.sleep(1)
+        for w in scorers:
+            if w.is_alive():
+                w.terminate()
+        for w in storers:
+            if w.is_alive():
+                time.sleep(1)
+                w.terminate()
+        # # self.session.commit()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
 

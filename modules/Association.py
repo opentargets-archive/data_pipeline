@@ -506,7 +506,8 @@ class EvidenceGetter(Process):
                  global_count,
                  start_time,
                  signal_finish,
-                 producer_done):
+                 producer_done,
+                 lock):
         super(EvidenceGetter, self).__init__()
         self.task_q= task_q
         self.result_q= result_q
@@ -517,6 +518,7 @@ class EvidenceGetter(Process):
         self.start_time = start_time
         self.signal_finish = signal_finish
         self.producer_done = producer_done
+        self.lock=lock
 
 
     def run(self):
@@ -550,7 +552,8 @@ class EvidenceGetter(Process):
                                 ]
             # self.task_q.task_done()
             self.result_q.put((target, disease, evidence))
-            self.global_count.value +=1
+            with self.lock:
+                self.global_count.value +=1
             count = self.global_count.value
             if count %global_reporting_step == 0:
                logging.info('target-disease pair analysed: %s | analysis rate: %s pairs per second'%(millify(count), millify(count/(time.time()-self.start_time))))
@@ -568,7 +571,8 @@ class TargetDiseasePairProducer(Process):
                  n_consumers,
                  start_time,
                  signal_finish,
-                 pairs_generated):
+                 pairs_generated,
+                 lock):
         super(TargetDiseasePairProducer, self).__init__()
         self.q= task_q
         self.adapter=Adapter()
@@ -578,6 +582,7 @@ class TargetDiseasePairProducer(Process):
         self.start_time = start_time
         self.signal_finish = signal_finish
         self.pairs_generated = pairs_generated
+        self.lock = lock
 
 
     def run(self):
@@ -600,6 +605,9 @@ class TargetDiseasePairProducer(Process):
             self.data_cache[key].append(self.get_score_from_row(row))
             if c%5e5 == 0:
                 logging.info(('%s rows read'%millify(c)))
+            # print c
+            # if c==10000:
+            #     break
 
 
 
@@ -607,88 +615,11 @@ class TargetDiseasePairProducer(Process):
         # for w in range(self.n_consumers):
         #     self.q.put(None)#kill consumers when done
         logging.info("task loading done: %s loaded in %is"%(millify(self.total_jobs), time.time()-self.start_time))
+        with self.lock:
+            self.pairs_generated.value = self.total_jobs
         self.signal_finish.set()
-        self.pairs_generated.value = self.total_jobs
         logging.debug("%s finished"%self.name)
 
-    # def _get_data_stream(self,page_size = 50000):
-    #
-    #     with self.adapter.engine.connect() as conn:
-    #
-    #         target_query_string ="""SELECT DISTINCT target_id FROM pipeline.target_to_disease_association_score_map;"""
-    #         result = conn.execute(target_query_string)
-    #         target_ids = list(set([i[0] for i in result.fetchall()]))
-    #
-    #         for target_id in target_ids:
-    #             # query_string = """SELECT * FROM pipeline.target_to_disease_association_score_map WHERE target_id = '%s';"""%(target_id)
-    #             #
-    #             #
-    #             # result = conn.execute(query_string)
-    #             # chunk = result.fetchall()
-    #             # if not chunk:
-    #             #     break
-    #             # for row in chunk:
-    #             #     yield row
-    #
-    #             for row in self.session.query(TargetToDiseaseAssociationScoreMap).filter(
-    #                             TargetToDiseaseAssociationScoreMap.target_id == target_id).yield_per(5000):
-    #                 yield row.__dict__
-
-    # def _get_data_stream(self,page_size = 10000):
-    #     offset = 0
-    #
-    #
-    #
-    #     gene_res =self.es.search(index=Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-    #                              body={ "query": { "match_all" :{}},
-    #                                       'size': 100000,
-    #                                       '_source': False,
-    #                                     },
-    #                              timeout="10m"
-    #     )
-    #     logging.info("getting info for %i targets"%gene_res['hits']['total'])
-    #
-    #     for target_hit in gene_res['hits']['hits']:
-    #         target_id = target_hit['_id']
-    #         logging.debug("getting info for target: %s"%target_id)
-    #         query_body = {
-    #               "query": {
-    #                   "filtered": {
-    #                       "query": {
-    #                           "match_all": {}
-    #                       },
-    #                       "filter": {
-    #                           "terms": {
-    #                               "target.id": [target_id]
-    #
-    #                           }
-    #                       }
-    #                   }
-    #               },
-    #               'size': 1e6,
-    #               '_source': "*",
-    #           }
-    #
-    #
-    #         res = helpers.scan(client=self.es,
-    #                            query=query_body,
-    #                            scroll='10m',
-    #                            index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
-    #                            timeout="10m",
-    #                            request_timeout=10*60
-    #         )
-    #         # except ConnectionTimeout:
-    #         #     logging.error("Connection timed out for gene_id: 5s | trying again..."%target_id)
-    #
-    #         for hit in res:
-    #             hit = hit['_source']
-    #             for efo in hit['private']['efo_codes']:
-    #                 yield dict(target_id = hit['target']['id'],
-    #                            disease_id = efo,
-    #                            association_score = hit['scores']['association_score'],
-    #                            datasource = hit['sourceID'],
-    #                            is_direct = efo == hit['disease']['id'],
-    #                            )
 
     def _get_data_stream(self,page_size = 10000):
         local_data =dict()
@@ -766,7 +697,8 @@ class TargetDiseasePairProducer(Process):
             self.q.put((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
         self.total_jobs +=c
-        self.pairs_generated.value =  self.total_jobs
+        with self.lock:
+            self.pairs_generated.value =  self.total_jobs
 
     def get_score_from_row(self, row):
         return EvidenceScore(score = row['association_score']*Config.SCORING_WEIGHTS[row['datasource']],
@@ -785,10 +717,12 @@ class ScorerProducer(Process):
                  signal_finish,
                  target_disease_pairs_generated_count,
                  global_counter,
-                 total_loaded):
+                 total_loaded,
+                 lock):
         super(ScorerProducer, self).__init__()
         self.evidence_data_q = evidence_data_q
         self.score_q = score_q
+        self.lock = lock
         self.adapter=Adapter()
         self.session=self.adapter.session
         self.start_time = start_time
@@ -812,7 +746,8 @@ class ScorerProducer(Process):
                 self.signal_started()
             target, disease, evidence, is_direct = data
             if evidence:
-                self.global_counter.value +=1
+                with self.lock:
+                    self.global_counter.value +=1
                 score = self.scorer.score(target, disease, evidence, is_direct)
                 score.set_target_data(self.gene_retriever.get_gene(target))
                 score.set_disease_data(self.efo_retriever.get_efo(disease))
@@ -839,6 +774,7 @@ class ScoreStorerWorker(Process):
                  score_computation_finished,
                  scores_submitted_to_storage,
                  target_disease_pairs_generated_count,
+                 lock,
                  chunk_size = 1e4
                  ):
         super(ScoreStorerWorker, self).__init__()
@@ -846,6 +782,7 @@ class ScoreStorerWorker(Process):
         self.signal_finish = signal_finish
         self.score_computation_finished = score_computation_finished
         self.chunk_size=chunk_size
+        self.lock = lock
         self.global_counter = scores_submitted_to_storage
         self.total_loaded = target_disease_pairs_generated_count
         self.adapter=Adapter()
@@ -860,7 +797,8 @@ class ScoreStorerWorker(Process):
                         self.score_computation_finished.is_set()):
                     target, disease, score = self.q.get()
                     if score:
-                        self.global_counter.value +=1
+                        with self.lock:
+                            self.global_counter.value +=1
                         storer.put('%s-%s'%(target,disease),
                                         score)
 
@@ -919,6 +857,10 @@ class ScoringProcess():
         target_disease_pairs_generated_count =  Value('i', 0)
         scores_computed =  Value('i', 0)
         scores_submitted_to_storage =  Value('i', 0)
+        '''create locks'''
+        target_disease_pairs_generated_lock = multiprocessing.Lock()
+        scores_computed_lock =  multiprocessing.Lock()
+        scores_submitted_to_storage_lock =  multiprocessing.Lock()
 
 
         number_of_workers = multiprocessing.cpu_count()
@@ -928,7 +870,8 @@ class ScoringProcess():
                                              number_of_workers,
                                              self.start_time,
                                              target_disease_pair_loading_finished,
-                                             target_disease_pairs_generated_count)
+                                             target_disease_pairs_generated_count,
+                                             target_disease_pairs_generated_lock)
         target_disease_pair_producer.start()
 
         '''wait for preprocessing to finish'''
@@ -957,6 +900,7 @@ class ScoringProcess():
                                   target_disease_pairs_generated_count,
                                   scores_computed,
                                   target_disease_pairs_generated_count,
+                                  scores_computed_lock,
                                   ) for i in range(number_of_workers)]
         for w in scorers:
             w.start()
@@ -977,6 +921,7 @@ class ScoringProcess():
                                    score_computation_finished,
                                    scores_submitted_to_storage,
                                    target_disease_pairs_generated_count,
+                                   scores_submitted_to_storage_lock,
                                    chunk_size=1000,
                                      ) for i in range(number_of_workers)]
 
