@@ -1136,7 +1136,7 @@ class EvidenceStringProcess():
         data_processing_lock =  multiprocessing.Lock()
         data_storage_lock =  multiprocessing.Lock()
 
-
+        workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
 
         '''create workers'''
         scorers = [EvidenceProcesser(input_q,
@@ -1149,7 +1149,7 @@ class EvidenceStringProcess():
                                      processing_errors_count,
                                      input_processed_count,
                                      data_processing_lock
-                                     ) for i in range(multiprocessing.cpu_count())]
+                                     ) for i in range(workers_number)]
                                   # ) for i in range(2)]
         for w in scorers:
             w.start()
@@ -1160,7 +1160,7 @@ class EvidenceStringProcess():
                                         submitted_to_storage_count,
                                         output_computed_count,
                                         data_storage_lock
-                                     )  for i in range(multiprocessing.cpu_count())]
+                                     )  for i in range(workers_number)]
                                   # ) for i in range(1)]
         for w in storers:
             w.start()

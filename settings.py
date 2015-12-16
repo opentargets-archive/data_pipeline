@@ -124,6 +124,8 @@ class Config():
     SCORING_WEIGHTS['europepmc'] = 0.2
     SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
+    WORKERS_NUMBER = 2
+
     RELEASE_VERSION='2.test'
 
 
