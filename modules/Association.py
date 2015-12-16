@@ -1,5 +1,6 @@
 import json
 import logging
+from Queue import Empty
 from multiprocessing.queues import SimpleQueue
 import pprint
 import multiprocessing
@@ -740,17 +741,20 @@ class ScoreProducer(Process):
         while not (((self.target_disease_pairs_generated_count ==  self.global_counter.value ) and
                         self.target_disease_pair_loading_finished.is_set()) or self.signal_finish.is_set()):
 
-            data = self.evidence_data_q.get()
-            if data:
-                self.signal_started()
-            target, disease, evidence, is_direct = data
-            if evidence:
-                score = self.scorer.score(target, disease, evidence, is_direct)
-                score.set_target_data(self.gene_retriever.get_gene(target))
-                score.set_disease_data(self.efo_retriever.get_efo(disease))
-                self.score_q.put((target, disease,score))
-            with self.lock:
-                self.global_counter.value +=1
+            try:
+                data = self.evidence_data_q.get_nowait()
+                if data:
+                    self.signal_started()
+                target, disease, evidence, is_direct = data
+                if evidence:
+                    score = self.scorer.score(target, disease, evidence, is_direct)
+                    score.set_target_data(self.gene_retriever.get_gene(target))
+                    score.set_disease_data(self.efo_retriever.get_efo(disease))
+                    self.score_q.put((target, disease,score))
+                with self.lock:
+                    self.global_counter.value +=1
+            except Empty:
+                        time.sleep(1)
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
@@ -768,6 +772,7 @@ class ScoreStorerWorker(Process):
                  score_computation_finished,
                  scores_submitted_to_storage,
                  target_disease_pairs_generated_count,
+                 target_disease_pair_loading_finished,
                  lock,
                  chunk_size = 1e4
                  ):
@@ -779,6 +784,7 @@ class ScoreStorerWorker(Process):
         self.lock = lock
         self.global_counter = scores_submitted_to_storage
         self.target_disease_pairs_generated_count = target_disease_pairs_generated_count
+        self.target_disease_pair_loading_finished = target_disease_pair_loading_finished
         self.adapter=Adapter()
         self.session=self.adapter.session
         self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
@@ -788,15 +794,18 @@ class ScoreStorerWorker(Process):
         with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
             with ScoreStorer(self.adapter, es_loader, chunk_size=self.chunk_size) as storer:
                 while not (((self.target_disease_pairs_generated_count ==  self.global_counter.value ) and
-                        self.score_computation_finished.is_set()) or self.signal_finish.is_set()):
-                    data = self.q.get()
+                        self.target_disease_pair_loading_finished.is_set()) or self.signal_finish.is_set()):
+                    try:
+                        data = self.q.get_nowait()
 
-                    target, disease, score = data
-                    if score:
-                        storer.put('%s-%s'%(target,disease),
-                                        score)
-                    with self.lock:
-                            self.global_counter.value +=1
+                        target, disease, score = data
+                        if score:
+                            storer.put('%s-%s'%(target,disease),
+                                            score)
+                        with self.lock:
+                                self.global_counter.value +=1
+                    except Empty:
+                        time.sleep(1)
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
@@ -914,6 +923,7 @@ class ScoringProcess():
                                    score_computation_finished,
                                    scores_submitted_to_storage,
                                    target_disease_pairs_generated_count,
+                                   target_disease_pair_loading_finished,
                                    scores_submitted_to_storage_lock,
                                    chunk_size=1000,
                                      ) for i in range(number_of_workers)]
