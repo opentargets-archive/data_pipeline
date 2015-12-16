@@ -587,8 +587,8 @@ class TargetDiseasePairProducer(Process):
 
     def run(self):
         logging.info("%s started"%self.name)
-        total_assocaition_pairs = self.session.query(TargetToDiseaseAssociationScoreMap).count()
-        logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
+        # total_assocaition_pairs = self.session.query(TargetToDiseaseAssociationScoreMap).count()
+        # logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
         self.total_jobs = 0
         self.init_data_cache()
         c=0
@@ -640,7 +640,7 @@ class TargetDiseasePairProducer(Process):
         res = helpers.scan(client=self.es,
                            query=query_body,
                            scroll='2h',
-                           index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
+                           index=Config.RELEASE_VERSION+'_'+Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
                            timeout="2h",
                            request_timeout=2*60*60,
                            size = 50000,

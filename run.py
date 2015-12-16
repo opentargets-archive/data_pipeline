@@ -95,7 +95,7 @@ if __name__ == '__main__':
     #                     sniffer_timeout=60)
     #
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.CRITICAL)
+    logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     for handler in logger.handlers:
         handler.setFormatter(formatter)
@@ -155,16 +155,16 @@ if __name__ == '__main__':
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
                 EvidenceStringProcess(adapter).process_all()
-            if (EvidenceStringActions.UPLOAD in args.evs) or do_all:
-                EvidenceStringUploader(adapter, loader).upload_all()
+            # if (EvidenceStringActions.UPLOAD in args.evs) or do_all:
+            #     EvidenceStringUploader(adapter, loader).upload_all()
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.EXTRACT in args.ass) or do_all:
                 ScoringExtract(adapter).extract()
             if (AssociationActions.PROCESS in args.ass) or do_all:
                 ScoringProcess(adapter, loader).process_all()
-            if (AssociationActions.UPLOAD in args.ass):# data will be uploaded also by the proces step
-                ScoringUploader(adapter, loader).upload_all()
+            # if (AssociationActions.UPLOAD in args.ass):# data will be uploaded also by the proces step
+            #     ScoringUploader(adapter, loader).upload_all()
         if args.val or run_full_pipeline:
             do_all = (EvidenceValidationActions.ALL in args.val) or run_full_pipeline
             if (EvidenceValidationActions.CHECKFILES in args.val) or do_all:
