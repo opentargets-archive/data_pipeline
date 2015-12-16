@@ -707,7 +707,7 @@ class TargetDiseasePairProducer(Process):
                              is_direct=row['is_direct'])
 
 
-class ScorerProducer(Process):
+class ScoreProducer(Process):
 
     def __init__(self,
                  evidence_data_q,
@@ -718,7 +718,7 @@ class ScorerProducer(Process):
                  target_disease_pairs_generated_count,
                  global_counter,
                  lock):
-        super(ScorerProducer, self).__init__()
+        super(ScoreProducer, self).__init__()
         self.evidence_data_q = evidence_data_q
         self.score_q = score_q
         self.lock = lock
@@ -745,12 +745,12 @@ class ScorerProducer(Process):
                 self.signal_started()
             target, disease, evidence, is_direct = data
             if evidence:
-                with self.lock:
-                    self.global_counter.value +=1
                 score = self.scorer.score(target, disease, evidence, is_direct)
                 score.set_target_data(self.gene_retriever.get_gene(target))
                 score.set_disease_data(self.efo_retriever.get_efo(disease))
                 self.score_q.put((target, disease,score))
+            with self.lock:
+                self.global_counter.value +=1
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
@@ -778,7 +778,7 @@ class ScoreStorerWorker(Process):
         self.chunk_size=chunk_size
         self.lock = lock
         self.global_counter = scores_submitted_to_storage
-        self.total_loaded = target_disease_pairs_generated_count
+        self.target_disease_pairs_generated_count = target_disease_pairs_generated_count
         self.adapter=Adapter()
         self.session=self.adapter.session
         self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
@@ -787,14 +787,16 @@ class ScoreStorerWorker(Process):
         logging.info("worker %s started"%self.name)
         with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
             with ScoreStorer(self.adapter, es_loader, chunk_size=self.chunk_size) as storer:
-                while not (((self.total_loaded ==  self.global_counter.value ) and
+                while not (((self.target_disease_pairs_generated_count ==  self.global_counter.value ) and
                         self.score_computation_finished.is_set()) or self.signal_finish.is_set()):
-                    target, disease, score = self.q.get()
+                    data = self.q.get()
+
+                    target, disease, score = data
                     if score:
-                        with self.lock:
-                            self.global_counter.value +=1
                         storer.put('%s-%s'%(target,disease),
                                         score)
+                    with self.lock:
+                            self.global_counter.value +=1
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
@@ -884,15 +886,15 @@ class ScoringProcess():
         reporter.start()
 
         '''create scoring workers'''
-        scorers = [ScorerProducer(target_disease_pair_q,
-                                  score_data_q,
-                                  self.start_time,
-                                  target_disease_pair_loading_finished,
-                                  score_computation_finished,
-                                  target_disease_pairs_generated_count,
-                                  scores_computed,
-                                  scores_computed_lock,
-                                  ) for i in range(number_of_workers)]
+        scorers = [ScoreProducer(target_disease_pair_q,
+                                 score_data_q,
+                                 self.start_time,
+                                 target_disease_pair_loading_finished,
+                                 score_computation_finished,
+                                 target_disease_pairs_generated_count,
+                                 scores_computed,
+                                 scores_computed_lock,
+                                 ) for i in range(number_of_workers)]
         for w in scorers:
             w.start()
 
@@ -924,6 +926,14 @@ class ScoringProcess():
         while not data_storage_finished.is_set():
 
             time.sleep(10)
+        for w in scorers:
+            if w.is_alive():
+                w.terminate()
+        for w in storers:
+            if w.is_alive():
+                time.sleep(1)
+                w.terminate()
+        reporter.terminate
 
         logging.info("DONE")
 
