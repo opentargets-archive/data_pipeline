@@ -485,6 +485,12 @@ scores submitted for storage: %s
             #     logging.info('%1.1f%% combinations computed, %s with data, %s remaining'%(c/total_jobs*100,
             #                                                                               millify(combination_with_data),
             #                                                                               millify(total_jobs)))
+            if self.target_disease_pair_loading_finished.is_set():
+                if (self.scores_computed.value == self.target_disease_pairs_generated_count.value):
+                    self.score_computation_finished.set()
+                if (self.scores_submitted_to_storage.value == self.scores_computed.value):
+                    self.data_storage_finished.set()
+
             if self.data_storage_finished.is_set():
                 break
 
@@ -754,7 +760,7 @@ class ScoreProducer(Process):
                 with self.lock:
                     self.global_counter.value +=1
             except Empty:
-                time.sleep(0.1)
+                time.sleep(0.01)
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
@@ -805,7 +811,7 @@ class ScoreStorerWorker(Process):
                         with self.lock:
                                 self.global_counter.value +=1
                     except Empty:
-                        time.sleep(0.1)
+                        time.sleep(0.01)
 
         self.signal_finish.set()
         logging.debug("%s finished"%self.name)
