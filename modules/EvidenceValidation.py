@@ -1,7 +1,8 @@
 import os
 import sys
+# This bit is necessary for text mining data
 reload(sys);
-sys.setdefaultencoding("utf8")
+sys.setdefaultencoding("utf8");
 import re
 import gzip
 import smtplib
