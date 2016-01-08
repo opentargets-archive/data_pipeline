@@ -3,6 +3,7 @@ import sys
 # This bit is necessary for text mining data
 reload(sys);
 sys.setdefaultencoding("utf8");
+#blahblah
 import re
 import gzip
 import smtplib
