@@ -30,9 +30,10 @@ import hashlib
 from lxml.etree import tostring
 from xml.etree import cElementTree as ElementTree
 from sqlalchemy.dialects.postgresql import JSON
+import multiprocessing
 
 BLOCKSIZE = 65536
-
+NB_JSON_FILES = 5
 
 __author__ = 'gautierk'
 
@@ -125,6 +126,93 @@ class EvidenceValidationActions(Actions):
     CHECKFILES='checkfiles'
     VALIDATE='validate'
     GENEMAPPING='genemapping'
+
+class EvidenceFileReader(multiprocessing.Process):
+
+    def __init__(self,
+                 output_q,
+                 input_file_loading_finished,
+                 input_file_count,
+                 lock):
+        super(EvidenceFileReader, self).__init__()
+        self.output_q = output_q
+        self.start_time = time.time()
+        self.input_file_loading_finished = input_file_loading_finished
+        self.input_file_count = input_file_count
+        self.start_time = time.time()#reset timer start
+        self.lock = lock
+
+    def run(self):
+        logger.info("%s started"%self.name)
+
+        for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
+            dirnames.sort()
+            for subdirname in dirnames:
+                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
+                cttv_match = re.match("^(cttv006)$", subdirname)
+                if cttv_match:
+                    # get provider id
+                    provider_id = cttv_match.groups()[0]
+
+                    cttv_dir = os.path.join(dirname, subdirname)
+                    logging.info(cttv_dir)
+                    path = os.path.join(cttv_dir, "upload/submissions")
+                    for cttv_dirname, cttv_dirs, filenames in os.walk(path):
+                        # sort by the last modified time of the files
+                        filenames.sort(key=lambda x: os.stat(os.path.join(path, x)).st_mtime)
+                        for filename in filenames:
+                            logging.info(filename);
+                            cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
+                            #cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
+                            if cttv_filename_match and filename == "cttv006_Networks_Reactome-03-12-2015.json.gz":
+                                cttv_file = os.path.join(cttv_dirname, filename)
+                                logging.info(cttv_file)
+                                data_source_name = Config.JSON_FILE_TO_DATASOURCE_MAPPING[cttv_filename_match.groups()[0]]
+                                logging.info(data_source_name)
+                                last_modified = os.path.getmtime(cttv_file)
+                                #july = time.strptime("01 Jul 2015", "%d %b %Y")
+                                #julyseconds = time.mktime(july)
+                                sep = time.strptime("20 Oct 2015", "%d %b %Y")
+                                sepseconds = time.mktime(sep)
+                                if( last_modified - sepseconds ) > 0:
+                                    m = re.match("^(.+).json.gz$", filename)
+                                    logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
+                                    logging.info(cttv_file)
+                                    md5_hash = self.check_gzipfile(cttv_file)
+                                    # push to the queue
+                                    #self.validate_gzipfile(cttv_file, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
+
+                                    try:
+                                        self.output_q.put((cttv_file, filename, provider_id, data_source_name, md5_hash))
+                                        with self.lock:
+                                            self.input_file_count.value +=1
+
+                                    except Exception, error:
+
+                                        if isinstance(error,AttributeError):
+                                            logger.error("Error loading data for id %s: %s" % (cttv_file, str(error)))
+                                        else:
+                                            logger.exception("Error loading file for id %s: %s" % (cttv_file, str(error)))
+
+
+
+        self.input_file_loading_finished.set()
+        logger.info("%s finished"%self.name)
+
+
+    def check_gzipfile(self, filename):
+
+        hasher = hashlib.md5()
+        with gzip.open(filename,'rb') as afile:
+        #with open(filename, 'rb') as afile:
+            buf = afile.read(BLOCKSIZE)
+            while len(buf) > 0:
+                hasher.update(buf)
+                buf = afile.read(BLOCKSIZE)
+        md5_hash = hasher.hexdigest()
+        print(md5_hash)
+        afile.close()
+        return md5_hash
 
 class EvidenceStringStorage():
 
@@ -639,7 +727,45 @@ class EvidenceValidationFileChecker():
         #return;
         self.load_efo();
         self.load_eco();
-        
+
+        '''
+        Create queues
+        '''
+        file_q = multiprocessing.Queue(maxsize=NB_JSON_FILES+1)
+
+        '''
+        Create events
+        '''
+        input_file_loading_finished = multiprocessing.Event()
+
+        '''
+        Create counters (shared memory objects)
+        '''
+        input_file_count =  multiprocessing.Value('i', 0)
+
+        '''create locks'''
+        data_processing_lock =  multiprocessing.Lock()
+        data_storage_lock =  multiprocessing.Lock()
+
+        workers_number = Config.EVIDENCEVALIDATION_WORKERS_NUMBER or multiprocessing.cpu_count()
+
+        file_reader = EvidenceFileReader(
+                                    file_q,
+                                    input_file_loading_finished,
+                                    input_file_count,
+                                    data_processing_lock)
+
+        file_reader.start()
+
+        '''wait for other processes to finish'''
+        while not input_file_loading_finished.is_set():
+                time.sleep(1)
+        if file_reader.is_alive():
+            file_reader.terminate()
+
+        return
+
+    def toto(self):
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             dirnames.sort()
             for subdirname in dirnames:
@@ -1140,20 +1266,6 @@ class EvidenceValidationFileChecker():
                 text, 
                 logfile
                 )
-                                
-    
-    def check_gzipfile(self, filename):
-    
-        hasher = hashlib.md5()
-        with gzip.open(filename,'rb') as afile:
-        #with open(filename, 'rb') as afile:
-            buf = afile.read(BLOCKSIZE)
-            while len(buf) > 0:
-                hasher.update(buf)
-                buf = afile.read(BLOCKSIZE)
-        md5_hash = hasher.hexdigest() 
-        print(md5_hash)
-        afile.close()
-        return md5_hash
+
 
                 
