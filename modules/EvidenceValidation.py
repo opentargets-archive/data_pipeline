@@ -119,19 +119,12 @@ eva_curated = {
 #"http://www.orpha.net/ORDO/Orphanet_171059" # needs to be refined variant by variant, terms exists in EFO for each of the conditions : methylmalonic aciduria (cobalamin deficiency) cblD type, with homocystinuria in CLinVAR: Homocystinuria, cblD type, variant 1 OR Methylmalonic aciduria, cblD type, variant 2
 "http://www.orpha.net/ORDO/Orphanet_158032" : "http://www.orpha.net/ORDO/Orphanet_540", # STX11, STXBP2 => Familial hemophagocytic lymphohistiocytosis 
 "http://www.orpha.net/ORDO/Orphanet_159550" : "http://www.orpha.net/ORDO/Orphanet_35698" #POLG : Mitochondrial DNA depletion syndrome
-} 
-
-efo_current = {}
-efo_obsolete = {}
-efo_uncat = []
-ensembl_current = {}
-uniprot_current = {}
-eco_current = {}
-symbols = {}
+}
 
 class EvidenceValidationActions(Actions):
     CHECKFILES='checkfiles'
     VALIDATE='validate'
+    GENEMAPPING='genemapping'
 
 class EvidenceStringStorage():
 
@@ -216,6 +209,14 @@ class EvidenceValidationFileChecker():
         #LOGGER = logging.getLogger('cttv.model.evidence.association_score')
         #LOGGER.setLevel(logging.ERROR)
         #LOGGER.addHandler(memoryhandler)
+
+        self.uniprot_current = {}
+        self.efo_current = {}
+        self.efo_obsolete = {}
+        self.efo_uncat = []
+        self.ensembl_current = {}
+        self.eco_current = {}
+        self.symbols = {}
 
     def storage_reset(self):
         self.cache = {}
@@ -371,6 +372,10 @@ class EvidenceValidationFileChecker():
         return 0;
         
     def load_HGNC(self):
+        '''
+        Load HGNC information from the last version in database
+        :return: None
+        '''
         logging.info("Loading HGNC entries and mapping from Ensembl Gene Id to UniProt")
         c = 0
         for row in self.session.query(HgncInfoLookup).order_by(desc(HgncInfoLookup.last_updated)).limit(1):
@@ -380,26 +385,28 @@ class EvidenceValidationFileChecker():
                 ensembl_gene_id = None;
                 if "symbol" in doc:
                     gene_symbol = doc["symbol"];
-                    if gene_symbol not in symbols:
+                    if gene_symbol not in self.symbols:
                         logging.info("Adding missing symbol from Ensembl %s" % gene_symbol)
-                        symbols[gene_symbol] = {};
-                        
+                        self.symbols[gene_symbol] = {};
+
+                    self.symbols[gene_symbol]["hgnc_id"] = doc["hgnc_id"]
+
                 if "ensembl_gene_id" in doc: 
                     ensembl_gene_id = doc["ensembl_gene_id"];
                         
                 if "uniprot_ids" in doc:
-                    if "uniprot_ids" not in symbols[gene_symbol]:
-                        symbols[gene_symbol]["uniprot_ids"] = [];
+                    if "uniprot_ids" not in self.symbols[gene_symbol]:
+                        self.symbols[gene_symbol]["uniprot_ids"] = [];
                     for uniprot_id in doc["uniprot_ids"]:
-                        if uniprot_id in uniprot_current and ensembl_gene_id is not None and ensembl_gene_id in ensembl_current:
+                        if uniprot_id in self.uniprot_current and ensembl_gene_id is not None and ensembl_gene_id in self.ensembl_current:
                             #print uniprot_id, " ", ensembl_gene_id, "\n"
-                            if "gene_ids" not in uniprot_current[uniprot_id]:
-                                uniprot_current[uniprot_id]["gene_ids"] = [ensembl_gene_id];
-                            else:
-                                uniprot_current[uniprot_id]["gene_ids"].append(ensembl_gene_id);
+                            if "gene_ids" not in self.uniprot_current[uniprot_id]:
+                                self.uniprot_current[uniprot_id]["gene_ids"] = [ensembl_gene_id];
+                            elif ensembl_gene_id not in self.uniprot_current[uniprot_id]["gene_ids"]:
+                                self.uniprot_current[uniprot_id]["gene_ids"].append(ensembl_gene_id);
 
-                        if uniprot_id not in symbols[gene_symbol]["uniprot_ids"]:
-                            symbols[gene_symbol]["uniprot_ids"].append(uniprot_id)               
+                        if uniprot_id not in self.symbols[gene_symbol]["uniprot_ids"]:
+                            self.symbols[gene_symbol]["uniprot_ids"].append(uniprot_id)
                 
         logging.info("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
         
@@ -409,7 +416,7 @@ class EvidenceValidationFileChecker():
         for row in self.session.query(UniprotInfo).yield_per(1000):
             # get the symbol too
             uniprot_accession = row.uniprot_accession
-            uniprot_current[uniprot_accession] = {};
+            self.uniprot_current[uniprot_accession] = {};
             root = ElementTree.fromstring(row.uniprot_entry)
             protein_name = None
             for name in root.findall("./ns0:name", { 'ns0' : 'http://uniprot.org/uniprot'} ):        
@@ -436,60 +443,116 @@ class EvidenceValidationFileChecker():
                     gene_symbol = 'HMP19';
                     logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
                     
-                uniprot_current[uniprot_accession]["gene_symbol"] = gene_symbol;
+                self.uniprot_current[uniprot_accession]["gene_symbol"] = gene_symbol;
                 
-                if gene_symbol not in symbols:
-                    symbols[gene_symbol] = {};
-                if "uniprot_ids" not in symbols[gene_symbol]:
-                    symbols[gene_symbol]["uniprot_ids"] = [ uniprot_accession ]
-                elif uniprot_accession not in symbols[gene_symbol]["uniprot_ids"]:
-                    symbols[gene_symbol]["uniprot_ids"].append(uniprot_accession)
+                if gene_symbol not in self.symbols:
+                    self.symbols[gene_symbol] = {};
+                if "uniprot_ids" not in self.symbols[gene_symbol]:
+                    self.symbols[gene_symbol]["uniprot_ids"] = [ uniprot_accession ]
+                elif uniprot_accession not in self.symbols[gene_symbol]["uniprot_ids"]:
+                    self.symbols[gene_symbol]["uniprot_ids"].append(uniprot_accession)
                 
             gene_id = None
             for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']", { 'ns0' : 'http://uniprot.org/uniprot'} ):
                 ensembl_gene_id = crossref.get("value")
-                if ensembl_gene_id in ensembl_current:
+                if ensembl_gene_id in self.ensembl_current:
                     #print uniprot_accession, " ", ensembl_gene_id, "\n"
-                    if "gene_ids" not in uniprot_current[uniprot_accession]:
-                        uniprot_current[uniprot_accession]["gene_ids"] = [ensembl_gene_id];
-                    else:
-                        uniprot_current[uniprot_accession]["gene_ids"].append(ensembl_gene_id)
+                    if "gene_ids" not in self.uniprot_current[uniprot_accession]:
+                        self.uniprot_current[uniprot_accession]["gene_ids"] = [ensembl_gene_id];
+                    elif ensembl_gene_id not in self.uniprot_current[uniprot_accession]["gene_ids"]:
+                        self.uniprot_current[uniprot_accession]["gene_ids"].append(ensembl_gene_id)
                         
             # create a mapping from the symbol instead to link to Ensembl
-            if "gene_ids" not in uniprot_current[uniprot_accession]:
-                if gene_symbol and gene_symbol in symbols:
-                    if "ensembl_primary_id" in symbols[gene_symbol]:
-                        uniprot_current[uniprot_accession]["gene_ids"] = [symbols[gene_symbol]["ensembl_primary_id"]];
-                    elif "ensembl_secondary_id" in symbols[gene_symbol]:
-                        uniprot_current[uniprot_accession]["gene_ids"] = [symbols[gene_symbol]["ensembl_secondary_id"]];
+            if "gene_ids" not in self.uniprot_current[uniprot_accession]:
+                if gene_symbol and gene_symbol in self.symbols:
+                    if ("ensembl_primary_id" in self.symbols[gene_symbol] and
+                        ("gene_ids" not in self.uniprot_current[uniprot_accession] or
+                         self.symbols[gene_symbol]["ensembl_primary_id"] not in self.uniprot_current[uniprot_accession]["gene_ids"]
+                        )
+                       ):
+                        self.uniprot_current[uniprot_accession]["gene_ids"] = [self.symbols[gene_symbol]["ensembl_primary_id"]];
+                    elif ("ensembl_secondary_id" in self.symbols[gene_symbol] and
+                          ("gene_ids" not in self.uniprot_current[uniprot_accession] or
+                           self.symbols[gene_symbol]["ensembl_secondary_id"] not in self.uniprot_current[uniprot_accession]["gene_ids"]
+                          )
+                         ):
+                        self.uniprot_current[uniprot_accession]["gene_ids"] = [self.symbols[gene_symbol]["ensembl_secondary_id"]];
 
             #seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
             if c % 5000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
             #for accession in seqrec.annotations['accessions']:
-            #    uniprot_current.append(accession)
+            #    self.uniprot_current.append(accession)
         logging.info("%i entries retrieved for uniprot" % c)
     
     def load_Ensembl(self):
         logging.info("Loading Ensembl {0} assembly genes and non reference assembly".format(Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
         for row in self.session.query(EnsemblGeneInfo).all(): #filter_by(assembly_name = Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY).all():
             #print "%s %s"%(row.ensembl_gene_id, row.external_name)
-            ensembl_current[row.ensembl_gene_id] = row
+            self.ensembl_current[row.ensembl_gene_id] = \
+                { 'assembly_name' : row.assembly_name,
+                  'ensembl_release': row.ensembl_release,
+                  'ensembl_gene_id': row.ensembl_gene_id,
+                  'external_name' : row.external_name,
+                  'is_reference' : row.is_reference
+                }
             # put the ensembl_id in symbols too
-            if row.external_name not in symbols:
-                symbols[row.external_name] = {}
+            if row.external_name not in self.symbols:
+                self.symbols[row.external_name] = {}
+                self.symbols[row.external_name]["assembly_name"] = row.assembly_name
+                self.symbols[row.external_name]["ensembl_release"] = row.ensembl_release
             if row.is_reference:
-                symbols[row.external_name]["ensembl_primary_id"] = row.ensembl_gene_id
+                self.symbols[row.external_name]["ensembl_primary_id"] = row.ensembl_gene_id
             else:
-                if "ensembl_secondary_id" not in symbols[row.external_name] or row.ensembl_gene_id < symbols[row.external_name]["ensembl_secondary_id"]:
-                    symbols[row.external_name]["ensembl_secondary_id"] = row.ensembl_gene_id;
-                
+                if "ensembl_secondary_id" not in self.symbols[row.external_name] or row.ensembl_gene_id < self.symbols[row.external_name]["ensembl_secondary_id"]:
+                    self.symbols[row.external_name]["ensembl_secondary_id"] = row.ensembl_gene_id;
+                if "ensembl_secondary_ids" not in self.symbols[row.external_name]:
+                    self.symbols[row.external_name]["ensembl_secondary_ids"] = []
+                self.symbols[row.external_name]["ensembl_secondary_ids"].append(row.ensembl_gene_id)
+
+    def store_gene_mapping(self):
+        '''
+            Stores the relation between UniProt, Ensembl, HGNC and the gene symbols
+            in one table called gene_mapping_lookup.
+            It's a snapshot of the UniProt, Ensembl and HGNC information at a given time
+        '''
+        logging.info("Stitching everything together")
+        data  = { 'symbols': self.symbols, 'uniprot': self.uniprot_current, 'ensembl': self.ensembl_current }
+        print(json.dumps( data, indent=4));
+
+        now = datetime.utcnow()
+        today = datetime.strptime("{:%Y-%m-%d}".format(datetime.now()), '%Y-%m-%d')
+        # Truncate table
+        self.session.query(GeneMappingLookup).delete()
+        hr = GeneMappingLookup(
+                last_updated = today,
+                data = data
+                )
+        self.session.add(hr)
+        self.session.commit()
+        logging.info("inserted gene mapping information in JSONB format in the gene_mapping_lookup table at {:%d, %b %Y}".format(today))
+
+    def load_gene_mapping(self):
+        '''
+            Loads the relation between UniProt, Ensembl, HGNC and the gene symbols
+            from one table called gene_mapping_lookup.
+        '''
+
+        logging.info("Loading mapping between Ensembl, UniProt, HGNC and gene symbols")
+        for row in self.session.query(GeneMappingLookup).order_by(desc(GeneMappingLookup.last_updated)).limit(1):
+            data = row.data
+            self.symbols = data['symbols']
+            self.uniprot_current = data['uniprot']
+            logging.info("Uniprot dictionary contains {0} entries".format(len(self.uniprot_current.keys())))
+            logging.info(json.dumps(self.uniprot_current.keys()))
+            self.ensembl_current = data['ensembl']
+
     def load_eco(self):
 
         logging.info("Loading ECO current valid terms")
         for row in self.session.query(ECONames):
-            eco_current[row.uri] = row.label
+            self.eco_current[row.uri] = row.label
     
     def load_efo(self):
         # Change this in favor of paths
@@ -503,12 +566,12 @@ class EvidenceValidationFileChecker():
         omim_pattern = "http://purl.bioontology.org/omim/OMIM_%"
         
         '''
-        Temp: store the uncharactered diseases to fitler them
+        Temp: store the uncharactered diseases to fliter them
         https://alpha.targetvalidation.org/disease/genetic_disorder_uncategorized
         '''
         for row in self.session.query(EFOPath):
             if any(map(lambda x: x["uri"] == 'http://www.targetvalidation.org/genetic_disorder_uncategorized', row.tree_path)):
-                efo_uncat.append(row.uri);
+                self.efo_uncat.append(row.uri);
         
         for row in self.session.query(EFONames).filter(
                 or_(
@@ -523,30 +586,56 @@ class EvidenceValidationFileChecker():
                 ):
             #logging.info(row.uri)
             #if row.uri not in uncat:
-            efo_current[row.uri] = row.label
-        #logging.info(len(efo_current))
+            self.efo_current[row.uri] = row.label
+        #logging.info(len(self.efo_current))
         #logging.info("Loading EFO obsolete terms")
         for row in self.session.query(EFOObsoleteClass):
             #print "obsolete %s"%(row.uri)
-            efo_obsolete[row.uri] = row.reason
+            self.efo_obsolete[row.uri] = row.reason
             
     def get_reference_gene_from_list(self, genes):
+        '''
+        Given a list of genes will return the gene that is mapped to the reference assembly
+        :param genes: a list of ensembl gene identifiers
+        :return: the ensembl gene identifier mapped to the reference assembly if it exists, the list of ensembl gene
+        identifiers passed in the input otherwise
+        '''
         for ensembl_gene_id in genes:
-            if ensembl_current[ensembl_gene_id].is_reference:
-                return ensembl_gene_id + " " + ensembl_current[ensembl_gene_id].external_name + " (reference assembly)"
+            if self.ensembl_current[ensembl_gene_id]['is_reference'] is True:
+                return ensembl_gene_id + " " + self.ensembl_current[ensembl_gene_id]['external_name'] + " (reference assembly)"
         return ", ".join(genes) + " (non reference assembly)"
 
     def get_reference_gene_from_Ensembl(self, ensembl_gene_id):
-        symbol = ensembl_current[ensembl_gene_id].external_name;
-        for row in self.session.query(EnsemblGeneInfo).filter_by(assembly_name = Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, is_reference=True, external_name = symbol).all():
-            return row.ensembl_gene_id + " " + row.external_name + " (reference assembly)"
+        '''
+        Given an ensembl gene id return the corresponding reference assembly gene id if it exists.
+        It get the gene external name and get the corresponding primary assembly gene id.
+        :param self:
+        :param ensembl_gene_id: ensembl gene identifier to check
+        :return: a string indicating if the gene is mapped to a reference assembly or an alternative assembly only
+        '''
+        symbol = self.ensembl_current[ensembl_gene_id]['external_name']
+        if symbol in self.symbols and 'ensembl_primary_id' in self.symbols[symbol]:
+            return self.symbols[symbol]['ensembl_primary_id'] + " " + symbol + " (reference assembly)"
         return symbol + " (non reference assembly)"
-        
+
+    def map_genes(self):
+        '''
+            This is the preamble step of the pipeline
+            It's loading all the Ensembl, UniProt, HGNC and symbol information
+            and will store it in the back-end to be shared and used by the validation
+            workers
+        '''
+        self.load_Ensembl()
+        self.load_Uniprot()
+        self.load_HGNC()
+        self.store_gene_mapping()
+
     def check_all(self):
- 
-        self.load_Ensembl(); 
-        self.load_Uniprot();
-        self.load_HGNC();
+        '''
+        Check every given evidence string
+        :return:
+        '''
+        self.load_gene_mapping()
         #return;
         self.load_efo();
         self.load_eco();
@@ -555,7 +644,7 @@ class EvidenceValidationFileChecker():
             dirnames.sort()
             for subdirname in dirnames:
                 cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv012|cttv011)$", subdirname)
+                cttv_match = re.match("^(cttv006)$", subdirname)
                 if cttv_match:
                     # get provider id
                     provider_id = cttv_match.groups()[0]
@@ -569,12 +658,12 @@ class EvidenceValidationFileChecker():
                         for filename in filenames:
                             logging.info(filename);
                             cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
-                            # cttv_filename_match = re.match("cttv025-03-11-2015.json.gz", filename);
-                            if cttv_filename_match:
+                            #cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
+                            if cttv_filename_match and filename == "cttv006_Networks_Reactome-03-12-2015.json.gz":
                                 cttv_file = os.path.join(cttv_dirname, filename)
-                                logging.info(cttv_file);
+                                logging.info(cttv_file)
                                 data_source_name = Config.JSON_FILE_TO_DATASOURCE_MAPPING[cttv_filename_match.groups()[0]]
-                                logging.info(data_source_name);
+                                logging.info(data_source_name)
                                 last_modified = os.path.getmtime(cttv_file)
                                 #july = time.strptime("01 Jul 2015", "%d %b %Y")
                                 #julyseconds = time.mktime(july)
@@ -750,7 +839,7 @@ class EvidenceValidationFileChecker():
                                         obj.disease.id[index] = eva_curated[disease_id];
                                         disease_id = obj.disease.id[index];
                                     index +=1
-                                    if disease_id not in efo_current or disease_id in efo_uncat:
+                                    if disease_id not in self.efo_current or disease_id in self.efo_uncat:
                                         logger.error("Line {0}: Invalid disease term detected {1}. Please provide the correct EFO disease term".format(lc+1, disease_id))
                                         disease_failed = True
                                         if disease_id not in invalid_diseases:
@@ -758,8 +847,8 @@ class EvidenceValidationFileChecker():
                                         else:
                                             invalid_diseases[disease_id] += 1
                                         nb_efo_invalid +=1              
-                                    if disease_id in efo_obsolete:
-                                        logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, efo_current[disease_id], efo_obsolete[disease_id]))
+                                    if disease_id in self.efo_obsolete:
+                                        logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
                                         disease_failed = True
                                         if disease_id not in obsolete_diseases:
                                             obsolete_diseases[disease_id] = 1
@@ -777,7 +866,7 @@ class EvidenceValidationFileChecker():
                                     uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
                                     if ensemblMatch:
                                         ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
-                                        if not ensembl_id in ensembl_current:
+                                        if not ensembl_id in self.ensembl_current:
                                             gene_failed = True
                                             logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not ensembl_id in invalid_ensembl_ids:
@@ -785,7 +874,7 @@ class EvidenceValidationFileChecker():
                                             else:
                                                 invalid_ensembl_ids[ensembl_id] += 1
                                             nb_ensembl_invalid +=1
-                                        elif not ensembl_current[ensembl_id].is_reference:
+                                        elif self.ensembl_current[ensembl_id]['is_reference'] is False:
                                             gene_mapping_failed = True
                                             logger.warning("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not ensembl_id in invalid_ensembl_ids:
@@ -795,7 +884,7 @@ class EvidenceValidationFileChecker():
                                             nb_ensembl_nonref +=1                                            
                                     elif uniprotMatch:
                                         uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                                        if uniprot_id not in uniprot_current:
+                                        if uniprot_id not in self.uniprot_current:
                                             gene_failed = True
                                             logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier".format(lc+1, uniprot_id))
                                             if uniprot_id not in invalid_uniprot_ids:
@@ -803,7 +892,7 @@ class EvidenceValidationFileChecker():
                                             else:
                                                 invalid_uniprot_ids[uniprot_id] += 1
                                             nb_uniprot_invalid +=1
-                                        elif "gene_ids" not in uniprot_current[uniprot_id]:
+                                        elif "gene_ids" not in self.uniprot_current[uniprot_id]:
                                             # check symbol mapping (get symbol first)
                                             gene_mapping_failed = True
                                             logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
@@ -813,7 +902,7 @@ class EvidenceValidationFileChecker():
                                                 missing_uniprot_id_xrefs[uniprot_id] += 1
                                             nb_missing_uniprot_id_xrefs +=1
                                             #This identifier is not in the current EnsEMBL database
-                                        elif not reduce( (lambda x, y: x or y), map(lambda x: ensembl_current[x].is_reference, uniprot_current[uniprot_id]["gene_ids"]) ):
+                                        elif not reduce( (lambda x, y: x or y), map(lambda x: self.ensembl_current[x]['is_reference'] is True, self.uniprot_current[uniprot_id]["gene_ids"]) ):
                                             gene_mapping_failed = True
                                             logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not uniprot_id in invalid_uniprot_id_mappings:
@@ -890,8 +979,8 @@ class EvidenceValidationFileChecker():
             if top_diseases:
                 text +="Top %i diseases:\n"%(Config.EVIDENCEVALIDATION_NB_TOP_DISEASES)
                 for n in range(0,len(top_diseases)):
-                    if top_diseases[n] in efo_current:
-                        text +="\t-{0}:\t{1} ({2:.1f}%) {3}\n".format(top_diseases[n], diseases[top_diseases[n]], diseases[top_diseases[n]]*100/lc, efo_current[top_diseases[n]])
+                    if top_diseases[n] in self.efo_current:
+                        text +="\t-{0}:\t{1} ({2:.1f}%) {3}\n".format(top_diseases[n], diseases[top_diseases[n]], diseases[top_diseases[n]]*100/lc, self.efo_current[top_diseases[n]])
                     else:
                         text +="\t-{0}:\t{1} ({2:.1f}%)\n".format(top_diseases[n], diseases[top_diseases[n]], diseases[top_diseases[n]]*100/lc)
                 text +="\n"
@@ -907,7 +996,7 @@ class EvidenceValidationFileChecker():
                         id_text = self.get_reference_gene_from_Ensembl(ensembl_id);
                     elif uniprotMatch:
                         uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                        id_text = self.get_reference_gene_from_list(uniprot_current[uniprot_id]["gene_ids"]);
+                        id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
                     text +="\t-{0}:\t{1} ({2:.1f}%) {3}\n".format(top_targets[n], targets[top_targets[n]], targets[top_targets[n]]*100/lc, id_text)
                 text +="\n"
 
@@ -927,9 +1016,9 @@ class EvidenceValidationFileChecker():
                 text +="\t%i obsolete EFO term(s) found in %i (%.1f%s) of the records.\n"%(len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete*100/lc, '%' )
                 for disease_id in obsolete_diseases:
                     if obsolete_diseases[disease_id] == 1:
-                        text += "\t%s\t(reported once)\t%s\n"%(disease_id, efo_obsolete[disease_id].replace("\n", " "))
+                        text += "\t%s\t(reported once)\t%s\n"%(disease_id, self.efo_obsolete[disease_id].replace("\n", " "))
                     else:
-                        text += "\t%s\t(reported %i times)\t%s\n"%(disease_id, obsolete_diseases[disease_id], efo_obsolete[disease_id].replace("\n", " "))
+                        text += "\t%s\t(reported %i times)\t%s\n"%(disease_id, obsolete_diseases[disease_id], self.efo_obsolete[disease_id].replace("\n", " "))
                 text +="\n"
 
             # report invalid Ensembl genes
@@ -987,9 +1076,9 @@ class EvidenceValidationFileChecker():
                 text +="\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifiers.\n"
                 for uniprot_id in invalid_uniprot_id_mappings:
                     if invalid_uniprot_id_mappings[uniprot_id] == 1:
-                        text += "\t%s\t(reported once) maps to %s\n"%(uniprot_id, self.get_reference_gene_from_list(uniprot_current[uniprot_id]["gene_ids"]))
+                        text += "\t%s\t(reported once) maps to %s\n"%(uniprot_id, self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
                     else:
-                        text += "\t%s\t(reported %i times) maps to %s\n"%(uniprot_id, invalid_uniprot_id_mappings[uniprot_id], self.get_reference_gene_from_list(uniprot_current[uniprot_id]["gene_ids"]))
+                        text += "\t%s\t(reported %i times) maps to %s\n"%(uniprot_id, invalid_uniprot_id_mappings[uniprot_id], self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
                 text +="\n"
                 
             now = datetime.utcnow()

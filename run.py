@@ -79,6 +79,8 @@ if __name__ == '__main__':
                         action="append_const", const = ElasticsearchActions.RELOAD)
     parser.add_argument("--valck", dest='val', help="check new json files submitted to ftp site",
                         action="append_const", const = EvidenceValidationActions.CHECKFILES)
+    parser.add_argument("--valgm", dest='val', help="update gene protein mapping to database",
+                        action="append_const", const = EvidenceValidationActions.GENEMAPPING)
     parser.add_argument("--val", dest='val', help="check new json files submitted to ftp site, validate them and store them in postgres",
                         action="append_const", const = EvidenceValidationActions.ALL)                        
     args = parser.parse_args()
@@ -167,6 +169,8 @@ if __name__ == '__main__':
             #     ScoringUploader(adapter, loader).upload_all()
         if args.val or run_full_pipeline:
             do_all = (EvidenceValidationActions.ALL in args.val) or run_full_pipeline
+            if (EvidenceValidationActions.GENEMAPPING in args.val) or do_all:
+                EvidenceValidationFileChecker(adapter).map_genes()
             if (EvidenceValidationActions.CHECKFILES in args.val) or do_all:
                 EvidenceValidationFileChecker(adapter).check_all()               
 

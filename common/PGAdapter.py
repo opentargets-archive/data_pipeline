@@ -145,7 +145,7 @@ class HgncInfoLookup(Base):
     __table_args__ = {'schema':'lookups'}
     last_updated = Column(TIMESTAMP, primary_key=True)
     data = Column(JSONB)
-    
+
 class HgncGeneInfo(Base):
     __tablename__ = 'hgnc_gene_info'
     __table_args__ = {'schema':'lookups'}
@@ -194,6 +194,16 @@ class EnsemblGeneInfo(Base):
     cytobands = Column(Text)
     ensembl_release = Column(Integer)
     is_reference = Column(BOOLEAN)
+
+class GeneMappingLookup(Base):
+    '''
+    This table is used by the validation step
+    to map genes from UniProt to Ensembl
+    '''
+    __tablename__ = 'gene_mapping_lookup'
+    __table_args__ = {'schema':'lookups'}
+    last_updated = Column(TIMESTAMP, primary_key=True)
+    data = Column(JSONB)
 
 # class EnsemblToUniprotMapping(Base):
 #     __tablename__ = 'uniprot_ensembl_mapping'
