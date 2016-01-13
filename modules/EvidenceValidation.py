@@ -31,10 +31,26 @@ from lxml.etree import tostring
 from xml.etree import cElementTree as ElementTree
 from sqlalchemy.dialects.postgresql import JSON
 import multiprocessing
+from multiprocessing import Manager
 
 BLOCKSIZE = 65536
 NB_JSON_FILES = 5
 MAX_NB_EVIDENCE = 25000
+CHUNK_SIZE = 1e3
+
+EVIDENCE_STRING_INVALID = 10
+EVIDENCE_STRING_INVALID_TYPE = 11
+EVIDENCE_STRING_INVALID_SCHEMA_VERSION = 12
+EVIDENCE_STRING_INVALID_MISSING_TYPE = 13
+EVIDENCE_STRING_INVALID_MISSING_TARGET = 14
+EVIDENCE_STRING_INVALID_MISSING_DISEASE = 15
+ENSEMBL_GENE_ID_UNKNOWN = 20
+ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE = 21
+UNIPROT_PROTEIN_ID_UNKNOWN = 30
+UNIPROT_PROTEIN_ID_MISSING_ENSEMBL_XREF = 31
+UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF = 32
+DISEASE_ID_INVALID = 40
+DISEASE_ID_OBSOLETE = 41
 
 __author__ = 'gautierk'
 
@@ -128,14 +144,14 @@ class EvidenceValidationActions(Actions):
     VALIDATE='validate'
     GENEMAPPING='genemapping'
 
-class EvidenceDirectoryCrawler(multiprocessing.Process):
+class EvidenceDirectoryCrawlerProcess(multiprocessing.Process):
 
     def __init__(self,
                  output_q,
                  input_file_loading_finished,
                  input_file_count,
                  lock):
-        super(EvidenceDirectoryCrawler, self).__init__()
+        super(EvidenceDirectoryCrawlerProcess, self).__init__()
         self.output_q = output_q
         self.start_time = time.time()
         self.input_file_loading_finished = input_file_loading_finished
@@ -149,7 +165,7 @@ class EvidenceDirectoryCrawler(multiprocessing.Process):
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             dirnames.sort()
             for subdirname in dirnames:
-                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
+                #cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
                 cttv_match = re.match("^(cttv006)$", subdirname)
                 if cttv_match:
                     # get provider id
@@ -201,22 +217,24 @@ class EvidenceDirectoryCrawler(multiprocessing.Process):
         logger.info("%s finished"%self.name)
 
 
-class EvidenceFileReader(multiprocessing.Process):
+class EvidenceFileReaderProcess(multiprocessing.Process):
 
     def __init__(self,
                  input_q,
                  output_q,
-                 session,
+                 adapter,
                  input_file_loading_finished,
                  input_file_processing_finished,
                  input_file_count,
                  input_file_processed_count,
                  evidence_loaded_count,
                  lock):
-        super(EvidenceFileReader, self).__init__()
+        super(EvidenceFileReaderProcess, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
-        self.session = session
+        self.adapter = adapter
+        self.session = adapter.session
+        self.evidence_chunk_storage = EvidenceChunkStorage(adapter = self.adapter)
         self.start_time = time.time()
         self.input_file_loading_finished = input_file_loading_finished
         self.input_file_processing_finished = input_file_processing_finished
@@ -233,28 +251,25 @@ class EvidenceFileReader(multiprocessing.Process):
             with self.lock:
                 self.input_file_processed_count.value +=1
             if data:
-                cttv_file, filename, provider_id, data_source_name, logfile = data
+                file_on_disk, filename, provider_id, data_source_name, logfile = data
                 try:
-                    #self.validate_gzipfile(cttv_file, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
-                    logging.info(cttv_file)
-                    md5_hash = self.md5_hash_gzipfile(cttv_file)
-                    self.check_gzipfile(cttv_file, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
-                    # this is the loop where to add evidence too
-                    #self.output_q.put((idev, ev_string_to_load))
-                    #with self.lock:
-                    #    self.output_computed_count.value +=1
+                    logging.info(file_on_disk)
+                    ''' get md5 '''
+                    md5_hash = self.md5_hash_gzipfile(file_on_disk)
+                    ''' parse the file and put evidence in the queue '''
+                    self.parse_gzipfile(file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
 
                 except Exception, error:
-                    with self.lock:
-                        self.processing_errors_count.value +=1
+                    #with self.lock:
+                    #    self.processing_errors_count.value +=1
                     # UploadError(ev, error, idev).save()
                     # err += 1
 
                     if isinstance(error,AttributeError):
-                        logger.error("Error loading data for id %s: %s" % (cttv_file, str(error)))
+                        logger.error("Error loading data for id %s: %s" % (file_on_disk, str(error)))
                         # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
                     else:
-                        logger.exception("Error loading data for id %s: %s" % (cttv_file, str(error)))
+                        logger.exception("Error loading data for id %s: %s" % (file_on_disk, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
 
         self.input_file_processing_finished.set()
@@ -274,12 +289,11 @@ class EvidenceFileReader(multiprocessing.Process):
         afile.close()
         return md5_hash
 
-    def check_gzipfile(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = None):
+    def parse_gzipfile(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = None):
         '''
         check if the file was already processed
         '''
         bValidate = False
-        bGivingUp = False
         rowToUpdate = None
         count = self.session.query(EvidenceValidation.filename).filter_by(filename=file_on_disk).count()
         logging.info('Was the file parsed already? %i'%(count))
@@ -297,10 +311,183 @@ class EvidenceFileReader(multiprocessing.Process):
                     rowToUpdate = row
                     break;
         logging.info('bValidate %r'% (bValidate))
-        return
 
-        # Check EFO overrepresentation
-        # Check target overrepresentation
+        if bValidate == True:
+
+            ''' reset information in pipeline.evidence_validation table '''
+
+            now = datetime.utcnow()
+
+            if count == 0:
+                f = EvidenceValidation(
+                    provider_id = provider_id,
+                    filename = file_on_disk,
+                    md5 = md5_hash,
+                    date_created = now,
+                    date_modified = now,
+                    date_validated = now,
+                    nb_submission = 1,
+                    nb_records = 0,
+                    #nb_valid = nb_valid,
+                    nb_errors = 0,
+                    nb_duplicates = 0,
+                    successfully_validated = False
+                )
+                self.session.add(f)
+            else:
+                # update database
+                rowToUpdate.md5 = md5_hash
+                rowToUpdate.nb_records = 0
+                rowToUpdate.nb_errors = 0
+                rowToUpdate.nb_duplicates = 0
+                rowToUpdate.date_modified = now
+                rowToUpdate.date_validated = now
+                rowToUpdate.successfully_validated = False
+                self.session.add(rowToUpdate)
+
+            self.session.commit();
+
+            logging.info('Delete previous data for %s'% (data_source_name))
+            self.evidence_chunk_storage.storage_delete(data_source_name);
+
+            logging.info('Starting parsing %s'% (file_on_disk))
+
+            fh = gzip.GzipFile(file_on_disk, "r")
+            #lfh = gzip.open(logfile, 'wb', compresslevel=5)
+            line_buffer = []
+            offset = 0
+            line_number = 0
+
+            for line in fh:
+                line_buffer.append(line)
+                line_number+=1
+                if line_number % CHUNK_SIZE == 0:
+                    logging.info('%s %i %i'% (file_on_disk, offset, len(line_buffer)))
+                    self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, list(line_buffer)))
+                    offset += CHUNK_SIZE
+                    del line_buffer[:]
+            if len(line_buffer) > 0:
+                logging.info('%s %i %i'% (file_on_disk, offset, len(line_buffer)))
+                self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, list(line_buffer)))
+                offset += len(line_buffer)
+                del line_buffer[:]
+
+            '''
+            indicate how many evidence were sent
+            '''
+            with self.lock:
+                self.evidence_loaded_count.value += line_number
+
+            '''
+            finally send a signal to inform that parsing is completed for this file and no other line are to be expected
+            '''
+            logging.info('%s %i %i'% (file_on_disk, offset, len(line_buffer)))
+            self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, line_buffer))
+
+            return
+
+
+class EvidenceValidatorProcess(multiprocessing.Process):
+
+    def __init__(self,
+                 input_q,
+                 output_q,
+                 adapter,
+                 efo_current,
+                 efo_uncat,
+                 efo_obsolete,
+                 uniprot_current,
+                 ensembl_current,
+                 input_file_processing_finished,
+                 input_file_validation_finished,
+                 input_file_processed_count,
+                 input_file_validated_count,
+                 evidence_loaded_count,
+                 evidence_validated_count,
+                 lock):
+        super(EvidenceValidatorProcess, self).__init__()
+        self.input_q = input_q
+        self.output_q = output_q
+        self.adapter = adapter
+        self.session = adapter.get_new_session()
+        self.evidence_chunk_storage = EvidenceChunkStorage(adapter = self.adapter)
+        self.efo_current = efo_current
+        self.efo_uncat = efo_uncat
+        self.efo_obsolete = efo_obsolete
+        self.uniprot_current = uniprot_current
+        self.ensembl_current = ensembl_current
+        self.start_time = time.time()
+        self.input_file_validation_finished = input_file_validation_finished
+        self.input_file_processing_finished = input_file_processing_finished
+        self.input_file_validated_count = input_file_validated_count
+        self.input_file_processed_count = input_file_processed_count
+        self.evidence_loaded_count = evidence_loaded_count
+        self.evidence_validated_count = evidence_validated_count
+        self.start_time = time.time()#reset timer start
+        self.lock = lock
+        self.audit = list()
+
+    def run(self):
+        logger.info("%s started"%self.name)
+        ''' 3 conditions to fullfill to exit the loop
+            make sure that all files have been validated: this is ensured by the last information sent in the queue
+            for every file
+            make sure all evidence strings have been validated. This should equate to condition one above
+            make sure that the producer has finished processing the files
+        '''
+        while not ((self.input_file_processed_count.value == self.input_file_validated_count.value) and
+                   (self.evidence_loaded_count == self.evidence_validated_count) and
+                   self.input_file_processing_finished.set()):
+            data = self.input_q.get()
+            if data:
+                file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, line_buffer = data
+
+                try:
+                    logging.info(file_on_disk)
+                    self.validate_evidence(file_on_disk, filename, provider_id, data_source_name, md5_hash, offset, line_buffer, logfile = logfile)
+
+                except Exception, error:
+
+                    if isinstance(error,AttributeError):
+                        logger.error("Error loading data for id %s: %s" % (file_on_disk, str(error)))
+                        # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
+                    else:
+                        logger.exception("Error loading data for id %s: %s" % (file_on_disk, str(error)))
+                    # traceback.print_exc(limit=1, file=sys.stdout)
+
+        self.input_file_validation_finished.set()
+        logger.info("%s finished"%self.name)
+
+
+    def validate_evidence(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, offset, line_buffer, logfile = None):
+        '''
+        validate evidence strings from a chunk
+        cumulate the logs, acquire a lock,
+        write the logs
+        write the data to the database
+        '''
+        rowToUpdate = None
+
+        #for row in self.session.query(EFONames).filter(
+        for row in self.session.query(EvidenceValidation).filter(
+                and_(
+                        EvidenceValidation.filename == file_on_disk,
+                        EvidenceValidation.md5 == md5_hash
+                    )
+                ).limit(1):
+            rowToUpdate = row
+
+        logging.info('Processing %s %i'% (row.filename, offset))
+
+        if len(line_buffer) == 0:
+            logging.info("Validation of %s completed" % (file_on_disk))
+            with self.lock:
+                self.input_file_validated_count.value +=1
+        else:
+            logging.info('Validating %s %i %i'% (row.filename, offset, len(line_buffer)))
+            with self.lock:
+                self.evidence_validated_count.value += len(line_buffer)
+
         diseases = {}
         top_diseases = []
         targets = {}
@@ -313,440 +500,296 @@ class EvidenceFileReader(multiprocessing.Process):
         missing_uniprot_id_xrefs = {}
         invalid_uniprot_id_mappings = {}
 
-        if bValidate == True:
+        logging.info('Starting validation of %s'% (file_on_disk))
 
-            logging.info('Delete previous data for %s'% (data_source_name))
-            self.storage_delete(data_source_name);
+        cc = 0
+        lc = 0
+        nb_valid = 0
+        nb_errors = 0
+        nb_duplicates = 0
+        nb_efo_invalid = 0
+        nb_efo_obsolete = 0
+        nb_ensembl_invalid = 0
+        nb_ensembl_nonref = 0
+        nb_uniprot_invalid = 0
+        nb_missing_uniprot_id_xrefs = 0
+        nb_uniprot_invalid_mapping = 0
+        audit = list()
 
-            logging.info('Starting validation of %s'% (file_on_disk))
+        for line in line_buffer:
 
-            fh = gzip.GzipFile(file_on_disk, "r")
-            #lfh = gzip.open(logfile, 'wb', compresslevel=5)
-            lfh = open(logfile, 'wb')
-            cc = 0
-            lc = 0
-            nb_valid = 0
-            nb_errors = 0
-            nb_duplicates = 0
-            nb_efo_invalid = 0
-            nb_efo_obsolete = 0
-            nb_ensembl_invalid = 0
-            nb_ensembl_nonref = 0
-            nb_uniprot_invalid = 0
-            nb_missing_uniprot_id_xrefs = 0
-            nb_uniprot_invalid_mapping = 0
-            hexdigest_map = {}
-            for line in fh:
-                #logging.info(line)
-                python_raw = json.loads(line)
-                # now validate
-                obj = None
-                validation_result = 0
-                validation_failed = False
-                disease_failed = False
-                gene_failed = False
-                gene_mapping_failed = False
-                uniq_elements_flat_hexdig = None
+            python_raw = json.loads(line)
+            lc+=1
 
-                if ('label' in python_raw  or 'type' in python_raw) and 'validated_against_schema_version' in python_raw and python_raw['validated_against_schema_version'] == "1.2.1":
-                    if 'label' in python_raw:
-                        python_raw['type'] = python_raw.pop('label', None)
-                    data_type = python_raw['type']
-                    #logging.info('type %s'%data_type)
-                    if data_type in ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']:
-                        try:
-                            if data_type == 'genetic_association':
-                                obj = cttv.Genetics.fromMap(python_raw)
-                            elif data_type == 'rna_expression':
-                                obj = cttv.Expression.fromMap(python_raw)
-                            elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
-                                obj = cttv.Literature_Curated.fromMap(python_raw)
-                            elif data_type == 'known_drug':
-                                obj = cttv.Drug.fromMap(python_raw)
-                                #logging.info(obj.evidence.association_score.__class__.__name__)
-                                #logging.info(obj.evidence.target2drug.association_score.__class__.__name__)
-                                #logging.info(obj.evidence.drug2clinic.association_score.__class__.__name__)
-                            elif data_type == 'literature':
-                                obj = cttv.Literature_Mining.fromMap(python_raw)
-                            elif data_type == 'animal_model':
-                                obj = cttv.Animal_Models.fromMap(python_raw)
-                        except:
-                            obj = None
+            # now validate
+            obj = None
+            validation_result = 0
+            validation_failed = False
+            disease_failed = False
+            gene_failed = False
+            gene_mapping_failed = False
+            uniq_elements_flat_hexdig = None
+            target_id = None
+            efo_id = None
 
-                        if obj:
+            if (('label' in python_raw  or
+                 'type' in python_raw) and
+                'validated_against_schema_version' in python_raw and
+                python_raw['validated_against_schema_version'] == Config.EVIDENCEVALIDATION_SCHEMA):
+                if 'label' in python_raw:
+                    python_raw['type'] = python_raw.pop('label', None)
+                data_type = python_raw['type']
+                #logging.info('type %s'%data_type)
+                if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
+                    try:
+                        if data_type == 'genetic_association':
+                            obj = cttv.Genetics.fromMap(python_raw)
+                        elif data_type == 'rna_expression':
+                            obj = cttv.Expression.fromMap(python_raw)
+                        elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
+                            obj = cttv.Literature_Curated.fromMap(python_raw)
+                        elif data_type == 'known_drug':
+                            obj = cttv.Drug.fromMap(python_raw)
+                            #logging.info(obj.evidence.association_score.__class__.__name__)
+                            #logging.info(obj.evidence.target2drug.association_score.__class__.__name__)
+                            #logging.info(obj.evidence.drug2clinic.association_score.__class__.__name__)
+                        elif data_type == 'literature':
+                            obj = cttv.Literature_Mining.fromMap(python_raw)
+                        elif data_type == 'animal_model':
+                            obj = cttv.Animal_Models.fromMap(python_raw)
+                    except:
+                        obj = None
 
-                            if obj.target.id:
-                                for id in obj.target.id:
-                                    if id in targets:
-                                        targets[id] +=1
+                    if obj:
+
+                        if obj.target.id:
+                            for id in obj.target.id:
+                                if id in targets:
+                                    targets[id] +=1
+                                else:
+                                    targets[id] = 1
+                                if not id in top_targets:
+                                    if len(top_targets) < Config.EVIDENCEVALIDATION_NB_TOP_TARGETS:
+                                        top_targets.append(id)
                                     else:
-                                        targets[id] = 1
-                                    if not id in top_targets:
-                                        if len(top_targets) < Config.EVIDENCEVALIDATION_NB_TOP_TARGETS:
-                                            top_targets.append(id)
-                                        else:
-                                            # map,reduce
-                                            for n in range(0,len(top_targets)):
-                                                if targets[top_targets[n]] < targets[id]:
-                                                    top_targets[n] = id;
-                                                    break;
+                                        # map,reduce
+                                        for n in range(0,len(top_targets)):
+                                            if targets[top_targets[n]] < targets[id]:
+                                                top_targets[n] = id;
+                                                break;
 
-                            if obj.disease.id:
-                                for id in obj.disease.id:
-                                    if id in diseases:
-                                        diseases[id] +=1
+                        if obj.disease.id:
+                            for id in obj.disease.id:
+                                if id in diseases:
+                                    diseases[id] +=1
+                                else:
+                                    diseases[id] =1
+                                if not id in top_diseases:
+                                    if len(top_diseases) < Config.EVIDENCEVALIDATION_NB_TOP_DISEASES:
+                                        top_diseases.append(id)
                                     else:
-                                        diseases[id] =1
-                                    if not id in top_diseases:
-                                        if len(top_diseases) < Config.EVIDENCEVALIDATION_NB_TOP_DISEASES:
-                                            top_diseases.append(id)
+                                        # map,reduce
+                                        for n in range(0,len(top_diseases)):
+                                            if diseases[top_diseases[n]] < diseases[id]:
+                                                top_diseases[n] = id;
+                                                break;
+
+                        # flatten
+                        uniq_elements = obj.unique_association_fields
+                        uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
+                        uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
+
+                        '''
+                        Validate evidence string
+                        '''
+                        validation_result = obj.validate(logger)
+                        nb_errors = nb_errors + validation_result
+
+                        '''
+                        Check EFO
+                        '''
+                        disease_count = 0
+                        if obj.disease.id:
+                            index = 0
+                            for disease_id in obj.disease.id:
+                                disease_count+=1
+                                efo_id = disease_id
+                                # fix for EVA data
+                                if disease_id in eva_curated:
+                                    obj.disease.id[index] = eva_curated[disease_id];
+                                    disease_id = obj.disease.id[index];
+                                index +=1
+                                if disease_id not in self.efo_current or disease_id in self.efo_uncat:
+                                    audit.append((lc, DISEASE_ID_INVALID, disease_id))
+                                    disease_failed = True
+                                    if disease_id not in invalid_diseases:
+                                        invalid_diseases[disease_id] = 1
+                                    else:
+                                        invalid_diseases[disease_id] += 1
+                                    nb_efo_invalid +=1
+                                if disease_id in self.efo_obsolete:
+                                    audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
+                                    #logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                    disease_failed = True
+                                    if disease_id not in obsolete_diseases:
+                                        obsolete_diseases[disease_id] = 1
+                                    else:
+                                        obsolete_diseases[disease_id] += 1
+                                    nb_efo_obsolete +=1
+                        if obj.disease.id is None or disease_count == 0:
+                            ''' no disease id !!!! '''
+                            audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_DISEASE))
+                            disease_failed = True
+
+                        '''
+                        Check Ensembl ID, UniProt ID and UniProt ID mapping to a Gene ID
+                        '''
+                        target_count = 0
+                        if obj.target.id:
+                            for id in obj.target.id:
+                                target_count+=1
+                                # http://identifiers.org/ensembl/ENSG00000178573
+                                ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', id)
+                                uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
+                                if ensemblMatch:
+                                    ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
+                                    target_id = ensembl_id
+                                    if not ensembl_id in self.ensembl_current:
+                                        gene_failed = True
+                                        audit.append((lc, ENSEMBL_GENE_ID_UNKNOWN, ensembl_id))
+                                        #logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                        if not ensembl_id in invalid_ensembl_ids:
+                                            invalid_ensembl_ids[ensembl_id] = 1
                                         else:
-                                            # map,reduce
-                                            for n in range(0,len(top_diseases)):
-                                                if diseases[top_diseases[n]] < diseases[id]:
-                                                    top_diseases[n] = id;
-                                                    break;
-
-                            if not bGivingUp:
-                                self.startCapture(logging.WARNING)
-
-                            # flatten
-                            uniq_elements = obj.unique_association_fields
-                            uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
-                            uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
-
-                            if not uniq_elements_flat_hexdig in hexdigest_map:
-                                hexdigest_map[uniq_elements_flat_hexdig] = [ lc+1 ]
-                            else:
-                                hexdigest_map[uniq_elements_flat_hexdig].append(lc+1)
-                                logger.error("Line {0}: Duplicated unique_association_fields on lines {1}".format(lc+1, ",".join(map(lambda x: "%i"%x,  hexdigest_map[uniq_elements_flat_hexdig]))))
-                                nb_duplicates = nb_duplicates + 1
-                                validation_failed = True
-
-                            validation_result = obj.validate(logger)
-                            nb_errors = nb_errors + validation_result
-
-                            '''
-                            Check EFO
-                            '''
-                            if obj.disease.id:
-                                index = 0
-                                for disease_id in obj.disease.id:
-                                    # fix for EVA data
-                                    if disease_id in eva_curated:
-                                        obj.disease.id[index] = eva_curated[disease_id];
-                                        disease_id = obj.disease.id[index];
-                                    index +=1
-                                    if disease_id not in self.efo_current or disease_id in self.efo_uncat:
-                                        logger.error("Line {0}: Invalid disease term detected {1}. Please provide the correct EFO disease term".format(lc+1, disease_id))
-                                        disease_failed = True
-                                        if disease_id not in invalid_diseases:
-                                            invalid_diseases[disease_id] = 1
+                                            invalid_ensembl_ids[ensembl_id] += 1
+                                        nb_ensembl_invalid +=1
+                                    elif self.ensembl_current[ensembl_id]['is_reference'] is False:
+                                        gene_mapping_failed = True
+                                        audit.append((lc, ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE, ensembl_id))
+                                        #logger.warning("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                        if not ensembl_id in invalid_ensembl_ids:
+                                            nonref_ensembl_ids[ensembl_id] = 1
                                         else:
-                                            invalid_diseases[disease_id] += 1
-                                        nb_efo_invalid +=1
-                                    if disease_id in self.efo_obsolete:
-                                        logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
-                                        disease_failed = True
-                                        if disease_id not in obsolete_diseases:
-                                            obsolete_diseases[disease_id] = 1
+                                            nonref_ensembl_ids[ensembl_id] += 1
+                                        nb_ensembl_nonref +=1
+
+                                elif uniprotMatch:
+                                    uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
+                                    if uniprot_id not in self.uniprot_current:
+                                        gene_failed = True
+                                        audit.append((lc, UNIPROT_PROTEIN_ID_UNKNOWN, uniprot_id))
+                                        #logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier".format(lc+1, uniprot_id))
+                                        if uniprot_id not in invalid_uniprot_ids:
+                                            invalid_uniprot_ids[uniprot_id] = 1
                                         else:
-                                            obsolete_diseases[disease_id] += 1
-                                        nb_efo_obsolete +=1
+                                            invalid_uniprot_ids[uniprot_id] += 1
+                                        nb_uniprot_invalid +=1
+                                    elif "gene_ids" not in self.uniprot_current[uniprot_id]:
+                                        # check symbol mapping (get symbol first)
+                                        #gene_mapping_failed = True
+                                        gene_failed = True
+                                        audit.append((lc, UNIPROT_PROTEIN_ID_MISSING_ENSEMBL_XREF, uniprot_id))
+                                        #logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
+                                        if not uniprot_id in missing_uniprot_id_xrefs:
+                                            missing_uniprot_id_xrefs[uniprot_id] = 1
+                                        else:
+                                            missing_uniprot_id_xrefs[uniprot_id] += 1
+                                        nb_missing_uniprot_id_xrefs +=1
+                                        #This identifier is not in the current EnsEMBL database
+                                    elif not reduce( (lambda x, y: x or y), map(lambda x: self.ensembl_current[x]['is_reference'] is True, self.uniprot_current[uniprot_id]["gene_ids"]) ):
+                                        gene_mapping_failed = True
+                                        audit.append((lc, UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF, uniprot_id))
+                                        #logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                        if not uniprot_id in invalid_uniprot_id_mappings:
+                                            invalid_uniprot_id_mappings[uniprot_id] = 1
+                                        else:
+                                            invalid_uniprot_id_mappings[uniprot_id] += 1
+                                        nb_uniprot_invalid_mapping +=1
+                                    else:
+                                        reference_target_list = filter(lambda x: self.ensembl_current[x]['is_reference'] is True, self.uniprot_current[uniprot_id]["gene_ids"])
+                                        if reference_target_list:
+                                            target_id = reference_target_list[0]
+                                        else:
+                                            # get the first one, needs a better way
+                                            target_id = self.uniprot_current[uniprot_id]["gene_ids"][0]
+                                        #logger.info("Found target id being: %s for %s" %(target_id, uniprot_id))
+                                        if target_id is None:
+                                            logger.info("Found no target id for %s" %(uniprot_id))
 
-                            '''
-                            Check Ensembl ID, UniProt ID and UniProt ID mapping to a Gene ID
-                            '''
-                            if obj.target.id:
-                                for id in obj.target.id:
-                                    # http://identifiers.org/ensembl/ENSG00000178573
-                                    ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', id)
-                                    uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
-                                    if ensemblMatch:
-                                        ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
-                                        if not ensembl_id in self.ensembl_current:
-                                            gene_failed = True
-                                            logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                                            if not ensembl_id in invalid_ensembl_ids:
-                                                invalid_ensembl_ids[ensembl_id] = 1
-                                            else:
-                                                invalid_ensembl_ids[ensembl_id] += 1
-                                            nb_ensembl_invalid +=1
-                                        elif self.ensembl_current[ensembl_id]['is_reference'] is False:
-                                            gene_mapping_failed = True
-                                            logger.warning("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                                            if not ensembl_id in invalid_ensembl_ids:
-                                                nonref_ensembl_ids[ensembl_id] = 1
-                                            else:
-                                                nonref_ensembl_ids[ensembl_id] += 1
-                                            nb_ensembl_nonref +=1
-                                    elif uniprotMatch:
-                                        uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                                        if uniprot_id not in self.uniprot_current:
-                                            gene_failed = True
-                                            logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier".format(lc+1, uniprot_id))
-                                            if uniprot_id not in invalid_uniprot_ids:
-                                                invalid_uniprot_ids[uniprot_id] = 1
-                                            else:
-                                                invalid_uniprot_ids[uniprot_id] += 1
-                                            nb_uniprot_invalid +=1
-                                        elif "gene_ids" not in self.uniprot_current[uniprot_id]:
-                                            # check symbol mapping (get symbol first)
-                                            gene_mapping_failed = True
-                                            logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
-                                            if not uniprot_id in missing_uniprot_id_xrefs:
-                                                missing_uniprot_id_xrefs[uniprot_id] = 1
-                                            else:
-                                                missing_uniprot_id_xrefs[uniprot_id] += 1
-                                            nb_missing_uniprot_id_xrefs +=1
-                                            #This identifier is not in the current EnsEMBL database
-                                        elif not reduce( (lambda x, y: x or y), map(lambda x: self.ensembl_current[x]['is_reference'] is True, self.uniprot_current[uniprot_id]["gene_ids"]) ):
-                                            gene_mapping_failed = True
-                                            logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                                            if not uniprot_id in invalid_uniprot_id_mappings:
-                                                invalid_uniprot_id_mappings[uniprot_id] = 1
-                                            else:
-                                                invalid_uniprot_id_mappings[uniprot_id] += 1
-                                            nb_uniprot_invalid_mapping +=1
+                        if obj.target.id is None or target_count == 0 or target_id is None:
+                            ''' no target id !!!! '''
+                            audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_TARGET))
+                            gene_failed = True
 
-                            if not bGivingUp:
-                                logs = self.stopCapture()
-
-                        else:
-                            if not bGivingUp:
-                                self.startCapture(logging.ERROR)
-                                logger.error("Line {0}: Not a valid 1.2.1 evidence string - There was an error parsing the JSON document. The document may contain an invalid field".format(lc+1))
-                                logs = self.stopCapture()
-                            nb_errors += 1
-                            validation_failed = True
+                        ''' store the evidence '''
+                        if validation_result == 0 and not disease_failed and not gene_failed:
+                            nb_valid +=1;
+                            #logger.info("Add evidence for %s %s " %(target_id, disease_id))
+                            # flatten data structure
+                            json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest();
+                            self.evidence_chunk_storage.storage_add(uniq_elements_flat_hexdig,
+                                            EvidenceString11(uniq_assoc_fields_hashdig = uniq_elements_flat_hexdig,
+                                                            json_doc_hashdig = json_doc_hashdig,
+                                                            evidence_string = python_raw,
+                                                            target_id = target_id,
+                                                            disease_id = efo_id,
+                                                            data_source_name = data_source_name,
+                                                            json_schema_version = "1.2.1",
+                                                            json_doc_version = 1,
+                                                            release_date = datetime.utcnow()),
+                                            data_source_name);
 
                     else:
-                        if not bGivingUp:
-                            self.startCapture(logging.ERROR)
-                            logger.error("Line {0}: '{1}' is not a valid 1.2.1 evidence string type".format(lc+1, data_type))
-                            logs = self.stopCapture()
+                        audit.append((lc, EVIDENCE_STRING_INVALID))
+                        #logger.error("Line {0}: Not a valid 1.2.1 evidence string - There was an error parsing the JSON document. The document may contain an invalid field".format(lc+1))
                         nb_errors += 1
                         validation_failed = True
 
-                elif not 'validated_against_schema_version' in python_raw or ('validated_against_schema_version' in python_raw and python_raw['validated_against_schema_version'] != "1.2.1"):
-                    if not bGivingUp:
-                        self.startCapture(logging.ERROR)
-                        logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
-                        logs = self.stopCapture()
-                    nb_errors += 1
-                    validation_failed = True
                 else:
-                    if not bGivingUp:
-                        self.startCapture(logging.ERROR)
-                        logger.error("Line {0}: Not a valid 1.2.1 evidence string - please add the mandatory 'type' attribute".format(lc+1))
-                        logs = self.stopCapture()
+                    audit.append((lc, EVIDENCE_STRING_INVALID_TYPE, data_type))
+                    #logger.error("Line {0}: '{1}' is not a valid 1.2.1 evidence string type".format(lc+1, data_type))
                     nb_errors += 1
                     validation_failed = True
 
-                if (validation_failed or validation_result > 0 or disease_failed or gene_failed or gene_mapping_failed) and not bGivingUp:
-                    if obj:
-                        lfh.write("line {0} - {1}".format(lc+1, json.dumps(obj.unique_association_fields)))
-                    else:
-                        lfh.write("line {0} ".format(lc+1))
-                    lfh.write(logs)
-                    if nb_errors > Config.EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED or nb_duplicates > Config.EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED:
-                        lfh.write("Too many errors: giving up.\n")
-                        bGivingUp = True
-                if not validation_failed and validation_result == 0 and not disease_failed and not gene_failed:
-                    nb_valid +=1;
-                    # flatten data structure
-                    json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest();
-                    self.storage_add(uniq_elements_flat_hexdig,
-                                    EvidenceString10(uniq_assoc_fields_hashdig = uniq_elements_flat_hexdig,
-                                                    json_doc_hashdig = json_doc_hashdig,
-                                                    evidence_string = python_raw,
-                                                    data_source_name = data_source_name,
-                                                    json_schema_version = "1.2.1",
-                                                    json_doc_version = 1,
-                                                    release_date = datetime.utcnow()),
-                                    data_source_name);
-
-                lc += 1
-                cc += len(line)
-            logging.info('nb line parsed %i (size %i)'% (lc, cc))
-            fh.close()
-            lfh.close()
-
-            # write top diseases / top targets
-            text = ""
-            if top_diseases:
-                text +="Top %i diseases:\n"%(Config.EVIDENCEVALIDATION_NB_TOP_DISEASES)
-                for n in range(0,len(top_diseases)):
-                    if top_diseases[n] in self.efo_current:
-                        text +="\t-{0}:\t{1} ({2:.1f}%) {3}\n".format(top_diseases[n], diseases[top_diseases[n]], diseases[top_diseases[n]]*100/lc, self.efo_current[top_diseases[n]])
-                    else:
-                        text +="\t-{0}:\t{1} ({2:.1f}%)\n".format(top_diseases[n], diseases[top_diseases[n]], diseases[top_diseases[n]]*100/lc)
-                text +="\n"
-            if top_targets:
-                text +="Top %i targets:\n"%(Config.EVIDENCEVALIDATION_NB_TOP_TARGETS)
-                for n in range(0,len(top_targets)):
-                    id = top_targets[n];
-                    id_text = None
-                    ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', id)
-                    uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
-                    if ensemblMatch:
-                        ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
-                        id_text = self.get_reference_gene_from_Ensembl(ensembl_id);
-                    elif uniprotMatch:
-                        uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                        id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
-                    text +="\t-{0}:\t{1} ({2:.1f}%) {3}\n".format(top_targets[n], targets[top_targets[n]], targets[top_targets[n]]*100/lc, id_text)
-                text +="\n"
-
-            # report invalid/obsolete EFO term
-            if nb_efo_invalid > 0:
-                text +="Errors:\n"
-                text +="\t%i invalid EFO term(s) found in %i (%.1f%s) of the records.\n"%(len(invalid_diseases), nb_efo_invalid, nb_efo_invalid*100/lc, '%' )
-                for disease_id in invalid_diseases:
-                    if invalid_diseases[disease_id] == 1:
-                        text += "\t%s\t(reported once)\n"%(disease_id)
-                    else:
-                        text += "\t%s\t(reported %i times)\n"%(disease_id, invalid_diseases[disease_id])
-
-                text +="\n"
-            if nb_efo_obsolete > 0:
-                text +="Errors:\n"
-                text +="\t%i obsolete EFO term(s) found in %i (%.1f%s) of the records.\n"%(len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete*100/lc, '%' )
-                for disease_id in obsolete_diseases:
-                    if obsolete_diseases[disease_id] == 1:
-                        text += "\t%s\t(reported once)\t%s\n"%(disease_id, self.efo_obsolete[disease_id].replace("\n", " "))
-                    else:
-                        text += "\t%s\t(reported %i times)\t%s\n"%(disease_id, obsolete_diseases[disease_id], self.efo_obsolete[disease_id].replace("\n", " "))
-                text +="\n"
-
-            # report invalid Ensembl genes
-            if nb_ensembl_invalid > 0:
-                text +="Errors:\n"
-                text +="\t%i unknown Ensembl identifier(s) found in %i (%.1f%s) of the records.\n"%(len(invalid_ensembl_ids), nb_ensembl_invalid, nb_ensembl_invalid*100/lc, '%' )
-                for ensembl_id in invalid_ensembl_ids:
-                    if invalid_ensembl_ids[ensembl_id] == 1:
-                        text += "\t%s\t(reported once)\n"%(ensembl_id)
-                    else:
-                        text += "\t%s\t(reported %i times)\n"%(ensembl_id, invalid_ensembl_ids[ensembl_id])
-                text +="\n"
-
-            # report Ensembl genes not on reference assembly
-            if nb_ensembl_nonref > 0:
-                text +="Warnings:\n"
-                text +="\t%i Ensembl Human Alternative sequence Gene identifier(s) not mapped to the reference genome assembly %s found in %i (%.1f%s) of the records.\n"%(len(nonref_ensembl_ids), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_ensembl_nonref, nb_ensembl_nonref*100/lc, '%' )
-                text +="\tPlease map them to a reference assembly gene if possible.\n"
-                text +="\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifier.\n"
-                for ensembl_id in nonref_ensembl_ids:
-                    if nonref_ensembl_ids[ensembl_id] == 1:
-                        text += "\t%s\t(reported once) maps to %s\n"%(ensembl_id, self.get_reference_gene_from_Ensembl(ensembl_id))
-                    else:
-                        text += "\t%s\t(reported %i times) maps to %s\n"%(ensembl_id, nonref_ensembl_ids[ensembl_id], self.get_reference_gene_from_Ensembl(ensembl_id))
-                text +="\n"
-
-            # report invalid Uniprot entries
-            if nb_uniprot_invalid > 0:
-                text +="Errors:\n"
-                text +="\t%i invalid UniProt identifier(s) found in %i (%.1f%s) of the records.\n"%(len(invalid_uniprot_ids), nb_uniprot_invalid, nb_uniprot_invalid*100/lc, '%' )
-                for uniprot_id in invalid_uniprot_ids:
-                    if invalid_uniprot_ids[uniprot_id] == 1:
-                        text += "\t%s\t(reported once)\n"%(uniprot_id)
-                    else:
-                        text += "\t%s\t(reported %i times)\n"%(uniprot_id, invalid_uniprot_ids[uniprot_id])
-                text +="\n"
-
-            # report UniProt ids with no mapping to Ensembl
-            # missing_uniprot_id_xrefs
-            if nb_missing_uniprot_id_xrefs > 0:
-                text +="Warnings:\n"
-                text +="\t%i UniProt identifier(s) without cross-references to Ensembl found in %i (%.1f%s) of the records.\n"%(len(missing_uniprot_id_xrefs), nb_missing_uniprot_id_xrefs, nb_missing_uniprot_id_xrefs*100/lc, '%' )
-                text +="\tThe corresponding evidence strings have been discarded.\n"
-                for uniprot_id in missing_uniprot_id_xrefs:
-                    if missing_uniprot_id_xrefs[uniprot_id] == 1:
-                        text += "\t%s\t(reported once)\n"%(uniprot_id)
-                    else:
-                        text += "\t%s\t(reported %i times)\n"%(uniprot_id, missing_uniprot_id_xrefs[uniprot_id])
-                text +="\n"
-            # report invalid Uniprot mapping entries
-            if nb_uniprot_invalid_mapping > 0:
-                text +="Warnings:\n"
-                text +="\t%i UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (%.1f%s) of the records.\n"%(len(invalid_uniprot_id_mappings), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping*100/lc, '%' )
-                text +="\tIf you think that might be an error in your submission, please use a UniProt identifier that will map to a reference assembly gene identifier.\n"
-                text +="\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifiers.\n"
-                for uniprot_id in invalid_uniprot_id_mappings:
-                    if invalid_uniprot_id_mappings[uniprot_id] == 1:
-                        text += "\t%s\t(reported once) maps to %s\n"%(uniprot_id, self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
-                    else:
-                        text += "\t%s\t(reported %i times) maps to %s\n"%(uniprot_id, invalid_uniprot_id_mappings[uniprot_id], self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
-                text +="\n"
-
-            now = datetime.utcnow()
-
-            # A file is successfully validated if it meets the following conditions
-            successfully_validated = (nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0 and nb_uniprot_invalid == 0)
-
-            if count == 0:
-                # insert
-                f = EvidenceValidation(
-                    provider_id = provider_id,
-                    filename = file_on_disk,
-                    md5 = md5_hash,
-                    date_created = now,
-                    date_modified = now,
-                    date_validated = now,
-                    nb_submission = 1,
-                    nb_records = lc,
-                    #nb_valid = nb_valid,
-                    nb_errors = nb_errors,
-                    nb_duplicates = nb_duplicates,
-                    successfully_validated = successfully_validated
-                )
-                self.session.add(f)
-                logging.info('inserted %s file in the validation table'%file_on_disk)
+            elif (not 'validated_against_schema_version' in python_raw or
+                  ('validated_against_schema_version' in python_raw and
+                   python_raw['validated_against_schema_version'] != Config.EVIDENCEVALIDATION_SCHEMA
+                  )
+                 ):
+                audit.append((lc, EVIDENCE_STRING_INVALID_SCHEMA_VERSION))
+                #logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
+                nb_errors += 1
+                validation_failed = True
             else:
-                # update database
-                rowToUpdate.md5 = md5_hash
-                rowToUpdate.nb_records = lc
-                rowToUpdate.nb_errors = nb_errors
-                rowToUpdate.nb_duplicates = nb_duplicates
-                rowToUpdate.date_modified = now
-                rowToUpdate.date_validated = now
-                rowToUpdate.successfully_validated = successfully_validated
-                self.session.add(rowToUpdate)
+                ''' type '''
+                audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_TYPE))
+                logger.error("Line {0}: Not a valid 1.2.1 evidence string - please add the mandatory 'type' attribute".format(lc+1))
+                nb_errors += 1
+                validation_failed = True
 
-            # write
-            self.storage_flush(data_source_name);
-            self.storage_commit();
+            cc += len(line)
+            # for line :)
 
-            self.send_email(
-                Config.EVIDENCEVALIDATION_SEND_EMAIL,
-                provider_id,
-                filename,
-                successfully_validated,
-                lc,
-                {   'valid records': nb_valid,
-                    'JSON errors': nb_errors,
-                    'records with duplicates': nb_duplicates,
-                    'records with invalid EFO terms': nb_efo_invalid,
-                    'records with obsolete EFO terms': nb_efo_obsolete,
-                    'records with invalid Ensembl ids': nb_ensembl_invalid,
-                    'records with Human Alternative sequence Gene Ensembl ids (warning)': nb_ensembl_nonref,
-                    'records with invalid UniProt ids': nb_uniprot_invalid,
-                    'records with UniProt entries without x-refs to Ensembl (warning)': nb_missing_uniprot_id_xrefs,
-                    'records with UniProt ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping
-                },
-                now,
-                text,
-                logfile
-                )
+        logging.info('nb line parsed %i (size %i)'% (lc, cc))
 
+        ''' write results '''
+        self.evidence_chunk_storage.storage_flush(data_source_name)
+        self.evidence_chunk_storage.storage_commit()
+
+        '''
+        Inform the audit trailer to generate a report and send an e-mail to the data provider
+        '''
+        self.output_q.put((nb_errors, audit, len(line_buffer)))
+
+        return
 
 class EvidenceStringStorage():
 
     @staticmethod
     def delete_prev_data_in_pg(session, data_source_name):
         rows_deleted = session.query(
-            EvidenceString10).filter(
-                EvidenceString10.data_source_name == data_source_name).delete(synchronize_session=False)
+            EvidenceString11).filter(
+                EvidenceString11.data_source_name == data_source_name).delete(synchronize_session=False)
         if rows_deleted:
             logging.info('deleted %i rows from evidence_string' % rows_deleted)
 
@@ -788,18 +831,71 @@ class EvidenceStringStorage():
             rows_to_insert.append(dict(uniq_assoc_fields_hashdig = key,
                                         json_doc_hashdig = value.json_doc_hashdig,
                                         evidence_string = value.evidence_string,
+                                        target_id = value.target_id,
+                                        disease_id = value.disease_id,
                                         data_source_name = value.data_source_name,
                                         json_schema_version = value.json_schema_version,
                                         json_doc_version = value.json_doc_version,
                                         release_date = value.release_date
                                       ))
-        adapter.engine.execute(EvidenceString10.__table__.insert(),rows_to_insert)
+        adapter.engine.execute(EvidenceString11.__table__.insert(),rows_to_insert)
 
         # if autocommit:
         #     adapter.session.commit()
         if not quiet:
             logging.info('inserted %i rows of %s inserted in evidence_string' %(len(rows_to_insert), data_source_name))
         return len(rows_to_insert)
+
+class EvidenceChunkStorage():
+    def __init__(self, adapter, chunk_size=1e4):
+        self.adapter = adapter
+        self.session = adapter.get_new_session()
+        self.chunk_size = chunk_size
+        self.cache = {}
+        self.counter = 0
+
+    def storage_reset(self):
+        self.cache = {}
+        self.counter = 0
+
+    def storage_add(self, id, evidence_string, data_source_name):
+
+        self.cache[id] = evidence_string
+        self.counter +=1
+        if (len(self.cache) % self.chunk_size) == 0:
+            self.storage_flush(data_source_name)
+
+    def storage_delete(self, data_source_name):
+        EvidenceStringStorage.delete_prev_data_in_pg(self.adapter.session, data_source_name)
+        self.session.commit()
+        self.cache = {}
+        self.counter = 0
+
+    def storage_flush(self, data_source_name):
+
+        if self.cache:
+            EvidenceStringStorage.store_to_pg_core(self.adapter,
+                                              data_source_name,
+                                              self.cache,
+                                              delete_prev=False,
+                                              quiet=True
+                                             )
+            self.counter+=len(self.cache)
+            # if (self.counter % global_reporting_step) == 0:
+            #     logging.info("%s precalculated scores inserted in elasticsearch_load table" %(millify(self.counter)))
+
+            self.session.flush()
+            self.cache = {}
+
+    def storage_commit(self):
+        self.session.flush()
+        self.session.commit()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.storage_commit()
 
 class EvidenceValidationFileChecker():
 
@@ -1251,31 +1347,37 @@ class EvidenceValidationFileChecker():
         '''
         self.load_gene_mapping()
         #return;
-        self.load_efo();
-        self.load_eco();
+        self.load_efo()
+        self.load_eco()
 
         '''
         Create queues
         '''
         file_q = multiprocessing.Queue(maxsize=NB_JSON_FILES+1)
         evidence_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE+1)
+        audit_q = multiprocessing.Queue(maxsize=NB_JSON_FILES+1)
 
         '''
         Create events
         '''
         input_file_loading_finished = multiprocessing.Event()
         input_file_processing_finished = multiprocessing.Event()
-        evidence_loaded_finished = multiprocessing.Event()
+        input_file_validation_finished = multiprocessing.Event()
+        data_processing_finished = multiprocessing.Event()
+        data_storage_finished = multiprocessing.Event()
 
         '''
         Create counters (shared memory objects)
         '''
         input_file_count = multiprocessing.Value('i', 0)
         input_file_processed_count = multiprocessing.Value('i', 0)
+        input_file_validated_count = multiprocessing.Value('i', 0)
         evidence_loaded_count = multiprocessing.Value('i', 0)
+        evidence_validated_count = multiprocessing.Value('i', 0)
 
         '''create locks'''
         file_processing_lock = multiprocessing.Lock()
+        log_file_lock = multiprocessing.Lock()
         data_processing_lock =  multiprocessing.Lock()
         data_storage_lock =  multiprocessing.Lock()
 
@@ -1284,7 +1386,7 @@ class EvidenceValidationFileChecker():
         '''
         Start crawling the FTP directory
         '''
-        directory_crawler = EvidenceDirectoryCrawler(
+        directory_crawler = EvidenceDirectoryCrawlerProcess(
                                     file_q,
                                     input_file_loading_finished,
                                     input_file_count,
@@ -1296,9 +1398,9 @@ class EvidenceValidationFileChecker():
         '''
         Start processing the evidence file from the data providers
         '''
-        readers = [EvidenceFileReader(file_q,
+        readers = [EvidenceFileReaderProcess(file_q,
                                       evidence_q,
-                                      self.session,
+                                      self.adapter,
                                       input_file_loading_finished,
                                       input_file_processing_finished,
                                       input_file_count,
@@ -1310,8 +1412,33 @@ class EvidenceValidationFileChecker():
         for w in readers:
             w.start()
 
+        '''
+        Start processing the evidence in chunks
+        on the evidence queue
+        '''
+
+        validators = [EvidenceValidatorProcess(evidence_q,
+                                      audit_q,
+                                      self.adapter,
+                                      self.efo_current,
+                                      self.efo_uncat,
+                                      self.efo_obsolete,
+                                      self.uniprot_current,
+                                      self.ensembl_current,
+                                      input_file_processing_finished,
+                                      input_file_validation_finished,
+                                      input_file_processed_count,
+                                      input_file_validated_count,
+                                      evidence_loaded_count,
+                                      evidence_validated_count,
+                                      log_file_lock
+                                     ) for i in range(workers_number)]
+                                  # ) for i in range(2)]
+        for w in validators:
+            w.start()
+
         '''wait for other processes to finish'''
-        while not input_file_processing_finished.is_set():
+        while not input_file_validation_finished.is_set():
                 time.sleep(1)
 
         if directory_crawler.is_alive():
@@ -1320,6 +1447,11 @@ class EvidenceValidationFileChecker():
         for w in readers:
             if w.is_alive():
                 w.terminate()
+
+        for w in validators:
+            if w.is_alive():
+                w.terminate()
+
         return
 
     def toto(self):
@@ -1432,6 +1564,8 @@ class EvidenceValidationFileChecker():
                 gene_failed = False
                 gene_mapping_failed = False
                 uniq_elements_flat_hexdig = None
+                target_id = None
+                disease_id = None
                 
                 if ('label' in python_raw  or 'type' in python_raw) and 'validated_against_schema_version' in python_raw and python_raw['validated_against_schema_version'] == "1.2.1":
                     if 'label' in python_raw:
@@ -1482,6 +1616,8 @@ class EvidenceValidationFileChecker():
                                         diseases[id] +=1
                                     else:
                                         diseases[id] =1
+                                    ''' assign disease id here '''
+                                    disease_id = id
                                     if not id in top_diseases:
                                         if len(top_diseases) < Config.EVIDENCEVALIDATION_NB_TOP_DISEASES:
                                             top_diseases.append(id)
@@ -1549,6 +1685,7 @@ class EvidenceValidationFileChecker():
                                     uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
                                     if ensemblMatch:
                                         ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
+                                        target_id = ensembl_id
                                         if not ensembl_id in self.ensembl_current:
                                             gene_failed = True
                                             logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
@@ -1593,6 +1730,9 @@ class EvidenceValidationFileChecker():
                                             else:
                                                 invalid_uniprot_id_mappings[uniprot_id] += 1
                                             nb_uniprot_invalid_mapping +=1
+                                        else:
+                                            ''' assign target_id using ensembl identifier '''
+                                            target = reduce( (lambda x, y: x or y), map(lambda x: self.ensembl_current[x]['is_reference'] is True, self.uniprot_current[uniprot_id]["gene_ids"]) ).key()
                                             
                             if not bGivingUp:  
                                 logs = self.stopCapture()
@@ -1642,9 +1782,11 @@ class EvidenceValidationFileChecker():
                     # flatten data structure
                     json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest();
                     self.storage_add(uniq_elements_flat_hexdig, 
-                                    EvidenceString10(uniq_assoc_fields_hashdig = uniq_elements_flat_hexdig,
+                                    EvidenceString11(uniq_assoc_fields_hashdig = uniq_elements_flat_hexdig,
                                                     json_doc_hashdig = json_doc_hashdig,
                                                     evidence_string = python_raw,
+                                                    target_id = TODO,
+                                                    disease_id = TODO,
                                                     data_source_name = data_source_name,
                                                     json_schema_version = "1.2.1", 
                                                     json_doc_version = 1,

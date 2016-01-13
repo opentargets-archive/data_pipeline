@@ -44,8 +44,10 @@ class Config():
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
     REACTOME_PATHWAY_RELATION = 'http://www.reactome.org/download/current/ReactomePathwaysRelation.txt'
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
+    EVIDENCEVALIDATION_SCHEMA = "1.2.1"
+    EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
     # path to the FTP files on the processing machine
-    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp'
+    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/Users/koscieln/Documents/data/ftp' #'/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp'
     EVIDENCEVALIDATION_FILENAME_REGEX = '^(cttv[0-9]{3}|cttv_external_mousemodels|cttv006_Networks_Reactome)\-\d{2}\-\d{2}\-\d{4}\.json\.gz$'
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
@@ -80,7 +82,10 @@ class Config():
     JSON_FILE_TO_DATASOURCE_MAPPING['cttv018'] = 'CTTV018_IBD_GWAS'
     JSON_FILE_TO_DATASOURCE_MAPPING['cttv025'] = 'CTTV025_Literature'
     JSON_FILE_TO_DATASOURCE_MAPPING['cttv_external_mousemodels'] = 'CTTV_External_MouseModels'
- 
+
+    # This tells you how many workers will process the evidence strings
+    EVIDENCEVALIDATION_WORKERS_NUMBER = None
+
     DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
     DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
                                                         #phenodigm=dict(min=0.4, max= 1),
