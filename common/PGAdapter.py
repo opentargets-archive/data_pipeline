@@ -32,6 +32,9 @@ class Adapter():
         return create_engine(URL(**url))
 
 
+    def get_new_session(self,):
+        DBSession = sessionmaker(bind=self.engine)
+        return DBSession()
 
     def setup(self,):
 
@@ -65,6 +68,19 @@ class EvidenceString10(Base):
     uniq_assoc_fields_hashdig = Column(String(250), primary_key=True)
     json_doc_hashdig = Column(String(250))
     evidence_string = Column(JSONB)
+    data_source_name = Column(Text)
+    json_schema_version = Column(String(250))
+    json_doc_version = Column(Integer)
+    release_date = Column(Date)
+
+class EvidenceString11(Base):
+    __tablename__ = 'evidence_strings_1_1'
+    __table_args__ = {'schema':'public'}
+    uniq_assoc_fields_hashdig = Column(String(250), primary_key=True)
+    json_doc_hashdig = Column(String(250))
+    evidence_string = Column(JSONB)
+    target_id = Column(String(250))
+    disease_id = Column(String(250))
     data_source_name = Column(Text)
     json_schema_version = Column(String(250))
     json_doc_version = Column(Integer)
