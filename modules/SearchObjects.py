@@ -41,5 +41,6 @@ for i in range(10):
         print value, 'done'
 
 print q.get_status()
+print 'QUEUE IS DONE:', q.is_done()
 q.close()
 print q.get_status()

@@ -30,20 +30,23 @@ class RedisQueue(object):
     In this case a :param r_server: (typically instantiated in the worker process) needs to be passed when calling
     the methods.
 
+    Given the job-process oriented design by default keys stored in redis will expire in 2 days
+
     '''
 
     MAIN_QUEUE = "queue:main:%(queue)s"
     PROCESSING_QUEUE = "queue:processing:%(queue)s"
     VALUE_STORE = "queue:values:%(queue)s:%(key)s"
-    SUMBITTED_STORE = "queue:submitted:%(queue)s"
-    SUMBMITION_FINISH_STORE = "queue:submitionfinished:%(queue)s"
+    SUBMITTED_STORE = "queue:submitted:%(queue)s"
+    SUBMISSION_FINISH_STORE = "queue:submitionfinished:%(queue)s"
     PROCESSED_STORE = "queue:processed:%(queue)s"
     ERRORS_STORE = "queue:errors:%(queue)s"
 
     def __init__(self,
                  queue_id=None,
                  r_server = None,
-                 max_size = 25000):
+                 max_size = 25000,
+                 ttl = 60*60*24+2):
         '''
         :param queue_id: queue id to attach to preconfigured queues
         :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
@@ -57,13 +60,14 @@ class RedisQueue(object):
         self.queue_id = queue_id
         self.main_queue = self.MAIN_QUEUE% dict(queue = queue_id)
         self.processing_key = self.PROCESSING_QUEUE % dict(queue = queue_id)
-        self.submitted_counter = self.SUMBITTED_STORE % dict(queue = queue_id)
+        self.submitted_counter = self.SUBMITTED_STORE % dict(queue = queue_id)
         self.processed_counter = self.PROCESSED_STORE % dict(queue = queue_id)
         self.errors_counter = self.ERRORS_STORE % dict(queue = queue_id)
-        self.submission_done = self.SUMBMITION_FINISH_STORE % dict(queue = queue_id)
+        self.submission_done = self.SUBMISSION_FINISH_STORE % dict(queue = queue_id)
         self.r_server = r_server
         self.job_timeout = 5
         self.max_queue_size = max_size
+        self.default_ttl = ttl
 
 
     def put(self, element, r_server=None):
@@ -75,8 +79,10 @@ class RedisQueue(object):
                 queue_size = r_server.llen(self.main_queue)
         key = uuid.uuid4().hex
         r_server.lpush(self.main_queue, key)
-        r_server.set(self._get_value_key(key), pickle.dumps(element))
+        r_server.expire(self.main_queue, self.default_ttl)
+        r_server.setex(self._get_value_key(key), pickle.dumps(element), self.default_ttl)
         r_server.incr(self.submitted_counter)
+        r_server.expire(self.submitted_counter, self.default_ttl)
         return key
 
     def get(self, r_server=None, wait_on_empty = 0, timeout = 0):
@@ -92,14 +98,17 @@ class RedisQueue(object):
             return
         key = response[1]
         r_server.zadd(self.processing_key, key, time.time())
+        r_server.expire(self.processing_key, self.default_ttl)
         return key, pickle.loads(r_server.get(self._get_value_key(key)))
 
     def done(self,key, r_server=None, error = False):
         r_server = self._get_r_server(r_server)
         self._remove_job(key, r_server)
         r_server.incr(self.processed_counter)
+        r_server.expire(self.processed_counter, self.default_ttl)
         if error:
             r_server.incr(self.errors_counter)
+            r_server.expire(self.errors_counter, self.default_ttl)
 
     def _get_value_key(self, key):
         return self.VALUE_STORE % dict(queue = self.queue_id, key =key)
@@ -205,6 +214,8 @@ class RedisQueue(object):
     def set_submission_finished(self, r_server = None):
         r_server = self._get_r_server(r_server)
         r_server.setbit(self.submission_done, 1, 1)
+        r_server.expire(self.submission_done, self.default_ttl)
+
 
     def is_done(self, r_server = None):
         r_server = self._get_r_server(r_server)
