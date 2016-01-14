@@ -72,7 +72,7 @@ class RedisQueue(object):
         self.errors_counter = self.ERRORS_STORE % dict(queue = queue_id)
         self.submission_done = self.SUBMISSION_FINISH_STORE % dict(queue = queue_id)
         self.r_server = r_server
-        self.job_timeout = 5
+        self.job_timeout = 30
         self.max_queue_size = max_size
         self.default_ttl = ttl
 

@@ -221,24 +221,29 @@ class SearchObjectProcess(object):
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
-        '''get gene simplified objects and push them to the processing queue'''
-        for i,target in enumerate(self.esquery.get_all_targets()):
-            target['search_type'] = SearchObjectTypes.TARGET
-            queue.put(target, self.r_server)
+        # '''get gene simplified objects and push them to the processing queue'''
+        # for i,target in enumerate(self.esquery.get_all_targets()):
+        #     target['search_type'] = SearchObjectTypes.TARGET
+        #     queue.put(target, self.r_server)
 
         for i,disease in enumerate(self.esquery.get_all_diseases()):
             disease['search_type'] = SearchObjectTypes.DISEASE
             queue.put(disease, self.r_server)
+
+        queue.set_submission_finished(r_server=self.r_server)
 
 
 
         '''get disease objects  and push them to the processing queue'''
 
         while not queue.is_done(r_server=self.r_server):
-            data = queue.get()
+            data = queue.get(r_server=self.r_server)
             if data is not None:
+                time.sleep(0.05)
                 key, value = data
                 error = random.random()>0.92
                 queue.done(key, error=error, r_server=self.r_server)
 
+
+        logging.critical(queue.get_status(r_server=self.r_server))
         logging.critical('ALL DONE!')
