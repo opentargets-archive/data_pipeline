@@ -1,6 +1,11 @@
+import base64
 import json
 import logging
-import uuid, pickle
+import uuid
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import time
 from multiprocessing import Process
 
@@ -88,7 +93,9 @@ class RedisQueue(object):
         pipe = r_server.pipeline()
         pipe.lpush(self.main_queue, key)
         pipe.expire(self.main_queue, self.default_ttl)
-        pipe.setex(self._get_value_key(key), pickle.dumps(element), self.default_ttl)
+        pipe.setex(self._get_value_key(key),
+                   base64.encodestring(pickle.dumps(element, pickle.HIGHEST_PROTOCOL)),
+                   self.default_ttl)
         pipe.incr(self.submitted_counter)
         pipe.expire(self.submitted_counter, self.default_ttl)
         pipe.execute()
@@ -110,7 +117,7 @@ class RedisQueue(object):
         pipe.zadd(self.processing_key, key, time.time())
         pipe.expire(self.processing_key, self.default_ttl)
         pipe.execute()
-        return key, pickle.loads(r_server.get(self._get_value_key(key)))
+        return key, pickle.loads(base64.decodestring(r_server.get(self._get_value_key(key))))
 
     def done(self,key, r_server=None, error = False):
         r_server = self._get_r_server(r_server)
@@ -303,11 +310,11 @@ class RedisLookupTable(object):
             raise AttributeError('Only str and unicode types are accepted as object value. Use the \
             RedisLookupTablePickle subclass for generic objects.')
         r_server = self._get_r_server(r_server)
-        return r_server.setex(self._get_key_namespace(key), obj, self.default_ttl)
+        return r_server.setex(self._get_key_namespace(key), self._encode(obj), self.default_ttl)
 
     def get(self, key, r_server = None):
         r_server = self._get_r_server(r_server)
-        return r_server.get(self._get_key_namespace(key))
+        return self._decode(r_server.get(self._get_key_namespace(key)))
 
     def keys(self, r_server = None):
         r_server = self._get_r_server(r_server)
@@ -324,6 +331,12 @@ class RedisLookupTable(object):
     def _get_key_namespace(self, key):
         return self.KEY_NAMESPACE % dict(namespace = self.namespace, key = key)
 
+    def _encode(self, obj):
+        return obj
+
+    def _decode(self, obj):
+        return obj
+
 
 class RedisLookupTableJson(RedisLookupTable):
     '''
@@ -331,13 +344,11 @@ class RedisLookupTableJson(RedisLookupTable):
     By default keys will expire in 2 days
     '''
 
-    def set(self, key, obj, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return r_server.setex(self._get_key_namespace(key), json.dumps(obj), self.default_ttl)
+    def _encode(self, obj):
+        return json.dumps(obj)
 
-    def get(self, key, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return json.loads(r_server.get(self._get_key_namespace(key)))
+    def _decode(self, obj):
+        return json.loads(obj)
 
 
 
@@ -347,12 +358,8 @@ class RedisLookupTablePickle(RedisLookupTable):
     By default keys will expire in 2 days
     '''
 
-    def set(self, key, obj, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return r_server.setex(self._get_key_namespace(key), pickle.dumps(obj), self.default_ttl)
+    def _encode(self, obj):
+        return base64.encodestring(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL))
 
-    def get(self, key, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return pickle.loads(r_server.get(self._get_key_namespace(key)))
-
-
+    def _decode(self, obj):
+        return pickle.loads(base64.decodestring(obj))
