@@ -1,3 +1,4 @@
+import uuid
 from collections import defaultdict
 
 __author__ = 'andreap'
@@ -134,6 +135,8 @@ class Config():
     RELEASE_VERSION='2.test'
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
+
+    UNIQUE_RUN_ID = str(uuid.uuid4())
 
 
 
