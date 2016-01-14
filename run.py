@@ -170,9 +170,9 @@ if __name__ == '__main__':
         if args.val or run_full_pipeline:
             do_all = (EvidenceValidationActions.ALL in args.val) or run_full_pipeline
             if (EvidenceValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter).map_genes()
+                EvidenceValidationFileChecker(adapter, es).map_genes()
             if (EvidenceValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter).check_all()               
+                EvidenceValidationFileChecker(adapter, es).check_all()
 
         '''only run if explicetely called'''
         if args.es:

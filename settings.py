@@ -12,6 +12,8 @@ class Config():
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
+    ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
+    ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_DATA_INDEX_NAME = 'evidence-data'
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
