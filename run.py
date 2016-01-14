@@ -1,4 +1,7 @@
 import logging
+import os
+
+import sys
 from elasticsearch import Elasticsearch
 from common import Actions
 from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
@@ -18,6 +21,10 @@ import argparse
 from settings import Config, ElasticSearchConfiguration
 from redislite import Redis
 
+
+def clear_redislite_db():
+    if os.path.exists(Config.REDISLITE_DB_PATH):
+        os.remove(Config.REDISLITE_DB_PATH)
 
 __author__ = 'andreap'
 if __name__ == '__main__':
@@ -87,6 +94,8 @@ if __name__ == '__main__':
                         action="append_const", const = EvidenceValidationActions.ALL)
     parser.add_argument("--seap", dest='sea', help="precompute search results",
                         action="append_const", const = SearchObjectActions.PROCESS)
+    parser.add_argument("--volatile-redis", dest='volredis', help="use a fresh redislite db",
+                        action='store_true', default=False)
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -111,7 +120,9 @@ if __name__ == '__main__':
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logger.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
-    r_server= Redis()
+    if args.volredis:
+        clear_redislite_db()
+    r_server= Redis(Config.REDISLITE_DB_PATH)
     with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
         run_full_pipeline = False
         if args.all  and (Actions.ALL in args.all):
@@ -186,6 +197,7 @@ if __name__ == '__main__':
         if args.es:
             if ElasticsearchActions.RELOAD in args.es:
                 JSONObjectStorage.refresh_all_data_in_es(loader,adapter.session)
+
 
 
 

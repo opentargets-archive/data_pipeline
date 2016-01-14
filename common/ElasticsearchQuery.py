@@ -34,6 +34,8 @@ class ESQuery(object):
             yield hit
 
     def get_all_diseases(self, fields = None):
+        if fields is None:
+            fields = ['*']
         res = self.handler.search(index=Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                                   doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                                   body={"query": {

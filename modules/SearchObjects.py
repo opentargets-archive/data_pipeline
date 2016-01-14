@@ -216,9 +216,14 @@ class SearchObjectProcess(object):
         for i,target in enumerate(self.esquery.get_all_targets()):
             target['search_type'] = SearchObjectTypes.TARGET
             queue.put(target, self.r_server)
-            if (i+1)%100 == 0:
+            if (i+1)%1000 == 0:
                 print queue.get_status(self.r_server), target['_id']
 
+        for i,disease in enumerate(self.esquery.get_all_diseases()):
+            disease['search_type'] = SearchObjectTypes.DISEASE
+            queue.put(target, self.r_server)
+            if (i+1)%1000 == 0:
+                print queue.get_status(self.r_server), disease['_id']
 
 
         '''get disease objects  and push them to the processing queue'''

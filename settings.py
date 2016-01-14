@@ -133,6 +133,8 @@ class Config():
 
     RELEASE_VERSION='2.test'
 
+    REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
+
 
 
 def _get_evidence_string_generic_mapping():

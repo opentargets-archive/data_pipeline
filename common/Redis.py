@@ -1,3 +1,4 @@
+import json
 import uuid, pickle
 import time
 
@@ -78,11 +79,13 @@ class RedisQueue(object):
                 time.sleep(0.1)
                 queue_size = r_server.llen(self.main_queue)
         key = uuid.uuid4().hex
-        r_server.lpush(self.main_queue, key)
-        r_server.expire(self.main_queue, self.default_ttl)
-        r_server.setex(self._get_value_key(key), pickle.dumps(element), self.default_ttl)
-        r_server.incr(self.submitted_counter)
-        r_server.expire(self.submitted_counter, self.default_ttl)
+        pipe = r_server.pipeline()
+        pipe.lpush(self.main_queue, key)
+        pipe.expire(self.main_queue, self.default_ttl)
+        pipe.setex(self._get_value_key(key), pickle.dumps(element), self.default_ttl)
+        pipe.incr(self.submitted_counter)
+        pipe.expire(self.submitted_counter, self.default_ttl)
+        pipe.execute()
         return key
 
     def get(self, r_server=None, wait_on_empty = 0, timeout = 0):
@@ -97,18 +100,23 @@ class RedisQueue(object):
         if response is None:
             return
         key = response[1]
-        r_server.zadd(self.processing_key, key, time.time())
-        r_server.expire(self.processing_key, self.default_ttl)
+        pipe = r_server.pipeline()
+        pipe.zadd(self.processing_key, key, time.time())
+        pipe.expire(self.processing_key, self.default_ttl)
+        pipe.execute()
         return key, pickle.loads(r_server.get(self._get_value_key(key)))
 
     def done(self,key, r_server=None, error = False):
         r_server = self._get_r_server(r_server)
-        self._remove_job(key, r_server)
-        r_server.incr(self.processed_counter)
-        r_server.expire(self.processed_counter, self.default_ttl)
+        pipe = r_server.pipeline()
+        pipe.zrem(self.processing_key, key)
+        pipe.delete(self._get_value_key(key))
+        pipe.incr(self.processed_counter)
+        pipe.expire(self.processed_counter, self.default_ttl)
         if error:
-            r_server.incr(self.errors_counter)
-            r_server.expire(self.errors_counter, self.default_ttl)
+            pipe.incr(self.errors_counter)
+            pipe.expire(self.errors_counter, self.default_ttl)
+        pipe.execute()
 
     def _get_value_key(self, key):
         return self.VALUE_STORE % dict(queue = self.queue_id, key =key)
@@ -188,13 +196,15 @@ class RedisQueue(object):
         #values_left = r_server.keys(self.VALUE_STORE % dict(queue = self.queue_id, key ='*')) #slow implementation. it will look over ALL the keys in redis. is slow if may other things are there.
         values_left = [ self.VALUE_STORE % dict(queue = self.queue_id, key =key) \
                         for key in r_server.lrange(self.main_queue, 0, -1)] # fast implementation
+        pipe = r_server.pipeline()
         for key in values_left:
-            r_server.delete(key)
-        r_server.delete(self.main_queue)
-        r_server.delete(self.processing_key)
-        r_server.delete(self.processed_counter)
-        r_server.delete(self.submitted_counter)
-        r_server.delete(self.errors_counter)
+            pipe.delete(key)
+        pipe.delete(self.main_queue)
+        pipe.delete(self.processing_key)
+        pipe.delete(self.processed_counter)
+        pipe.delete(self.submitted_counter)
+        pipe.delete(self.errors_counter)
+        pipe.execute()
 
     def get_size(self, r_server= None):
         r_server = self._get_r_server(r_server)
@@ -207,24 +217,109 @@ class RedisQueue(object):
             return pickle.loads(value)
         return None
 
-    def _remove_job(self, key, r_server):
-        r_server.zrem(self.processing_key, key)
-        r_server.delete(self._get_value_key(key))
-
     def set_submission_finished(self, r_server = None):
         r_server = self._get_r_server(r_server)
-        r_server.setbit(self.submission_done, 1, 1)
-        r_server.expire(self.submission_done, self.default_ttl)
+        pipe = r_server.pipeline()
+        pipe.setbit(self.submission_done, 1, 1)
+        pipe.expire(self.submission_done, self.default_ttl)
+        pipe.execute()
 
 
     def is_done(self, r_server = None):
         r_server = self._get_r_server(r_server)
         submission_finished = r_server.getbit(self.submission_done, 1)
         if submission_finished:
-            return r_server.get(self.submitted_counter) == r_server.get(self.processed_counter)
+            pipe = r_server.pipeline()
+            pipe.get(self.submitted_counter)
+            pipe.get(self.processed_counter)
+            submitted, processed = pipe.execute()
+            return submitted == processed
         return False
 
     def _get_r_server(self, r_server = None):
         if not r_server:
             r_server = self.r_server
+        if r_server is None:
+            raise AttributeError('A redis server is required either at class instantation or at the method level')
         return r_server
+
+
+class RedisLookupTable(object):
+    '''
+    Simple Redis-based key value store for string-based objects.
+    Faster than its subclasses since it does not serialise and unseriliase strings.
+    By default keys will expire in 2 days
+    '''
+
+    LOOK_UPTABLE_NAMESPACE = 'lookuptable:%(namespace)s'
+    KEY_NAMESPACE = 'lookuptable:%(namespace)s:%(key)s'
+
+    def __init__(self,
+                 namespace = None,
+                 r_server = None,
+                 ttl = 60*60*24+2):
+        if namespace is None:
+            namespace = uuid.uuid4()
+        self.namespace = self.LOOK_UPTABLE_NAMESPACE % dict(namespace = namespace)
+        self.r_server = r_server
+        self.default_ttl = ttl
+
+
+    def set(self, key, obj, r_server = None):
+        if not (isinstance(obj, str) or isinstance(obj, unicode)):
+            raise AttributeError('Only str and unicode types are accepted as object value. Use the \
+            RedisLookupTablePickle subclass for generic objects.')
+        r_server = self._get_r_server(r_server)
+        return r_server.setex(self._get_key_namespace(key), obj, self.default_ttl)
+
+    def get(self, key, r_server = None):
+        r_server = self._get_r_server(r_server)
+        return r_server.get(self._get_key_namespace(key))
+
+    def keys(self, r_server = None):
+        r_server = self._get_r_server(r_server)
+        return r_server.keys(self.namespace+'*')
+
+
+    def _get_r_server(self, r_server = None):
+        if not r_server:
+            r_server = self.r_server
+        if r_server is None:
+            raise AttributeError('A redis server is required either at class instantation or at the method level')
+        return r_server
+
+    def _get_key_namespace(self, key):
+        return self.KEY_NAMESPACE % dict(namespace = self.namespace, key = key)
+
+
+class RedisLookupTableJson(RedisLookupTable):
+    '''
+    Simple Redis-based key value store for Json serialised objects
+    By default keys will expire in 2 days
+    '''
+
+    def set(self, key, obj, r_server = None):
+        r_server = self._get_r_server(r_server)
+        return r_server.setex(self._get_key_namespace(key), json.dumps(obj), self.default_ttl)
+
+    def get(self, key, r_server = None):
+        r_server = self._get_r_server(r_server)
+        return json.loads(r_server.get(self._get_key_namespace(key)))
+
+
+
+class RedisLookupTablePickle(RedisLookupTable):
+    '''
+    Simple Redis-based key value store for pickled objects
+    By default keys will expire in 2 days
+    '''
+
+    def set(self, key, obj, r_server = None):
+        r_server = self._get_r_server(r_server)
+        return r_server.setex(self._get_key_namespace(key), pickle.dumps(obj), self.default_ttl)
+
+    def get(self, key, r_server = None):
+        r_server = self._get_r_server(r_server)
+        return pickle.loads(r_server.get(self._get_key_namespace(key)))
+
+
