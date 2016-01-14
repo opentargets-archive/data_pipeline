@@ -186,7 +186,10 @@ class RedisQueue(object):
                     queue_size_status = 'occepting jobs'
             lines.append('Queue size: %i | %s'%(queue_size, queue_size_status))
             lines.append('Jobs being processed: %i'%len(self.get_processing_jobs(r_server)))
-            lines.append('Jobs timed out: %i'%len(self.get_timedout_jobs(r_server)))
+            timedout_jobs = self.get_timedout_jobs(r_server)
+            if timedout_jobs:
+                self.put_back_timedout_jobs(r_server=r_server)
+            lines.append('Jobs timed out: %i'%len(timedout_jobs))
             lines.append('Sumbission finished: %s'%submission_finished)
             status = 'idle'
             if submitted:
