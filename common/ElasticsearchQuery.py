@@ -20,30 +20,35 @@ class ESQuery(object):
     def get_all_targets(self, fields = None):
         if fields is None:
             fields = ['*']
-
+        source =  {"include": fields},
         res = self.handler.search(index=Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                                   doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                                   body={"query": {
                                           "match_all": {}
                                         },
-                                       'fields': fields,
+                                       '_source': source,
                                        'size': int(1e5),
                                        }
                                   )
         for hit in res['hits']['hits']:
-            yield hit
+            yield hit['_source']
 
     def get_all_diseases(self, fields = None):
         if fields is None:
             fields = ['*']
+        source =  {"include": fields},
         res = self.handler.search(index=Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                                   doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                                   body={"query": {
                                           "match_all": {}
                                         },
-                                       'fields': fields,
+                                       '_source': source,
                                        'size': int(1e5),
                                        }
                                   )
         for hit in res['hits']['hits']:
-            yield hit
+            yield hit['_source']
+
+
+    def get_associations_for_target(self, target):
+        pass

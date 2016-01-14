@@ -1,6 +1,12 @@
 import json
+import logging
 import uuid, pickle
 import time
+from multiprocessing import Process
+
+from redislite import Redis
+
+from settings import Config
 
 
 class RedisQueue(object):
@@ -242,6 +248,33 @@ class RedisQueue(object):
         if r_server is None:
             raise AttributeError('A redis server is required either at class instantation or at the method level')
         return r_server
+
+class RedisQueueStatusReporter(Process):
+    '''
+    Cyclically logs the status of a list RedisQueue objects
+    '''
+    def __init__(self,
+                 queues,
+                 interval = 15
+                 ):
+        super(RedisQueueStatusReporter, self).__init__()
+        self.queues = queues
+        self.r_server = Redis(Config.REDISLITE_DB_PATH)
+        self.interval = interval
+
+    def run(self):
+        logging.info("reporter worker started")
+
+        while not self.is_done():
+            for q in self.queues:
+                logging.info(q.get_status(self.r_server))
+                time.sleep(self.interval)
+
+    def is_done(self):
+        for q in self.queues:
+            if not q.is_done(self.r_server):
+                return False
+        return True
 
 
 class RedisLookupTable(object):

@@ -94,7 +94,7 @@ if __name__ == '__main__':
                         action="append_const", const = EvidenceValidationActions.ALL)
     parser.add_argument("--seap", dest='sea', help="precompute search results",
                         action="append_const", const = SearchObjectActions.PROCESS)
-    parser.add_argument("--volatile-redis", dest='volredis', help="use a fresh redislite db",
+    parser.add_argument("--persist-redis", dest='redisperist', help="use a fresh redislite db",
                         action='store_true', default=False)
     args = parser.parse_args()
 
@@ -120,7 +120,7 @@ if __name__ == '__main__':
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logger.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
-    if args.volredis:
+    if not args.redisperist:
         clear_redislite_db()
     r_server= Redis(Config.REDISLITE_DB_PATH)
     with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:

@@ -1,13 +1,16 @@
+import logging
+import random
 import time
 from redislite import Redis
 
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisQueue
+from common.Redis import RedisQueue, RedisQueueStatusReporter
 from  multiprocessing import Process
 from elasticsearch import Elasticsearch, helpers
 
+from settings import Config
 
 """ TEST RedisQueue
 
@@ -179,7 +182,7 @@ class SearchObjectAnalyserWorker(Process):
     '''
 
     def __init__(self):
-        pass
+        super(SearchObjectAnalyserWorker, self).__init__()
 
     def run(self):
 
@@ -191,6 +194,9 @@ class SearchObjectAnalyserWorker(Process):
 
             '''store search objects'''
             pass
+
+
+
 
 
 class SearchObjectProcess(object):
@@ -209,21 +215,30 @@ class SearchObjectProcess(object):
         :return:
         '''
 
-        queue = RedisQueue(max_size=int(1e5))
-        print queue.get_status(self.r_server)
-        '''get gene simplified objects and push them to the processing queue'''
+        queue = RedisQueue(queue_id='search_obj_processing',
+                           max_size=int(1e5))
 
+        q_reporter = RedisQueueStatusReporter([queue])
+        q_reporter.start()
+
+        '''get gene simplified objects and push them to the processing queue'''
         for i,target in enumerate(self.esquery.get_all_targets()):
             target['search_type'] = SearchObjectTypes.TARGET
             queue.put(target, self.r_server)
-            if (i+1)%1000 == 0:
-                print queue.get_status(self.r_server), target['_id']
 
         for i,disease in enumerate(self.esquery.get_all_diseases()):
             disease['search_type'] = SearchObjectTypes.DISEASE
-            queue.put(target, self.r_server)
-            if (i+1)%1000 == 0:
-                print queue.get_status(self.r_server), disease['_id']
+            queue.put(disease, self.r_server)
+
 
 
         '''get disease objects  and push them to the processing queue'''
+
+        while not queue.is_done(r_server=self.r_server):
+            data = queue.get()
+            if data is not None:
+                key, value = data
+                error = random.random()>0.92
+                queue.done(key, error=error, r_server=self.r_server)
+
+        logging.critical('ALL DONE!')
