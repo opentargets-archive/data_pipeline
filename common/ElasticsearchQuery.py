@@ -9,6 +9,15 @@ from common.PGAdapter import ElasticsearchLoad
 from common.processify import processify
 from settings import ElasticSearchConfiguration, Config
 
+class AssociationSummary(object):
+
+    def __init__(self, res):
+        self.top_associations = []
+        self.total_associations = 0
+        if res['hits']['total']:
+            self.total_associations = 0
+            self.top_associations = [hit['_source'] for hit in res['hits']['hits']]
+
 
 
 class ESQuery(object):
@@ -17,7 +26,7 @@ class ESQuery(object):
         self.handler = es
 
 
-    def get_all_targets(self, fields = None):
+    def get_all_targets(self, fields = None):#TODO: Reimplement with scan method and a small chunksize to lower memory fingerprint
         if fields is None:
             fields = ['*']
         source =  {"include": fields},
@@ -33,7 +42,7 @@ class ESQuery(object):
         for hit in res['hits']['hits']:
             yield hit['_source']
 
-    def get_all_diseases(self, fields = None):
+    def get_all_diseases(self, fields = None):#TODO: Reimplement with scan method and a small chunksize to lower memory fingerprint
         if fields is None:
             fields = ['*']
         source =  {"include": fields},
@@ -51,4 +60,33 @@ class ESQuery(object):
 
 
     def get_associations_for_target(self, target):
-        pass
+        res = self.handler.search(index=Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+                                  doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
+                                  body={"query": {
+                                          "filtered": {
+                                              "filter": {
+                                                   "terms": {"target.id": [target]}
+                                              }
+                                          }
+                                        },
+                                       '_source': True,
+                                       'size': 100,
+                                       }
+                                  )
+        return AssociationSummary(res)
+
+    def get_associations_for_disease(self, disease):
+        res = self.handler.search(index=Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+                                  doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
+                                  body={"query": {
+                                          "filtered": {
+                                              "filter": {
+                                                   "terms": {"disease.id": [disease]}
+                                              }
+                                          }
+                                        },
+                                       '_source': True,
+                                       'size': 100,
+                                       }
+                                  )
+        return AssociationSummary(res)

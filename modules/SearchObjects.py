@@ -202,6 +202,7 @@ class SearchObjectAnalyserWorker(Process):
         super(SearchObjectAnalyserWorker, self).__init__()
         self.queue = queue
         self.r_server = Redis(Config.REDISLITE_DB_PATH)
+        self.es_query = ESQuery(Elasticsearch(Config.ELASTICSEARCH_URL))
         # logging.info('%s started'%self.name)
 
     def run(self):
@@ -216,8 +217,17 @@ class SearchObjectAnalyserWorker(Process):
                     so = self.data_handlers[value[SearchObjectTypes.__ROOT__]]()
                     so.digest(json_input=value)
                     '''count associations '''
-                    so.set_associations(top_associations=[so['id']*(int(random.random()*10)+1)],
-                                        total_associations=int(random.random()*100))
+                    if value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
+                        ass_data = self.es_query.get_associations_for_target(value['id'])
+                        so.set_associations(ass_data.top_associations,
+                                            ass_data.total_associations)
+
+                    elif value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
+                        ass_data = self.es_query.get_associations_for_disease(value['efo_code'])
+                        so.set_associations(ass_data.top_associations,
+                                            ass_data.total_associations)
+                    else:
+                        so.set_associations()
                     '''store search objects'''
                 except:
                     error = True
@@ -249,12 +259,12 @@ class SearchObjectProcess(object):
 
         start_time = datetime.now()
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID+'|search_obj_processing',
-                           max_size=int(1e5))
+                           max_size=1000)
 
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
-        workers = [SearchObjectAnalyserWorker(queue) for i in range(multiprocessing.cpu_count())]
+        workers = [SearchObjectAnalyserWorker(queue) for i in range(multiprocessing.cpu_count()*3)]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()
