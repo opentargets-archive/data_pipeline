@@ -58,6 +58,7 @@ class RedisQueue(object):
                  queue_id=None,
                  r_server = None,
                  max_size = 25000,
+                 job_timeout = 30,
                  ttl = 60*60*24+2):
         '''
         :param queue_id: queue id to attach to preconfigured queues
@@ -77,7 +78,7 @@ class RedisQueue(object):
         self.errors_counter = self.ERRORS_STORE % dict(queue = queue_id)
         self.submission_done = self.SUBMISSION_FINISH_STORE % dict(queue = queue_id)
         self.r_server = r_server
-        self.job_timeout = 30
+        self.job_timeout = job_timeout
         self.max_queue_size = max_size
         self.default_ttl = ttl
 
@@ -141,6 +142,8 @@ class RedisQueue(object):
 
     def get_timedout_jobs(self, r_server = None, timeout=None):
         r_server = self._get_r_server(r_server)
+        if timeout is None:
+            timeout = self.job_timeout
         if not r_server:
             r_server = self.r_server
         return [i[0] for i in r_server.zrange(self.processing_key, 0, -1, withscores=True) if time.time() - i[1] > timeout]

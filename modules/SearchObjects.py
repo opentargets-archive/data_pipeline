@@ -11,6 +11,7 @@ from redislite import Redis
 
 from common import Actions
 from common.DataStructure import JSONSerializable
+from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisQueue, RedisQueueStatusReporter
 from  multiprocessing import Process
@@ -202,36 +203,42 @@ class SearchObjectAnalyserWorker(Process):
         super(SearchObjectAnalyserWorker, self).__init__()
         self.queue = queue
         self.r_server = Redis(Config.REDISLITE_DB_PATH)
-        self.es_query = ESQuery(Elasticsearch(Config.ELASTICSEARCH_URL))
+        self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        self.es_query = ESQuery(self.es)
         # logging.info('%s started'%self.name)
 
     def run(self):
+        with Loader(self.es, chunk_size=50) as loader:
+            while not self.queue.is_done(r_server=self.r_server):
+                data = self.queue.get(r_server=self.r_server, timeout= 1)
+                if data is not None:
+                    key, value = data
+                    error = False
+                    try:
+                        '''process objects to simple search object'''
+                        so = self.data_handlers[value[SearchObjectTypes.__ROOT__]]()
+                        so.digest(json_input=value)
+                        '''count associations '''
+                        if value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
+                            ass_data = self.es_query.get_associations_for_target(value['id'])
+                            so.set_associations(ass_data.top_associations,
+                                                ass_data.total_associations)
 
-        while not self.queue.is_done(r_server=self.r_server):
-            data = self.queue.get(r_server=self.r_server, timeout= 1)
-            if data is not None:
-                key, value = data
-                error = False
-                try:
-                    '''process objects to simple search object'''
-                    so = self.data_handlers[value[SearchObjectTypes.__ROOT__]]()
-                    so.digest(json_input=value)
-                    '''count associations '''
-                    if value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
-                        ass_data = self.es_query.get_associations_for_target(value['id'])
-                        so.set_associations(ass_data.top_associations,
-                                            ass_data.total_associations)
-
-                    elif value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
-                        ass_data = self.es_query.get_associations_for_disease(value['efo_code'])
-                        so.set_associations(ass_data.top_associations,
-                                            ass_data.total_associations)
-                    else:
-                        so.set_associations()
-                    '''store search objects'''
-                except:
-                    error = True
-                self.queue.done(key, error=error, r_server=self.r_server)
+                        elif value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
+                            ass_data = self.es_query.get_associations_for_disease(value['efo_code'])
+                            so.set_associations(ass_data.top_associations,
+                                                ass_data.total_associations)
+                        else:
+                            so.set_associations()
+                        '''store search objects'''
+                        loader.put(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
+                                   Config.ELASTICSEARCH_DATA_SEARCH_DOC_NAME,
+                                   so.id,
+                                   so.to_json(),
+                                   create_index=False)
+                    except:
+                        error = True
+                    self.queue.done(key, error=error, r_server=self.r_server)
 
 
 
@@ -257,14 +264,16 @@ class SearchObjectProcess(object):
         :return:
         '''
 
+        self.loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME)
         start_time = datetime.now()
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID+'|search_obj_processing',
-                           max_size=1000)
+                           max_size=1000,
+                           job_timeout=180)
 
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
-        workers = [SearchObjectAnalyserWorker(queue) for i in range(multiprocessing.cpu_count()*3)]
+        workers = [SearchObjectAnalyserWorker(queue) for i in range(multiprocessing.cpu_count())]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()
