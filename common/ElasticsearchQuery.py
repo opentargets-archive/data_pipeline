@@ -15,10 +15,18 @@ class AssociationSummary(object):
 
     def __init__(self, res):
         self.top_associations = []
+        self.top_associations_ids = []
         self.total_associations = 0
         if res['hits']['total']:
-            self.total_associations = 0
-            self.top_associations = [hit['_source'] for hit in res['hits']['hits']]
+            for hit in res['hits']['hits']:
+                if 'cttv_root' not in hit['_id']:
+                    if '_source' in hit:
+                        self.top_associations.append(hit['_source'])
+                    elif 'fields' in hit:
+                        self.top_associations.append(hit['fields'])
+                    self.top_associations_ids.append(hit['_id'])
+            self.total_associations = len(self.top_associations_ids)
+
 
 
 
@@ -50,15 +58,15 @@ class ESQuery(object):
             yield hit['_source']
 
     def get_all_diseases(self, fields = None):
-        if fields is None:
-            fields = ['*']
-        source =  {"include": fields},
+        # if fields is None:
+        #     fields = ['*']
+        # source =  {"include": fields},
 
         res = helpers.scan(client=self.handler,
                             query={"query": {
                                       "match_all": {}
                                     },
-                                   '_source': source,
+                                   'fields': fields,
                                    'size': 100,
                                    },
                             scroll='1h',
@@ -70,7 +78,7 @@ class ESQuery(object):
             yield hit['_source']
 
 
-    def get_associations_for_target(self, target):
+    def get_associations_for_target(self, target, fields = None):
         res = self.handler.search(index=Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body={"query": {
@@ -80,13 +88,14 @@ class ESQuery(object):
                                               }
                                           }
                                         },
-                                       '_source': True,
+                                       "sort" : [{ "haromic-sum.overall" : "desc" }],
+                                       'fields': fields,
                                        'size': 100,
                                        }
                                   )
         return AssociationSummary(res)
 
-    def get_associations_for_disease(self, disease):
+    def get_associations_for_disease(self, disease, fields = None):
         res = self.handler.search(index=Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body={"query": {
@@ -96,7 +105,8 @@ class ESQuery(object):
                                               }
                                           }
                                         },
-                                       '_source': True,
+                                       "sort" : [{ "haromic-sum.overall" : "desc" }],
+                                       'fields': fields,
                                        'size': 100,
                                        }
                                   )

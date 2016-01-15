@@ -220,12 +220,12 @@ class SearchObjectAnalyserWorker(Process):
                         so.digest(json_input=value)
                         '''count associations '''
                         if value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
-                            ass_data = self.es_query.get_associations_for_target(value['id'])
+                            ass_data = self.es_query.get_associations_for_target(value['id'], fields=['id','harmonic-sum.overall'])
                             so.set_associations(ass_data.top_associations,
                                                 ass_data.total_associations)
 
                         elif value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
-                            ass_data = self.es_query.get_associations_for_disease(value['efo_code'])
+                            ass_data = self.es_query.get_associations_for_disease(value['efo_code'], fields=['id','harmonic-sum.overall'])
                             so.set_associations(ass_data.top_associations,
                                                 ass_data.total_associations)
                         else:

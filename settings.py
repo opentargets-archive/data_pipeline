@@ -134,7 +134,7 @@ class Config():
 
     WORKERS_NUMBER = None # if None defaults to cpu count
 
-    RELEASE_VERSION='2.test'
+    RELEASE_VERSION='3'
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
