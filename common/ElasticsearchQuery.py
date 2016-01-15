@@ -88,7 +88,7 @@ class ESQuery(object):
                                               }
                                           }
                                         },
-                                       "sort" : [{ "haromic-sum.overall" : "desc" }],
+                                       "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
                                        'fields': fields,
                                        'size': 100,
                                        }
@@ -105,7 +105,7 @@ class ESQuery(object):
                                               }
                                           }
                                         },
-                                       "sort" : [{ "haromic-sum.overall" : "desc" }],
+                                       "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
                                        'fields': fields,
                                        'size': 100,
                                        }

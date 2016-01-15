@@ -177,16 +177,16 @@ class SearchObjectDisease(SearchObject, object):
 
     def digest(self, json_input):
         json_input = self._parse_json(json_input)
-        self.id=json_input['efo_code']
-        self.title=json_input['efo_label']
-        self.description=json_input['efo_definition']
-        self.efo_code=json_input['efo_code']
-        self.efo_url=json_input['efo_url']
-        self.efo_label=json_input['efo_label']
-        self.efo_definition=json_input['efo_definition']
+        self.id=json_input['path_codes'][0][-1]
+        self.title=json_input['label']
+        self.description=json_input['definition']
+        self.efo_code=json_input['path_codes'][0][-1]
+        self.efo_url=json_input['code']
+        self.efo_label=json_input['label']
+        self.efo_definition=json_input['definition']
         self.efo_synonyms=json_input['efo_synonyms']
-        self.efo_path_codes=json_input['efo_path_codes']
-        self.efo_path_labels=json_input['efo_path_labels']
+        self.efo_path_codes=json_input['path_codes']
+        self.efo_path_labels=json_input['path_labels']
 
 
 class SearchObjectAnalyserWorker(Process):
@@ -221,12 +221,12 @@ class SearchObjectAnalyserWorker(Process):
                         '''count associations '''
                         if value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
                             ass_data = self.es_query.get_associations_for_target(value['id'], fields=['id','harmonic-sum.overall'])
-                            so.set_associations(ass_data.top_associations,
+                            so.set_associations(self._summarise_assocaition(ass_data.top_associations),
                                                 ass_data.total_associations)
 
                         elif value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
-                            ass_data = self.es_query.get_associations_for_disease(value['efo_code'], fields=['id','harmonic-sum.overall'])
-                            so.set_associations(ass_data.top_associations,
+                            ass_data = self.es_query.get_associations_for_disease(value['path_codes'][0][-1], fields=['id','harmonic-sum.overall'])
+                            so.set_associations(self._summarise_assocaition(ass_data.top_associations),
                                                 ass_data.total_associations)
                         else:
                             so.set_associations()
@@ -236,14 +236,19 @@ class SearchObjectAnalyserWorker(Process):
                                    so.id,
                                    so.to_json(),
                                    create_index=False)
-                    except:
+                    except Exception, e:
                         error = True
+                        logging.exception('Error processing key %s'%key)
                     self.queue.done(key, error=error, r_server=self.r_server)
 
 
 
 
         # logging.info('%s done processing'%self.name)
+
+    def _summarise_assocaition(self, data):
+        return [dict(id = data_point['id'][0],
+                    score = data_point['harmonic-sum.overall'][0]) for data_point in data]
 
 
 
