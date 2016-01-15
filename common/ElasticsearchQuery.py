@@ -18,6 +18,7 @@ class AssociationSummary(object):
         self.top_associations_ids = []
         self.total_associations = 0
         if res['hits']['total']:
+            self.total_associations = res['hits']['total']-1#correct for cttv_root
             for hit in res['hits']['hits']:
                 if 'cttv_root' not in hit['_id']:
                     if '_source' in hit:
@@ -25,7 +26,6 @@ class AssociationSummary(object):
                     elif 'fields' in hit:
                         self.top_associations.append(hit['fields'])
                     self.top_associations_ids.append(hit['_id'])
-            self.total_associations = len(self.top_associations_ids)
 
 
 
