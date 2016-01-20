@@ -824,7 +824,12 @@ class EvidenceStringELasticStorage():
 
     @staticmethod
     def delete_prev_data_in_es(es, data_source_name):
-        es.delete
+        '''
+        Given an es instance, delete all data from a data source.
+        :param es:
+        :param data_source_name:
+        :return:
+        '''
         rows_deleted = session.query(
             EvidenceString11).filter(
                 EvidenceString11.data_source_name == data_source_name).delete(synchronize_session=False)
