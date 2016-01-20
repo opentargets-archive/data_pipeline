@@ -1,4 +1,7 @@
 import logging
+import os
+
+import sys
 from elasticsearch import Elasticsearch
 from common import Actions
 from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
@@ -11,11 +14,17 @@ from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
 from modules.Association import AssociationActions, ScoringProcess, ScoringUploader, ScoringExtract
+from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from modules.Uniprot import UniProtActions,UniprotDownloader
 from modules.HGNC import HGNCActions, HGNCUploader
 import argparse
 from settings import Config, ElasticSearchConfiguration
+from redislite import Redis
 
+
+def clear_redislite_db():
+    if os.path.exists(Config.REDISLITE_DB_PATH):
+        os.remove(Config.REDISLITE_DB_PATH)
 
 __author__ = 'andreap'
 if __name__ == '__main__':
@@ -82,7 +91,11 @@ if __name__ == '__main__':
     parser.add_argument("--valgm", dest='val', help="update gene protein mapping to database",
                         action="append_const", const = EvidenceValidationActions.GENEMAPPING)
     parser.add_argument("--val", dest='val', help="check new json files submitted to ftp site, validate them and store them in postgres",
-                        action="append_const", const = EvidenceValidationActions.ALL)                        
+                        action="append_const", const = EvidenceValidationActions.ALL)
+    parser.add_argument("--seap", dest='sea', help="precompute search results",
+                        action="append_const", const = SearchObjectActions.PROCESS)
+    parser.add_argument("--persist-redis", dest='redisperist', help="use a fresh redislite db",
+                        action='store_true', default=False)
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -107,6 +120,9 @@ if __name__ == '__main__':
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logger.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
+    if not args.redisperist:
+        clear_redislite_db()
+    r_server= Redis(Config.REDISLITE_DB_PATH)
     with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
         run_full_pipeline = False
         if args.all  and (Actions.ALL in args.all):
@@ -140,7 +156,7 @@ if __name__ == '__main__':
             if (GeneActions.MERGE in args.gen) or do_all:
                 GeneManager(adapter).merge_all()
             if (GeneActions.UPLOAD in args.gen) or do_all:
-                GeneUploader(adapter, loader).upload_all()                
+                GeneUploader(adapter, loader).upload_all()
         if args.efo or run_full_pipeline:
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:
@@ -153,6 +169,12 @@ if __name__ == '__main__':
                 EcoProcess(adapter).process_all()
             if (EcoActions.UPLOAD in args.eco) or do_all:
                 EcoUploader(adapter, loader).upload_all()
+        if args.val or run_full_pipeline:
+            do_all = (EvidenceValidationActions.ALL in args.val) or run_full_pipeline
+            if (EvidenceValidationActions.GENEMAPPING in args.val) or do_all:
+                EvidenceValidationFileChecker(adapter).map_genes()
+            if (EvidenceValidationActions.CHECKFILES in args.val) or do_all:
+                EvidenceValidationFileChecker(adapter).check_all()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
@@ -167,17 +189,15 @@ if __name__ == '__main__':
                 ScoringProcess(adapter, loader).process_all()
             # if (AssociationActions.UPLOAD in args.ass):# data will be uploaded also by the proces step
             #     ScoringUploader(adapter, loader).upload_all()
-        if args.val or run_full_pipeline:
-            do_all = (EvidenceValidationActions.ALL in args.val) or run_full_pipeline
-            if (EvidenceValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es).map_genes()
-            if (EvidenceValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es).check_all()
-
+        if args.sea or run_full_pipeline:
+            do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
+            if (SearchObjectActions.PROCESS in args.sea) or do_all:
+                SearchObjectProcess(adapter, loader, r_server).process_all()
         '''only run if explicetely called'''
         if args.es:
             if ElasticsearchActions.RELOAD in args.es:
                 JSONObjectStorage.refresh_all_data_in_es(loader,adapter.session)
+
 
 
 
