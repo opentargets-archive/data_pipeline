@@ -9,7 +9,9 @@ import ujson as json
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
+from common.ElasticsearchQuery import ESQuery
 from common.PGAdapter import HgncGeneInfo, EnsemblGeneInfo, UniprotInfo, ElasticsearchLoad
+from common.Redis import RedisLookupTablePickle
 from common.UniprotIO import UniprotIterator
 from modules.Reactome import ReactomeRetriever
 from settings import Config
@@ -331,16 +333,7 @@ class GeneSet():
 
     def __contains__(self, item):
         return self.genes.__contains__(item)
-        # if item:
-        # if item in self.genes:
-        #         return True
-        #     # else:
-        #     #     for gene in self.genes.values():
-        #     #         if (item == gene.ensembl_gene_id) or \
-        #     #                 (item == gene.uniprot_id) or \
-        #     #                 (item == gene.hgnc_id):
-        #     #             return True
-        # return False
+
 
     def remove_gene(self,key):
         del self.genes[key]
@@ -609,3 +602,35 @@ class GeneRetriever():
         while len(self.cache) >self.cache_size:
             self.cache.popitem(last=False)
 
+
+class TargetLookUpTable(object):
+    """
+    A redis-based pickable target look up table
+    """
+
+    def __init__(self,
+                 es,
+                 namespace = None,
+                 r_server = None,
+                 ttl = 60*60*24+7):
+        self._table = RedisLookupTablePickle(namespace = namespace,
+                                            r_server = r_server,
+                                            ttl = ttl)
+        self._es = es
+        self._es_query = ESQuery(es)
+        self.r_server = None
+        if r_server is not None:
+            self._load_target_data()
+
+    def _load_target_data(self, r_server = None):
+        for target in self._es_query.get_all_targets():
+            self._table.set(target['id'],target, r_server=r_server)#TODO can be improved by sending elements in batches
+
+    def get_target(self, target_id, r_server = None ):
+        return self._table.get(target_id, r_server=r_server)
+
+    def set_target(self, target, r_server = None):
+        self._table.set(target['id'],target, r_server=r_server)
+
+    def get_available_target_ids(self, r_server = None):
+        return self._table.keys()

@@ -1,3 +1,4 @@
+import uuid
 from collections import defaultdict
 
 __author__ = 'andreap'
@@ -28,6 +29,8 @@ class Config():
     ELASTICSEARCH_REACTOME_REACTION_DOC_NAME = 'reactome-reaction'
     ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME = 'association-data'
     ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME = 'association'
+    ELASTICSEARCH_DATA_SEARCH_INDEX_NAME = 'search-data'
+    ELASTICSEARCH_DATA_SEARCH_DOC_NAME = 'search-object'
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
@@ -133,9 +136,11 @@ class Config():
 
     WORKERS_NUMBER = None # if None defaults to cpu count
 
-    RELEASE_VERSION='2.test'
+    RELEASE_VERSION='3'
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
+
+    UNIQUE_RUN_ID = str(uuid.uuid4())
 
 
 

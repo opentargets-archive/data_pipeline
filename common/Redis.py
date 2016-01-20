@@ -1,6 +1,11 @@
+import base64
 import json
 import logging
-import uuid, pickle
+import uuid
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import time
 from multiprocessing import Process
 
@@ -53,6 +58,7 @@ class RedisQueue(object):
                  queue_id=None,
                  r_server = None,
                  max_size = 25000,
+                 job_timeout = 30,
                  ttl = 60*60*24+2):
         '''
         :param queue_id: queue id to attach to preconfigured queues
@@ -72,7 +78,7 @@ class RedisQueue(object):
         self.errors_counter = self.ERRORS_STORE % dict(queue = queue_id)
         self.submission_done = self.SUBMISSION_FINISH_STORE % dict(queue = queue_id)
         self.r_server = r_server
-        self.job_timeout = 5
+        self.job_timeout = job_timeout
         self.max_queue_size = max_size
         self.default_ttl = ttl
 
@@ -88,7 +94,9 @@ class RedisQueue(object):
         pipe = r_server.pipeline()
         pipe.lpush(self.main_queue, key)
         pipe.expire(self.main_queue, self.default_ttl)
-        pipe.setex(self._get_value_key(key), pickle.dumps(element), self.default_ttl)
+        pipe.setex(self._get_value_key(key),
+                   base64.encodestring(pickle.dumps(element, pickle.HIGHEST_PROTOCOL)),
+                   self.default_ttl)
         pipe.incr(self.submitted_counter)
         pipe.expire(self.submitted_counter, self.default_ttl)
         pipe.execute()
@@ -110,7 +118,7 @@ class RedisQueue(object):
         pipe.zadd(self.processing_key, key, time.time())
         pipe.expire(self.processing_key, self.default_ttl)
         pipe.execute()
-        return key, pickle.loads(r_server.get(self._get_value_key(key)))
+        return key, pickle.loads(base64.decodestring(r_server.get(self._get_value_key(key))))
 
     def done(self,key, r_server=None, error = False):
         r_server = self._get_r_server(r_server)
@@ -134,6 +142,8 @@ class RedisQueue(object):
 
     def get_timedout_jobs(self, r_server = None, timeout=None):
         r_server = self._get_r_server(r_server)
+        if timeout is None:
+            timeout = self.job_timeout
         if not r_server:
             r_server = self.r_server
         return [i[0] for i in r_server.zrange(self.processing_key, 0, -1, withscores=True) if time.time() - i[1] > timeout]
@@ -179,7 +189,10 @@ class RedisQueue(object):
                     queue_size_status = 'occepting jobs'
             lines.append('Queue size: %i | %s'%(queue_size, queue_size_status))
             lines.append('Jobs being processed: %i'%len(self.get_processing_jobs(r_server)))
-            lines.append('Jobs timed out: %i'%len(self.get_timedout_jobs(r_server)))
+            timedout_jobs = self.get_timedout_jobs(r_server)
+            if timedout_jobs:
+                self.put_back_timedout_jobs(r_server=r_server)
+            lines.append('Jobs timed out: %i'%len(timedout_jobs))
             lines.append('Sumbission finished: %s'%submission_finished)
             status = 'idle'
             if submitted:
@@ -303,11 +316,11 @@ class RedisLookupTable(object):
             raise AttributeError('Only str and unicode types are accepted as object value. Use the \
             RedisLookupTablePickle subclass for generic objects.')
         r_server = self._get_r_server(r_server)
-        return r_server.setex(self._get_key_namespace(key), obj, self.default_ttl)
+        return r_server.setex(self._get_key_namespace(key), self._encode(obj), self.default_ttl)
 
     def get(self, key, r_server = None):
         r_server = self._get_r_server(r_server)
-        return r_server.get(self._get_key_namespace(key))
+        return self._decode(r_server.get(self._get_key_namespace(key)))
 
     def keys(self, r_server = None):
         r_server = self._get_r_server(r_server)
@@ -324,6 +337,12 @@ class RedisLookupTable(object):
     def _get_key_namespace(self, key):
         return self.KEY_NAMESPACE % dict(namespace = self.namespace, key = key)
 
+    def _encode(self, obj):
+        return obj
+
+    def _decode(self, obj):
+        return obj
+
 
 class RedisLookupTableJson(RedisLookupTable):
     '''
@@ -331,13 +350,11 @@ class RedisLookupTableJson(RedisLookupTable):
     By default keys will expire in 2 days
     '''
 
-    def set(self, key, obj, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return r_server.setex(self._get_key_namespace(key), json.dumps(obj), self.default_ttl)
+    def _encode(self, obj):
+        return json.dumps(obj)
 
-    def get(self, key, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return json.loads(r_server.get(self._get_key_namespace(key)))
+    def _decode(self, obj):
+        return json.loads(obj)
 
 
 
@@ -347,12 +364,8 @@ class RedisLookupTablePickle(RedisLookupTable):
     By default keys will expire in 2 days
     '''
 
-    def set(self, key, obj, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return r_server.setex(self._get_key_namespace(key), pickle.dumps(obj), self.default_ttl)
+    def _encode(self, obj):
+        return base64.encodestring(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL))
 
-    def get(self, key, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return pickle.loads(r_server.get(self._get_key_namespace(key)))
-
-
+    def _decode(self, obj):
+        return pickle.loads(base64.decodestring(obj))

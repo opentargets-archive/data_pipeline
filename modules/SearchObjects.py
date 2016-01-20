@@ -1,10 +1,17 @@
+import json
 import logging
 import random
 import time
+
+import multiprocessing
+from collections import defaultdict
+from datetime import datetime
+
 from redislite import Redis
 
 from common import Actions
 from common.DataStructure import JSONSerializable
+from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisQueue, RedisQueueStatusReporter
 from  multiprocessing import Process
@@ -65,6 +72,7 @@ class SearchObjectActions(Actions):
     PROCESS = 'process'
 
 class SearchObjectTypes(object):
+    __ROOT__ = 'search_type'
     TARGET = 'target'
     DISEASE = 'disease'
     GO_TERM = 'go'
@@ -73,13 +81,13 @@ class SearchObjectTypes(object):
     SNP = 'snp'
     GENERIC = 'generic'
 
-class SearchObject(JSONSerializable):
+class SearchObject(JSONSerializable, object):
     """ Base class for search objects
     """
     def __init__(self,
-                 id,
-                 title,
-                 description,
+                 id='',
+                 title='',
+                 description='',
                  ):
         self.id = id
         self.title = title
@@ -116,64 +124,69 @@ class SearchObject(JSONSerializable):
 
         self.private['suggestions']['input'] = [x.lower() for x in self.private['suggestions']['input']]
 
+    def digest(self, json_input):
+        pass
+
+    def _parse_json(self, json_input):
+        if isinstance(json_input, str) or isinstance(json_input, unicode):
+            json_input=json.loads(json_input)
+        return json_input
 
 
-class SearchObjectTarget(JSONSerializable):
+class SearchObjectTarget(SearchObject, object):
     """
     Target search object
     """
     def __init__(self,
-                 id,
-                 title,
-                 description,
-                 approved_symbol,
-                 approved_name,
-                 symbol_synonyms,
-                 name_synonyms,
-                 biotype,
-                 gene_family_description,
-                 uniprot_accessions,
-                 hgnc_id,
-                 ensembl_gene_id,
+                 id='',
+                 title='',
+                 description='',
                  ):
         super(SearchObjectTarget, self).__init__()
         self.type = SearchObjectTypes.TARGET
-        self.approved_symbol = approved_symbol
-        self.approved_name = approved_name
-        self.symbol_synonyms = symbol_synonyms
-        self.name_synonyms = name_synonyms
-        self.biotype = biotype
-        self.gene_family_description = gene_family_description
-        self.uniprot_accessions = uniprot_accessions
-        self.hgnc_id = hgnc_id
-        self.ensembl_gene_id = ensembl_gene_id
+
+    def digest(self, json_input):
+        json_input = self._parse_json(json_input)
+        self.id=json_input['id']
+        self.title=json_input['approved_symbol']
+        self.description=json_input['approved_name']
+        self.approved_symbol=json_input['approved_symbol']
+        self.approved_name=json_input['approved_name']
+        self.symbol_synonyms=json_input['symbol_synonyms']
+        self.name_synonyms=json_input['name_synonyms']
+        self.biotype=json_input['biotype'],
+        self.gene_family_description=json_input['gene_family_description']
+        self.uniprot_accessions=json_input['uniprot_accessions']
+        self.hgnc_id=json_input['hgnc_id']
+        self.ensembl_gene_id=json_input['ensembl_gene_id']
 
 
-class SearchObjectDisease(JSONSerializable):
+
+class SearchObjectDisease(SearchObject, object):
     """
     Target search object
     """
     def __init__(self,
-                 id,
-                 title,
-                 description,
-                 efo_code,
-                 efo_url,
-                 efo_label,
-                 efo_definition,
-                 efo_synonyms,
-                 efo_path_codes,
-                 efo_path_labels
+                 id='',
+                 title='',
+                 description='',
                  ):
         super(SearchObjectDisease, self).__init__()
         self.type = SearchObjectTypes.DISEASE
-        self.efo_code = efo_code
-        self.efo_url = efo_url
-        self.efo_label = efo_label
-        self.efo_definition = efo_definition
-        self.efo_synonyms = efo_synonyms
-        self.efo_path_codes = efo_path_codes
-        self.efo_path_labels = efo_path_labels
+
+
+    def digest(self, json_input):
+        json_input = self._parse_json(json_input)
+        self.id=json_input['path_codes'][0][-1]
+        self.title=json_input['label']
+        self.description=json_input['definition']
+        self.efo_code=json_input['path_codes'][0][-1]
+        self.efo_url=json_input['code']
+        self.efo_label=json_input['label']
+        self.efo_definition=json_input['definition']
+        self.efo_synonyms=json_input['efo_synonyms']
+        self.efo_path_codes=json_input['path_codes']
+        self.efo_path_labels=json_input['path_labels']
 
 
 class SearchObjectAnalyserWorker(Process):
@@ -181,20 +194,61 @@ class SearchObjectAnalyserWorker(Process):
     storing them in elasticsearch
     '''
 
-    def __init__(self):
+    '''define data processing handlers'''
+    data_handlers = defaultdict(lambda: SearchObject)
+    data_handlers[SearchObjectTypes.TARGET] = SearchObjectTarget
+    data_handlers[SearchObjectTypes.DISEASE] = SearchObjectDisease
+
+    def __init__(self, queue):
         super(SearchObjectAnalyserWorker, self).__init__()
+        self.queue = queue
+        self.r_server = Redis(Config.REDISLITE_DB_PATH)
+        self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        self.es_query = ESQuery(self.es)
+        # logging.info('%s started'%self.name)
 
     def run(self):
+        with Loader(self.es, chunk_size=50) as loader:
+            while not self.queue.is_done(r_server=self.r_server):
+                data = self.queue.get(r_server=self.r_server, timeout= 1)
+                if data is not None:
+                    key, value = data
+                    error = False
+                    try:
+                        '''process objects to simple search object'''
+                        so = self.data_handlers[value[SearchObjectTypes.__ROOT__]]()
+                        so.digest(json_input=value)
+                        '''count associations '''
+                        if value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
+                            ass_data = self.es_query.get_associations_for_target(value['id'], fields=['id','harmonic-sum.overall'])
+                            so.set_associations(self._summarise_assocaition(ass_data.top_associations),
+                                                ass_data.total_associations)
 
-        while True:
+                        elif value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
+                            ass_data = self.es_query.get_associations_for_disease(value['path_codes'][0][-1], fields=['id','harmonic-sum.overall'])
+                            so.set_associations(self._summarise_assocaition(ass_data.top_associations),
+                                                ass_data.total_associations)
+                        else:
+                            so.set_associations()
+                        '''store search objects'''
+                        loader.put(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
+                                   Config.ELASTICSEARCH_DATA_SEARCH_DOC_NAME,
+                                   so.id,
+                                   so.to_json(),
+                                   create_index=False)
+                    except Exception, e:
+                        error = True
+                        logging.exception('Error processing key %s'%key)
+                    self.queue.done(key, error=error, r_server=self.r_server)
 
-            '''process objects to simple search object'''
 
-            '''count associations '''
 
-            '''store search objects'''
-            pass
 
+        # logging.info('%s done processing'%self.name)
+
+    def _summarise_assocaition(self, data):
+        return [dict(id = data_point['id'][0],
+                    score = data_point['harmonic-sum.overall'][0]) for data_point in data]
 
 
 
@@ -215,30 +269,36 @@ class SearchObjectProcess(object):
         :return:
         '''
 
-        queue = RedisQueue(queue_id='search_obj_processing',
-                           max_size=int(1e5))
+        self.loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME)
+        start_time = datetime.now()
+        queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID+'|search_obj_processing',
+                           max_size=1000,
+                           job_timeout=180)
 
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
+        workers = [SearchObjectAnalyserWorker(queue) for i in range(multiprocessing.cpu_count())]
+        # workers = [SearchObjectAnalyserWorker(queue)]
+        for w in workers:
+            w.start()
+
         '''get gene simplified objects and push them to the processing queue'''
         for i,target in enumerate(self.esquery.get_all_targets()):
-            target['search_type'] = SearchObjectTypes.TARGET
+            target[SearchObjectTypes.__ROOT__] = SearchObjectTypes.TARGET
             queue.put(target, self.r_server)
 
+        '''get disease objects  and push them to the processing queue'''
         for i,disease in enumerate(self.esquery.get_all_diseases()):
-            disease['search_type'] = SearchObjectTypes.DISEASE
+            disease[SearchObjectTypes.__ROOT__] = SearchObjectTypes.DISEASE
             queue.put(disease, self.r_server)
 
+        queue.set_submission_finished(r_server=self.r_server)
 
-
-        '''get disease objects  and push them to the processing queue'''
 
         while not queue.is_done(r_server=self.r_server):
-            data = queue.get()
-            if data is not None:
-                key, value = data
-                error = random.random()>0.92
-                queue.done(key, error=error, r_server=self.r_server)
+            time.sleep(0.5)
 
-        logging.critical('ALL DONE!')
+
+        logging.info(queue.get_status(r_server=self.r_server))
+        logging.info('ALL DONE! Execution time: %s'%(datetime.now()-start_time))
