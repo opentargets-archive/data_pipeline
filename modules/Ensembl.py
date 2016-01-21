@@ -146,7 +146,7 @@ class EnsemblGeneInfo:
             rest_gene_post = EnsemblRestGenePost(sublist)
             gene_post_output = rest_gene_post.get_gene_post_output()
             gene_info_json_map.update(gene_post_output)
-        return self.__add_ensembl_release(gene_info_json_map)
+        return self.__add_additional_info(gene_info_json_map)
 if __name__ == '__main__':
     ensembl_release = 83
     gene_info = EnsemblGeneInfo(ensembl_release)
