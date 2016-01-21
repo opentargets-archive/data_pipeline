@@ -9,7 +9,7 @@ from common.PGAdapter import Adapter
 from modules.ECO import EcoActions, EcoProcess, EcoUploader
 from modules.EFO import EfoActions, EfoProcess, EfoUploader
 from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess, EvidenceStringUploader
-from modules.EvidenceValidation import EvidenceValidationActions, EvidenceValidationFileChecker
+from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
@@ -87,11 +87,11 @@ if __name__ == '__main__':
     parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
                         action="append_const", const = ElasticsearchActions.RELOAD)
     parser.add_argument("--valck", dest='val', help="check new json files submitted to ftp site",
-                        action="append_const", const = EvidenceValidationActions.CHECKFILES)
+                        action="append_const", const = ValidationActions.CHECKFILES)
     parser.add_argument("--valgm", dest='val', help="update gene protein mapping to database",
-                        action="append_const", const = EvidenceValidationActions.GENEMAPPING)
+                        action="append_const", const = ValidationActions.GENEMAPPING)
     parser.add_argument("--val", dest='val', help="check new json files submitted to ftp site, validate them and store them in postgres",
-                        action="append_const", const = EvidenceValidationActions.ALL)
+                        action="append_const", const = ValidationActions.ALL)
     parser.add_argument("--seap", dest='sea', help="precompute search results",
                         action="append_const", const = SearchObjectActions.PROCESS)
     parser.add_argument("--persist-redis", dest='redisperist', help="use a fresh redislite db",
@@ -170,11 +170,11 @@ if __name__ == '__main__':
             if (EcoActions.UPLOAD in args.eco) or do_all:
                 EcoUploader(adapter, loader).upload_all()
         if args.val or run_full_pipeline:
-            do_all = (EvidenceValidationActions.ALL in args.val) or run_full_pipeline
-            if (EvidenceValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter).map_genes()
-            if (EvidenceValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter).check_all()
+            do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
+            if (ValidationActions.GENEMAPPING in args.val) or do_all:
+                EvidenceValidationFileChecker(adapter, es).map_genes()
+            if (ValidationActions.CHECKFILES in args.val) or do_all:
+                EvidenceValidationFileChecker(adapter, es).check_all()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:

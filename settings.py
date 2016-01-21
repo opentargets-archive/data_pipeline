@@ -615,9 +615,54 @@ class ElasticSearchConfiguration():
 
     }
 
+    validated_data_mapping = {
+                "properties" : {
+                    "uniq_assoc_fields_hashdig" : {
+                        "type" : "string",
+                        },
+                    "json_doc_hashdig" : {
+                        "type" : "string",
+                        },
+                    "evidence_string" : {
+                        "type" : "object",
+                    },
+                    "target_id" : {
+                        "type" : "string",
+                        },
+                    "disease_id" : {
+                        "type" : "string",
+                        },
+                   "data_source_name" : {
+                        "type" : "string",
+                        },
+                   "json_schema_version" : {
+                        "type" : "string",
+                        "index" : "not_analyzed"
+                        },
+                   "json_doc_version" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "release_date" : {
+                        "type" : "date",
+                        "format" : "dateOptionalTime",
+                        "index" : "not_analyzed"
+                        }
+                }
+    }
+
     evidence_mappings = {}
     for db in available_databases:
         evidence_mappings[Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+db]= _get_evidence_string_generic_mapping()
+
+
+    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
+                                           "number_of_replicas" : evidence_replicas_number,
+                                           # "index.store.type": "memory",
+                                           "refresh_interval" : "60s",
+                                           },
+                               "mappings": validated_data_mapping,
+    }
 
     evidence_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                            "number_of_replicas" : evidence_replicas_number,
