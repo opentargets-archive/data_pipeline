@@ -31,12 +31,16 @@ from lxml.etree import tostring
 from xml.etree import cElementTree as ElementTree
 from sqlalchemy.dialects.postgresql import JSON
 import multiprocessing
+import Queue
+from common.PGAdapter import Adapter
+from elasticsearch import Elasticsearch
+
 from multiprocessing import Manager
 
 BLOCKSIZE = 65536
 NB_JSON_FILES = 5
 MAX_NB_EVIDENCE = 25000
-CHUNK_SIZE = 1e3
+CHUNK_SIZE = 1e4
 
 EVIDENCE_STRING_INVALID = 10
 EVIDENCE_STRING_INVALID_TYPE = 11
@@ -148,11 +152,14 @@ class EvidenceDirectoryCrawlerProcess(multiprocessing.Process):
 
     def __init__(self,
                  output_q,
+                 adapter,
                  input_file_loading_finished,
                  input_file_count,
                  lock):
         super(EvidenceDirectoryCrawlerProcess, self).__init__()
         self.output_q = output_q
+        self.adapter = adapter
+        self.session = adapter.session
         self.start_time = time.time()
         self.input_file_loading_finished = input_file_loading_finished
         self.input_file_count = input_file_count
@@ -166,7 +173,7 @@ class EvidenceDirectoryCrawlerProcess(multiprocessing.Process):
             dirnames.sort()
             for subdirname in dirnames:
                 #cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                cttv_match = re.match("^(cttv006)$", subdirname)
+                cttv_match = re.match("^(cttv001)$", subdirname)
                 if cttv_match:
                     # get provider id
                     provider_id = cttv_match.groups()[0]
@@ -181,7 +188,7 @@ class EvidenceDirectoryCrawlerProcess(multiprocessing.Process):
                             logging.info(filename);
                             cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
                             #cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
-                            if cttv_filename_match and filename == "cttv006_Networks_Reactome-03-12-2015.json.gz":
+                            if cttv_filename_match and filename == "cttv_external_mousemodels-01-12-2015.json.gz": #"cttv006_Networks_Reactome-03-12-2015.json.gz":
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 logging.info(cttv_file)
                                 data_source_name = Config.JSON_FILE_TO_DATASOURCE_MAPPING[cttv_filename_match.groups()[0]]
@@ -200,9 +207,9 @@ class EvidenceDirectoryCrawlerProcess(multiprocessing.Process):
                                     #self.validate_gzipfile(cttv_file, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
 
                                     try:
-                                        self.output_q.put((cttv_file, filename, provider_id, data_source_name, logfile))
-                                        with self.lock:
-                                            self.input_file_count.value +=1
+                                        ''' get md5 '''
+                                        md5_hash = self.md5_hash_gzipfile(cttv_file)
+                                        self.check_gzipfile(cttv_file, filename, provider_id, data_source_name, md5_hash, logfile)
 
                                     except Exception, error:
 
@@ -214,65 +221,6 @@ class EvidenceDirectoryCrawlerProcess(multiprocessing.Process):
 
 
         self.input_file_loading_finished.set()
-        logger.info("%s finished"%self.name)
-
-
-class EvidenceFileReaderProcess(multiprocessing.Process):
-
-    def __init__(self,
-                 input_q,
-                 output_q,
-                 adapter,
-                 input_file_loading_finished,
-                 input_file_processing_finished,
-                 input_file_count,
-                 input_file_processed_count,
-                 evidence_loaded_count,
-                 lock):
-        super(EvidenceFileReaderProcess, self).__init__()
-        self.input_q = input_q
-        self.output_q = output_q
-        self.adapter = adapter
-        self.session = adapter.session
-        self.evidence_chunk_storage = EvidenceChunkStorage(adapter = self.adapter)
-        self.start_time = time.time()
-        self.input_file_loading_finished = input_file_loading_finished
-        self.input_file_processing_finished = input_file_processing_finished
-        self.input_file_count = input_file_count
-        self.input_file_processed_count = input_file_processed_count
-        self.evidence_loaded_count = evidence_loaded_count
-        self.start_time = time.time()#reset timer start
-        self.lock = lock
-
-    def run(self):
-        logger.info("%s started"%self.name)
-        while not ((self.input_file_count.value == self.input_file_processed_count.value) and self.input_file_loading_finished.is_set()):
-            data = self.input_q.get()
-            with self.lock:
-                self.input_file_processed_count.value +=1
-            if data:
-                file_on_disk, filename, provider_id, data_source_name, logfile = data
-                try:
-                    logging.info(file_on_disk)
-                    ''' get md5 '''
-                    md5_hash = self.md5_hash_gzipfile(file_on_disk)
-                    ''' parse the file and put evidence in the queue '''
-                    self.parse_gzipfile(file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
-
-                except Exception, error:
-                    #with self.lock:
-                    #    self.processing_errors_count.value +=1
-                    # UploadError(ev, error, idev).save()
-                    # err += 1
-
-                    if isinstance(error,AttributeError):
-                        logger.error("Error loading data for id %s: %s" % (file_on_disk, str(error)))
-                        # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
-                    else:
-                        logger.exception("Error loading data for id %s: %s" % (file_on_disk, str(error)))
-                    # traceback.print_exc(limit=1, file=sys.stdout)
-
-        self.input_file_processing_finished.set()
         logger.info("%s finished"%self.name)
 
     def md5_hash_gzipfile(self, filename):
@@ -289,7 +237,8 @@ class EvidenceFileReaderProcess(multiprocessing.Process):
         afile.close()
         return md5_hash
 
-    def parse_gzipfile(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = None):
+
+    def check_gzipfile(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = None):
         '''
         check if the file was already processed
         '''
@@ -304,7 +253,10 @@ class EvidenceFileReaderProcess(multiprocessing.Process):
                 if row.md5 == md5_hash:
                     logging.info('%s == %s'% (row.md5, md5_hash))
                     logging.info('%s file already recorded. Won\'t parse'%file_on_disk)
-                    return;
+                    bValidate = True
+                    rowToUpdate = row
+                    break;
+                    #return;
                 else:
                     logging.info('%s != %s'% (row.md5, md5_hash))
                     bValidate = True
@@ -347,44 +299,119 @@ class EvidenceFileReaderProcess(multiprocessing.Process):
 
             self.session.commit();
 
-            logging.info('Delete previous data for %s'% (data_source_name))
-            self.evidence_chunk_storage.storage_delete(data_source_name);
-
-            logging.info('Starting parsing %s'% (file_on_disk))
-
-            fh = gzip.GzipFile(file_on_disk, "r")
-            #lfh = gzip.open(logfile, 'wb', compresslevel=5)
-            line_buffer = []
-            offset = 0
-            line_number = 0
-
-            for line in fh:
-                line_buffer.append(line)
-                line_number+=1
-                if line_number % CHUNK_SIZE == 0:
-                    logging.info('%s %i %i'% (file_on_disk, offset, len(line_buffer)))
-                    self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, list(line_buffer)))
-                    offset += CHUNK_SIZE
-                    del line_buffer[:]
-            if len(line_buffer) > 0:
-                logging.info('%s %i %i'% (file_on_disk, offset, len(line_buffer)))
-                self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, list(line_buffer)))
-                offset += len(line_buffer)
-                del line_buffer[:]
-
-            '''
-            indicate how many evidence were sent
-            '''
+            self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile))
             with self.lock:
-                self.evidence_loaded_count.value += line_number
+                self.input_file_count.value +=1
 
-            '''
-            finally send a signal to inform that parsing is completed for this file and no other line are to be expected
-            '''
-            logging.info('%s %i %i'% (file_on_disk, offset, len(line_buffer)))
-            self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, line_buffer))
+        return
 
-            return
+class EvidenceFileReaderProcess(multiprocessing.Process):
+
+    def __init__(self,
+                 input_q,
+                 output_q,
+                 adapter,
+                 es,
+                 input_file_loading_finished,
+                 input_file_processing_finished,
+                 input_file_count,
+                 input_file_processed_count,
+                 evidence_loaded_count,
+                 lock):
+        super(EvidenceFileReaderProcess, self).__init__()
+        self.input_q = input_q
+        self.output_q = output_q
+        self.adapter = adapter
+        self.session = adapter.session
+        self.es = es
+        #self.evidence_chunk_storage = EvidenceChunkStorage(adapter = self.adapter)
+        self.evidence_chunk_storage = EvidenceChunkStorage(adapter = self.adapter, es = self.es)
+        self.start_time = time.time()
+        self.input_file_loading_finished = input_file_loading_finished
+        self.input_file_processing_finished = input_file_processing_finished
+        self.input_file_count = input_file_count
+        self.input_file_processed_count = input_file_processed_count
+        self.evidence_loaded_count = evidence_loaded_count
+        self.start_time = time.time()#reset timer start
+        self.lock = lock
+
+    def run(self):
+        logger.info("%s started"%self.name)
+        while not ((self.input_file_count.value == self.input_file_processed_count.value) and self.input_file_loading_finished.is_set()):
+            logger.info("%s %i"%(self.name, self.input_file_count.value))
+            time.sleep(1)
+            data = None
+            try:
+                data = self.input_q.get_nowait()
+            except Queue.Empty:
+                pass
+            if data:
+                with self.lock:
+                    self.input_file_processed_count.value +=1
+                file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = data
+                try:
+                    logging.info(file_on_disk)
+                    ''' parse the file and put evidence in the queue '''
+                    self.parse_gzipfile(file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
+
+                except Exception, error:
+                    #with self.lock:
+                    #    self.processing_errors_count.value +=1
+                    # UploadError(ev, error, idev).save()
+                    # err += 1
+
+                    if isinstance(error,AttributeError):
+                        logger.error("Error loading data for id %s: %s" % (file_on_disk, str(error)))
+                        # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
+                    else:
+                        logger.exception("Error loading data for id %s: %s" % (file_on_disk, str(error)))
+                    # traceback.print_exc(limit=1, file=sys.stdout)
+
+        self.input_file_processing_finished.set()
+        logger.info("%s finished"%self.name)
+
+
+
+    def parse_gzipfile(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = None):
+
+        logging.info('%s Delete previous data for %s'% (self.name, data_source_name))
+        self.evidence_chunk_storage.storage_delete(data_source_name);
+
+        logging.info('%s Starting parsing %s'% (self.name, file_on_disk))
+
+        fh = gzip.GzipFile(file_on_disk, "r")
+        #lfh = gzip.open(logfile, 'wb', compresslevel=5)
+        line_buffer = []
+        offset = 0
+        line_number = 0
+
+        for line in fh:
+            line_buffer.append(line)
+            line_number+=1
+            if line_number % CHUNK_SIZE == 0:
+                logging.info('%s %s %i %i'% (self.name, md5_hash, offset, len(line_buffer)))
+                self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, list(line_buffer)))
+                offset += CHUNK_SIZE
+                del line_buffer[:]
+        if len(line_buffer) > 0:
+            logging.info('%s %s %i %i'% (self.name, md5_hash, offset, len(line_buffer)))
+            self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, list(line_buffer)))
+            offset += len(line_buffer)
+            del line_buffer[:]
+
+        '''
+        indicate how many evidence were sent
+        '''
+        with self.lock:
+            self.evidence_loaded_count.value += line_number
+
+        '''
+        finally send a signal to inform that parsing is completed for this file and no other line are to be expected
+        '''
+        logging.info('%s %s %i %i'% (self.name, md5_hash, offset, len(line_buffer)))
+        self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, line_buffer))
+
+        return
 
 
 class EvidenceValidatorProcess(multiprocessing.Process):
@@ -393,6 +420,7 @@ class EvidenceValidatorProcess(multiprocessing.Process):
                  input_q,
                  output_q,
                  adapter,
+                 es,
                  efo_current,
                  efo_uncat,
                  efo_obsolete,
@@ -410,7 +438,8 @@ class EvidenceValidatorProcess(multiprocessing.Process):
         self.output_q = output_q
         self.adapter = adapter
         self.session = adapter.get_new_session()
-        self.evidence_chunk_storage = EvidenceChunkStorage(adapter = self.adapter)
+        self.es = es
+        self.evidence_chunk_storage = EvidenceChunkStorage(adapter = self.adapter, es = self.es)
         self.efo_current = efo_current
         self.efo_uncat = efo_uncat
         self.efo_obsolete = efo_obsolete
@@ -435,15 +464,21 @@ class EvidenceValidatorProcess(multiprocessing.Process):
             make sure all evidence strings have been validated. This should equate to condition one above
             make sure that the producer has finished processing the files
         '''
-        while not ((self.input_file_processed_count.value == self.input_file_validated_count.value) and
-                   (self.evidence_loaded_count == self.evidence_validated_count) and
-                   self.input_file_processing_finished.set()):
-            data = self.input_q.get()
+        while not ((self.evidence_loaded_count.value == self.evidence_validated_count.value) and
+                   (self.input_file_processed_count.value == self.input_file_validated_count.value) and
+                   self.input_file_processing_finished.is_set()):
+            logger.info("%s %i %i"%(self.name,self.evidence_loaded_count.value, self.evidence_validated_count.value ))
+            time.sleep(1)
+            data = None
+            try:
+                data = self.input_q.get_nowait()
+            except Queue.Empty:
+                pass
             if data:
                 file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, line_buffer = data
 
                 try:
-                    logging.info(file_on_disk)
+                    #logging.info(file_on_disk)
                     self.validate_evidence(file_on_disk, filename, provider_id, data_source_name, md5_hash, offset, line_buffer, logfile = logfile)
 
                 except Exception, error:
@@ -477,14 +512,12 @@ class EvidenceValidatorProcess(multiprocessing.Process):
                 ).limit(1):
             rowToUpdate = row
 
-        logging.info('Processing %s %i'% (row.filename, offset))
-
         if len(line_buffer) == 0:
-            logging.info("Validation of %s completed" % (file_on_disk))
+            logging.info("%s Validation of %s completed" % (self.name, file_on_disk))
             with self.lock:
                 self.input_file_validated_count.value +=1
         else:
-            logging.info('Validating %s %i %i'% (row.filename, offset, len(line_buffer)))
+            logging.info('%s Validating %s %i %i'% (self.name, md5_hash, offset, len(line_buffer)))
             with self.lock:
                 self.evidence_validated_count.value += len(line_buffer)
 
@@ -500,10 +533,8 @@ class EvidenceValidatorProcess(multiprocessing.Process):
         missing_uniprot_id_xrefs = {}
         invalid_uniprot_id_mappings = {}
 
-        logging.info('Starting validation of %s'% (file_on_disk))
-
         cc = 0
-        lc = 0
+        lc = offset
         nb_valid = 0
         nb_errors = 0
         nb_duplicates = 0
@@ -770,11 +801,12 @@ class EvidenceValidatorProcess(multiprocessing.Process):
             cc += len(line)
             # for line :)
 
-        logging.info('nb line parsed %i (size %i)'% (lc, cc))
+        logging.info('%s nb line parsed %i (size %i)'% (self.name, lc, cc))
 
         ''' write results '''
         self.evidence_chunk_storage.storage_flush(data_source_name)
-        self.evidence_chunk_storage.storage_commit()
+        #self.evidence_chunk_storage.storage_commit()
+        logging.info('%s bulk insert complete'% (self.name))
 
         '''
         Inform the audit trailer to generate a report and send an e-mail to the data provider
@@ -783,10 +815,21 @@ class EvidenceValidatorProcess(multiprocessing.Process):
 
         return
 
-class EvidenceStringStorage():
+class EvidenceStringELasticStorage():
 
     @staticmethod
-    def delete_prev_data_in_pg(session, data_source_name):
+    def create_data_index(es):
+        # ignore 400 cause by IndexAlreadyExistsException when creating an index
+        es.indices.create(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME, ignore=400)
+
+    @staticmethod
+    def delete_prev_data_in_es(es, data_source_name):
+        '''
+        Given an es instance, delete all data from a data source.
+        :param es:
+        :param data_source_name:
+        :return:
+        '''
         rows_deleted = session.query(
             EvidenceString11).filter(
                 EvidenceString11.data_source_name == data_source_name).delete(synchronize_session=False)
@@ -794,36 +837,17 @@ class EvidenceStringStorage():
             logging.info('deleted %i rows from evidence_string' % rows_deleted)
 
     @staticmethod
-    def store_to_pg(session,
+    def store_to_pg_core(es,
                     data_source_name,
                     data,
                     delete_prev=True,
                     autocommit=True,
                     quiet = False):
-        if delete_prev:
-            EvidenceStringStorage.delete_prev_data_in_pg(session, data_source_name)
-        c = 0
-        for key, value in data.iteritems():
-            c += 1
+        '''
+        SQLAlchemy's ORM is not designed to deal with bulk insertions
 
-            session.add(value)
-            if c % 1000 == 0:
-                logging.debug("%i rows of %s inserted to evidence_string" %(c, data_source_name))
-                session.flush()
-        session.flush()
-        if autocommit:
-            session.commit()
-        if not quiet:
-            logging.info('inserted %i rows of %s inserted in evidence_string' %(c, data_source_name))
-        return c
-
-    @staticmethod
-    def store_to_pg_core(adapter,
-                    data_source_name,
-                    data,
-                    delete_prev=True,
-                    autocommit=True,
-                    quiet = False):
+        '''
+        start_time = time.time()
         if delete_prev:
             EvidenceStringStorage.delete_prev_data_in_pg(adapter.session, data_source_name)
         rows_to_insert =[]
@@ -838,21 +862,116 @@ class EvidenceStringStorage():
                                         json_doc_version = value.json_doc_version,
                                         release_date = value.release_date
                                       ))
+        logger.info("EvidenceStringStorage: append records, took %ss"%str(time.time()-start_time))
+        #create a new transaction
+        ## If you are using raw SQL then you control the transactions, so you have to issue the BEGIN and COMMIT statements yourself
         adapter.engine.execute(EvidenceString11.__table__.insert(),rows_to_insert)
+        #session.execute(EvidenceString11.__table__.insert(),rows_to_insert)
 
         # if autocommit:
         #     adapter.session.commit()
         if not quiet:
-            logging.info('inserted %i rows of %s inserted in evidence_string' %(len(rows_to_insert), data_source_name))
+            #logger.debug("finished self._get_gene_info(), took %ss"%str(time.time()-start_time))
+            logging.info('EvidenceStringStorage: inserted %i rows of %s inserted in evidence_string took %ss' %(len(rows_to_insert), data_source_name, str(time.time()-start_time)))
         return len(rows_to_insert)
 
-class EvidenceChunkStorage():
-    def __init__(self, adapter, chunk_size=1e4):
-        self.adapter = adapter
-        self.session = adapter.get_new_session()
+class EvidenceChunkElasticStorage():
+    def __init__(self, es, chunk_size=1e3):
+        self.es = es
         self.chunk_size = chunk_size
         self.cache = {}
         self.counter = 0
+
+    def storage_create_index(self):
+        EvidenceStringELasticStorage.create_data_index()
+
+    def storage_reset(self):
+        self.cache = {}
+        self.counter = 0
+
+    def storage_add(self, id, evidence_string, data_source_name):
+
+        self.cache[id] = evidence_string
+        self.counter +=1
+        if (len(self.cache) % self.chunk_size) == 0:
+            self.storage_flush(data_source_name)
+
+    def storage_delete(self, data_source_name):
+        EvidenceStringELasticStorage.delete_prev_data_in_es(self.es, data_source_name)
+        self.cache = {}
+        self.counter = 0
+
+    def storage_flush(self, data_source_name):
+
+        if self.cache:
+            EvidenceStringELasticStorage.store_to_es(self.es,
+                                              data_source_name,
+                                              self.cache,
+                                              delete_prev=False,
+                                              quiet=False
+                                             )
+            self.counter+=len(self.cache)
+            self.cache = {}
+
+class EvidenceStringStorage():
+
+    @staticmethod
+    def delete_prev_data_in_pg(session, data_source_name):
+        rows_deleted = session.query(
+            EvidenceString11).filter(
+                EvidenceString11.data_source_name == data_source_name).delete(synchronize_session=False)
+        if rows_deleted:
+            logging.info('deleted %i rows from evidence_string' % rows_deleted)
+
+    @staticmethod
+    def store_to_pg_core(adapter,
+                    data_source_name,
+                    data,
+                    delete_prev=True,
+                    autocommit=True,
+                    quiet = False):
+        '''
+        SQLAlchemy's ORM is not designed to deal with bulk insertions
+
+        '''
+        start_time = time.time()
+        if delete_prev:
+            EvidenceStringStorage.delete_prev_data_in_pg(adapter.session, data_source_name)
+        rows_to_insert =[]
+        for key, value in data.iteritems():
+            rows_to_insert.append(dict(uniq_assoc_fields_hashdig = key,
+                                        json_doc_hashdig = value.json_doc_hashdig,
+                                        evidence_string = value.evidence_string,
+                                        target_id = value.target_id,
+                                        disease_id = value.disease_id,
+                                        data_source_name = value.data_source_name,
+                                        json_schema_version = value.json_schema_version,
+                                        json_doc_version = value.json_doc_version,
+                                        release_date = value.release_date
+                                      ))
+        logger.info("EvidenceStringStorage: append records, took %ss"%str(time.time()-start_time))
+        #create a new transaction
+        ## If you are using raw SQL then you control the transactions, so you have to issue the BEGIN and COMMIT statements yourself
+        adapter.engine.execute(EvidenceString11.__table__.insert(),rows_to_insert)
+        #session.execute(EvidenceString11.__table__.insert(),rows_to_insert)
+
+        # if autocommit:
+        #     adapter.session.commit()
+        if not quiet:
+            #logger.debug("finished self._get_gene_info(), took %ss"%str(time.time()-start_time))
+            logging.info('EvidenceStringStorage: inserted %i rows of %s inserted in evidence_string took %ss' %(len(rows_to_insert), data_source_name, str(time.time()-start_time)))
+        return len(rows_to_insert)
+
+class EvidenceChunkStorage():
+    def __init__(self, adapter, es, chunk_size=1000):
+        self.adapter = adapter
+        self.es = es
+        self.chunk_size = chunk_size
+        self.cache = {}
+        self.counter = 0
+
+    def storage_create_index(self):
+
 
     def storage_reset(self):
         self.cache = {}
@@ -867,7 +986,7 @@ class EvidenceChunkStorage():
 
     def storage_delete(self, data_source_name):
         EvidenceStringStorage.delete_prev_data_in_pg(self.adapter.session, data_source_name)
-        self.session.commit()
+        self.adapter.session.commit()
         self.cache = {}
         self.counter = 0
 
@@ -878,17 +997,18 @@ class EvidenceChunkStorage():
                                               data_source_name,
                                               self.cache,
                                               delete_prev=False,
-                                              quiet=True
+                                              quiet=False
                                              )
             self.counter+=len(self.cache)
             # if (self.counter % global_reporting_step) == 0:
             #     logging.info("%s precalculated scores inserted in elasticsearch_load table" %(millify(self.counter)))
 
-            self.session.flush()
+            #self.session.flush()
             self.cache = {}
 
     def storage_commit(self):
-        self.session.flush()
+        #self.session.flush()
+        #flush() is always called as part of a call to commit()
         self.session.commit()
 
     def __enter__(self):
@@ -899,9 +1019,10 @@ class EvidenceChunkStorage():
 
 class EvidenceValidationFileChecker():
 
-    def __init__(self, adapter, chunk_size=1e4):
+    def __init__(self, adapter, es, chunk_size=1e4):
         self.adapter = adapter
         self.session = adapter.session
+        self.es = es
         self.chunk_size = chunk_size
         self.cache = {}
         self.counter = 0        
@@ -946,7 +1067,11 @@ class EvidenceValidationFileChecker():
         self.counter = 0
         
     def storage_flush(self, data_source_name):
-
+        '''
+        Should be part of same session
+        :param data_source_name:
+        :return:
+        '''
         if self.cache:
             EvidenceStringStorage.store_to_pg_core(self.adapter,
                                               data_source_name,
@@ -962,7 +1087,8 @@ class EvidenceValidationFileChecker():
             self.cache = {}
 
     def storage_commit(self):
-        self.session.flush()
+        #self.session.flush()
+        #flush() is always called as part of a call to commit()
         self.session.commit()
 
     def __enter__(self):
@@ -1388,6 +1514,7 @@ class EvidenceValidationFileChecker():
         '''
         directory_crawler = EvidenceDirectoryCrawlerProcess(
                                     file_q,
+                                    self.adapter,
                                     input_file_loading_finished,
                                     input_file_count,
                                     file_processing_lock)
@@ -1401,6 +1528,7 @@ class EvidenceValidationFileChecker():
         readers = [EvidenceFileReaderProcess(file_q,
                                       evidence_q,
                                       self.adapter,
+                                      self.es,
                                       input_file_loading_finished,
                                       input_file_processing_finished,
                                       input_file_count,
@@ -1419,7 +1547,8 @@ class EvidenceValidationFileChecker():
 
         validators = [EvidenceValidatorProcess(evidence_q,
                                       audit_q,
-                                      self.adapter,
+                                      Adapter(),
+                                      self.es,
                                       self.efo_current,
                                       self.efo_uncat,
                                       self.efo_obsolete,
