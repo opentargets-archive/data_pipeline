@@ -17,6 +17,7 @@ from modules.Association import AssociationActions, ScoringProcess, ScoringUploa
 from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from modules.Uniprot import UniProtActions,UniprotDownloader
 from modules.HGNC import HGNCActions, HGNCUploader
+from modules.Ensembl import EnsemblGeneInfo, EnsemblActions, EnsemblProcess
 import argparse
 from settings import Config, ElasticSearchConfiguration
 from redislite import Redis
@@ -92,6 +93,8 @@ if __name__ == '__main__':
                         action="append_const", const = EvidenceValidationActions.GENEMAPPING)
     parser.add_argument("--val", dest='val', help="check new json files submitted to ftp site, validate them and store them in postgres",
                         action="append_const", const = EvidenceValidationActions.ALL)
+    parser.add_argument("--ens", dest='ens', help="retrieve and store latest ensembl gene records in elasticsearch",
+                        action="append_const", const = EnsemblActions.ALL)
     parser.add_argument("--seap", dest='sea', help="precompute search results",
                         action="append_const", const = SearchObjectActions.PROCESS)
     parser.add_argument("--persist-redis", dest='redisperist', help="use a fresh redislite db",
@@ -151,6 +154,11 @@ if __name__ == '__main__':
             do_all = (HGNCActions.ALL in args.hgnc) or run_full_pipeline
             if (HGNCActions.UPLOAD in args.hgnc) or do_all:
                 HGNCUploader(adapter).upload()
+        if args.ens or run_full_pipeline:
+            do_all = (EnsemblActions.ALL in args.ens) or run_full_pipeline
+            if (EnsemblActions.PROCESS in args.ens) or do_all:
+                EnsemblProcess(loader).process()
+
         if args.gen or run_full_pipeline:
             do_all = (GeneActions.ALL in args.gen) or run_full_pipeline
             if (GeneActions.MERGE in args.gen) or do_all:

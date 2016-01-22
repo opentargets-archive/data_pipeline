@@ -971,7 +971,7 @@ class EvidenceChunkStorage():
         self.counter = 0
 
     def storage_create_index(self):
-
+        pass
 
     def storage_reset(self):
         self.cache = {}
