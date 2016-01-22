@@ -164,7 +164,7 @@ class EnsemblProcess(object):
 
     def process(self, ensembl_release=Config.ENSEMBL_RELEASE_VERSION):
         gene_info = EnsemblGeneInfo(ensembl_release)
-        for ens_id, data in gene_info.get_gene_info_json_map():
+        for ens_id, data in gene_info.get_gene_info_json_map().items():
             self.loader.put(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
                             Config.ELASTICSEARCH_ENSEMBL_DOC_NAME,
                             ens_id,
