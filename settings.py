@@ -140,7 +140,7 @@ class Config():
 
     RELEASE_VERSION='3'
 
-    ENSEMBL_RELEASE_VERSION='83'
+    ENSEMBL_RELEASE_VERSION=83
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
