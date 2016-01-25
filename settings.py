@@ -31,6 +31,8 @@ class Config():
     ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME = 'association'
     ELASTICSEARCH_DATA_SEARCH_INDEX_NAME = 'search-data'
     ELASTICSEARCH_DATA_SEARCH_DOC_NAME = 'search-object'
+    ELASTICSEARCH_ENSEMBL_INDEX_NAME = 'ensembl-data'
+    ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
@@ -153,6 +155,8 @@ class Config():
     WORKERS_NUMBER = None # if None defaults to cpu count
 
     RELEASE_VERSION='3'
+
+    ENSEMBL_RELEASE_VERSION=83
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 

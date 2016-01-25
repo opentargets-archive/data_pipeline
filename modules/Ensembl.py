@@ -1,10 +1,18 @@
+import json
+
 import MySQLdb
 import requests
 import time
 
+from common import Actions
+from settings import Config
+
 '''
 
 '''
+class EnsemblActions(Actions):
+    PROCESS='process'
+
 class EnsemblMysqlGene:
     '''
     Use the Ensembl human core database to retrieve a list of Ensembl gene IDs.
@@ -104,7 +112,7 @@ class EnsemblGeneInfo:
     def __chunk_list(self, input_list, chunk_size=500):
         '''
         Breaks the input list into chunks. Used to limit the number of identifiers
-        sent to Ensembl REST POST API calls.
+        sent to Ensembl REST POST API calls (limit 1000).
         :param chunk_size: int
         :return: generator
         '''
@@ -147,8 +155,18 @@ class EnsemblGeneInfo:
             gene_post_output = rest_gene_post.get_gene_post_output()
             gene_info_json_map.update(gene_post_output)
         return self.__add_additional_info(gene_info_json_map)
-if __name__ == '__main__':
-    ensembl_release = 83
-    gene_info = EnsemblGeneInfo(ensembl_release)
-    gene_info_json_map = gene_info.get_gene_info_json_map()
-    print gene_info_json_map.pop('ENSG00000130203')
+
+
+class EnsemblProcess(object):
+
+    def __init__(self, loader):
+        self.loader = loader
+
+    def process(self, ensembl_release=Config.ENSEMBL_RELEASE_VERSION):
+        gene_info = EnsemblGeneInfo(ensembl_release)
+        for ens_id, data in gene_info.get_gene_info_json_map().items():
+            self.loader.put(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
+                            Config.ELASTICSEARCH_ENSEMBL_DOC_NAME,
+                            ens_id,
+                            json.dumps(data),
+                            True)
