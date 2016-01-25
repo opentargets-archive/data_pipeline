@@ -63,11 +63,11 @@ class Config():
     # Current genome Assembly
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     # Change this if you don't want to send e-mails
-    EVIDENCEVALIDATION_SEND_EMAIL = False
+    EVIDENCEVALIDATION_SEND_EMAIL = True
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org'] #, 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'gautierk@targetvalidation.org' ] #[ 'fabregat@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'kl1@sanger.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'cleroy@ebi.ac.uk' ]
