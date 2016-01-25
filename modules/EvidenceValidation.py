@@ -40,6 +40,10 @@ from elasticsearch import Elasticsearch, helpers
 
 from multiprocessing import Manager
 
+__author__ = 'gautierk'
+
+logger = logging.getLogger(__name__)
+
 BLOCKSIZE = 65536
 NB_JSON_FILES = 5
 MAX_NB_EVIDENCE = 25000
@@ -59,12 +63,12 @@ UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF = 32
 DISEASE_ID_INVALID = 40
 DISEASE_ID_OBSOLETE = 41
 
+TOP_20_GENES_QUERY = '{  "size": 0, "aggs" : {  "group_by_targets" : {   "terms" : { "field" : "target_id", "order" : { "_count" : "desc" }, "size": 20 } } } }'
+TOP_20_DISEASES_QUERY = '{  "size": 0, "aggs" : {  "group_by_diseases" : {   "terms" : { "field" : "disease_id", "order" : { "_count" : "desc" }, "size": 20 } } } }'
+
 from time import strftime
-VALIDATION_DATE = strftime("%Y-%m-%d %H:%M:%S")
-
-__author__ = 'gautierk'
-
-logger = logging.getLogger(__name__)
+#yyyyMMdd'T'HHmmssZ
+VALIDATION_DATE = strftime("%Y%m%dT%H%M%SZ")
 
 # figlet -c "Validation Passed"
 messagePassed='''
@@ -207,7 +211,8 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                             if cttv_filename_match and filename == "cttv006_Networks_Reactome-03-12-2015.json.gz": #"cttv_external_mousemodels-01-12-2015.json.gz": #"cttv006_Networks_Reactome-03-12-2015.json.gz":
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 logging.info(cttv_file)
-                                data_source_name = Config.JSON_FILE_TO_DATASOURCE_MAPPING[cttv_filename_match.groups()[0]]
+                                cttv_data_source_name = Config.JSON_FILE_TO_DATASOURCE_MAPPING[cttv_filename_match.groups()[0]]
+                                data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[cttv_data_source_name]
                                 logging.info(data_source_name)
                                 last_modified = os.path.getmtime(cttv_file)
                                 #july = time.strptime("01 Jul 2015", "%d %b %Y")
@@ -911,29 +916,9 @@ class AuditTrailProcess(multiprocessing.Process):
             except Queue.Empty:
                 pass
             if data:
-                file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, buffer_size, end_of_transmission = data
                 try:
-                    logger.info("%s %s chunk=%i nb_lines=%i nb_valid=%i nb_errors=%i"%(self.name, md5_hash, chunk, stats["nb_lines"], stats["nb_valid"], stats["nb_errors"]))
-                    for item in audit:
-                        if item[1] == DISEASE_ID_INVALID:
-                            # lc, DISEASE_ID_INVALID, disease_id
-                            logger.info("Line %i: invalid disease %s"%(item[0], item[2]))
-                    if not md5_hash in self.registry:
-                        self.registry[md5_hash] = dict(chunk_received = 0,
-                                             chunk_expected = -1)
-
-                    if end_of_transmission:
-                        self.registry[md5_hash]['chunk_expected'] = chunk-1
-                    else:
-                        self.registry[md5_hash]['chunk_received'] +=1
-                    if self.registry[md5_hash]['chunk_expected'] == self.registry[md5_hash]['chunk_received']:
-                        '''
-                        Generate report and send e-mails
-                        '''
-                        with self.lock:
-                            self.input_file_audited_count.value +=1
-                    ''' parse the file and put evidence in the queue '''
-                    #self.parse_gzipfile(file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
+                    file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, buffer_size, end_of_transmission = data
+                    self.audit_submission(file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, buffer_size, end_of_transmission, None)
 
                 except Exception, error:
                     #with self.lock:
@@ -953,44 +938,214 @@ class AuditTrailProcess(multiprocessing.Process):
 
 
 
-    def parse_gzipfile(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = None):
+    def audit_submission(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, buffer_size, end_of_transmission, logfile = None):
 
-        logging.info('%s Delete previous data for %s'% (self.name, data_source_name))
-        self.evidence_chunk_storage.storage_delete(data_source_name)
+        logger.info("%s %s chunk=%i nb_lines=%i nb_valid=%i nb_errors=%i"
+                    %(self.name, md5_hash, chunk, stats["nb_lines"], stats["nb_valid"], stats["nb_errors"]))
 
-        logging.info('%s Starting parsing %s'% (self.name, file_on_disk))
+        for item in audit:
+            if item[1] == DISEASE_ID_INVALID:
+                # lc, DISEASE_ID_INVALID, disease_id
+                logger.info("Line %i: invalid disease %s"%(item[0], item[2]))
 
-        fh = gzip.GzipFile(file_on_disk, "r")
-        #lfh = gzip.open(logfile, 'wb', compresslevel=5)
-        line_buffer = []
-        offset = 0
-        line_number = 0
+        if not md5_hash in self.registry:
+            self.registry[md5_hash] = dict(
+                    chunk_received = 0,
+                    chunk_expected = -1,
+                    chunks = list())
 
-        for line in fh:
-            line_buffer.append(line)
-            line_number+=1
-            if line_number % CHUNK_SIZE == 0:
-                logging.info('%s %s %i %i'% (self.name, md5_hash, offset, len(line_buffer)))
-                self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, list(line_buffer)))
-                offset += CHUNK_SIZE
-                del line_buffer[:]
-        if len(line_buffer) > 0:
-            logging.info('%s %s %i %i'% (self.name, md5_hash, offset, len(line_buffer)))
-            self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, list(line_buffer)))
-            offset += len(line_buffer)
-            del line_buffer[:]
+        if end_of_transmission:
+            self.registry[md5_hash]['chunk_expected'] = chunk-1
+        else:
+            self.registry[md5_hash]['chunk_received'] +=1
+            '''
+             Add the stats and audit to an array
+            '''
+            self.registry[md5_hash]['chunks'].append(dict(chunk=chunk,stats=stats, audit=audit))
 
         '''
-        indicate how many evidence were sent
+        Generate the audit report if all audit parts have been received.
         '''
-        with self.lock:
-            self.evidence_loaded_count.value += line_number
+        if self.registry[md5_hash]['chunk_expected'] == self.registry[md5_hash]['chunk_received']:
 
-        '''
-        finally send a signal to inform that parsing is completed for this file and no other line are to be expected
-        '''
-        logging.info('%s %s %i %i'% (self.name, md5_hash, offset, len(line_buffer)))
-        self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, offset, line_buffer))
+            '''
+            Get top 20 diseases
+            Get top 20 targets
+            '''
+            group_by_targets = '{ "size": 0, "aggs" : { "group_by_targets" : { "terms" : { "field" : "target_id", "size": 20 } } } }'
+            group_by_diseases = '{ "size": 0, "aggs" : { "group_by_diseases" : { "terms" : { "field" : "disease_id", "size": 20 } } } }'
+
+            with self.lock:
+                self.input_file_audited_count.value +=1
+
+            return
+
+            # write top diseases / top targets
+            text = ""
+            if top_diseases:
+                text +="Top %i diseases:\n"%(Config.EVIDENCEVALIDATION_NB_TOP_DISEASES)
+                for n in range(0,len(top_diseases)):
+                    if top_diseases[n] in self.efo_current:
+                        text +="\t-{0}:\t{1} ({2:.1f}%) {3}\n".format(top_diseases[n], diseases[top_diseases[n]], diseases[top_diseases[n]]*100/lc, self.efo_current[top_diseases[n]])
+                    else:
+                        text +="\t-{0}:\t{1} ({2:.1f}%)\n".format(top_diseases[n], diseases[top_diseases[n]], diseases[top_diseases[n]]*100/lc)
+                text +="\n"
+            if top_targets:
+                text +="Top %i targets:\n"%(Config.EVIDENCEVALIDATION_NB_TOP_TARGETS)
+                for n in range(0,len(top_targets)):
+                    id = top_targets[n];
+                    id_text = None
+                    ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', id)
+                    uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
+                    if ensemblMatch:
+                        ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
+                        id_text = self.get_reference_gene_from_Ensembl(ensembl_id);
+                    elif uniprotMatch:
+                        uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
+                        id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
+                    text +="\t-{0}:\t{1} ({2:.1f}%) {3}\n".format(top_targets[n], targets[top_targets[n]], targets[top_targets[n]]*100/lc, id_text)
+                text +="\n"
+
+            # report invalid/obsolete EFO term
+            if nb_efo_invalid > 0:
+                text +="Errors:\n"
+                text +="\t%i invalid EFO term(s) found in %i (%.1f%s) of the records.\n"%(len(invalid_diseases), nb_efo_invalid, nb_efo_invalid*100/lc, '%' )
+                for disease_id in invalid_diseases:
+                    if invalid_diseases[disease_id] == 1:
+                        text += "\t%s\t(reported once)\n"%(disease_id)
+                    else:
+                        text += "\t%s\t(reported %i times)\n"%(disease_id, invalid_diseases[disease_id])
+
+                text +="\n"
+            if nb_efo_obsolete > 0:
+                text +="Errors:\n"
+                text +="\t%i obsolete EFO term(s) found in %i (%.1f%s) of the records.\n"%(len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete*100/lc, '%' )
+                for disease_id in obsolete_diseases:
+                    if obsolete_diseases[disease_id] == 1:
+                        text += "\t%s\t(reported once)\t%s\n"%(disease_id, self.efo_obsolete[disease_id].replace("\n", " "))
+                    else:
+                        text += "\t%s\t(reported %i times)\t%s\n"%(disease_id, obsolete_diseases[disease_id], self.efo_obsolete[disease_id].replace("\n", " "))
+                text +="\n"
+
+            # report invalid Ensembl genes
+            if nb_ensembl_invalid > 0:
+                text +="Errors:\n"
+                text +="\t%i unknown Ensembl identifier(s) found in %i (%.1f%s) of the records.\n"%(len(invalid_ensembl_ids), nb_ensembl_invalid, nb_ensembl_invalid*100/lc, '%' )
+                for ensembl_id in invalid_ensembl_ids:
+                    if invalid_ensembl_ids[ensembl_id] == 1:
+                        text += "\t%s\t(reported once)\n"%(ensembl_id)
+                    else:
+                        text += "\t%s\t(reported %i times)\n"%(ensembl_id, invalid_ensembl_ids[ensembl_id])
+                text +="\n"
+
+            # report Ensembl genes not on reference assembly
+            if nb_ensembl_nonref > 0:
+                text +="Warnings:\n"
+                text +="\t%i Ensembl Human Alternative sequence Gene identifier(s) not mapped to the reference genome assembly %s found in %i (%.1f%s) of the records.\n"%(len(nonref_ensembl_ids), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_ensembl_nonref, nb_ensembl_nonref*100/lc, '%' )
+                text +="\tPlease map them to a reference assembly gene if possible.\n"
+                text +="\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifier.\n"
+                for ensembl_id in nonref_ensembl_ids:
+                    if nonref_ensembl_ids[ensembl_id] == 1:
+                        text += "\t%s\t(reported once) maps to %s\n"%(ensembl_id, self.get_reference_gene_from_Ensembl(ensembl_id))
+                    else:
+                        text += "\t%s\t(reported %i times) maps to %s\n"%(ensembl_id, nonref_ensembl_ids[ensembl_id], self.get_reference_gene_from_Ensembl(ensembl_id))
+                text +="\n"
+
+            # report invalid Uniprot entries
+            if nb_uniprot_invalid > 0:
+                text +="Errors:\n"
+                text +="\t%i invalid UniProt identifier(s) found in %i (%.1f%s) of the records.\n"%(len(invalid_uniprot_ids), nb_uniprot_invalid, nb_uniprot_invalid*100/lc, '%' )
+                for uniprot_id in invalid_uniprot_ids:
+                    if invalid_uniprot_ids[uniprot_id] == 1:
+                        text += "\t%s\t(reported once)\n"%(uniprot_id)
+                    else:
+                        text += "\t%s\t(reported %i times)\n"%(uniprot_id, invalid_uniprot_ids[uniprot_id])
+                text +="\n"
+
+            # report UniProt ids with no mapping to Ensembl
+            # missing_uniprot_id_xrefs
+            if nb_missing_uniprot_id_xrefs > 0:
+                text +="Warnings:\n"
+                text +="\t%i UniProt identifier(s) without cross-references to Ensembl found in %i (%.1f%s) of the records.\n"%(len(missing_uniprot_id_xrefs), nb_missing_uniprot_id_xrefs, nb_missing_uniprot_id_xrefs*100/lc, '%' )
+                text +="\tThe corresponding evidence strings have been discarded.\n"
+                for uniprot_id in missing_uniprot_id_xrefs:
+                    if missing_uniprot_id_xrefs[uniprot_id] == 1:
+                        text += "\t%s\t(reported once)\n"%(uniprot_id)
+                    else:
+                        text += "\t%s\t(reported %i times)\n"%(uniprot_id, missing_uniprot_id_xrefs[uniprot_id])
+                text +="\n"
+            # report invalid Uniprot mapping entries
+            if nb_uniprot_invalid_mapping > 0:
+                text +="Warnings:\n"
+                text +="\t%i UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (%.1f%s) of the records.\n"%(len(invalid_uniprot_id_mappings), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping*100/lc, '%' )
+                text +="\tIf you think that might be an error in your submission, please use a UniProt identifier that will map to a reference assembly gene identifier.\n"
+                text +="\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifiers.\n"
+                for uniprot_id in invalid_uniprot_id_mappings:
+                    if invalid_uniprot_id_mappings[uniprot_id] == 1:
+                        text += "\t%s\t(reported once) maps to %s\n"%(uniprot_id, self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
+                    else:
+                        text += "\t%s\t(reported %i times) maps to %s\n"%(uniprot_id, invalid_uniprot_id_mappings[uniprot_id], self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
+                text +="\n"
+
+            now = datetime.utcnow()
+
+            # A file is successfully validated if it meets the following conditions
+            successfully_validated = (nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0 and nb_uniprot_invalid == 0)
+
+            if count == 0:
+                # insert
+                f = EvidenceValidation(
+                    provider_id = provider_id,
+                    filename = file_on_disk,
+                    md5 = md5_hash,
+                    date_created = now,
+                    date_modified = now,
+                    date_validated = now,
+                    nb_submission = 1,
+                    nb_records = lc,
+                    #nb_valid = nb_valid,
+                    nb_errors = nb_errors,
+                    nb_duplicates = nb_duplicates,
+                    successfully_validated = successfully_validated
+                )
+                self.session.add(f)
+                logging.info('inserted %s file in the validation table'%file_on_disk)
+            else:
+                # update database
+                rowToUpdate.md5 = md5_hash
+                rowToUpdate.nb_records = lc
+                rowToUpdate.nb_errors = nb_errors
+                rowToUpdate.nb_duplicates = nb_duplicates
+                rowToUpdate.date_modified = now
+                rowToUpdate.date_validated = now
+                rowToUpdate.successfully_validated = successfully_validated
+                self.session.add(rowToUpdate)
+
+            # write
+            self.storage_flush(data_source_name);
+            self.storage_commit();
+
+            self.send_email(
+                Config.EVIDENCEVALIDATION_SEND_EMAIL,
+                provider_id,
+                filename,
+                successfully_validated,
+                lc,
+                {   'valid records': nb_valid,
+                    'JSON errors': nb_errors,
+                    'records with duplicates': nb_duplicates,
+                    'records with invalid EFO terms': nb_efo_invalid,
+                    'records with obsolete EFO terms': nb_efo_obsolete,
+                    'records with invalid Ensembl ids': nb_ensembl_invalid,
+                    'records with Human Alternative sequence Gene Ensembl ids (warning)': nb_ensembl_nonref,
+                    'records with invalid UniProt ids': nb_uniprot_invalid,
+                    'records with UniProt entries without x-refs to Ensembl (warning)': nb_missing_uniprot_id_xrefs,
+                    'records with UniProt ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping
+                },
+                now,
+                text,
+                logfile
+                )
 
         return
 
@@ -1007,9 +1162,10 @@ class EvidenceStringELasticStorage():
 
         # ElasticSearchConfiguration().validated_data_settings_and_mappings
         # ignore 400 cause by IndexAlreadyExistsException when creating an index
-        es.indices.create(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
-                          body=ElasticSearchConfiguration().validated_data_settings_and_mappings,
+        res = es.indices.create(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                          body=ElasticSearchConfiguration.validated_data_settings_and_mappings,
                           ignore=400)
+        print(" response: '%s'" % (res))
 
     @staticmethod
     def delete_prev_data_in_es_obsolete(es, data_source_name):

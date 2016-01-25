@@ -109,6 +109,22 @@ class Config():
                                                 rare2common = 'CTTV005_Rare2Common',
                                                 tissue_specificity = 'CTTV010_Tissue_Specificity'
                                                 )
+
+    DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(CTTV006_Networks_Reactome = 'reactome',
+                                                CTTV006_Networks_IntAct = 'intact',
+                                                CTTV008_ChEMBL = 'chembl',
+                                                CTTV009_GWAS_Catalog = 'gwas_catalog',
+                                                CTTV011_UniProt = 'uniprot',
+                                                CTTV012_Variation = 'eva',
+                                                CTTV018_IBD_GWAS = 'gwas_ibd',
+                                                CTTV_External_MouseModels = 'phenodigm',
+                                                CTTV_External_Cancer_Gene_Census = 'cancer_gene_census',
+                                                CTTV025_Literature = 'europepmc',
+                                                CTTV_External_DisGeNet = 'disgenet',
+                                                CTTV005_Rare2Common = 'rare2common',
+                                                CTTV010_Tissue_Specificity = 'tissue_specificity'
+                                                )
+
     DATASOURCE_TO_DATATYPE_MAPPING = defaultdict(lambda: "other")
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
@@ -619,21 +635,26 @@ class ElasticSearchConfiguration():
                 "properties" : {
                     "uniq_assoc_fields_hashdig" : {
                         "type" : "string",
+                        "index" : "not_analyzed",
                         },
                     "json_doc_hashdig" : {
                         "type" : "string",
+                        "index" : "not_analyzed",
                         },
                     "evidence_string" : {
                         "type" : "object",
                     },
                     "target_id" : {
                         "type" : "string",
+                        "index" : "not_analyzed"
                         },
                     "disease_id" : {
                         "type" : "string",
+                        "index" : "not_analyzed"
                         },
                    "data_source_name" : {
                         "type" : "string",
+
                         },
                    "json_schema_version" : {
                         "type" : "string",
@@ -645,8 +666,8 @@ class ElasticSearchConfiguration():
                         },
                    "release_date" : {
                         "type" : "date",
-                        "format" : "dateOptionalTime",
-                        "index" : "not_analyzed"
+                        "format" : "basic_date_time_no_millis",
+                        "index" : "no"
                         }
                 }
     }
@@ -655,15 +676,6 @@ class ElasticSearchConfiguration():
     for db in available_databases:
         evidence_mappings[Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+db]= _get_evidence_string_generic_mapping()
 
-
-    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
-                                           "number_of_replicas" : evidence_replicas_number,
-                                           # "index.store.type": "memory",
-                                           "refresh_interval" : "60s",
-                                           },
-                               "mappings": validated_data_mapping,
-    }
-
     evidence_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                            "number_of_replicas" : evidence_replicas_number,
                                            # "index.store.type": "memory",
@@ -671,6 +683,19 @@ class ElasticSearchConfiguration():
                                            },
                               "mappings": evidence_mappings,
                             }
+
+    validated_data_datasource_mappings = {}
+    for db in available_databases:
+        validated_data_datasource_mappings[db]= validated_data_mapping
+
+    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
+                                           "number_of_replicas" : evidence_replicas_number,
+                                           # "index.store.type": "memory",
+                                           "refresh_interval" : "60s",
+                                           },
+                               "mappings": validated_data_datasource_mappings,
+    }
+
     score_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                        "number_of_replicas" : evidence_replicas_number,
                                        # "index.store.type": "memory",
