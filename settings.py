@@ -64,17 +64,19 @@ class Config():
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     # Change this if you don't want to send e-mails
     EVIDENCEVALIDATION_SEND_EMAIL = True
+    EVIDENCEVALIDATION_SENDER_ACCOUNT = 'data.pipeline@targetvalidation.org'
+    EVIDENCEVALIDATION_SENDER_PASSWORD = 'P@ssword'
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org'] #, 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'gautierk@targetvalidation.org' ] #[ 'fabregat@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'kl1@sanger.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'cleroy@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'mkeays@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'fjlopez@ebi.ac.uk', 'garys@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'gautierk@targetvalidation.org' ] #[ 'kl1@sanger.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'gautierk@targetvalidation.org' ] #[ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'gautierk@targetvalidation.org' ] #[ 'cleroy@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'gautierk@targetvalidation.org' ] #[ 'mkeays@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'gautierk@targetvalidation.org' ] #[ 'eddturner@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'gautierk@targetvalidation.org' ] #[ 'fjlopez@ebi.ac.uk', 'garys@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'gautierk@targetvalidation.org' ] #[ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
     # This is a mapping from the file prefix to the data source name in the system
     JSON_FILE_TO_DATASOURCE_MAPPING = defaultdict(lambda: "other")
     JSON_FILE_TO_DATASOURCE_MAPPING['cttv005'] = 'CTTV005_Rare2Common'
