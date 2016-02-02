@@ -15,6 +15,8 @@ class Config():
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
+    ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
+    ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME = 'submission'
     ELASTICSEARCH_DATA_INDEX_NAME = 'evidence-data'
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
@@ -637,6 +639,66 @@ class ElasticSearchConfiguration():
 
     }
 
+    submission_audit_mapping = {
+                "properties" : {
+                    "md5" : {
+                        "type" : "string",
+                        "index" : "not_analyzed",
+                        },
+                    "provider_id" : {
+                        "type" : "string",
+                        "index" : "not_analyzed",
+                        },
+                    "data_source_name" : {
+                        "type" : "string",
+                        "index" : "not_analyzed",
+                        },
+                    "filename" : {
+                        "type" : "string",
+                        "index" : "not_analyzed",
+                        },
+                   "nb_submission" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "nb_records" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "nb_passed_validation" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "nb_errors" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "nb_duplicates" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "successfully_validated" : {
+                        "type" : "boolean",
+                        "index" : "not_analyzed"
+                        },
+                   "date_created" : {
+                        "type" : "date",
+                        "format" : "strict_date_hour_minute_second_millis",
+                        "index" : "no"
+                        },
+                   "date_validated" : {
+                        "type" : "date",
+                        "format" : "strict_date_hour_minute_second_millis",
+                        "index" : "no"
+                        },
+                   "date_modified" : {
+                        "type" : "date",
+                        "format" : "strict_date_hour_minute_second_millis",
+                        "index" : "no"
+                        }
+                }
+    }
+
     validated_data_mapping = {
                 "properties" : {
                     "uniq_assoc_fields_hashdig" : {
@@ -700,6 +762,16 @@ class ElasticSearchConfiguration():
                                            "refresh_interval" : "60s",
                                            },
                                "mappings": validated_data_datasource_mappings,
+    }
+
+    submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
+                                           "number_of_replicas" : evidence_replicas_number,
+                                           # "index.store.type": "memory",
+                                           "refresh_interval" : "60s",
+                                           },
+                               "mappings": {
+                                   Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME: submission_audit_mapping
+                               }
     }
 
     score_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,

@@ -68,6 +68,15 @@ TOP_20_TARGETS_QUERY = '{  "size": 0, "aggs" : {  "group_by_targets" : {   "term
 TOP_20_DISEASES_QUERY = '{  "size": 0, "aggs" : {  "group_by_diseases" : {   "terms" : { "field" : "disease_id", "order" : { "_count" : "desc" }, "size": 20 } } } }'
 DISTINCT_TARGETS_QUERY = '{  "size": 0, "aggs" : {  "distinct_targets" : {  "cardinality" : { "field" : "target_id" } } } }'
 DISTINCT_DISEASES_QUERY = '{  "size": 0, "aggs" : {  "distinct_diseases" : {  "cardinality" : { "field" : "disease_id" } } } }'
+SUBMISSION_FILTER_MD5 = '''
+{
+    "filename_filter" : {
+        "filter" : {
+            "terms" : { "filename" : ["/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-26-11-2015.json.gz"]}
+        }
+    }
+}
+'''
 
 from time import strftime
 
@@ -199,6 +208,8 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
         self.adapter = adapter
         self.session = adapter.session
         self.es = es
+        self.evidence_chunk = EvidenceChunkElasticStorage(es=self.es)
+        self.submission_audit = SubmissionAuditElasticStorage(es=self.es)
         self.start_time = time.time()
         self.input_file_loading_finished = input_file_loading_finished
         self.input_file_count = input_file_count
@@ -209,9 +220,12 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
         logger.info("%s started" % self.name)
 
         '''
-        create index for the data if it does not exists
+        create index for:
+         the evidence if it does not exists
+         the submitted files if it does not exists
         '''
-        EvidenceStringELasticStorage.create_data_index(self.es)
+        self.evidence_chunk.storage_create_index()
+        self.submission_audit.storage_create_index()
 
         '''
         now scroll through directories
@@ -314,6 +328,35 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                     rowToUpdate = row
                     break;
         logging.info('bValidate %r' % (bValidate))
+
+        '''
+        check if the file was parsed already in ES
+        TODO
+        '''
+        now = datetime.now().isoformat()
+
+        submission=dict(
+            md5=md5_hash,
+            provider_id=provider_id,
+            data_source_name=data_source_name,
+            filename=file_on_disk,
+            date_created=now,
+            date_modified=now,
+            date_validated=now,
+            nb_submission=1,
+            nb_passed_validation=0,
+            nb_records=0,
+            nb_errors=0,
+            nb_duplicates=0,
+            successfully_validated=False
+        )
+        # store in ElasticSearch
+
+        if self.submission_audit.exists(filename=file_on_disk):
+            self.submission_audit.storage_insert_or_update(submission, update=True)
+        else:
+            self.submission_audit.storage_insert_or_update(submission, update=False)
+
 
         if bValidate == True:
 
@@ -1493,19 +1536,22 @@ class AuditTrailProcess(multiprocessing.Process):
         return
 
 
-class EvidenceStringELasticStorage():
+class ELasticStorage():
     @staticmethod
-    def create_data_index(es):
+    def create_data_index(es, index_name=None, mappings=None, b_recreate=False):
         # delete former index, uncomment if required
-        if es.indices.exists(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME):
-            print("deleting '%s' index..." % (Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME))
-            res = es.indices.delete(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
-            print(" response: '%s'" % (res))
+        if es.indices.exists(index_name):
+            if b_recreate:
+                print("deleting '%s' index..." % (index_name))
+                res = es.indices.delete(index=index_name)
+                print(" response: '%s'" % (res))
+            else:
+                return
 
         # ElasticSearchConfiguration().validated_data_settings_and_mappings
         # ignore 400 cause by IndexAlreadyExistsException when creating an index
-        res = es.indices.create(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
-                                body=ElasticSearchConfiguration.validated_data_settings_and_mappings,
+        res = es.indices.create(index=index_name,
+                                body=mappings,
                                 ignore=400)
         print(" response: '%s'" % (res))
 
@@ -1635,7 +1681,11 @@ class EvidenceChunkElasticStorage():
         self.counter = 0
 
     def storage_create_index(self):
-        EvidenceStringELasticStorage.create_data_index(self.es)
+        ELasticStorage.create_data_index(
+                self.es,
+                index_name=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                mappings=ElasticSearchConfiguration.validated_data_settings_and_mappings,
+                b_recreate=True)
 
     def storage_reset(self):
         self.cache = {}
@@ -1649,7 +1699,7 @@ class EvidenceChunkElasticStorage():
             self.storage_flush(data_source_name)
 
     def storage_delete(self, data_source_name):
-        EvidenceStringELasticStorage.delete_prev_data_in_es(self.es, data_source_name)
+        ELasticStorage.delete_prev_data_in_es(self.es, data_source_name)
         self.cache = {}
         self.counter = 0
 
@@ -1657,11 +1707,74 @@ class EvidenceChunkElasticStorage():
 
         #logging.info("Flush storage for %s" % data_source_name)
         if self.cache:
-            EvidenceStringELasticStorage.store_to_es(self.es,
-                                                     data_source_name,
-                                                     self.cache,
-                                                     quiet=False
-                                                     )
+            ELasticStorage.store_to_es(self.es,
+                                       data_source_name,
+                                       self.cache,
+                                       quiet=False
+                                       )
+            self.counter += len(self.cache)
+            self.cache = {}
+
+class SubmissionAuditElasticStorage():
+    def __init__(self, es, chunk_size=1e3):
+        self.es = es
+
+    def storage_create_index(self):
+        ELasticStorage.create_data_index(
+                self.es,
+                index_name=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                mappings=ElasticSearchConfiguration.submission_audit_settings_and_mappings,
+                b_recreate=False)
+
+    def exists(self, filename=None):
+        return False
+
+    def storage_insert_or_update(self, submission=None, update=False):
+        start_time = time.time()
+
+        actions = []
+        if update:
+            action = {
+                '_op_type': 'update',
+                "_index": "%s" % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                "_type": "%s" % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
+                "_id": submission['md5'],
+                "doc":
+                    json.dumps(submission)
+            }
+            actions.append(action)
+
+        else:
+            action = {
+                "_index": "%s" % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                "_type": "%s" % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
+                "_id": submission['md5'],
+                "_source":
+                    json.dumps(submission)
+            }
+            actions.append(action)
+
+        print(json.dumps(actions[0]))
+
+        helpers.bulk(self.es, actions)
+        logging.info('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
+
+        return
+
+    def storage_delete(self, data_source_name):
+        ELasticStorage.delete_prev_data_in_es(self.es, data_source_name)
+        self.cache = {}
+        self.counter = 0
+
+    def storage_flush(self, data_source_name):
+
+        #logging.info("Flush storage for %s" % data_source_name)
+        if self.cache:
+            ELasticStorage.store_to_es(self.es,
+                                       data_source_name,
+                                       self.cache,
+                                       quiet=False
+                                       )
             self.counter += len(self.cache)
             self.cache = {}
 
