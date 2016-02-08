@@ -68,15 +68,44 @@ TOP_20_TARGETS_QUERY = '{  "size": 0, "aggs" : {  "group_by_targets" : {   "term
 TOP_20_DISEASES_QUERY = '{  "size": 0, "aggs" : {  "group_by_diseases" : {   "terms" : { "field" : "disease_id", "order" : { "_count" : "desc" }, "size": 20 } } } }'
 DISTINCT_TARGETS_QUERY = '{  "size": 0, "aggs" : {  "distinct_targets" : {  "cardinality" : { "field" : "target_id" } } } }'
 DISTINCT_DISEASES_QUERY = '{  "size": 0, "aggs" : {  "distinct_diseases" : {  "cardinality" : { "field" : "disease_id" } } } }'
-SUBMISSION_FILTER_MD5 = '''
+SUBMISSION_FILTER_FILENAME_QUERY = '''
 {
-    "filename_filter" : {
-        "filter" : {
-            "terms" : { "filename" : ["/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-26-11-2015.json.gz"]}
-        }
+  "query": {
+    "filtered": {
+      "filter": {
+        "terms" : { "filename": ["/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-26-11-2015.json.gz"]}
+      }
     }
+  }
 }
 '''
+
+'''
+curl "localhost:9201/submission-audit/_search?" -d '
+{
+  "query": {
+    "filtered": {
+      "filter": {
+        "terms" : { "md5": ["c4053985ca0680dd5eb1c0e226ecd587"]}
+      }
+    }
+  }
+}
+'
+
+curl "localhost:9201/submission-audit/_search?" -d '
+{
+  "query": {
+    "filtered": {
+      "filter": {
+        "terms" : { "filename": ["/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-26-11-2015.json.gz"]}
+      }
+    }
+  }
+}
+'
+'''
+
 
 from time import strftime
 
@@ -309,89 +338,67 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
         '''
         bValidate = False
         rowToUpdate = None
-        count = self.session.query(EvidenceValidation.filename).filter_by(filename=file_on_disk).count()
-        logging.info('Was the file parsed already? %i' % (count))
-        if count == 0:
-            bValidate = True
-        else:
-            for row in self.session.query(EvidenceValidation).filter_by(filename=file_on_disk):
-                if row.md5 == md5_hash:
-                    logging.info('%s == %s' % (row.md5, md5_hash))
-                    logging.info('%s file already recorded. Won\'t parse' % file_on_disk)
-                    bValidate = True
-                    rowToUpdate = row
-                    break;
-                    # return;
-                else:
-                    logging.info('%s != %s' % (row.md5, md5_hash))
-                    bValidate = True
-                    rowToUpdate = row
-                    break;
-        logging.info('bValidate %r' % (bValidate))
 
         '''
         check if the file was parsed already in ES
-        TODO
         '''
-        now = datetime.now().isoformat()
 
-        submission=dict(
-            md5=md5_hash,
-            provider_id=provider_id,
-            data_source_name=data_source_name,
-            filename=file_on_disk,
-            date_created=now,
-            date_modified=now,
-            date_validated=now,
-            nb_submission=1,
-            nb_passed_validation=0,
-            nb_records=0,
-            nb_errors=0,
-            nb_duplicates=0,
-            successfully_validated=False
-        )
-        # store in ElasticSearch
-
-        if self.submission_audit.exists(filename=file_on_disk):
-            self.submission_audit.storage_insert_or_update(submission, update=True)
+        existing_submission= self.submission_audit.get_submission(filename=file_on_disk)
+        if existing_submission:
+            md5 = existing_submission["_source"]["md5"]
+            if md5 == md5_hash:
+                    logging.info('%s == %s' % (md5, md5_hash))
+                    logging.info('%s file already recorded. Won\'t parse' % file_on_disk)
+                    ''' should be false, set to true if you want to parse anyway '''
+                    bValidate = True
+            else:
+                logging.info('%s != %s' % (md5, md5_hash))
+                bValidate = True
         else:
-            self.submission_audit.storage_insert_or_update(submission, update=False)
-
+            bValidate = True
+        logging.info('bValidate %r' % (bValidate))
 
         if bValidate == True:
 
-            ''' reset information in pipeline.evidence_validation table '''
+            ''' reset information in submission_audit index '''
 
-            now = datetime.utcnow()
+            now = datetime.now().strftime("%Y%m%dT%H%M%SZ")
 
-            if count == 0:
-                f = EvidenceValidation(
-                        provider_id=provider_id,
-                        filename=file_on_disk,
-                        md5=md5_hash,
-                        date_created=now,
-                        date_modified=now,
-                        date_validated=now,
-                        nb_submission=1,
-                        nb_records=0,
-                        # nb_valid = nb_valid,
-                        nb_errors=0,
-                        nb_duplicates=0,
-                        successfully_validated=False
+            if existing_submission:
+                ''' update '''
+                submission = dict(
+                        md5 = md5_hash,
+                        nb_submission=existing_submission["_source"]["nb_submission"]+1,
+                        nb_passed_validation=0,
+                        nb_records = 0,
+                        nb_errors = 0,
+                        nb_duplicates = 0,
+                        date_modified = now,
+                        date_validated = now,
+                        successfully_validated = False
                 )
-                self.session.add(f)
-            else:
-                # update database
-                rowToUpdate.md5 = md5_hash
-                rowToUpdate.nb_records = 0
-                rowToUpdate.nb_errors = 0
-                rowToUpdate.nb_duplicates = 0
-                rowToUpdate.date_modified = now
-                rowToUpdate.date_validated = now
-                rowToUpdate.successfully_validated = False
-                self.session.add(rowToUpdate)
 
-            self.session.commit();
+                self.submission_audit.storage_insert_or_update(submission, update=True)
+
+            else:
+                ''' insert '''
+                submission=dict(
+                    md5=md5_hash,
+                    provider_id=provider_id,
+                    data_source_name=data_source_name,
+                    filename=file_on_disk,
+                    date_created=now,
+                    date_modified=now,
+                    date_validated=now,
+                    nb_submission=1,
+                    nb_passed_validation=0,
+                    nb_records=0,
+                    nb_errors=0,
+                    nb_duplicates=0,
+                    successfully_validated=False
+                )
+
+                self.submission_audit.storage_insert_or_update(submission, update=False)
 
             self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile))
             with self.lock:
@@ -1018,6 +1025,7 @@ class AuditTrailProcess(multiprocessing.Process):
         self.adapter = adapter
         self.session = adapter.session
         self.es = es
+        self.submission_audit = SubmissionAuditElasticStorage(es=self.es)
         self.ensembl_current = ensembl_current
         self.uniprot_current = uniprot_current
         self.symbols = symbols
@@ -1467,8 +1475,6 @@ class AuditTrailProcess(multiprocessing.Process):
                         self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
                 text += "\n"
 
-            now = datetime.utcnow()
-
             print(text)
 
             # A file is successfully validated if it meets the following conditions
@@ -1476,26 +1482,24 @@ class AuditTrailProcess(multiprocessing.Process):
             nb_errors == 0 and nb_duplicates == 0 and nb_efo_invalid == 0 and nb_efo_obsolete == 0 and nb_ensembl_invalid == 0 and nb_uniprot_invalid == 0)
 
             '''
-            Update database
+            Update audit index
             '''
 
-            for row in self.session.query(EvidenceValidation).filter(
-                    and_(
-                                    EvidenceValidation.filename == file_on_disk,
-                                    EvidenceValidation.md5 == md5_hash
-                    )
-            ).limit(1):
-                rowToUpdate = row
+            now = datetime.now().strftime("%Y%m%dT%H%M%SZ")
 
-            rowToUpdate.md5 = md5_hash
-            rowToUpdate.nb_records = self.registry[md5_hash]['nb_lines']
-            rowToUpdate.nb_errors = nb_errors
-            rowToUpdate.nb_duplicates = nb_duplicates
-            rowToUpdate.date_modified = now
-            rowToUpdate.date_validated = now
-            rowToUpdate.successfully_validated = successfully_validated
-            self.session.add(rowToUpdate)
-            self.session.commit()
+            submission = dict(
+                    md5 = md5_hash,
+                    nb_records = self.registry[md5_hash]['nb_lines'],
+                    nb_errors = nb_errors,
+                    nb_duplicates = nb_duplicates,
+                    nb_passed_validation = nb_valid,
+                    date_modified = now,
+                    date_validated = now,
+                    successfully_validated = successfully_validated
+            )
+
+            self.submission_audit.storage_insert_or_update(submission, update=True)
+
             logging.info('%s updated %s file in the validation table' % (self.name, file_on_disk))
 
             '''
@@ -1727,22 +1731,41 @@ class SubmissionAuditElasticStorage():
                 b_recreate=False)
 
     def exists(self, filename=None):
-        return False
+        search = self.es.search(
+                index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
+                body=SUBMISSION_FILTER_FILENAME_QUERY,
+        )
+
+        return (search and search["hits"]["total"] == 1)
+
+    def get_submission(self, filename=None):
+        search = self.es.search(
+                index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
+                body=SUBMISSION_FILTER_FILENAME_QUERY,
+        )
+
+        if search and search["hits"]["total"] == 1:
+            return search["hits"]["hits"][0]
+        else:
+            return None
 
     def storage_insert_or_update(self, submission=None, update=False):
         start_time = time.time()
 
         actions = []
         if update:
+            logging.info(json.dumps(submission, indent=4))
             action = {
                 '_op_type': 'update',
-                "_index": "%s" % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
-                "_type": "%s" % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
-                "_id": submission['md5'],
-                "doc":
-                    json.dumps(submission)
+                '_index': '%s' % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                '_type': '%s' % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
+                '_id': submission['md5'],
+                'doc': json.dumps(submission)
             }
             actions.append(action)
+            #actions.append()
 
         else:
             action = {
@@ -1756,8 +1779,14 @@ class SubmissionAuditElasticStorage():
 
         print(json.dumps(actions[0]))
 
-        helpers.bulk(self.es, actions)
-        logging.info('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
+        nb_success = helpers.bulk(self.es, actions, stats_only=False)
+        if nb_success[0] !=1:
+            print("ERRORS REPORTED " + json.dumps(nb_errors))
+            logging.info("SubmissionAuditElasticStorage: command failed:%s"%nb_success[0])
+        else:
+            logging.info('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
+
+        self.es.indices.refresh(index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME)
 
         return
 
@@ -2062,7 +2091,7 @@ class EvidenceValidationFileChecker():
         omim_pattern = "http://purl.bioontology.org/omim/OMIM_%"
 
         '''
-        Temp: store the uncharactered diseases to fliter them
+        Temp: store the uncharactered diseases to filter them
         https://alpha.targetvalidation.org/disease/genetic_disorder_uncategorized
         '''
         for row in self.session.query(EFOPath):
@@ -2081,13 +2110,13 @@ class EvidenceValidationFileChecker():
                         EFONames.uri.like(omim_pattern)
                 )
         ):
-            # logging.info(row.uri)
+            #logging.info(row.uri)
             # if row.uri not in uncat:
             self.efo_current[row.uri] = row.label
         # logging.info(len(self.efo_current))
         # logging.info("Loading EFO obsolete terms")
         for row in self.session.query(EFOObsoleteClass):
-            # print "obsolete %s"%(row.uri)
+            #print "obsolete %s"%(row.uri)
             self.efo_obsolete[row.uri] = row.reason
 
     def get_reference_gene_from_Ensembl(self, ensembl_gene_id):
