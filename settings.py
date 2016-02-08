@@ -683,17 +683,17 @@ class ElasticSearchConfiguration():
                         },
                    "date_created" : {
                         "type" : "date",
-                        "format" : "strict_date_hour_minute_second_millis",
+                        "format" : "basic_date_time_no_millis",
                         "index" : "no"
                         },
                    "date_validated" : {
                         "type" : "date",
-                        "format" : "strict_date_hour_minute_second_millis",
+                        "format" : "basic_date_time_no_millis",
                         "index" : "no"
                         },
                    "date_modified" : {
                         "type" : "date",
-                        "format" : "strict_date_hour_minute_second_millis",
+                        "format" : "basic_date_time_no_millis",
                         "index" : "no"
                         }
                 }
