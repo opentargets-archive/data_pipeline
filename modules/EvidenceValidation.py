@@ -73,7 +73,7 @@ SUBMISSION_FILTER_FILENAME_QUERY = '''
   "query": {
     "filtered": {
       "filter": {
-        "terms" : { "filename": ["/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-26-11-2015.json.gz"]}
+        "terms" : { "filename": ["%s"]}
       }
     }
   }
@@ -227,15 +227,12 @@ class ValidationActions(Actions):
 class DirectoryCrawlerProcess(multiprocessing.Process):
     def __init__(self,
                  output_q,
-                 adapter,
                  es,
                  input_file_loading_finished,
                  input_file_count,
                  lock):
         super(DirectoryCrawlerProcess, self).__init__()
         self.output_q = output_q
-        self.adapter = adapter
-        self.session = adapter.session
         self.es = es
         self.evidence_chunk = EvidenceChunkElasticStorage(es=self.es)
         self.submission_audit = SubmissionAuditElasticStorage(es=self.es)
@@ -262,8 +259,8 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
         for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
             dirnames.sort()
             for subdirname in dirnames:
-                # cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                cttv_match = re.match("^(cttv012)$", subdirname)
+                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
+                #cttv_match = re.match("^(cttv012)$", subdirname)
                 if cttv_match:
                     # get provider id
                     provider_id = cttv_match.groups()[0]
@@ -278,7 +275,18 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                             logging.info(filename);
                             cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
                             # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
-                            if cttv_filename_match and filename == 'cttv012-26-11-2015.json.gz': #(filename == "cttv006_Networks_Reactome-03-12-2015.json.gz" or filename == "cttv_external_mousemodels-26-01-2016.json.gz"): #"cttv006_Networks_Reactome-03-12-2015.json.gz":
+                            if (cttv_filename_match and
+                                (filename == 'cttv012-26-11-2015.json.gz') or
+                                (filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
+                                (filename == 'cttv006_Networks_Reactome-03-12-2015.json.gz') or
+                                (filename == 'cttv007-01-12-2015.json.gz') or
+                                (filename == 'cttv008-24-11-2015.json.gz') or
+                                (filename == 'cttv009-18-11-2015.json.gz') or
+                                (filename == 'cttv010-07-01-2016.json.gz') or
+                                (filename == 'cttv011-19-11-2015.json.gz') or
+                                (filename == 'cttv012-26-11-2015.json.gz') or
+                                (filename == 'cttv025-18-11-2015.json.gz')):
+                                #: #(filename == "cttv006_Networks_Reactome-03-12-2015.json.gz" or filename == "cttv_external_mousemodels-26-01-2016.json.gz"): #"cttv006_Networks_Reactome-03-12-2015.json.gz":
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 logging.info(cttv_file)
                                 cttv_data_source_name = Config.JSON_FILE_TO_DATASOURCE_MAPPING[
@@ -411,7 +419,6 @@ class FileReaderProcess(multiprocessing.Process):
     def __init__(self,
                  input_q,
                  output_q,
-                 adapter,
                  es,
                  input_file_loading_finished,
                  input_file_processing_finished,
@@ -422,10 +429,7 @@ class FileReaderProcess(multiprocessing.Process):
         super(FileReaderProcess, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
-        self.adapter = adapter
-        self.session = adapter.session
         self.es = es
-        # self.evidence_chunk_storage = EvidenceChunkStorage(adapter = self.adapter)
         self.evidence_chunk_storage = EvidenceChunkElasticStorage(es=self.es)
         self.start_time = time.time()
         self.input_file_loading_finished = input_file_loading_finished
@@ -525,7 +529,6 @@ class ValidatorProcess(multiprocessing.Process):
     def __init__(self,
                  input_q,
                  output_q,
-                 adapter,
                  es,
                  efo_current,
                  efo_uncat,
@@ -542,8 +545,6 @@ class ValidatorProcess(multiprocessing.Process):
         super(ValidatorProcess, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
-        self.adapter = adapter
-        self.session = adapter.get_new_session()
         self.es = es
         self.evidence_chunk_storage = EvidenceChunkElasticStorage(es=self.es)
         self.efo_current = efo_current
@@ -609,16 +610,6 @@ class ValidatorProcess(multiprocessing.Process):
         write the logs
         write the data to the database
         '''
-        rowToUpdate = None
-
-        # for row in self.session.query(EFONames).filter(
-        for row in self.session.query(EvidenceValidation).filter(
-                and_(
-                                EvidenceValidation.filename == file_on_disk,
-                                EvidenceValidation.md5 == md5_hash
-                )
-        ).limit(1):
-            rowToUpdate = row
 
         if end_of_transmission:
             logging.info("%s Validation of %s completed" % (self.name, file_on_disk))
@@ -1008,7 +999,6 @@ class ValidatorProcess(multiprocessing.Process):
 class AuditTrailProcess(multiprocessing.Process):
     def __init__(self,
                  input_q,
-                 adapter,
                  es,
                  ensembl_current,
                  uniprot_current,
@@ -1022,8 +1012,6 @@ class AuditTrailProcess(multiprocessing.Process):
                  lock):
         super(AuditTrailProcess, self).__init__()
         self.input_q = input_q
-        self.adapter = adapter
-        self.session = adapter.session
         self.es = es
         self.submission_audit = SubmissionAuditElasticStorage(es=self.es)
         self.ensembl_current = ensembl_current
@@ -1085,7 +1073,7 @@ class AuditTrailProcess(multiprocessing.Process):
         # Create message container - the correct MIME type is multipart/alternative.
         # msg = MIMEMultipart('alternative')
         msg = MIMEMultipart()
-        msg['Subject'] = "CTTV: Validation of submitted file {0} {1}".format(filename, status)
+        msg['Subject'] = "CTTV: {0} validation {1} for {2}".format(data_source_name, status, filename)
         msg['From'] = me
         msg['To'] = you
         rcpt = Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id]
@@ -1734,7 +1722,7 @@ class SubmissionAuditElasticStorage():
         search = self.es.search(
                 index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
                 doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
-                body=SUBMISSION_FILTER_FILENAME_QUERY,
+                body=SUBMISSION_FILTER_FILENAME_QUERY%filename,
         )
 
         return (search and search["hits"]["total"] == 1)
@@ -1743,7 +1731,7 @@ class SubmissionAuditElasticStorage():
         search = self.es.search(
                 index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
                 doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
-                body=SUBMISSION_FILTER_FILENAME_QUERY,
+                body=SUBMISSION_FILTER_FILENAME_QUERY%filename,
         )
 
         if search and search["hits"]["total"] == 1:
@@ -2153,6 +2141,7 @@ class EvidenceValidationFileChecker():
         # return;
         self.load_efo()
         self.load_eco()
+        self.adapter.close()
 
         '''
         Create queues
@@ -2191,7 +2180,6 @@ class EvidenceValidationFileChecker():
         '''
         directory_crawler = DirectoryCrawlerProcess(
                 file_q,
-                self.adapter,
                 self.es,
                 input_file_loading_finished,
                 input_file_count,
@@ -2204,7 +2192,6 @@ class EvidenceValidationFileChecker():
         '''
         readers = [FileReaderProcess(file_q,
                                      evidence_q,
-                                     self.adapter,
                                      self.es,
                                      input_file_loading_finished,
                                      input_file_processing_finished,
@@ -2224,7 +2211,6 @@ class EvidenceValidationFileChecker():
 
         validators = [ValidatorProcess(evidence_q,
                                        audit_q,
-                                       Adapter(),
                                        self.es,
                                        self.efo_current,
                                        self.efo_uncat,
@@ -2248,7 +2234,6 @@ class EvidenceValidationFileChecker():
         '''
         auditor = AuditTrailProcess(
                 audit_q,
-                self.adapter,
                 self.es,
                 self.ensembl_current,
                 self.uniprot_current,
