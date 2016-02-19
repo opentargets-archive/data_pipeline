@@ -276,16 +276,17 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                             cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
                             # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
                             if (cttv_filename_match and
-                                (filename == 'cttv012-26-11-2015.json.gz') or
-                                (filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
-                                (filename == 'cttv006_Networks_Reactome-03-12-2015.json.gz') or
-                                (filename == 'cttv007-01-12-2015.json.gz') or
-                                (filename == 'cttv008-24-11-2015.json.gz') or
-                                (filename == 'cttv009-18-11-2015.json.gz') or
-                                (filename == 'cttv010-07-01-2016.json.gz') or
-                                (filename == 'cttv011-19-11-2015.json.gz') or
-                                (filename == 'cttv012-26-11-2015.json.gz') or
-                                (filename == 'cttv025-18-11-2015.json.gz')):
+                                #(filename == 'cttv012-26-11-2015.json.gz') or
+                                #(filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
+                                (filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
+                                #(filename == 'cttv007-01-12-2015.json.gz') or
+                                #(filename == 'cttv008-24-11-2015.json.gz') or
+                                #(filename == 'cttv009-18-11-2015.json.gz') or
+                                #(filename == 'cttv010-07-01-2016.json.gz') or
+                                #(filename == 'cttv011-19-11-2015.json.gz') or
+                                #(filename == 'cttv012-26-11-2015.json.gz') or
+                                #(filename == 'cttv025-18-11-2015.json.gz')
+                                ):
                                 #: #(filename == "cttv006_Networks_Reactome-03-12-2015.json.gz" or filename == "cttv_external_mousemodels-26-01-2016.json.gz"): #"cttv006_Networks_Reactome-03-12-2015.json.gz":
                                 cttv_file = os.path.join(cttv_dirname, filename)
                                 logging.info(cttv_file)
@@ -704,8 +705,9 @@ class ValidatorProcess(multiprocessing.Process):
                     if 'label' in python_raw:
                         python_raw['type'] = python_raw.pop('label', None)
                     data_type = python_raw['type']
-                    # logging.info('type %s'%data_type)
+                    logging.info('type %s'%data_type)
                     if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
+                        logging.info(line)
                         try:
                             if data_type == 'genetic_association':
                                 obj = cttv.Genetics.fromMap(python_raw)
@@ -907,7 +909,7 @@ class ValidatorProcess(multiprocessing.Process):
                                                                             target_id=target_id,
                                                                             disease_id=efo_id,
                                                                             data_source_name=data_source_name,
-                                                                            json_schema_version="1.2.1",
+                                                                            json_schema_version="1.2.2",
                                                                             json_doc_version=1,
                                                                             release_date=VALIDATION_DATE),
                                                                         # release_date = datetime.utcnow()),
@@ -919,13 +921,13 @@ class ValidatorProcess(multiprocessing.Process):
                                     nb_errors += 1
                         else:
                             audit.append((lc, EVIDENCE_STRING_INVALID))
-                            # logger.error("Line {0}: Not a valid 1.2.1 evidence string - There was an error parsing the JSON document. The document may contain an invalid field".format(lc+1))
+                            # logger.error("Line {0}: Not a valid 1.2.2 evidence string - There was an error parsing the JSON document. The document may contain an invalid field".format(lc+1))
                             nb_errors += 1
                             validation_failed = True
 
                     else:
                         audit.append((lc, EVIDENCE_STRING_INVALID_TYPE, data_type))
-                        # logger.error("Line {0}: '{1}' is not a valid 1.2.1 evidence string type".format(lc+1, data_type))
+                        # logger.error("Line {0}: '{1}' is not a valid 1.2.2 evidence string type".format(lc+1, data_type))
                         nb_errors += 1
                         validation_failed = True
 
