@@ -15,6 +15,8 @@ class Config():
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
+    ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
+    ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME = 'submission'
     ELASTICSEARCH_DATA_INDEX_NAME = 'evidence-data'
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
@@ -63,18 +65,20 @@ class Config():
     # Current genome Assembly
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     # Change this if you don't want to send e-mails
-    EVIDENCEVALIDATION_SEND_EMAIL = False
+    EVIDENCEVALIDATION_SEND_EMAIL = True
+    EVIDENCEVALIDATION_SENDER_ACCOUNT = 'data.pipeline@targetvalidation.org'
+    EVIDENCEVALIDATION_SENDER_PASSWORD = 'P@ssword'
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'kl1@sanger.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'cleroy@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'mkeays@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'fjlopez@ebi.ac.uk', 'garys@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org'] #, 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'gautierk@targetvalidation.org' ] #[ 'fabregat@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'gautierk@targetvalidation.org' ] #[ 'kl1@sanger.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'gautierk@targetvalidation.org' ] #[ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'gautierk@targetvalidation.org' ] #[ 'cleroy@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'gautierk@targetvalidation.org' ] #[ 'mkeays@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'gautierk@targetvalidation.org' ] #[ 'eddturner@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'gautierk@targetvalidation.org' ] #[ 'fjlopez@ebi.ac.uk', 'garys@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'gautierk@targetvalidation.org' ] #[ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
     # This is a mapping from the file prefix to the data source name in the system
     JSON_FILE_TO_DATASOURCE_MAPPING = defaultdict(lambda: "other")
     JSON_FILE_TO_DATASOURCE_MAPPING['cttv005'] = 'CTTV005_Rare2Common'
@@ -105,12 +109,28 @@ class Config():
                                                 eva = 'CTTV012_Variation',
                                                 gwas_ibd = 'CTTV018_IBD_GWAS',
                                                 phenodigm = 'CTTV_External_MouseModels',
-                                                cancer_gene_census = 'CTTV_External_Cancer_Gene_Census',
+                                                cancer_gene_census = 'CTTV007_Cancer_Gene_Census',
                                                 europepmc = 'CTTV025_Literature',
                                                 disgenet = 'CTTV_External_DisGeNet',
                                                 rare2common = 'CTTV005_Rare2Common',
                                                 tissue_specificity = 'CTTV010_Tissue_Specificity'
                                                 )
+
+    DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(CTTV006_Networks_Reactome = 'reactome',
+                                                CTTV006_Networks_IntAct = 'intact',
+                                                CTTV008_ChEMBL = 'chembl',
+                                                CTTV009_GWAS_Catalog = 'gwas_catalog',
+                                                CTTV011_UniProt = 'uniprot',
+                                                CTTV012_Variation = 'eva',
+                                                CTTV018_IBD_GWAS = 'gwas_ibd',
+                                                CTTV_External_MouseModels = 'phenodigm',
+                                                CTTV007_Cancer_Gene_Census = 'cancer_gene_census',
+                                                CTTV025_Literature = 'europepmc',
+                                                CTTV_External_DisGeNet = 'disgenet',
+                                                CTTV005_Rare2Common = 'rare2common',
+                                                CTTV010_Tissue_Specificity = 'tissue_specificity'
+                                                )
+
     DATASOURCE_TO_DATATYPE_MAPPING = defaultdict(lambda: "other")
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
@@ -619,25 +639,90 @@ class ElasticSearchConfiguration():
 
     }
 
+    submission_audit_mapping = {
+                "properties" : {
+                    "md5" : {
+                        "type" : "string",
+                        "index" : "not_analyzed",
+                        },
+                    "provider_id" : {
+                        "type" : "string",
+                        "index" : "not_analyzed",
+                        },
+                    "data_source_name" : {
+                        "type" : "string",
+                        "index" : "not_analyzed",
+                        },
+                    "filename" : {
+                        "type" : "string",
+                        "index" : "not_analyzed",
+                        },
+                   "nb_submission" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "nb_records" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "nb_passed_validation" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "nb_errors" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "nb_duplicates" : {
+                        "type" : "integer",
+                        "index" : "not_analyzed"
+                        },
+                   "successfully_validated" : {
+                        "type" : "boolean",
+                        "index" : "not_analyzed"
+                        },
+                   "date_created" : {
+                        "type" : "date",
+                        "format" : "basic_date_time_no_millis",
+                        "index" : "no"
+                        },
+                   "date_validated" : {
+                        "type" : "date",
+                        "format" : "basic_date_time_no_millis",
+                        "index" : "no"
+                        },
+                   "date_modified" : {
+                        "type" : "date",
+                        "format" : "basic_date_time_no_millis",
+                        "index" : "no"
+                        }
+                }
+    }
+
     validated_data_mapping = {
                 "properties" : {
                     "uniq_assoc_fields_hashdig" : {
                         "type" : "string",
+                        "index" : "not_analyzed",
                         },
                     "json_doc_hashdig" : {
                         "type" : "string",
+                        "index" : "not_analyzed",
                         },
                     "evidence_string" : {
                         "type" : "object",
                     },
                     "target_id" : {
                         "type" : "string",
+                        "index" : "not_analyzed"
                         },
                     "disease_id" : {
                         "type" : "string",
+                        "index" : "not_analyzed"
                         },
                    "data_source_name" : {
                         "type" : "string",
+
                         },
                    "json_schema_version" : {
                         "type" : "string",
@@ -649,8 +734,8 @@ class ElasticSearchConfiguration():
                         },
                    "release_date" : {
                         "type" : "date",
-                        "format" : "dateOptionalTime",
-                        "index" : "not_analyzed"
+                        "format" : "basic_date_time_no_millis",
+                        "index" : "no"
                         }
                 }
     }
@@ -659,15 +744,6 @@ class ElasticSearchConfiguration():
     for db in available_databases:
         evidence_mappings[Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+db]= _get_evidence_string_generic_mapping()
 
-
-    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
-                                           "number_of_replicas" : evidence_replicas_number,
-                                           # "index.store.type": "memory",
-                                           "refresh_interval" : "60s",
-                                           },
-                               "mappings": validated_data_mapping,
-    }
-
     evidence_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                            "number_of_replicas" : evidence_replicas_number,
                                            # "index.store.type": "memory",
@@ -675,6 +751,29 @@ class ElasticSearchConfiguration():
                                            },
                               "mappings": evidence_mappings,
                             }
+
+    validated_data_datasource_mappings = {}
+    for db in available_databases:
+        validated_data_datasource_mappings[db]= validated_data_mapping
+
+    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
+                                           "number_of_replicas" : evidence_replicas_number,
+                                           # "index.store.type": "memory",
+                                           "refresh_interval" : "60s",
+                                           },
+                               "mappings": validated_data_datasource_mappings,
+    }
+
+    submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
+                                           "number_of_replicas" : evidence_replicas_number,
+                                           # "index.store.type": "memory",
+                                           "refresh_interval" : "60s",
+                                           },
+                               "mappings": {
+                                   Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME: submission_audit_mapping
+                               }
+    }
+
     score_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                        "number_of_replicas" : evidence_replicas_number,
                                        # "index.store.type": "memory",
