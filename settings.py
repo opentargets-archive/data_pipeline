@@ -874,3 +874,69 @@ class ElasticSearchConfiguration():
                                     }
                                 }
                             }
+    search_obj_data_mapping = {
+         "settings": {
+                "number_of_shards" : generic_shard_number,
+                "number_of_replicas" : generic_replicas_number,
+                "refresh_interval" : "60s",
+                "analysis": {
+                    "filter": {
+                         "edgeNGram_filter": {
+                            "type": "edgeNGram",
+                            "min_gram": 2,
+                            "max_gram": 20,
+                            "token_chars": [
+                               "letter",
+                               "digit"
+                            ]
+                         },
+                         "simple_filter": {
+                            "type": "standard",
+                            "token_chars": [
+                               "letter",
+                               "digit"
+                            ]
+                         }
+                    },
+                    "analyzer": {
+                         "edgeNGram_analyzer": {
+                            "type": "custom",
+                            "tokenizer": "whitespace",
+                            "filter": [
+                               "lowercase",
+                               "asciifolding",
+                               "edgeNGram_filter"
+                            ]
+                         },
+                        "whitespace_analyzer": {
+                            "type": "custom",
+                            "tokenizer": "whitespace",
+                            "filter": [
+                               "lowercase",
+                               "asciifolding",
+                               "simple_filter",
+                            ]
+                        }
+                    }
+                }
+            },
+        "mappings": {
+           '_default_' : {
+                "properties" : {
+                    "private" : {
+                        "type" : "object",
+                        "properties" : {
+                            "suggestions" : {
+                                "type" : "completion",
+                                "index_analyzer" : "whitespace_analyzer",
+                                "search_analyzer" : "whitespace_analyzer",
+                                "payloads" : True
+                                },
+
+
+                            },
+                        },
+                    },
+                },
+            },
+        }
