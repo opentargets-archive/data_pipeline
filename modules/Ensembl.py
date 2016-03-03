@@ -1,6 +1,6 @@
 import json
 
-import MySQLdb
+import mysql.connector
 import requests
 import time
 
@@ -27,8 +27,8 @@ class EnsemblMysqlGene(object):
         '''
         dbname = 'homo_sapiens_core_%d_38' % ensembl_release
         try:
-            self.conn = MySQLdb.connect(host='ensembldb.ensembl.org', user='anonymous', port=5306, db=dbname, passwd='')
-        except MySQLdb.OperationalError as mysql_ex:
+            self.conn = mysql.connector.connect(host='ensembldb.ensembl.org', user='anonymous', port=5306, db=dbname, passwd='')
+        except mysql.connector.OperationalError as mysql_ex:
             raise mysql_ex
 
     def get_ensembl_gene_ids(self):
