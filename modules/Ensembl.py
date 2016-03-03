@@ -101,7 +101,7 @@ class EnsemblRestGenePost():
                     raise ex
         return gene_post_output
 
-class EnsemblGeneInfo:
+class EnsemblGeneInfo(object):
     def __init__(self, ensembl_release):
         '''
         Set the Ensembl gene IDs list and Ensembl release verion attributes.
