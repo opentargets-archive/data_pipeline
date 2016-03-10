@@ -1,6 +1,6 @@
 import json
 
-import MySQLdb
+import mysql.connector
 import requests
 import time
 
@@ -13,7 +13,7 @@ from settings import Config
 class EnsemblActions(Actions):
     PROCESS='process'
 
-class EnsemblMysqlGene:
+class EnsemblMysqlGene(object):
     '''
     Use the Ensembl human core database to retrieve a list of Ensembl gene IDs.
     This list is then used by "EnsemblRestGenePost" to generate JSONs containing
@@ -27,8 +27,8 @@ class EnsemblMysqlGene:
         '''
         dbname = 'homo_sapiens_core_%d_38' % ensembl_release
         try:
-            self.conn = MySQLdb.connect(host='ensembldb.ensembl.org', user='anonymous', port=5306, db=dbname, passwd='')
-        except MySQLdb.OperationalError as mysql_ex:
+            self.conn = mysql.connector.connect(host='ensembldb.ensembl.org', user='anonymous', port=5306, db=dbname, passwd='')
+        except mysql.connector.OperationalError as mysql_ex:
             raise mysql_ex
 
     def get_ensembl_gene_ids(self):
@@ -60,6 +60,7 @@ class EnsemblRestGenePost():
         :return: None
         '''
         self.ensembl_gene_ids = ensembl_gene_ids
+
     def __query_rest_api(self):
         '''
 
@@ -72,6 +73,7 @@ class EnsemblRestGenePost():
         ids_list = '{ "ids" : %s }' % gene_id_string_formatted_for_post
         req = requests.post(server+ext, headers=headers, data=ids_list)
         return req.json()
+
     def get_gene_post_output(self, max_retry_count = 10):
         '''
         Calls "__query_rest_api()" in a loop to allow for
@@ -98,7 +100,8 @@ class EnsemblRestGenePost():
                 else:
                     raise ex
         return gene_post_output
-class EnsemblGeneInfo:
+
+class EnsemblGeneInfo(object):
     def __init__(self, ensembl_release):
         '''
         Set the Ensembl gene IDs list and Ensembl release verion attributes.
@@ -109,6 +112,7 @@ class EnsemblGeneInfo:
         self.mysql_genes = mysql_gene.get_ensembl_gene_ids()
         self.ensembl_release = ensembl_release
         mysql_gene.conn_close()
+
     def __chunk_list(self, input_list, chunk_size=500):
         '''
         Breaks the input list into chunks. Used to limit the number of identifiers
@@ -124,6 +128,7 @@ class EnsemblGeneInfo:
                 sublist = []
         if sublist:
             yield sublist
+
     def __add_additional_info(self, gene_info_json_map):
         '''
         Inject additional information into the gene JSON returned by the REST API.
@@ -132,7 +137,7 @@ class EnsemblGeneInfo:
         :return:
         '''
         chromosomes = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16',
-                       '17', '18', '19', '20', '21', 'X', 'Y']
+                       '17', '18', '19', '20', '21', '22', 'X', 'Y', 'MT']
         new_gene_info_json_map = {}
         for ensembl_gene_id, ensembl_rest_json in gene_info_json_map.items():
             ensembl_rest_json['ensembl_release'] = self.ensembl_release
@@ -142,6 +147,7 @@ class EnsemblGeneInfo:
                 ensembl_rest_json['is_reference'] = False
             new_gene_info_json_map[ensembl_gene_id] = ensembl_rest_json
         return new_gene_info_json_map
+
     def get_gene_info_json_map(self):
         '''
         Loop over a series of sub-lists of genes and instantiate "EnsemblRestGenePost for each one.

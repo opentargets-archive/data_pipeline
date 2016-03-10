@@ -79,6 +79,18 @@ SUBMISSION_FILTER_FILENAME_QUERY = '''
   }
 }
 '''
+SUBMISSION_FILTER_MD5_QUERY = '''
+{
+  "query": {
+    "filtered": {
+      "filter": {
+        "terms" : { "md5": ["%s"]}
+      }
+    }
+  }
+}
+
+'''
 
 '''
 curl "localhost:9201/submission-audit/_search?" -d '
@@ -272,20 +284,21 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                         # sort by the last modified time of the files
                         filenames.sort(key=lambda x: os.stat(os.path.join(path, x)).st_mtime)
                         for filename in filenames:
-                            logging.info(filename);
+
                             cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
+                            logging.info("%s %r"%(filename, cttv_filename_match))
                             # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
                             if (cttv_filename_match and
                                 #(filename == 'cttv012-26-11-2015.json.gz') or
                                 #(filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
-                                (filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
-                                #(filename == 'cttv007-01-12-2015.json.gz') or
-                                #(filename == 'cttv008-24-11-2015.json.gz') or
-                                #(filename == 'cttv009-18-11-2015.json.gz') or
-                                #(filename == 'cttv010-07-01-2016.json.gz') or
-                                #(filename == 'cttv011-19-11-2015.json.gz') or
-                                #(filename == 'cttv012-26-11-2015.json.gz') or
-                                #(filename == 'cttv025-18-11-2015.json.gz')
+                                #(filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
+                                #(filename == 'cttv025-24-02-2016.json.gz')
+                                #(filename == 'cttv007-01-03-2016.json.gz')
+                                #(filename == 'cttv008-26-02-2016.json.gz')
+                                #(filename == 'cttv009-25-02-2016.json.gz')
+                                #(filename == 'cttv010-23-02-2016.json.gz')
+                                #(filename == 'cttv011-26-02-2016.json.gz') or
+                                (filename == 'cttv012-03-03-2016.json.gz')
                                 ):
                                 #: #(filename == "cttv006_Networks_Reactome-03-12-2015.json.gz" or filename == "cttv_external_mousemodels-26-01-2016.json.gz"): #"cttv006_Networks_Reactome-03-12-2015.json.gz":
                                 cttv_file = os.path.join(cttv_dirname, filename)
@@ -352,7 +365,9 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
         check if the file was parsed already in ES
         '''
 
-        existing_submission= self.submission_audit.get_submission(filename=file_on_disk)
+        #existing_submission= self.submission_audit.get_submission(filename=file_on_disk)
+        existing_submission= self.submission_audit.get_submission_md5(md5=md5_hash)
+
         if existing_submission:
             md5 = existing_submission["_source"]["md5"]
             if md5 == md5_hash:
@@ -705,9 +720,9 @@ class ValidatorProcess(multiprocessing.Process):
                     if 'label' in python_raw:
                         python_raw['type'] = python_raw.pop('label', None)
                     data_type = python_raw['type']
-                    logging.info('type %s'%data_type)
+                    #logging.info('type %s'%data_type)
                     if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
-                        logging.info(line)
+                        #logging.info(line)
                         try:
                             if data_type == 'genetic_association':
                                 obj = cttv.Genetics.fromMap(python_raw)
@@ -901,6 +916,8 @@ class ValidatorProcess(multiprocessing.Process):
                                 # flatten data structure
                                 # logging.info('%s Adding to chunk %s %s'% (self.name, target_id, disease_id))
                                 json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest();
+
+
                                 self.evidence_chunk_storage.storage_add(uniq_elements_flat_hexdig,
                                                                         EvidenceString11(
                                                                             uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
@@ -914,6 +931,7 @@ class ValidatorProcess(multiprocessing.Process):
                                                                             release_date=VALIDATION_DATE),
                                                                         # release_date = datetime.utcnow()),
                                                                         data_source_name);
+
                             else:
                                 if disease_failed:
                                     nb_errors += 1
@@ -954,9 +972,10 @@ class ValidatorProcess(multiprocessing.Process):
 
             logging.info('%s nb line parsed %i (size %i)' % (self.name, lc, cc))
 
-            ''' write results '''
+            ''' write results in ES '''
+
             self.evidence_chunk_storage.storage_flush(data_source_name)
-            # self.evidence_chunk_storage.storage_commit()
+
             logging.info('%s bulk insert complete' % (self.name))
 
             '''
@@ -1149,7 +1168,7 @@ class AuditTrailProcess(multiprocessing.Process):
         :param ensembl_gene_id: ensembl gene identifier to check
         :return: a string indicating if the gene is mapped to a reference assembly or an alternative assembly only
         '''
-        symbol = self.ensembl_current[ensembl_gene_id]['external_name']
+        symbol = self.ensembl_current[ensembl_gene_id]['display_name']
         if symbol in self.symbols and 'ensembl_primary_id' in self.symbols[symbol]:
             return self.symbols[symbol]['ensembl_primary_id'] + " " + symbol + " (reference assembly)"
         return symbol + " (non reference assembly)"
@@ -1164,7 +1183,7 @@ class AuditTrailProcess(multiprocessing.Process):
         for ensembl_gene_id in genes:
             if self.ensembl_current[ensembl_gene_id]['is_reference'] is True:
                 return ensembl_gene_id + " " + self.ensembl_current[ensembl_gene_id][
-                    'external_name'] + " (reference assembly)"
+                    'display_name'] + " (reference assembly)"
         return ", ".join(genes) + " (non reference assembly)"
 
     def audit_submission(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit,
@@ -1281,9 +1300,34 @@ class AuditTrailProcess(multiprocessing.Process):
             for chunk in sortedChunks:
                 logging.info("%i"%chunk['chunk'])
                 for item in chunk['audit']:
+                    # TOTO
                     if item[1] == DISEASE_ID_INVALID:
                         # lc, DISEASE_ID_INVALID, disease_id
                         lfh.write("Line %i: invalid disease %s\n" % (item[0], item[2]))
+                    elif item[1] == DISEASE_ID_OBSOLETE:
+                        # lc, DISEASE_ID_INVALID, disease_id
+                        lfh.write("Line %i: obsolete disease %s\n" % (item[0], item[2]))
+                    elif item[1] == EVIDENCE_STRING_INVALID_MISSING_DISEASE:
+                        lfh.write("Line %i: missing disease information\n" % (item[0]))
+                    elif item[1] == EVIDENCE_STRING_INVALID_SCHEMA_VERSION:
+                        lfh.write("Line %i: Not a valid 1.2.2 evidence string - please check the 'validated_against_schema_version' mandatory attribute\n" % (item[0]))
+                    # logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
+                    elif item[1] == EVIDENCE_STRING_INVALID:
+                        lfh.write("Line %i: Not a valid 1.2.2 evidence string - There was an error parsing the JSON document. The document may contain an invalid field\n" % (item[0]))
+                    elif item[1] == EVIDENCE_STRING_INVALID_MISSING_TYPE:
+                        lfh.write("Line %i: Not a valid 1.2.2 evidence string - please add the mandatory 'type' attribute\n" % (item[0]))
+                    elif item[1] == ENSEMBL_GENE_ID_UNKNOWN:
+                        lfh.write("Line %i: Unknown Ensembl gene detected %s. Please provide a correct gene identifier on the reference genome assembly %s\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                    elif item[1] == ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE:
+                        lfh.write("Line %i: Human Alternative sequence Ensembl Gene detected %s. We will attempt to map it to a gene identifier on the reference genome assembly %s or choose a Human Alternative sequence Ensembl Gene Id\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                    elif item[1] == UNIPROT_PROTEIN_ID_UNKNOWN:
+                        lfh.write("Line %i: Invalid UniProt entry detected %s. Please provide a correct identifier\n" % (item[0], item[2]))
+                    elif item[1] == UNIPROT_PROTEIN_ID_MISSING_ENSEMBL_XREF:
+                        lfh.write("Line %i: UniProt entry %s does not have any cross-reference to Ensembl\n" % (item[0], item[2]))
+                    elif item[1] == UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF:
+                        lfh.write("Line %i: The UniProt entry %s does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly %s. It will be mapped to a Human Alternative sequence Ensembl Gene Id\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                    elif item[1] == EVIDENCE_STRING_INVALID_MISSING_TARGET:
+                        lfh.write("Line %i: missing target information\n" % (item[0]))
             lfh.close()
             logging.info("Close log file")
 
@@ -1300,6 +1344,8 @@ class AuditTrailProcess(multiprocessing.Process):
 
             # {"hits": {"hits": [], "total": 9468, "max_score": 0.0}, "_shards": {"successful": 3, "failed": 0, "total": 3}, "took": 3, "timed_out": false}
             nb_documents = search['hits']['total']
+            if nb_documents == 0:
+                nb_documents = 1
 
             '''
             Get top 20 diseases
@@ -1327,7 +1373,7 @@ class AuditTrailProcess(multiprocessing.Process):
                     if ensemblMatch:
                         ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
                         id_text = self.get_reference_gene_from_Ensembl(ensembl_id)
-                        symbol = self.ensembl_current[ensembl_id]['external_name']
+                        symbol = self.ensembl_current[ensembl_id]['display_name']
                     # elif uniprotMatch:
                     #    uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
                     #    id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
@@ -1729,6 +1775,18 @@ class SubmissionAuditElasticStorage():
 
         return (search and search["hits"]["total"] == 1)
 
+    def get_submission_md5(self, md5=None):
+        search = self.es.search(
+                index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
+                body=SUBMISSION_FILTER_MD5_QUERY%md5,
+        )
+
+        if search and search["hits"]["total"] == 1:
+            return search["hits"]["hits"][0]
+        else:
+            return None
+
     def get_submission(self, filename=None):
         search = self.es.search(
                 index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
@@ -2024,6 +2082,54 @@ class EvidenceValidationFileChecker():
                     self.symbols[row.external_name]["ensembl_secondary_ids"] = []
                 self.symbols[row.external_name]["ensembl_secondary_ids"].append(row.ensembl_gene_id)
 
+    def load_ES_Ensembl(self):
+
+        logging.info("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
+            Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+
+        page = self.es.search(
+                        index=['3_ensembl-data'],
+                        scroll='30s',
+                        search_type='scan',
+                        size=1000,
+                        body= { "query": { "match_all": {} } }
+                        )
+
+        scroll_size = page['hits']['total']
+
+        while scroll_size > 0:
+            logging.info("scroll size %i"%scroll_size)
+            try:
+                scroll_id = page['_scroll_id']
+                page = self.es.scroll(scroll_id=scroll_id, scroll = '30s')
+
+                for hit in page['hits']['hits']:
+                    row = hit["_source"]
+
+                    self.ensembl_current[row["id"]] = row
+                    # put the ensembl_id in symbols too
+                    display_name = row["display_name"]
+                    if display_name not in self.symbols:
+                        self.symbols[display_name] = {}
+                        self.symbols[display_name]["assembly_name"] = row["assembly_name"]
+                        self.symbols[display_name]["ensembl_release"] = row["ensembl_release"]
+                    if row["is_reference"]:
+                        self.symbols[display_name]["ensembl_primary_id"] = row["id"]
+                    else:
+                        if "ensembl_secondary_id" not in self.symbols[display_name] or row["id"] < \
+                                self.symbols[display_name]["ensembl_secondary_id"]:
+                            self.symbols[display_name]["ensembl_secondary_id"] = row["id"];
+                        if "ensembl_secondary_ids" not in self.symbols[display_name]:
+                            self.symbols[display_name]["ensembl_secondary_ids"] = []
+                        self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
+                scroll_size = len(page['hits']['hits'])
+            except Exception, error:
+
+                    logger.exception(
+                        "Error loading gene/protein information %s" % (str(error)))
+        logging.info("Loading ES Ensembl finished")
+
+
     def store_gene_mapping(self):
         '''
             Stores the relation between UniProt, Ensembl, HGNC and the gene symbols
@@ -2068,6 +2174,22 @@ class EvidenceValidationFileChecker():
         logging.info("Loading ECO current valid terms")
         for row in self.session.query(ECONames):
             self.eco_current[row.uri] = row.label
+
+    def load_hpo(self):
+        '''
+        Load HPO to accept phenotype terms that are not
+        :return:
+        '''
+        sparql_query =
+        '''
+        SELECT DISTINCT ?hp_node ?label
+        FROM <http://purl.obolibrary.org/obo/hp.owl>
+        {
+        ?hp_node rdfs:subClassOf* <http://purl.obolibrary.org/obo/HP_0000118> .
+        ?hp_node rdfs:label ?label
+        }
+        LIMIT 100
+        '''
 
     def load_efo(self):
         # Change this in favor of paths
@@ -2117,7 +2239,7 @@ class EvidenceValidationFileChecker():
         :param ensembl_gene_id: ensembl gene identifier to check
         :return: a string indicating if the gene is mapped to a reference assembly or an alternative assembly only
         '''
-        symbol = self.ensembl_current[ensembl_gene_id]['external_name']
+        symbol = self.ensembl_current[ensembl_gene_id]['display_name']
         if symbol in self.symbols and 'ensembl_primary_id' in self.symbols[symbol]:
             return self.symbols[symbol]['ensembl_primary_id'] + " " + symbol + " (reference assembly)"
         return symbol + " (non reference assembly)"
@@ -2129,7 +2251,8 @@ class EvidenceValidationFileChecker():
             and will store it in the back-end to be shared and used by the validation
             workers
         '''
-        self.load_Ensembl()
+        self.load_ES_Ensembl()
+        #self.load_Ensembl()
         self.load_Uniprot()
         self.load_HGNC()
         self.store_gene_mapping()
@@ -2201,7 +2324,7 @@ class EvidenceValidationFileChecker():
                                      input_file_processed_count,
                                      evidence_loaded_count,
                                      file_processing_lock
-                                     ) for i in range(workers_number)]
+                                     ) for i in range(1)]
         # ) for i in range(2)]
         for w in readers:
             w.start()
@@ -2226,7 +2349,7 @@ class EvidenceValidationFileChecker():
                                        evidence_loaded_count,
                                        evidence_validated_count,
                                        log_file_lock
-                                       ) for i in range(workers_number)]
+                                       ) for i in range(workers_number+1)]
         # ) for i in range(2)]
         for w in validators:
             w.start()

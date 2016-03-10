@@ -327,6 +327,11 @@ class Loader():
                                    ignore=400,
                                    body=ElasticSearchConfiguration.expression_data_mapping
                                    )
+        elif Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME in index_name:
+            self.es.indices.create(index=index_name,
+                                   ignore=400,
+                                   body=ElasticSearchConfiguration.search_obj_data_mapping
+                                   )
         else:
             self.es.indices.create(index=index_name, ignore=400)
 

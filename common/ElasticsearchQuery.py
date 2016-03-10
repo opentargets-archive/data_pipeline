@@ -14,18 +14,24 @@ from settings import ElasticSearchConfiguration, Config
 class AssociationSummary(object):
 
     def __init__(self, res):
-        self.top_associations = []
-        self.top_associations_ids = []
-        self.total_associations = 0
+        self.top_associations = dict(total = [], direct =[])
+        self.associations_count = dict(total = 0, direct =0)
         if res['hits']['total']:
-            self.total_associations = res['hits']['total']-1#correct for cttv_root
+            self.associations_count['total'] = res['hits']['total']-1#correct for cttv_root
             for hit in res['hits']['hits']:
                 if 'cttv_root' not in hit['_id']:
                     if '_source' in hit:
-                        self.top_associations.append(hit['_source'])
+                        self.top_associations['total'].append(hit['_source'])
                     elif 'fields' in hit:
-                        self.top_associations.append(hit['fields'])
-                    self.top_associations_ids.append(hit['_id'])
+                        self.top_associations['total'].append(hit['fields'])
+            self.associations_count['direct'] = res['aggregations']['direct_associations']['doc_count']
+            for hit in res['aggregations']['direct_associations']['top_direct_ass']['hits']['hits']:
+                if 'cttv_root' not in hit['_id']:
+                    if '_source' in hit:
+                        self.top_associations['direct'].append(hit['_source'])
+                    elif 'fields' in hit:
+                        self.top_associations['direct'].append(hit['fields'])
+
 
 
 
@@ -78,7 +84,8 @@ class ESQuery(object):
             yield hit['_source']
 
 
-    def get_associations_for_target(self, target, fields = None):
+    def get_associations_for_target(self, target, fields = None, size = 100):
+        source =  {"include": fields}
         res = self.handler.search(index=Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body={"query": {
@@ -89,13 +96,30 @@ class ESQuery(object):
                                           }
                                         },
                                        "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
-                                       'fields': fields,
-                                       'size': 100,
+                                       '_source': source,
+                                       "aggs" : {
+                                            "direct_associations" : {
+                                                "filter" : { "term": { "is_direct": True}},
+                                                'aggs':{
+                                                   "top_direct_ass": {
+                                                        "top_hits": {
+                                                            "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
+                                                            "_source": source,
+
+                                                        "size" : size
+                                                        },
+                                                   }
+                                                },
+                                            }
+                                       },
+                                       'size': size,
                                        }
                                   )
         return AssociationSummary(res)
 
-    def get_associations_for_disease(self, disease, fields = None):
+    def get_associations_for_disease(self, disease, fields = None, size = 100):
+        source =  {"include": fields}
+
         res = self.handler.search(index=Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body={"query": {
@@ -105,9 +129,24 @@ class ESQuery(object):
                                               }
                                           }
                                         },
-                                       "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
-                                       'fields': fields,
-                                       'size': 100,
+                                       "sort" : { "harmonic-sum.overall" : {"order":"desc"}},
+                                       '_source': source,
+                                       "aggs" : {
+                                            "direct_associations" : {
+                                                "filter" : { "term": {"is_direct": True}},
+                                                'aggs':{
+                                                   "top_direct_ass": {
+                                                        "top_hits": {
+                                                            "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
+                                                            "_source": source,
+
+                                                        "size" :size
+                                                        },
+                                                   }
+                                                },
+                                            }
+                                       },
+                                       'size': size,
                                        }
                                   )
         return AssociationSummary(res)

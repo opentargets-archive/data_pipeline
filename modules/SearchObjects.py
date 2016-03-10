@@ -86,34 +86,47 @@ class SearchObject(JSONSerializable, object):
     """
     def __init__(self,
                  id='',
-                 title='',
+                 name='',
+                 full_name='',
                  description='',
                  ):
         self.id = id
-        self.title = title
+        if not name:
+            name = id
+        self.name = name
+        if not full_name:
+            full_name = name
+        self.full_name = full_name
+        if not description:
+            description = full_name
         self.description = description
         self.type = SearchObjectTypes.GENERIC
         self.private ={}
         self._create_suggestions()
 
-    def set_associations(self, top_associations = [], total_associations = 0):
-        self.top_associations = top_associations
-        self.total_associations = total_associations
+    def set_associations(self,
+                         top_associations =  dict(total = [], direct = []),
+                         association_counts = dict(total = 0, direct = 0),
+                         max_top = 20):
+        self.top_associations = dict(total = top_associations['total'][:max_top],
+                                     direct = top_associations['direct'][:max_top])
+        self.association_counts = association_counts
 
     def _create_suggestions(self):
         '''reimplement in subclasses to allow a better autocompletion'''
 
         field_order = [self.id,
-                       self.title,
+                       self.name,
                        self.description,
                        ]
 
         self.private['suggestions'] = dict(input = [],
-                                              output = self.title,
-                                              payload = dict(id = self.id,
-                                                             title = self.title,
-                                                             description = self.description),
-                                              )
+                                           output = self.name,
+                                           payload = dict(id = self.id,
+                                                          title = self.name,
+                                                          dull_name = self.full_name,
+                                                          description = self.description),
+                                           )
 
 
         for field in field_order:
@@ -139,7 +152,7 @@ class SearchObjectTarget(SearchObject, object):
     """
     def __init__(self,
                  id='',
-                 title='',
+                 name='',
                  description='',
                  ):
         super(SearchObjectTarget, self).__init__()
@@ -148,13 +161,15 @@ class SearchObjectTarget(SearchObject, object):
     def digest(self, json_input):
         json_input = self._parse_json(json_input)
         self.id=json_input['id']
-        self.title=json_input['approved_symbol']
-        self.description=json_input['approved_name']
+        self.name=json_input['approved_symbol']
+        self.full_name = json_input['approved_name']
+        if json_input['uniprot_function']:
+            self.description=json_input['uniprot_function'][0]
         self.approved_symbol=json_input['approved_symbol']
         self.approved_name=json_input['approved_name']
         self.symbol_synonyms=json_input['symbol_synonyms']
         self.name_synonyms=json_input['name_synonyms']
-        self.biotype=json_input['biotype'],
+        self.biotype=json_input['biotype']
         self.gene_family_description=json_input['gene_family_description']
         self.uniprot_accessions=json_input['uniprot_accessions']
         self.hgnc_id=json_input['hgnc_id']
@@ -168,7 +183,7 @@ class SearchObjectDisease(SearchObject, object):
     """
     def __init__(self,
                  id='',
-                 title='',
+                 name='',
                  description='',
                  ):
         super(SearchObjectDisease, self).__init__()
@@ -178,7 +193,8 @@ class SearchObjectDisease(SearchObject, object):
     def digest(self, json_input):
         json_input = self._parse_json(json_input)
         self.id=json_input['path_codes'][0][-1]
-        self.title=json_input['label']
+        self.name=json_input['label']
+        self.full_name=json_input['label']
         self.description=json_input['definition']
         self.efo_code=json_input['path_codes'][0][-1]
         self.efo_url=json_input['code']
@@ -187,6 +203,13 @@ class SearchObjectDisease(SearchObject, object):
         self.efo_synonyms=json_input['efo_synonyms']
         self.efo_path_codes=json_input['path_codes']
         self.efo_path_labels=json_input['path_labels']
+        self.min_path_len=len(json_input['path_codes'][0])
+        if len(json_input['path_codes'])>1:
+            for path in json_input['path_codes'][1]:
+                path_len = len(path)
+                if path_len < self.min_path_len:
+                    self.min_path_len = path_len
+        self.min_path_len-=1#correct for cttv_root
 
 
 class SearchObjectAnalyserWorker(Process):
@@ -220,19 +243,19 @@ class SearchObjectAnalyserWorker(Process):
                         so.digest(json_input=value)
                         '''count associations '''
                         if value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
-                            ass_data = self.es_query.get_associations_for_target(value['id'], fields=['id','harmonic-sum.overall'])
-                            so.set_associations(self._summarise_assocaition(ass_data.top_associations),
-                                                ass_data.total_associations)
+                            ass_data = self.es_query.get_associations_for_target(value['id'], fields=['id','harmonic-sum.overall'], size = 20)
+                            so.set_associations(self._summarise_association(ass_data.top_associations),
+                                                ass_data.associations_count)
 
                         elif value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
-                            ass_data = self.es_query.get_associations_for_disease(value['path_codes'][0][-1], fields=['id','harmonic-sum.overall'])
-                            so.set_associations(self._summarise_assocaition(ass_data.top_associations),
-                                                ass_data.total_associations)
+                            ass_data = self.es_query.get_associations_for_disease(value['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
+                            so.set_associations(self._summarise_association(ass_data.top_associations),
+                                                ass_data.associations_count)
                         else:
                             so.set_associations()
                         '''store search objects'''
                         loader.put(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
-                                   Config.ELASTICSEARCH_DATA_SEARCH_DOC_NAME,
+                                   Config.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
                                    so.id,
                                    so.to_json(),
                                    create_index=False)
@@ -246,9 +269,18 @@ class SearchObjectAnalyserWorker(Process):
 
         # logging.info('%s done processing'%self.name)
 
-    def _summarise_assocaition(self, data):
-        return [dict(id = data_point['id'][0],
-                    score = data_point['harmonic-sum.overall'][0]) for data_point in data]
+    def _summarise_association(self, data):
+        def cap_score(value):
+            if value >1:
+                return 1.0
+            elif value <-1:
+                return -1
+            return value
+        return dict(total = [dict(id = data_point['id'],
+                                score = cap_score(data_point['harmonic-sum']['overall'])) for data_point in data['total']],
+                    direct = [dict(id = data_point['id'],
+                                score = cap_score(data_point['harmonic-sum']['overall'])) for data_point in data['direct']]
+            )
 
 
 
@@ -269,7 +301,7 @@ class SearchObjectProcess(object):
         :return:
         '''
 
-        self.loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME)
+        self.loader.create_new_index(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
         start_time = datetime.now()
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID+'|search_obj_processing',
                            max_size=1000,
