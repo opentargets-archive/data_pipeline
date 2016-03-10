@@ -53,7 +53,7 @@ class Config():
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
     REACTOME_PATHWAY_RELATION = 'http://www.reactome.org/download/current/ReactomePathwaysRelation.txt'
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
-    EVIDENCEVALIDATION_SCHEMA = "1.2.1"
+    EVIDENCEVALIDATION_SCHEMA = "1.2.2"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
     # path to the FTP files on the processing machine
     EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/Users/koscieln/Documents/data/ftp' #'/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp'
