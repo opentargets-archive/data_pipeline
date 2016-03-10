@@ -71,7 +71,7 @@ class Config():
     EVIDENCEVALIDATION_SENDER_PASSWORD = 'P@ssword'
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org'] #, 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org'] #, 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'gautierk@targetvalidation.org' ] #[ 'fabregat@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'gautierk@targetvalidation.org' ] #[ 'kl1@sanger.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'gautierk@targetvalidation.org' ] #[ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
@@ -114,7 +114,7 @@ class Config():
                                                 europepmc = 'CTTV025_Literature',
                                                 disgenet = 'CTTV_External_DisGeNet',
                                                 rare2common = 'CTTV005_Rare2Common',
-                                                tissue_specificity = 'CTTV010_Tissue_Specificity'
+                                                expression_atlas = 'CTTV010_Tissue_Specificity'
                                                 )
 
     DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(CTTV006_Networks_Reactome = 'reactome',
@@ -129,7 +129,7 @@ class Config():
                                                 CTTV025_Literature = 'europepmc',
                                                 CTTV_External_DisGeNet = 'disgenet',
                                                 CTTV005_Rare2Common = 'rare2common',
-                                                CTTV010_Tissue_Specificity = 'tissue_specificity'
+                                                CTTV010_Tissue_Specificity = 'expression_atlas'
                                                 )
 
     DATASOURCE_TO_DATATYPE_MAPPING = defaultdict(lambda: "other")
