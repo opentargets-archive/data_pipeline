@@ -38,6 +38,7 @@ class Config():
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
+    SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
     POSTGRES_DATABASE = {'drivername': 'postgres',
             'host': iniparser.get(ENV, 'host'),
             'port': iniparser.get(ENV, 'port'),

@@ -3,6 +3,7 @@ import os
 
 import sys
 from elasticsearch import Elasticsearch
+from SPARQLWrapper import SPARQLWrapper, JSON
 from common import Actions
 from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
 from common.PGAdapter import Adapter
@@ -112,6 +113,8 @@ if __name__ == '__main__':
     #                     # and also every 60 seconds
     #                     sniffer_timeout=60)
     #
+    '''init sparql endpoint client'''
+    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -180,9 +183,9 @@ if __name__ == '__main__':
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es).map_genes()
+                EvidenceValidationFileChecker(adapter, es, sparql).map_genes()
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es).check_all()
+                EvidenceValidationFileChecker(adapter, es, sparql).check_all()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
