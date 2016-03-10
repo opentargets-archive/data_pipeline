@@ -57,7 +57,7 @@ class Config():
     EVIDENCEVALIDATION_SCHEMA = "1.2.2"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
     # path to the FTP files on the processing machine
-    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/Users/koscieln/Documents/data/ftp' #'/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp'
+    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH =  '/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp', #'/Users/koscieln/Documents/data/ftp'
     EVIDENCEVALIDATION_FILENAME_REGEX = '^(cttv[0-9]{3}|cttv_external_mousemodels|cttv006_Networks_Reactome)\-\d{2}\-\d{2}\-\d{4}\.json\.gz$'
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
@@ -71,15 +71,15 @@ class Config():
     EVIDENCEVALIDATION_SENDER_PASSWORD = 'P@ssword'
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org'] #, 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'gautierk@targetvalidation.org' ] #[ 'fabregat@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'gautierk@targetvalidation.org' ] #[ 'kl1@sanger.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'gautierk@targetvalidation.org' ] #[ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'gautierk@targetvalidation.org' ] #[ 'cleroy@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'gautierk@targetvalidation.org' ] #[ 'mkeays@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'gautierk@targetvalidation.org' ] #[ 'eddturner@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'gautierk@targetvalidation.org' ] #[ 'fjlopez@ebi.ac.uk', 'garys@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'gautierk@targetvalidation.org' ] #[ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'zs1@sanger.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'cleroy@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'mkeays@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
     # This is a mapping from the file prefix to the data source name in the system
     JSON_FILE_TO_DATASOURCE_MAPPING = defaultdict(lambda: "other")
     JSON_FILE_TO_DATASOURCE_MAPPING['cttv005'] = 'CTTV005_Rare2Common'
