@@ -73,6 +73,7 @@ SUBMISSION_FILTER_FILENAME_QUERY = '''
 {
   "query": {
     "filtered": {
+    "filtered": {
       "filter": {
         "terms" : { "filename": ["%s"]}
       }
@@ -290,7 +291,7 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                             logging.info("%s %r"%(filename, cttv_filename_match))
                             # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
                             if (cttv_filename_match
-                                and
+                                #and
                                 #(filename == 'cttv012-26-11-2015.json.gz') or
                                 #(filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
                                 #(filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
@@ -298,7 +299,7 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                                 #(filename == 'cttv007-01-03-2016.json.gz')
                                 #(filename == 'cttv008-26-02-2016.json.gz') or
                                 #(filename == 'cttv009-25-02-2016.json.gz') or
-                                (filename == 'cttv010-10-03-2016.json.gz')
+                                #(filename == 'cttv010-10-03-2016.json.gz')
                                 #(filename == 'cttv011-26-02-2016.json.gz') or
                                 #(filename == 'cttv012-03-03-2016.json.gz')
                                 ):
@@ -316,6 +317,7 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                                 earliest_date = time.strptime("15 Feb 2016", "%d %b %Y")
                                 sepseconds = time.mktime(earliest_date)
                                 if (last_modified - sepseconds) > 0:
+                                    logging.info("Elapsed time %i"%(last_modified - sepseconds))
                                     m = re.match("^(.+).json.gz$", filename)
                                     logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
                                     logging.info("%s %s" % (self.name, cttv_file))
@@ -2240,8 +2242,8 @@ class EvidenceValidationFileChecker():
             uri = result['ont_node']['value']
             label = result['label']['value']
             current[uri] = label
-            print(json.dumps(result, indent=4))
-            print("%s %s"%(uri, label))
+            #print(json.dumps(result, indent=4))
+            #print("%s %s"%(uri, label))
 
         sparql_query = '''
         PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
