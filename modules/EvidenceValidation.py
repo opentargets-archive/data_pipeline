@@ -289,15 +289,16 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                             cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
                             logging.info("%s %r"%(filename, cttv_filename_match))
                             # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
-                            if (cttv_filename_match and
+                            if (cttv_filename_match
+                                and
                                 #(filename == 'cttv012-26-11-2015.json.gz') or
                                 #(filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
                                 #(filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
                                 #(filename == 'cttv025-24-02-2016.json.gz')
                                 #(filename == 'cttv007-01-03-2016.json.gz')
-                                (filename == 'cttv008-26-02-2016.json.gz')
-                                #(filename == 'cttv009-25-02-2016.json.gz')
-                                #(filename == 'cttv010-23-02-2016.json.gz')
+                                #(filename == 'cttv008-26-02-2016.json.gz') or
+                                #(filename == 'cttv009-25-02-2016.json.gz') or
+                                (filename == 'cttv010-10-03-2016.json.gz')
                                 #(filename == 'cttv011-26-02-2016.json.gz') or
                                 #(filename == 'cttv012-03-03-2016.json.gz')
                                 ):
@@ -312,8 +313,8 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                                 last_modified = os.path.getmtime(cttv_file)
                                 # july = time.strptime("01 Jul 2015", "%d %b %Y")
                                 # julyseconds = time.mktime(july)
-                                sep = time.strptime("20 Oct 2015", "%d %b %Y")
-                                sepseconds = time.mktime(sep)
+                                earliest_date = time.strptime("15 Feb 2016", "%d %b %Y")
+                                sepseconds = time.mktime(earliest_date)
                                 if (last_modified - sepseconds) > 0:
                                     m = re.match("^(.+).json.gz$", filename)
                                     logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
@@ -375,7 +376,7 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                     logging.info('%s == %s' % (md5, md5_hash))
                     logging.info('%s file already recorded. Won\'t parse' % file_on_disk)
                     ''' should be false, set to true if you want to parse anyway '''
-                    bValidate = True
+                    bValidate = False
             else:
                 logging.info('%s != %s' % (md5, md5_hash))
                 bValidate = True
@@ -1140,7 +1141,7 @@ class AuditTrailProcess(multiprocessing.Process):
             text += messageFailed
             text += "See details in the attachment {0}\n\n".format(os.path.basename(logfile))
         text += "Data Provider:\t%s\n"%data_source_name
-        text += "JSON schema version:\t1.2.1\n"
+        text += "JSON schema version:\t1.2.2\n"
         text += "Number of records parsed:\t{0}\n".format(nb_records)
         for key in errors:
             text += "Number of {0}:\t{1}\n".format(key, errors[key])
@@ -1558,6 +1559,7 @@ class AuditTrailProcess(multiprocessing.Process):
             '''
 
             now = datetime.now().strftime("%Y%m%dT%H%M%SZ")
+            now_nice = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
 
             submission = dict(
                     md5 = md5_hash,
@@ -1596,7 +1598,7 @@ class AuditTrailProcess(multiprocessing.Process):
                      'records with UniProt entries without x-refs to Ensembl (warning)': nb_missing_uniprot_id_xrefs,
                      'records with UniProt ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping
                      },
-                    now,
+                    now_nice,
                     text,
                     logfile
             )
@@ -1846,7 +1848,7 @@ class SubmissionAuditElasticStorage():
                 '_index': '%s' % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
                 '_type': '%s' % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
                 '_id': submission['md5'],
-                'doc': json.dumps(submission)
+                'doc': submission
             }
             actions.append(action)
             #actions.append()
@@ -1861,9 +1863,10 @@ class SubmissionAuditElasticStorage():
             }
             actions.append(action)
 
-        print(json.dumps(actions[0]))
+        logging.info(json.dumps(actions[0], indent=4))
 
         nb_success = helpers.bulk(self.es, actions, stats_only=False)
+        logging.info(json.dumps(nb_success, indent=4))
         if nb_success[0] !=1:
             print("ERRORS REPORTED " + json.dumps(nb_errors))
             logging.info("SubmissionAuditElasticStorage: command failed:%s"%nb_success[0])
