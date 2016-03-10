@@ -38,6 +38,7 @@ from common.PGAdapter import Adapter
 import elasticsearch
 import itertools
 from elasticsearch import Elasticsearch, helpers
+from SPARQLWrapper import SPARQLWrapper, JSON
 
 from multiprocessing import Manager
 
@@ -294,11 +295,11 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                                 #(filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
                                 #(filename == 'cttv025-24-02-2016.json.gz')
                                 #(filename == 'cttv007-01-03-2016.json.gz')
-                                #(filename == 'cttv008-26-02-2016.json.gz')
+                                (filename == 'cttv008-26-02-2016.json.gz')
                                 #(filename == 'cttv009-25-02-2016.json.gz')
                                 #(filename == 'cttv010-23-02-2016.json.gz')
                                 #(filename == 'cttv011-26-02-2016.json.gz') or
-                                (filename == 'cttv012-03-03-2016.json.gz')
+                                #(filename == 'cttv012-03-03-2016.json.gz')
                                 ):
                                 #: #(filename == "cttv006_Networks_Reactome-03-12-2015.json.gz" or filename == "cttv_external_mousemodels-26-01-2016.json.gz"): #"cttv006_Networks_Reactome-03-12-2015.json.gz":
                                 cttv_file = os.path.join(cttv_dirname, filename)
@@ -549,6 +550,8 @@ class ValidatorProcess(multiprocessing.Process):
                  efo_current,
                  efo_uncat,
                  efo_obsolete,
+                 hpo_current,
+                 hpo_obsolete,
                  uniprot_current,
                  ensembl_current,
                  input_file_processing_finished,
@@ -566,6 +569,8 @@ class ValidatorProcess(multiprocessing.Process):
         self.efo_current = efo_current
         self.efo_uncat = efo_uncat
         self.efo_obsolete = efo_obsolete
+        self.hpo_current = hpo_current
+        self.hpo_obsolete = hpo_obsolete
         self.uniprot_current = uniprot_current
         self.ensembl_current = ensembl_current
         self.start_time = time.time()
@@ -796,12 +801,14 @@ class ValidatorProcess(multiprocessing.Process):
                                 for disease_id in obj.disease.id:
                                     disease_count += 1
                                     efo_id = disease_id
-                                    # fix for EVA data
-                                    if disease_id in eva_curated:
-                                        obj.disease.id[index] = eva_curated[disease_id];
-                                        disease_id = obj.disease.id[index];
+                                    # fix for EVA data for release 1.0
+                                    #if disease_id in eva_curated:
+                                    #    obj.disease.id[index] = eva_curated[disease_id];
+                                    #    disease_id = obj.disease.id[index];
                                     index += 1
-                                    if disease_id not in self.efo_current or disease_id in self.efo_uncat:
+
+                                    ''' Check disease term or phenotype term '''
+                                    if (disease_id not in self.efo_current and disease_id not in self.hpo_current) or disease_id in self.efo_uncat :
                                         audit.append((lc, DISEASE_ID_INVALID, disease_id))
                                         disease_failed = True
                                         if disease_id not in invalid_diseases:
@@ -818,6 +825,16 @@ class ValidatorProcess(multiprocessing.Process):
                                         else:
                                             obsolete_diseases[disease_id] += 1
                                         nb_efo_obsolete += 1
+                                    elif disease_id in self.hpo_obsolete:
+                                        audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
+                                        # logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                        disease_failed = True
+                                        if disease_id not in obsolete_diseases:
+                                            obsolete_diseases[disease_id] = 1
+                                        else:
+                                            obsolete_diseases[disease_id] += 1
+                                        nb_efo_obsolete += 1
+
                             if obj.disease.id is None or disease_count == 0:
                                 ''' no disease id !!!! '''
                                 audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_DISEASE))
@@ -1026,6 +1043,8 @@ class AuditTrailProcess(multiprocessing.Process):
                  symbols,
                  efo_current,
                  efo_obsolete,
+                 hpo_current,
+                 hpo_obsolete,
                  input_file_validation_finished,
                  input_file_auditing_finished,
                  input_file_validated_count,
@@ -1040,6 +1059,8 @@ class AuditTrailProcess(multiprocessing.Process):
         self.symbols = symbols
         self.efo_current = efo_current
         self.efo_obsolete = efo_obsolete
+        self.hpo_current = hpo_current
+        self.hpo_obsolete = hpo_obsolete
         self.start_time = time.time()
         self.input_file_auditing_finished = input_file_auditing_finished
         self.input_file_validation_finished = input_file_validation_finished
@@ -1306,7 +1327,7 @@ class AuditTrailProcess(multiprocessing.Process):
                         lfh.write("Line %i: invalid disease %s\n" % (item[0], item[2]))
                     elif item[1] == DISEASE_ID_OBSOLETE:
                         # lc, DISEASE_ID_INVALID, disease_id
-                        lfh.write("Line %i: obsolete disease %s\n" % (item[0], item[2]))
+                        lfh.write("Line %i: obsolete ontology class %s\n" % (item[0], item[2]))
                     elif item[1] == EVIDENCE_STRING_INVALID_MISSING_DISEASE:
                         lfh.write("Line %i: missing disease information\n" % (item[0]))
                     elif item[1] == EVIDENCE_STRING_INVALID_SCHEMA_VERSION:
@@ -1408,7 +1429,7 @@ class AuditTrailProcess(multiprocessing.Process):
             logging.info("report invalid EFO term")
             if nb_efo_invalid > 0:
                 text += "Errors:\n"
-                text += "\t%i invalid EFO term(s) found in %i (%.2f%s) of the records.\n" % (
+                text += "\t%i invalid ontology term(s) found in %i (%.2f%s) of the records.\n" % (
                 len(invalid_diseases), nb_efo_invalid, nb_efo_invalid * 100.0 / nb_documents, '%')
                 for disease_id in invalid_diseases:
                     if invalid_diseases[disease_id] == 1:
@@ -1421,15 +1442,20 @@ class AuditTrailProcess(multiprocessing.Process):
             logging.info("report obsolete EFO term")
             if nb_efo_obsolete > 0:
                 text += "Errors:\n"
-                text += "\t%i obsolete EFO term(s) found in %i (%.1f%s) of the records.\n" % (
+                text += "\t%i obsolete ontology term(s) found in %i (%.1f%s) of the records.\n" % (
                 len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete * 100 / nb_documents, '%')
                 for disease_id in obsolete_diseases:
+                    new_term = None
+                    if disease_id in self.efo_obsolete:
+                        new_term = self.efo_obsolete[disease_id]
+                    else:
+                        new_term = self.hpo_obsolete[disease_id]
                     if obsolete_diseases[disease_id] == 1:
                         text += "\t%s\t(reported once)\t%s\n" % (
-                        disease_id, self.efo_obsolete[disease_id].replace("\n", " "))
+                        disease_id, new_term.replace("\n", " "))
                     else:
                         text += "\t%s\t(reported %i times)\t%s\n" % (
-                        disease_id, obsolete_diseases[disease_id], self.efo_obsolete[disease_id].replace("\n", " "))
+                        disease_id, obsolete_diseases[disease_id], new_term.replace("\n", " "))
                 text += "\n"
 
             # report invalid Ensembl genes
@@ -1856,10 +1882,11 @@ class SubmissionAuditElasticStorage():
             self.cache = {}
 
 class EvidenceValidationFileChecker():
-    def __init__(self, adapter, es, chunk_size=1e4):
+    def __init__(self, adapter, es, sparql, chunk_size=1e4):
         self.adapter = adapter
         self.session = adapter.session
         self.es = es
+        self.sparql = sparql
         self.chunk_size = chunk_size
         self.cache = {}
         self.counter = 0
@@ -1882,6 +1909,8 @@ class EvidenceValidationFileChecker():
         self.efo_current = {}
         self.efo_obsolete = {}
         self.efo_uncat = []
+        self.hpo_current = {}
+        self.hpo_obsolete = {}
         self.ensembl_current = {}
         self.eco_current = {}
         self.symbols = {}
@@ -2180,16 +2209,63 @@ class EvidenceValidationFileChecker():
         Load HPO to accept phenotype terms that are not
         :return:
         '''
-        sparql_query =
-        '''
+        sparql_query = '''
         SELECT DISTINCT ?hp_node ?label
         FROM <http://purl.obolibrary.org/obo/hp.owl>
         {
         ?hp_node rdfs:subClassOf* <http://purl.obolibrary.org/obo/HP_0000118> .
         ?hp_node rdfs:label ?label
         }
-        LIMIT 100
         '''
+        self.sparql.setQuery(sparql_query)
+        self.sparql.setReturnFormat(JSON)
+        results = self.sparql.query().convert()
+
+        for result in results["results"]["bindings"]:
+            uri = result['hp_node']['value']
+            label = result['label']['value']
+            self.hpo_current[uri] = label
+            if 'HP_0000315' in uri: # == 'http://purl.obolibrary.org/obo/HP_0000315':
+                print(json.dumps(result, indent=4))
+            #print(json.dumps(result, indent=4))
+            #print("%s %s"%(uri, label))
+
+        sparql_query = '''
+        PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
+        PREFIX obo: <http://purl.obolibrary.org/obo/>
+        SELECT DISTINCT ?hp_node ?label ?id ?hp_new
+         FROM <http://purl.obolibrary.org/obo/hp.owl>
+         FROM <http://purl.obolibrary.org/obo/>
+         {
+            ?hp_node owl:deprecated true .
+            ?hp_node oboInOwl:id ?id .
+            ?hp_node obo:IAO_0100001 ?hp_new .
+            ?hp_node rdfs:label ?label
+
+         }
+        '''
+        self.sparql.setQuery(sparql_query)
+        self.sparql.setReturnFormat(JSON)
+        results = self.sparql.query().convert()
+
+        obsolete_classes = {}
+
+        for result in results["results"]["bindings"]:
+            uri = result['hp_node']['value']
+            label = result['label']['value']
+            id = result['label']['value']
+            hp_new = result['hp_new']['value']
+            new_label = ''
+            if (not re.match('http:\/\/purl.obolibrary\.org', hp_new)):
+                hp_new = "http://purl.obolibrary.org/obo/%s"%hp_new.replace(':','_')
+            obsolete_classes[uri] = hp_new
+        for uri in obsolete_classes:
+            next_uri = obsolete_classes[uri]
+            while next_uri in obsolete_classes:
+                next_uri = obsolete_classes[next_uri]
+            new_label = self.hpo_current[next_uri]
+            self.hpo_obsolete[uri] = "Use %s label:%s"%(next_uri, new_label)
+            print "%s %s"%(uri, self.hpo_obsolete[uri])
 
     def load_efo(self):
         # Change this in favor of paths
@@ -2262,9 +2338,14 @@ class EvidenceValidationFileChecker():
         Check every given evidence string
         :return:
         '''
+
+        #self.load_hpo()
+        #return;
+
         self.load_gene_mapping()
         # return;
         self.load_efo()
+        self.load_hpo()
         self.load_eco()
         self.adapter.close()
 
@@ -2340,6 +2421,8 @@ class EvidenceValidationFileChecker():
                                        self.efo_current,
                                        self.efo_uncat,
                                        self.efo_obsolete,
+                                       self.hpo_current,
+                                       self.hpo_obsolete,
                                        self.uniprot_current,
                                        self.ensembl_current,
                                        input_file_processing_finished,
@@ -2365,6 +2448,8 @@ class EvidenceValidationFileChecker():
                 self.symbols,
                 self.efo_current,
                 self.efo_obsolete,
+                self.hpo_current,
+                self.hpo_obsolete,
                 input_file_validation_finished,
                 input_file_auditing_finished,
                 input_file_validated_count,
