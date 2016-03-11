@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 BLOCKSIZE = 65536
 NB_JSON_FILES = 5
-MAX_NB_EVIDENCE = 25000
+MAX_NB_EVIDENCE_CHUNKS = 500
 CHUNK_SIZE = 1e4
 
 EVIDENCE_STRING_INVALID = 10
@@ -1218,19 +1218,54 @@ class AuditTrailProcess(multiprocessing.Process):
                     'display_name'] + " (reference assembly)"
         return ", ".join(genes) + " (non reference assembly)"
 
+    def write_logs(self, lfh, audit):
+
+        for item in audit:
+            if item[1] == DISEASE_ID_INVALID:
+                # lc, DISEASE_ID_INVALID, disease_id
+                lfh.write("Line %i: invalid disease %s\n" % (item[0], item[2]))
+            elif item[1] == DISEASE_ID_OBSOLETE:
+                # lc, DISEASE_ID_INVALID, disease_id
+                lfh.write("Line %i: obsolete ontology class %s\n" % (item[0], item[2]))
+            elif item[1] == EVIDENCE_STRING_INVALID_MISSING_DISEASE:
+                lfh.write("Line %i: missing disease information\n" % (item[0]))
+            elif item[1] == EVIDENCE_STRING_INVALID_SCHEMA_VERSION:
+                lfh.write("Line %i: Not a valid 1.2.2 evidence string - please check the 'validated_against_schema_version' mandatory attribute\n" % (item[0]))
+            # logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
+            elif item[1] == EVIDENCE_STRING_INVALID:
+                lfh.write("Line %i: Not a valid 1.2.2 evidence string - There was an error parsing the JSON document. The document may contain an invalid field\n" % (item[0]))
+            elif item[1] == EVIDENCE_STRING_INVALID_MISSING_TYPE:
+                lfh.write("Line %i: Not a valid 1.2.2 evidence string - please add the mandatory 'type' attribute\n" % (item[0]))
+            elif item[1] == ENSEMBL_GENE_ID_UNKNOWN:
+                lfh.write("Line %i: Unknown Ensembl gene detected %s. Please provide a correct gene identifier on the reference genome assembly %s\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+            elif item[1] == ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE:
+                lfh.write("Line %i: Human Alternative sequence Ensembl Gene detected %s. We will attempt to map it to a gene identifier on the reference genome assembly %s or choose a Human Alternative sequence Ensembl Gene Id\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+            elif item[1] == UNIPROT_PROTEIN_ID_UNKNOWN:
+                lfh.write("Line %i: Invalid UniProt entry detected %s. Please provide a correct identifier\n" % (item[0], item[2]))
+            elif item[1] == UNIPROT_PROTEIN_ID_MISSING_ENSEMBL_XREF:
+                lfh.write("Line %i: UniProt entry %s does not have any cross-reference to Ensembl\n" % (item[0], item[2]))
+            elif item[1] == UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF:
+                lfh.write("Line %i: The UniProt entry %s does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly %s. It will be mapped to a Human Alternative sequence Ensembl Gene Id\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+            elif item[1] == EVIDENCE_STRING_INVALID_MISSING_TARGET:
+                lfh.write("Line %i: missing target information\n" % (item[0]))
+
     def audit_submission(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit,
                          offset, buffer_size, end_of_transmission, logfile=None):
 
         logger.info("%s %s chunk=%i nb_lines=%i nb_valid=%i nb_errors=%i"
                     % (self.name, md5_hash, chunk, stats["nb_lines"], stats["nb_valid"], stats["nb_errors"]))
 
-        for item in audit:
-            if item[1] == DISEASE_ID_INVALID:
-                # lc, DISEASE_ID_INVALID, disease_id
-                logger.info("Line %i: invalid disease %s" % (item[0], item[2]))
+        ''' check invalid disease and report it in the logs '''
+        #for item in audit:
+        #    if item[1] == DISEASE_ID_INVALID:
+        #        # lc, DISEASE_ID_INVALID, disease_id
+        #        logger.info("Line %i: invalid disease %s" % (item[0], item[2]))
 
+        ''' it's the first time we hear about this submission '''
         if not md5_hash in self.registry:
+            ''' open a file handler to write the logs '''
             self.registry[md5_hash] = dict(
+                    current_index=0,
                     chunk_received=0,
                     chunk_expected=-1,
                     nb_lines=0,
@@ -1244,7 +1279,10 @@ class AuditTrailProcess(multiprocessing.Process):
             '''
              Add the stats and audit to an array
             '''
-            self.registry[md5_hash]['chunks'].append(dict(chunk=chunk, stats=stats, audit=audit))
+            new_chunk = dict(chunk=chunk, stats=stats, audit=audit)
+            self.registry[md5_hash]['chunks'].append(new_chunk)
+            ''' TODO: write the audit results to the log file as they are received '''
+
 
         '''
         Generate the audit report if all audit parts have been received.
@@ -1315,14 +1353,12 @@ class AuditTrailProcess(multiprocessing.Process):
                                                      self.registry[md5_hash]['chunks']))
 
 
+
             logging.info("not sorted chunks %i", len(self.registry[md5_hash]['chunks']))
             sortedChunks = sorted(self.registry[md5_hash]['chunks'], key=lambda k: k['chunk'])
-            #sortedChunks = sorted(lambda x: x['chunk'], self.registry[md5_hash]['chunks']))
-            #, key=lambda k: k['chunk'])
             logging.info("sortedChunks %i", len(sortedChunks))
             logging.info("keys %s", ",".join(sortedChunks[0]))
 
-            #reverse=True)
 
             '''
             Write audit logs
@@ -1331,35 +1367,7 @@ class AuditTrailProcess(multiprocessing.Process):
             lfh = open(logfile, 'wb')
             for chunk in sortedChunks:
                 logging.info("%i"%chunk['chunk'])
-                for item in chunk['audit']:
-                    # TOTO
-                    if item[1] == DISEASE_ID_INVALID:
-                        # lc, DISEASE_ID_INVALID, disease_id
-                        lfh.write("Line %i: invalid disease %s\n" % (item[0], item[2]))
-                    elif item[1] == DISEASE_ID_OBSOLETE:
-                        # lc, DISEASE_ID_INVALID, disease_id
-                        lfh.write("Line %i: obsolete ontology class %s\n" % (item[0], item[2]))
-                    elif item[1] == EVIDENCE_STRING_INVALID_MISSING_DISEASE:
-                        lfh.write("Line %i: missing disease information\n" % (item[0]))
-                    elif item[1] == EVIDENCE_STRING_INVALID_SCHEMA_VERSION:
-                        lfh.write("Line %i: Not a valid 1.2.2 evidence string - please check the 'validated_against_schema_version' mandatory attribute\n" % (item[0]))
-                    # logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
-                    elif item[1] == EVIDENCE_STRING_INVALID:
-                        lfh.write("Line %i: Not a valid 1.2.2 evidence string - There was an error parsing the JSON document. The document may contain an invalid field\n" % (item[0]))
-                    elif item[1] == EVIDENCE_STRING_INVALID_MISSING_TYPE:
-                        lfh.write("Line %i: Not a valid 1.2.2 evidence string - please add the mandatory 'type' attribute\n" % (item[0]))
-                    elif item[1] == ENSEMBL_GENE_ID_UNKNOWN:
-                        lfh.write("Line %i: Unknown Ensembl gene detected %s. Please provide a correct gene identifier on the reference genome assembly %s\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                    elif item[1] == ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE:
-                        lfh.write("Line %i: Human Alternative sequence Ensembl Gene detected %s. We will attempt to map it to a gene identifier on the reference genome assembly %s or choose a Human Alternative sequence Ensembl Gene Id\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                    elif item[1] == UNIPROT_PROTEIN_ID_UNKNOWN:
-                        lfh.write("Line %i: Invalid UniProt entry detected %s. Please provide a correct identifier\n" % (item[0], item[2]))
-                    elif item[1] == UNIPROT_PROTEIN_ID_MISSING_ENSEMBL_XREF:
-                        lfh.write("Line %i: UniProt entry %s does not have any cross-reference to Ensembl\n" % (item[0], item[2]))
-                    elif item[1] == UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF:
-                        lfh.write("Line %i: The UniProt entry %s does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly %s. It will be mapped to a Human Alternative sequence Ensembl Gene Id\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                    elif item[1] == EVIDENCE_STRING_INVALID_MISSING_TARGET:
-                        lfh.write("Line %i: missing target information\n" % (item[0]))
+                self.write_logs(lfh, chunk['audit'])
             lfh.close()
             logging.info("Close log file")
 
@@ -2383,8 +2391,8 @@ class EvidenceValidationFileChecker():
         Create queues
         '''
         file_q = multiprocessing.Queue(maxsize=NB_JSON_FILES + 1)
-        evidence_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE + 1)
-        audit_q = multiprocessing.Queue(maxsize=NB_JSON_FILES + 1)
+        evidence_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS + 1)
+        audit_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS + 1)
 
         '''
         Create events

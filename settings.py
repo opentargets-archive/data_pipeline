@@ -57,7 +57,7 @@ class Config():
     EVIDENCEVALIDATION_SCHEMA = "1.2.2"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
     # path to the FTP files on the processing machine
-    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH =  '/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp', #'/Users/koscieln/Documents/data/ftp'
+    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/opt/share/data/ftp' #'/Users/koscieln/Documents/data/ftp' #'/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp',
     EVIDENCEVALIDATION_FILENAME_REGEX = '^(cttv[0-9]{3}|cttv_external_mousemodels|cttv006_Networks_Reactome)\-\d{2}\-\d{2}\-\d{4}\.json\.gz$'
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
@@ -66,12 +66,12 @@ class Config():
     # Current genome Assembly
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     # Change this if you don't want to send e-mails
-    EVIDENCEVALIDATION_SEND_EMAIL = True
+    EVIDENCEVALIDATION_SEND_EMAIL = False
     EVIDENCEVALIDATION_SENDER_ACCOUNT = 'data.pipeline@targetvalidation.org'
     EVIDENCEVALIDATION_SENDER_PASSWORD = 'P@ssword'
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@ebi.ac.uk', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'zs1@sanger.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
