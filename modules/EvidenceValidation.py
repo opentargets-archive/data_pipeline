@@ -81,6 +81,11 @@ SUBMISSION_FILTER_FILENAME_QUERY = '''
   }
 }
 '''
+
+'''
+curl "localhost:9201/submission-audit/_search" -d '{ "query": { "filtered": { "filter": { "terms" : { "filename": ["/Users/koscieln/Documents/data/ftp/cttv008/upload/submissions/cttv008-04-03-2016.json.gz"]} } } } }'
+'''
+
 SUBMISSION_FILTER_MD5_QUERY = '''
 {
   "query": {
@@ -1154,6 +1159,7 @@ class AuditTrailProcess(multiprocessing.Process):
         print text
 
         if bSend:
+            logging.info("Send e-mail to data provider...")
             # Record the MIME types of both parts - text/plain and text/html.
             part1 = MIMEText(text, 'plain')
 
@@ -1179,6 +1185,7 @@ class AuditTrailProcess(multiprocessing.Process):
             mail.login(me, Config.EVIDENCEVALIDATION_SENDER_PASSWORD)
             mail.sendmail(me, rcpt, msg.as_string())
             mail.quit()
+            logging.info("e-mail sent")
         return 0
 
     def merge_dict_sum(self, x, y):
@@ -2109,34 +2116,6 @@ class EvidenceValidationFileChecker():
         logging.info("%i entries retrieved for uniprot" % c)
 
     def load_Ensembl(self):
-        logging.info("Loading Ensembl {0} assembly genes and non reference assembly".format(
-            Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-        for row in self.session.query(
-                EnsemblGeneInfo).all():  # filter_by(assembly_name = Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY).all():
-            # print "%s %s"%(row.ensembl_gene_id, row.external_name)
-            self.ensembl_current[row.ensembl_gene_id] = \
-                {'assembly_name': row.assembly_name,
-                 'ensembl_release': row.ensembl_release,
-                 'ensembl_gene_id': row.ensembl_gene_id,
-                 'external_name': row.external_name,
-                 'is_reference': row.is_reference
-                 }
-            # put the ensembl_id in symbols too
-            if row.external_name not in self.symbols:
-                self.symbols[row.external_name] = {}
-                self.symbols[row.external_name]["assembly_name"] = row.assembly_name
-                self.symbols[row.external_name]["ensembl_release"] = row.ensembl_release
-            if row.is_reference:
-                self.symbols[row.external_name]["ensembl_primary_id"] = row.ensembl_gene_id
-            else:
-                if "ensembl_secondary_id" not in self.symbols[row.external_name] or row.ensembl_gene_id < \
-                        self.symbols[row.external_name]["ensembl_secondary_id"]:
-                    self.symbols[row.external_name]["ensembl_secondary_id"] = row.ensembl_gene_id;
-                if "ensembl_secondary_ids" not in self.symbols[row.external_name]:
-                    self.symbols[row.external_name]["ensembl_secondary_ids"] = []
-                self.symbols[row.external_name]["ensembl_secondary_ids"].append(row.ensembl_gene_id)
-
-    def load_ES_Ensembl(self):
 
         logging.info("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
             Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
@@ -2219,8 +2198,8 @@ class EvidenceValidationFileChecker():
             data = row.data
             self.symbols = data['symbols']
             self.uniprot_current = data['uniprot']
-            logging.info("Uniprot dictionary contains {0} entries".format(len(self.uniprot_current.keys())))
-            logging.info(json.dumps(self.uniprot_current.keys()))
+            #logging.info("Uniprot dictionary contains {0} entries".format(len(self.uniprot_current.keys())))
+            #logging.info(json.dumps(self.uniprot_current.keys()))
             self.ensembl_current = data['ensembl']
 
     def load_eco(self):
@@ -2364,8 +2343,7 @@ class EvidenceValidationFileChecker():
             and will store it in the back-end to be shared and used by the validation
             workers
         '''
-        self.load_ES_Ensembl()
-        #self.load_Ensembl()
+        self.load_Ensembl()
         self.load_Uniprot()
         self.load_HGNC()
         self.store_gene_mapping()
