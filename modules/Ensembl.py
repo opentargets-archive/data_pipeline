@@ -137,7 +137,7 @@ class EnsemblGeneInfo(object):
         :return:
         '''
         chromosomes = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16',
-                       '17', '18', '19', '20', '21', 'X', 'Y']
+                       '17', '18', '19', '20', '21', '22', 'X', 'Y', 'MT']
         new_gene_info_json_map = {}
         for ensembl_gene_id, ensembl_rest_json in gene_info_json_map.items():
             ensembl_rest_json['ensembl_release'] = self.ensembl_release

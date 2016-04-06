@@ -3,6 +3,7 @@ import os
 
 import sys
 from elasticsearch import Elasticsearch
+from SPARQLWrapper import SPARQLWrapper, JSON
 from common import Actions
 from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
 from common.PGAdapter import Adapter
@@ -18,6 +19,7 @@ from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from modules.Uniprot import UniProtActions,UniprotDownloader
 from modules.HGNC import HGNCActions, HGNCUploader
 from modules.Ensembl import EnsemblGeneInfo, EnsemblActions, EnsemblProcess
+from modules.MouseModels import MouseModelsActions, Phenodigm
 import argparse
 from settings import Config, ElasticSearchConfiguration
 from redislite import Redis
@@ -87,7 +89,7 @@ if __name__ == '__main__':
                         action="append_const", const = AssociationActions.ALL)
     parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
                         action="append_const", const = ElasticsearchActions.RELOAD)
-    parser.add_argument("--valck", dest='val', help="check new json files submitted to ftp site",
+    parser.add_argument("--valck", dest='val', help="check new json files submitted to ftp site and store the evidence strings to ElasticSearch",
                         action="append_const", const = ValidationActions.CHECKFILES)
     parser.add_argument("--valgm", dest='val', help="update gene protein mapping to database",
                         action="append_const", const = ValidationActions.GENEMAPPING)
@@ -99,6 +101,12 @@ if __name__ == '__main__':
                         action="append_const", const = SearchObjectActions.PROCESS)
     parser.add_argument("--persist-redis", dest='redisperist', help="use a fresh redislite db",
                         action='store_true', default=False)
+    parser.add_argument("--musu", dest='mus', help="update phenodigm data",
+                        action="append_const", const = MouseModelsActions.UPDATE_CACHE)
+    parser.add_argument("--musg", dest='mus', help="update phenodigm data",
+                        action="append_const", const = MouseModelsActions.UPDATE_GENES)
+    parser.add_argument("--mus", dest='mus', help="update phenodigm data",
+                        action="append_const", const = MouseModelsActions.ALL)
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -113,6 +121,8 @@ if __name__ == '__main__':
     #                     # and also every 60 seconds
     #                     sniffer_timeout=60)
     #
+    '''init sparql endpoint client'''
+    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -178,12 +188,18 @@ if __name__ == '__main__':
                 EcoProcess(adapter).process_all()
             if (EcoActions.UPLOAD in args.eco) or do_all:
                 EcoUploader(adapter, loader).upload_all()
+        if args.mus or run_full_pipeline:
+            do_all = (MouseModelsActions.ALL in args.mus) or run_full_pipeline
+            if (MouseModelsActions.UPDATE_CACHE in args.mus) or do_all:
+                Phenodigm(adapter, es, sparql).update_cache()
+            if (MouseModelsActions.UPDATE_GENES in args.mus) or do_all:
+                Phenodigm(adapter, es, sparql).update_genes()
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es).map_genes()
+                EvidenceValidationFileChecker(adapter, es, sparql).map_genes()
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es).check_all()
+                EvidenceValidationFileChecker(adapter, es, sparql).check_all()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:

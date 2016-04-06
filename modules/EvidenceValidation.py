@@ -38,6 +38,7 @@ from common.PGAdapter import Adapter
 import elasticsearch
 import itertools
 from elasticsearch import Elasticsearch, helpers
+from SPARQLWrapper import SPARQLWrapper, JSON
 
 from multiprocessing import Manager
 
@@ -47,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 BLOCKSIZE = 65536
 NB_JSON_FILES = 5
-MAX_NB_EVIDENCE = 25000
+MAX_NB_EVIDENCE_CHUNKS = 500
 CHUNK_SIZE = 1e4
 
 EVIDENCE_STRING_INVALID = 10
@@ -72,12 +73,30 @@ SUBMISSION_FILTER_FILENAME_QUERY = '''
 {
   "query": {
     "filtered": {
+    "filtered": {
       "filter": {
         "terms" : { "filename": ["%s"]}
       }
     }
   }
 }
+'''
+
+'''
+curl "localhost:9201/submission-audit/_search" -d '{ "query": { "filtered": { "filter": { "terms" : { "filename": ["/Users/koscieln/Documents/data/ftp/cttv008/upload/submissions/cttv008-04-03-2016.json.gz"]} } } } }'
+'''
+
+SUBMISSION_FILTER_MD5_QUERY = '''
+{
+  "query": {
+    "filtered": {
+      "filter": {
+        "terms" : { "md5": ["%s"]}
+      }
+    }
+  }
+}
+
 '''
 
 '''
@@ -272,20 +291,22 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                         # sort by the last modified time of the files
                         filenames.sort(key=lambda x: os.stat(os.path.join(path, x)).st_mtime)
                         for filename in filenames:
-                            logging.info(filename);
+
                             cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
+                            logging.info("%s %r"%(filename, cttv_filename_match))
                             # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
-                            if (cttv_filename_match and
+                            if (cttv_filename_match
+                                #and
                                 #(filename == 'cttv012-26-11-2015.json.gz') or
                                 #(filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
-                                (filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
-                                #(filename == 'cttv007-01-12-2015.json.gz') or
-                                #(filename == 'cttv008-24-11-2015.json.gz') or
-                                #(filename == 'cttv009-18-11-2015.json.gz') or
-                                #(filename == 'cttv010-07-01-2016.json.gz') or
-                                #(filename == 'cttv011-19-11-2015.json.gz') or
-                                #(filename == 'cttv012-26-11-2015.json.gz') or
-                                #(filename == 'cttv025-18-11-2015.json.gz')
+                                #(filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
+                                #(filename == 'cttv025-24-02-2016.json.gz')
+                                #(filename == 'cttv007-01-03-2016.json.gz')
+                                #(filename == 'cttv008-26-02-2016.json.gz') or
+                                #(filename == 'cttv009-25-02-2016.json.gz') or
+                                #(filename == 'cttv010-10-03-2016.json.gz')
+                                #(filename == 'cttv011-26-02-2016.json.gz') or
+                                #(filename == 'cttv012-03-03-2016.json.gz')
                                 ):
                                 #: #(filename == "cttv006_Networks_Reactome-03-12-2015.json.gz" or filename == "cttv_external_mousemodels-26-01-2016.json.gz"): #"cttv006_Networks_Reactome-03-12-2015.json.gz":
                                 cttv_file = os.path.join(cttv_dirname, filename)
@@ -298,9 +319,10 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                                 last_modified = os.path.getmtime(cttv_file)
                                 # july = time.strptime("01 Jul 2015", "%d %b %Y")
                                 # julyseconds = time.mktime(july)
-                                sep = time.strptime("20 Oct 2015", "%d %b %Y")
-                                sepseconds = time.mktime(sep)
+                                earliest_date = time.strptime("15 Feb 2016", "%d %b %Y")
+                                sepseconds = time.mktime(earliest_date)
                                 if (last_modified - sepseconds) > 0:
+                                    logging.info("Elapsed time %i"%(last_modified - sepseconds))
                                     m = re.match("^(.+).json.gz$", filename)
                                     logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
                                     logging.info("%s %s" % (self.name, cttv_file))
@@ -352,14 +374,16 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
         check if the file was parsed already in ES
         '''
 
-        existing_submission= self.submission_audit.get_submission(filename=file_on_disk)
+        #existing_submission= self.submission_audit.get_submission(filename=file_on_disk)
+        existing_submission= self.submission_audit.get_submission_md5(md5=md5_hash)
+
         if existing_submission:
             md5 = existing_submission["_source"]["md5"]
             if md5 == md5_hash:
                     logging.info('%s == %s' % (md5, md5_hash))
                     logging.info('%s file already recorded. Won\'t parse' % file_on_disk)
                     ''' should be false, set to true if you want to parse anyway '''
-                    bValidate = True
+                    bValidate = False
             else:
                 logging.info('%s != %s' % (md5, md5_hash))
                 bValidate = True
@@ -534,6 +558,10 @@ class ValidatorProcess(multiprocessing.Process):
                  efo_current,
                  efo_uncat,
                  efo_obsolete,
+                 hpo_current,
+                 hpo_obsolete,
+                 mp_current,
+                 mp_obsolete,
                  uniprot_current,
                  ensembl_current,
                  input_file_processing_finished,
@@ -551,6 +579,10 @@ class ValidatorProcess(multiprocessing.Process):
         self.efo_current = efo_current
         self.efo_uncat = efo_uncat
         self.efo_obsolete = efo_obsolete
+        self.hpo_current = hpo_current
+        self.hpo_obsolete = hpo_obsolete
+        self.mp_current = mp_current
+        self.mp_obsolete = mp_obsolete
         self.uniprot_current = uniprot_current
         self.ensembl_current = ensembl_current
         self.start_time = time.time()
@@ -705,9 +737,9 @@ class ValidatorProcess(multiprocessing.Process):
                     if 'label' in python_raw:
                         python_raw['type'] = python_raw.pop('label', None)
                     data_type = python_raw['type']
-                    logging.info('type %s'%data_type)
+                    #logging.info('type %s'%data_type)
                     if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
-                        logging.info(line)
+                        #logging.info(line)
                         try:
                             if data_type == 'genetic_association':
                                 obj = cttv.Genetics.fromMap(python_raw)
@@ -781,12 +813,14 @@ class ValidatorProcess(multiprocessing.Process):
                                 for disease_id in obj.disease.id:
                                     disease_count += 1
                                     efo_id = disease_id
-                                    # fix for EVA data
-                                    if disease_id in eva_curated:
-                                        obj.disease.id[index] = eva_curated[disease_id];
-                                        disease_id = obj.disease.id[index];
+                                    # fix for EVA data for release 1.0
+                                    #if disease_id in eva_curated:
+                                    #    obj.disease.id[index] = eva_curated[disease_id];
+                                    #    disease_id = obj.disease.id[index];
                                     index += 1
-                                    if disease_id not in self.efo_current or disease_id in self.efo_uncat:
+
+                                    ''' Check disease term or phenotype term '''
+                                    if (disease_id not in self.efo_current and disease_id not in self.hpo_current and disease_id not in self.mp_current) or disease_id in self.efo_uncat:
                                         audit.append((lc, DISEASE_ID_INVALID, disease_id))
                                         disease_failed = True
                                         if disease_id not in invalid_diseases:
@@ -803,6 +837,16 @@ class ValidatorProcess(multiprocessing.Process):
                                         else:
                                             obsolete_diseases[disease_id] += 1
                                         nb_efo_obsolete += 1
+                                    elif disease_id in self.hpo_obsolete or disease_id in self.mp_obsolete:
+                                        audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
+                                        # logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                        disease_failed = True
+                                        if disease_id not in obsolete_diseases:
+                                            obsolete_diseases[disease_id] = 1
+                                        else:
+                                            obsolete_diseases[disease_id] += 1
+                                        nb_efo_obsolete += 1
+
                             if obj.disease.id is None or disease_count == 0:
                                 ''' no disease id !!!! '''
                                 audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_DISEASE))
@@ -901,6 +945,8 @@ class ValidatorProcess(multiprocessing.Process):
                                 # flatten data structure
                                 # logging.info('%s Adding to chunk %s %s'% (self.name, target_id, disease_id))
                                 json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest();
+
+
                                 self.evidence_chunk_storage.storage_add(uniq_elements_flat_hexdig,
                                                                         EvidenceString11(
                                                                             uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
@@ -914,6 +960,7 @@ class ValidatorProcess(multiprocessing.Process):
                                                                             release_date=VALIDATION_DATE),
                                                                         # release_date = datetime.utcnow()),
                                                                         data_source_name);
+
                             else:
                                 if disease_failed:
                                     nb_errors += 1
@@ -954,9 +1001,10 @@ class ValidatorProcess(multiprocessing.Process):
 
             logging.info('%s nb line parsed %i (size %i)' % (self.name, lc, cc))
 
-            ''' write results '''
+            ''' write results in ES '''
+
             self.evidence_chunk_storage.storage_flush(data_source_name)
-            # self.evidence_chunk_storage.storage_commit()
+
             logging.info('%s bulk insert complete' % (self.name))
 
             '''
@@ -1007,6 +1055,10 @@ class AuditTrailProcess(multiprocessing.Process):
                  symbols,
                  efo_current,
                  efo_obsolete,
+                 mp_current,
+                 mp_obsolete,
+                 hpo_current,
+                 hpo_obsolete,
                  input_file_validation_finished,
                  input_file_auditing_finished,
                  input_file_validated_count,
@@ -1021,6 +1073,10 @@ class AuditTrailProcess(multiprocessing.Process):
         self.symbols = symbols
         self.efo_current = efo_current
         self.efo_obsolete = efo_obsolete
+        self.hpo_current = hpo_current
+        self.hpo_obsolete = hpo_obsolete
+        self.mp_current = mp_current
+        self.mp_obsolete = mp_obsolete
         self.start_time = time.time()
         self.input_file_auditing_finished = input_file_auditing_finished
         self.input_file_validation_finished = input_file_validation_finished
@@ -1092,7 +1148,7 @@ class AuditTrailProcess(multiprocessing.Process):
             text += messageFailed
             text += "See details in the attachment {0}\n\n".format(os.path.basename(logfile))
         text += "Data Provider:\t%s\n"%data_source_name
-        text += "JSON schema version:\t1.2.1\n"
+        text += "JSON schema version:\t1.2.2\n"
         text += "Number of records parsed:\t{0}\n".format(nb_records)
         for key in errors:
             text += "Number of {0}:\t{1}\n".format(key, errors[key])
@@ -1103,6 +1159,7 @@ class AuditTrailProcess(multiprocessing.Process):
         print text
 
         if bSend:
+            logging.info("Send e-mail to data provider...")
             # Record the MIME types of both parts - text/plain and text/html.
             part1 = MIMEText(text, 'plain')
 
@@ -1128,6 +1185,7 @@ class AuditTrailProcess(multiprocessing.Process):
             mail.login(me, Config.EVIDENCEVALIDATION_SENDER_PASSWORD)
             mail.sendmail(me, rcpt, msg.as_string())
             mail.quit()
+            logging.info("e-mail sent")
         return 0
 
     def merge_dict_sum(self, x, y):
@@ -1149,7 +1207,7 @@ class AuditTrailProcess(multiprocessing.Process):
         :param ensembl_gene_id: ensembl gene identifier to check
         :return: a string indicating if the gene is mapped to a reference assembly or an alternative assembly only
         '''
-        symbol = self.ensembl_current[ensembl_gene_id]['external_name']
+        symbol = self.ensembl_current[ensembl_gene_id]['display_name']
         if symbol in self.symbols and 'ensembl_primary_id' in self.symbols[symbol]:
             return self.symbols[symbol]['ensembl_primary_id'] + " " + symbol + " (reference assembly)"
         return symbol + " (non reference assembly)"
@@ -1164,8 +1222,39 @@ class AuditTrailProcess(multiprocessing.Process):
         for ensembl_gene_id in genes:
             if self.ensembl_current[ensembl_gene_id]['is_reference'] is True:
                 return ensembl_gene_id + " " + self.ensembl_current[ensembl_gene_id][
-                    'external_name'] + " (reference assembly)"
+                    'display_name'] + " (reference assembly)"
         return ", ".join(genes) + " (non reference assembly)"
+
+    def write_logs(self, lfh, audit):
+
+        for item in audit:
+            if item[1] == DISEASE_ID_INVALID:
+                # lc, DISEASE_ID_INVALID, disease_id
+                lfh.write("Line %i: invalid disease %s\n" % (item[0], item[2]))
+            elif item[1] == DISEASE_ID_OBSOLETE:
+                # lc, DISEASE_ID_INVALID, disease_id
+                lfh.write("Line %i: obsolete ontology class %s\n" % (item[0], item[2]))
+            elif item[1] == EVIDENCE_STRING_INVALID_MISSING_DISEASE:
+                lfh.write("Line %i: missing disease information\n" % (item[0]))
+            elif item[1] == EVIDENCE_STRING_INVALID_SCHEMA_VERSION:
+                lfh.write("Line %i: Not a valid 1.2.2 evidence string - please check the 'validated_against_schema_version' mandatory attribute\n" % (item[0]))
+            # logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
+            elif item[1] == EVIDENCE_STRING_INVALID:
+                lfh.write("Line %i: Not a valid 1.2.2 evidence string - There was an error parsing the JSON document. The document may contain an invalid field\n" % (item[0]))
+            elif item[1] == EVIDENCE_STRING_INVALID_MISSING_TYPE:
+                lfh.write("Line %i: Not a valid 1.2.2 evidence string - please add the mandatory 'type' attribute\n" % (item[0]))
+            elif item[1] == ENSEMBL_GENE_ID_UNKNOWN:
+                lfh.write("Line %i: Unknown Ensembl gene detected %s. Please provide a correct gene identifier on the reference genome assembly %s\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+            elif item[1] == ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE:
+                lfh.write("Line %i: Human Alternative sequence Ensembl Gene detected %s. We will attempt to map it to a gene identifier on the reference genome assembly %s or choose a Human Alternative sequence Ensembl Gene Id\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+            elif item[1] == UNIPROT_PROTEIN_ID_UNKNOWN:
+                lfh.write("Line %i: Invalid UniProt entry detected %s. Please provide a correct identifier\n" % (item[0], item[2]))
+            elif item[1] == UNIPROT_PROTEIN_ID_MISSING_ENSEMBL_XREF:
+                lfh.write("Line %i: UniProt entry %s does not have any cross-reference to Ensembl\n" % (item[0], item[2]))
+            elif item[1] == UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF:
+                lfh.write("Line %i: The UniProt entry %s does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly %s. It will be mapped to a Human Alternative sequence Ensembl Gene Id\n" % (item[0], item[2], Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+            elif item[1] == EVIDENCE_STRING_INVALID_MISSING_TARGET:
+                lfh.write("Line %i: missing target information\n" % (item[0]))
 
     def audit_submission(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit,
                          offset, buffer_size, end_of_transmission, logfile=None):
@@ -1173,13 +1262,17 @@ class AuditTrailProcess(multiprocessing.Process):
         logger.info("%s %s chunk=%i nb_lines=%i nb_valid=%i nb_errors=%i"
                     % (self.name, md5_hash, chunk, stats["nb_lines"], stats["nb_valid"], stats["nb_errors"]))
 
-        for item in audit:
-            if item[1] == DISEASE_ID_INVALID:
-                # lc, DISEASE_ID_INVALID, disease_id
-                logger.info("Line %i: invalid disease %s" % (item[0], item[2]))
+        ''' check invalid disease and report it in the logs '''
+        #for item in audit:
+        #    if item[1] == DISEASE_ID_INVALID:
+        #        # lc, DISEASE_ID_INVALID, disease_id
+        #        logger.info("Line %i: invalid disease %s" % (item[0], item[2]))
 
+        ''' it's the first time we hear about this submission '''
         if not md5_hash in self.registry:
+            ''' open a file handler to write the logs '''
             self.registry[md5_hash] = dict(
+                    current_index=0,
                     chunk_received=0,
                     chunk_expected=-1,
                     nb_lines=0,
@@ -1193,7 +1286,10 @@ class AuditTrailProcess(multiprocessing.Process):
             '''
              Add the stats and audit to an array
             '''
-            self.registry[md5_hash]['chunks'].append(dict(chunk=chunk, stats=stats, audit=audit))
+            new_chunk = dict(chunk=chunk, stats=stats, audit=audit)
+            self.registry[md5_hash]['chunks'].append(new_chunk)
+            ''' TODO: write the audit results to the log file as they are received '''
+
 
         '''
         Generate the audit report if all audit parts have been received.
@@ -1264,14 +1360,12 @@ class AuditTrailProcess(multiprocessing.Process):
                                                      self.registry[md5_hash]['chunks']))
 
 
+
             logging.info("not sorted chunks %i", len(self.registry[md5_hash]['chunks']))
             sortedChunks = sorted(self.registry[md5_hash]['chunks'], key=lambda k: k['chunk'])
-            #sortedChunks = sorted(lambda x: x['chunk'], self.registry[md5_hash]['chunks']))
-            #, key=lambda k: k['chunk'])
             logging.info("sortedChunks %i", len(sortedChunks))
             logging.info("keys %s", ",".join(sortedChunks[0]))
 
-            #reverse=True)
 
             '''
             Write audit logs
@@ -1280,10 +1374,7 @@ class AuditTrailProcess(multiprocessing.Process):
             lfh = open(logfile, 'wb')
             for chunk in sortedChunks:
                 logging.info("%i"%chunk['chunk'])
-                for item in chunk['audit']:
-                    if item[1] == DISEASE_ID_INVALID:
-                        # lc, DISEASE_ID_INVALID, disease_id
-                        lfh.write("Line %i: invalid disease %s\n" % (item[0], item[2]))
+                self.write_logs(lfh, chunk['audit'])
             lfh.close()
             logging.info("Close log file")
 
@@ -1300,6 +1391,8 @@ class AuditTrailProcess(multiprocessing.Process):
 
             # {"hits": {"hits": [], "total": 9468, "max_score": 0.0}, "_shards": {"successful": 3, "failed": 0, "total": 3}, "took": 3, "timed_out": false}
             nb_documents = search['hits']['total']
+            if nb_documents == 0:
+                nb_documents = 1
 
             '''
             Get top 20 diseases
@@ -1327,7 +1420,7 @@ class AuditTrailProcess(multiprocessing.Process):
                     if ensemblMatch:
                         ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
                         id_text = self.get_reference_gene_from_Ensembl(ensembl_id)
-                        symbol = self.ensembl_current[ensembl_id]['external_name']
+                        symbol = self.ensembl_current[ensembl_id]['display_name']
                     # elif uniprotMatch:
                     #    uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
                     #    id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
@@ -1362,7 +1455,7 @@ class AuditTrailProcess(multiprocessing.Process):
             logging.info("report invalid EFO term")
             if nb_efo_invalid > 0:
                 text += "Errors:\n"
-                text += "\t%i invalid EFO term(s) found in %i (%.2f%s) of the records.\n" % (
+                text += "\t%i invalid ontology term(s) found in %i (%.2f%s) of the records.\n" % (
                 len(invalid_diseases), nb_efo_invalid, nb_efo_invalid * 100.0 / nb_documents, '%')
                 for disease_id in invalid_diseases:
                     if invalid_diseases[disease_id] == 1:
@@ -1375,15 +1468,22 @@ class AuditTrailProcess(multiprocessing.Process):
             logging.info("report obsolete EFO term")
             if nb_efo_obsolete > 0:
                 text += "Errors:\n"
-                text += "\t%i obsolete EFO term(s) found in %i (%.1f%s) of the records.\n" % (
+                text += "\t%i obsolete ontology term(s) found in %i (%.1f%s) of the records.\n" % (
                 len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete * 100 / nb_documents, '%')
                 for disease_id in obsolete_diseases:
+                    new_term = None
+                    if disease_id in self.efo_obsolete:
+                        new_term = self.efo_obsolete[disease_id]
+                    elif disease_id in self.hpo_obsolete:
+                        new_term = self.hpo_obsolete[disease_id]
+                    else:
+                        new_term = self.mp_obsolete[disease_id]
                     if obsolete_diseases[disease_id] == 1:
                         text += "\t%s\t(reported once)\t%s\n" % (
-                        disease_id, self.efo_obsolete[disease_id].replace("\n", " "))
+                        disease_id, new_term.replace("\n", " "))
                     else:
                         text += "\t%s\t(reported %i times)\t%s\n" % (
-                        disease_id, obsolete_diseases[disease_id], self.efo_obsolete[disease_id].replace("\n", " "))
+                        disease_id, obsolete_diseases[disease_id], new_term.replace("\n", " "))
                 text += "\n"
 
             # report invalid Ensembl genes
@@ -1476,6 +1576,7 @@ class AuditTrailProcess(multiprocessing.Process):
             '''
 
             now = datetime.now().strftime("%Y%m%dT%H%M%SZ")
+            now_nice = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
 
             submission = dict(
                     md5 = md5_hash,
@@ -1514,7 +1615,7 @@ class AuditTrailProcess(multiprocessing.Process):
                      'records with UniProt entries without x-refs to Ensembl (warning)': nb_missing_uniprot_id_xrefs,
                      'records with UniProt ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping
                      },
-                    now,
+                    now_nice,
                     text,
                     logfile
             )
@@ -1729,6 +1830,18 @@ class SubmissionAuditElasticStorage():
 
         return (search and search["hits"]["total"] == 1)
 
+    def get_submission_md5(self, md5=None):
+        search = self.es.search(
+                index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
+                body=SUBMISSION_FILTER_MD5_QUERY%md5,
+        )
+
+        if search and search["hits"]["total"] == 1:
+            return search["hits"]["hits"][0]
+        else:
+            return None
+
     def get_submission(self, filename=None):
         search = self.es.search(
                 index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
@@ -1752,7 +1865,7 @@ class SubmissionAuditElasticStorage():
                 '_index': '%s' % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
                 '_type': '%s' % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
                 '_id': submission['md5'],
-                'doc': json.dumps(submission)
+                'doc': submission
             }
             actions.append(action)
             #actions.append()
@@ -1767,9 +1880,10 @@ class SubmissionAuditElasticStorage():
             }
             actions.append(action)
 
-        print(json.dumps(actions[0]))
+        logging.info(json.dumps(actions[0], indent=4))
 
         nb_success = helpers.bulk(self.es, actions, stats_only=False)
+        logging.info(json.dumps(nb_success, indent=4))
         if nb_success[0] !=1:
             print("ERRORS REPORTED " + json.dumps(nb_errors))
             logging.info("SubmissionAuditElasticStorage: command failed:%s"%nb_success[0])
@@ -1798,10 +1912,11 @@ class SubmissionAuditElasticStorage():
             self.cache = {}
 
 class EvidenceValidationFileChecker():
-    def __init__(self, adapter, es, chunk_size=1e4):
+    def __init__(self, adapter, es, sparql, chunk_size=1e4):
         self.adapter = adapter
         self.session = adapter.session
         self.es = es
+        self.sparql = sparql
         self.chunk_size = chunk_size
         self.cache = {}
         self.counter = 0
@@ -1824,6 +1939,10 @@ class EvidenceValidationFileChecker():
         self.efo_current = {}
         self.efo_obsolete = {}
         self.efo_uncat = []
+        self.hpo_current = {}
+        self.hpo_obsolete = {}
+        self.mp_current = {}
+        self.mp_obsolete = {}
         self.ensembl_current = {}
         self.eco_current = {}
         self.symbols = {}
@@ -1997,32 +2116,52 @@ class EvidenceValidationFileChecker():
         logging.info("%i entries retrieved for uniprot" % c)
 
     def load_Ensembl(self):
-        logging.info("Loading Ensembl {0} assembly genes and non reference assembly".format(
+
+        logging.info("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
             Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-        for row in self.session.query(
-                EnsemblGeneInfo).all():  # filter_by(assembly_name = Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY).all():
-            # print "%s %s"%(row.ensembl_gene_id, row.external_name)
-            self.ensembl_current[row.ensembl_gene_id] = \
-                {'assembly_name': row.assembly_name,
-                 'ensembl_release': row.ensembl_release,
-                 'ensembl_gene_id': row.ensembl_gene_id,
-                 'external_name': row.external_name,
-                 'is_reference': row.is_reference
-                 }
-            # put the ensembl_id in symbols too
-            if row.external_name not in self.symbols:
-                self.symbols[row.external_name] = {}
-                self.symbols[row.external_name]["assembly_name"] = row.assembly_name
-                self.symbols[row.external_name]["ensembl_release"] = row.ensembl_release
-            if row.is_reference:
-                self.symbols[row.external_name]["ensembl_primary_id"] = row.ensembl_gene_id
-            else:
-                if "ensembl_secondary_id" not in self.symbols[row.external_name] or row.ensembl_gene_id < \
-                        self.symbols[row.external_name]["ensembl_secondary_id"]:
-                    self.symbols[row.external_name]["ensembl_secondary_id"] = row.ensembl_gene_id;
-                if "ensembl_secondary_ids" not in self.symbols[row.external_name]:
-                    self.symbols[row.external_name]["ensembl_secondary_ids"] = []
-                self.symbols[row.external_name]["ensembl_secondary_ids"].append(row.ensembl_gene_id)
+
+        page = self.es.search(
+                        index=['3_ensembl-data'],
+                        scroll='30s',
+                        search_type='scan',
+                        size=1000,
+                        body= { "query": { "match_all": {} } }
+                        )
+
+        scroll_size = page['hits']['total']
+
+        while scroll_size > 0:
+            logging.info("scroll size %i"%scroll_size)
+            try:
+                scroll_id = page['_scroll_id']
+                page = self.es.scroll(scroll_id=scroll_id, scroll = '30s')
+
+                for hit in page['hits']['hits']:
+                    row = hit["_source"]
+
+                    self.ensembl_current[row["id"]] = row
+                    # put the ensembl_id in symbols too
+                    display_name = row["display_name"]
+                    if display_name not in self.symbols:
+                        self.symbols[display_name] = {}
+                        self.symbols[display_name]["assembly_name"] = row["assembly_name"]
+                        self.symbols[display_name]["ensembl_release"] = row["ensembl_release"]
+                    if row["is_reference"]:
+                        self.symbols[display_name]["ensembl_primary_id"] = row["id"]
+                    else:
+                        if "ensembl_secondary_id" not in self.symbols[display_name] or row["id"] < \
+                                self.symbols[display_name]["ensembl_secondary_id"]:
+                            self.symbols[display_name]["ensembl_secondary_id"] = row["id"];
+                        if "ensembl_secondary_ids" not in self.symbols[display_name]:
+                            self.symbols[display_name]["ensembl_secondary_ids"] = []
+                        self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
+                scroll_size = len(page['hits']['hits'])
+            except Exception, error:
+
+                    logger.exception(
+                        "Error loading gene/protein information %s" % (str(error)))
+        logging.info("Loading ES Ensembl finished")
+
 
     def store_gene_mapping(self):
         '''
@@ -2059,8 +2198,8 @@ class EvidenceValidationFileChecker():
             data = row.data
             self.symbols = data['symbols']
             self.uniprot_current = data['uniprot']
-            logging.info("Uniprot dictionary contains {0} entries".format(len(self.uniprot_current.keys())))
-            logging.info(json.dumps(self.uniprot_current.keys()))
+            #logging.info("Uniprot dictionary contains {0} entries".format(len(self.uniprot_current.keys())))
+            #logging.info(json.dumps(self.uniprot_current.keys()))
             self.ensembl_current = data['ensembl']
 
     def load_eco(self):
@@ -2068,6 +2207,81 @@ class EvidenceValidationFileChecker():
         logging.info("Loading ECO current valid terms")
         for row in self.session.query(ECONames):
             self.eco_current[row.uri] = row.label
+
+    def load_ontology(self, name, base_class, current, obsolete):
+        '''
+        Load ontology to accept phenotype terms that are not
+        :return:
+        '''
+        sparql_query = '''
+        SELECT DISTINCT ?ont_node ?label
+        FROM <http://purl.obolibrary.org/obo/%s.owl>
+        {
+        ?ont_node rdfs:subClassOf* <%s> .
+        ?ont_node rdfs:label ?label
+        }
+        '''
+        self.sparql.setQuery(sparql_query%(name, base_class))
+        self.sparql.setReturnFormat(JSON)
+        results = self.sparql.query().convert()
+
+        for result in results["results"]["bindings"]:
+            uri = result['ont_node']['value']
+            label = result['label']['value']
+            current[uri] = label
+            #print(json.dumps(result, indent=4))
+            #print("%s %s"%(uri, label))
+
+        sparql_query = '''
+        PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
+        PREFIX obo: <http://purl.obolibrary.org/obo/>
+        SELECT DISTINCT ?hp_node ?label ?id ?hp_new
+         FROM <http://purl.obolibrary.org/obo/%s.owl>
+         FROM <http://purl.obolibrary.org/obo/>
+         {
+            ?hp_node owl:deprecated true .
+            ?hp_node oboInOwl:id ?id .
+            ?hp_node obo:IAO_0100001 ?hp_new .
+            ?hp_node rdfs:label ?label
+
+         }
+        '''
+        self.sparql.setQuery(sparql_query%name)
+        self.sparql.setReturnFormat(JSON)
+        results = self.sparql.query().convert()
+
+        obsolete_classes = {}
+
+        for result in results["results"]["bindings"]:
+            uri = result['hp_node']['value']
+            label = result['label']['value']
+            id = result['label']['value']
+            hp_new = result['hp_new']['value']
+            new_label = ''
+            if (not re.match('http:\/\/purl.obolibrary\.org', hp_new)):
+                hp_new = "http://purl.obolibrary.org/obo/%s"%hp_new.replace(':','_')
+            obsolete_classes[uri] = hp_new
+        for uri in obsolete_classes:
+            next_uri = obsolete_classes[uri]
+            while next_uri in obsolete_classes:
+                next_uri = obsolete_classes[next_uri]
+            new_label = current[next_uri]
+            obsolete[uri] = "Use %s label:%s"%(next_uri, new_label)
+            print "%s %s"%(uri, obsolete[uri])
+
+    def load_hpo(self):
+        '''
+        Load HPO to accept phenotype terms that are not in EFO
+        :return:
+        '''
+        self.load_ontology('hp', 'http://purl.obolibrary.org/obo/HP_0000118', self.hpo_current, self.hpo_obsolete)
+
+    def load_mp(self):
+        '''
+        Load MP to accept phenotype terms that are not in EFO
+        :return:
+        '''
+        self.load_ontology('mp', 'http://purl.obolibrary.org/obo/MP_0000001', self.mp_current, self.mp_obsolete)
 
     def load_efo(self):
         # Change this in favor of paths
@@ -2117,7 +2331,7 @@ class EvidenceValidationFileChecker():
         :param ensembl_gene_id: ensembl gene identifier to check
         :return: a string indicating if the gene is mapped to a reference assembly or an alternative assembly only
         '''
-        symbol = self.ensembl_current[ensembl_gene_id]['external_name']
+        symbol = self.ensembl_current[ensembl_gene_id]['display_name']
         if symbol in self.symbols and 'ensembl_primary_id' in self.symbols[symbol]:
             return self.symbols[symbol]['ensembl_primary_id'] + " " + symbol + " (reference assembly)"
         return symbol + " (non reference assembly)"
@@ -2139,9 +2353,15 @@ class EvidenceValidationFileChecker():
         Check every given evidence string
         :return:
         '''
+
+        #self.load_mp()
+        #return;
+
         self.load_gene_mapping()
         # return;
         self.load_efo()
+        self.load_hpo()
+        self.load_mp()
         self.load_eco()
         self.adapter.close()
 
@@ -2149,8 +2369,8 @@ class EvidenceValidationFileChecker():
         Create queues
         '''
         file_q = multiprocessing.Queue(maxsize=NB_JSON_FILES + 1)
-        evidence_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE + 1)
-        audit_q = multiprocessing.Queue(maxsize=NB_JSON_FILES + 1)
+        evidence_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS + 1)
+        audit_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS + 1)
 
         '''
         Create events
@@ -2201,7 +2421,7 @@ class EvidenceValidationFileChecker():
                                      input_file_processed_count,
                                      evidence_loaded_count,
                                      file_processing_lock
-                                     ) for i in range(workers_number)]
+                                     ) for i in range(1)]
         # ) for i in range(2)]
         for w in readers:
             w.start()
@@ -2217,6 +2437,10 @@ class EvidenceValidationFileChecker():
                                        self.efo_current,
                                        self.efo_uncat,
                                        self.efo_obsolete,
+                                       self.hpo_current,
+                                       self.hpo_obsolete,
+                                       self.mp_current,
+                                       self.mp_obsolete,
                                        self.uniprot_current,
                                        self.ensembl_current,
                                        input_file_processing_finished,
@@ -2226,7 +2450,7 @@ class EvidenceValidationFileChecker():
                                        evidence_loaded_count,
                                        evidence_validated_count,
                                        log_file_lock
-                                       ) for i in range(workers_number)]
+                                       ) for i in range(workers_number+1)]
         # ) for i in range(2)]
         for w in validators:
             w.start()
@@ -2242,6 +2466,10 @@ class EvidenceValidationFileChecker():
                 self.symbols,
                 self.efo_current,
                 self.efo_obsolete,
+                self.hpo_current,
+                self.hpo_obsolete,
+                self.mp_current,
+                self.mp_obsolete,
                 input_file_validation_finished,
                 input_file_auditing_finished,
                 input_file_validated_count,

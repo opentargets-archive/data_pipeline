@@ -38,6 +38,7 @@ class Config():
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
+    SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
     POSTGRES_DATABASE = {'drivername': 'postgres',
             'host': iniparser.get(ENV, 'host'),
             'port': iniparser.get(ENV, 'port'),
@@ -53,10 +54,10 @@ class Config():
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
     REACTOME_PATHWAY_RELATION = 'http://www.reactome.org/download/current/ReactomePathwaysRelation.txt'
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
-    EVIDENCEVALIDATION_SCHEMA = "1.2.1"
+    EVIDENCEVALIDATION_SCHEMA = "1.2.2"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
     # path to the FTP files on the processing machine
-    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/Users/koscieln/Documents/data/ftp' #'/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp'
+    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/Users/koscieln/Documents/data/ftp' #'/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp',
     EVIDENCEVALIDATION_FILENAME_REGEX = '^(cttv[0-9]{3}|cttv_external_mousemodels|cttv006_Networks_Reactome)\-\d{2}\-\d{2}\-\d{4}\.json\.gz$'
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
@@ -70,15 +71,15 @@ class Config():
     EVIDENCEVALIDATION_SENDER_PASSWORD = 'P@ssword'
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautierk@targetvalidation.org'] #, 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'gautierk@targetvalidation.org' ] #[ 'fabregat@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'gautierk@targetvalidation.org' ] #[ 'kl1@sanger.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'gautierk@targetvalidation.org' ] #[ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'gautierk@targetvalidation.org' ] #[ 'cleroy@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'gautierk@targetvalidation.org' ] #[ 'mkeays@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'gautierk@targetvalidation.org' ] #[ 'eddturner@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'gautierk@targetvalidation.org' ] #[ 'fjlopez@ebi.ac.uk', 'garys@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'gautierk@targetvalidation.org' ] #[ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'zs1@sanger.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'cleroy@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'mkeays@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
     # This is a mapping from the file prefix to the data source name in the system
     JSON_FILE_TO_DATASOURCE_MAPPING = defaultdict(lambda: "other")
     JSON_FILE_TO_DATASOURCE_MAPPING['cttv005'] = 'CTTV005_Rare2Common'
@@ -97,6 +98,10 @@ class Config():
     # This tells you how many workers will process the evidence strings
     EVIDENCEVALIDATION_WORKERS_NUMBER = None
 
+    # mouse models
+    MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
+    MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
+
     DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
     DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
                                                         #phenodigm=dict(min=0.4, max= 1),
@@ -113,7 +118,7 @@ class Config():
                                                 europepmc = 'CTTV025_Literature',
                                                 disgenet = 'CTTV_External_DisGeNet',
                                                 rare2common = 'CTTV005_Rare2Common',
-                                                tissue_specificity = 'CTTV010_Tissue_Specificity'
+                                                expression_atlas = 'CTTV010_Tissue_Specificity'
                                                 )
 
     DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(CTTV006_Networks_Reactome = 'reactome',
@@ -128,7 +133,7 @@ class Config():
                                                 CTTV025_Literature = 'europepmc',
                                                 CTTV_External_DisGeNet = 'disgenet',
                                                 CTTV005_Rare2Common = 'rare2common',
-                                                CTTV010_Tissue_Specificity = 'tissue_specificity'
+                                                CTTV010_Tissue_Specificity = 'expression_atlas'
                                                 )
 
     DATASOURCE_TO_DATATYPE_MAPPING = defaultdict(lambda: "other")
