@@ -1,5 +1,8 @@
 from collections import OrderedDict
 import logging
+
+import sys
+
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
@@ -79,7 +82,7 @@ class EFO(JSONSerializable):
 class EfoProcess():
 
     def __init__(self,
-                 adapter):
+                 adapter,):
         self.adapter=adapter
         self.session=adapter.session
         self.efos = OrderedDict()
@@ -111,9 +114,11 @@ class EfoProcess():
         for row in self.session.query(EFOPath).yield_per(1000):
             full_path_codes = []
             full_path_labels = []
-            if get_ontology_code_from_url(row.uri) in self.efos:
-                efo = self.efos[get_ontology_code_from_url(row.uri)]
-                full_tree_path = row.tree_path
+            efo_code = get_ontology_code_from_url(row.uri)
+            if  (efo_code in self.efos) and \
+                    (efo_code != 'cttv_root'):
+                efo = self.efos[efo_code]
+                full_tree_path = row.tree_path[1:]#skip cttv_root
                 for node in row.tree_path:
                     if isinstance(node, list):
                         for node_element in node:
@@ -122,10 +127,14 @@ class EfoProcess():
                     else:
                         full_path_codes.append(get_ontology_code_from_url(node['uri']))
                         full_path_labels.append(node['label'])
+                if 'cttv_root' in full_path_codes:
+                    del full_path_codes[full_path_codes.index('cttv_root')]
+                    del full_path_labels[full_path_labels.index('CTTV Root')]
+
                 efo.path_codes.append(full_path_codes)
                 efo.path_labels.append(full_path_labels)
                 efo.path.append(full_tree_path)
-                self.efos[get_ontology_code_from_url(row.uri)] = efo
+                self.efos[efo_code] = efo
 
         """temporary clean efos with empty path"""
         keys = self.efos.keys()

@@ -103,7 +103,8 @@ if __name__ == '__main__':
 
     adapter = Adapter()
     '''init es client'''
-    es = Elasticsearch(Config.ELASTICSEARCH_URL)
+    es = Elasticsearch(Config.ELASTICSEARCH_URL,
+                       maxsize=50)
     # es = Elasticsearch(["10.0.0.11:9200"],
     # # sniff before doing anything
     #                     sniff_on_start=True,
@@ -186,7 +187,7 @@ if __name__ == '__main__':
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                EvidenceStringProcess(adapter).process_all()
+                EvidenceStringProcess(adapter, es).process_all()
             # if (EvidenceStringActions.UPLOAD in args.evs) or do_all:
             #     EvidenceStringUploader(adapter, loader).upload_all()
         if args.ass or run_full_pipeline:

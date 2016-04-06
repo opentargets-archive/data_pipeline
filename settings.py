@@ -158,13 +158,16 @@ class Config():
 
     WORKERS_NUMBER = None # if None defaults to cpu count
 
-    RELEASE_VERSION='3'
+    RELEASE_VERSION='4'
 
     ENSEMBL_RELEASE_VERSION=83
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
     UNIQUE_RUN_ID = str(uuid.uuid4())
+
+    def get_versioned_index(self, idx):
+        return self.RELEASE_VERSION+'_'+idx
 
 
 
@@ -363,16 +366,16 @@ class ElasticSearchConfiguration():
     if os.environ.get('CTTV_EL_LOADER')== 'prod' or \
             os.environ.get('CTTV_EL_LOADER')== 'stag':
         generic_shard_number = 3
-        generic_replicas_number = 1
+        generic_replicas_number = 0
         evidence_shard_number = 3
         evidence_replicas_number = 1
 
         bulk_load_chunk =1000
     else:
         generic_shard_number = 3
-        generic_replicas_number = 1
+        generic_replicas_number = 0
         evidence_shard_number = 3
-        evidence_replicas_number = 1
+        evidence_replicas_number = 0
         bulk_load_chunk =1000
 
     eco_data_mapping = {"mappings": {

@@ -14,6 +14,7 @@ import sys
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage, Loader
+from common.ElasticsearchQuery import ESQuery
 from common.PGAdapter import LatestEvidenceString, ElasticsearchLoad, EvidenceString121, \
     TargetToDiseaseAssociationScoreMap, Adapter, EvidenceString10
 from modules import GeneData
@@ -125,9 +126,9 @@ class ExtendedInfoEFO(ExtendedInfo):
         therapeutic_area_codes = set()
         therapeutic_area_labels = set()
         for path in efo.path:
-            if len(path) >2:
-                therapeutic_area_codes.add(get_ontology_code_from_url(path[1]['uri']))
-                therapeutic_area_labels.add(get_ontology_code_from_url(path[1]['label']))
+            if len(path) >1:
+                therapeutic_area_codes.add(get_ontology_code_from_url(path[0]['uri']))
+                therapeutic_area_labels.add(get_ontology_code_from_url(path[0]['label']))
         self.data = dict( efo_id = efo.get_id(),
                           label=efo.label,
                           path=efo.path_codes,
@@ -1091,10 +1092,13 @@ class EvidenceStorerWorker(multiprocessing.Process):
 class EvidenceStringProcess():
 
     def __init__(self,
-                 adapter):
+                 adapter,
+                 es):
         self.adapter=adapter
         self.session=adapter.session
         self.loaded_entries_to_pg = 0
+        self.es = es
+        self.es_query = ESQuery(es)
 
     def process_all(self):
         self._process_evidence_string_data()
@@ -1168,8 +1172,8 @@ class EvidenceStringProcess():
 
 
         for row in self.get_evidence(page_size = get_evidence_page_size):
-            ev = Evidence(row.evidence_string, datasource= row.data_source_name)
-            idev = row.uniq_assoc_fields_hashdig
+            ev = Evidence(row['evidence_string'], datasource= row['data_source_name'])
+            idev = row['uniq_assoc_fields_hashdig']
             ev.evidence['id'] = idev
             input_q.put((idev, ev))
             input_generated_count.value += 1
@@ -1238,7 +1242,7 @@ class EvidenceStringProcess():
     #     self.session.flush()
     #     self.data=OrderedDict()
 
-    def get_evidence(self, page_size = 25000):
+    def get_evidence(self, page_size = 50000):
         # with self.adapter.engine.connect() as conn:
         #     # total = conn.execute("""select count(*) from public.evidence_strings_1pt2pt1;""").fetchone()['count']
         #     # logger.critical("preparing to fetch %i evidence string rows"%total)
@@ -1256,11 +1260,17 @@ class EvidenceStringProcess():
         #         offset += page_size
         #         logger.info("loaded %i ev from db to process"%offset)
         #         result.close()
-        c=0
-        for row in self.session.query(EvidenceString10).yield_per(page_size):
-            c+=1
-            if c%page_size==0:
-                logger.critical("loaded %i ev from db to process"%c)
+        # c=0
+        # for row in self.session.query(EvidenceString10).yield_per(page_size):
+        #     c+=1
+        #     if c%page_size==0:
+        #         logger.critical("loaded %i ev from db to process"%c)
+        #     yield row
+        c = 0
+        for row in self.es_query.get_validated_evidence_strings():
+            c += 1
+            if c % page_size == 0:
+                logger.critical("loaded %i ev from db to process" % c)
             yield row
         logger.info("loaded %i ev from db to process"%c)
 
