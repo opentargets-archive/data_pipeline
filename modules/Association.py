@@ -75,11 +75,11 @@ class Association(JSONSerializable):
             if not method_key.startswith('_'):
                 self.set_scoring_method(method,AssociationScore())
         self.evidence_count = dict(total = 0.0,
-                                   datatype = {},
-                                   datasource = {})
+                                   datatypes = {},
+                                   datasources = {})
         for ds,dt in Config.DATASOURCE_TO_DATATYPE_MAPPING.items():
-            self.evidence_count['datasource'][ds]=0.0
-            self.evidence_count['datatype'][dt]= 0.0
+            self.evidence_count['datasources'][ds]=0.0
+            self.evidence_count['datatypes'][dt]= 0.0
         self.private = {}
         self.private['facets']=dict(datatype = [],
                                     datasource = [])
@@ -238,8 +238,8 @@ class Scorer():
         for e in evidence_scores:
             "set evidence counts"
             ass.evidence_count['total']+=1
-            ass.evidence_count['datatype'][e.datatype]+=1
-            ass.evidence_count['datasource'][e.datasource]+=1
+            ass.evidence_count['datatypes'][e.datatype]+=1
+            ass.evidence_count['datasources'][e.datasource]+=1
 
             "set facet data"
             ass.set_available_datatype(e.datatype)
@@ -582,8 +582,8 @@ class TargetDiseasePairProducer(Process):
                  lock):
         super(TargetDiseasePairProducer, self).__init__()
         self.q= task_q
-        self.adapter=Adapter()
-        self.session=self.adapter.session
+        # self.adapter=Adapter()
+        # self.session=self.adapter.session
         self.es = Elasticsearch(Config.ELASTICSEARCH_URL, timeout = 10*60)
         self.n_consumers=n_consumers
         self.start_time = start_time
@@ -640,7 +640,8 @@ class TargetDiseasePairProducer(Process):
                                        "sourceID",
                                        "id",
                                        ],
-                           }
+                           },
+              "sort":"target.id",
           }
 
 
@@ -651,6 +652,7 @@ class TargetDiseasePairProducer(Process):
                            timeout="2h",
                            request_timeout=2*60*60,
                            size = 50000,
+                           preserve_order=True
         )
 
         c=0
@@ -658,32 +660,18 @@ class TargetDiseasePairProducer(Process):
         for hit in res:
             hit = hit['_source']
             c+=1
-            e+=len( hit['private']['efo_codes'])
             target_id = hit['target']['id']
-            if target_id not in local_data:
-                local_data[target_id] =[]
-
-            local_data[target_id].append( dict(target_id = target_id,
-                                                       disease_id = hit['disease']['id'],
-                                                       association_score = hit['scores']['association_score'],
-                                                       datasource = hit['sourceID'],
-                                                       efo_codes = hit['private']['efo_codes'],
-                                                       )
-                                )
+            for efo in hit['private']['efo_codes']:
+                yield dict(target_id=target_id,
+                           disease_id=efo,
+                           association_score=hit['scores']['association_score'],
+                           datasource=hit['sourceID'],
+                           is_direct=efo == hit['disease']['id'],
+                           )
+                e+=1
             if c%1e4==0:
                 logging.debug("loaded %s evidencestrings and expanded to %s"%(millify(c),millify(e)))
         logging.info("finished loading %s evidencestrings and expanded to %s"%(millify(c),millify(e)))
-
-        for v in local_data.values():
-            for row in v:
-                for efo in row['efo_codes']:
-                    yield dict(target_id = row['target_id'],
-                               disease_id = efo,
-                               association_score = row['association_score'],
-                               datasource = row['datasource'],
-                               is_direct = efo == row['disease_id'],
-                               )
-
 
 
     def init_data_cache(self,):
@@ -872,7 +860,7 @@ class ScoringProcess():
 
 
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-
+        number_of_workers = number_of_workers*2
 
         '''start target-disease pair producer'''
         target_disease_pair_producer = TargetDiseasePairProducer(target_disease_pair_q,

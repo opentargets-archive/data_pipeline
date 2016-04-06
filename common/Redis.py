@@ -311,16 +311,20 @@ class RedisLookupTable(object):
         self.default_ttl = ttl
 
 
-    def set(self, key, obj, r_server = None):
+    def set(self, key, obj, r_server = None, ttl = None):
         if not (isinstance(obj, str) or isinstance(obj, unicode)):
             raise AttributeError('Only str and unicode types are accepted as object value. Use the \
             RedisLookupTablePickle subclass for generic objects.')
         r_server = self._get_r_server(r_server)
-        return r_server.setex(self._get_key_namespace(key), self._encode(obj), self.default_ttl)
+        return r_server.setex(self._get_key_namespace(key),
+                              self._encode(obj),
+                              ttl or self.default_ttl)
 
     def get(self, key, r_server = None):
         r_server = self._get_r_server(r_server)
-        return self._decode(r_server.get(self._get_key_namespace(key)))
+        value = r_server.get(self._get_key_namespace(key))
+        if value:
+            return self._decode(value)
 
     def keys(self, r_server = None):
         r_server = self._get_r_server(r_server)

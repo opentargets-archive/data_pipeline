@@ -178,3 +178,10 @@ class UniprotData():
         self.session = adapter.session
 
     #TODO: method to retrieve a single uniprot entry from the db cache with failover to uniprot.org
+
+
+
+
+'''store seqrec as json
+jsonpickle.dumps(a, unpicklable=False, make_refs=False)
+'''

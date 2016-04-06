@@ -2,6 +2,8 @@ import os
 import sys
 import copy
 # This bit is necessary for text mining data
+from common.ElasticsearchQuery import ESQuery
+
 reload(sys);
 sys.setdefaultencoding("utf8");
 # blahblah
@@ -1911,7 +1913,7 @@ class SubmissionAuditElasticStorage():
         nb_success = helpers.bulk(self.es, actions, stats_only=False)
         logging.info(json.dumps(nb_success, indent=4))
         if nb_success[0] !=1:
-            print("ERRORS REPORTED " + json.dumps(nb_errors))
+            # print("ERRORS REPORTED " + json.dumps(nb_errors))
             logging.info("SubmissionAuditElasticStorage: command failed:%s"%nb_success[0])
         else:
             logging.info('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
@@ -1942,6 +1944,7 @@ class EvidenceValidationFileChecker():
         self.adapter = adapter
         self.session = adapter.session
         self.es = es
+        self.esquery = ESQuery(self.es)
         self.sparql = sparql
         self.chunk_size = chunk_size
         self.cache = {}
@@ -2148,46 +2151,24 @@ class EvidenceValidationFileChecker():
         logging.info("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
             Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
 
-        page = self.es.search(
-                        index=['3_ensembl-data'],
-                        scroll='30s',
-                        search_type='scan',
-                        size=1000,
-                        body= { "query": { "match_all": {} } }
-                        )
+        for row in self.esquery.get_all_ensembl_genes():
+            self.ensembl_current[row["id"]] = row
+            # put the ensembl_id in symbols too
+            display_name = row["display_name"]
+            if display_name not in self.symbols:
+                self.symbols[display_name] = {}
+                self.symbols[display_name]["assembly_name"] = row["assembly_name"]
+                self.symbols[display_name]["ensembl_release"] = row["ensembl_release"]
+            if row["is_reference"]:
+                self.symbols[display_name]["ensembl_primary_id"] = row["id"]
+            else:
+                if "ensembl_secondary_id" not in self.symbols[display_name] or row["id"] < \
+                        self.symbols[display_name]["ensembl_secondary_id"]:
+                    self.symbols[display_name]["ensembl_secondary_id"] = row["id"];
+                if "ensembl_secondary_ids" not in self.symbols[display_name]:
+                    self.symbols[display_name]["ensembl_secondary_ids"] = []
+                self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
 
-        scroll_size = page['hits']['total']
-
-        while scroll_size > 0:
-            logging.info("scroll size %i"%scroll_size)
-            try:
-                scroll_id = page['_scroll_id']
-                page = self.es.scroll(scroll_id=scroll_id, scroll = '30s')
-
-                for hit in page['hits']['hits']:
-                    row = hit["_source"]
-
-                    self.ensembl_current[row["id"]] = row
-                    # put the ensembl_id in symbols too
-                    display_name = row["display_name"]
-                    if display_name not in self.symbols:
-                        self.symbols[display_name] = {}
-                        self.symbols[display_name]["assembly_name"] = row["assembly_name"]
-                        self.symbols[display_name]["ensembl_release"] = row["ensembl_release"]
-                    if row["is_reference"]:
-                        self.symbols[display_name]["ensembl_primary_id"] = row["id"]
-                    else:
-                        if "ensembl_secondary_id" not in self.symbols[display_name] or row["id"] < \
-                                self.symbols[display_name]["ensembl_secondary_id"]:
-                            self.symbols[display_name]["ensembl_secondary_id"] = row["id"];
-                        if "ensembl_secondary_ids" not in self.symbols[display_name]:
-                            self.symbols[display_name]["ensembl_secondary_ids"] = []
-                        self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
-                scroll_size = len(page['hits']['hits'])
-            except Exception, error:
-
-                    logger.exception(
-                        "Error loading gene/protein information %s" % (str(error)))
         logging.info("Loading ES Ensembl finished")
 
 
