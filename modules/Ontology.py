@@ -14,6 +14,51 @@ __author__ = 'gautierk'
 
 logger = logging.getLogger(__name__)
 
+TOP_LEVELS = '''
+PREFIX obo: <http://purl.obolibrary.org/obo/>
+select *
+FROM <http://purl.obolibrary.org/obo/hp.owl>
+FROM <http://purl.obolibrary.org/obo/mp.owl>
+where {
+  ?top_level rdfs:subClassOf <%s> .
+  ?top_level rdfs:label ?top_level_label
+}
+'''
+
+DIRECT_ANCESTORS = '''
+PREFIX obo: <http://purl.obolibrary.org/obo/>
+SELECT ?dist1 as ?distance ?y as ?ancestor ?ancestor_label ?x as ?direct_child ?direct_child_label
+FROM <http://purl.obolibrary.org/obo/hp.owl>
+FROM <http://purl.obolibrary.org/obo/mp.owl>
+   WHERE
+    {
+       ?x rdfs:subClassOf ?y
+       option(transitive, t_max(1), t_in(?x), t_out(?y), t_step("step_no") as ?dist1) .
+       ?y rdfs:label ?ancestor_label .
+       ?x rdfs:label ?direct_child_label .
+       FILTER (?x = <%s>)
+    }
+order by ?dist1
+'''
+
+INDIRECT_ANCESTORS = '''
+PREFIX obo: <http://purl.obolibrary.org/obo/>
+SELECT ?dist1 as ?distance ?y as ?ancestor ?ancestor_label ?z as ?direct_child ?direct_child_label
+FROM <http://purl.obolibrary.org/obo/hp.owl>
+FROM <http://purl.obolibrary.org/obo/mp.owl>
+   WHERE
+    {
+       ?x rdfs:subClassOf ?y
+       option(transitive, t_max(20), t_in(?x), t_out(?y), t_step("step_no") as ?dist1) .
+       ?y rdfs:label ?ancestor_label .
+       ?z rdfs:subClassOf ?y .
+       ?z rdfs:label ?direct_child_label .
+       {SELECT ?z WHERE { ?x2 rdfs:subClassOf ?z option(transitive) FILTER (?x2 = <http://purl.obolibrary.org/obo/HP_0001251>) }}
+       FILTER (?x = <%s>)
+    }
+order by ?dist1
+'''
+
 SPARQL_PATH_QUERY = '''
 PREFIX efo: <http://www.ebi.ac.uk/efo/>
 SELECT ?node_uri ?parent_uri ?parent_label ?dist ?path
@@ -64,38 +109,53 @@ class PhenotypeSlim():
 
         self.sparql = sparql
 
-        self.hpo_current = {}
-        self.hpo_obsolete = {}
-        self.mp_current = {}
-        self.mp_obsolete = {}
+        self.phenotype_current = {}
+        self.phenotype_obsolete = {}
+        self.phenotype_map = {}
+        self.phenotype_top_levels = {}
+        self.phenotype_excluded = set()
 
-        self.hp_map = {}
-        self.mp_map = {}
-
-    def get_ontology_path(self, name, base_class, term):
-
-        sparql_query = '''
-        PREFIX obo: <http://purl.obolibrary.org/obo/>
-        select ?class ?parent_label count(?mid) AS ?count
-        FROM <http://purl.obolibrary.org/obo/%s.owl>
-        where {
-        obo:%s rdfs:subClassOf* ?mid .
-        ?mid rdfs:subClassOf* ?class .
-        ?class rdfs:label ?parent_label .
-        }
-        group by ?class ?parent_label
-        order by ?count
-        '''
-        self.sparql.setQuery(sparql_query%(name, term))
+    def get_ontology_top_levels(self, base_class):
+        sparql_query = TOP_LEVELS
+        self.sparql.setQuery(sparql_query%base_class)
         self.sparql.setReturnFormat(JSON)
         results = self.sparql.query().convert()
-
-
         for result in results["results"]["bindings"]:
-            print json.dumps(result)
-            uri = result['ont_node']['value']
-            label = result['label']['value']
-            current[uri] = label
+            #print json.dumps(result)
+            top_level_label = result['top_level_label']['value']
+            top_level = result['top_level']['value']
+            self.phenotype_top_levels[top_level] = top_level_label
+            print "%s %s"%(top_level, top_level_label)
+
+    def get_ontology_path(self, base_class, term):
+
+        if term in self.phenotype_map:
+            return
+
+        #if term == 'http://purl.obolibrary.org/obo/HP_0001251':
+        if True:
+
+            print "---------"
+            for sparql_query in [DIRECT_ANCESTORS, INDIRECT_ANCESTORS]:
+                self.sparql.setQuery(sparql_query%(term))
+                self.sparql.setReturnFormat(JSON)
+                results = self.sparql.query().convert()
+                #print len(results)
+                #print json.dumps(results)
+
+                for result in results["results"]["bindings"]:
+                    #print json.dumps(result)
+                    count = int(result['distance']['value'])
+                    parent_label = result['ancestor_label']['value']
+                    ancestor = result['ancestor']['value']
+                    direct_child = result['direct_child']['value']
+                    direct_child_label = result['direct_child_label']['value']
+                    if direct_child not in self.phenotype_map:
+                        self.phenotype_map[direct_child] = { 'label': direct_child_label , 'superclasses': [] }
+                    if ancestor not in self.phenotype_map[direct_child]['superclasses']:
+                        self.phenotype_map[direct_child]['superclasses'].append(ancestor)
+                        print "%i %s %s (direct child is %s %s)"%(count, parent_label, ancestor, direct_child_label, direct_child)
+            print "---------"
 
     def load_ontology(self, name, base_class, current, obsolete):
         '''
@@ -163,14 +223,56 @@ class PhenotypeSlim():
         Load HPO to accept phenotype terms that are not in EFO
         :return:
         '''
-        self.load_ontology('hp', 'http://purl.obolibrary.org/obo/HP_0000118', self.hpo_current, self.hpo_obsolete)
+        self.load_ontology('hp', 'http://purl.obolibrary.org/obo/HP_0000118', self.phenotype_current, self.phenotype_obsolete)
+        self.get_ontology_top_levels('http://purl.obolibrary.org/obo/HP_0000118')
 
     def load_mp(self):
         '''
         Load MP to accept phenotype terms that are not in EFO
         :return:
         '''
-        self.load_ontology('mp', 'http://purl.obolibrary.org/obo/MP_0000001', self.mp_current, self.mp_obsolete)
+        self.load_ontology('mp', 'http://purl.obolibrary.org/obo/MP_0000001', self.phenotype_current, self.phenotype_obsolete)
+        self.get_ontology_top_levels('http://purl.obolibrary.org/obo/MP_0000001')
+
+    def exclude_phenotypes(self, l):
+        for p in l:
+            if p not in self.phenotype_excluded:
+                self.phenotype_excluded.add(p)
+                print "Excluding %s"%p
+                # get parents
+                sparql_query = DIRECT_ANCESTORS
+                self.sparql.setQuery(sparql_query%p)
+                self.sparql.setReturnFormat(JSON)
+                results = self.sparql.query().convert()
+                al = []
+                for result in results["results"]["bindings"]:
+                    count = int(result['distance']['value'])
+                    parent_label = result['ancestor_label']['value']
+                    ancestor = result['ancestor']['value']
+                    al.append(ancestor)
+                    self.exclude_phenotypes(al)
+
+    def generate_ttl_query(self):
+
+        # create restricted list
+        print ",".join(self.phenotype_top_levels.keys())
+        for p in self.phenotype_top_levels:
+            if p in self.phenotype_map:
+                self.exclude_phenotypes(self.phenotype_map[p]['superclasses'])
+        #return
+
+        print "\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+
+        for k,v  in self.phenotype_map.iteritems():
+            count = 0
+            if k not in self.phenotype_excluded:
+                print "<%s> rdfs:label \"%s\" ."%(k, v['label'])
+                if k in self.phenotype_top_levels:
+                    print "<%s> rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0000651> ."%k
+                else:
+                    for p in v['superclasses']:
+                        print "<%s> rdfs:subClassOf <%s> ."%(k, p)
+
 
     def create_phenotype_slim(self):
 
@@ -179,10 +281,9 @@ class PhenotypeSlim():
         file_on_disk = '/Users/koscieln/Documents/data/ftp/cttv008/upload/submissions/cttv008-14-03-2016.json.gz'
         self.parse_gzipfile(file_on_disk)
 
-    def parse_gzipfile(self, file_on_disk):
+        self.generate_ttl_query()
 
-        self.load_hpo()
-        self.load_mp()
+    def parse_gzipfile(self, file_on_disk):
 
         logging.info('Starting parsing %s' %file_on_disk)
 
@@ -198,18 +299,12 @@ class PhenotypeSlim():
             if obj.disease.id:
                 for id in obj.disease.id:
                     if re.match('http://purl.obolibrary.org/obo/HP_\d+', id):
-                        hp_match = re.match('http://purl.obolibrary.org/obo/(HP_\d+)', id)
-                        term_id = hp_match.groups()[0]
-                        if id not in self.hp_map:
-                            ''' get all terms '''
-                            self.get_ontology_path('hp', 'http://purl.obolibrary.org/obo/HP_0000118', term_id)
+                        ''' get all terms '''
+                        self.get_ontology_path('http://purl.obolibrary.org/obo/HP_0000118', id)
 
                     elif re.match('http://purl.obolibrary.org/obo/MP_\d+', id):
-                        mp_match = re.match('http://purl.obolibrary.org/obo/(MP_\d+)', id)
-                        term_id = mp_match.groups()[0]
-                        if id not in self.mp_map:
-                            ''' get all terms '''
-                            self.get_ontology_path('mp', 'http://purl.obolibrary.org/obo/MP_0000001', term_id)
+                        ''' get all terms '''
+                        self.get_ontology_path('http://purl.obolibrary.org/obo/MP_0000001', id)
 
 
         fh.close()
