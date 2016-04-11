@@ -271,8 +271,8 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
          the evidence if it does not exists
          the submitted files if it does not exists
         '''
-        self.evidence_chunk.storage_create_index()
-        self.submission_audit.storage_create_index()
+        self.evidence_chunk.storage_create_index(b_recreate=False)
+        self.submission_audit.storage_create_index(b_recreate=False)
 
         '''
         now scroll through directories
@@ -298,12 +298,12 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                             logging.info("%s %r"%(filename, cttv_filename_match))
                             # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
                             if (cttv_filename_match
-                                #and
+                                and
                                 #(filename == 'cttv012-26-11-2015.json.gz') or
                                 #(filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
                                 #(filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
                                 #(filename == 'cttv025-24-02-2016.json.gz')
-                                #(filename == 'cttv007-01-03-2016.json.gz')
+                                (filename == 'cttv007-09-03-2016.json.gz')
                                 #(filename == 'cttv008-26-02-2016.json.gz') or
                                 #(filename == 'cttv009-25-02-2016.json.gz') or
                                 #(filename == 'cttv010-10-03-2016.json.gz')
@@ -496,10 +496,17 @@ class FileReaderProcess(multiprocessing.Process):
 
                     if isinstance(error, AttributeError):
                         logger.error("Error loading data for id %s: %s" % (file_on_disk, str(error)))
+                        break
                         # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
+                    #elif isinstance(error, elasticsearch.connection.exceptions.TransportError):
+                    #    logger.error("Error updating data in ElasticSearch for id %s: %s" % (file_on_disk, str(error)))
+                    #    # we have to stop the program in case of an error
+                    #    break
+
                     else:
                         logger.exception("Error loading data for id %s: %s" % (file_on_disk, str(error)))
                         # traceback.print_exc(limit=1, file=sys.stdout)
+                        break
 
         self.input_file_processing_finished.set()
         logger.info("%s finished" % self.name)
@@ -749,6 +756,11 @@ class ValidatorProcess(multiprocessing.Process):
                                 obj = cttv.Expression.fromMap(python_raw)
                             elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
                                 obj = cttv.Literature_Curated.fromMap(python_raw)
+                                if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'], list):
+                                    mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
+                                    python_raw['evidence']['known_mutations'] = [ mutations ]
+                                    logging.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
+                                    obj = cttv.Literature_Curated.fromMap(python_raw)
                             elif data_type == 'known_drug':
                                 obj = cttv.Drug.fromMap(python_raw)
                                 # logging.info(obj.evidence.association_score.__class__.__name__)
@@ -993,7 +1005,7 @@ class ValidatorProcess(multiprocessing.Process):
                     ''' type '''
                     audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_TYPE))
                     logger.error(
-                        "Line {0}: Not a valid 1.2.1 evidence string - please add the mandatory 'type' attribute".format(
+                        "Line {0}: Not a valid 1.2.2 evidence string - please add the mandatory 'type' attribute".format(
                             lc + 1))
                     nb_errors += 1
                     validation_failed = True
@@ -1690,28 +1702,50 @@ class ELasticStorage():
             return
 
         if (count > 0):
+            logging.info("Delete previous submitted data: %i evidence will be removed"%count)
+            #search = es.search(
+            #        index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+            #        doc_type=data_source_name,
+            #        q='{"query":{"match_all":{}}}',
+            #        size=10,
+            #        search_type="scan",
+            #        scroll='5m',
+            #)
+
             search = es.search(
                     index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
                     doc_type=data_source_name,
-                    q='{"query":{"match_all":{}}}',
-                    size=10,
+                    body=q,
+                    size=int(CHUNK_SIZE),
                     search_type="scan",
-                    scroll='5m',
-            )
-            while True:
+                    scroll='5m')
+
+            nb_scroll = 0
+            total_hits = count
+
+            while total_hits > 0:
                 try:
-                    # Git the next page of results.
-                    scroll = es.scroll(scroll_id=search['_scroll_id'], scroll='5m', )
+                    # Get the next page of results.
+                    if nb_scroll % 10 == 0:
+                        logging.info("Get Scroll %i and delete data for datasource %s"%(nb_scroll, data_source_name))
+                    nb_scroll+=1
+                    scroll = es.scroll(scroll_id=search['_scroll_id'], scroll='5m')
                     # Since scroll throws an error catch it and break the loop.
-                except elasticsearch.exceptions.NotFoundError:
+                    # We have results initialize the bulk variable.
+                    bulk = ""
+                    for result in scroll['hits']['hits']:
+                        bulk = bulk + '{ "delete" : { "_index" : "' + str(result['_index']) + '", "_type" : "' + str(
+                                result['_type']) + '", "_id" : "' + str(result['_id']) + '" } }\n'
+                    # Finally do the deleting.
+                    es.bulk(body=bulk)
+                    total_hits -= len(scroll['hits']['hits'])
+                except Exception, error:
+                    if isinstance(error, elasticsearch.exceptions.NotFoundError):
+                        logger.error("ElasticSearch Error updating data in ElasticSearch %s" % (str(error)))
+                    else:
+                        logger.error("ElasticSearch Error %s" % (str(error)))
                     break
-                # We have results initialize the bulk variable.
-                bulk = ""
-                for result in scroll['hits']['hits']:
-                    bulk = bulk + '{ "delete" : { "_index" : "' + str(result['_index']) + '", "_type" : "' + str(
-                            result['_type']) + '", "_id" : "' + str(result['_id']) + '" } }\n'
-                # Finally do the deleting.
-                es.bulk(body=bulk)
+
                 # es.delete(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME, doc_type=data_source_name)
 
     @staticmethod
@@ -1777,12 +1811,12 @@ class EvidenceChunkElasticStorage():
         self.cache = {}
         self.counter = 0
 
-    def storage_create_index(self):
+    def storage_create_index(self, b_recreate=False):
         ELasticStorage.create_data_index(
                 self.es,
                 index_name=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
                 mappings=ElasticSearchConfiguration.validated_data_settings_and_mappings,
-                b_recreate=True)
+                b_recreate=b_recreate)
 
     def storage_reset(self):
         self.cache = {}
@@ -1816,12 +1850,12 @@ class SubmissionAuditElasticStorage():
     def __init__(self, es, chunk_size=1e3):
         self.es = es
 
-    def storage_create_index(self):
+    def storage_create_index(self, b_recreate=False):
         ELasticStorage.create_data_index(
                 self.es,
                 index_name=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
                 mappings=ElasticSearchConfiguration.submission_audit_settings_and_mappings,
-                b_recreate=False)
+                b_recreate=b_recreate)
 
     def exists(self, filename=None):
         search = self.es.search(
@@ -1947,6 +1981,7 @@ class EvidenceValidationFileChecker():
         self.mp_current = {}
         self.mp_obsolete = {}
         self.ensembl_current = {}
+        self.hgnc_current = {}
         self.eco_current = {}
         self.symbols = {}
 
@@ -2016,6 +2051,7 @@ class EvidenceValidationFileChecker():
                         self.symbols[gene_symbol] = {};
 
                     self.symbols[gene_symbol]["hgnc_id"] = doc["hgnc_id"]
+                    self.hgnc_current = doc
 
                 if "ensembl_gene_id" in doc:
                     ensembl_gene_id = doc["ensembl_gene_id"];
