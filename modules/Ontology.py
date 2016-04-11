@@ -26,6 +26,7 @@ where {
 '''
 
 DIRECT_ANCESTORS = '''
+# %s
 PREFIX obo: <http://purl.obolibrary.org/obo/>
 SELECT ?dist1 as ?distance ?y as ?ancestor ?ancestor_label ?x as ?direct_child ?direct_child_label
 FROM <http://purl.obolibrary.org/obo/hp.owl>
@@ -53,7 +54,7 @@ FROM <http://purl.obolibrary.org/obo/mp.owl>
        ?y rdfs:label ?ancestor_label .
        ?z rdfs:subClassOf ?y .
        ?z rdfs:label ?direct_child_label .
-       {SELECT ?z WHERE { ?x2 rdfs:subClassOf ?z option(transitive) FILTER (?x2 = <http://purl.obolibrary.org/obo/HP_0001251>) }}
+       {SELECT ?z WHERE { ?x2 rdfs:subClassOf ?z option(transitive) FILTER (?x2 = <%s>) }}
        FILTER (?x = <%s>)
     }
 order by ?dist1
@@ -137,7 +138,7 @@ class PhenotypeSlim():
 
             print "---------"
             for sparql_query in [DIRECT_ANCESTORS, INDIRECT_ANCESTORS]:
-                self.sparql.setQuery(sparql_query%(term))
+                self.sparql.setQuery(sparql_query%(term, term))
                 self.sparql.setReturnFormat(JSON)
                 results = self.sparql.query().convert()
                 #print len(results)
@@ -155,6 +156,7 @@ class PhenotypeSlim():
                     if ancestor not in self.phenotype_map[direct_child]['superclasses']:
                         self.phenotype_map[direct_child]['superclasses'].append(ancestor)
                         print "%i %s %s (direct child is %s %s)"%(count, parent_label, ancestor, direct_child_label, direct_child)
+                    #print "%i %s %s (direct child is %s %s)"%(count, parent_label, ancestor, direct_child_label, direct_child)
             print "---------"
 
     def load_ontology(self, name, base_class, current, obsolete):
@@ -235,13 +237,17 @@ class PhenotypeSlim():
         self.get_ontology_top_levels('http://purl.obolibrary.org/obo/MP_0000001')
 
     def exclude_phenotypes(self, l):
+        '''
+        :param l:
+        :return:
+        '''
         for p in l:
             if p not in self.phenotype_excluded:
                 self.phenotype_excluded.add(p)
                 print "Excluding %s"%p
                 # get parents
                 sparql_query = DIRECT_ANCESTORS
-                self.sparql.setQuery(sparql_query%p)
+                self.sparql.setQuery(sparql_query%(p, p))
                 self.sparql.setReturnFormat(JSON)
                 results = self.sparql.query().convert()
                 al = []
