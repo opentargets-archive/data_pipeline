@@ -20,6 +20,7 @@ from modules.Uniprot import UniProtActions,UniprotDownloader
 from modules.HGNC import HGNCActions, HGNCUploader
 from modules.Ensembl import EnsemblGeneInfo, EnsemblActions, EnsemblProcess
 from modules.MouseModels import MouseModelsActions, Phenodigm
+from modules.Ontology import OntologyActions, PhenotypeSlim
 import argparse
 from settings import Config, ElasticSearchConfiguration
 from redislite import Redis
@@ -109,6 +110,8 @@ if __name__ == '__main__':
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
+    parser.add_argument("--onto", dest='onto', help="create phenotype slim",
+                        action="append_const", const = OntologyActions.ALL)
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -198,6 +201,10 @@ if __name__ == '__main__':
                 Phenodigm(adapter, es, sparql).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(adapter, es, sparql).generate_evidence()
+        if args.onto or run_full_pipeline:
+            do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
+            if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
+                PhenotypeSlim(sparql).create_phenotype_slim()
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.GENEMAPPING in args.val) or do_all:
