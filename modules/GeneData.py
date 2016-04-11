@@ -174,42 +174,43 @@ class Gene(JSONSerializable):
                 self.vega_ids = data['vega_id']
             if 'uniprot_ids' in data:
                 self.uniprot_accessions = data['uniprot_ids']
-                self.uniprot_id = self.uniprot_accessions [0]
+                if not self.uniprot_id:
+                    self.uniprot_id = self.uniprot_accessions[0]
             if 'pubmed_id' in data:
                 self.pubmed_ids = data['pubmed_id']
 
     def load_ensembl_data(self, data):
 
-        if data.ensembl_gene_id:
+        if 'id' in data:
             self.is_active_in_ensembl = True
-            self.ensembl_gene_id = data.ensembl_gene_id
-        if data.assembly_name:
-            self.ensembl_assembly_name = data.assembly_name
-        if data.biotype:
-            self.biotype = data.biotype
-        if data.description:
-            self.ensembl_description = data.description.split(' [')[0]
+            self.ensembl_gene_id = data['id']
+        if 'assembly_name' in data:
+            self.ensembl_assembly_name = data['assembly_name']
+        if 'biotype' in data:
+            self.biotype = data['biotype']
+        if 'description' in data:
+            self.ensembl_description = data['description'].split(' [')[0]
             if not self.approved_name:
                 self.approved_name= self.ensembl_description
-        if data.gene_end is not None:
-            self.gene_end = data.gene_end
-        if data.gene_start is not None:
-            self.gene_start = data.gene_start
-        if data.strand is not None:
-            self.strand = data.strand
-        if data.chromosome:
-            self.chromosome = data.chromosome
-        if data.external_name:
-            self.ensembl_external_name = data.external_name
+        if 'end' in data:
+            self.gene_end = data['end']
+        if 'start' in data:
+            self.gene_start = data['start']
+        if 'strand' in data:
+            self.strand = data['strand']
+        if 'seq_region_name' in data:
+            self.chromosome = data['seq_region_name']
+        if 'display_name' in data:
+            self.ensembl_external_name = data['display_name']
             if not self.approved_symbol:
-                self.approved_symbol= data.external_name
-        if data.gene_version is not None:
-            self.ensembl_gene_version = data.gene_version
-        if data.cytobands:
-            self.cytobands = data.cytobands
-        if data.ensembl_release:
-            self.ensembl_release = data.ensembl_release
-        is_reference = (data.is_reference and data.ensembl_gene_id.startswith('ENSG'))
+                self.approved_symbol= data['display_name']
+        if 'version' in data:
+            self.ensembl_gene_version = data['version']
+        if 'cytobands' in data:
+            self.cytobands = data['cytobands']
+        if 'ensembl_release' in data:
+            self.ensembl_release = data['ensembl_release']
+        is_reference = (data['is_reference'] and data['id'].startswith('ENSG'))
         self.is_ensembl_reference = is_reference
 
 
@@ -403,10 +404,13 @@ class GeneManager():
     """
 
     def __init__(self,
-                 adapter):
+                 adapter,
+                 es):
 
         self.adapter=adapter
         self.session=adapter.session
+        self.es = es
+        self.esquery = ESQuery(es)
         self.genes = GeneSet()
         self.reactome_retriever=ReactomeRetriever(adapter)
 
@@ -443,9 +447,9 @@ class GeneManager():
 
 
     def _get_ensembl_data(self):
-        for row in self.session.query(EnsemblGeneInfo).yield_per(1000):
-            if row.ensembl_gene_id in self.genes:
-                gene = self.genes.get_gene(row.ensembl_gene_id)
+        for row in self.esquery.get_all_ensembl_genes():
+            if row['id'] in self.genes:
+                gene = self.genes.get_gene(row['id'])
                 gene.load_ensembl_data(row)
                 self.genes.add_gene(gene)
             else:

@@ -95,8 +95,8 @@ class Config():
     JSON_FILE_TO_DATASOURCE_MAPPING['cttv025'] = 'CTTV025_Literature'
     JSON_FILE_TO_DATASOURCE_MAPPING['cttv_external_mousemodels'] = 'CTTV_External_MouseModels'
 
-    # This tells you how many workers will process the evidence strings
-    EVIDENCEVALIDATION_WORKERS_NUMBER = None
+    # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
+    WORKERS_NUMBER = None
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
@@ -150,20 +150,25 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['disgenet'] = 'literature'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
 
+    # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
-    DATASOURCE_TO_INDEX_KEY_MAPPING['disgenet'] = 'disgenet'
-    DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
+    # DATASOURCE_TO_INDEX_KEY_MAPPING['disgenet'] = 'disgenet'
+    # DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
     # DATASOURCE_TO_INDEX_KEY_MAPPING['phenodigm'] = DATASOURCE_TO_DATATYPE_MAPPING['phenodigm']
     # DATASOURCE_TO_INDEX_KEY_MAPPING['expression_atlas'] = DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas']
+
+    # setup the weights for evidence strings score
     SCORING_WEIGHTS = defaultdict(lambda: 1)
-    SCORING_WEIGHTS['phenodigm'] = 0.33333333
+    SCORING_WEIGHTS['phenodigm'] = 0.2
     # SCORING_WEIGHTS['expression_atlas'] = 0.2
     SCORING_WEIGHTS['europepmc'] = 0.2
     SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
-    WORKERS_NUMBER = None # if None defaults to cpu count
+    # setup a minimum score value for an evidence string to be accepted.
+    SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
+    SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
-    RELEASE_VERSION='4'
+    RELEASE_VERSION='16.04'
 
     ENSEMBL_RELEASE_VERSION=83
 

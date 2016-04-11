@@ -173,7 +173,7 @@ if __name__ == '__main__':
         if args.gen or run_full_pipeline:
             do_all = (GeneActions.ALL in args.gen) or run_full_pipeline
             if (GeneActions.MERGE in args.gen) or do_all:
-                GeneManager(adapter).merge_all()
+                GeneManager(adapter, es).merge_all()
             if (GeneActions.UPLOAD in args.gen) or do_all:
                 GeneUploader(adapter, loader).upload_all()
         if args.efo or run_full_pipeline:

@@ -193,3 +193,18 @@ class ESQuery(object):
                            )
         for hit in res:
             yield hit['_source']
+
+    def get_all_genes(self):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "match_all": {}
+                           },
+                               '_source': True,
+                               'size': 1000,
+                           },
+                           scroll='1h',
+                           index=Config().get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
+                           timeout="10m",
+                           )
+        for hit in res:
+            yield hit['_source']
