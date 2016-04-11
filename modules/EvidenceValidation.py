@@ -298,12 +298,12 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                             logging.info("%s %r"%(filename, cttv_filename_match))
                             # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
                             if (cttv_filename_match
-                                #and
+                                and
                                 #(filename == 'cttv012-26-11-2015.json.gz') or
                                 #(filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
                                 #(filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
                                 #(filename == 'cttv025-24-02-2016.json.gz')
-                                #(filename == 'cttv007-01-03-2016.json.gz')
+                                (filename == 'cttv007-09-03-2016.json.gz')
                                 #(filename == 'cttv008-26-02-2016.json.gz') or
                                 #(filename == 'cttv009-25-02-2016.json.gz') or
                                 #(filename == 'cttv010-10-03-2016.json.gz')
@@ -756,6 +756,11 @@ class ValidatorProcess(multiprocessing.Process):
                                 obj = cttv.Expression.fromMap(python_raw)
                             elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
                                 obj = cttv.Literature_Curated.fromMap(python_raw)
+                                if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'], list):
+                                    mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
+                                    python_raw['evidence']['known_mutations'] = [ mutations ]
+                                    logging.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
+                                    obj = cttv.Literature_Curated.fromMap(python_raw)
                             elif data_type == 'known_drug':
                                 obj = cttv.Drug.fromMap(python_raw)
                                 # logging.info(obj.evidence.association_score.__class__.__name__)
@@ -1000,7 +1005,7 @@ class ValidatorProcess(multiprocessing.Process):
                     ''' type '''
                     audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_TYPE))
                     logger.error(
-                        "Line {0}: Not a valid 1.2.1 evidence string - please add the mandatory 'type' attribute".format(
+                        "Line {0}: Not a valid 1.2.2 evidence string - please add the mandatory 'type' attribute".format(
                             lc + 1))
                     nb_errors += 1
                     validation_failed = True
@@ -1697,7 +1702,7 @@ class ELasticStorage():
             return
 
         if (count > 0):
-
+            logging.info("Delete previous submitted data: %i evidence will be removed"%count)
             #search = es.search(
             #        index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
             #        doc_type=data_source_name,
@@ -1716,13 +1721,15 @@ class ELasticStorage():
                     scroll='5m')
 
             nb_scroll = 0
-            while True:
+            total_hits = count
+
+            while total_hits > 0:
                 try:
-                    # Git the next page of results.
+                    # Get the next page of results.
                     if nb_scroll % 10 == 0:
                         logging.info("Get Scroll %i and delete data for datasource %s"%(nb_scroll, data_source_name))
                     nb_scroll+=1
-                    scroll = es.scroll(scroll_id=search['_scroll_id'], scroll='5m', )
+                    scroll = es.scroll(scroll_id=search['_scroll_id'], scroll='5m')
                     # Since scroll throws an error catch it and break the loop.
                     # We have results initialize the bulk variable.
                     bulk = ""
@@ -1731,6 +1738,7 @@ class ELasticStorage():
                                 result['_type']) + '", "_id" : "' + str(result['_id']) + '" } }\n'
                     # Finally do the deleting.
                     es.bulk(body=bulk)
+                    total_hits -= len(scroll['hits']['hits'])
                 except Exception, error:
                     if isinstance(error, elasticsearch.exceptions.NotFoundError):
                         logger.error("ElasticSearch Error updating data in ElasticSearch %s" % (str(error)))
