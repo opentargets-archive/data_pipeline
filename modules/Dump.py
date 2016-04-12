@@ -37,14 +37,16 @@ class DumpGenerator(object):
 
         '''dump evidence data'''
         logging.info('Dumping evidence data')
-        c=0
         with gzip.open(Config.DUMP_FILE_EVIDENCE, 'wb') as dump_file:
             for row in self.get_data('/api/latest/public/evidence/filter'):
                 dump_file.write(row+'\n')
 
 
         '''dump association data'''
-
+        logging.info('Dumping association data')
+        with gzip.open(Config.DUMP_FILE_ASSOCIATION, 'wb') as dump_file:
+            for row in self.get_data('/api/latest/public/association/filter'):
+                dump_file.write(row + '\n')
 
         '''dump search objects???'''
 
@@ -121,7 +123,7 @@ class DumpGenerator(object):
             data_rate = downloaded_data/1048576./et
             eta = datetime.timedelta(seconds=int((total-c)/speed))
 
-            logging.info("retrieved %i of %i (%.2f%%) | elapsed time %s| speed %i datapoints/sec | data rate %.2fMbps | data downloaded %.2fMb | ETA %s"%(c,total,float(c)/total%100, etd, speed,data_rate, downloaded_data/1048576., eta))
+            logging.info("retrieved %i of %i (%.2f%%) | elapsed time %s| speed %i datapoints/sec | data rate %.2fMbps | downloaded data %.2fMb | ETA %s"%(c,total,float(c)/total*100, etd, speed,data_rate, downloaded_data/1048576., eta))
             if is_done:
                 break
 
