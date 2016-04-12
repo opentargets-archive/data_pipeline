@@ -56,7 +56,7 @@ class ESQuery(object):
                                    },
                             scroll='1h',
                             doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                            index=Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                            index=Config().get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
                             timeout="10m",
                             )
         for hit in res:
@@ -76,7 +76,7 @@ class ESQuery(object):
                                    },
                             scroll='1h',
                             doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                            index=Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                            index=Config().get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME),
                             timeout="10m",
                             )
         for hit in res:

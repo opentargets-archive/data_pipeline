@@ -10,6 +10,8 @@ iniparser.read('db.ini')
 
 class Config():
 
+
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.04'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
@@ -168,13 +170,17 @@ class Config():
     SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
-    RELEASE_VERSION='16.04'
 
     ENSEMBL_RELEASE_VERSION=83
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
     UNIQUE_RUN_ID = str(uuid.uuid4())
+
+
+    #dump file names
+    DUMP_FILE_EVIDENCE=RELEASE_VERSION+'_evidence_data.json.gz'
+    DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
 
     def get_versioned_index(self, idx):
         return self.RELEASE_VERSION+'_'+idx

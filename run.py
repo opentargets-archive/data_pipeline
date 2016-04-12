@@ -7,6 +7,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 from common import Actions
 from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
 from common.PGAdapter import Adapter
+from modules.Dump import DumpActions, DumpGenerator
 from modules.ECO import EcoActions, EcoProcess, EcoUploader
 from modules.EFO import EfoActions, EfoProcess, EfoUploader
 from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess, EvidenceStringUploader
@@ -112,6 +113,9 @@ if __name__ == '__main__':
                         action="append_const", const = MouseModelsActions.ALL)
     parser.add_argument("--onto", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.ALL)
+    parser.add_argument("--dump", dest='dump',
+                        help="dump core data to local gzipped files",
+                        action="append_const", const=DumpActions.ALL)
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -229,10 +233,10 @@ if __name__ == '__main__':
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
                 SearchObjectProcess(adapter, loader, r_server).process_all()
-        '''only run if explicetely called'''
-        if args.es:
-            if ElasticsearchActions.RELOAD in args.es:
-                JSONObjectStorage.refresh_all_data_in_es(loader,adapter.session)
+        if args.dump or run_full_pipeline:
+            do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
+            if (DumpActions.DUMP in args.dump) or do_all:
+                DumpGenerator(es).dump()
 
 
 
