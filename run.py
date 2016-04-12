@@ -86,7 +86,7 @@ if __name__ == '__main__':
                         action="append_const", const = AssociationActions.PROCESS)
     parser.add_argument("--assu", dest='ass', help="upload the stored precomputed score json object to elasticsearch",
                         action="append_const", const = AssociationActions.UPLOAD)
-    parser.add_argument("--ass", dest='evs', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--ass", dest='ass', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = AssociationActions.ALL)
     parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
                         action="append_const", const = ElasticsearchActions.RELOAD)
@@ -219,8 +219,8 @@ if __name__ == '__main__':
             #     EvidenceStringUploader(adapter, loader).upload_all()
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
-            if (AssociationActions.EXTRACT in args.ass) or do_all:
-                ScoringExtract(adapter).extract()
+            # if (AssociationActions.EXTRACT in args.ass) or do_all:
+            #     ScoringExtract(adapter).extract()
             if (AssociationActions.PROCESS in args.ass) or do_all:
                 ScoringProcess(adapter, loader).process_all()
             # if (AssociationActions.UPLOAD in args.ass):# data will be uploaded also by the proces step
