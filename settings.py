@@ -179,6 +179,7 @@ class Config():
 
 
     #dump file names
+    DUMP_FILE_FOLDER = '/tmp'
     DUMP_FILE_EVIDENCE=RELEASE_VERSION+'_evidence_data.json.gz'
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
 

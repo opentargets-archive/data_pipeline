@@ -18,3 +18,4 @@ lxml>=3.4.4
 -e git+https://github.com/CTTV/cttvmodel.git#egg=cttvmodel-master
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.0.12.tar.gz
 SPARQLWrapper>=1.7.6
+grequests
