@@ -641,7 +641,7 @@ class TargetDiseasePairProducer(Process):
                                        "id",
                                        ],
                            },
-              "sort":"target.id",
+              "sort":["target.id", "disease.id"],
           }
 
 
@@ -651,7 +651,7 @@ class TargetDiseasePairProducer(Process):
                            index=Config.RELEASE_VERSION+'_'+Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
                            timeout="2h",
                            request_timeout=2*60*60,
-                           size = 50000,
+                           size = 5000,
                            preserve_order=True
         )
 

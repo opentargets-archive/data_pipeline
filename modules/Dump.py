@@ -17,12 +17,6 @@ import gzip, time, logging
 from settings import Config
 import grequests, requests
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(levelname)s %(message)s',
-                    # filename='/tmp/myapp.log',
-                    # filemode='w',
-                    )
-
 
 class DumpActions(Actions):
     DUMP='dump'
@@ -40,17 +34,20 @@ class DumpGenerator(object):
     def dump(self):
 
 
-        '''dump evidence data'''
-        logging.info('Dumping evidence data')
-        # self.get_data('/api/latest/public/evidence/filter', Config.DUMP_FILE_EVIDENCE)
-        # with gzip.open(Config.DUMP_FILE_EVIDENCE, 'wb') as dump_file:
-            # for row in self.get_data_concurrently('/api/latest/public/evidence/filter'):
-            #     dump_file.write(row+'\n')
-
+        # '''dump evidence data'''
+        # logging.info('Dumping evidence data')
+        # # self.get_data('/api/latest/public/evidence/filter', Config.DUMP_FILE_EVIDENCE)
+        # self.put_files_together(Config.DUMP_FILE_EVIDENCE)
+        # # with gzip.open(Config.DUMP_FILE_EVIDENCE, 'wb') as dump_file:
+        #     # for row in self.get_data_concurrently('/api/latest/public/evidence/filter'):
+        #     #     dump_file.write(row+'\n')
+        #
 
         '''dump association data'''
         logging.info('Dumping association data')
         self.get_data('/api/latest/public/association/filter', Config.DUMP_FILE_ASSOCIATION)
+        self.put_files_together(Config.DUMP_FILE_ASSOCIATION)
+
         # with gzip.open(Config.DUMP_FILE_ASSOCIATION, 'wb') as dump_file:
         #     for row in self.get_data('/api/latest/public/association/filter'):
                 # dump_file.write(row + '\n')
@@ -117,7 +114,7 @@ class DumpGenerator(object):
                             logging.info('getting data completed')
                             is_done = True
                         if r.status_code == 200:
-                            file_path = self.get_file_path(r.url)
+                            file_path = self.get_file_path(r.url, filename)
 
                             if not os.path.exists(file_path):
                                 with gzip.open(file_path, 'wb') as dump_file:
@@ -127,7 +124,8 @@ class DumpGenerator(object):
                             #     yield json.dumps(row, separators=(',', ':'))
                             i += 1
                             c += len(data)
-                            downloaded_data += int(r.headers['content-length'])
+                            if data:
+                                downloaded_data += int(r.headers['content-length'])
 
 
             et = int(time.time()-start_time)
@@ -304,3 +302,18 @@ class DumpGenerator(object):
         file_path = os.path.join(Config.DUMP_FILE_FOLDER,
                                  filename + '_' + url.split('?')[1])
         return file_path
+
+    def put_files_together(self, filename_pattern):
+        joined_output_path = os.path.join(Config.DUMP_FILE_FOLDER, filename_pattern)
+        c=0
+        with gzip.open(joined_output_path, 'wb') as joined_output:
+            for f in os.listdir(Config.DUMP_FILE_FOLDER):
+                if f.startswith(filename_pattern) and not f==filename_pattern:
+                    with gzip.open(os.path.join(Config.DUMP_FILE_FOLDER, f), 'rb') as f_unit:
+                        data = f_unit.readlines()
+                        c+=len(data)
+                        joined_output.writelines(data)
+                    logging.debug("compacted %s"%f)
+
+        logging.info('Compacted %i lines in a file at this path: %s'%(c, joined_output_path))
+

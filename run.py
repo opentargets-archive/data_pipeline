@@ -14,6 +14,7 @@ from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess,
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
+from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
 from modules.Association import AssociationActions, ScoringProcess, ScoringUploader, ScoringExtract
 from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
@@ -113,6 +114,9 @@ if __name__ == '__main__':
                         action="append_const", const = MouseModelsActions.ALL)
     parser.add_argument("--onto", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.ALL)
+    parser.add_argument("--qc", dest='qc',
+                        help="Run quality control scripts",
+                        action="append_const", const=QCActions.ALL)
     parser.add_argument("--dump", dest='dump',
                         help="dump core data to local gzipped files",
                         action="append_const", const=DumpActions.ALL)
@@ -233,6 +237,10 @@ if __name__ == '__main__':
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
                 SearchObjectProcess(adapter, loader, r_server).process_all()
+        if args.qc or run_full_pipeline:
+            do_all = (QCActions.ALL in args.qc) or run_full_pipeline
+            if (QCActions.QC in args.qc) or do_all:
+                QCRunner(es)
         if args.dump or run_full_pipeline:
             do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
             if (DumpActions.DUMP in args.dump) or do_all:
