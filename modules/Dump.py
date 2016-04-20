@@ -63,8 +63,8 @@ class DumpGenerator(object):
         start_time = time.time()
 
         max_page = int(1e7)
-        batch_size=10
-        page_size=10000
+        batch_size = Config.DUMP_BATCH_SIZE
+        page_size=Config.DUMP_PAGE_SIZE
         downloaded_data = 0
         is_done = False
         total= int(requests.get(self.api_url + query + '?size=0').json()['total'])

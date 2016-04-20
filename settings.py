@@ -182,6 +182,8 @@ class Config():
     DUMP_FILE_FOLDER = '/tmp'
     DUMP_FILE_EVIDENCE=RELEASE_VERSION+'_evidence_data.json.gz'
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
+    DUMP_PAGE_SIZE = 10000
+    DUMP_BATCH_SIZE = 10
 
     def get_versioned_index(self, idx):
         return self.RELEASE_VERSION+'_'+idx
