@@ -298,12 +298,13 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                             logging.info("%s %r"%(filename, cttv_filename_match))
                             # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
                             if (cttv_filename_match
-                                and
+                                #and
                                 #(filename == 'cttv012-26-11-2015.json.gz') or
                                 #(filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
                                 #(filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
                                 #(filename == 'cttv025-24-02-2016.json.gz')
-                                (filename == 'cttv007-09-03-2016.json.gz')
+                                #(filename == 'cttv007-09-03-2016.json.gz')
+                                #(filename == 'cttv012-03-03-2016.json.gz')
                                 #(filename == 'cttv008-26-02-2016.json.gz') or
                                 #(filename == 'cttv009-25-02-2016.json.gz') or
                                 #(filename == 'cttv010-10-03-2016.json.gz')
@@ -827,10 +828,10 @@ class ValidatorProcess(multiprocessing.Process):
                                 for disease_id in obj.disease.id:
                                     disease_count += 1
                                     efo_id = disease_id
-                                    # fix for EVA data for release 1.0
-                                    #if disease_id in eva_curated:
-                                    #    obj.disease.id[index] = eva_curated[disease_id];
-                                    #    disease_id = obj.disease.id[index];
+                                    # fix for EVA data for release 1.1
+                                    if disease_id in eva_curated:
+                                        obj.disease.id[index] = eva_curated[disease_id];
+                                        disease_id = obj.disease.id[index];
                                     index += 1
 
                                     ''' Check disease term or phenotype term '''
