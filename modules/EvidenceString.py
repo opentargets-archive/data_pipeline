@@ -1,4 +1,5 @@
 import ctypes
+import pprint
 from collections import defaultdict, OrderedDict
 import copy
 from datetime import datetime
@@ -239,9 +240,12 @@ class EvidenceManagerLookUpData():
 
 
 class EvidenceManagerLookUpDataRetrieval():
-    def __init__(self, adapter = Adapter()):
+    def __init__(self, adapter = Adapter(), es = None):
         self.adapter = adapter
         self.session = adapter.session
+        self.es = es
+        if es is not None:
+            self.esquery = ESQuery(es)
         self.lookup = EvidenceManagerLookUpData()
         start_time = time.time()
         self._get_gene_info()
@@ -326,8 +330,11 @@ class EvidenceManagerLookUpDataRetrieval():
         #         logger.debug("retrieved %i gene objects"%offset)
         #         result.close()
 
-        for row in self.session.query(ElasticsearchLoad.id,ElasticsearchLoad.data ).filter(ElasticsearchLoad.index == Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME).yield_per(1000):
-            yield row.id, json.loads(row.data)
+        # for row in self.session.query(ElasticsearchLoad.id,ElasticsearchLoad.data ).filter(ElasticsearchLoad.index == Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME).yield_per(1000):
+        #     yield row.id, json.loads(row.data)
+
+        for row in self.esquery.get_all_genes():
+            yield row['id'], row
 
 
 class EvidenceManager():
@@ -529,6 +536,7 @@ class EvidenceManager():
                 logger.error(
                     "%s Evidence %s has an invalid eco id in evidence.evidence_codes: %s" % (datasource, evidence_id, eco_id))
                 return False
+
         return True
 
     def get_extended_evidence(self, evidence):
@@ -776,7 +784,10 @@ class Evidence(JSONSerializable):
                 log2_fold_change = self.evidence['evidence']['log2_fold_change']['value']
                 fold_scale_factor = abs(log2_fold_change)/10.
                 rank = self.evidence['evidence']['log2_fold_change']['percentile_rank']/100.
-                self.evidence['scores'] ['association_score']= pvalue*fold_scale_factor*rank
+                score = pvalue*fold_scale_factor*rank
+                if score > 1:
+                    score = 1.
+                self.evidence['scores']['association_score']=score
 
             elif self.evidence['type']=='genetic_association':
                 if 'gene2variant' in  self.evidence['evidence']:
@@ -785,6 +796,8 @@ class Evidence(JSONSerializable):
                         v2d_score = self._get_score_from_pvalue(self.evidence['evidence']['variant2disease']['resource_score']['value'])
                     elif self.evidence['evidence']['variant2disease']['resource_score']['type'] =='probability':
                         v2d_score = self.evidence['evidence']['variant2disease']['resource_score']['value']
+                    else:
+                        v2d_score = 0.
                     if self.evidence['sourceID']=='gwas_catalog':
                         sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
                         score =self._score_gwascatalog(v2d_score, sample_size,g2v_score)
@@ -832,6 +845,10 @@ class Evidence(JSONSerializable):
         except:
             logger.warn("Cannot score evidence %s of type %s"%(self.evidence['id'],self.evidence['type']))
 
+        '''check for minimum score '''
+        if self.evidence['scores'] ['association_score'] < Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]:
+            raise AttributeError("Evidence String Rejected since score is too low: %s" % (self.get_id()))
+
         '''modify scores accodigng to weights'''
         datasource_weight = Config.DATASOURCE_ASSOCIATION_SCORE_WEIGHT.get( self.evidence['sourceID'], 1.)
         if datasource_weight !=1:
@@ -840,7 +857,7 @@ class Evidence(JSONSerializable):
                weighted_score = 1.
             self.evidence['scores'] ['association_score'] =  weighted_score
 
-        '''applay rescaling to scores'''
+        '''apply rescaling to scores'''
         if self.evidence['sourceID'] in modifiers:
             self.evidence['scores'] ['association_score'] =  modifiers[self.evidence['sourceID']]( self.evidence['scores'] ['association_score'])
 
@@ -1118,7 +1135,7 @@ class EvidenceStringProcess():
         # self._delete_prev_data()
         # for row in self.session.query(LatestEvidenceString).yield_per(1000):
         evidence_start_time = time.time()
-        lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter).lookup
+        lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter, self.es).lookup
         get_evidence_page_size = 25000
 
         '''create queues'''

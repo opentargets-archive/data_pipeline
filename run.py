@@ -7,12 +7,14 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 from common import Actions
 from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
 from common.PGAdapter import Adapter
+from modules.Dump import DumpActions, DumpGenerator
 from modules.ECO import EcoActions, EcoProcess, EcoUploader
 from modules.EFO import EfoActions, EfoProcess, EfoUploader
 from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess, EvidenceStringUploader
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager, GeneUploader
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
+from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
 from modules.Association import AssociationActions, ScoringProcess, ScoringUploader, ScoringExtract
 from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
@@ -86,7 +88,7 @@ if __name__ == '__main__':
                         action="append_const", const = AssociationActions.PROCESS)
     parser.add_argument("--assu", dest='ass', help="upload the stored precomputed score json object to elasticsearch",
                         action="append_const", const = AssociationActions.UPLOAD)
-    parser.add_argument("--ass", dest='evs', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--ass", dest='ass', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = AssociationActions.ALL)
     parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
                         action="append_const", const = ElasticsearchActions.RELOAD)
@@ -112,6 +114,12 @@ if __name__ == '__main__':
                         action="append_const", const = MouseModelsActions.ALL)
     parser.add_argument("--onto", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.ALL)
+    parser.add_argument("--qc", dest='qc',
+                        help="Run quality control scripts",
+                        action="append_const", const=QCActions.ALL)
+    parser.add_argument("--dump", dest='dump',
+                        help="dump core data to local gzipped files",
+                        action="append_const", const=DumpActions.ALL)
     args = parser.parse_args()
 
     adapter = Adapter()
@@ -178,7 +186,7 @@ if __name__ == '__main__':
         if args.gen or run_full_pipeline:
             do_all = (GeneActions.ALL in args.gen) or run_full_pipeline
             if (GeneActions.MERGE in args.gen) or do_all:
-                GeneManager(adapter).merge_all()
+                GeneManager(adapter, es).merge_all()
             if (GeneActions.UPLOAD in args.gen) or do_all:
                 GeneUploader(adapter, loader).upload_all()
         if args.efo or run_full_pipeline:
@@ -219,8 +227,8 @@ if __name__ == '__main__':
             #     EvidenceStringUploader(adapter, loader).upload_all()
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
-            if (AssociationActions.EXTRACT in args.ass) or do_all:
-                ScoringExtract(adapter).extract()
+            # if (AssociationActions.EXTRACT in args.ass) or do_all:
+            #     ScoringExtract(adapter).extract()
             if (AssociationActions.PROCESS in args.ass) or do_all:
                 ScoringProcess(adapter, loader).process_all()
             # if (AssociationActions.UPLOAD in args.ass):# data will be uploaded also by the proces step
@@ -229,10 +237,14 @@ if __name__ == '__main__':
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
                 SearchObjectProcess(adapter, loader, r_server).process_all()
-        '''only run if explicetely called'''
-        if args.es:
-            if ElasticsearchActions.RELOAD in args.es:
-                JSONObjectStorage.refresh_all_data_in_es(loader,adapter.session)
+        if args.qc or run_full_pipeline:
+            do_all = (QCActions.ALL in args.qc) or run_full_pipeline
+            if (QCActions.QC in args.qc) or do_all:
+                QCRunner(es)
+        if args.dump or run_full_pipeline:
+            do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
+            if (DumpActions.DUMP in args.dump) or do_all:
+                DumpGenerator(es).dump()
 
 
 

@@ -2413,7 +2413,7 @@ class EvidenceValidationFileChecker():
         log_file_lock = multiprocessing.Lock()
         audit_lock = multiprocessing.Lock()
 
-        workers_number = Config.EVIDENCEVALIDATION_WORKERS_NUMBER or multiprocessing.cpu_count()
+        workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
 
         '''
         Start crawling the FTP directory
