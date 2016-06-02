@@ -468,8 +468,7 @@ class GeneManager():
 
     def _get_uniprot_data(self):
         c = 0
-        for row in self.session.query(UniprotInfo).yield_per(1000):
-            seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
+        for seqrec in self.esquery.get_all_uniprot_entries():
             c += 1
             if c % 5000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
@@ -530,7 +529,6 @@ class GeneManager():
                 if gene.is_ensembl_reference:
                     gene.preprocess()
                     c += 1
-                    print c
                     loader.put(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                                Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                                geneid,
