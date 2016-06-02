@@ -746,6 +746,7 @@ class ElasticSearchConfiguration():
                         },
                     "evidence_string" : {
                         "type" : "object",
+                        "index": "no",
                     },
                     "target_id" : {
                         "type" : "string",
@@ -757,7 +758,7 @@ class ElasticSearchConfiguration():
                         },
                    "data_source_name" : {
                         "type" : "string",
-
+                        "index": "not_analyzed"
                         },
                    "json_schema_version" : {
                         "type" : "string",
@@ -770,7 +771,6 @@ class ElasticSearchConfiguration():
                    "release_date" : {
                         "type" : "date",
                         "format" : "basic_date_time_no_millis",
-                        "index" : "no"
                         }
                 }
     }

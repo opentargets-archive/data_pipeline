@@ -312,26 +312,6 @@ class EvidenceManagerLookUpDataRetrieval():
 
     def _get_all_stored_genes(self):
 
-        # with self.adapter.engine.connect() as conn:
-        #     offset = 0
-        #     page_size = 5e3
-        #     while True:
-        #         query_string = """select id, data from pipeline.elasticsearch_load WHERE type = '%s' LIMIT %i OFFSET %i;"""%(Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,page_size, offset)
-        #
-        #         result = conn.execute(query_string)
-        #         chunk = result.fetchall()
-        #         if not chunk:
-        #             break
-        #         for row in chunk:
-        #             yield row['id'], json.loads(row['data'])
-        #         # break#TODO: just to speed up test debugging- REMOVE THIS BREAK!
-        #         offset += page_size
-        #         logger.debug("retrieved %i gene objects"%offset)
-        #         result.close()
-
-        # for row in self.session.query(ElasticsearchLoad.id,ElasticsearchLoad.data ).filter(ElasticsearchLoad.index == Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME).yield_per(1000):
-        #     yield row.id, json.loads(row.data)
-
         for row in self.esquery.get_all_genes():
             yield row['id'], row
 

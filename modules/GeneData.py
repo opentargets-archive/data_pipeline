@@ -4,6 +4,8 @@ from datetime import datetime
 import logging
 from StringIO import StringIO
 import urllib2
+
+import sys
 from sqlalchemy import and_
 import ujson as json
 from common import Actions
@@ -418,10 +420,10 @@ class GeneManager():
 
     def merge_all(self):
         # self._get_hgnc_data()
-        self._get_hgnc_data_from_json()
-        self._get_ensembl_data()
+        # self._get_hgnc_data_from_json()
+        # self._get_ensembl_data()
         self._get_uniprot_data()
-        self._store_data()
+        # self._store_data()
 
     def _get_hgnc_data(self):
         for row in self.session.query(HgncGeneInfo).yield_per(1000):
@@ -471,7 +473,7 @@ class GeneManager():
         c = 0
         for seqrec in self.esquery.get_all_uniprot_entries():
             c += 1
-            if c % 5000 == 0:
+            if c % 1000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
             if 'Ensembl' in seqrec.annotations['dbxref_extended']:
                 ensembl_data=seqrec.annotations['dbxref_extended']['Ensembl']

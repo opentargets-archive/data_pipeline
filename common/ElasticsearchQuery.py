@@ -202,7 +202,7 @@ class ESQuery(object):
                                "match_all": {}
                            },
                                '_source': True,
-                               'size': 1000,
+                               'size': 10,
                            },
                            scroll='1h',
                            # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
@@ -218,7 +218,7 @@ class ESQuery(object):
                                "match_all": {}
                            },
                                '_source': True,
-                               'size': 1000,
+                               'size': 20,
                            },
                            scroll='1h',
                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
