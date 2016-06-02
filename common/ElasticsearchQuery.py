@@ -3,6 +3,7 @@ from datetime import datetime, time
 import logging
 from pprint import pprint
 
+import jsonpickle
 from elasticsearch import helpers
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk, parallel_bulk
@@ -194,6 +195,22 @@ class ESQuery(object):
                            )
         for hit in res:
             yield hit['_source']
+
+    def get_all_uniprot_entries(self):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "match_all": {}
+                           },
+                               '_source': True,
+                               'size': 1000,
+                           },
+                           scroll='1h',
+                           # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME),
+                           timeout="10m",
+                           )
+        for hit in res:
+            yield jsonpickle.loads(hit['_source']['entry'])
 
     def get_all_genes(self):
         res = helpers.scan(client=self.handler,
