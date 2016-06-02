@@ -176,7 +176,6 @@ class ProcessedEvidenceStorer():
 
     def flush(self):
 
-
         if self.cache:
 
             rows_to_insert =[]

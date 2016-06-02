@@ -8,7 +8,7 @@ from sqlalchemy import and_
 import ujson as json
 from common import Actions
 from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import JSONObjectStorage
+from common.ElasticsearchLoader import JSONObjectStorage, Loader
 from common.ElasticsearchQuery import ESQuery
 from common.PGAdapter import HgncGeneInfo, EnsemblGeneInfo, UniprotInfo, ElasticsearchLoad
 from common.Redis import RedisLookupTablePickle
@@ -523,30 +523,23 @@ class GeneManager():
 
 
     def _store_data(self):
-        rows_deleted= self.session.query(
-                ElasticsearchLoad).filter(
-                    and_(ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                         ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME)).delete()
-        if rows_deleted:
-            logging.info('deleted %i rows of gene data from elasticsearch_load'%rows_deleted)
-        c=0
-        for geneid, gene in self.genes.iterate():
-            if gene.is_ensembl_reference:
-                gene.preprocess()
-                c+=1
-                self.session.add(ElasticsearchLoad(id=gene.id,
-                                                   index=Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                                   type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                                                   data=gene.to_json(),
-                                                   active=True,
-                                                   date_created=datetime.now(),
-                                                   date_modified=datetime.now(),
-                                                  ))
-                if c % 10000 == 0:
-                    logging.info("%i rows of gene data inserted to elasticsearch_load"%c)
-                    self.session.flush()
-        self.session.commit()
-        logging.info('inserted %i rows of gene data inserted in elasticsearch_load'%c)
+
+        with Loader(self.es, chunk_size=10) as loader:
+            c = 0
+            for geneid, gene in self.genes.iterate():
+                if gene.is_ensembl_reference:
+                    gene.preprocess()
+                    c += 1
+                    print c
+                    loader.put(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                               Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                               geneid,
+                               gene.to_json(),
+                               create_index=True)
+                    if c % 5000 == 0:
+                        logging.info("%i gene objects pushed to elasticsearch" % c)
+
+        logging.info('%i gene objects pushed to elasticsearch'%c)
 
 
 

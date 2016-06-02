@@ -1,7 +1,7 @@
 import json
 import os
 import ujson
-
+import requests
 import datetime
 
 import sys
@@ -15,7 +15,6 @@ from common.ElasticsearchQuery import ESQuery
 import gzip, time, logging
 
 from settings import Config
-import grequests, requests
 
 
 class DumpActions(Actions):
@@ -57,6 +56,7 @@ class DumpGenerator(object):
 
 
     def get_data(self, query, filename = Config.DUMP_FILE_EVIDENCE):
+        import grequests
 
 
         c=0

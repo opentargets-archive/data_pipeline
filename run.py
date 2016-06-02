@@ -173,7 +173,7 @@ if __name__ == '__main__':
         if args.uni or run_full_pipeline:
             do_all = (UniProtActions.ALL in args.uni) or run_full_pipeline
             if (UniProtActions.CACHE in args.uni) or do_all:
-                UniprotDownloader(adapter).cache_human_entries()
+                UniprotDownloader(loader).cache_human_entries()
         if args.hgnc or run_full_pipeline:
             do_all = (HGNCActions.ALL in args.hgnc) or run_full_pipeline
             if (HGNCActions.UPLOAD in args.hgnc) or do_all:

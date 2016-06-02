@@ -8,6 +8,7 @@ from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk, parallel_bulk
 from sqlalchemy import and_
 from common import Actions
+from common.ElasticsearchLoader import Loader
 from common.PGAdapter import ElasticsearchLoad
 from common.processify import processify
 from settings import ElasticSearchConfiguration, Config
@@ -56,7 +57,7 @@ class ESQuery(object):
                                    },
                             scroll='1h',
                             doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                            index=Config().get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
+                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
                             timeout="10m",
                             )
         for hit in res:
@@ -76,7 +77,7 @@ class ESQuery(object):
                                    },
                             scroll='1h',
                             doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                            index=Config().get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME),
+                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME),
                             timeout="10m",
                             )
         for hit in res:
@@ -162,7 +163,7 @@ class ESQuery(object):
                            },
                            scroll='1h',
                            # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
-                           index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
                            timeout="10m",
                            )
 
@@ -188,7 +189,7 @@ class ESQuery(object):
                            },
                            scroll='1h',
                            # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
-                           index=Config().get_versioned_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME),
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME),
                            timeout="10m",
                            )
         for hit in res:
@@ -203,7 +204,7 @@ class ESQuery(object):
                                'size': 1000,
                            },
                            scroll='1h',
-                           index=Config().get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
                            timeout="10m",
                            )
         for hit in res:

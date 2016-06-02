@@ -169,7 +169,8 @@ class Loader():
         self.index_created=[]
         logging.debug("loader chunk_size: %i"%chunk_size)
 
-    def _get_versioned_index(self,index_name):
+    @staticmethod
+    def get_versioned_index(index_name):
         return Config.RELEASE_VERSION + '_' + index_name
 
 
@@ -180,14 +181,14 @@ class Loader():
             if create_index:
                 self.create_new_index(index_name)
             self.index_created.append(index_name)
-            try:
-                time.sleep(3)
-                self.prepare_for_bulk_indexing(self._get_versioned_index(index_name))
-            except:
-                logging.error("cannot prepare index %s for bulk indexing"%index_name)
-                pass
+            # try:
+            #     # time.sleep(3)
+            #     self.prepare_for_bulk_indexing(self.get_versioned_index(index_name))
+            # except:
+            #     logging.error("cannot prepare index %s for bulk indexing"%index_name)
+            #     pass
 
-        self.cache.append(dict(_index=self._get_versioned_index(index_name),
+        self.cache.append(dict(_index=self.get_versioned_index(index_name),
                                _type=doc_type,
                                _id=ID,
                                _source=body))
@@ -268,7 +269,7 @@ class Loader():
                         "number_of_replicas" : 1
                     }
         }
-        index_name = self._get_versioned_index(index_name)
+        index_name = self.get_versioned_index(index_name)
 
         def update_settings(base_settings, specific_settings):
             for key in ["refresh_interval", "number_of_replicas"]:
@@ -291,12 +292,21 @@ class Loader():
         self.es.indices.put_settings(index=index_name,
                                      body =settings)
 
-    def create_new_index(self, index_name):
-        index_name = self._get_versioned_index(index_name)
+    def create_new_index(self, index_name, recreate = True):
+        index_name = self.get_versioned_index(index_name)
+
         try:
-            self.es.indices.delete(index_name, ignore=400)
+            if recreate:
+                self.es.indices.delete(index_name, ignore=400)
+            else:
+                try:
+                    self.es.indices.delete(index_name)
+                except:
+                    logging.info("%s index already existing" % index_name)
+                    return
         except NotFoundError:
             pass
+
         if Config.ELASTICSEARCH_DATA_INDEX_NAME in index_name:
             self.es.indices.create(index=index_name,
                                    ignore=400,
@@ -332,8 +342,25 @@ class Loader():
                                    ignore=400,
                                    body=ElasticSearchConfiguration.search_obj_data_mapping
                                    )
+        elif Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME in index_name:
+            self.es.indices.create(index=index_name,
+                                   ignore=400,
+                                   body=ElasticSearchConfiguration.validated_data_settings_and_mappings
+                                   )
+        elif Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME in index_name:
+            self.es.indices.create(index=index_name,
+                                   ignore=400,
+                                   body=ElasticSearchConfiguration.submission_audit_settings_and_mappings
+                                   )
+        elif Config.ELASTICSEARCH_UNIPROT_INDEX_NAME in index_name:
+            self.es.indices.create(index=index_name,
+                                   ignore=400,
+                                   body=ElasticSearchConfiguration.uniprot_data_mapping
+                                   )
         else:
             self.es.indices.create(index=index_name, ignore=400)
+
+
 
         logging.info("%s index created"%index_name)
 
@@ -350,6 +377,6 @@ class Loader():
 
     def optimize_index(self, index_name):
         try:
-            self.es.indices.optimize(index=self._get_versioned_index(index_name), max_num_segments=5, wait_for_merge = False)
+            self.es.indices.optimize(index=self.get_versioned_index(index_name), max_num_segments=5, wait_for_merge = False)
         except:
             logging.warn('optimisation of index %s failed'%index_name)

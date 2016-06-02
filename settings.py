@@ -1,5 +1,5 @@
 import uuid
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 __author__ = 'andreap'
 import os
@@ -11,7 +11,7 @@ iniparser.read('db.ini')
 class Config():
 
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.04'
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'29.05'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
@@ -37,6 +37,8 @@ class Config():
     ELASTICSEARCH_DATA_SEARCH_DOC_NAME = 'search-object'
     ELASTICSEARCH_ENSEMBL_INDEX_NAME = 'ensembl-data'
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
+    ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
+    ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
@@ -47,10 +49,10 @@ class Config():
             'username': iniparser.get(ENV, 'username'),
             'password': iniparser.get(ENV, 'password'),
             'database': iniparser.get(ENV, 'database')}
-    HPA_NORMAL_TISSUE_URL = 'http://www.proteinatlas.org/download/normal_tissue.csv.zip'
-    HPA_CANCER_URL = 'http://www.proteinatlas.org/download/cancer.csv.zip'
-    HPA_SUBCELLULAR_LOCATION_URL = 'http://www.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'http://www.proteinatlas.org/download/rna.csv.zip'
+    HPA_NORMAL_TISSUE_URL = 'http://v13.proteinatlas.org/download/normal_tissue.csv.zip'
+    HPA_CANCER_URL = 'http://v13.proteinatlas.org/download/cancer.csv.zip'
+    HPA_SUBCELLULAR_LOCATION_URL = 'http://v13.proteinatlas.org/download/subcellular_location.csv.zip'
+    HPA_RNA_URL = 'http://v13.proteinatlas.org/download/rna.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
@@ -82,20 +84,20 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
-    # This is a mapping from the file prefix to the data source name in the system
-    JSON_FILE_TO_DATASOURCE_MAPPING = defaultdict(lambda: "other")
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv005'] = 'CTTV005_Rare2Common'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv006_Networks_Reactome'] = 'CTTV006_Networks_Reactome'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv006'] = 'CTTV006_Networks_Reactome'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv007'] = 'CTTV007_Cancer_Gene_Census'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv008'] = 'CTTV008_ChEMBL'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv009'] = 'CTTV009_GWAS_Catalog'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv010'] = 'CTTV010_Tissue_Specificity'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv011'] = 'CTTV011_UniProt'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv012'] = 'CTTV012_Variation'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv018'] = 'CTTV018_IBD_GWAS'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv025'] = 'CTTV025_Literature'
-    JSON_FILE_TO_DATASOURCE_MAPPING['cttv_external_mousemodels'] = 'CTTV_External_MouseModels'
+    # ftp user and passwords
+    EVIDENCEVALIDATION_FTP_HOST= dict( host = '192.168.1.150',
+                                       port = 22)
+    EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
+    # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
+    #EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv010"] = 'c2a64557'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv011"] = 'bde373ca'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv012"] = '10441b6b'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv008"] = '409a0d21'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv007"] = 'a6052a3b'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv025"] = 'd2b315fa'
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
     WORKERS_NUMBER = None
@@ -114,7 +116,7 @@ class Config():
                                                 gwas_catalog = 'CTTV009_GWAS_Catalog',
                                                 uniprot = 'CTTV011_UniProt',
                                                 eva = 'CTTV012_Variation',
-                                                gwas_ibd = 'CTTV018_IBD_GWAS',
+                                                # gwas_ibd = 'CTTV018_IBD_GWAS',
                                                 phenodigm = 'CTTV_External_MouseModels',
                                                 cancer_gene_census = 'CTTV007_Cancer_Gene_Census',
                                                 europepmc = 'CTTV025_Literature',
@@ -123,19 +125,17 @@ class Config():
                                                 expression_atlas = 'CTTV010_Tissue_Specificity'
                                                 )
 
-    DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(CTTV006_Networks_Reactome = 'reactome',
-                                                CTTV006_Networks_IntAct = 'intact',
-                                                CTTV008_ChEMBL = 'chembl',
-                                                CTTV009_GWAS_Catalog = 'gwas_catalog',
-                                                CTTV011_UniProt = 'uniprot',
-                                                CTTV012_Variation = 'eva',
-                                                CTTV018_IBD_GWAS = 'gwas_ibd',
-                                                CTTV_External_MouseModels = 'phenodigm',
-                                                CTTV007_Cancer_Gene_Census = 'cancer_gene_census',
-                                                CTTV025_Literature = 'europepmc',
-                                                CTTV_External_DisGeNet = 'disgenet',
-                                                CTTV005_Rare2Common = 'rare2common',
-                                                CTTV010_Tissue_Specificity = 'expression_atlas'
+    DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(cttv006 = 'reactome',
+                                                         cttv008 = 'chembl',
+                                                         cttv009 = 'gwas_catalog',
+                                                         cttv011 = 'uniprot',
+                                                         cttv012 = 'eva',
+                                                         cttv018 = 'gwas_ibd',
+                                                         cttv_external_mousemodels = 'phenodigm',
+                                                         cttv007 = 'cancer_gene_census',
+                                                         cttv025 = 'europepmc',
+                                                         cttv005 = 'rare2common',
+                                                         cttv010 = 'expression_atlas'
                                                 )
 
     DATASOURCE_TO_DATATYPE_MAPPING = defaultdict(lambda: "other")
@@ -184,9 +184,6 @@ class Config():
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
-
-    def get_versioned_index(self, idx):
-        return self.RELEASE_VERSION+'_'+idx
 
 
 
@@ -396,6 +393,22 @@ class ElasticSearchConfiguration():
         evidence_shard_number = 3
         evidence_replicas_number = 0
         bulk_load_chunk =1000
+
+    uniprot_data_mapping = eco_data_mapping = {"mappings": {
+                    Config.ELASTICSEARCH_UNIPROT_DOC_NAME: {
+                        "properties": {
+                            "entry": {
+                                "type": "string",
+                                "index": "no"
+                            },
+                                                 }
+                    }
+                },
+                    "settings": {"number_of_shards": 1,
+                                 "number_of_replicas": 0,
+                                 "refresh_interval": "60s",
+                                 },
+                }
 
     eco_data_mapping = {"mappings": {
                            Config.ELASTICSEARCH_ECO_DOC_NAME : {

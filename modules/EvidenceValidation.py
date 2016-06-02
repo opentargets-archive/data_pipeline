@@ -1,12 +1,14 @@
 import os
 import sys
 import copy
-# This bit is necessary for text mining data
-from common.ElasticsearchQuery import ESQuery
+from pprint import pprint
 
-reload(sys);
-sys.setdefaultencoding("utf8");
-# blahblah
+import paramiko
+import pysftp
+from paramiko import AuthenticationException
+
+from common.ElasticsearchLoader import Loader
+from common.ElasticsearchQuery import ESQuery
 import re
 import gzip
 import smtplib
@@ -22,7 +24,7 @@ from StringIO import StringIO
 import json
 from json import JSONDecoder
 from json import JSONEncoder
-from datetime import datetime
+from datetime import datetime, date
 from sqlalchemy import and_, or_, table, column, select, update, insert, desc
 from common import Actions
 from common.PGAdapter import *
@@ -41,17 +43,22 @@ import elasticsearch
 import itertools
 from elasticsearch import Elasticsearch, helpers
 from SPARQLWrapper import SPARQLWrapper, JSON
-
 from multiprocessing import Manager
+
+# This bit is necessary for text mining data
+reload(sys);
+sys.setdefaultencoding("utf8");
+
 
 __author__ = 'gautierk'
 
 logger = logging.getLogger(__name__)
+logging.getLogger("paramiko").setLevel(logging.WARNING)
 
 BLOCKSIZE = 65536
-NB_JSON_FILES = 5
-MAX_NB_EVIDENCE_CHUNKS = 500
-CHUNK_SIZE = 1e4
+NB_JSON_FILES = 3
+MAX_NB_EVIDENCE_CHUNKS = 10000
+EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 1000
 
 EVIDENCE_STRING_INVALID = 10
 EVIDENCE_STRING_INVALID_TYPE = 11
@@ -135,20 +142,14 @@ VALIDATION_DATE = strftime("%Y%m%dT%H%M%SZ")
 
 # figlet -c "Validation Passed"
 messagePassed = '''
-__     __    _ _     _       _   _               ____                        _
-\ \   / /_ _| (_) __| | __ _| |_(_) ___  _ __   |  _ \ __ _ ___ ___  ___  __| |
- \ \ / / _` | | |/ _` |/ _` | __| |/ _ \| '_ \  | |_) / _` / __/ __|/ _ \/ _` |
-  \ V / (_| | | | (_| | (_| | |_| | (_) | | | | |  __/ (_| \__ \__ \  __/ (_| |
-   \_/ \__,_|_|_|\__,_|\__,_|\__|_|\___/|_| |_| |_|   \__,_|___/___/\___|\__,_|
+
+VALIDATION PASSED
 
 '''
 
 messageFailed = '''
-   __     __    _ _     _       _   _               _____     _ _          _
-   \ \   / /_ _| (_) __| | __ _| |_(_) ___  _ __   |  ___|_ _(_) | ___  __| |
-    \ \ / / _` | | |/ _` |/ _` | __| |/ _ \| '_ \  | |_ / _` | | |/ _ \/ _` |
-     \ V / (_| | | | (_| | (_| | |_| | (_) | | | | |  _| (_| | | |  __/ (_| |
-      \_/ \__,_|_|_|\__,_|\__,_|\__|_|\___/|_| |_| |_|  \__,_|_|_|\___|\__,_|
+
+VALIDATION FAILED
 
 '''
 
@@ -245,155 +246,138 @@ class ValidationActions(Actions):
     GENEMAPPING = 'genemapping'
 
 
-class DirectoryCrawlerProcess(multiprocessing.Process):
+class DirectoryCrawlerProcess():
     def __init__(self,
                  output_q,
                  es,
                  input_file_loading_finished,
                  input_file_count,
                  lock):
-        super(DirectoryCrawlerProcess, self).__init__()
         self.output_q = output_q
         self.es = es
-        self.evidence_chunk = EvidenceChunkElasticStorage(es=self.es)
-        self.submission_audit = SubmissionAuditElasticStorage(es=self.es)
+        self.evidence_chunk = EvidenceChunkElasticStorage(loader = Loader(self.es))
+        self.submission_audit = SubmissionAuditElasticStorage(loader = Loader(self.es))
         self.start_time = time.time()
         self.input_file_loading_finished = input_file_loading_finished
         self.input_file_count = input_file_count
         self.start_time = time.time()  # reset timer start
         self.lock = lock
+        self._remote_filenames =dict()
+
+    def _store_remote_filename(self, filename):
+        if filename.startswith('/upload/submissions/') and \
+            filename.endswith('.json.gz'):
+            try:
+                version_name = filename.split('/')[3].split('.')[0]
+                if '-' in version_name:
+                    user, day, month, year = version_name.split('-')
+                    if '_' in user:
+                        user = user.split('_')[0]
+                    release_date = date(int(year),int(month), int(day))
+                    if user not in self._remote_filenames:
+                        self._remote_filenames[user]=dict(date = release_date,
+                                                          file_path = filename,
+                                                          file_version = version_name)
+                    else:
+                        if release_date > self._remote_filenames[user]['date']:
+                            self._remote_filenames[user] = dict(date=release_date,
+                                                                file_path=filename,
+                                                                file_version=version_name)
+            except:
+                logger.debug('error getting remote file%s'%filename)
+
+    def _callback_not_used(self, path):
+        logger.debug("skipped "+path)
 
     def run(self):
-        logger.info("%s started" % self.name)
-
         '''
-        create index for:
+        create index for"
          the evidence if it does not exists
          the submitted files if it does not exists
         '''
-        self.evidence_chunk.storage_create_index(b_recreate=False)
-        self.submission_audit.storage_create_index(b_recreate=False)
 
-        '''
-        now scroll through directories
-        '''
-        for dirname, dirnames, filenames in os.walk(Config.EVIDENCEVALIDATION_FTP_SUBMISSION_PATH):
-            dirnames.sort()
-            for subdirname in dirnames:
-                cttv_match = re.match("^(cttv[0-9]{3})$", subdirname)
-                #cttv_match = re.match("^(cttv012)$", subdirname)
-                if cttv_match:
-                    # get provider id
-                    provider_id = cttv_match.groups()[0]
+        logger.info("%s started" % self.__class__.__name__)
 
-                    cttv_dir = os.path.join(dirname, subdirname)
-                    logging.info(cttv_dir)
-                    path = os.path.join(cttv_dir, "upload/submissions")
-                    for cttv_dirname, cttv_dirs, filenames in os.walk(path):
-                        # sort by the last modified time of the files
-                        filenames.sort(key=lambda x: os.stat(os.path.join(path, x)).st_mtime)
-                        for filename in filenames:
+        self.evidence_chunk.storage_create_index(recreate=False)
+        self.submission_audit.storage_create_index(recreate=False)
 
-                            cttv_filename_match = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename);
-                            logging.info("%s %r"%(filename, cttv_filename_match))
-                            # cttv_filename_match = re.match("cttv006_Networks_Reactome-03-12-2015.json.gz", filename);
-                            if (cttv_filename_match
-                                and
-                                #(filename == 'cttv012-26-11-2015.json.gz') or
-                                #(filename == 'cttv_external_mousemodels-26-01-2016.json.gz') or
-                                #(filename == 'cttv006_Networks_Reactome-18-02-2016.json.gz')
-                                #(filename == 'cttv025-24-02-2016.json.gz')
-                                (filename == 'cttv007-09-03-2016.json.gz')
-                                #(filename == 'cttv008-26-02-2016.json.gz') or
-                                #(filename == 'cttv009-25-02-2016.json.gz') or
-                                #(filename == 'cttv010-10-03-2016.json.gz')
-                                #(filename == 'cttv011-26-02-2016.json.gz') or
-                                #(filename == 'cttv012-03-03-2016.json.gz')
-                                ):
-                                #: #(filename == "cttv006_Networks_Reactome-03-12-2015.json.gz" or filename == "cttv_external_mousemodels-26-01-2016.json.gz"): #"cttv006_Networks_Reactome-03-12-2015.json.gz":
-                                cttv_file = os.path.join(cttv_dirname, filename)
-                                logging.info(cttv_file)
-                                cttv_data_source_name = Config.JSON_FILE_TO_DATASOURCE_MAPPING[
-                                    cttv_filename_match.groups()[0]]
-                                data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[
-                                    cttv_data_source_name]
-                                logging.info(data_source_name)
-                                last_modified = os.path.getmtime(cttv_file)
-                                # july = time.strptime("01 Jul 2015", "%d %b %Y")
-                                # julyseconds = time.mktime(july)
-                                earliest_date = time.strptime("15 Feb 2016", "%d %b %Y")
-                                sepseconds = time.mktime(earliest_date)
-                                if (last_modified - sepseconds) > 0:
-                                    logging.info("Elapsed time %i"%(last_modified - sepseconds))
-                                    m = re.match("^(.+).json.gz$", filename)
-                                    logfile = os.path.join(cttv_dirname, m.groups()[0] + "_log.txt")
-                                    logging.info("%s %s" % (self.name, cttv_file))
+        '''scroll through remote  user directories and find the latest files'''
+        for u, p in Config.EVIDENCEVALIDATION_FTP_ACCOUNTS.items():
+            try:
+                with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
+                                       port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
+                                       username=u,
+                                       password=p,
+                                       ) as srv:
+                    srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
+                    latest_file = self._remote_filenames[u]['file_path']
+                    file_version = self._remote_filenames[u]['file_version']
+                    logging.info(latest_file)
 
-                                    # push to the queue
-                                    # self.validate_gzipfile(cttv_file, filename, provider_id, data_source_name, md5_hash, logfile = logfile)
+                    data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[u]
+                    logging.info(data_source_name)
+                    logfile = os.path.join('/tmp', file_version+ ".log")
+                    logging.Info("%s checking file: %s" % (self.__class__.__name__, file_version))
 
-                                    try:
-                                        ''' get md5 '''
-                                        md5_hash = self.md5_hash_gzipfile(cttv_file)
-                                        logging.info("%s %s %s" % (self.name, cttv_file, md5_hash))
-                                        self.check_gzipfile(cttv_file, filename, provider_id, data_source_name,
-                                                            md5_hash, logfile)
-                                        logging.info("%s %s DONE" % (self.name, cttv_file))
 
-                                    except Exception, error:
+                    try:
+                        ''' get md5 '''
+                        md5_hash = self.md5_hash_remote_file(latest_file, srv)
+                        logging.debug("%s %s %s" % (self.__class__.__name__, file_version, md5_hash))
+                        self.check_file(latest_file, file_version, u, data_source_name,
+                                        md5_hash, logfile)
+                        logging.debug("%s %s DONE" % (self.__class__.__name__, file_version))
 
-                                        if isinstance(error, AttributeError):
-                                            logger.error("%s Error checking file %s: %s" % (self.name, cttv_file, str(error)))
-                                        else:
-                                            logger.exception(
-                                                "%s Error loading file for id %s: %s" % (self.name, cttv_file, str(error)))
+                    except AttributeError, e:
+                        logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
+
+            except AuthenticationException:
+                print 'cannot connect with credentials: user:%s password:%s' % (u, p)
 
         self.input_file_loading_finished.set()
-        logger.info("%s finished" % self.name)
+        logger.info("%s finished" % self.__class__.__name__)
 
-    def md5_hash_gzipfile(self, filename):
+    def md5_hash_local_file(self, filename):
+        return self.md5_hash_from_file_stat(os.stat(filename))
 
+    def md5_hash_remote_file(self, filename, srv):
+        return self.md5_hash_from_file_stat(srv.stat(filename))
+
+    def md5_hash_from_file_stat(self, file_stats):
         hasher = hashlib.md5()
-        with gzip.open(filename, 'rb') as afile:
-            # with open(filename, 'rb') as afile:
-            buf = afile.read(BLOCKSIZE)
-            while len(buf) > 0:
-                hasher.update(buf)
-                buf = afile.read(BLOCKSIZE)
-        md5_hash = hasher.hexdigest()
-        print(md5_hash)
-        afile.close()
-        return md5_hash
+        hasher.update(str(file_stats.st_size))
+        hasher.update(str(file_stats.st_mtime))
+        return hasher.hexdigest()
 
-    def check_gzipfile(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile=None):
-        '''
-        check if the file was already processed
-        '''
-        bValidate = False
-        rowToUpdate = None
+    def check_file(self,
+                   file_path,
+                   file_version,
+                   provider_id,
+                   data_source_name,
+                   md5_hash,
+                   logfile=None,
+                   validate=True,
+                   rowToUpdate = None,
+                   ):
+        '''check if the file was already parsed in ES'''
 
-        '''
-        check if the file was parsed already in ES
-        '''
-
-        #existing_submission= self.submission_audit.get_submission(filename=file_on_disk)
         existing_submission= self.submission_audit.get_submission_md5(md5=md5_hash)
 
-        if existing_submission:
-            md5 = existing_submission["_source"]["md5"]
-            if md5 == md5_hash:
-                    logging.info('%s == %s' % (md5, md5_hash))
-                    logging.info('%s file already recorded. Won\'t parse' % file_on_disk)
-                    ''' should be false, set to true if you want to parse anyway '''
-                    bValidate = False
-            else:
-                logging.info('%s != %s' % (md5, md5_hash))
-                bValidate = True
-        else:
-            bValidate = True
-        logging.info('bValidate %r' % (bValidate))
+        # if existing_submission:
+        #     md5 = existing_submission["_source"]["md5"]
+        #     if md5 == md5_hash:
+        #             logging.info('%s == %s' % (md5, md5_hash))
+        #             logging.info('%s file already recorded. Won\'t parse' % file_path)
+        #             ''' should be false, set to true if you want to parse anyway '''
+        #             validate = False
+        #     else:
+        #         logging.info('%s != %s' % (md5, md5_hash))
+        #         validate = True
+        # else:
+        #     validate = True
+        logging.info('validate for file %s %r' % (file_version,validate))
 
-        if bValidate == True:
+        if validate == True:
 
             ''' reset information in submission_audit index '''
 
@@ -421,7 +405,7 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
                     md5=md5_hash,
                     provider_id=provider_id,
                     data_source_name=data_source_name,
-                    filename=file_on_disk,
+                    filename=file_path,
                     date_created=now,
                     date_modified=now,
                     date_validated=now,
@@ -435,7 +419,7 @@ class DirectoryCrawlerProcess(multiprocessing.Process):
 
                 self.submission_audit.storage_insert_or_update(submission, update=False)
 
-            self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile))
+            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile))
             with self.lock:
                 self.input_file_count.value += 1
 
@@ -457,7 +441,7 @@ class FileReaderProcess(multiprocessing.Process):
         self.input_q = input_q
         self.output_q = output_q
         self.es = es
-        self.evidence_chunk_storage = EvidenceChunkElasticStorage(es=self.es)
+        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
         self.start_time = time.time()
         self.input_file_loading_finished = input_file_loading_finished
         self.input_file_processing_finished = input_file_processing_finished
@@ -469,91 +453,125 @@ class FileReaderProcess(multiprocessing.Process):
 
     def run(self):
         logger.info("%s started" % self.name)
-        while not ((
-                       self.input_file_count.value == self.input_file_processed_count.value) and self.input_file_loading_finished.is_set()):
-            logger.info("%s %i" % (self.name, self.input_file_count.value))
-            time.sleep(1)
+        while not ((self.input_file_count.value == self.input_file_processed_count.value) and \
+                           self.input_file_loading_finished.is_set()):
             data = None
             try:
                 data = self.input_q.get_nowait()
             except Queue.Empty:
+                time.sleep(0.1)
                 pass
             if data:
+                logger.critical("%s %i" % (self.name, self.input_file_count.value))
                 with self.lock:
                     self.input_file_processed_count.value += 1
-                file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile = data
-                try:
-                    logging.info(file_on_disk)
-                    ''' parse the file and put evidence in the queue '''
-                    self.parse_gzipfile(file_on_disk, filename, provider_id, data_source_name, md5_hash,
-                                        logfile=logfile)
+                file_path, file_version, provider_id, data_source_name, md5_hash, logfile = data
+                logging.info('Starting to parse  file %s'%file_path)
+                ''' parse the file and put evidence in the queue '''
+                self.parse_gzipfile(file_path, file_version, provider_id, data_source_name, md5_hash,
+                                    logfile=logfile)
 
-                except Exception, error:
-                    # with self.lock:
-                    #    self.processing_errors_count.value +=1
-                    # UploadError(ev, error, idev).save()
-                    # err += 1
+                # try:
 
-                    if isinstance(error, AttributeError):
-                        logger.error("Error loading data for id %s: %s" % (file_on_disk, str(error)))
-                        break
-                        # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
-                    #elif isinstance(error, elasticsearch.connection.exceptions.TransportError):
-                    #    logger.error("Error updating data in ElasticSearch for id %s: %s" % (file_on_disk, str(error)))
-                    #    # we have to stop the program in case of an error
-                    #    break
 
-                    else:
-                        logger.exception("Error loading data for id %s: %s" % (file_on_disk, str(error)))
-                        # traceback.print_exc(limit=1, file=sys.stdout)
-                        break
+                # except Exception, error:
+                #     # with self.lock:
+                #     #    self.processing_errors_count.value +=1
+                #     # UploadError(ev, error, idev).save()
+                #     # err += 1
+                #
+                #     if isinstance(error, AttributeError):
+                #         logger.error("Error loading data for id %s: %s" % (file_path, str(error)))
+                #         break
+                #         # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
+                #     #elif isinstance(error, elasticsearch.connection.exceptions.TransportError):
+                #     #    logger.error("Error updating data in ElasticSearch for id %s: %s" % (file_path, str(error)))
+                #     #    # we have to stop the program in case of an error
+                #     #    break
+                #
+                #     else:
+                #         logger.exception("Error loading data for id %s: %s" % (file_path, str(error)))
+                #         # traceback.print_exc(limit=1, file=sys.stdout)
+                #         break
 
         self.input_file_processing_finished.set()
         logger.info("%s finished" % self.name)
 
-    def parse_gzipfile(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile=None):
+
+    # file_stat = srv.stat(latest_file)
+    # file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
+    # with srv.open(latest_file, mode='rb', buffer=1) as f:
+    #     with gzip.GzipFile(filename = latest_file.split('/')[1],
+    #                        mode = 'rb',
+    #                        fileobj = f,
+    #                        mtime = file_mod_time) as afile:
+    #         line = afile.readline()
+    #         while line:
+    #             print line
+    # data = afile.read(BLOCKSIZE)
+    # c=0
+    # while data:
+    #     c+=len(data)
+    #     if int(round(c/(1024*1024.))) %100 ==0:
+    #         print round(c/(1024*1024.)), round(float(c)/size*100, 2),'%'
+    #     data = afile.read(BLOCKSIZE)
+
+    def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None):
 
         logging.info('%s Delete previous data for %s' % (self.name, data_source_name))
         self.evidence_chunk_storage.storage_delete(data_source_name)
 
-        logging.info('%s Starting parsing %s' % (self.name, file_on_disk))
+        logging.info('%s Starting parsing %s' % (self.name, file_path))
 
-        fh = gzip.GzipFile(file_on_disk, "r")
-        # lfh = gzip.open(logfile, 'wb', compresslevel=5)
         line_buffer = []
         offset = 0
         chunk = 1
         line_number = 0
 
-        for line in fh:
-            line_buffer.append(line)
-            line_number += 1
-            if line_number % CHUNK_SIZE == 0:
-                logging.info('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-                self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, chunk,
-                                   offset, list(line_buffer), False))
-                offset += CHUNK_SIZE
-                chunk += 1
-                del line_buffer[:]
-        if len(line_buffer) > 0:
-            logging.info('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-            self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
+        with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
+                               port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
+                               username=provider_id,
+                               password=Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[provider_id],
+                               ) as srv:
+
+            file_stat = srv.stat(file_path)
+            file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
+            with srv.open(file_path, mode='rb', bufsize=1) as f:
+                with gzip.GzipFile(filename = file_path.split('/')[1],
+                                   mode = 'rb',
+                                   fileobj = f,
+                                   mtime = file_mod_time) as fh:
+                    line = fh.readline()
+                    while line:
+                        line_buffer.append(line)
+                        line_number += 1
+                        if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
+                            logging.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
+                            self.output_q.put(
+                                (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                                 offset, list(line_buffer), False))
+                            offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+                            chunk += 1
+                            line_buffer = []
+                            with self.lock:
+                                self.evidence_loaded_count.value = line_number
+                        line = fh.readline()
+
+        if line_buffer:
+            logging.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
+            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
                                list(line_buffer), False))
             offset += len(line_buffer)
             chunk += 1
-            del line_buffer[:]
-
-        '''
-        indicate how many evidence were sent
-        '''
-        with self.lock:
-            self.evidence_loaded_count.value += line_number
+            line_buffer = []
+            with self.lock:
+                self.evidence_loaded_count.value = line_number
 
         '''
         finally send a signal to inform that parsing is completed for this file and no other line are to be expected
         '''
         logging.info('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-        self.output_q.put((file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
+        self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
                            line_buffer, True))
 
         return
@@ -584,7 +602,7 @@ class ValidatorProcess(multiprocessing.Process):
         self.input_q = input_q
         self.output_q = output_q
         self.es = es
-        self.evidence_chunk_storage = EvidenceChunkElasticStorage(es=self.es)
+        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
         self.efo_current = efo_current
         self.efo_uncat = efo_uncat
         self.efo_obsolete = efo_obsolete
@@ -614,38 +632,30 @@ class ValidatorProcess(multiprocessing.Process):
                equals to the number of evidence string processed.
             3. make sure that the producer has finished processing the files
         '''
-        while not ((self.evidence_loaded_count.value == self.evidence_validated_count.value) and
-                       (self.input_file_processed_count.value == self.input_file_validated_count.value) and
-                       self.input_file_processing_finished.is_set()):
-            # logger.info("%s %i %i"%(self.name,self.evidence_loaded_count.value, self.evidence_validated_count.value ))
-            time.sleep(1)
-            data = None
-            try:
-                data = self.input_q.get_nowait()
-            except Queue.Empty:
-                pass
-            if data:
-                file_on_disk, filename, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
-
+        with Loader(self.es) as es_loader:
+            while not ((self.evidence_loaded_count.value == self.evidence_validated_count.value) and
+                           (self.input_file_processed_count.value == self.input_file_validated_count.value) and
+                           self.input_file_processing_finished.is_set()):
+                # logger.info("%s %i %i"%(self.name,self.evidence_loaded_count.value, self.evidence_validated_count.value ))
+                data = None
                 try:
-                    # logging.info(file_on_disk)
-                    self.validate_evidence(file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk,
-                                           offset, line_buffer, end_of_transmission, logfile=logfile)
+                    data = self.input_q.get_nowait()
+                except Queue.Empty:
+                    time.sleep(0.1)
+                    pass
+                if data:
+                    file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
 
-                except Exception, error:
+                    self.validate_evidence(file_path, file_version, provider_id, data_source_name, md5_hash, chunk,
+                                               offset, line_buffer, end_of_transmission, es_loader, logfile=logfile)
 
-                    if isinstance(error, AttributeError):
-                        logger.error("%s Error checking file %s: %s" % (self.name, file_on_disk, str(error)))
-                        # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
-                    else:
-                        logger.error("%s Error checking file %s: %s" % (self.name, file_on_disk, str(error)))
-                        # traceback.print_exc(limit=1, file=sys.stdout)
+
 
         self.input_file_validation_finished.set()
         logger.info("%s finished" % self.name)
 
-    def validate_evidence(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, offset,
-                          line_buffer, end_of_transmission, logfile=None):
+    def validate_evidence(self, file_path, file_version, provider_id, data_source_name, md5_hash, chunk, offset,
+                          line_buffer, end_of_transmission, es_loader, logfile=None):
         '''
         validate evidence strings from a chunk
         cumulate the logs, acquire a lock,
@@ -654,13 +664,13 @@ class ValidatorProcess(multiprocessing.Process):
         '''
 
         if end_of_transmission:
-            logging.info("%s Validation of %s completed" % (self.name, file_on_disk))
+            logging.info("%s Validation of %s completed" % (self.name, file_path))
             '''
             Send a message to the audit trail process with the md5 key of the file
             '''
 
-            self.output_q.put((file_on_disk,
-                               filename,
+            self.output_q.put((file_path,
+                               file_version,
                                provider_id,
                                data_source_name,
                                md5_hash,
@@ -695,7 +705,7 @@ class ValidatorProcess(multiprocessing.Process):
             with self.lock:
                 self.input_file_validated_count.value += 1
         else:
-            logging.info('%s Validating %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
+            logging.debug('%s Validating %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
 
             diseases = {}
             top_diseases = []
@@ -730,12 +740,8 @@ class ValidatorProcess(multiprocessing.Process):
 
                 # now validate
                 obj = None
-                validation_result = 0
-                validation_failed = False
                 disease_failed = False
                 gene_failed = False
-                gene_mapping_failed = False
-                uniq_elements_flat_hexdig = None
                 target_id = None
                 efo_id = None
 
@@ -746,35 +752,27 @@ class ValidatorProcess(multiprocessing.Process):
                     if 'label' in python_raw:
                         python_raw['type'] = python_raw.pop('label', None)
                     data_type = python_raw['type']
-                    #logging.info('type %s'%data_type)
                     if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
-                        #logging.info(line)
-                        try:
-                            if data_type == 'genetic_association':
-                                obj = cttv.Genetics.fromMap(python_raw)
-                            elif data_type == 'rna_expression':
-                                obj = cttv.Expression.fromMap(python_raw)
-                            elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
+                        if data_type == 'genetic_association':
+                            obj = cttv.Genetics.fromMap(python_raw)
+                        elif data_type == 'rna_expression':
+                            obj = cttv.Expression.fromMap(python_raw)
+                        elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
+                            obj = cttv.Literature_Curated.fromMap(python_raw)
+                            if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'], list):
+                                mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
+                                python_raw['evidence']['known_mutations'] = [ mutations ]
+                                logging.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
                                 obj = cttv.Literature_Curated.fromMap(python_raw)
-                                if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'], list):
-                                    mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
-                                    python_raw['evidence']['known_mutations'] = [ mutations ]
-                                    logging.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
-                                    obj = cttv.Literature_Curated.fromMap(python_raw)
-                            elif data_type == 'known_drug':
-                                obj = cttv.Drug.fromMap(python_raw)
-                                # logging.info(obj.evidence.association_score.__class__.__name__)
-                                # logging.info(obj.evidence.target2drug.association_score.__class__.__name__)
-                                # logging.info(obj.evidence.drug2clinic.association_score.__class__.__name__)
-                            elif data_type == 'literature':
-                                obj = cttv.Literature_Mining.fromMap(python_raw)
-                            elif data_type == 'animal_model':
-                                obj = cttv.Animal_Models.fromMap(python_raw)
-                        except:
-                            obj = None
+                        elif data_type == 'known_drug':
+                            obj = cttv.Drug.fromMap(python_raw)
+                        elif data_type == 'literature':
+                            obj = cttv.Literature_Mining.fromMap(python_raw)
+                        elif data_type == 'animal_model':
+                            obj = cttv.Animal_Models.fromMap(python_raw)
 
-                        if obj:
 
+                        if obj is not None:
                             if obj.target.id:
                                 for id in obj.target.id:
                                     if id in targets:
@@ -812,15 +810,11 @@ class ValidatorProcess(multiprocessing.Process):
                             uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
                             uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
 
-                            '''
-                            Validate evidence string
-                            '''
+                            'Validate evidence string'
                             validation_result = obj.validate(logger)
                             nb_errors += validation_result
 
-                            '''
-                            Check EFO
-                            '''
+                            'Check EFO'
                             disease_count = 0
                             if obj.disease.id:
                                 index = 0
@@ -833,7 +827,7 @@ class ValidatorProcess(multiprocessing.Process):
                                     #    disease_id = obj.disease.id[index];
                                     index += 1
 
-                                    ''' Check disease term or phenotype term '''
+                                    ' Check disease term or phenotype term '
                                     if (disease_id not in self.efo_current and disease_id not in self.hpo_current and disease_id not in self.mp_current) or disease_id in self.efo_uncat:
                                         audit.append((lc, DISEASE_ID_INVALID, disease_id))
                                         disease_failed = True
@@ -866,9 +860,7 @@ class ValidatorProcess(multiprocessing.Process):
                                 audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_DISEASE))
                                 disease_failed = True
 
-                            '''
-                            Check Ensembl ID, UniProt ID and UniProt ID mapping to a Gene ID
-                            '''
+                            ' Check Ensembl ID, UniProt ID and UniProt ID mapping to a Gene ID'
                             target_count = 0
                             if obj.target.id:
                                 for id in obj.target.id:
@@ -958,11 +950,9 @@ class ValidatorProcess(multiprocessing.Process):
                                 # logger.info("Add evidence for %s %s " %(target_id, disease_id))
                                 # flatten data structure
                                 # logging.info('%s Adding to chunk %s %s'% (self.name, target_id, disease_id))
-                                json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest();
-
-
+                                json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest()
                                 self.evidence_chunk_storage.storage_add(uniq_elements_flat_hexdig,
-                                                                        EvidenceString11(
+                                                                        dict(
                                                                             uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
                                                                             json_doc_hashdig=json_doc_hashdig,
                                                                             evidence_string=json.loads(obj.to_JSON()),
@@ -973,7 +963,7 @@ class ValidatorProcess(multiprocessing.Process):
                                                                             json_doc_version=1,
                                                                             release_date=VALIDATION_DATE),
                                                                         # release_date = datetime.utcnow()),
-                                                                        data_source_name);
+                                                                        data_source_name)
 
                             else:
                                 if disease_failed:
@@ -1013,19 +1003,17 @@ class ValidatorProcess(multiprocessing.Process):
                 cc += len(line)
                 # for line :)
 
-            logging.info('%s nb line parsed %i (size %i)' % (self.name, lc, cc))
+            logging.debug('%s nb line parsed %i (size %i)' % (self.name, lc, cc))
 
             ''' write results in ES '''
 
-            self.evidence_chunk_storage.storage_flush(data_source_name)
+            self.evidence_chunk_storage.storage_flush()
 
-            logging.info('%s bulk insert complete' % (self.name))
+            logging.debug('%s bulk insert complete' % (self.name))
 
-            '''
-            Inform the audit trailer to generate a report and send an e-mail to the data provider
-            '''
-            self.output_q.put((file_on_disk,
-                               filename,
+            'Inform the audit trailer to generate a report and send an e-mail to the data provider'
+            self.output_q.put((file_path,
+                               file_version,
                                provider_id,
                                data_source_name,
                                md5_hash,
@@ -1112,26 +1100,11 @@ class AuditTrailProcess(multiprocessing.Process):
             except Queue.Empty:
                 pass
             if data:
-                try:
-                    file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, offset, buffer_size, logfile, end_of_transmission = data
-                    self.audit_submission(file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats,
-                                          audit, offset, buffer_size, end_of_transmission, logfile)
+                file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, offset, buffer_size, logfile, end_of_transmission = data
+                self.audit_submission(file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats,
+                                      audit, offset, buffer_size, end_of_transmission, logfile)
 
-                except Exception, error:
-                    # with self.lock:
-                    #    self.processing_errors_count.value +=1
-                    # UploadError(ev, error, idev).save()
-                    # err += 1
 
-                    if isinstance(error, AttributeError):
-                        logger.error("%s Error auditing file %s: %s" % (self.name, file_on_disk, str(error)))
-                        import traceback
-                        logging.error('generic exception: ' + traceback.format_exc())
-                        # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
-                    else:
-                        logger.error("%s Error auditing file %s: %s" % (self.name, file_on_disk, str(error)))
-                        import traceback
-                        traceback.print_exc(limit=1, file=sys.stdout)
 
         self.input_file_auditing_finished.set()
         logger.info("%s finished" % self.name)
@@ -1170,7 +1143,7 @@ class AuditTrailProcess(multiprocessing.Process):
         text += extra_text
         text += "\nYours\nThe CTTV Core Platform Team"
         # text += signature
-        print text
+        # print text
 
         if bSend:
             logging.info("Send e-mail to data provider...")
@@ -1273,7 +1246,7 @@ class AuditTrailProcess(multiprocessing.Process):
     def audit_submission(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit,
                          offset, buffer_size, end_of_transmission, logfile=None):
 
-        logger.info("%s %s chunk=%i nb_lines=%i nb_valid=%i nb_errors=%i"
+        logger.debug("%s %s chunk=%i nb_lines=%i nb_valid=%i nb_errors=%i"
                     % (self.name, md5_hash, chunk, stats["nb_lines"], stats["nb_valid"], stats["nb_errors"]))
 
         ''' check invalid disease and report it in the logs '''
@@ -1346,14 +1319,14 @@ class AuditTrailProcess(multiprocessing.Process):
                               map(lambda x: x['stats']['nb_valid'], self.registry[md5_hash]['chunks']))
 
             for x in self.registry[md5_hash]['chunks']:
-                logging.info("%s %i"%(data_source_name, x['chunk']))
+                logging.debug("%s %i"%(data_source_name, x['chunk']))
                 if x['stats']['invalid_diseases'] is not None:
-                    logging.info("len invalid_diseases: %i"%len(x['stats']['invalid_diseases']))
+                    logging.debug("len invalid_diseases: %i"%len(x['stats']['invalid_diseases']))
                 else:
-                    logging.info('None invalid_diseases')
+                    logging.debug('None invalid_diseases')
             invalid_diseases = reduce((lambda x, y: self.merge_dict_sum(x, y)), map(lambda x: x['stats']['invalid_diseases'].copy(),
                                                                       self.registry[md5_hash]['chunks']))
-            logging.info("len TOTAL invalid_diseases: %i"%len(invalid_diseases))
+            logging.debug("len TOTAL invalid_diseases: %i"%len(invalid_diseases))
 
             obsolete_diseases = reduce((lambda x, y: self.merge_dict_sum(x, y)), map(lambda x: x['stats']['obsolete_diseases'].copy(),
                                                                        self.registry[md5_hash]['chunks']))
@@ -1375,27 +1348,27 @@ class AuditTrailProcess(multiprocessing.Process):
 
 
 
-            logging.info("not sorted chunks %i", len(self.registry[md5_hash]['chunks']))
+            logging.debug("not sorted chunks %i", len(self.registry[md5_hash]['chunks']))
             sortedChunks = sorted(self.registry[md5_hash]['chunks'], key=lambda k: k['chunk'])
-            logging.info("sortedChunks %i", len(sortedChunks))
-            logging.info("keys %s", ",".join(sortedChunks[0]))
+            logging.debug("sortedChunks %i", len(sortedChunks))
+            logging.debug("keys %s", ",".join(sortedChunks[0]))
 
 
             '''
             Write audit logs
             '''
-            logging.info("Open log file")
+            logging.debug("Open log file")
             lfh = open(logfile, 'wb')
             for chunk in sortedChunks:
-                logging.info("%i"%chunk['chunk'])
+                logging.debug("%i"%chunk['chunk'])
                 self.write_logs(lfh, chunk['audit'])
             lfh.close()
-            logging.info("Close log file")
+            logging.debug("Close log file")
 
             '''
             Count nb of documents
             '''
-            logging.info("Count nb of inserted documents")
+            logging.debug("Count nb of inserted documents")
             search = self.es.search(
                     index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
                     doc_type=data_source_name,
@@ -1414,7 +1387,7 @@ class AuditTrailProcess(multiprocessing.Process):
             {"hits": {"hits": [], "total": 9468, "max_score": 0.0}, "_shards": {"successful": 3, "failed": 0, "total": 3}, "took": 21, "aggregations": {"group_by_targets": {"buckets": [{"key": "ENSG00000146648", "doc_count": 4157}, {"key": "ENSG00000066468", "doc_count": 513}, {"key": "ENSG00000068078", "doc_count": 377}, {"key": "ENSG00000148400", "doc_count": 322}, {"key": "ENSG00000160867", "doc_count": 125}, {"key": "ENSG00000077782", "doc_count": 118}, {"key": "ENSG00000164690", "doc_count": 78}, {"key": "ENSG00000005075", "doc_count": 45}, {"key": "ENSG00000047315", "doc_count": 45}, {"key": "ENSG00000099817", "doc_count": 45}, {"key": "ENSG00000100142", "doc_count": 45}, {"key": "ENSG00000102978", "doc_count": 45}, {"key": "ENSG00000105258", "doc_count": 45}, {"key": "ENSG00000125651", "doc_count": 45}, {"key": "ENSG00000144231", "doc_count": 45}, {"key": "ENSG00000147669", "doc_count": 45}, {"key": "ENSG00000163882", "doc_count": 45}, {"key": "ENSG00000168002", "doc_count": 45}, {"key": "ENSG00000177700", "doc_count": 45}, {"key": "ENSG00000181222", "doc_count": 45}], "sum_other_doc_count": 3193, "doc_count_error_upper_bound": 18}}, "timed_out": false}
             '''
 
-            logging.info("Get top 20 targets")
+            logging.debug("Get top 20 targets")
             search = self.es.search(
                     index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
                     doc_type=data_source_name,
@@ -1444,7 +1417,7 @@ class AuditTrailProcess(multiprocessing.Process):
 
                 # logging.info(json.dumps(top_target))
 
-            logging.info("Get top 20 diseases")
+            logging.debug("Get top 20 diseases")
             search = self.es.search(
                     index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
                     doc_type=data_source_name,
@@ -1466,7 +1439,7 @@ class AuditTrailProcess(multiprocessing.Process):
                 text += "\n"
 
             # report invalid/obsolete EFO term
-            logging.info("report invalid EFO term")
+            logging.debug("report invalid EFO term")
             if nb_efo_invalid > 0:
                 text += "Errors:\n"
                 text += "\t%i invalid ontology term(s) found in %i (%.2f%s) of the records.\n" % (
@@ -1479,7 +1452,7 @@ class AuditTrailProcess(multiprocessing.Process):
 
                 text += "\n"
 
-            logging.info("report obsolete EFO term")
+            logging.debug("report obsolete EFO term")
             if nb_efo_obsolete > 0:
                 text += "Errors:\n"
                 text += "\t%i obsolete ontology term(s) found in %i (%.1f%s) of the records.\n" % (
@@ -1501,7 +1474,7 @@ class AuditTrailProcess(multiprocessing.Process):
                 text += "\n"
 
             # report invalid Ensembl genes
-            logging.info("report invalid Ensembl genes")
+            logging.debug("report invalid Ensembl genes")
             if nb_ensembl_invalid > 0:
                 text += "Errors:\n"
                 text += "\t%i unknown Ensembl identifier(s) found in %i (%.1f%s) of the records.\n" % (
@@ -1514,7 +1487,7 @@ class AuditTrailProcess(multiprocessing.Process):
                 text += "\n"
 
             # report Ensembl genes not on reference assembly
-            logging.info("report Ensembl genes not on reference assembly")
+            logging.debug("report Ensembl genes not on reference assembly")
             if nb_ensembl_nonref > 0:
                 text += "Warnings:\n"
                 text += "\t%i Ensembl Human Alternative sequence Gene identifier(s) not mapped to the reference genome assembly %s found in %i (%.1f%s) of the records.\n" % (
@@ -1532,7 +1505,7 @@ class AuditTrailProcess(multiprocessing.Process):
                 text += "\n"
 
             # report invalid Uniprot entries
-            logging.info("report invalid Uniprot entries")
+            logging.debug("report invalid Uniprot entries")
             if nb_uniprot_invalid > 0:
                 text += "Errors:\n"
                 text += "\t%i invalid UniProt identifier(s) found in %i (%.1f%s) of the records.\n" % (
@@ -1546,7 +1519,7 @@ class AuditTrailProcess(multiprocessing.Process):
 
                 # report UniProt ids with no mapping to Ensembl
             # missing_uniprot_id_xrefs
-            logging.info("report UniProt ids with no mapping to Ensembl")
+            logging.debug("report UniProt ids with no mapping to Ensembl")
             if nb_missing_uniprot_id_xrefs > 0:
                 text += "Warnings:\n"
                 text += "\t%i UniProt identifier(s) without cross-references to Ensembl found in %i (%.1f%s) of the records.\n" % (
@@ -1561,7 +1534,7 @@ class AuditTrailProcess(multiprocessing.Process):
                 text += "\n"
 
             # report invalid Uniprot mapping entries
-            logging.info("report invalid Uniprot mapping entries")
+            logging.debug("report invalid Uniprot mapping entries")
             if nb_uniprot_invalid_mapping > 0:
                 text += "Warnings:\n"
                 text += "\t%i UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (that's %.2f%s) of the records.\n" % (
@@ -1579,7 +1552,7 @@ class AuditTrailProcess(multiprocessing.Process):
                         self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
                 text += "\n"
 
-            print(text)
+            # print(text)
 
             # A file is successfully validated if it meets the following conditions
             successfully_validated = (
@@ -1605,7 +1578,7 @@ class AuditTrailProcess(multiprocessing.Process):
 
             self.submission_audit.storage_insert_or_update(submission, update=True)
 
-            logging.info('%s updated %s file in the validation table' % (self.name, file_on_disk))
+            logging.debug('%s updated %s file in the validation table' % (self.name, file_on_disk))
 
             '''
             Send e-mail
@@ -1645,78 +1618,40 @@ class AuditTrailProcess(multiprocessing.Process):
         return
 
 
-class ELasticStorage():
-    @staticmethod
-    def create_data_index(es, index_name=None, mappings=None, b_recreate=False):
-        # delete former index, uncomment if required
-        if es.indices.exists(index_name):
-            if b_recreate:
-                print("deleting '%s' index..." % (index_name))
-                res = es.indices.delete(index=index_name)
-                print(" response: '%s'" % (res))
-            else:
-                return
+class ElasticStorage():
 
-        # ElasticSearchConfiguration().validated_data_settings_and_mappings
-        # ignore 400 cause by IndexAlreadyExistsException when creating an index
-        res = es.indices.create(index=index_name,
-                                body=mappings,
-                                ignore=400)
-        print(" response: '%s'" % (res))
+
+
 
     @staticmethod
-    def delete_prev_data_in_es_obsolete(es, data_source_name):
-        # Delete all documents in an index of specific type without deleting its mapping
-        # delete_by_query
-        es.delete(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
-                  doc_type=data_source_name,
-                  q='{"query":{"match_all":{}}}')
-
-    @staticmethod
-    def delete_prev_data_in_es(es, data_source_name):
+    def delete_prev_data_in_es(es, index, data_source_name):
         # Create a query for results you want to delete
 
         count = 0
-        # filter without a query
-        # { "query": { "filtered": { "filter": { "type" : { "value" : "efo" } } } } }
-        # {"took":1,"timed_out":false,"_shards":{"total":3,"successful":3,"failed":0},"hits":{"total":0,"max_score":0.0,"hits":[]}}
-        try:
-            q = '{ "query": { "filtered": { "filter": { "type" : { "value" : "%s" } } } } }' % (data_source_name)
 
-            res = es.search(
-                    index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
-                    body=q,
-                    size=0,
-                    search_type='count')
+        q = '{ "query": { "filtered": { "filter": { "type" : { "value" : "%s" } } } } }' % (data_source_name)
 
-            count = res["hits"]["total"]
+        res = es.search(
+                index=index,
+                body=q,
+                size=0,
+                search_type='count')
 
-            logger.info(
-                "EvidenceStringELasticStorage %s nb docs: %i" % (Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME, count))
+        count = res["hits"]["total"]
 
-        except Exception:
-            # import traceback
-            # logging.error('generic exception: ' + traceback.format_exc())
-            # generate HTTP_EXCEPTIONS.get(status_code, TransportError)(status_code, error_message, additional_info)
-            # NotFoundError: TransportError(404, u'IndexMissingException[[validated-data] missing]')
-            return
+        logger.debug(
+            "EvidenceStringELasticStorage %s number of docs: %i" % (index, count))
+
+
 
         if (count > 0):
-            logging.info("Delete previous submitted data: %i evidence will be removed"%count)
-            #search = es.search(
-            #        index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
-            #        doc_type=data_source_name,
-            #        q='{"query":{"match_all":{}}}',
-            #        size=10,
-            #        search_type="scan",
-            #        scroll='5m',
-            #)
+            logging.debug("Delete previous submitted data: %i evidence strings will be removed"%count)
 
             search = es.search(
-                    index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                    index=index,
                     doc_type=data_source_name,
                     body=q,
-                    size=int(CHUNK_SIZE),
+                    size=int(EVIDENCESTRING_VALIDATION_CHUNK_SIZE),
                     search_type="scan",
                     scroll='5m')
 
@@ -1724,32 +1659,33 @@ class ELasticStorage():
             total_hits = count
 
             while total_hits > 0:
-                try:
-                    # Get the next page of results.
-                    if nb_scroll % 10 == 0:
-                        logging.info("Get Scroll %i and delete data for datasource %s"%(nb_scroll, data_source_name))
-                    nb_scroll+=1
-                    scroll = es.scroll(scroll_id=search['_scroll_id'], scroll='5m')
-                    # Since scroll throws an error catch it and break the loop.
-                    # We have results initialize the bulk variable.
-                    bulk = ""
-                    for result in scroll['hits']['hits']:
-                        bulk = bulk + '{ "delete" : { "_index" : "' + str(result['_index']) + '", "_type" : "' + str(
-                                result['_type']) + '", "_id" : "' + str(result['_id']) + '" } }\n'
-                    # Finally do the deleting.
-                    es.bulk(body=bulk)
-                    total_hits -= len(scroll['hits']['hits'])
-                except Exception, error:
-                    if isinstance(error, elasticsearch.exceptions.NotFoundError):
-                        logger.error("ElasticSearch Error updating data in ElasticSearch %s" % (str(error)))
-                    else:
-                        logger.error("ElasticSearch Error %s" % (str(error)))
-                    break
+                # try:
+                # Get the next page of results.
+                if nb_scroll % 10 == 0:
+                    logging.debug("Get Scroll %i and delete data for datasource %s"%(nb_scroll, data_source_name))
+                nb_scroll+=1
+                scroll = es.scroll(scroll_id=search['_scroll_id'], scroll='5m')
+                # Since scroll throws an error catch it and break the loop.
+                # We have results initialize the bulk variable.
+                bulk = ""
+                for result in scroll['hits']['hits']:
+                    bulk = bulk + '{ "delete" : { "_index" : "' + str(result['_index']) + '", "_type" : "' + str(
+                            result['_type']) + '", "_id" : "' + str(result['_id']) + '" } }\n'
+                # Finally do the deleting.
+                es.bulk(body=bulk)
+                total_hits -= len(scroll['hits']['hits'])
+                # except Exception, error:
+                #     if isinstance(error, elasticsearch.exceptions.NotFoundError):
+                #         logger.error("ElasticSearch Error updating data in ElasticSearch %s" % (str(error)))
+                #     else:
+                #         logger.error("ElasticSearch Error %s" % (str(error)))
+                #     break
 
                 # es.delete(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME, doc_type=data_source_name)
 
     @staticmethod
     def store_to_es(es,
+                    index,
                     data_source_name,
                     data,
                     quiet=False):
@@ -1762,7 +1698,7 @@ class ELasticStorage():
         for key, value in data.iteritems():
             rows_to_insert += 1
             action = {
-                "_index": "%s" % Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                "_index": "%s" % index,
                 "_type": "%s" % data_source_name,
                 "_id": key,
                 "_source":
@@ -1780,95 +1716,57 @@ class ELasticStorage():
             }
             actions.append(action)
 
-            '''
-            es.index(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
-                     doc_type=data_source_name,
-                     id=key,
-                     body=json.dumps(dict(uniq_assoc_fields_hashdig = key,
-                                        json_doc_hashdig = value.json_doc_hashdig,
-                                        evidence_string = value.evidence_string,
-                                        target_id = value.target_id,
-                                        disease_id = value.disease_id,
-                                        data_source_name = value.data_source_name,
-                                        json_schema_version = value.json_schema_version,
-                                        json_doc_version = value.json_doc_version,
-                                        release_date = value.release_date
-                                      )))
-            '''
         if len(actions) > 0:
             helpers.bulk(es, actions)
         # if not quiet:
-        logging.info('EvidenceStringStorage: inserted %i rows of %s inserted in evidence_string took %ss' % (
+        logging.debug('EvidenceStringStorage: inserted %i rows of %s inserted in evidence_string took %ss' % (
         rows_to_insert, data_source_name, str(time.time() - start_time)))
 
         return rows_to_insert
 
 
 class EvidenceChunkElasticStorage():
-    def __init__(self, es, chunk_size=1e3):
-        self.es = es
-        self.chunk_size = chunk_size
-        self.cache = {}
-        self.counter = 0
+    def __init__(self, loader,):
+        self.loader = loader
 
-    def storage_create_index(self, b_recreate=False):
-        ELasticStorage.create_data_index(
-                self.es,
-                index_name=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
-                mappings=ElasticSearchConfiguration.validated_data_settings_and_mappings,
-                b_recreate=b_recreate)
-
-    def storage_reset(self):
-        self.cache = {}
-        self.counter = 0
+    def storage_create_index(self, recreate=False):
+        self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME, recreate = recreate)
 
     def storage_add(self, id, evidence_string, data_source_name):
 
-        self.cache[id] = evidence_string
-        self.counter += 1
-        if (len(self.cache) % self.chunk_size) == 0:
-            self.storage_flush(data_source_name)
+        self.loader.put(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                        data_source_name,
+                        id,
+                        evidence_string,
+                        create_index=False)
 
     def storage_delete(self, data_source_name):
-        ELasticStorage.delete_prev_data_in_es(self.es, data_source_name)
-        self.cache = {}
-        self.counter = 0
+        ElasticStorage.delete_prev_data_in_es(self.loader.es,
+                                              self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
+                                              data_source_name)
 
-    def storage_flush(self, data_source_name):
-
-        #logging.info("Flush storage for %s" % data_source_name)
-        if self.cache:
-            ELasticStorage.store_to_es(self.es,
-                                       data_source_name,
-                                       self.cache,
-                                       quiet=False
-                                       )
-            self.counter += len(self.cache)
-            self.cache = {}
+    def storage_flush(self):
+        self.loader.flush()
 
 class SubmissionAuditElasticStorage():
-    def __init__(self, es, chunk_size=1e3):
-        self.es = es
+    def __init__(self, loader, chunk_size=1e3):
+        self.loader = loader
 
-    def storage_create_index(self, b_recreate=False):
-        ELasticStorage.create_data_index(
-                self.es,
-                index_name=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
-                mappings=ElasticSearchConfiguration.submission_audit_settings_and_mappings,
-                b_recreate=b_recreate)
+    def storage_create_index(self, recreate=False):
+        self.loader.create_new_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME, recreate)
 
     def exists(self, filename=None):
-        search = self.es.search(
-                index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+        search = self.loader.es.search(
+                index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
                 doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
                 body=SUBMISSION_FILTER_FILENAME_QUERY%filename,
         )
 
-        return (search and search["hits"]["total"] == 1)
+        return search and search["hits"]["total"] == 1
 
     def get_submission_md5(self, md5=None):
-        search = self.es.search(
-                index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+        search = self.loader.es.search(
+                index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
                 doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
                 body=SUBMISSION_FILTER_MD5_QUERY%md5,
         )
@@ -1879,8 +1777,8 @@ class SubmissionAuditElasticStorage():
             return None
 
     def get_submission(self, filename=None):
-        search = self.es.search(
-                index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+        search = self.loader.es.search(
+                index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
                 doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
                 body=SUBMISSION_FILTER_FILENAME_QUERY%filename,
         )
@@ -1895,20 +1793,19 @@ class SubmissionAuditElasticStorage():
 
         actions = []
         if update:
-            logging.info(json.dumps(submission, indent=4))
+            logging.debug(json.dumps(submission, indent=4))
             action = {
                 '_op_type': 'update',
-                '_index': '%s' % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                '_index': '%s' % self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
                 '_type': '%s' % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
                 '_id': submission['md5'],
                 'doc': submission
             }
             actions.append(action)
-            #actions.append()
 
         else:
             action = {
-                "_index": "%s" % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME,
+                "_index": "%s" % self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
                 "_type": "%s" % Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
                 "_id": submission['md5'],
                 "_source":
@@ -1916,22 +1813,22 @@ class SubmissionAuditElasticStorage():
             }
             actions.append(action)
 
-        logging.info(json.dumps(actions[0], indent=4))
+        logging.debug(json.dumps(actions[0], indent=4))
 
-        nb_success = helpers.bulk(self.es, actions, stats_only=False)
-        logging.info(json.dumps(nb_success, indent=4))
-        if nb_success[0] !=1:
+        success = helpers.bulk(self.loader.es, actions, stats_only=False)
+        logging.debug(json.dumps(success, indent=4))
+        if success[0] !=1:
             # print("ERRORS REPORTED " + json.dumps(nb_errors))
-            logging.info("SubmissionAuditElasticStorage: command failed:%s"%nb_success[0])
+            logging.debug("SubmissionAuditElasticStorage: command failed:%s"%success[0])
         else:
-            logging.info('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
+            logging.debug('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
 
-        self.es.indices.refresh(index=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME)
+        self.loader.es.indices.flush(index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME))
 
         return
 
     def storage_delete(self, data_source_name):
-        ELasticStorage.delete_prev_data_in_es(self.es, data_source_name)
+        ElasticStorage.delete_prev_data_in_es(self.es, data_source_name)
         self.cache = {}
         self.counter = 0
 
@@ -1939,7 +1836,8 @@ class SubmissionAuditElasticStorage():
 
         #logging.info("Flush storage for %s" % data_source_name)
         if self.cache:
-            ELasticStorage.store_to_es(self.es,
+            ElasticStorage.store_to_es(self.loader.es,
+                                       self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
                                        data_source_name,
                                        self.cache,
                                        quiet=False
@@ -2037,7 +1935,7 @@ class EvidenceValidationFileChecker():
         Load HGNC information from the last version in database
         :return: None
         '''
-        logging.info("Loading HGNC entries and mapping from Ensembl Gene Id to UniProt")
+        logging.debug("Loading HGNC entries and mapping from Ensembl Gene Id to UniProt")
         c = 0
         for row in self.session.query(HgncInfoLookup).order_by(desc(HgncInfoLookup.last_updated)).limit(1):
             # data = json.loads(row.data);
@@ -2047,7 +1945,7 @@ class EvidenceValidationFileChecker():
                 if "symbol" in doc:
                     gene_symbol = doc["symbol"];
                     if gene_symbol not in self.symbols:
-                        logging.info("Adding missing symbol from Ensembl %s" % gene_symbol)
+                        logging.debug("Adding missing symbol from Ensembl %s" % gene_symbol)
                         self.symbols[gene_symbol] = {};
 
                     self.symbols[gene_symbol]["hgnc_id"] = doc["hgnc_id"]
@@ -2070,10 +1968,10 @@ class EvidenceValidationFileChecker():
                         if uniprot_id not in self.symbols[gene_symbol]["uniprot_ids"]:
                             self.symbols[gene_symbol]["uniprot_ids"].append(uniprot_id)
 
-        logging.info("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
+        logging.debug("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
 
     def load_Uniprot(self):
-        logging.info("Loading Uniprot identifiers and mappings to Gene Symbol and Ensembl Gene Id")
+        logging.debug("Loading Uniprot identifiers and mappings to Gene Symbol and Ensembl Gene Id")
         c = 0
         for row in self.session.query(UniprotInfo).yield_per(1000):
             # get the symbol too
@@ -2098,13 +1996,13 @@ class EvidenceValidationFileChecker():
                 #
                 if gene_symbol == 'PLSCR3':
                     gene_symbol = 'TMEM256-PLSCR3';
-                    logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
+                    logging.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
                 elif gene_symbol == 'LPPR4':
                     gene_symbol = 'PLPPR4';
-                    logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
+                    logging.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
                 elif gene_symbol == 'NSG2':
                     gene_symbol = 'HMP19';
-                    logging.info("Mapping protein entry to correct symbol %s" % gene_symbol)
+                    logging.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
 
                 self.uniprot_current[uniprot_accession]["gene_symbol"] = gene_symbol;
 
@@ -2149,14 +2047,14 @@ class EvidenceValidationFileChecker():
             # seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
             if c % 5000 == 0:
-                logging.info("%i entries retrieved for uniprot" % c)
+                logging.debug("%i entries retrieved for uniprot" % c)
                 # for accession in seqrec.annotations['accessions']:
                 #    self.uniprot_current.append(accession)
-        logging.info("%i entries retrieved for uniprot" % c)
+        logging.debug("%i entries retrieved for uniprot" % c)
 
     def load_Ensembl(self):
 
-        logging.info("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
+        logging.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
             Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
 
         for row in self.esquery.get_all_ensembl_genes():
@@ -2177,7 +2075,7 @@ class EvidenceValidationFileChecker():
                     self.symbols[display_name]["ensembl_secondary_ids"] = []
                 self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
 
-        logging.info("Loading ES Ensembl finished")
+        logging.debug("Loading ES Ensembl finished")
 
 
     def store_gene_mapping(self):
@@ -2186,7 +2084,7 @@ class EvidenceValidationFileChecker():
             in one table called gene_mapping_lookup.
             It's a snapshot of the UniProt, Ensembl and HGNC information at a given time
         '''
-        logging.info("Stitching everything together")
+        logging.debug("Stitching everything together")
         data = {'symbols': self.symbols, 'uniprot': self.uniprot_current, 'ensembl': self.ensembl_current}
         print(json.dumps(data, indent=4));
 
@@ -2200,7 +2098,7 @@ class EvidenceValidationFileChecker():
         )
         self.session.add(hr)
         self.session.commit()
-        logging.info(
+        logging.debug(
             "inserted gene mapping information in JSONB format in the gene_mapping_lookup table at {:%d, %b %Y}".format(
                 today))
 
@@ -2210,7 +2108,7 @@ class EvidenceValidationFileChecker():
             from one table called gene_mapping_lookup.
         '''
 
-        logging.info("Loading mapping between Ensembl, UniProt, HGNC and gene symbols")
+        logging.debug("Loading mapping between Ensembl, UniProt, HGNC and gene symbols")
         for row in self.session.query(GeneMappingLookup).order_by(desc(GeneMappingLookup.last_updated)).limit(1):
             data = row.data
             self.symbols = data['symbols']
@@ -2221,7 +2119,7 @@ class EvidenceValidationFileChecker():
 
     def load_eco(self):
 
-        logging.info("Loading ECO current valid terms")
+        logging.debug("Loading ECO current valid terms")
         for row in self.session.query(ECONames):
             self.eco_current[row.uri] = row.label
 
@@ -2375,31 +2273,24 @@ class EvidenceValidationFileChecker():
         #return;
 
         self.load_gene_mapping()
-        # return;
         self.load_efo()
         self.load_hpo()
         self.load_mp()
         self.load_eco()
         self.adapter.close()
 
-        '''
-        Create queues
-        '''
-        file_q = multiprocessing.Queue(maxsize=NB_JSON_FILES + 1)
+        'Create queues'
+        file_q = multiprocessing.Queue(maxsize=NB_JSON_FILES)
         evidence_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS + 1)
-        audit_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS + 1)
+        audit_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS)
 
-        '''
-        Create events
-        '''
+        'Create events'
         input_file_loading_finished = multiprocessing.Event()
         input_file_processing_finished = multiprocessing.Event()
         input_file_validation_finished = multiprocessing.Event()
         input_file_auditing_finished = multiprocessing.Event()
 
-        '''
-        Create counters (shared memory objects)
-        '''
+        'Create counters (shared memory objects)'
         input_file_count = multiprocessing.Value('i', 0)
         input_file_processed_count = multiprocessing.Value('i', 0)
         input_file_validated_count = multiprocessing.Value('i', 0)
@@ -2407,28 +2298,14 @@ class EvidenceValidationFileChecker():
         evidence_validated_count = multiprocessing.Value('i', 0)
         input_file_audited_count = multiprocessing.Value('i', 0)
 
-        '''create locks'''
+        'create locks'
         file_processing_lock = multiprocessing.Lock()
         log_file_lock = multiprocessing.Lock()
         audit_lock = multiprocessing.Lock()
 
         workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
 
-        '''
-        Start crawling the FTP directory
-        '''
-        directory_crawler = DirectoryCrawlerProcess(
-                file_q,
-                self.es,
-                input_file_loading_finished,
-                input_file_count,
-                file_processing_lock)
-
-        directory_crawler.start()
-
-        '''
-        Start processing the evidence file from the data providers
-        '''
+        'Start file reader workers'
         readers = [FileReaderProcess(file_q,
                                      evidence_q,
                                      self.es,
@@ -2443,10 +2320,22 @@ class EvidenceValidationFileChecker():
         for w in readers:
             w.start()
 
-        '''
-        Start processing the evidence in chunks
-        on the evidence queue
-        '''
+
+
+        'Start crawling the FTP directory'
+        directory_crawler = DirectoryCrawlerProcess(
+                file_q,
+                self.es,
+                input_file_loading_finished,
+                input_file_count,
+                file_processing_lock)
+
+        directory_crawler.run()
+
+
+
+
+        'Start validating the evidence in chunks on the evidence queue'
 
         validators = [ValidatorProcess(evidence_q,
                                        audit_q,
@@ -2472,9 +2361,9 @@ class EvidenceValidationFileChecker():
         for w in validators:
             w.start()
 
-        '''
-        Audit the whole process and send e-mails
-        '''
+        sys.exit()
+
+        'Audit the whole process and send e-mails'
         auditor = AuditTrailProcess(
                 audit_q,
                 self.es,
@@ -2499,8 +2388,6 @@ class EvidenceValidationFileChecker():
         while not input_file_auditing_finished.is_set():
             time.sleep(1)
 
-        if directory_crawler.is_alive():
-            directory_crawler.terminate()
 
         for w in readers:
             if w.is_alive():
