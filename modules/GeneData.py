@@ -420,10 +420,10 @@ class GeneManager():
 
     def merge_all(self):
         # self._get_hgnc_data()
-        # self._get_hgnc_data_from_json()
-        # self._get_ensembl_data()
+        self._get_hgnc_data_from_json()
+        self._get_ensembl_data()
         self._get_uniprot_data()
-        # self._store_data()
+        self._store_data()
 
     def _get_hgnc_data(self):
         for row in self.session.query(HgncGeneInfo).yield_per(1000):
