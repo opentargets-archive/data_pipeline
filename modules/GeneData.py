@@ -561,11 +561,11 @@ class GeneManager():
 
     def _extend_reactome_data(self, gene):
         reaction_types = dict()
-        for r in self.reactome:
+        for r in gene.reactome:
             key, reaction = r['id'], r['value']
             for reaction_type in self._get_pathway_type(key):
                 reaction_types[reaction_type['pathway type']]=reaction_type
-        for r in self.reactome:
+        for r in gene.reactome:
             if r['id']==key:
                 r['pathway types']=reaction_types.values()
         return gene
