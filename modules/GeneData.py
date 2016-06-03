@@ -538,8 +538,8 @@ class GeneManager():
             if 'Ensembl' in seqrec.annotations['dbxref_extended']:
                 ensembl_data=seqrec.annotations['dbxref_extended']['Ensembl']
                 ensembl_genes_id=[]
-                for enst in ensembl_data:
-                    ensembl_genes_id.append(ensembl_data[enst]['gene ID'])
+                for ens_data_point in ensembl_data:
+                    ensembl_genes_id.append(ens_data_point[['value']]['gene ID'])
                 ensembl_genes_id = list(set(ensembl_genes_id))
                 success = False
                 for ensembl_id in ensembl_genes_id:
