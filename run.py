@@ -186,7 +186,7 @@ if __name__ == '__main__':
         if args.gen or run_full_pipeline:
             do_all = (GeneActions.ALL in args.gen) or run_full_pipeline
             if (GeneActions.MERGE in args.gen) or do_all:
-                GeneManager(es).merge_all()
+                GeneManager(es,r_server).merge_all()
         if args.efo or run_full_pipeline:
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:

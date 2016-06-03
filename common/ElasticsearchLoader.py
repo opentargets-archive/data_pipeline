@@ -198,9 +198,10 @@ class Loader():
             # self.load_single(index_name, doc_type, ID, body)
 
     def flush(self):
-        # for ok, results in streaming_bulk(
+
         try:
-            for ok, results in parallel_bulk(
+            # for ok, results in parallel_bulk(
+            for ok, results in streaming_bulk(
                     self.es,
                     self.cache,
                     chunk_size=self.chunk_size,
