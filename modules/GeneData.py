@@ -349,7 +349,8 @@ class Gene(JSONSerializable):
         if self.reactome:
             pathways=[]
             pathway_types=[]
-            for reaction_code, reaction in self.reactome.items():
+            for r in self.reactome:
+                reaction_code, reaction = r['id'], r['value']
                 pathways.append(reaction_code)
                 if 'pathway types' in reaction:
                     for ptype in reaction['pathway types']:
@@ -560,10 +561,13 @@ class GeneManager():
 
     def _extend_reactome_data(self, gene):
         reaction_types = dict()
-        for key, reaction in gene.reactome.items():
+        for r in self.reactome:
+            key, reaction = r['id'], r['value']
             for reaction_type in self._get_pathway_type(key):
                 reaction_types[reaction_type['pathway type']]=reaction_type
-        gene.reactome[key]['pathway types']=reaction_types.values()
+        for r in self.reactome:
+            if r['id']==key:
+                r['pathway types']=reaction_types.values()
         return gene
 
     def _get_pathway_type(self, reaction_id):
