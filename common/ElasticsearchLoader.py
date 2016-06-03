@@ -197,7 +197,7 @@ class Loader():
                     self.es,
                     self.cache,
                     chunk_size=self.chunk_size,
-                    request_timeout=1200,
+                    request_timeout=60000,
             ):
 
                 action, result = results.popitem()
