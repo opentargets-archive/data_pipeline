@@ -87,7 +87,7 @@ class ESQuery(object):
 
     def get_associations_for_target(self, target, fields = None, size = 100):
         source =  {"include": fields}
-        res = self.handler.search(index=Config().get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body={"query": {
                                           "filtered": {
@@ -121,7 +121,7 @@ class ESQuery(object):
     def get_associations_for_disease(self, disease, fields = None, size = 100):
         source =  {"include": fields}
 
-        res = self.handler.search(index=Config().get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body={"query": {
                                           "filtered": {
@@ -226,3 +226,19 @@ class ESQuery(object):
                            )
         for hit in res:
             yield hit['_source']
+
+    def get_reaction(self, reaction_id):
+        print repr(reaction_id)
+        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_REACTOME_INDEX_NAME),
+                                  doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                                  body={"query": {
+                                            "ids" : {
+                                                "values" : [reaction_id]
+                                              }
+                                          },
+                                          '_source': True,
+                                          'size': 1,
+                                      }
+                                  )
+        for hit in res['hits']['hits']:
+            return hit['_source']

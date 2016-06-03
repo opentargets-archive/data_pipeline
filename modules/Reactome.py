@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from common import Actions
 from common.DataStructure import TreeNode, JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
+from common.ElasticsearchQuery import ESQuery
 from common.PGAdapter import ReactomePathwayData, ReactomePathwayRelation, ReactomeEnsembleMapping
 from settings import Config
 import networkx as nx
@@ -212,18 +213,13 @@ class ReactomeUploader():
 
 class ReactomeRetriever():
     """
-    Will retrieve a Reactome object form the processed json stored in postgres
+    Will retrieve a Reactome object form the processed json stored in elasticsearch
     """
     def __init__(self,
-                 adapter):
-        self.adapter=adapter
-        self.session=adapter.session
+                 es):
+        self.es_query=ESQuery(es)
 
     def get_reaction(self, reaction_id):
-        json_data = JSONObjectStorage.get_data_from_pg(self.session,
-                                                       Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
-                                                       Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                                                       reaction_id)
         reaction = ReactomeNode()
-        reaction.load_json(json_data)
+        reaction.load_json(self.es_query.get_reaction(reaction_id))
         return reaction

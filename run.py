@@ -12,7 +12,7 @@ from modules.ECO import EcoActions, EcoProcess, EcoUploader
 from modules.EFO import EfoActions, EfoProcess, EfoUploader
 from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess, EvidenceStringUploader
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
-from modules.GeneData import GeneActions, GeneManager, GeneUploader
+from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
@@ -186,9 +186,7 @@ if __name__ == '__main__':
         if args.gen or run_full_pipeline:
             do_all = (GeneActions.ALL in args.gen) or run_full_pipeline
             if (GeneActions.MERGE in args.gen) or do_all:
-                GeneManager(adapter, es).merge_all()
-            if (GeneActions.UPLOAD in args.gen) or do_all:
-                GeneUploader(adapter, loader).upload_all()
+                GeneManager(es).merge_all()
         if args.efo or run_full_pipeline:
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:

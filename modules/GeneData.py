@@ -1,3 +1,4 @@
+import warnings
 from collections import OrderedDict
 import copy
 from datetime import datetime
@@ -17,6 +18,37 @@ from common.Redis import RedisLookupTablePickle
 from common.UniprotIO import UniprotIterator
 from modules.Reactome import ReactomeRetriever
 from settings import Config
+
+
+'''line profiler code'''
+# try:
+from line_profiler import LineProfiler
+
+def do_profile(follow=[]):
+    def inner(func):
+        def profiled_func(*args, **kwargs):
+            try:
+                profiler = LineProfiler()
+                profiler.add_function(func)
+                for f in follow:
+                    profiler.add_function(f)
+                profiler.enable_by_count()
+                return func(*args, **kwargs)
+            finally:
+                profiler.print_stats()
+                print 'done'
+        return profiled_func
+    return inner
+
+# except ImportError:
+#     def do_profile(follow=[]):
+#         "Helpful if you accidentally leave in production!"
+#         def inner(func):
+#             def nothing(*args, **kwargs):
+#                 return func(*args, **kwargs)
+#             return nothing
+#         return inner
+'''end of line profiler code'''
 
 __author__ = 'andreap'
 
@@ -406,15 +438,13 @@ class GeneManager():
     """
 
     def __init__(self,
-                 adapter,
                  es):
 
-        self.adapter=adapter
-        self.session=adapter.session
+
         self.es = es
         self.esquery = ESQuery(es)
         self.genes = GeneSet()
-        self.reactome_retriever=ReactomeRetriever(adapter)
+        self.reactome_retriever=ReactomeRetriever(es)
 
 
 
@@ -423,7 +453,7 @@ class GeneManager():
         self._get_hgnc_data_from_json()
         self._get_ensembl_data()
         self._get_uniprot_data()
-        self._store_data()
+        # self._store_data()
 
     def _get_hgnc_data(self):
         for row in self.session.query(HgncGeneInfo).yield_per(1000):
@@ -469,10 +499,14 @@ class GeneManager():
             if not gene.is_ensembl_reference:
                 self.genes.remove_gene(geneid)
 
+    # @do_profile
     def _get_uniprot_data(self):
         c = 0
         for seqrec in self.esquery.get_all_uniprot_entries():
             c += 1
+            print c
+            if c ==10:
+                break
             if c % 1000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
             if 'Ensembl' in seqrec.annotations['dbxref_extended']:
@@ -545,32 +579,16 @@ class GeneManager():
 
 
 
-class GeneUploader():
-    """upload the gene objects to elasticsearch"""
-
-    def __init__(self,
-                 adapter,
-                 loader):
-        self.adapter=adapter
-        self.session=adapter.session
-        self.loader=loader
-
-
-    def upload_all(self):
-        JSONObjectStorage.refresh_index_data_in_es(self.loader,
-                                         self.session,
-                                         Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                         Config.ELASTICSEARCH_GENE_NAME_DOC_NAME)
-        self.loader.optimize_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
-
 
 class GeneRetriever():
     """
+    DEPRECATED USE TargetLookUpTable
     Will retrieve a Gene object form the processed json stored in postgres
     """
     def __init__(self,
                  adapter,
                  cache_size = 25):
+        warnings.warn('use TargetLookUpTable instead', DeprecationWarning, stacklevel=2)
         self.adapter=adapter
         self.session=adapter.session
         self.cache = OrderedDict()
