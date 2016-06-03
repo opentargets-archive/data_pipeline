@@ -118,7 +118,10 @@ class RedisQueue(object):
         pipe.zadd(self.processing_key, key, time.time())
         pipe.expire(self.processing_key, self.default_ttl)
         pipe.execute()
-        return key, pickle.loads(base64.decodestring(r_server.get(self._get_value_key(key))))
+        pickled = r_server.get(self._get_value_key(key))
+        if pickled is not None:
+            return key, pickle.loads(base64.decodestring(pickled))
+        return None
 
     def done(self,key, r_server=None, error = False):
         r_server = self._get_r_server(r_server)
