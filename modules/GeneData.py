@@ -504,9 +504,6 @@ class GeneManager():
         c = 0
         for seqrec in self.esquery.get_all_uniprot_entries():
             c += 1
-            print c
-            if c ==10:
-                break
             if c % 1000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
             if 'Ensembl' in seqrec.annotations['dbxref_extended']:

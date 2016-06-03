@@ -228,7 +228,6 @@ class ESQuery(object):
             yield hit['_source']
 
     def get_reaction(self, reaction_id):
-        print repr(reaction_id)
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_REACTOME_INDEX_NAME),
                                   doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
                                   body={"query": {
