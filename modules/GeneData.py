@@ -589,13 +589,13 @@ class GeneManager():
             loader.create_new_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|gene_data_storage',
                            r_server=self.r_server,
-                           max_size=1000,
-                           job_timeout=180)
+                           max_size=10000,
+                           job_timeout=600)
 
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
-        workers = [GeneObjectStorer(self.es,self.r_server,queue) for i in range(multiprocessing.cpu_count())]
+        workers = [GeneObjectStorer(self.es,self.r_server,queue) for i in range(multiprocessing.cpu_count()*2)]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()
