@@ -310,8 +310,8 @@ class Parser(object):
                 if 'dbxref_extended' not in self.ParsedSeqRecord.annotations:
                     self.ParsedSeqRecord.annotations['dbxref_extended']={}
                 if element.attrib['type'] not in self.ParsedSeqRecord.annotations['dbxref_extended']:
-                    self.ParsedSeqRecord.annotations['dbxref_extended'][element.attrib['type']]={}
-                self.ParsedSeqRecord.annotations['dbxref_extended'][element.attrib['type']]=dict(id=key,value=properties)
+                    self.ParsedSeqRecord.annotations['dbxref_extended'][element.attrib['type']]=[]
+                self.ParsedSeqRecord.annotations['dbxref_extended'][element.attrib['type']].append(dict(id=key,value=properties))
 
 
         def _parse_dbReference(element):
