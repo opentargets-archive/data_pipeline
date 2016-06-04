@@ -487,8 +487,8 @@ class GeneManager():
 
     def merge_all(self):
         # self._get_hgnc_data()
-        self._get_hgnc_data_from_json()
-        self._get_ensembl_data()
+        # self._get_hgnc_data_from_json()
+        # self._get_ensembl_data()
         self._get_uniprot_data()
         self._store_data()
 
@@ -539,7 +539,7 @@ class GeneManager():
                 ensembl_data=seqrec.annotations['dbxref_extended']['Ensembl']
                 ensembl_genes_id=[]
                 for ens_data_point in ensembl_data:
-                    ensembl_genes_id.append(ens_data_point[['value']]['gene ID'])
+                    ensembl_genes_id.append(ens_data_point['value']['gene ID'])
                 ensembl_genes_id = list(set(ensembl_genes_id))
                 success = False
                 for ensembl_id in ensembl_genes_id:
