@@ -85,6 +85,26 @@ class ESQuery(object):
             yield hit['_source']
 
 
+    def get_all_eco(self, fields=None):
+        # if fields is None:
+        #     fields = ['*']
+        # source =  {"include": fields},
+
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "match_all": {}
+                           },
+                               'fields': fields,
+                               'size': 100,
+                           },
+                           scroll='12h',
+                           doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_ECO_INDEX_NAME),
+                           timeout="10m",
+                           )
+        for hit in res:
+            yield hit['_source']
+
     def get_associations_for_target(self, target, fields = None, size = 100):
         source =  {"include": fields}
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),

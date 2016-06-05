@@ -220,7 +220,7 @@ if __name__ == '__main__':
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                EvidenceStringProcess(adapter, es).process_all()
+                EvidenceStringProcess(es).process_all()
             # if (EvidenceStringActions.UPLOAD in args.evs) or do_all:
             #     EvidenceStringUploader(adapter, loader).upload_all()
         if args.ass or run_full_pipeline:

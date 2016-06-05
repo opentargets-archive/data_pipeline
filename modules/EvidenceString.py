@@ -16,12 +16,10 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage, Loader
 from common.ElasticsearchQuery import ESQuery
-from common.PGAdapter import LatestEvidenceString, ElasticsearchLoad, EvidenceString121, \
-    TargetToDiseaseAssociationScoreMap, Adapter, EvidenceString10
 from modules import GeneData
-from modules.ECO import ECO, EcoRetriever
-from modules.EFO import EFO, get_ontology_code_from_url, EfoRetriever
-from modules.GeneData import Gene, GeneRetriever
+from modules.ECO import ECO, EcoRetriever, ECOLookUpTable
+from modules.EFO import EFO, get_ontology_code_from_url, EfoRetriever, EFOLookUpTable
+from modules.GeneData import Gene, GeneRetriever, GeneLookUpTable
 from settings import Config
 from dateutil import parser as smart_date_parser
 import time
@@ -150,10 +148,9 @@ class ExtendedInfoECO(ExtendedInfo):
                           label=eco.label),
 
 class ProcessedEvidenceStorer():
-    def __init__(self, adapter, es_loader, chunk_size=1e4, quiet = False):
+    def __init__(self,  es_loader, chunk_size=1e4, quiet = False):
 
-        self.adapter=adapter
-        self.session=adapter.session
+
         self.chunk_size = chunk_size
         self.cache = {}
         self.counter = 0
@@ -164,8 +161,6 @@ class ProcessedEvidenceStorer():
 
         # self.cache[id] = ev
         self.counter +=1
-        if (len(self.cache) % self.chunk_size) == 0:
-            self.flush()
         self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
                            ev.get_doc_name(),
                            id,
@@ -174,49 +169,11 @@ class ProcessedEvidenceStorer():
 
 
 
-    def flush(self):
 
-        if self.cache:
-
-            rows_to_insert =[]
-            map_rows_to_insert = []
-            for key, value in self.cache.iteritems():
-                rows_to_insert.append(dict(id=key,
-                                          index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value.database],
-                                          type=value.get_doc_name(),
-                                          data=value.to_json(),
-                                          active=True,
-                                          ))
-                for efo in value.evidence['private']['efo_codes']:
-                    map_rows_to_insert.append(dict(target_id=value.evidence['target']['id'],
-                                                  disease_id=efo,
-                                                  evidence_id=value.evidence['id'],
-                                                  is_direct=efo==value.evidence['disease']['id'],
-                                                  association_score=value.evidence['scores']['association_score'],
-                                                  datasource=value.evidence['sourceID'],))
-            self.adapter.engine.execute(ElasticsearchLoad.__table__.insert(),rows_to_insert)
-            self.adapter.engine.execute(TargetToDiseaseAssociationScoreMap.__table__.insert(),map_rows_to_insert)
-
-
-
-
-            # if autocommit:
-            #     adapter.session.commit()
-            self.counter+=len(self.cache)
-
-            if not self.quiet:
-                logger.critical('%i rows inserted in elasticsearch_load table' %(self.counter))
-
-
-            self.session.flush()
-            self.cache = {}
 
 
     def close(self):
-
-        self.flush()
-        self.session.commit()
-
+        pass
 
     def __enter__(self):
         return self
@@ -239,9 +196,8 @@ class EvidenceManagerLookUpData():
 
 
 class EvidenceManagerLookUpDataRetrieval():
-    def __init__(self, adapter = Adapter(), es = None):
-        self.adapter = adapter
-        self.session = adapter.session
+    def __init__(self,  es = None):
+
         self.es = es
         if es is not None:
             self.esquery = ESQuery(es)
@@ -257,25 +213,17 @@ class EvidenceManagerLookUpDataRetrieval():
 
     def _get_available_efos(self):
         self.lookup.available_efo_objects = dict()
-        for row in self.session.query(ElasticsearchLoad.id,
-                                      ElasticsearchLoad.data).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                        ElasticsearchLoad.active==True)):
-            efo_obj = EFO(get_ontology_code_from_url(row.id))
-            efo_obj.load_json(row.data)
-            self.lookup.available_efo_objects[get_ontology_code_from_url(row.id)]= efo_obj
+        for row in self.esquery.get_all_diseases():
+            efo_obj = EFO(get_ontology_code_from_url(row['id']))
+            efo_obj.load_json(row)
+            self.lookup.available_efo_objects[efo_obj.get_id()]= efo_obj
         self.lookup.available_efos = frozenset(self.lookup.available_efo_objects.keys())
 
     def _get_available_ecos(self):
         self.lookup.available_eco_objects = dict()
-        for row in self.session.query(ElasticsearchLoad.id,
-                                      ElasticsearchLoad.data).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_ECO_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_ECO_DOC_NAME,
-                        ElasticsearchLoad.active==True)):
-            eco_obj = ECO(row.id)
-            eco_obj.load_json(row.data)
+        for row in self.esquery.get_all_eco():
+            eco_obj = ECO(get_ontology_code_from_url(row['id']))
+            eco_obj.load_json(row)
             self.lookup.available_eco_objects[eco_obj.get_id()]= eco_obj
 
         self.lookup.available_ecos = frozenset(self.lookup.available_eco_objects.keys())
@@ -317,9 +265,7 @@ class EvidenceManagerLookUpDataRetrieval():
 
 
 class EvidenceManager():
-    def __init__(self, lookup_data, adapter = Adapter()):
-        self.adapter = adapter
-        self.session = adapter.session
+    def __init__(self, lookup_data,):
         self.available_genes = lookup_data.available_genes
         self.available_gene_objects = lookup_data.available_gene_objects
         self.available_efos =  lookup_data.available_efos
@@ -332,18 +278,12 @@ class EvidenceManager():
         # logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header=GeneData.UNI_ID_ORG_PREFIX
         self.ens_header=GeneData.ENS_ID_ORG_PREFIX
-        self.gene_retriever = GeneRetriever(adapter)
-        # logger.debug("finished self.gene_retriever(), took %ss"%str(time.time()-start_time))
-        self.efo_retriever = EfoRetriever(adapter)
-        # logger.debug("finished self.efo_retriever(), took %ss"%str(time.time()-start_time))
-        self.eco_retriever = EcoRetriever(adapter)
-        # logger.debug("finished self.eco_retriever(), took %ss"%str(time.time()-start_time))
+        # self.gene_retriever = GeneLookUpTable(self.es)
+        # self.efo_retriever = EFOLookUpTable(self.es)
+        # self.eco_retriever = ECOLookUpTable(self.es)
         self._get_score_modifiers()
         # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
 
-    def make_pickable(self):
-        self.adapter = None
-        self.session = None
 
     # @do_profile()#follow=[])
     def fix_evidence(self, evidence):
@@ -679,23 +619,6 @@ class EvidenceManager():
         for datasource, values in Config.DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE.items():
             self.score_modifiers[datasource]=DataNormaliser(values['min'],values['max'])
 
-    def _get_all_stored_genes(self):
-        with self.adapter.engine.connect() as conn:
-                offset = 0
-                page_size = 5e3
-                while True:
-                    query_string = """select id, data from pipeline.elasticsearch_load WHERE type = '%s' LIMIT %i OFFSET %i;"""%(Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,page_size, offset)
-
-                    result = conn.execute(query_string)
-                    chunk = result.fetchall()
-                    if not chunk:
-                        break
-                    for row in chunk:
-                        yield row['id'], json.loads(row['data'])
-                    # break#TODO: just to speed up test debugging- REMOVE THIS BREAK!
-                    offset += page_size
-                    logger.debug("retrieved %i gene objects"%offset)
-                    result.close()
 
 
 
@@ -1057,15 +980,13 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.processing_finished = processing_finished
         self.output_generated_count = output_generated_count
         self.total_loaded = submitted_to_storage
-        self.adapter=Adapter()
-        self.session=self.adapter.session
         self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
         self.lock = lock
 
     def run(self):
         logger.info("worker %s started"%self.name)
         with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
-            with ProcessedEvidenceStorer(self.adapter, es_loader, chunk_size=self.chunk_size, quiet=False) as storer:
+            with ProcessedEvidenceStorer( es_loader, chunk_size=self.chunk_size, quiet=False) as storer:
                 while not (((self.output_generated_count.value == self.total_loaded.value) and \
                         self.processing_finished.is_set()) or self.signal_finish.is_set()):
                     if not self.q.empty():
@@ -1088,10 +1009,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
 class EvidenceStringProcess():
 
     def __init__(self,
-                 adapter,
                  es):
-        self.adapter=adapter
-        self.session=adapter.session
         self.loaded_entries_to_pg = 0
         self.es = es
         self.es_query = ESQuery(es)
@@ -1111,10 +1029,9 @@ class EvidenceStringProcess():
 
         logger.debug("Starting Evidence Manager")
 
-        # self._delete_prev_data()
-        # for row in self.session.query(LatestEvidenceString).yield_per(1000):
+
         evidence_start_time = time.time()
-        lookup_data = EvidenceManagerLookUpDataRetrieval(self.adapter, self.es).lookup
+        lookup_data = EvidenceManagerLookUpDataRetrieval(self.es).lookup
         get_evidence_page_size = 25000
 
         '''create queues'''
@@ -1188,80 +1105,15 @@ class EvidenceStringProcess():
             if w.is_alive():
                 time.sleep(1)
                 w.terminate()
-        # # self.session.commit()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
         return
 
 
 
-    def _delete_prev_data(self):
-        logger.info("deleting old evidence-data objects")
-        JSONObjectStorage.delete_prev_data_in_pg(self.session,
-                                                 Config.ELASTICSEARCH_DATA_INDEX_NAME)
 
-        logger.info("deleting old target-to-disease map objects")
-        rows_deleted = self.session.query(
-                TargetToDiseaseAssociationScoreMap).delete(synchronize_session=False)
-        self.session.commit()
-
-        if rows_deleted:
-            logger.info('deleted %i rows from target_to_disease_associaiton_score_map' % rows_deleted)
-
-    # def _store_evidence_string(self):
-    #     for key, value in self.data.iteritems():
-    #         self.loaded_entries_to_pg += 1
-    #         self.session.add(ElasticsearchLoad(id=key,
-    #                                       index=Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[value.database],
-    #                                       type=value.get_doc_name(),
-    #                                       data=value.to_json(),
-    #                                       active=True,
-    #                                       date_created=datetime.now(),
-    #                                       date_modified=datetime.now(),
-    #                                       ))
-    #         # for efo in value.evidence['private']['efo_codes']:
-    #         #     self.session.add(TargetToDiseaseAssociationScoreMap(
-    #         #                                       target_id=value.evidence['target']['id'],
-    #         #                                       disease_id=efo,
-    #         #                                       evidence_id=value.evidence['id'],
-    #         #                                       is_direct=efo==value.evidence['disease']['id'],
-    #         #                                       association_score=value.evidence['scores']['association_score'],
-    #         #                                       datasource=value.evidence['sourceID'],))
-    #         # self.session.add(ElasticsearchLoad(id=key,
-    #         #                               index=Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME,
-    #         #                               type=value.get_doc_name(),
-    #         #                               data=value.score_to_json(),
-    #         #                               active=True,
-    #         #                               date_created=datetime.now(),
-    #         #                               date_modified=datetime.now(),
-    #         #                               ))
-    #     logger.info("%i rows of evidence strings inserted to elasticsearch_load" % self.loaded_entries_to_pg)
-    #     self.session.flush()
-    #     self.data=OrderedDict()
 
     def get_evidence(self, page_size = 50000):
-        # with self.adapter.engine.connect() as conn:
-        #     # total = conn.execute("""select count(*) from public.evidence_strings_1pt2pt1;""").fetchone()['count']
-        #     # logger.critical("preparing to fetch %i evidence string rows"%total)
-        #     offset = 0
-        #     page_size = 1e3
-        #     while True:
-        #         query_string = """select * from public.evidence_strings_1pt2pt1 LIMIT %i OFFSET %i;"""%(page_size, offset)
-        #
-        #         result = conn.execute(query_string)
-        #         chunk = result.fetchall()
-        #         if not chunk:
-        #             break
-        #         for row in chunk:
-        #             yield row
-        #         offset += page_size
-        #         logger.info("loaded %i ev from db to process"%offset)
-        #         result.close()
-        # c=0
-        # for row in self.session.query(EvidenceString10).yield_per(page_size):
-        #     c+=1
-        #     if c%page_size==0:
-        #         logger.critical("loaded %i ev from db to process"%c)
-        #     yield row
+
         c = 0
         for row in self.es_query.get_validated_evidence_strings():
             c += 1
@@ -1273,46 +1125,3 @@ class EvidenceStringProcess():
 
 
 
-
-class EvidenceStringUploader():
-
-    def __init__(self,
-                 adapter,
-                 loader):
-        self.adapter=adapter
-        self.session=adapter.session
-        self.loader=loader
-
-    def upload_all(self):
-        # self.clear_old_data()
-        # JSONObjectStorage.refresh_index_data_in_es(self.loader,
-        #                                  self.session,
-        #                                  Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME
-        #                                  )
-        JSONObjectStorage.refresh_index_data_in_es(self.loader,
-                                         self.session,
-                                         Config.ELASTICSEARCH_DATA_INDEX_NAME
-                                         )
-        # self.loader.optimize_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
-        self.loader.optimize_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
-
-    def clear_old_data(self):
-        # self.loader.clear_index(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME+'*')
-        self.loader.clear_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
-
-class EvidenceStringRetriever():
-    """
-    Will retrieve an evidence string object form the processed json stored in postgres
-    """
-    def __init__(self,
-                 adapter):
-        self.adapter=adapter
-        self.session=adapter.session
-
-    def get_gene(self, evidenceid):
-        json_data = JSONObjectStorage.get_data_from_pg(self.session,
-                                                       Config.ELASTICSEARCH_DATA_INDEX_NAME,
-                                                       Config.ELASTICSEARCH_DATA_DOC_NAME,
-                                                       evidenceid)
-        evidence = Evidence(json_data)
-        return evidence

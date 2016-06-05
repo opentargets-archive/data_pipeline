@@ -625,7 +625,7 @@ class GeneRetriever():
     def __init__(self,
                  adapter,
                  cache_size = 25):
-        warnings.warn('use TargetLookUpTable instead', DeprecationWarning, stacklevel=2)
+        warnings.warn('use GeneLookUpTable instead', DeprecationWarning, stacklevel=2)
         self.adapter=adapter
         self.session=adapter.session
         self.cache = OrderedDict()
@@ -656,9 +656,9 @@ class GeneRetriever():
             self.cache.popitem(last=False)
 
 
-class TargetLookUpTable(object):
+class GeneLookUpTable(object):
     """
-    A redis-based pickable target look up table
+    A redis-based pickable gene look up table
     """
 
     def __init__(self,
@@ -673,17 +673,17 @@ class TargetLookUpTable(object):
         self._es_query = ESQuery(es)
         self.r_server = None
         if r_server is not None:
-            self._load_target_data()
+            self._load_gene_data()
 
-    def _load_target_data(self, r_server = None):
+    def _load_gene_data(self, r_server = None):
         for target in self._es_query.get_all_targets():
             self._table.set(target['id'],target, r_server=r_server)#TODO can be improved by sending elements in batches
 
-    def get_target(self, target_id, r_server = None ):
+    def get_gene(self, target_id, r_server = None):
         return self._table.get(target_id, r_server=r_server)
 
-    def set_target(self, target, r_server = None):
+    def set_gene(self, target, r_server = None):
         self._table.set(target['id'],target, r_server=r_server)
 
-    def get_available_target_ids(self, r_server = None):
+    def get_available_gene_ids(self, r_server = None):
         return self._table.keys()

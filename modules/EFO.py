@@ -1,3 +1,4 @@
+import warnings
 from collections import OrderedDict
 import logging
 
@@ -6,7 +7,9 @@ import sys
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
+from common.ElasticsearchQuery import ESQuery
 from common.PGAdapter import  EFONames, EFOPath, EFOFirstChild
+from common.Redis import RedisLookupTablePickle
 from settings import Config
 
 __author__ = 'andreap'
@@ -208,6 +211,7 @@ class EfoRetriever():
     def __init__(self,
                  adapter,
                  cache_size = 25):
+        warnings.warn('use redis based instead', DeprecationWarning, stacklevel=2)
         self.adapter=adapter
         self.session=adapter.session
         self.cache = OrderedDict()
@@ -236,3 +240,36 @@ class EfoRetriever():
         self.cache[efoid]=efo
         while len(self.cache) >self.cache_size:
             self.cache.popitem(last=False)
+
+
+class EFOLookUpTable(object):
+    """
+    A redis-based pickable efo look up table
+    """
+
+    def __init__(self,
+                 es,
+                 namespace = None,
+                 r_server = None,
+                 ttl = 60*60*24+7):
+        self._table = RedisLookupTablePickle(namespace = namespace,
+                                            r_server = r_server,
+                                            ttl = ttl)
+        self._es = es
+        self._es_query = ESQuery(es)
+        self.r_server = None
+        if r_server is not None:
+            self._load_efo_data()
+
+    def _load_efo_data(self, r_server = None):
+        for efo in self._es_query.get_all_diseases():
+            self._table.set(efo['id'],efo, r_server=r_server)#TODO can be improved by sending elements in batches
+
+    def get_efo(self, efo_id, r_server = None):
+        return self._table.get(efo_id, r_server=r_server)
+
+    def set_efo(self, target, r_server = None):
+        self._table.set(target['id'],target, r_server=r_server)
+
+    def get_available_gefo_ids(self, r_server = None):
+        return self._table.keys()
