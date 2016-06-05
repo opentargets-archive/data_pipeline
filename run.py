@@ -10,7 +10,7 @@ from common.PGAdapter import Adapter
 from modules.Dump import DumpActions, DumpGenerator
 from modules.ECO import EcoActions, EcoProcess, EcoUploader
 from modules.EFO import EfoActions, EfoProcess, EfoUploader
-from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess, EvidenceStringUploader
+from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
