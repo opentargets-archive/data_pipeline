@@ -54,12 +54,12 @@ class ESQuery(object):
                                       "match_all": {}
                                     },
                                    '_source': source,
-                                   'size': 100,
+                                   'size': 50,
                                    },
                             scroll='12h',
                             doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                             index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
-                            timeout="10m",
+                            timeout="30m",
                             )
         for hit in res:
             yield hit['_source']
@@ -74,9 +74,9 @@ class ESQuery(object):
                                       "match_all": {}
                                     },
                                    'fields': fields,
-                                   'size': 100,
+                                   'size': 1000,
                                    },
-                            scroll='12h',
+                            scroll='2h',
                             doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                             index=Loader.get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME),
                             timeout="10m",
@@ -95,9 +95,9 @@ class ESQuery(object):
                                "match_all": {}
                            },
                                'fields': fields,
-                               'size': 100,
+                               'size': 1000,
                            },
-                           scroll='12h',
+                           scroll='2h',
                            doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_ECO_INDEX_NAME),
                            timeout="10m",

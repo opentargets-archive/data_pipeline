@@ -206,14 +206,16 @@ class EvidenceManagerLookUpDataRetrieval():
             self.esquery = ESQuery(es)
         self.lookup = EvidenceManagerLookUpData()
         start_time = time.time()
-        self._get_available_efos()
-        logger.debug("finished self._get_available_efos(), took %ss"%str(time.time()-start_time))
-        self._get_available_ecos()
-        logger.debug("finished self._get_available_ecos(), took %ss"%str(time.time()-start_time))
         self._get_gene_info()
-        logger.debug("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
+        logger.info("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
+        self._get_available_efos()
+        logger.info("finished self._get_available_efos(), took %ss"%str(time.time()-start_time))
+        self._get_available_ecos()
+        logger.info("finished self._get_available_ecos(), took %ss"%str(time.time()-start_time))
+
 
     def _get_available_efos(self):
+        logger.info('getting efos')
         self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
         # self.lookup.available_efo_objects = dict()
         # for row in self.esquery.get_all_diseases():
@@ -223,6 +225,7 @@ class EvidenceManagerLookUpDataRetrieval():
         # self.lookup.available_efos = frozenset(self.lookup.available_efo_objects.keys())
 
     def _get_available_ecos(self):
+        logger.info('getting ecos')
         self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
         # self.lookup.available_eco_objects = dict()
         # for row in self.esquery.get_all_eco():
@@ -234,6 +237,7 @@ class EvidenceManagerLookUpDataRetrieval():
 
 
     def _get_gene_info(self):
+        logger.info('getting gene info')
         self.lookup.uni2ens = {}
         self.lookup.available_gene_objects={}
         for gene_id, gene in self._get_all_stored_genes():
