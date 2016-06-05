@@ -155,19 +155,35 @@ class ECOLookUpTable(object):
                                             ttl = ttl)
         self._es = es
         self._es_query = ESQuery(es)
-        self.r_server = None
+        self.r_server = r_server
         if r_server is not None:
-            self._load_eco_data()
+            self._load_eco_data(r_server)
 
     def _load_eco_data(self, r_server = None):
         for eco in self._es_query.get_all_diseases():
-            self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=r_server)#TODO can be improved by sending elements in batches
+            self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
     def get_eco(self, efo_id, r_server = None):
         return self._table.get(efo_id, r_server=r_server)
 
     def set_eco(self, eco, r_server = None):
-        self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=r_server)
+        self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=self._get_r_server(r_server))
 
     def get_available_eco_ids(self, r_server = None):
         return self._table.keys()
+
+    def __contains__(self, key, r_server=None):
+        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
+
+    def __getitem__(self, key, r_server=None):
+        self.get_eco(key, r_server)
+
+    def __setitem__(self, key, value, r_server=None):
+        self._table.set(key, value, r_server=self._get_r_server(r_server))
+
+    def _get_r_server(self, r_server=None):
+        if not r_server:
+            r_server = self.r_server
+        if r_server is None:
+            raise AttributeError('A redis server is required either at class instantation or at the method level')
+        return r_server

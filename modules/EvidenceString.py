@@ -196,9 +196,12 @@ class EvidenceManagerLookUpData():
 
 
 class EvidenceManagerLookUpDataRetrieval():
-    def __init__(self,  es = None):
+    def __init__(self,
+                 es = None,
+                 r_server = None):
 
         self.es = es
+        self.r_server = r_server
         if es is not None:
             self.esquery = ESQuery(es)
         self.lookup = EvidenceManagerLookUpData()
@@ -211,21 +214,23 @@ class EvidenceManagerLookUpDataRetrieval():
         logger.debug("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
 
     def _get_available_efos(self):
-        self.lookup.available_efo_objects = dict()
-        for row in self.esquery.get_all_diseases():
-            efo_obj = EFO(get_ontology_code_from_url(row['code']))
-            efo_obj.load_json(row)
-            self.lookup.available_efo_objects[efo_obj.get_id()]= efo_obj
-        self.lookup.available_efos = frozenset(self.lookup.available_efo_objects.keys())
+        self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
+        # self.lookup.available_efo_objects = dict()
+        # for row in self.esquery.get_all_diseases():
+        #     efo_obj = EFO(get_ontology_code_from_url(row['code']))
+        #     efo_obj.load_json(row)
+        #     self.lookup.available_efo_objects[efo_obj.get_id()]= efo_obj
+        # self.lookup.available_efos = frozenset(self.lookup.available_efo_objects.keys())
 
     def _get_available_ecos(self):
-        self.lookup.available_eco_objects = dict()
-        for row in self.esquery.get_all_eco():
-            eco_obj = ECO(get_ontology_code_from_url(row['code']))
-            eco_obj.load_json(row)
-            self.lookup.available_eco_objects[eco_obj.get_id()]= eco_obj
-
-        self.lookup.available_ecos = frozenset(self.lookup.available_eco_objects.keys())
+        self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
+        # self.lookup.available_eco_objects = dict()
+        # for row in self.esquery.get_all_eco():
+        #     eco_obj = ECO(get_ontology_code_from_url(row['code']))
+        #     eco_obj.load_json(row)
+        #     self.lookup.available_eco_objects[eco_obj.get_id()]= eco_obj
+        #
+        # self.lookup.available_ecos = frozenset(self.lookup.available_eco_objects.keys())
 
 
     def _get_gene_info(self):
@@ -239,7 +244,8 @@ class EvidenceManagerLookUpDataRetrieval():
                 self.lookup.uni2ens[gene['uniprot_id']] = gene_id
             for accession in gene['uniprot_accessions']:
                 self.lookup.uni2ens[accession]=gene_id
-        self.lookup.available_genes = frozenset(self.lookup.available_gene_objects.keys())
+        # self.lookup.available_genes = frozenset(self.lookup.available_gene_objects.keys())
+        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
         self._get_non_reference_gene_mappings()
 
     def _get_non_reference_gene_mappings(self):
@@ -1008,10 +1014,12 @@ class EvidenceStorerWorker(multiprocessing.Process):
 class EvidenceStringProcess():
 
     def __init__(self,
-                 es):
+                 es,
+                 r_server):
         self.loaded_entries_to_pg = 0
         self.es = es
         self.es_query = ESQuery(es)
+        self.r_server = r_server
 
     def process_all(self):
         self._process_evidence_string_data()
@@ -1030,7 +1038,7 @@ class EvidenceStringProcess():
 
 
         evidence_start_time = time.time()
-        lookup_data = EvidenceManagerLookUpDataRetrieval(self.es).lookup
+        lookup_data = EvidenceManagerLookUpDataRetrieval(self.es, self.r_server).lookup
         get_evidence_page_size = 25000
 
         '''create queues'''

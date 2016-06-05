@@ -671,19 +671,35 @@ class GeneLookUpTable(object):
                                             ttl = ttl)
         self._es = es
         self._es_query = ESQuery(es)
-        self.r_server = None
+        self.r_server = r_server
         if r_server is not None:
-            self._load_gene_data()
+            self._load_gene_data(r_server)
 
     def _load_gene_data(self, r_server = None):
         for target in self._es_query.get_all_targets():
-            self._table.set(target['id'],target, r_server=r_server)#TODO can be improved by sending elements in batches
+            self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
     def get_gene(self, target_id, r_server = None):
-        return self._table.get(target_id, r_server=r_server)
+        return self._table.get(target_id, r_server=self._get_r_server(r_server))
 
     def set_gene(self, target, r_server = None):
-        self._table.set(target['id'],target, r_server=r_server)
+        self._table.set(target['id'],target, r_server=self._get_r_server(r_server))
 
     def get_available_gene_ids(self, r_server = None):
-        return self._table.keys()
+        return self._table.keys(r_server = self._get_r_server(r_server))
+
+    def __contains__(self, key, r_server = None):
+        return self._table.__contains__(key, r_server = self._get_r_server(r_server))
+
+    def __getitem__(self, key, r_server = None):
+        self.get_gene(key, r_server)
+
+    def __setitem__(self, key, value, r_server=None):
+        self._table.set(key, value, r_server=self._get_r_server(r_server))
+
+    def _get_r_server(self, r_server=None):
+        if not r_server:
+            r_server = self.r_server
+        if r_server is None:
+            raise AttributeError('A redis server is required either at class instantation or at the method level')
+        return r_server
