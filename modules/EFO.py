@@ -263,13 +263,13 @@ class EFOLookUpTable(object):
 
     def _load_efo_data(self, r_server = None):
         for efo in self._es_query.get_all_diseases():
-            self._table.set(efo['id'],efo, r_server=r_server)#TODO can be improved by sending elements in batches
+            self._table.set(get_ontology_code_from_url(efo['code']),efo, r_server=r_server)#TODO can be improved by sending elements in batches
 
     def get_efo(self, efo_id, r_server = None):
         return self._table.get(efo_id, r_server=r_server)
 
-    def set_efo(self, target, r_server = None):
-        self._table.set(target['id'],target, r_server=r_server)
+    def set_efo(self, efo, r_server = None):
+        self._table.set(get_ontology_code_from_url(efo['code']),efo, r_server=r_server)
 
     def get_available_gefo_ids(self, r_server = None):
         return self._table.keys()

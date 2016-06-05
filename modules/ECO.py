@@ -161,13 +161,13 @@ class ECOLookUpTable(object):
 
     def _load_eco_data(self, r_server = None):
         for eco in self._es_query.get_all_diseases():
-            self._table.set(eco['id'],eco, r_server=r_server)#TODO can be improved by sending elements in batches
+            self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=r_server)#TODO can be improved by sending elements in batches
 
     def get_eco(self, efo_id, r_server = None):
         return self._table.get(efo_id, r_server=r_server)
 
-    def set_eco(self, target, r_server = None):
-        self._table.set(target['id'],target, r_server=r_server)
+    def set_eco(self, eco, r_server = None):
+        self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=r_server)
 
     def get_available_eco_ids(self, r_server = None):
         return self._table.keys()

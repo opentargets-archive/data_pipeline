@@ -203,18 +203,17 @@ class EvidenceManagerLookUpDataRetrieval():
             self.esquery = ESQuery(es)
         self.lookup = EvidenceManagerLookUpData()
         start_time = time.time()
-        self._get_gene_info()
-        logger.debug("finished self._get_gene_info(), took %ss"%str(time.time()-start_time))
         self._get_available_efos()
         logger.debug("finished self._get_available_efos(), took %ss"%str(time.time()-start_time))
         self._get_available_ecos()
         logger.debug("finished self._get_available_ecos(), took %ss"%str(time.time()-start_time))
-
+        self._get_gene_info()
+        logger.debug("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
 
     def _get_available_efos(self):
         self.lookup.available_efo_objects = dict()
         for row in self.esquery.get_all_diseases():
-            efo_obj = EFO(get_ontology_code_from_url(row['id']))
+            efo_obj = EFO(get_ontology_code_from_url(row['code']))
             efo_obj.load_json(row)
             self.lookup.available_efo_objects[efo_obj.get_id()]= efo_obj
         self.lookup.available_efos = frozenset(self.lookup.available_efo_objects.keys())
@@ -222,7 +221,7 @@ class EvidenceManagerLookUpDataRetrieval():
     def _get_available_ecos(self):
         self.lookup.available_eco_objects = dict()
         for row in self.esquery.get_all_eco():
-            eco_obj = ECO(get_ontology_code_from_url(row['id']))
+            eco_obj = ECO(get_ontology_code_from_url(row['code']))
             eco_obj.load_json(row)
             self.lookup.available_eco_objects[eco_obj.get_id()]= eco_obj
 
