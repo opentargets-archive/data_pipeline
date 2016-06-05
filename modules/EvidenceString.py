@@ -243,7 +243,7 @@ class EvidenceManagerLookUpDataRetrieval():
         for gene_id, gene in self._get_all_stored_genes():
             gene_obj = Gene(gene_id)
             gene_obj.load_json(gene)
-            self.lookup.available_gene_objects[gene_obj.id]=gene_obj
+            # self.lookup.available_gene_objects[gene_obj.id]=gene_obj
             if gene['uniprot_id']:
                 self.lookup.uni2ens[gene['uniprot_id']] = gene_id
             for accession in gene['uniprot_accessions']:
