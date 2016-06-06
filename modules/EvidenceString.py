@@ -328,6 +328,11 @@ class EvidenceManager():
         if evidence['type']=='genetic_literature':
             evidence['type']='genetic_association'
 
+        if 'provenance_type' in evidence and \
+                'database' in evidence['provenance_type'] and \
+                'version' in evidence['provenance_type']['database']:
+            evidence['provenance_type']['database']['version'] = str(evidence['provenance_type']['database']['version'])
+
         '''enforce eco-based score for genetic_association evidencestrings'''
         if evidence['type']=='genetic_association':
             available_score=None
@@ -1089,7 +1094,6 @@ class EvidenceStringProcess():
                                   # ) for i in range(1)]
         for w in storers:
             w.start()
-
 
 
         for row in self.get_evidence(page_size = get_evidence_page_size):

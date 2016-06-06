@@ -189,132 +189,90 @@ class Config():
 
 def _get_evidence_string_generic_mapping():
     return {
-            "_all" : {"enabled" : True},
-            "_routing":{ "required":True,
-                         "path":"target.id"},
+            # "_all" : {"enabled" : True},
+            # "_routing":{ "required":True},
             "properties" : {
                 "target" : {
-                    "type" : "object",
                      "properties" : {
                          "id" : {
                               "type" : "string",
                               "index" : "not_analyzed",
-                              "fielddata": {
-                                 "format": "doc_values"
-                              },
                          },
                          "target_type" : {
                               "type" : "string",
                               "index" : "not_analyzed",
-                              "fielddata": {
-                                 "format": "doc_values"
-                              },
                          },
                          "activity" : {
                               "type" : "string",
                               "index" : "not_analyzed",
-                              "fielddata": {
-                                 "format": "doc_values"
-                              },
                          },
 
                      }
                 },
                 "disease" : {
-                    "type" : "object",
                      "properties" : {
                          "id" : {
                               "type" : "string",
                               "index" : "not_analyzed",
-                              "fielddata": {
-                                 "format": "doc_values"
-                              },
+                         },
+                         "efo_info" : {
+                             "properties" : {
+                                 "path": {
+                                    "type": "string",
+                                    "index": "not_analyzed",
+                                 }
+                             }
                          }
+
                      }
                 },
                 "private" : {
-                    "type" : "object",
                      "properties" : {
                          "efo_codes" : {
                               "type" : "string",
                               "index" : "not_analyzed",
-                              "fielddata": {
-                                 "format": "doc_values"
-                              },
                          },
                          "facets" : {
-                            "type" : "object",
                             "properties" : {
                                 "uniprot_keywords": {
                                     "type" : "string",
                                     "index" : "not_analyzed",
-                                      "fielddata": {
-                                         "format": "doc_values"
-                                      },
                                 },
                                 "reactome": {
-                                     "type" : "object",
-                                          "properties" : {
-                                               "pathway_type_code": {
-                                                    "type" : "string",
-                                                    "index" : "not_analyzed",
-                                                        "fielddata": {
-                                                            "format": "doc_values"
-                                                        },
-                                               },
-                                               "pathway_code": {
-                                                    "type" : "string",
-                                                    "index" : "not_analyzed",
-                                                        "fielddata": {
-                                                            "format": "doc_values"
-                                                        },
-                                               },
-                                          }
+                                      "properties" : {
+                                           "pathway_type_code": {
+                                                "type" : "string",
+                                                "index" : "not_analyzed",
+                                           },
+                                           "pathway_code": {
+                                                "type" : "string",
+                                                "index" : "not_analyzed",
+                                           },
+                                      }
                                 }
                             }
                          }
                      }
                 },
-                "disease.efo_info" : {
-                    "type" : "object",
-                     "properties" : {
-                         "path" : {
-                              "type" : "string",
-                              "index" : "not_analyzed",
-                              "fielddata": {
-                                 "format": "doc_values"
-                              },
-                         }
-                     }
-                },
                 "evidence" : {
-                    "type" : "object",
-                    # "index": "no",
                      "properties" : {
                          "evidence_codes" : {
                               "type" : "string",
                               "index" : "not_analyzed",
-                              "fielddata": {
-                                 "format": "doc_values"
-                              },
                          },
-                #      #
-                #      #     "association_score":{
-                #      #         "type" : "object",
-                #      #         "properties" : {
-                #      #             "probability" : {
-                #      #                 "type" : "object",
-                #      #                 "properties" : {
-                #      #                     "value" : {
-                #      #                        "type" : "double",
-                #      #                     },
-                #      #                     "method" : {
-                #      #                        "type" : "string",
-                #      #                     }
-                #      #                 }
-                #      #             }
-                #      #         }
-                #      #     },
+                         "provenance_type": {
+                             "enabled": False,
+                             # "properties" : {
+                             #    "database" : {
+                             #        "properties": {
+                             #            "version": {
+                             #                "type": "string",
+                             #                "index": "not_analyzed",
+                             #            },
+                             #        },
+                             #    },
+                             # },
+                         },
                      }
                 }
             },
@@ -324,9 +282,6 @@ def _get_evidence_string_generic_mapping():
                     "path_match" : "scores.*",
                     "mapping" : {
                          "type" : "double",
-                          "fielddata": {
-                             "format": "doc_values"
-                          },
                     }
                 }
             },
@@ -337,10 +292,7 @@ def _get_evidence_string_generic_mapping():
                     "path_match" : "evidence.*",
                     "path_unmatch" : "evidence.evidence_codes*",
                     "mapping" : {
-                        "index" : "no",
-                        "fielddata": {
-                           "format": "doc_values"
-                        },
+                        "enabled" : False,
                     }
                 }
             },
@@ -349,10 +301,7 @@ def _get_evidence_string_generic_mapping():
                 "do_not_index_drug" : {
                     "path_match" : "drug.*",
                     "mapping" : {
-                        "index" : "no",
-                        "fielddata": {
-                           "format": "doc_values"
-                        },
+                        "enabled" : False,
                     }
                 }
             },
@@ -360,10 +309,7 @@ def _get_evidence_string_generic_mapping():
                 "do_not_index_unique_ass" : {
                     "path_match" : "unique_association_fields.*",
                     "mapping" : {
-                        "index" : "no",
-                        "fielddata": {
-                           "format": "doc_values"
-                        },
+                        "enabled" : False,
                     }
                 }
             },
@@ -459,7 +405,7 @@ class ElasticSearchConfiguration():
                             },
                         },
                     "_private" : {
-                        "type" : "object",
+                        # "type" : "object",
                         "properties" : {
                             "suggestions" : {
                                 "type" : "completion",
@@ -583,7 +529,7 @@ class ElasticSearchConfiguration():
         #                     },
         #                 },
                     "_private" : {
-                        "type" : "object",
+                        # "type" : "object",
                         "properties" : {
                             "suggestions" : {
                                 "type" : "completion",
@@ -592,10 +538,10 @@ class ElasticSearchConfiguration():
                                 "payloads" : True
                                 },
                             "facets":{
-                                "type" : "object",
+                                # "type" : "object",
                                 "properties" : {
                                     "reactome" : {
-                                        "type" : "object",
+                                        # "type" : "object",
                                         "properties" : {
                                             "pathway_type_code" : {
                                                 "type" : "string",
@@ -745,7 +691,7 @@ class ElasticSearchConfiguration():
                         "index" : "not_analyzed",
                         },
                     "evidence_string" : {
-                        "type" : "object",
+                        # "type" : "object",
                         "index": "no",
                     },
                     "target_id" : {
@@ -817,45 +763,30 @@ class ElasticSearchConfiguration():
                             "mappings": {
                                 Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {
                                         "_all" : {"enabled" : True},
-                                        "_routing":{ "required":True,
-                                                     "path":"target.id"},
+                                        "_routing":{ "required":True,},
                                         "properties" : {
                                             "target" : {
-                                                "type" : "object",
                                                  "properties" : {
                                                      "id" : {
                                                           "type" : "string",
                                                           "index" : "not_analyzed",
-                                                          "fielddata": {
-                                                             "format": "doc_values"
-                                                          },
                                                      },
                                                      "target_type" : {
                                                           "type" : "string",
                                                           "index" : "not_analyzed",
-                                                          "fielddata": {
-                                                             "format": "doc_values"
-                                                          },
                                                      },
                                                      "activity" : {
                                                           "type" : "string",
                                                           "index" : "not_analyzed",
-                                                          "fielddata": {
-                                                             "format": "doc_values"
-                                                          },
                                                      },
 
                                                  }
                                             },
                                             "disease" : {
-                                                "type" : "object",
                                                  "properties" : {
                                                      "id" : {
                                                           "type" : "string",
                                                           "index" : "not_analyzed",
-                                                          "fielddata": {
-                                                             "format": "doc_values"
-                                                          },
                                                      }
                                                  }
 
@@ -863,41 +794,26 @@ class ElasticSearchConfiguration():
 
                                             },
                                             "private" : {
-                                                "type" : "object",
                                                  "properties" : {
                                                      "efo_codes" : {
                                                           "type" : "string",
                                                           "index" : "not_analyzed",
-                                                          "fielddata": {
-                                                             "format": "doc_values"
-                                                          },
                                                      },
                                                      "facets" : {
-                                                        "type" : "object",
                                                         "properties" : {
                                                             "uniprot_keywords": {
                                                                 "type" : "string",
                                                                 "index" : "not_analyzed",
-                                                                  "fielddata": {
-                                                                     "format": "doc_values"
-                                                                  },
                                                             },
                                                             "reactome": {
-                                                                 "type" : "object",
                                                                       "properties" : {
                                                                            "pathway_type_code": {
                                                                                 "type" : "string",
                                                                                 "index" : "not_analyzed",
-                                                                                    "fielddata": {
-                                                                                        "format": "doc_values"
-                                                                                    },
                                                                            },
                                                                            "pathway_code": {
                                                                                 "type" : "string",
                                                                                 "index" : "not_analyzed",
-                                                                                    "fielddata": {
-                                                                                        "format": "doc_values"
-                                                                                    },
                                                                            },
                                                                       }
                                                             }
@@ -959,7 +875,7 @@ class ElasticSearchConfiguration():
            '_default_' : {
                 "properties" : {
                     "private" : {
-                        "type" : "object",
+                        # "type" : "object",
                         "properties" : {
                             "suggestions" : {
                                 "type" : "completion",
