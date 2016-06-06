@@ -794,7 +794,7 @@ class ScoreStorerWorker(Process):
                         target, disease, score = data
                         if score:
                             id = '%s-%s'%(target,disease)
-                            score['_routing']=score['target']['id']
+                            score.__dict__['_routing']=score['target']['id']
                             storer.put(id,
                                        score)
                         with self.lock:

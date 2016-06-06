@@ -1003,7 +1003,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
                     if not self.q.empty():
                         output = self.q.get()
                         idev, ev = output
-                        ev["_routing"]=ev['target']['id']
+                        ev.__dict__["_routing"]=ev['target']['id']
                         storer.put(idev,
                            ev)
                         with self.lock:
