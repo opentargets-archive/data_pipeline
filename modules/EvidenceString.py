@@ -240,14 +240,14 @@ class EvidenceManagerLookUpDataRetrieval():
         logger.info('getting gene info')
         self.lookup.uni2ens = {}
         self.lookup.available_gene_objects={}
-        for gene_id, gene in self._get_all_stored_genes():
-            gene_obj = Gene(gene_id)
-            gene_obj.load_json(gene)
+        for gene in self.esquery.get_all_targets():
+            gene_obj = Gene()
+            gene_obj= gene_obj.load_json(gene)
             # self.lookup.available_gene_objects[gene_obj.id]=gene_obj
             if gene['uniprot_id']:
-                self.lookup.uni2ens[gene['uniprot_id']] = gene_id
+                self.lookup.uni2ens[gene['uniprot_id']] = gene_obj.id
             for accession in gene['uniprot_accessions']:
-                self.lookup.uni2ens[accession]=gene_id
+                self.lookup.uni2ens[accession]=gene_obj.id
         # self.lookup.available_genes = frozenset(self.lookup.available_gene_objects.keys())
         self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
         self._get_non_reference_gene_mappings()
@@ -266,11 +266,6 @@ class EvidenceManagerLookUpDataRetrieval():
                 self.lookup.non_reference_genes[symbol]['reference']=ensg
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
-
-    def _get_all_stored_genes(self):
-
-        for row in self.esquery.get_all_genes():
-            yield row['id'], row
 
 
 class EvidenceManager():

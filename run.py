@@ -125,7 +125,8 @@ if __name__ == '__main__':
     adapter = Adapter()
     '''init es client'''
     es = Elasticsearch(Config.ELASTICSEARCH_URL,
-                       maxsize=50)
+                       maxsize=50,
+                       timeout=1800)
     # es = Elasticsearch(["10.0.0.11:9200"],
     # # sniff before doing anything
     #                     sniff_on_start=True,
