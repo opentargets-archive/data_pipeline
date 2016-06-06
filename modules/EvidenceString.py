@@ -242,7 +242,7 @@ class EvidenceManagerLookUpDataRetrieval():
         self.lookup.available_gene_objects={}
         for gene in self.esquery.get_all_targets():
             gene_obj = Gene()
-            gene_obj= gene_obj.load_json(gene)
+            gene_obj.load_json(gene)
             # self.lookup.available_gene_objects[gene_obj.id]=gene_obj
             if gene['uniprot_id']:
                 self.lookup.uni2ens[gene['uniprot_id']] = gene_obj.id

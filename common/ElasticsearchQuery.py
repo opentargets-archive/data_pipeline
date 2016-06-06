@@ -42,19 +42,21 @@ class ESQuery(object):
     def __init__(self, es):
         self.handler = es
 
-
-    def get_all_targets(self, fields = None):
+    @staticmethod
+    def _get_soruce_from_fields(fields = None):
         if fields is None:
             fields = ['*']
-        source =  {"include": fields},
+        source = {"include": fields}
+        return source
 
-
+    def get_all_targets(self, fields = None):
+        source = self._get_soruce_from_fields(fields)
         res = helpers.scan(client=self.handler,
                             query={"query": {
                                       "match_all": {}
                                     },
                                    '_source': source,
-                                   'size': 50,
+                                   'size': 100,
                                    },
                             scroll='12h',
                             doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
@@ -65,18 +67,16 @@ class ESQuery(object):
             yield hit['_source']
 
     def get_all_diseases(self, fields = None):
-        # if fields is None:
-        #     fields = ['*']
-        # source =  {"include": fields},
+        source = self._get_soruce_from_fields(fields)
 
         res = helpers.scan(client=self.handler,
                             query={"query": {
                                       "match_all": {}
                                     },
-                                   'fields': fields,
-                                   'size': 1000,
+                                   'source': source,
+                                   'size': 100,
                                    },
-                            scroll='2h',
+                            scroll='12h',
                             doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                             index=Loader.get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME),
                             timeout="10m",
@@ -86,15 +86,13 @@ class ESQuery(object):
 
 
     def get_all_eco(self, fields=None):
-        # if fields is None:
-        #     fields = ['*']
-        # source =  {"include": fields},
+        source = self._get_soruce_from_fields(fields)
 
         res = helpers.scan(client=self.handler,
                            query={"query": {
                                "match_all": {}
                            },
-                               'fields': fields,
+                               'source': source,
                                'size': 1000,
                            },
                            scroll='2h',
@@ -106,7 +104,7 @@ class ESQuery(object):
             yield hit['_source']
 
     def get_associations_for_target(self, target, fields = None, size = 100):
-        source =  {"include": fields}
+        source = self._get_soruce_from_fields(fields)
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body={"query": {
@@ -139,7 +137,7 @@ class ESQuery(object):
         return AssociationSummary(res)
 
     def get_associations_for_disease(self, disease, fields = None, size = 100):
-        source =  {"include": fields}
+        source = self._get_soruce_from_fields(fields)
 
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
@@ -173,13 +171,14 @@ class ESQuery(object):
         return AssociationSummary(res)
 
 
-    def get_validated_evidence_strings(self):
+    def get_validated_evidence_strings(self, fields = None):
+        source = self._get_soruce_from_fields(fields)
 
         res = helpers.scan(client=self.handler,
                            query={"query": {
                                "match_all": {}
                            },
-                               '_source': True,
+                               '_source': source,
                                'size': 1000,
                            },
                            scroll='12h',
@@ -232,20 +231,6 @@ class ESQuery(object):
         for hit in res:
             yield jsonpickle.loads(hit['_source']['entry'])
 
-    def get_all_genes(self):
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                           },
-                               '_source': True,
-                               'size': 20,
-                           },
-                           scroll='12h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
-                           timeout="10m",
-                           )
-        for hit in res:
-            yield hit['_source']
 
     def get_reaction(self, reaction_id):
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_REACTOME_INDEX_NAME),
