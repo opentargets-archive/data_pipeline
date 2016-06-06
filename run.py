@@ -16,7 +16,7 @@ from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
 from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
-from modules.Association import AssociationActions, ScoringProcess, ScoringUploader, ScoringExtract
+from modules.Association import AssociationActions, ScoringProcess
 from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from modules.Uniprot import UniProtActions,UniprotDownloader
 from modules.HGNC import HGNCActions, HGNCUploader

@@ -189,8 +189,8 @@ class Config():
 
 def _get_evidence_string_generic_mapping():
     return {
-            # "_all" : {"enabled" : True},
-            # "_routing":{ "required":True},
+            "_all" : {"enabled" : True},
+            "_routing":{ "required":True},
             "properties" : {
                 "target" : {
                      "properties" : {

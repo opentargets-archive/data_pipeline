@@ -791,11 +791,12 @@ class ScoreStorerWorker(Process):
                         self.target_disease_pair_loading_finished.is_set()) or self.signal_finish.is_set()):
                     try:
                         data = self.q.get_nowait()
-
                         target, disease, score = data
                         if score:
-                            storer.put('%s-%s'%(target,disease),
-                                            score)
+                            id = '%s-%s'%(target,disease)
+                            score['_routing']=score['target']['id']
+                            storer.put(id,
+                                       score)
                         with self.lock:
                                 self.global_counter.value +=1
                     except Empty:
@@ -943,48 +944,3 @@ class ScoringProcess():
 
 
 
-
-
-class ScoringUploader():
-
-    def __init__(self,
-                 adapter,
-                 loader):
-        self.adapter=adapter
-        self.session=adapter.session
-        self.loader=loader
-
-    def upload_all(self):
-        # store a syntetic dump
-        # data =[]
-        # c=0
-        # for row in self.session.query(ElasticsearchLoad.id, ElasticsearchLoad.index, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
-        #                     ElasticsearchLoad.index.startswith(Config.ELASTICSEARCH_DATA_SCORE_INDEX_NAME),
-        #                     ElasticsearchLoad.active == True)
-        #     ).yield_per(10000):
-        #         c+=1
-        #         parsed_data = json.loads(row.data)
-        #         data.append(dict(target_id=parsed_data['target']['id'],
-        #                        disease_id=parsed_data['disease']['id'],
-        #                        association_score=parsed_data['harmonic-sum']['overall'],
-        #
-        #                                       ))
-        #         if len(data)>=10000:
-        #             print c
-        #             self.adapter.engine.execute(TargetToDiseaseAssociationScoreMapAnalysed.__table__.insert(),data)
-        #             data =[]
-        # if data:
-        #     self.adapter.engine.execute(TargetToDiseaseAssociationScoreMapAnalysed.__table__.insert(),data)
-
-        self.clear_old_data()
-        JSONObjectStorage.refresh_index_data_in_es(self.loader,
-                                         self.session,
-                                         Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME
-                                         )
-        try:
-            self.loader.optimize_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME+'*')
-        except:
-            pass
-
-    def clear_old_data(self):
-        self.loader.clear_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME+'*')
