@@ -1119,6 +1119,11 @@ class EvidenceStringProcess():
                 time.sleep(1)
                 w.terminate()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
+
+
+        logging.info('flushing data to index')
+        self.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
+                              wait_if_ongoing=True)
         return
 
 

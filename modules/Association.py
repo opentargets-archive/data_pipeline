@@ -938,7 +938,11 @@ class ScoringProcess():
             if w.is_alive():
                 time.sleep(1)
                 w.terminate()
-        reporter.terminate
+        reporter.terminate()
+        logging.info('flushing data to index')
+        self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+                                        wait_if_ongoing =True)
+
 
         logging.info("DONE")
 
