@@ -73,8 +73,8 @@ class ESQuery(object):
                             query={"query": {
                                       "match_all": {}
                                     },
-                                   'source': source,
-                                   'size': 100,
+                                   '_source': source,
+                                   'size': 1000,
                                    },
                             scroll='12h',
                             doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
@@ -92,7 +92,7 @@ class ESQuery(object):
                            query={"query": {
                                "match_all": {}
                            },
-                               'source': source,
+                               '_source': source,
                                'size': 1000,
                            },
                            scroll='2h',

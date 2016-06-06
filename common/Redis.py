@@ -319,7 +319,7 @@ class RedisLookupTable(object):
         #     raise AttributeError('Only str and unicode types are accepted as object value. Use the \
         #     RedisLookupTablePickle subclass for generic objects.')
         r_server = self._get_r_server(r_server)
-        return r_server.setex(self._get_key_namespace(key),
+        r_server.setex(self._get_key_namespace(key),
                               self._encode(obj),
                               ttl or self.default_ttl)
 
@@ -331,7 +331,7 @@ class RedisLookupTable(object):
 
     def keys(self, r_server = None):
         r_server = self._get_r_server(r_server)
-        return r_server.keys(self.namespace+'*')
+        return [key.replace(self.namespace,'') for key in r_server.keys(self.namespace+'*')]
 
 
     def _get_r_server(self, r_server = None):
@@ -353,13 +353,13 @@ class RedisLookupTable(object):
     def __contains__(self, key, r_server = None):
         if not r_server:
             r_server = self.r_server
-        return r_server.exists(key)
+        return r_server.exists(self._get_key_namespace(key))
 
-    def __getitem__(self, key, r_server=None):
-        self.get(key, r_server)
+    def __getitem__(self, key,r_server=None):
+        self.get(self._get_key_namespace(key), r_server)
 
     def __setitem__(self, key, value, r_server=None):
-        self.set(key, value, r_server)
+        self.set(self._get_key_namespace(key), value, r_server)
 
 
 class RedisLookupTableJson(RedisLookupTable):

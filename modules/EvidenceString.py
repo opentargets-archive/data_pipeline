@@ -105,7 +105,7 @@ class ExtendedInfoGene(ExtendedInfo):
         if isinstance(gene, Gene):
             self.extract_info(gene)
         else:
-            raise AttributeError("you need to pass a Gene not a: " + type(gene))
+            raise AttributeError("you need to pass a Gene not a: " + str(type(gene)))
 
     def extract_info(self, gene):
         self.data = dict(geneid = gene.id,
@@ -119,7 +119,7 @@ class ExtendedInfoEFO(ExtendedInfo):
         if isinstance(efo, EFO):
             self.extract_info(efo)
         else:
-            raise AttributeError("you need to pass a EFO not a: " + type(efo))
+            raise AttributeError("you need to pass a EFO not a: " + str(type(efo)))
 
     def extract_info(self, efo):
         therapeutic_area_codes = set()
@@ -141,7 +141,7 @@ class ExtendedInfoECO(ExtendedInfo):
         if isinstance(eco, ECO):
             self.extract_info(eco)
         else:
-            raise AttributeError("you need to pass a EFO not a: " + type(eco))
+            raise AttributeError("you need to pass a ECO not a: " + str(type(eco)))
 
     def extract_info(self, eco):
         self.data = dict(eco_id = eco.get_id(),
@@ -271,11 +271,8 @@ class EvidenceManagerLookUpDataRetrieval():
 class EvidenceManager():
     def __init__(self, lookup_data,):
         self.available_genes = lookup_data.available_genes
-        self.available_gene_objects = lookup_data.available_gene_objects
         self.available_efos =  lookup_data.available_efos
-        self.available_efo_objects = lookup_data.available_efo_objects
         self.available_ecos =  lookup_data.available_ecos
-        self.available_eco_objects = lookup_data.available_eco_objects
         self.uni2ens =  lookup_data.uni2ens
         self.non_reference_genes =  lookup_data.non_reference_genes
         self._get_eco_scoring_values()
@@ -480,7 +477,7 @@ class EvidenceManager():
         #TODO: handle domains
         geneid =  extended_evidence['target']['id']
         # try:
-        gene = self._get_gene(geneid)
+        gene = self._get_gene_obj(geneid)
         genes_info=ExtendedInfoGene(gene)
         if 'reactome' in gene._private['facets']:
             pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
@@ -488,7 +485,8 @@ class EvidenceManager():
             # except Exception:
             #     logger.warning("Cannot get generic info for gene: %s" % aboutid)
         if gene.go:
-            for go_code,data in gene.go.items():
+            for go in gene.go:
+                go_code, data = go['id'], go['value']
                 try:
                     category,term = data['term'][0], data['term'][2:]
                     if category =='P':
@@ -518,7 +516,7 @@ class EvidenceManager():
         efo_info = []
         diseaseid = extended_evidence['disease']['id']
         # try:
-        efo = self._get_efo(diseaseid)
+        efo = self._get_efo_obj(diseaseid)
         efo_info=ExtendedInfoEFO(efo)
         # except Exception:
         #     logger.warning("Cannot get generic info for efo: %s" % aboutid)
@@ -536,7 +534,7 @@ class EvidenceManager():
             pass
         ecos_info = []
         for eco_id in all_eco_codes:
-            eco = self._get_eco(eco_id)
+            eco = self._get_eco_obj(eco_id)
             if eco is not None:
                 ecos_info.append(ExtendedInfoECO(eco))
             else:
@@ -570,17 +568,20 @@ class EvidenceManager():
 
 
 
-    def _get_gene(self, geneid):
-        return self.available_gene_objects[geneid]
-        # return self.gene_retriever.get_gene(geneid)
+    def _get_gene_obj(self, geneid):
+        gene = Gene(geneid)
+        gene.load_json(self.available_genes[geneid])
+        return gene
 
-    def _get_efo(self, efoid):
-        return self.available_efo_objects[efoid]
-        # return self.efo_retriever.get_efo(efoid)
+    def _get_efo_obj(self, efoid):
+        efo = EFO(efoid)
+        efo.load_json(self.available_efos[efoid])
+        return efo
 
-    def _get_eco(self, ecoid):
-        return self.available_eco_objects[ecoid]
-        # return self.eco_retriever.get_eco(ecoid)
+    def _get_eco_obj(self, ecoid):
+        eco = ECO(ecoid)
+        eco.load_json(self.available_ecos[ecoid])
+        return eco
 
 
     def _get_non_reference_gene_mappings(self):
@@ -954,8 +955,9 @@ class EvidenceProcesser(multiprocessing.Process):
                         logger.exception("Error loading data for id %s: %s" % (idev, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
 
-                if self.input_processed_count.value %1e3 ==0:
-                    logger.critical("%i processed | %i errors | processing %1.2f evidence per second"%(self.output_computed_count.value,
+
+                if self.input_processed_count.value %5e4 ==0:
+                    logger.info("%i processed | %i errors | processing %1.2f evidence per second"%(self.output_computed_count.value,
                                                                                                            self.processing_errors_count.value,
                                                                                                        float(self.input_processed_count.value)/(time.time()-self.start_time)))
 
@@ -1000,8 +1002,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
                            ev)
                         with self.lock:
                             self.total_loaded.value+=1
-                        if self.total_loaded.value % self.chunk_size ==0:
-                            logger.critical("pushed %i entries to es"%self.total_loaded.value)
+                        if self.total_loaded.value % (self.chunk_size*5) ==0:
+                            logger.info("pushed %i entries to es"%self.total_loaded.value)
                     # print self.name, (((self.output_generated_count.value == self.total_loaded.value) and \
                     #         self.processing_finished.is_set()) or self.signal_finish.is_set()), self.output_generated_count.value == self.total_loaded.value,self.processing_finished.is_set(),  self.signal_finish.is_set(), self.total_loaded.value
 
@@ -1124,7 +1126,7 @@ class EvidenceStringProcess():
         for row in self.es_query.get_validated_evidence_strings():
             c += 1
             if c % page_size == 0:
-                logger.critical("loaded %i ev from db to process" % c)
+                logger.info("loaded %i ev from db to process" % c)
             yield row
         logger.info("loaded %i ev from db to process"%c)
 

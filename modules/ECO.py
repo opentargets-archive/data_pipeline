@@ -160,7 +160,7 @@ class ECOLookUpTable(object):
             self._load_eco_data(r_server)
 
     def _load_eco_data(self, r_server = None):
-        for eco in self._es_query.get_all_diseases():
+        for eco in self._es_query.get_all_eco():
             self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
     def get_eco(self, efo_id, r_server = None):
@@ -176,7 +176,7 @@ class ECOLookUpTable(object):
         return self._table.__contains__(key, r_server=self._get_r_server(r_server))
 
     def __getitem__(self, key, r_server=None):
-        self.get_eco(key, r_server)
+        return self.get_eco(key, r_server)
 
     def __setitem__(self, key, value, r_server=None):
         self._table.set(key, value, r_server=self._get_r_server(r_server))
@@ -187,3 +187,6 @@ class ECOLookUpTable(object):
         if r_server is None:
             raise AttributeError('A redis server is required either at class instantation or at the method level')
         return r_server
+
+    def keys(self):
+        return self._table.keys()

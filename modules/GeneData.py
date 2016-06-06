@@ -692,10 +692,14 @@ class GeneLookUpTable(object):
         return self._table.__contains__(key, r_server = self._get_r_server(r_server))
 
     def __getitem__(self, key, r_server = None):
-        self.get_gene(key, r_server)
+        return self.get_gene(key, r_server)
 
     def __setitem__(self, key, value, r_server=None):
         self._table.set(key, value, r_server=self._get_r_server(r_server))
+
+    def __missing__(self, key):
+        print key
+
 
     def _get_r_server(self, r_server=None):
         if not r_server:
@@ -703,3 +707,6 @@ class GeneLookUpTable(object):
         if r_server is None:
             raise AttributeError('A redis server is required either at class instantation or at the method level')
         return r_server
+
+    def keys(self):
+        return self._table.keys()
