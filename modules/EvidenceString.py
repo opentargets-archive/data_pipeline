@@ -643,6 +643,7 @@ class Evidence(JSONSerializable):
                 "the evidence should be a dict or a json string to parse, not a " + str(type(evidence)))
         self.datasource = self.evidence['sourceID'] or datasource
         self._set_datatype()
+        self._set_routing()
 
 
     def _set_datatype(self,):
@@ -854,6 +855,9 @@ class Evidence(JSONSerializable):
 
         return normalised_pvalue*normalised_sample_size*severity
 
+    def _set_routing(self):
+        self.evidence['_routing']= self.evidence['target']['id']
+
 
 class UploadError():
     def __init__(self, evidence, trace, id, logdir='errorlogs'):
@@ -1003,7 +1007,6 @@ class EvidenceStorerWorker(multiprocessing.Process):
                     if not self.q.empty():
                         output = self.q.get()
                         idev, ev = output
-                        ev.__dict__["_routing"]=ev['target']['id']
                         storer.put(idev,
                            ev)
                         with self.lock:

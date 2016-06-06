@@ -68,6 +68,7 @@ class Association(JSONSerializable):
 
     def __init__(self, target, disease, is_direct):
         self.target = {'id':target}
+        self._routing = target
         self.disease = {'id':disease}
         self.is_direct=is_direct
         self.set_id()
@@ -794,7 +795,6 @@ class ScoreStorerWorker(Process):
                         target, disease, score = data
                         if score:
                             id = '%s-%s'%(target,disease)
-                            score.__dict__['_routing']=score['target']['id']
                             storer.put(id,
                                        score)
                         with self.lock:
