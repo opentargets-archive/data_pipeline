@@ -68,7 +68,6 @@ class Association(JSONSerializable):
 
     def __init__(self, target, disease, is_direct):
         self.target = {'id':target}
-        self._routing = target
         self.disease = {'id':disease}
         self.is_direct=is_direct
         self.set_id()
@@ -381,7 +380,8 @@ class ScoreStorer():
                            Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                            id,
                            score.to_json(),
-                           create_index = False)
+                           create_index = False,
+                           routing = score.target['id'])
 
 
     def flush(self):
