@@ -404,7 +404,7 @@ class ElasticSearchConfiguration():
                                 },
                             },
                         },
-                    "_private" : {
+                    "private" : {
                         # "type" : "object",
                         "properties" : {
                             "suggestions" : {
