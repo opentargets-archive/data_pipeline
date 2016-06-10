@@ -74,3 +74,9 @@ class SparseFloatDict(UserDict):
 
     def __missing__(self, key):
         return 0.
+
+
+class RelationType(object):
+
+    SHARED_DISEASE = 'shared-disease'
+    SHARED_TARGET = 'shared-target'

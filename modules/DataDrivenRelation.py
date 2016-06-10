@@ -1,5 +1,6 @@
 import logging
 from UserDict import UserDict
+from collections import Counter
 from multiprocessing import Pool, Process
 from operator import itemgetter
 
@@ -17,6 +18,8 @@ import pickle
 from redislite import Redis
 
 from common import Actions
+from common.DataStructure import JSONSerializable, RelationType
+from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from scipy.spatial.distance import pdist
 import time
@@ -25,10 +28,31 @@ from common.Redis import RedisQueue, RedisQueueStatusReporter
 from settings import Config
 
 
-class RelationType(object):
 
-    SHARED_DISEASE = 'shared-disease'
-    SHARED_TARGET = 'shared-target'
+class Relation(JSONSerializable):
+    type = ''
+
+    def __init__(self,
+                 subj_id,
+                 obj_id,
+                 scores,
+                 type = ''):
+        self.subject = dict(id = subj_id)
+        self.object = dict(id=obj_id)
+        self.scores = scores
+        if type:
+            self.type = type
+        self._set_id(subj_id, obj_id)
+
+    def _set_id(self, subj_id, obj_id):
+        self.id = '-'.join([subj_id, obj_id])
+
+class T2TRelation(JSONSerializable):
+    type = RelationType.SHARED_DISEASE
+
+class D2DRelation(JSONSerializable):
+    type = RelationType.SHARED_TARGET
+
 
 class DataDrivenRelationActions(Actions):
     PROCESS='process'
@@ -58,7 +82,7 @@ class DistanceComputationWorker(Process):
                     subj_id = data[0]
                     subj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[1]))
                     obj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[3]))
-                    dist = pdist([subj, obj])[0]
+                    dist = {'euclidean': pdist([subj, obj])[0]}
                     self.queue_out.put((subj_id, obj_id, dist, self.type), self.r_server)#TODO: create an object here
                 except Exception, e:
                     error = True
@@ -70,29 +94,49 @@ class DistanceComputationWorker(Process):
 
 class DistanceStorageWorker(Process):
             def __init__(self,
-                         queue_in):
+                         queue_in,
+                         es):
                 super(DistanceStorageWorker, self).__init__()
                 self.queue_in = queue_in
+                self.es = es
                 self.r_server = Redis(Config.REDISLITE_DB_PATH)
                 logging.info('%s started' % self.name)
 
             def run(self):
                 c=0
-                while not self.queue_in.is_done(r_server=self.r_server):
-                    job = self.queue_in.get(r_server=self.r_server, timeout=1)
-                    if job is not None:
-                        key, data = job
-                        error = False
-                        try:
-                            c+=2
-                            #TODO: store in es here
-                            if c%1000==0:
-                                logging.info('%i datapoint stored' % c)
-                        except Exception, e:
-                            error = True
-                            logging.exception('Error processing key %s' % key)
+                with Loader(self.es) as loader:
+                    while not self.queue_in.is_done(r_server=self.r_server):
+                        job = self.queue_in.get(r_server=self.r_server, timeout=1)
+                        if job is not None:
+                            key, data = job
+                            error = False
+                            try:
+                                subj_id, obj_id, dist, type = data
+                                r1 = Relation(subj_id,obj_id, dist, type)
+                                loader.put(Config.ELASTICSEARCH_RELATION_INDEX_NAME,
+                                           Config.ELASTICSEARCH_RELATION_DOC_NAME+'-'+type,
+                                           r1.id,
+                                           r1.to_json(),
+                                           create_index=False)
+                                c += 1
+                                if subj_id != obj_id:
+                                    r2 = Relation(obj_id, subj_id, dist, type)
+                                    loader.put(Config.ELASTICSEARCH_RELATION_INDEX_NAME,
+                                               Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + type,
+                                               r2.id,
+                                               r2.to_json(),
+                                               create_index=False)
+                                    c += 1
 
-                        self.queue_in.done(key, error=error, r_server=self.r_server)
+                                #TODO: store in es here
+                                Relation
+                                if c%1000==0:
+                                    logging.info('%i datapoint stored' % c)
+                            except Exception, e:
+                                error = True
+                                logging.exception('Error processing key %s' % key)
+
+                            self.queue_in.done(key, error=error, r_server=self.r_server)
 
                 logging.info('%s done processing' % self.name)
 
@@ -127,7 +171,11 @@ class DataDrivenRelationProcess(object):
         available_targets = target_data.keys()
         available_diseases = disease_data.keys()
 
+        self.get_hot_node_blacklist(disease_data)
+        # sys.exit()
 
+
+        Loader(self.es).create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME)
 
         queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_processing',
                            max_size=10000,
@@ -143,7 +191,8 @@ class DataDrivenRelationProcess(object):
         q_reporter_storage = RedisQueueStatusReporter([queue_storage])
         q_reporter_storage.start()
 
-        storage_workers = [DistanceStorageWorker(queue_storage
+        storage_workers = [DistanceStorageWorker(queue_storage,
+                                                 self.es,
                                                  ) for i in range(1)]
 
         for w in storage_workers:
@@ -177,6 +226,12 @@ class DataDrivenRelationProcess(object):
         #     queue_processing.put(pair, self.r_server)
         # logging.info('disease to disease distances computation done')
 
+
+        queue_processing.submission_done(self.r_server)
+
+        while not queue_processing.is_done():
+            time.sleep(0.1)
+        queue_storage.submission_done(self.r_server)
 
 
         # ''' compute disease to disease distances'''
@@ -312,3 +367,9 @@ class DataDrivenRelationProcess(object):
 
 
 
+    def get_hot_node_blacklist(self, data):
+        c = Counter()
+        for k,v in data.items():
+            c[k]=len(v)
+
+        logging.info('Most common diseases: %s'%c.most_common(100))

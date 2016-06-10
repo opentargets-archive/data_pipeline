@@ -282,6 +282,6 @@ class ESQuery(object):
             '''store disease associations'''
             if hit['disease']['id'] not in disease_results:
                 disease_results[hit['disease']['id']] = SparseFloatDict()
-                disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
+            disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
 
         return target_results, disease_results

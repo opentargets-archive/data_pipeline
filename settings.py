@@ -1,6 +1,8 @@
 import uuid
 from collections import defaultdict, OrderedDict
 
+from common.DataStructure import RelationType
+
 __author__ = 'andreap'
 import os
 import ConfigParser
@@ -39,6 +41,8 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
+    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
+    ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
@@ -310,6 +314,60 @@ def _get_evidence_string_generic_mapping():
                     "path_match" : "unique_association_fields.*",
                     "mapping" : {
                         "enabled" : False,
+                    }
+                }
+            },
+
+        ]
+       }
+
+def _get_relation_generic_mapping():
+    return {
+            "_all" : {"enabled" : True},
+            # "_routing":{ "required":True},
+            "properties" : {
+                "subject" : {
+                     "properties" : {
+                         "id" : {
+                              "type" : "string",
+                              "index" : "not_analyzed",
+                         },
+                         # "target_type" : {
+                         #      "type" : "string",
+                         #      "index" : "not_analyzed",
+                         # },
+                         # "activity" : {
+                         #      "type" : "string",
+                         #      "index" : "not_analyzed",
+                         # },
+
+                     }
+                },
+                "object" : {
+                     "properties" : {
+                         "id" : {
+                              "type" : "string",
+                              "index" : "not_analyzed",
+                         },
+                         # "efo_info" : {
+                         #     "properties" : {
+                         #         "path": {
+                         #            "type": "string",
+                         #            "index": "not_analyzed",
+                         #         }
+                         #     }
+                         # }
+
+                     }
+                },
+
+            },
+        "dynamic_templates" : [
+            {
+                "scores" : {
+                    "path_match" : "scores.*",
+                    "mapping" : {
+                         "type" : "double",
                     }
                 }
             },
@@ -732,6 +790,18 @@ class ElasticSearchConfiguration():
                                            },
                               "mappings": evidence_mappings,
                             }
+
+    relation_mappings = {}
+    for rt in RelationType().__dict__:
+        relation_mappings[Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + rt] = _get_relation_generic_mapping()
+
+    relation_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
+                                          "number_of_replicas": evidence_replicas_number,
+                                          # "index.store.type": "memory",
+                                          "refresh_interval": "60s",
+                                          },
+                             "mappings": relation_mappings,
+                             }
 
     validated_data_datasource_mappings = {}
     for db in available_databases:
