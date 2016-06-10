@@ -260,7 +260,11 @@ class ESQuery(object):
         #TODO: look at the multiquery api
 
         res = helpers.scan(client=self.handler,
-                           query={"query": {"match_all": {}},
+                           query={"query": {
+                               "term": {
+                                   "is_direct": "Quick True!"
+                               }
+                           },
                                '_source': {'include':["target.id", 'disease.id', 'harmonic-sum.overall']},
                                'size': 1000,
                            },
@@ -272,7 +276,9 @@ class ESQuery(object):
         target_results = dict()
         disease_results = dict()
 
+        c=0
         for hit in res:
+            c+=1
             hit = hit['_source']
             '''store target associations'''
             if hit['target']['id'] not in target_results:
@@ -283,5 +289,8 @@ class ESQuery(object):
             if hit['disease']['id'] not in disease_results:
                 disease_results[hit['disease']['id']] = SparseFloatDict()
             disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
+
+            if c%10000 ==0:
+                print c
 
         return target_results, disease_results

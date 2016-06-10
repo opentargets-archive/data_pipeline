@@ -82,7 +82,20 @@ class DistanceComputationWorker(Process):
                     subj_id = data[0]
                     subj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[1]))
                     obj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[3]))
-                    dist = {'euclidean': pdist([subj, obj])[0]}
+                    pos, neg = 0.,0.
+                    for i in range(len(data[1])):
+                        if data[1][i]>0 and data[3][i]>0:
+                            pos +=1
+                        elif data[1][i]>0 or data[3][i]>0:
+                            neg +=1
+                    neg+=pos
+                    jackard = 0
+                    if neg:
+                        jackard = pos/neg
+                    dist = {'euclidean': pdist([subj, obj])[0],
+                            'jaccard': jackard,
+                            'shared_count': pos,
+                            'union_count': neg}
                     self.queue_out.put((subj_id, obj_id, dist, self.type), self.r_server)#TODO: create an object here
                 except Exception, e:
                     error = True
@@ -171,8 +184,9 @@ class DataDrivenRelationProcess(object):
         available_targets = target_data.keys()
         available_diseases = disease_data.keys()
 
-        self.get_hot_node_blacklist(disease_data)
-        # sys.exit()
+        for d in self.get_hot_node_blacklist(disease_data):
+            available_diseases.remove(d)
+        logging.info('removed most common diseases, diseases left: %i'%len(available_diseases))
 
 
         Loader(self.es).create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME)
@@ -212,19 +226,19 @@ class DataDrivenRelationProcess(object):
             queue_processing.put(pair, self.r_server)
         logging.info('disease to disease distances computation done')
 
-        # ''' compute target to target distances'''
-        # t2t_workers = [DistanceComputationWorker(queue_processing,
-        #                                          available_diseases,
-        #                                          queue_storage,
-        #                                          RelationType.SHARED_DISEASE,
-        #                                          ) for i in range(multiprocessing.cpu_count())]
-        # for w in t2t_workers:
-        #     w.start()
-        #
-        # logging.info('Starting to compute disease to disease distances')
-        # for pair in self.get_distance_pair(target_data):
-        #     queue_processing.put(pair, self.r_server)
-        # logging.info('disease to disease distances computation done')
+        ''' compute target to target distances'''
+        t2t_workers = [DistanceComputationWorker(queue_processing,
+                                                 available_diseases,
+                                                 queue_storage,
+                                                 RelationType.SHARED_DISEASE,
+                                                 ) for i in range(multiprocessing.cpu_count())]
+        for w in t2t_workers:
+            w.start()
+
+        logging.info('Starting to compute disease to disease distances')
+        for pair in self.get_distance_pair(target_data):
+            queue_processing.put(pair, self.r_server)
+        logging.info('disease to disease distances computation done')
 
 
         queue_processing.submission_done(self.r_server)
@@ -372,4 +386,5 @@ class DataDrivenRelationProcess(object):
         for k,v in data.items():
             c[k]=len(v)
 
-        logging.info('Most common diseases: %s'%c.most_common(100))
+        logging.info('Most common diseases: %s'%c.most_common(10))
+        return [i[0] for i in c.most_common(10)]
