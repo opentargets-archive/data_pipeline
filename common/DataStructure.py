@@ -1,4 +1,5 @@
 import json
+from UserDict import UserDict
 from json import JSONEncoder
 
 __author__ = 'andreap'
@@ -68,3 +69,8 @@ class OntologyNode(TreeNode):
             self.uri = uri
             self.uri_code = uri_code
             self.ontology_name = ontology_name
+
+class SparseFloatDict(UserDict):
+
+    def __missing__(self, key):
+        return 0.

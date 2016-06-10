@@ -2,6 +2,9 @@ import base64
 import json
 import logging
 import uuid
+
+import datetime
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -81,9 +84,14 @@ class RedisQueue(object):
         self.job_timeout = job_timeout
         self.max_queue_size = max_size
         self.default_ttl = ttl
+        self.started = False
+        self.start_time = time.time()
 
 
     def put(self, element, r_server=None):
+        if not self.started:
+            self.start_time = time.time()
+            self.started = True
         r_server = self._get_r_server(r_server)
         queue_size = r_server.llen(self.main_queue)
         if queue_size:
@@ -169,6 +177,7 @@ class RedisQueue(object):
         return self.queue_id
 
     def get_status(self, r_server=None):
+        now = time.time()
         r_server = self._get_r_server(r_server)
         lines = ['==== QUEUE: %s ====='%self.queue_id ]
         submitted = int(r_server.get(self.submitted_counter) or 0)
@@ -179,9 +188,13 @@ class RedisQueue(object):
             if processed:
                 error_percent = float(errors)/processed
             submission_finished = bool(r_server.getbit(self.submission_done, 1))
+            processing_speed = 0.
+            if processed:
+                processing_speed = round(processed/(now-self.start_time),2)
             lines.append('Submitted jobs: %i'%submitted)
             lines.append('Processed jobs: {} | {:.1%}'.format(processed, float(processed)/submitted))
             lines.append('Errors: {} | {:.1%}'.format(errors, error_percent))
+            lines.append('Processing speed: {:.1f} jobs per second'.format(processing_speed))
             lines.append('-'*50)
             queue_size = self.get_size(r_server)
             queue_size_status = 'empty'
@@ -207,6 +220,7 @@ class RedisQueue(object):
                 status = 'done'
             lines.append('-'*50)
             lines.append('STATUS: %s'%status)
+            lines.append('Elapsed time: %s'%datetime.timedelta(seconds=now-self.start_time))
         else:
             lines.append('Queue size: 0 | initialised')
         lines.append(('='*50))

@@ -7,6 +7,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 from common import Actions
 from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
 from common.PGAdapter import Adapter
+from modules.DataDrivenRelation import DataDrivenRelationActions, DataDrivenRelationProcess
 from modules.Dump import DumpActions, DumpGenerator
 from modules.ECO import EcoActions, EcoProcess, EcoUploader
 from modules.EFO import EfoActions, EfoProcess, EfoUploader
@@ -58,8 +59,6 @@ if __name__ == '__main__':
                         action="append_const", const = UniProtActions.CACHE)
     parser.add_argument("--genm", dest='gen', help="merge the available gene information and store the resulting json objects in postgres",
                         action="append_const", const = GeneActions.MERGE)
-    parser.add_argument("--genu", dest='gen', help="upload the stored json gene object to elasticsearch",
-                        action="append_const", const = GeneActions.UPLOAD)
     parser.add_argument("--hgncu", dest='hgnc', help="upload the HGNC json file to the lookups schema in postgres",
                         action="append_const", const = HGNCActions.UPLOAD)
     parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
@@ -78,20 +77,12 @@ if __name__ == '__main__':
                         action="append_const", const = EcoActions.ALL)
     parser.add_argument("--evsp", dest='evs', help="process and validate the available evidence strings and store the resulting json object in postgres ",
                         action="append_const", const = EvidenceStringActions.PROCESS)
-    parser.add_argument("--evsu", dest='evs', help="upload the stored json evidence string object to elasticsearch",
-                        action="append_const", const = EvidenceStringActions.UPLOAD)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EvidenceStringActions.ALL)
-    parser.add_argument("--asse", dest='ass', help="extract data relevant to scoring",
-                        action="append_const", const = AssociationActions.EXTRACT)
     parser.add_argument("--assp", dest='ass', help="precompute association scores",
                         action="append_const", const = AssociationActions.PROCESS)
-    parser.add_argument("--assu", dest='ass', help="upload the stored precomputed score json object to elasticsearch",
-                        action="append_const", const = AssociationActions.UPLOAD)
     parser.add_argument("--ass", dest='ass', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = AssociationActions.ALL)
-    parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
-                        action="append_const", const = ElasticsearchActions.RELOAD)
     parser.add_argument("--valck", dest='val', help="check new json files submitted to ftp site and store the evidence strings to ElasticSearch",
                         action="append_const", const = ValidationActions.CHECKFILES)
     parser.add_argument("--valgm", dest='val', help="update gene protein mapping to database",
@@ -100,8 +91,10 @@ if __name__ == '__main__':
                         action="append_const", const = ValidationActions.ALL)
     parser.add_argument("--ens", dest='ens', help="retrieve and store latest ensembl gene records in elasticsearch",
                         action="append_const", const = EnsemblActions.ALL)
-    parser.add_argument("--seap", dest='sea', help="precompute search results",
+    parser.add_argument("--sea", dest='sea', help="precompute search results",
                         action="append_const", const = SearchObjectActions.PROCESS)
+    parser.add_argument("--ddr", dest='ddr', help="precompute data driven t2t and d2d relations",
+                        action="append_const", const=DataDrivenRelationActions.PROCESS)
     parser.add_argument("--persist-redis", dest='redisperist', help="use a fresh redislite db",
                         action='store_true', default=False)
     parser.add_argument("--musu", dest='mus', help="update mouse model data",
@@ -222,16 +215,14 @@ if __name__ == '__main__':
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
                 EvidenceStringProcess(es, r_server).process_all()
-            # if (EvidenceStringActions.UPLOAD in args.evs) or do_all:
-            #     EvidenceStringUploader(adapter, loader).upload_all()
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
-            # if (AssociationActions.EXTRACT in args.ass) or do_all:
-            #     ScoringExtract(adapter).extract()
             if (AssociationActions.PROCESS in args.ass) or do_all:
                 ScoringProcess(adapter, loader).process_all()
-            # if (AssociationActions.UPLOAD in args.ass):# data will be uploaded also by the proces step
-            #     ScoringUploader(adapter, loader).upload_all()
+        if args.ddr or run_full_pipeline:
+            do_all = (DataDrivenRelationActions.ALL in args.ddr) or run_full_pipeline
+            if (DataDrivenRelationActions.PROCESS in args.ddr) or do_all:
+                DataDrivenRelationProcess(es, r_server).process_all()
         if args.sea or run_full_pipeline:
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:

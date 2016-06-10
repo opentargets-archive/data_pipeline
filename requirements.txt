@@ -23,3 +23,5 @@ paramiko==1.17.0
 pysftp
 jsonpickle
 simplejson
+numpy
+scipy
