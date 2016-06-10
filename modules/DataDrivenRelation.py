@@ -25,20 +25,31 @@ from common.Redis import RedisQueue, RedisQueueStatusReporter
 from settings import Config
 
 
+class RelationType(object):
+
+    SHARED_DISEASE = 'shared-disease'
+    SHARED_TARGET = 'shared-target'
+
 class DataDrivenRelationActions(Actions):
     PROCESS='process'
 
 class DistanceComputationWorker(Process):
-    def __init__(self, queue, mapping_vector):
+    def __init__(self,
+                 queue_in,
+                 mapping_vector,
+                 queue_out,
+                 type):
         super(DistanceComputationWorker, self).__init__()
-        self.queue = queue
+        self.queue_in = queue_in
+        self.queue_out = queue_out
         self.r_server = Redis(Config.REDISLITE_DB_PATH)
         logging.info('%s started'%self.name)
         self.f = itemgetter(*mapping_vector)
+        self.type = type
 
     def run(self):
-        while not self.queue.is_done(r_server=self.r_server):
-            job = self.queue.get(r_server=self.r_server, timeout=1)
+        while not self.queue_in.is_done(r_server=self.r_server):
+            job = self.queue_in.get(r_server=self.r_server, timeout=1)
             if job is not None:
                 key, data = job
                 error = False
@@ -48,14 +59,42 @@ class DistanceComputationWorker(Process):
                     subj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[1]))
                     obj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[3]))
                     dist = pdist([subj, obj])[0]
-                    # print subj_id, obj_id, dist
+                    self.queue_out.put((subj_id, obj_id, dist, self.type), self.r_server)#TODO: create an object here
                 except Exception, e:
                     error = True
                     logging.exception('Error processing key %s' % key)
 
-                self.queue.done(key, error=error, r_server=self.r_server)
+                self.queue_in.done(key, error=error, r_server=self.r_server)
 
         logging.info('%s done processing'%self.name)
+
+class DistanceStorageWorker(Process):
+            def __init__(self,
+                         queue_in):
+                super(DistanceStorageWorker, self).__init__()
+                self.queue_in = queue_in
+                self.r_server = Redis(Config.REDISLITE_DB_PATH)
+                logging.info('%s started' % self.name)
+
+            def run(self):
+                c=0
+                while not self.queue_in.is_done(r_server=self.r_server):
+                    job = self.queue_in.get(r_server=self.r_server, timeout=1)
+                    if job is not None:
+                        key, data = job
+                        error = False
+                        try:
+                            c+=2
+                            #TODO: store in es here
+                            if c%1000==0:
+                                logging.info('%i datapoint stored' % c)
+                        except Exception, e:
+                            error = True
+                            logging.exception('Error processing key %s' % key)
+
+                        self.queue_in.done(key, error=error, r_server=self.r_server)
+
+                logging.info('%s done processing' % self.name)
 
 
 
@@ -90,23 +129,53 @@ class DataDrivenRelationProcess(object):
 
 
 
-        queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_processing',
+        queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_processing',
                            max_size=10000,
                            job_timeout=10)
 
-        q_reporter = RedisQueueStatusReporter([queue])
+        q_reporter = RedisQueueStatusReporter([queue_processing])
         q_reporter.start()
 
-        d2d_workers = [DistanceComputationWorker(queue, available_targets) for i in range(multiprocessing.cpu_count())]
+        queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
+                                   max_size=10000,
+                                   job_timeout=10)
+
+        q_reporter_storage = RedisQueueStatusReporter([queue_storage])
+        q_reporter_storage.start()
+
+        storage_workers = [DistanceStorageWorker(queue_storage
+                                                 ) for i in range(1)]
+
+        for w in storage_workers:
+            w.start()
+
+        ''' compute disease to disease distances'''
+        d2d_workers = [DistanceComputationWorker(queue_processing,
+                                                 available_targets,
+                                                 queue_storage,
+                                                 RelationType.SHARED_TARGET,
+                                                 ) for i in range(multiprocessing.cpu_count())]
         for w in d2d_workers:
             w.start()
 
         logging.info('Starting to compute disease to disease distances')
         for pair in self.get_distance_pair(disease_data):
-            queue.put(pair, self.r_server)
+            queue_processing.put(pair, self.r_server)
         logging.info('disease to disease distances computation done')
 
-
+        # ''' compute target to target distances'''
+        # t2t_workers = [DistanceComputationWorker(queue_processing,
+        #                                          available_diseases,
+        #                                          queue_storage,
+        #                                          RelationType.SHARED_DISEASE,
+        #                                          ) for i in range(multiprocessing.cpu_count())]
+        # for w in t2t_workers:
+        #     w.start()
+        #
+        # logging.info('Starting to compute disease to disease distances')
+        # for pair in self.get_distance_pair(target_data):
+        #     queue_processing.put(pair, self.r_server)
+        # logging.info('disease to disease distances computation done')
 
 
 
@@ -217,12 +286,29 @@ class DataDrivenRelationProcess(object):
 
     def get_distance_pair(self, data):
         keys = data.keys()
+        space_size = (len(keys)**2)/2
+        total = 0
+        shared = 0
+        logging.info('Space to explore: %i combinations'%space_size)
         for i in range(len(keys)):
             for j in range(len(keys)):
                 if j>=i:
+                    total += 1
                     subj_id = keys[i]
                     obj_id = keys[j]
-                    yield subj_id, data[subj_id], obj_id, data[obj_id]
+                    if set(data[subj_id].keys()) & set(data[obj_id].keys()):
+                        shared +=1
+                        if shared % 10000 == 0:
+                            logging.info('explored %i pairs (%.2f%%), loaded %i for computation, rate: %.2f%%'%(total, float(total)/space_size*100, shared, float(shared)/total*100))
+                        yield subj_id, data[subj_id], obj_id, data[obj_id]
+
+    # def get_distance_pair_batches(self,data, batch_size=10):
+    #     batch = []
+    #     for i in self.get_distance_pair(data):
+    #         batch.append(i)
+    #         if len(batch) == batch_size:
+    #             yield batch
+    #             batch = []
 
 
 
