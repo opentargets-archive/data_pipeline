@@ -78,18 +78,14 @@ class DistanceComputationWorker(Process):
                 key, data = job
                 error = False
                 try:
+                    union_keys = list(set(data[1].keys()) | set(data[3].keys()))
                     obj_id = data[2]
                     subj_id = data[0]
                     subj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[1]))
                     obj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[3]))
-                    pos, neg = 0.,0.
-                    for i in range(len(data[1])):
-                        if data[1][i]>0 and data[3][i]>0:
-                            pos +=1
-                        elif data[1][i]>0 or data[3][i]>0:
-                            neg +=1
-                    neg+=pos
-                    jackard = 0
+                    pos = len(set(data[1].keys()) & set(data[3].keys()))
+                    neg = len(union_keys)
+                    jackard = 0.
                     if neg:
                         jackard = pos/neg
                     dist = {'euclidean': pdist([subj, obj])[0],
