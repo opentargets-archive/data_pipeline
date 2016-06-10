@@ -60,7 +60,7 @@ class DataDrivenRelationActions(Actions):
 class DistanceComputationWorker(Process):
     def __init__(self,
                  queue_in,
-                 mapping_vector,
+                 filtered_keys,
                  queue_out,
                  type):
         super(DistanceComputationWorker, self).__init__()
@@ -68,7 +68,7 @@ class DistanceComputationWorker(Process):
         self.queue_out = queue_out
         self.r_server = Redis(Config.REDISLITE_DB_PATH)
         logging.info('%s started'%self.name)
-        self.f = itemgetter(*mapping_vector)
+        self.filtered_keys = set(filtered_keys)
         self.type = type
 
     def run(self):
@@ -78,21 +78,24 @@ class DistanceComputationWorker(Process):
                 key, data = job
                 error = False
                 try:
-                    union_keys = list(set(data[1].keys()) | set(data[3].keys()))
-                    obj_id = data[2]
-                    subj_id = data[0]
-                    subj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[1]))
-                    obj = map(DataDrivenRelationProcess.cap_to_one, self.f(data[3]))
-                    pos = len(set(data[1].keys()) & set(data[3].keys()))
-                    neg = len(union_keys)
-                    jackard = 0.
-                    if neg:
-                        jackard = pos/neg
-                    dist = {'euclidean': pdist([subj, obj])[0],
-                            'jaccard': jackard,
-                            'shared_count': pos,
-                            'union_count': neg}
-                    self.queue_out.put((subj_id, obj_id, dist, self.type), self.r_server)#TODO: create an object here
+                    union_keys = set(data[1].keys()) | set(data[3].keys())
+                    if self.filtered_keys:
+                        union_keys = union_keys - self.filtered_keys # remove filtered keys if needed
+                    if union_keys:
+                        obj_id = data[2]
+                        subj_id = data[0]
+                        subj = [DataDrivenRelationProcess.cap_to_one(i) for i in [data[1][k] for k in union_keys]]
+                        obj = [DataDrivenRelationProcess.cap_to_one(i) for i in [data[3][k] for k in union_keys]]
+                        pos = len(set(data[1].keys()) & set(data[3].keys()))
+                        neg = len(union_keys)
+                        jackard = 0.
+                        if neg:
+                            jackard = float(pos)/neg
+                        dist = {'euclidean': pdist([subj, obj])[0],
+                                'jaccard': jackard,
+                                'shared_count': pos,
+                                'union_count': neg}
+                        self.queue_out.put((subj_id, obj_id, dist, self.type), self.r_server)#TODO: create an object here
                 except Exception, e:
                     error = True
                     logging.exception('Error processing key %s' % key)
@@ -177,12 +180,10 @@ class DataDrivenRelationProcess(object):
         logging.info('Retrieved all the associations data in %i s'%(time.time()-start_time))
         logging.info('target data length: %s size in memory: %f Kb'%(len(target_data),sys.getsizeof(target_data)/1024.))
         logging.info('disease data length: %s size in memory: %f Kb' % (len(disease_data),sys.getsizeof(disease_data)/1024.))
-        available_targets = target_data.keys()
-        available_diseases = disease_data.keys()
+        # available_targets = target_data.keys()
+        # available_diseases = disease_data.keys()
 
-        for d in self.get_hot_node_blacklist(disease_data):
-            available_diseases.remove(d)
-        logging.info('removed most common diseases, diseases left: %i'%len(available_diseases))
+        filtered_diseases = self.get_hot_node_blacklist(disease_data)
 
 
         Loader(self.es).create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME)
@@ -210,7 +211,7 @@ class DataDrivenRelationProcess(object):
 
         ''' compute disease to disease distances'''
         d2d_workers = [DistanceComputationWorker(queue_processing,
-                                                 available_targets,
+                                                 [],
                                                  queue_storage,
                                                  RelationType.SHARED_TARGET,
                                                  ) for i in range(multiprocessing.cpu_count())]
@@ -224,7 +225,7 @@ class DataDrivenRelationProcess(object):
 
         ''' compute target to target distances'''
         t2t_workers = [DistanceComputationWorker(queue_processing,
-                                                 available_diseases,
+                                                 filtered_diseases,
                                                  queue_storage,
                                                  RelationType.SHARED_DISEASE,
                                                  ) for i in range(multiprocessing.cpu_count())]
