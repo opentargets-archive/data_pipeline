@@ -204,7 +204,8 @@ class DataDrivenRelationProcess(object):
 
         storage_workers = [DistanceStorageWorker(queue_storage,
                                                  self.es,
-                                                 ) for i in range(multiprocessing.cpu_count())]
+                                                 # ) for i in range(multiprocessing.cpu_count())]
+                                                 ) for i in range(1)]
 
         for w in storage_workers:
             w.start()
