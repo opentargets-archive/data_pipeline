@@ -79,14 +79,16 @@ class DistanceComputationWorker(Process):
                 error = False
                 try:
                     union_keys = set(data[1].keys()) | set(data[3].keys())
+                    shared_keys = set(data[1].keys()) & set(data[3].keys())
                     if self.filtered_keys:
                         union_keys = union_keys - self.filtered_keys # remove filtered keys if needed
+                        shared_keys = shared_keys - self.filtered_keys
                     if union_keys:
                         obj_id = data[2]
                         subj_id = data[0]
                         subj = [DataDrivenRelationProcess.cap_to_one(i) for i in [data[1][k] for k in union_keys]]
                         obj = [DataDrivenRelationProcess.cap_to_one(i) for i in [data[3][k] for k in union_keys]]
-                        pos = len(set(data[1].keys()) & set(data[3].keys()))
+                        pos = len(shared_keys)
                         neg = len(union_keys)
                         jackard = 0.
                         if neg:
@@ -189,14 +191,14 @@ class DataDrivenRelationProcess(object):
         Loader(self.es).create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME)
 
         queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_processing',
-                           max_size=10000,
+                           max_size=50000,
                            job_timeout=10)
 
         q_reporter = RedisQueueStatusReporter([queue_processing])
         q_reporter.start()
 
         queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
-                                   max_size=10000,
+                                   max_size=60000,
                                    job_timeout=10)
 
         q_reporter_storage = RedisQueueStatusReporter([queue_storage])
@@ -205,7 +207,7 @@ class DataDrivenRelationProcess(object):
         storage_workers = [DistanceStorageWorker(queue_storage,
                                                  self.es,
                                                  # ) for i in range(multiprocessing.cpu_count())]
-                                                 ) for i in range(1)]
+                                                 ) for i in range(2)]
 
         for w in storage_workers:
             w.start()
