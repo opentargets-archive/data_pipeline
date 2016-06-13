@@ -27,7 +27,8 @@ import time
 from common.Redis import RedisQueue, RedisQueueStatusReporter
 from settings import Config
 
-
+STORAGE_CHUNK_SIZE = 10000
+STORAGE_WORKERS = multiprocessing.cpu_count()/2
 
 class Relation(JSONSerializable):
     type = ''
@@ -118,7 +119,7 @@ class DistanceStorageWorker(Process):
 
             def run(self):
                 c=0
-                with Loader(self.es) as loader:
+                with Loader(self.es, chunk_size=10000) as loader:
                     while not self.queue_in.is_done(r_server=self.r_server):
                         job = self.queue_in.get(r_server=self.r_server, timeout=1)
                         if job is not None:
@@ -191,15 +192,15 @@ class DataDrivenRelationProcess(object):
         Loader(self.es).create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME)
 
         queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_processing',
-                           max_size=50000,
-                           job_timeout=10)
+                           max_size=multiprocessing.cpu_count()*STORAGE_CHUNK_SIZE,
+                           job_timeout=20)
 
         q_reporter = RedisQueueStatusReporter([queue_processing])
         q_reporter.start()
 
         queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
-                                   max_size=60000,
-                                   job_timeout=10)
+                                   max_size=int(STORAGE_CHUNK_SIZE*STORAGE_WORKERS*1.2),
+                                   job_timeout=20)
 
         q_reporter_storage = RedisQueueStatusReporter([queue_storage])
         q_reporter_storage.start()
@@ -207,7 +208,7 @@ class DataDrivenRelationProcess(object):
         storage_workers = [DistanceStorageWorker(queue_storage,
                                                  self.es,
                                                  # ) for i in range(multiprocessing.cpu_count())]
-                                                 ) for i in range(2)]
+                                                 ) for i in range(STORAGE_WORKERS)]
 
         for w in storage_workers:
             w.start()
