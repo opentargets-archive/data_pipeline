@@ -291,13 +291,14 @@ class RedisQueueStatusReporter(Process):
         self.queues = queues
         self.r_server = Redis(Config.REDISLITE_DB_PATH)
         self.interval = interval
+        self.logger = logging.getLogger()
 
     def run(self):
-        logging.info("reporter worker started")
+        self.logger.info("reporter worker started")
 
         while not self.is_done():
             for q in self.queues:
-                logging.info(q.get_status(self.r_server))
+                self.logger.info(q.get_status(self.r_server))
                 time.sleep(self.interval)
 
     def is_done(self):
@@ -305,6 +306,52 @@ class RedisQueueStatusReporter(Process):
             if not q.is_done(self.r_server):
                 return False
         return True
+
+class RedisQueueWorkerProcess(Process):
+    '''
+    Base class for workers attached to the RedisQueue class that runs in a separate process
+    it requires a queue in object to get data from, and a redis connection path.
+    if a queue out is specified it will push the output to that queue.
+    the implemented classes needs to add an implementation of the 'process' method, that either store the output or
+    returns it to be stored in a queue out
+    '''
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 queue_out = None,
+                 ):
+
+
+        super(RedisQueueWorkerProcess, self).__init__()
+        self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
+        self.queue_out = queue_out
+        self.r_server = Redis(redis_path)
+        self.logger = logging.getLogger()
+        self.logger.info('%s started' % self.name)
+
+
+    def run(self):
+        while not self.queue_in.is_done(r_server=self.r_server):
+            job = self.queue_in.get(r_server=self.r_server, timeout=1)
+            if job is not None:
+                key, data = job
+                error = False
+                try:
+                    job_results = self.process(data)
+                    if self.queue_out is not None:
+                        self.queue_out.put(job_results, self.r_server)  # TODO: create an object here
+                except Exception, e:
+                    error = True
+                    self.logger.exception('Error processing key %s' % key)
+
+                self.queue_in.done(key, error=error, r_server=self.r_server)
+
+            self.logger.info('%s done processing' % self.name)
+
+
+    def process(self, data):
+        raise NotImplementedError('please add an implementation to process the data')
+
 
 
 class RedisLookupTable(object):
