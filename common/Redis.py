@@ -268,13 +268,10 @@ class RedisQueue(object):
             pipe = r_server.pipeline()
             pipe.get(self.submitted_counter)
             pipe.get(self.processed_counter)
-            pipe.get(self.errors_counter)
             submitted, processed, errors = pipe.execute()
             submitted = int(submitted or 0)
             processed = int(processed or 0)
-            errors = int(errors or 0)
-            total_processed = processed + errors
-            return submitted == total_processed
+            return submitted <= processed #temporary hack should check for equal
         return False
 
     def _get_r_server(self, r_server = None):
