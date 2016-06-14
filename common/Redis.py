@@ -260,11 +260,13 @@ class RedisQueue(object):
         pipe.expire(self.submission_done, self.default_ttl)
         pipe.execute()
 
+    def is_submission_finished(self, r_server = None):
+        r_server = self._get_r_server(r_server)
+        return r_server.getbit(self.submission_done, 1)
 
     def is_done(self, r_server = None):
         r_server = self._get_r_server(r_server)
-        submission_finished = r_server.getbit(self.submission_done, 1)
-        if submission_finished:
+        if self.is_submission_finished(r_server):
             pipe = r_server.pipeline()
             pipe.get(self.submitted_counter)
             pipe.get(self.processed_counter)
@@ -336,6 +338,8 @@ class RedisQueueWorkerProcess(Process):
     def run(self):
         while not self.queue_in.is_done(r_server=self.r_server):
             job = self.queue_in.get(r_server=self.r_server, timeout=1)
+            if job is None and self.queue_in.is_submission_finished(r_server=self.r_server):
+                break
             if job is not None:
                 key, data = job
                 error = False
