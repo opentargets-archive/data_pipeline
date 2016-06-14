@@ -143,7 +143,7 @@ if __name__ == '__main__':
     logger.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
     if not args.redisperist:
         clear_redislite_db()
-    r_server= Redis(Config.REDISLITE_DB_PATH)
+    r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
     with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
         run_full_pipeline = False
         if args.all  and (Actions.ALL in args.all):
