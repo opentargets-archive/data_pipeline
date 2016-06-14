@@ -273,10 +273,10 @@ class DataDrivenRelationProcess(object):
         logging.info('disease to disease distances pair push done')
 
         '''stop d2d specifc workers'''
-        d2d_queue_loading.submission_done(self.r_server)
+        d2d_queue_loading.set_submission_finished(self.r_server)
         for w in d2d_loader_workers:
             w.join()
-        d2d_queue_processing.submission_done(self.r_server)
+        d2d_queue_processing.set_submission_finished(self.r_server)
         for w in d2d_workers:
             w.join()
 
@@ -306,15 +306,15 @@ class DataDrivenRelationProcess(object):
         logging.info('target to target distances pair push done')
 
         '''stop d2d specifc workers'''
-        t2t_queue_loading.submission_done(self.r_server)
+        t2t_queue_loading.set_submission_finished(self.r_server)
         for w in t2t_loader_workers:
             w.join()
-        t2t_queue_processing.submission_done(self.r_server)
+        t2t_queue_processing.set_submission_finished(self.r_server)
         for w in t2t_workers:
             w.join()
 
         '''stop storage workers'''
-        queue_storage.submission_done(self.r_server)
+        queue_storage.set_submission_finished(self.r_server)
         for w in storage_workers:
             w.start()
 
