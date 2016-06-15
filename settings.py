@@ -389,6 +389,7 @@ class ElasticSearchConfiguration():
         generic_replicas_number = 0
         evidence_shard_number = 3
         evidence_replicas_number = 1
+        relation_shard_number = 6
 
         bulk_load_chunk =1000
     else:
@@ -396,6 +397,7 @@ class ElasticSearchConfiguration():
         generic_replicas_number = 0
         evidence_shard_number = 3
         evidence_replicas_number = 0
+        relation_shard_number = 6
         bulk_load_chunk =1000
 
     uniprot_data_mapping = eco_data_mapping = {"mappings": {
@@ -795,7 +797,7 @@ class ElasticSearchConfiguration():
     for rt in RelationType().__dict__:
         relation_mappings[Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + rt] = _get_relation_generic_mapping()
 
-    relation_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
+    relation_data_mapping = {"settings": {"number_of_shards": relation_shard_number,
                                           "number_of_replicas": evidence_replicas_number,
                                           # "index.store.type": "memory",
                                           "refresh_interval": "60s",

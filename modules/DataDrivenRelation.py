@@ -301,11 +301,11 @@ class DataDrivenRelationProcess(object):
 
         ''' compute target to target distances'''
         logging.info('Starting to push pairs for target to target distances computation')
-        for i in range(len(disease_keys)):
-            d2d_queue_loading.put(i, self.r_server)
+        for i in range(len(target_keys)):
+            t2t_queue_loading.put(i, self.r_server)
         logging.info('target to target distances pair push done')
 
-        '''stop d2d specifc workers'''
+        '''stop t2t specifc workers'''
         t2t_queue_loading.set_submission_finished(self.r_server)
         for w in t2t_loader_workers:
             w.join()
