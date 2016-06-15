@@ -262,7 +262,7 @@ class ESQuery(object):
         res = helpers.scan(client=self.handler,
                            query={"query": {
                                "term": {
-                                   "is_direct": "Quick True!"
+                                   "is_direct": True,
                                }
                            },
                                '_source': {'include':["target.id", 'disease.id', 'harmonic-sum.overall']},

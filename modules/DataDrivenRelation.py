@@ -133,7 +133,8 @@ class DistanceStorageWorker(Process):
                                            Config.ELASTICSEARCH_RELATION_DOC_NAME+'-'+type,
                                            r1.id,
                                            r1.to_json(),
-                                           create_index=False)
+                                           create_index=False,
+                                           routing = subj_id)
                                 c += 1
                                 if subj_id != obj_id:
                                     r2 = Relation(obj_id, subj_id, dist, type)
@@ -141,7 +142,8 @@ class DistanceStorageWorker(Process):
                                                Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + type,
                                                r2.id,
                                                r2.to_json(),
-                                               create_index=False)
+                                               create_index=False,
+                                               routing=obj_id)
                                     c += 1
                             except Exception, e:
                                 error = True

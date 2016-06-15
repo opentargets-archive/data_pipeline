@@ -324,7 +324,7 @@ def _get_evidence_string_generic_mapping():
 def _get_relation_generic_mapping():
     return {
             "_all" : {"enabled" : True},
-            # "_routing":{ "required":True},
+            "_routing":{ "required":True},
             "properties" : {
                 "subject" : {
                      "properties" : {
@@ -794,7 +794,9 @@ class ElasticSearchConfiguration():
                             }
 
     relation_mappings = {}
-    for rt in RelationType().__dict__:
+    for rt in [RelationType.SHARED_DISEASE,
+               RelationType.SHARED_TARGET,
+               ]:
         relation_mappings[Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + rt] = _get_relation_generic_mapping()
 
     relation_data_mapping = {"settings": {"number_of_shards": relation_shard_number,
