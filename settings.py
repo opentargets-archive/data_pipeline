@@ -360,6 +360,14 @@ def _get_relation_generic_mapping():
 
                      }
                 },
+                "type": {
+                    "type": "string",
+                    "index": "not_analyzed",
+                },
+                "id": {
+                    "type": "string",
+                    "index": "not_analyzed",
+                },
 
             },
         "dynamic_templates" : [
