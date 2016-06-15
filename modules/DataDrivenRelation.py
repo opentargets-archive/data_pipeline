@@ -23,6 +23,7 @@ from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from scipy.spatial.distance import pdist
 import time
+from copy import copy
 import math
 
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
@@ -35,19 +36,21 @@ class Relation(JSONSerializable):
     type = ''
 
     def __init__(self,
-                 subj_id,
-                 obj_id,
+                 subject,
+                 object,
                  scores,
-                 type = ''):
-        self.subject = dict(id = subj_id)
-        self.object = dict(id=obj_id)
+                 type = '',
+                 **kwargs):
+        self.subject = subject
+        self.object = object
         self.scores = scores
         if type:
             self.type = type
-        self._set_id(subj_id, obj_id)
+        self.__dict__.update(**kwargs)
+        self.set_id()
 
-    def _set_id(self, subj_id, obj_id):
-        self.id = '-'.join([subj_id, obj_id])
+    def set_id(self):
+        self.id = '-'.join([self.subject['id'], self.object['id']])
 
 class T2TRelation(JSONSerializable):
     type = RelationType.SHARED_DISEASE
@@ -64,7 +67,8 @@ class DistanceComputationWorker(Process):
                  queue_in,
                  filtered_keys,
                  queue_out,
-                 type):
+                 type,
+                 labels = dict()):
         super(DistanceComputationWorker, self).__init__()
         self.queue_in = queue_in
         self.queue_out = queue_out
@@ -72,6 +76,7 @@ class DistanceComputationWorker(Process):
         logging.info('%s started'%self.name)
         self.filtered_keys = set(filtered_keys)
         self.type = type
+        self.labels = labels
 
     def run(self):
         while not self.queue_in.is_done(r_server=self.r_server):
@@ -80,26 +85,43 @@ class DistanceComputationWorker(Process):
                 key, data = job
                 error = False
                 try:
-                    union_keys = set(data[1].keys()) | set(data[3].keys())
-                    shared_keys = set(data[1].keys()) & set(data[3].keys())
+                    subject_id, subject_data, object_id, object_data = data
+                    subject = dict(id=subject_id,
+                                   links={})
+                    object = dict(id=object_id,
+                                  links={})
+                    union_keys = set(subject_data.keys()) | set(object_data.keys())
+                    shared_keys = set(subject_data.keys()) & set(object_data.keys())
                     if self.filtered_keys:
                         union_keys = union_keys - self.filtered_keys # remove filtered keys if needed
                         shared_keys = shared_keys - self.filtered_keys
                     if union_keys:
-                        obj_id = data[2]
-                        subj_id = data[0]
-                        subj = [DataDrivenRelationProcess.cap_to_one(i) for i in [data[1][k] for k in union_keys]]
-                        obj = [DataDrivenRelationProcess.cap_to_one(i) for i in [data[3][k] for k in union_keys]]
+                        subj_vector = [DataDrivenRelationProcess.cap_to_one(i) for i in [subject_data[k] for k in union_keys]]
+                        obj_vector = [DataDrivenRelationProcess.cap_to_one(i) for i in [object_data[k] for k in union_keys]]
                         pos = len(shared_keys)
                         neg = len(union_keys)
                         jackard = 0.
                         if neg:
                             jackard = float(pos)/neg
-                        dist = {'euclidean': pdist([subj, obj])[0],
+                        dist = {'euclidean': pdist([subj_vector, obj_vector])[0],
                                 'jaccard': jackard,
-                                'shared_count': pos,
-                                'union_count': neg}
-                        self.queue_out.put((subj_id, obj_id, dist, self.type), self.r_server)#TODO: create an object here
+                                }
+                        body = dict()
+                        body['counts'] = {'shared_count': pos,
+                                          'union_count': neg,
+                                          }
+                        if self.type == RelationType.SHARED_TARGET:
+                            subject['links']['targets_count'] =len(subject_data)
+                            subject['label'] = self.labels[subject_id]
+                            object['links']['targets_count'] = len(object_data)
+                            object['label'] = self.labels[object_id]
+                            body['shared_targets'] = list(union_keys)
+                        elif self.type == RelationType.SHARED_DISEASE:
+                            subject['links']['diseases_count'] = len(subject_data)
+                            object['links']['diseases_count'] = len(object_data)
+                            body['shared_diseases'] = list(union_keys)
+                        r = Relation(subject, object, dist, self.type, **body)
+                        self.queue_out.put(r, self.r_server)#TODO: create an object here
                 except Exception, e:
                     error = True
                     logging.exception('Error processing key %s' % key)
@@ -127,24 +149,27 @@ class DistanceStorageWorker(Process):
                             key, data = job
                             error = False
                             try:
-                                subj_id, obj_id, dist, type = data
-                                r1 = Relation(subj_id,obj_id, dist, type)
+                                r = data
                                 loader.put(Config.ELASTICSEARCH_RELATION_INDEX_NAME,
-                                           Config.ELASTICSEARCH_RELATION_DOC_NAME+'-'+type,
-                                           r1.id,
-                                           r1.to_json(),
+                                           Config.ELASTICSEARCH_RELATION_DOC_NAME+'-'+r.type,
+                                           r.id,
+                                           r.to_json(),
                                            create_index=False,
-                                           routing = subj_id)
+                                           routing = r.subject['id'])
                                 c += 1
-                                if subj_id != obj_id:
-                                    r2 = Relation(obj_id, subj_id, dist, type)
+                                subj= copy(r.subject)
+                                obj = copy(r.object)
+                                if subj['id'] != obj['id']:
+                                    r.subject = obj
+                                    r.object = subj
+                                    r.set_id()
                                     loader.put(Config.ELASTICSEARCH_RELATION_INDEX_NAME,
-                                               Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + type,
-                                               r2.id,
-                                               r2.to_json(),
+                                               Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
+                                               r.id,
+                                               r.to_json(),
                                                create_index=False,
-                                               routing=obj_id)
-                                    c += 1
+                                               routing=r.subject['id'])
+                                c += 1
                             except Exception, e:
                                 error = True
                                 logging.exception('Error processing key %s' % key)
@@ -249,20 +274,23 @@ class DataDrivenRelationProcess(object):
             w.start()
 
         '''start workers for d2d'''
+        disease_keys = disease_data.keys()
+        disease_labels = self.es_query.get_disease_labels(disease_keys)
         d2d_workers = [DistanceComputationWorker(d2d_queue_processing,
                                                  [],
                                                  queue_storage,
                                                  RelationType.SHARED_TARGET,
+                                                 disease_labels,
                                                  ) for i in range(multiprocessing.cpu_count())]
         for w in d2d_workers:
             w.start()
 
-        disease_keys = disease_data.keys()
         d2d_loader_workers = [MatrixIteratorWorker(d2d_queue_loading,
                                                    self.r_server.db,
                                                    d2d_queue_processing,
                                                    disease_data,
                                                    disease_keys,
+
                                                    ) for i in range(multiprocessing.cpu_count())]
 
         for w in d2d_loader_workers:
@@ -283,14 +311,16 @@ class DataDrivenRelationProcess(object):
             w.join()
 
         '''start workers for t2t'''
+        target_keys = target_data.keys()
+        target_labels = self.es_query.get_disease_labels(target_keys)
         t2t_workers = [DistanceComputationWorker(t2t_queue_processing,
                                                  filtered_diseases,
                                                  queue_storage,
                                                  RelationType.SHARED_DISEASE,
+                                                 target_labels,
                                                  ) for i in range(multiprocessing.cpu_count())]
         for w in t2t_workers:
             w.start()
-        target_keys = target_data.keys()
         t2t_loader_workers = [MatrixIteratorWorker(t2t_queue_loading,
                                                    self.r_server.db,
                                                    t2t_queue_processing,

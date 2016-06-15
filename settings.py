@@ -41,7 +41,7 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
-    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data.test3'
+    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data.test2'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     DEBUG = ENV == 'dev'
     PROFILE = False
@@ -179,7 +179,7 @@ class Config():
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
-    UNIQUE_RUN_ID = str(uuid.uuid4())
+    UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 
 
     #dump file names

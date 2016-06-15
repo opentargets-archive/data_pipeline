@@ -294,3 +294,40 @@ class ESQuery(object):
                 print c
 
         return target_results, disease_results
+
+    def get_target_labels(self, ids):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "ids": {
+                                   "values": ids,
+                               }
+                           },
+                               '_source': 'approved_symbol',
+                               'size': 1,
+                           },
+                          scroll='12h',
+                          index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
+                          timeout="10m",
+                          )
+
+
+
+        return dict((hit['_id'],hit['_source']['approved_symbol']) for hit in res)
+
+    def get_disease_labels(self, ids):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "ids": {
+                                   "values": ids,
+                               }
+                           },
+                               '_source': 'label',
+                               'size': 1,
+                           },
+                           scroll='12h',
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME),
+                           timeout="10m",
+                           )
+
+        return dict((hit['_id'],hit['_source']['label']) for hit in res)
+
