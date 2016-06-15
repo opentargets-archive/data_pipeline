@@ -368,6 +368,15 @@ def _get_relation_generic_mapping():
                     "type": "string",
                     "index": "not_analyzed",
                 },
+                "shared_targets": {
+                    "type": "string",
+                    "index": "not_analyzed",
+                },
+                "shared_diseases": {
+                    "type": "string",
+                    "index": "not_analyzed",
+                },
+
 
             },
         "dynamic_templates" : [
