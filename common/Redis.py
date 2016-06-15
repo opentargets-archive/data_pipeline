@@ -270,7 +270,7 @@ class RedisQueue(object):
             pipe = r_server.pipeline()
             pipe.get(self.submitted_counter)
             pipe.get(self.processed_counter)
-            submitted, processed, errors = pipe.execute()
+            submitted, processed = pipe.execute()
             submitted = int(submitted or 0)
             processed = int(processed or 0)
             return submitted <= processed #temporary hack should check for equal
@@ -339,7 +339,7 @@ class RedisQueueWorkerProcess(Process):
         while not self.queue_in.is_done(r_server=self.r_server):
             job = self.queue_in.get(r_server=self.r_server, timeout=1)
             if job is None and self.queue_in.is_submission_finished(r_server=self.r_server):
-                break
+                break#this might leave some unprocessed jobs at the end of the queue if they are very slow to be processed ( takes more than the timeout)
             if job is not None:
                 key, data = job
                 error = False
