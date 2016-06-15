@@ -142,7 +142,7 @@ class DistanceStorageWorker(Process):
 
             def run(self):
                 c=0
-                with Loader(self.es, chunk_size=10000) as loader:
+                with Loader(self.es, chunk_size=STORAGE_CHUNK_SIZE) as loader:
                     while not self.queue_in.is_done(r_server=self.r_server):
                         job = self.queue_in.get(r_server=self.r_server, timeout=1)
                         if job is not None:
