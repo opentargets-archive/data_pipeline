@@ -68,7 +68,7 @@ class DistanceComputationWorker(Process):
                  filtered_keys,
                  queue_out,
                  type,
-                 labels = dict()):
+                 ):
         super(DistanceComputationWorker, self).__init__()
         self.queue_in = queue_in
         self.queue_out = queue_out
@@ -76,7 +76,6 @@ class DistanceComputationWorker(Process):
         logging.info('%s started'%self.name)
         self.filtered_keys = set(filtered_keys)
         self.type = type
-        self.labels = labels
 
     def run(self):
         while not self.queue_in.is_done(r_server=self.r_server):
@@ -85,10 +84,12 @@ class DistanceComputationWorker(Process):
                 key, data = job
                 error = False
                 try:
-                    subject_id, subject_data, object_id, object_data = data
+                    subject_id, subject_data, subject_label, object_id, object_data, object_label = data
                     subject = dict(id=subject_id,
+                                   label = subject_label,
                                    links={})
                     object = dict(id=object_id,
+                                  label=object_label,
                                   links={})
                     union_keys = set(subject_data.keys()) | set(object_data.keys())
                     shared_keys = set(subject_data.keys()) & set(object_data.keys())
@@ -112,9 +113,7 @@ class DistanceComputationWorker(Process):
                                           }
                         if self.type == RelationType.SHARED_TARGET:
                             subject['links']['targets_count'] =len(subject_data)
-                            subject['label'] = self.labels[subject_id]
                             object['links']['targets_count'] = len(object_data)
-                            object['label'] = self.labels[object_id]
                             body['shared_targets'] = list(union_keys)
                         elif self.type == RelationType.SHARED_DISEASE:
                             subject['links']['diseases_count'] = len(subject_data)
@@ -187,10 +186,12 @@ class MatrixIteratorWorker(RedisQueueWorkerProcess):
                  queue_out=None,
                  matrix_data = None,
                  key_list = None,
+                 labels = None
                  ):
         super(MatrixIteratorWorker, self).__init__(queue_in,redis_path, queue_out)
         self.matrix_data = matrix_data
         self.keys = key_list
+        self.labels = labels
 
     def process(self, data):
         i = data
@@ -199,7 +200,7 @@ class MatrixIteratorWorker(RedisQueueWorkerProcess):
                 subj_id = self.keys[i]
                 obj_id = self.keys[j]
                 if set(self.matrix_data[subj_id].keys()) & set(self.matrix_data[obj_id].keys()):
-                    self.queue_out.put((subj_id, self.matrix_data[subj_id], obj_id, self.matrix_data[obj_id]),
+                    self.queue_out.put((subj_id, self.matrix_data[subj_id], self.labels[subj_id], obj_id, self.matrix_data[obj_id], self.labels[obj_id]),
                                        r_server= self.r_server)
 
 
@@ -280,7 +281,6 @@ class DataDrivenRelationProcess(object):
                                                  [],
                                                  queue_storage,
                                                  RelationType.SHARED_TARGET,
-                                                 disease_labels,
                                                  ) for i in range(multiprocessing.cpu_count())]
         for w in d2d_workers:
             w.start()
@@ -290,7 +290,7 @@ class DataDrivenRelationProcess(object):
                                                    d2d_queue_processing,
                                                    disease_data,
                                                    disease_keys,
-
+                                                   disease_labels,
                                                    ) for i in range(multiprocessing.cpu_count())]
 
         for w in d2d_loader_workers:
@@ -312,12 +312,11 @@ class DataDrivenRelationProcess(object):
 
         '''start workers for t2t'''
         target_keys = target_data.keys()
-        target_labels = self.es_query.get_disease_labels(target_keys)
+        target_labels = self.es_query.get_target_labels()(target_keys)
         t2t_workers = [DistanceComputationWorker(t2t_queue_processing,
                                                  filtered_diseases,
                                                  queue_storage,
                                                  RelationType.SHARED_DISEASE,
-                                                 target_labels,
                                                  ) for i in range(multiprocessing.cpu_count())]
         for w in t2t_workers:
             w.start()
@@ -326,6 +325,7 @@ class DataDrivenRelationProcess(object):
                                                    t2t_queue_processing,
                                                    target_data,
                                                    target_keys,
+                                                   target_labels,
                                                    ) for i in range(multiprocessing.cpu_count())]
 
         for w in t2t_loader_workers:
