@@ -114,11 +114,11 @@ class DistanceComputationWorker(Process):
                         if self.type == RelationType.SHARED_TARGET:
                             subject['links']['targets_count'] =len(subject_data)
                             object['links']['targets_count'] = len(object_data)
-                            body['shared_targets'] = list(union_keys)
+                            body['shared_targets'] = list(shared_keys)
                         elif self.type == RelationType.SHARED_DISEASE:
                             subject['links']['diseases_count'] = len(subject_data)
                             object['links']['diseases_count'] = len(object_data)
-                            body['shared_diseases'] = list(union_keys)
+                            body['shared_diseases'] = list(shared_keys)
                         r = Relation(subject, object, dist, self.type, **body)
                         self.queue_out.put(r, self.r_server)#TODO: create an object here
                 except Exception, e:
