@@ -92,20 +92,20 @@ class DistanceComputationWorker(Process):
                                   label=object_label,
                                   links={})
                     union_keys = set(subject_data.keys()) | set(object_data.keys())
-                    shared_keys = self._get_ordered_shared_keys(subject_data, object_data)
+                    shared_keys = set(subject_data.keys()) & set(object_data.keys())
+                    shared_keys = self._get_ordered_keys(subject_data, object_data, shared_keys)
                     if self.filtered_keys:
                         union_keys = union_keys - self.filtered_keys # remove filtered keys if needed
                         shared_keys = shared_keys - self.filtered_keys
                     if union_keys:
-                        subj_vector = [DataDrivenRelationProcess.cap_to_one(i) for i in [subject_data[k] for k in union_keys]]
-                        obj_vector = [DataDrivenRelationProcess.cap_to_one(i) for i in [object_data[k] for k in union_keys]]
                         pos = len(shared_keys)
                         neg = len(union_keys)
                         jackard = 0.
                         if neg:
                             jackard = float(pos)/neg
-                        dist = {'euclidean': pdist([subj_vector, obj_vector])[0],
+                        dist = {'euclidean': self._compute_normalised_euclidean_distance(subject_data, object_data, union_keys),
                                 'jaccard': jackard,
+                                'stongest_link_euclidean': self._compute_normalised_euclidean_distance(subject_data, object_data, self._get_ordered_keys(subject_data, object_data, union_keys)[:100]),
                                 }
                         body = dict()
                         body['counts'] = {'shared_count': pos,
@@ -129,10 +129,18 @@ class DistanceComputationWorker(Process):
 
         logging.info('%s done processing'%self.name)
 
-    def _get_ordered_shared_keys(self, subject_data, object_data):
-        shared_keys = set(subject_data.keys()) & set(object_data.keys())
-        weighted_keys = sorted([(max(subject_data[key], object_data[key]), key) for key in shared_keys], reverse=True)
-        return list((i[1] for i in weighted_keys))
+    def _get_ordered_keys(self, subject_data, object_data, keys):
+        ordered_keys = sorted([(max(subject_data[key], object_data[key]), key) for key in keys], reverse=True)
+        return list((i[1] for i in ordered_keys))
+
+    def _compute_normalised_euclidean_distance(self, subject_data, object_data, keys):
+        '''calculate a normlized inverted euclidean distance.
+        return 1 for perfect match
+        returns 0 if nothing is in common'''
+        subj_vector = [DataDrivenRelationProcess.cap_to_one(i) for i in [subject_data[k] for k in keys]]
+        obj_vector = [DataDrivenRelationProcess.cap_to_one(i) for i in [object_data[k] for k in keys]]
+        return 1.-(pdist([subj_vector, obj_vector])[0]/math.sqrt(len(keys)))
+
 
 
 class DistanceStorageWorker(Process):
