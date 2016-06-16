@@ -92,7 +92,7 @@ class DistanceComputationWorker(Process):
                                   label=object_label,
                                   links={})
                     union_keys = set(subject_data.keys()) | set(object_data.keys())
-                    shared_keys = set(subject_data.keys()) & set(object_data.keys())
+                    shared_keys = self._get_ordered_shared_keys(subject_data, object_data)
                     if self.filtered_keys:
                         union_keys = union_keys - self.filtered_keys # remove filtered keys if needed
                         shared_keys = shared_keys - self.filtered_keys
@@ -128,6 +128,12 @@ class DistanceComputationWorker(Process):
                 self.queue_in.done(key, error=error, r_server=self.r_server)
 
         logging.info('%s done processing'%self.name)
+
+    def _get_ordered_shared_keys(self, subject_data, object_data):
+        shared_keys = set(subject_data.keys()) & set(object_data.keys())
+        weighted_keys = sorted([(max(subject_data[key], object_data[key]), key) for key in shared_keys], reverse=True)
+        return tuple((i[1] for i in weighted_keys))
+
 
 class DistanceStorageWorker(Process):
             def __init__(self,
@@ -242,10 +248,10 @@ class DataDrivenRelationProcess(object):
         '''create the queues'''
         d2d_queue_loading = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_loading',
                                        max_size=multiprocessing.cpu_count() * STORAGE_WORKERS*2,
-                                       job_timeout=20)
+                                       job_timeout=180)
         t2t_queue_loading = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_loading',
                                        max_size=multiprocessing.cpu_count() * STORAGE_CHUNK_SIZE * 2,
-                                       job_timeout=20)
+                                       job_timeout=180)
 
         d2d_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_processing',
                                       max_size=multiprocessing.cpu_count()*STORAGE_CHUNK_SIZE,
@@ -312,7 +318,7 @@ class DataDrivenRelationProcess(object):
 
         '''start workers for t2t'''
         target_keys = target_data.keys()
-        target_labels = self.es_query.get_target_labels()(target_keys)
+        target_labels = self.es_query.get_target_labels(target_keys)
         t2t_workers = [DistanceComputationWorker(t2t_queue_processing,
                                                  filtered_diseases,
                                                  queue_storage,
