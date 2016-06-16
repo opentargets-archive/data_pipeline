@@ -132,7 +132,7 @@ class DistanceComputationWorker(Process):
     def _get_ordered_shared_keys(self, subject_data, object_data):
         shared_keys = set(subject_data.keys()) & set(object_data.keys())
         weighted_keys = sorted([(max(subject_data[key], object_data[key]), key) for key in shared_keys], reverse=True)
-        return tuple((i[1] for i in weighted_keys))
+        return list((i[1] for i in weighted_keys))
 
 
 class DistanceStorageWorker(Process):
