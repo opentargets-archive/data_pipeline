@@ -93,10 +93,10 @@ class DistanceComputationWorker(Process):
                                   links={})
                     union_keys = set(subject_data.keys()) | set(object_data.keys())
                     shared_keys = set(subject_data.keys()) & set(object_data.keys())
-                    shared_keys = self._get_ordered_keys(subject_data, object_data, shared_keys)
                     if self.filtered_keys:
                         union_keys = union_keys - self.filtered_keys # remove filtered keys if needed
                         shared_keys = shared_keys - self.filtered_keys
+                    shared_keys = self._get_ordered_keys(subject_data, object_data, shared_keys)
                     if union_keys:
                         pos = len(shared_keys)
                         neg = len(union_keys)
