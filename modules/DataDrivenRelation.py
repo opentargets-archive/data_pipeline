@@ -143,22 +143,22 @@ class DistanceComputationWorker(Process):
                       [object_data[k] for k in keys]]
         subj_vector = [DataDrivenRelationProcess.transform_for_euclidean_distance(i) for i in subj_vector_capped]
         obj_vector = [DataDrivenRelationProcess.transform_for_euclidean_distance(i) for i in obj_vector_capped]
-        subj_vector_b = [i==0. for i in subj_vector]
-        obj_vector_b = [i==0. for i in obj_vector]
+        # subj_vector_b = [i==0. for i in subj_vector]
+        # obj_vector_b = [i==0. for i in obj_vector]
         vectors = np.array([subj_vector, obj_vector])
-        vectors_b = np.array([subj_vector_b, obj_vector_b])
+        # vectors_b = np.array([subj_vector_b, obj_vector_b])
         correlation = pdist(vectors, 'correlation')[0]
         if math.isnan(correlation):
             correlation = 0.0
         return dict(euclidean = 1.-(pdist(vectors, 'euclidean')[0]/(math.sqrt(len(keys)*2))),
-                     jaccard_formal= pdist(vectors, 'jaccard')[0],
-                     matching=pdist(vectors, 'matching')[0],
-                     matching_b=pdist(vectors_b, 'matching')[0],
-                     cosine=pdist([subj_vector_capped, obj_vector_capped], 'cosine')[0],
-                     correlation=correlation,
-                     cityblock=pdist(vectors, 'cityblock')[0],
-                     hamming=pdist(vectors, 'hamming')[0],
-                     hamming_b=pdist(vectors_b, 'hamming')[0],
+                     # jaccard_formal= pdist(vectors, 'jaccard')[0],
+                     # matching=pdist(vectors, 'matching')[0],
+                     # matching_b=pdist(vectors_b, 'matching')[0],
+                     # cosine=pdist([subj_vector_capped, obj_vector_capped], 'cosine')[0],
+                     # correlation=correlation,
+                     cityblock=1-(pdist(vectors, 'cityblock')[0]/(len(keys)*2)),
+                     # hamming=pdist(vectors, 'hamming')[0],
+                     # hamming_b=pdist(vectors_b, 'hamming')[0],
                      )
 
 
