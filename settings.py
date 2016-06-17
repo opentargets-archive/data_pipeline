@@ -41,7 +41,7 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
-    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data.test3'
+    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data.test2'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     DEBUG = ENV == 'dev'
     PROFILE = False
@@ -406,7 +406,8 @@ class ElasticSearchConfiguration():
         generic_replicas_number = 0
         evidence_shard_number = 3
         evidence_replicas_number = 1
-        relation_shard_number = 6
+        relation_shard_number = 10
+        relation_replicas_number = 0
 
         bulk_load_chunk =1000
     else:
@@ -415,6 +416,7 @@ class ElasticSearchConfiguration():
         evidence_shard_number = 3
         evidence_replicas_number = 0
         relation_shard_number = 6
+        relation_replicas_number = 0
         bulk_load_chunk =1000
 
     uniprot_data_mapping = eco_data_mapping = {"mappings": {
@@ -817,7 +819,7 @@ class ElasticSearchConfiguration():
         relation_mappings[Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + rt] = _get_relation_generic_mapping()
 
     relation_data_mapping = {"settings": {"number_of_shards": relation_shard_number,
-                                          "number_of_replicas": evidence_replicas_number,
+                                          "number_of_replicas": relation_replicas_number,
                                           # "index.store.type": "memory",
                                           "refresh_interval": "60s",
                                           },

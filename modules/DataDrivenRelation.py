@@ -103,10 +103,10 @@ class DistanceComputationWorker(Process):
                         jackard = 0.
                         if neg:
                             jackard = float(pos)/neg
-                        dist = {'euclidean': self._compute_normalised_euclidean_distance(subject_data, object_data, union_keys),
+                        dist = {
                                 'jaccard': jackard,
-                                'stongest_link_euclidean': self._compute_normalised_euclidean_distance(subject_data, object_data, self._get_ordered_keys(subject_data, object_data, union_keys)[:100]),
                                 }
+                        dist.update(self._compute_vector_based_distances(subject_data, object_data, union_keys))
                         body = dict()
                         body['counts'] = {'shared_count': pos,
                                           'union_count': neg,
@@ -133,13 +133,33 @@ class DistanceComputationWorker(Process):
         ordered_keys = sorted([(max(subject_data[key], object_data[key]), key) for key in keys], reverse=True)
         return list((i[1] for i in ordered_keys))
 
-    def _compute_normalised_euclidean_distance(self, subject_data, object_data, keys):
+    def _compute_vector_based_distances(self, subject_data, object_data, keys):
         '''calculate a normlized inverted euclidean distance.
         return 1 for perfect match
         returns 0 if nothing is in common'''
-        subj_vector = [DataDrivenRelationProcess.cap_to_one(i) for i in [subject_data[k] for k in keys]]
-        obj_vector = [DataDrivenRelationProcess.cap_to_one(i) for i in [object_data[k] for k in keys]]
-        return 1.-(pdist([subj_vector, obj_vector])[0]/math.sqrt(len(keys)))
+        subj_vector_capped = [DataDrivenRelationProcess.cap_to_one(i) for i in
+                       [subject_data[k] for k in keys]]
+        obj_vector_capped = [DataDrivenRelationProcess.cap_to_one(i) for i in
+                      [object_data[k] for k in keys]]
+        subj_vector = [DataDrivenRelationProcess.transform_for_euclidean_distance(i) for i in subj_vector_capped]
+        obj_vector = [DataDrivenRelationProcess.transform_for_euclidean_distance(i) for i in obj_vector_capped]
+        subj_vector_b = [i==0. for i in subj_vector]
+        obj_vector_b = [i==0. for i in obj_vector]
+        vectors = np.array([subj_vector, obj_vector])
+        vectors_b = np.array([subj_vector_b, obj_vector_b])
+        correlation = pdist(vectors, 'correlation')[0]
+        if math.isnan(correlation):
+            correlation = 0.0
+        return dict(euclidean = 1.-(pdist(vectors, 'euclidean')[0]/(math.sqrt(len(keys)*2))),
+                     jaccard_formal= pdist(vectors, 'jaccard')[0],
+                     matching=pdist(vectors, 'matching')[0],
+                     matching_b=pdist(vectors_b, 'matching')[0],
+                     cosine=pdist([subj_vector_capped, obj_vector_capped], 'cosine')[0],
+                     correlation=correlation,
+                     cityblock=pdist(vectors, 'cityblock')[0],
+                     hamming=pdist(vectors, 'hamming')[0],
+                     hamming_b=pdist(vectors_b, 'hamming')[0],
+                     )
 
 
 
@@ -232,6 +252,12 @@ class DataDrivenRelationProcess(object):
         if i>1.:
             return 1.
         return i
+
+    @staticmethod
+    def transform_for_euclidean_distance(i):
+        if i == 0:
+            i=-1.
+        return DataDrivenRelationProcess.cap_to_one(i)
 
 
     def process_all(self):
