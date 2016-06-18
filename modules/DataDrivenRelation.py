@@ -281,18 +281,20 @@ class DataDrivenRelationProcess(object):
 
         '''create the queues'''
         d2d_queue_loading = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_loading',
-                                       max_size=multiprocessing.cpu_count() * STORAGE_WORKERS*2,
+                                       max_size=multiprocessing.cpu_count() *2,
                                        job_timeout=180)
         t2t_queue_loading = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_loading',
-                                       max_size=multiprocessing.cpu_count() * STORAGE_CHUNK_SIZE * 2,
-                                       job_timeout=180)
+                                       max_size=multiprocessing.cpu_count() * 2,
+                                       job_timeout=180,
+                                       ttl=60 * 60 * 24 * 14)
 
         d2d_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_processing',
                                       max_size=multiprocessing.cpu_count()*STORAGE_CHUNK_SIZE,
                                       job_timeout=20)
         t2t_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_processing',
                                       max_size=multiprocessing.cpu_count() * STORAGE_CHUNK_SIZE,
-                                      job_timeout=20)
+                                      job_timeout=20,
+                                      ttl=60 * 60 * 24 * 14)
 
         queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
                                    max_size=int(STORAGE_CHUNK_SIZE*STORAGE_WORKERS*1.2),
