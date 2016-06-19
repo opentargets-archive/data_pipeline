@@ -41,7 +41,7 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
-    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data.test2'
+    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data.test3'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     DEBUG = ENV == 'dev'
     PROFILE = False
