@@ -68,6 +68,7 @@ class DistanceComputationWorker(Process):
                  filtered_keys,
                  queue_out,
                  type,
+                 weights = {}
                  ):
         super(DistanceComputationWorker, self).__init__()
         self.queue_in = queue_in
@@ -75,6 +76,7 @@ class DistanceComputationWorker(Process):
         self.r_server = Redis(Config.REDISLITE_DB_PATH)
         logging.info('%s started'%self.name)
         self.filtered_keys = set(filtered_keys)
+        self.weights = weights
         self.type = type
 
     def run(self):
@@ -98,13 +100,17 @@ class DistanceComputationWorker(Process):
                         shared_keys = shared_keys - self.filtered_keys
                     shared_keys = self._get_ordered_keys(subject_data, object_data, shared_keys)
                     if union_keys:
+                        w_neg = sum([1./self.weights[i] for i in union_keys])
+                        w_pos = sum([1./self.weights[i] for i in shared_keys])
                         pos = len(shared_keys)
                         neg = len(union_keys)
-                        jackard = 0.
+                        jackard, jackard_weighted = 0., 0.
                         if neg:
                             jackard = float(pos)/neg
+                            jackard_weighted = float(w_pos)/w_neg
                         dist = {
                                 'jaccard': jackard,
+                                'jackard_weighted': jackard_weighted,
                                 }
                         dist.update(self._compute_vector_based_distances(subject_data, object_data, union_keys))
                         body = dict()
@@ -150,7 +156,7 @@ class DistanceComputationWorker(Process):
         correlation = pdist(vectors, 'correlation')[0]
         if math.isnan(correlation):
             correlation = 0.0
-        return dict(euclidean = 1.-(pdist(vectors, 'euclidean')[0]/(math.sqrt(len(keys)*2))),
+        return dict(euclidean = 1.-(pdist(vectors, 'euclidean')[0]/(math.sqrt(len(keys))*2)),
                      # jaccard_formal= pdist(vectors, 'jaccard')[0],
                      # matching=pdist(vectors, 'matching')[0],
                      # matching_b=pdist(vectors_b, 'matching')[0],
@@ -274,7 +280,11 @@ class DataDrivenRelationProcess(object):
         # available_targets = target_data.keys()
         # available_diseases = disease_data.keys()
 
-        filtered_diseases = self.get_hot_node_blacklist(disease_data)
+        inverted_disease_counts = self.get_inverted_counts(disease_data)
+        filtered_diseases = [i[0] for i in inverted_disease_counts.most_common(10)]
+
+        inverted_target_counts = self.get_inverted_counts(target_data)
+        filtered_targets = [i[0] for i in inverted_target_counts.most_common(10)]
 
         '''create the index'''
         Loader(self.es).create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME)
@@ -323,6 +333,7 @@ class DataDrivenRelationProcess(object):
                                                  [],
                                                  queue_storage,
                                                  RelationType.SHARED_TARGET,
+                                                 inverted_target_counts,
                                                  ) for i in range(multiprocessing.cpu_count())]
         for w in d2d_workers:
             w.start()
@@ -359,6 +370,7 @@ class DataDrivenRelationProcess(object):
                                                  filtered_diseases,
                                                  queue_storage,
                                                  RelationType.SHARED_DISEASE,
+                                                 inverted_disease_counts,
                                                  ) for i in range(multiprocessing.cpu_count())]
         for w in t2t_workers:
             w.start()
@@ -400,4 +412,12 @@ class DataDrivenRelationProcess(object):
 
         logging.info('Most common diseases: %s'%c.most_common(10))
         return [i[0] for i in c.most_common(10)]
+
+    def get_inverted_counts(self, data):
+        c = Counter()
+        for k, v in data.items():
+            c[k] = len(v)
+
+        # logging.info('Most common diseases: %s' % c.most_common(10))
+        return c
 
