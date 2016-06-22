@@ -5,6 +5,7 @@ from pprint import pprint
 
 import paramiko
 import pysftp
+import requests
 from paramiko import AuthenticationException
 
 from common.ElasticsearchLoader import Loader
@@ -46,8 +47,8 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 from multiprocessing import Manager
 
 # This bit is necessary for text mining data
-reload(sys);
-sys.setdefaultencoding("utf8");
+reload(sys)
+sys.setdefaultencoding("utf8")
 
 
 __author__ = 'gautierk'
@@ -74,14 +75,13 @@ UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF = 32
 DISEASE_ID_INVALID = 40
 DISEASE_ID_OBSOLETE = 41
 
-TOP_20_TARGETS_QUERY = '{  "size": 0, "aggs" : {  "group_by_targets" : {   "terms" : { "field" : "target_id", "order" : { "_count" : "desc" }, "size": 20 } } } }'
-TOP_20_DISEASES_QUERY = '{  "size": 0, "aggs" : {  "group_by_diseases" : {   "terms" : { "field" : "disease_id", "order" : { "_count" : "desc" }, "size": 20 } } } }'
-DISTINCT_TARGETS_QUERY = '{  "size": 0, "aggs" : {  "distinct_targets" : {  "cardinality" : { "field" : "target_id" } } } }'
-DISTINCT_DISEASES_QUERY = '{  "size": 0, "aggs" : {  "distinct_diseases" : {  "cardinality" : { "field" : "disease_id" } } } }'
+TOP_20_TARGETS_QUERY = {  "size": 0, "aggs" : {  "group_by_targets" : {   "terms" : { "field" : "target_id", "order" : { "_count" : "desc" }, "size": 20 } } } }
+TOP_20_DISEASES_QUERY = {  "size": 0, "aggs" : {  "group_by_diseases" : {   "terms" : { "field" : "disease_id", "order" : { "_count" : "desc" }, "size": 20 } } } }
+DISTINCT_TARGETS_QUERY = {  "size": 0, "aggs" : {  "distinct_targets" : {  "cardinality" : { "field" : "target_id" } } } }
+DISTINCT_DISEASES_QUERY = {  "size": 0, "aggs" : {  "distinct_diseases" : {  "cardinality" : { "field" : "disease_id" } } } }
 SUBMISSION_FILTER_FILENAME_QUERY = '''
 {
   "query": {
-    "filtered": {
     "filtered": {
       "filter": {
         "terms" : { "filename": ["%s"]}
@@ -91,9 +91,7 @@ SUBMISSION_FILTER_FILENAME_QUERY = '''
 }
 '''
 
-'''
-curl "localhost:9201/submission-audit/_search" -d '{ "query": { "filtered": { "filter": { "terms" : { "filename": ["/Users/koscieln/Documents/data/ftp/cttv008/upload/submissions/cttv008-04-03-2016.json.gz"]} } } } }'
-'''
+
 
 SUBMISSION_FILTER_MD5_QUERY = '''
 {
@@ -108,31 +106,6 @@ SUBMISSION_FILTER_MD5_QUERY = '''
 
 '''
 
-'''
-curl "localhost:9201/submission-audit/_search?" -d '
-{
-  "query": {
-    "filtered": {
-      "filter": {
-        "terms" : { "md5": ["c4053985ca0680dd5eb1c0e226ecd587"]}
-      }
-    }
-  }
-}
-'
-
-curl "localhost:9201/submission-audit/_search?" -d '
-{
-  "query": {
-    "filtered": {
-      "filter": {
-        "terms" : { "filename": ["/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-26-11-2015.json.gz"]}
-      }
-    }
-  }
-}
-'
-'''
 
 
 from time import strftime
@@ -141,16 +114,14 @@ from time import strftime
 VALIDATION_DATE = strftime("%Y%m%dT%H%M%SZ")
 
 # figlet -c "Validation Passed"
-messagePassed = '''
-
+messagePassed = '''-----------------
 VALIDATION PASSED
-
+-----------------
 '''
 
-messageFailed = '''
-
+messageFailed = '''-----------------
 VALIDATION FAILED
-
+-----------------
 '''
 
 eva_curated = {
@@ -317,7 +288,7 @@ class DirectoryCrawlerProcess():
                     data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[u]
                     logging.info(data_source_name)
                     logfile = os.path.join('/tmp', file_version+ ".log")
-                    logging.Info("%s checking file: %s" % (self.__class__.__name__, file_version))
+                    logging.info("%s checking file: %s" % (self.__class__.__name__, file_version))
 
 
                     try:
@@ -1069,7 +1040,7 @@ class AuditTrailProcess(multiprocessing.Process):
         super(AuditTrailProcess, self).__init__()
         self.input_q = input_q
         self.es = es
-        self.submission_audit = SubmissionAuditElasticStorage(es=self.es)
+        self.submission_audit = SubmissionAuditElasticStorage(loader=Loader(es))
         self.ensembl_current = ensembl_current
         self.uniprot_current = uniprot_current
         self.symbols = symbols
@@ -1110,70 +1081,44 @@ class AuditTrailProcess(multiprocessing.Process):
         logger.info("%s finished" % self.name)
 
     def send_email(self, bSend, provider_id, data_source_name, filename, bValidated, nb_records, errors, when, extra_text, logfile):
-        me = Config.EVIDENCEVALIDATION_SENDER_ACCOUNT
-        you = ",".join(Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id])
+        sender = Config.EVIDENCEVALIDATION_SENDER_ACCOUNT
+        recipient =Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id]
         status = "passed"
         if not bValidated:
             status = "failed"
-        # Create message container - the correct MIME type is multipart/alternative.
-        # msg = MIMEMultipart('alternative')
-        msg = MIMEMultipart()
-        msg['Subject'] = "CTTV: {0} validation {1} for {2}".format(data_source_name, status, filename)
-        msg['From'] = me
-        msg['To'] = you
-        rcpt = Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id]
-        if provider_id != 'cttv001':
-            rcpt.extend(Config.EVIDENCEVALIDATION_PROVIDER_EMAILS['cttv001'])
-            msg['Cc'] = ",".join(Config.EVIDENCEVALIDATION_PROVIDER_EMAILS['cttv001'])
 
-        text = "This is an automated message generated by the CTTV Core Platform Pipeline on {0}\n".format(when)
 
+        text = ["This is an automated message generated by the CTTV Core Platform Pipeline on {0}".format(when)]
         if bValidated:
-            text += messagePassed
-            text += "Congratulations :)\n"
+            text.append(messagePassed)
+            text.append("Congratulations :)")
         else:
-            text += messageFailed
-            text += "See details in the attachment {0}\n\n".format(os.path.basename(logfile))
-        text += "Data Provider:\t%s\n"%data_source_name
-        text += "JSON schema version:\t1.2.2\n"
-        text += "Number of records parsed:\t{0}\n".format(nb_records)
+            text.append(messageFailed)
+            text.append("See details in the attachment {0}\n".format(os.path.basename(logfile)))
+        text.append("Data Provider:\t%s"%data_source_name)
+        text.append("JSON schema version:\t%s"%Config.EVIDENCEVALIDATION_JSON_SCHEMA_VERSION)
+        text.append("Number of records parsed:\t{0}".format(nb_records))
         for key in errors:
-            text += "Number of {0}:\t{1}\n".format(key, errors[key])
-        text += "\n"
-        text += extra_text
-        text += "\nYours\nThe CTTV Core Platform Team"
-        # text += signature
-        # print text
-
-        if bSend:
-            logging.info("Send e-mail to data provider...")
-            # Record the MIME types of both parts - text/plain and text/html.
-            part1 = MIMEText(text, 'plain')
-
-            # Attach parts into message container.
-            # According to RFC 2046, the last part of a multipart message, in this case
-            # the HTML message, is best and preferred.
-            msg.attach(part1)
-
-            if not bValidated:
-                part2 = MIMEBase('application', "octet-stream")
-                part2.set_payload(open(logfile, "rb").read())
-                Encoders.encode_base64(part2)
-                part2.add_header('Content-Disposition', 'attachment; filename="{0}"'.format(os.path.basename(logfile)))
-                msg.attach(part2)
-
-            # Send the message via local SMTP server.
-            mail = smtplib.SMTP('smtp.office365.com', 587)
-
-            mail.ehlo()
-
-            mail.starttls()
-
-            mail.login(me, Config.EVIDENCEVALIDATION_SENDER_PASSWORD)
-            mail.sendmail(me, rcpt, msg.as_string())
-            mail.quit()
-            logging.info("e-mail sent")
-        return 0
+            text.append("Number of {0}:\t{1}".format(key, errors[key]))
+        text.append("")
+        text.append(extra_text)
+        text.append( "\nYours\nThe CTTV Core Platform Team")
+        # text.append( signature
+        text = '\n'.join(text)
+        print text
+        requests.post(
+            Config.MAILGUN_DOMAIN,
+            auth=("api", Config.MAILGUN_API_KEY),
+            files=[(filename+".log", open(logfile)),],
+            data={"from": sender,
+                  "to": "andreap@ebi.ac.uk",#recipient,
+                  "bcc": Config.EVIDENCEVALIDATION_BCC_ACCOUNT,
+                  "subject": "CTTV: {0} validation {1} for {2}".format(data_source_name, status, filename),
+                  "text": text,
+                  # "html": "<html>HTML version of the body</html>"
+                  },
+            )
+        return
 
     def merge_dict_sum(self, x, y):
         # merge keys
@@ -1285,7 +1230,7 @@ class AuditTrailProcess(multiprocessing.Process):
 
             logging.info("%s generating report "%self.name)
 
-            text = ''
+            text = []
 
             '''
              refresh the indice
@@ -1389,13 +1334,13 @@ class AuditTrailProcess(multiprocessing.Process):
 
             logging.debug("Get top 20 targets")
             search = self.es.search(
-                    index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
                     doc_type=data_source_name,
                     body=TOP_20_TARGETS_QUERY,
             )
 
             if search:
-                text += "Top %i targets:\n" % Config.EVIDENCEVALIDATION_NB_TOP_TARGETS
+                text.append("Top %i targets:" % Config.EVIDENCEVALIDATION_NB_TOP_TARGETS)
                 for top_targets in search['aggregations']['group_by_targets']['buckets']:
                     id = top_targets['key']
                     doc_count = top_targets['doc_count']
@@ -1411,52 +1356,52 @@ class AuditTrailProcess(multiprocessing.Process):
                     # elif uniprotMatch:
                     #    uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
                     #    id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
-                    text += "\t-{0}:\t{1} ({2:.2f}%) {3}\n".format(id, doc_count, doc_count * 100.0 / nb_documents,
-                                                                   id_text)
-                text += "\n"
+                    text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(id, doc_count, doc_count * 100.0 / nb_documents,
+                                                                   id_text))
+                text.append("")
 
                 # logging.info(json.dumps(top_target))
 
             logging.debug("Get top 20 diseases")
             search = self.es.search(
-                    index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
                     doc_type=data_source_name,
                     body=TOP_20_DISEASES_QUERY,
             )
 
             if search:
-                text += "Top %i diseases:\n" % (Config.EVIDENCEVALIDATION_NB_TOP_DISEASES)
+                text.append("Top %i diseases:" % (Config.EVIDENCEVALIDATION_NB_TOP_DISEASES))
                 for top_diseases in search['aggregations']['group_by_diseases']['buckets']:
                     # logging.info(json.dumps(result))
                     disease = top_diseases['key']
                     doc_count = top_diseases['doc_count']
                     if top_diseases['key'] in self.efo_current:
-                        text += "\t-{0}:\t{1} ({2:.2f}%) {3}\n".format(disease, doc_count,
+                        text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(disease, doc_count,
                                                                        doc_count * 100.0 / nb_documents,
-                                                                       self.efo_current[disease])
+                                                                       self.efo_current[disease]))
                     else:
-                        text += "\t-{0}:\t{1} ({2:.2f}%)\n".format(disease, doc_count, doc_count * 100.0 / nb_documents)
-                text += "\n"
+                        text.append("\t-{0}:\t{1} ({2:.2f}%)".format(disease, doc_count, doc_count * 100.0 / nb_documents))
+                text.append("")
 
             # report invalid/obsolete EFO term
             logging.debug("report invalid EFO term")
             if nb_efo_invalid > 0:
-                text += "Errors:\n"
-                text += "\t%i invalid ontology term(s) found in %i (%.2f%s) of the records.\n" % (
-                len(invalid_diseases), nb_efo_invalid, nb_efo_invalid * 100.0 / nb_documents, '%')
+                text.append("Errors:")
+                text.append("\t%i invalid ontology term(s) found in %i (%.2f%s) of the records." % (
+                    len(invalid_diseases), nb_efo_invalid, nb_efo_invalid * 100.0 / nb_documents, '%'))
                 for disease_id in invalid_diseases:
                     if invalid_diseases[disease_id] == 1:
-                        text += "\t%s\t(reported once)\n" % disease_id
+                        text.append("\t%s\t(reported once)" % disease_id)
                     else:
-                        text += "\t%s\t(reported %i times)\n" % (disease_id, invalid_diseases[disease_id])
+                        text.append("\t%s\t(reported %i times)" % (disease_id, invalid_diseases[disease_id]))
 
-                text += "\n"
+                text.append("")
 
             logging.debug("report obsolete EFO term")
             if nb_efo_obsolete > 0:
-                text += "Errors:\n"
-                text += "\t%i obsolete ontology term(s) found in %i (%.1f%s) of the records.\n" % (
-                len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete * 100 / nb_documents, '%')
+                text.append("Errors:")
+                text.append("\t%i obsolete ontology term(s) found in %i (%.1f%s) of the records." % (
+                    len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete * 100 / nb_documents, '%'))
                 for disease_id in obsolete_diseases:
                     new_term = None
                     if disease_id in self.efo_obsolete:
@@ -1466,93 +1411,93 @@ class AuditTrailProcess(multiprocessing.Process):
                     else:
                         new_term = self.mp_obsolete[disease_id]
                     if obsolete_diseases[disease_id] == 1:
-                        text += "\t%s\t(reported once)\t%s\n" % (
-                        disease_id, new_term.replace("\n", " "))
+                        text.append("\t%s\t(reported once)\t%s" % (
+                            disease_id, new_term.replace("", " ")))
                     else:
-                        text += "\t%s\t(reported %i times)\t%s\n" % (
-                        disease_id, obsolete_diseases[disease_id], new_term.replace("\n", " "))
-                text += "\n"
+                        text.append("\t%s\t(reported %i times)\t%s" % (
+                            disease_id, obsolete_diseases[disease_id], new_term.replace("", " ")))
+                text.append("")
 
             # report invalid Ensembl genes
             logging.debug("report invalid Ensembl genes")
             if nb_ensembl_invalid > 0:
-                text += "Errors:\n"
-                text += "\t%i unknown Ensembl identifier(s) found in %i (%.1f%s) of the records.\n" % (
-                len(invalid_ensembl_ids), nb_ensembl_invalid, nb_ensembl_invalid * 100 / nb_documents, '%')
+                text.append("Errors:")
+                text.append("\t%i unknown Ensembl identifier(s) found in %i (%.1f%s) of the records." % (
+                    len(invalid_ensembl_ids), nb_ensembl_invalid, nb_ensembl_invalid * 100 / nb_documents, '%'))
                 for ensembl_id in invalid_ensembl_ids:
                     if invalid_ensembl_ids[ensembl_id] == 1:
-                        text += "\t%s\t(reported once)\n" % (ensembl_id)
+                        text.append("\t%s\t(reported once)" % (ensembl_id))
                     else:
-                        text += "\t%s\t(reported %i times)\n" % (ensembl_id, invalid_ensembl_ids[ensembl_id])
-                text += "\n"
+                        text.append("\t%s\t(reported %i times)" % (ensembl_id, invalid_ensembl_ids[ensembl_id]))
+                text.append("")
 
             # report Ensembl genes not on reference assembly
             logging.debug("report Ensembl genes not on reference assembly")
             if nb_ensembl_nonref > 0:
-                text += "Warnings:\n"
-                text += "\t%i Ensembl Human Alternative sequence Gene identifier(s) not mapped to the reference genome assembly %s found in %i (%.1f%s) of the records.\n" % (
-                len(nonref_ensembl_ids), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_ensembl_nonref,
-                nb_ensembl_nonref * 100 / nb_documents, '%')
-                text += "\tPlease map them to a reference assembly gene if possible.\n"
-                text += "\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifier.\n"
+                text.append("Warnings:")
+                text.append("\t%i Ensembl Human Alternative sequence Gene identifier(s) not mapped to the reference genome assembly %s found in %i (%.1f%s) of the records." % (
+                    len(nonref_ensembl_ids), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_ensembl_nonref,
+                    nb_ensembl_nonref * 100 / nb_documents, '%'))
+                text.append("\tPlease map them to a reference assembly gene if possible.")
+                text.append("\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifier.")
                 for ensembl_id in nonref_ensembl_ids:
                     if nonref_ensembl_ids[ensembl_id] == 1:
-                        text += "\t%s\t(reported once) maps to %s\n" % (
-                        ensembl_id, self.get_reference_gene_from_Ensembl(ensembl_id))
+                        text.append("\t%s\t(reported once) maps to %s" % (
+                            ensembl_id, self.get_reference_gene_from_Ensembl(ensembl_id)))
                     else:
-                        text += "\t%s\t(reported %i times) maps to %s\n" % (
-                        ensembl_id, nonref_ensembl_ids[ensembl_id], self.get_reference_gene_from_Ensembl(ensembl_id))
-                text += "\n"
+                        text.append("\t%s\t(reported %i times) maps to %s" % (
+                            ensembl_id, nonref_ensembl_ids[ensembl_id], self.get_reference_gene_from_Ensembl(ensembl_id)))
+                text.append("")
 
             # report invalid Uniprot entries
             logging.debug("report invalid Uniprot entries")
             if nb_uniprot_invalid > 0:
-                text += "Errors:\n"
-                text += "\t%i invalid UniProt identifier(s) found in %i (%.1f%s) of the records.\n" % (
-                len(invalid_uniprot_ids), nb_uniprot_invalid, nb_uniprot_invalid * 100 / nb_documents, '%')
+                text.append("Errors:")
+                text.append("\t%i invalid UniProt identifier(s) found in %i (%.1f%s) of the records." % (
+                    len(invalid_uniprot_ids), nb_uniprot_invalid, nb_uniprot_invalid * 100 / nb_documents, '%'))
                 for uniprot_id in invalid_uniprot_ids:
                     if invalid_uniprot_ids[uniprot_id] == 1:
-                        text += "\t%s\t(reported once)\n" % (uniprot_id)
+                        text.append("\t%s\t(reported once)" % (uniprot_id))
                     else:
-                        text += "\t%s\t(reported %i times)\n" % (uniprot_id, invalid_uniprot_ids[uniprot_id])
-                text += "\n"
+                        text.append("\t%s\t(reported %i times)" % (uniprot_id, invalid_uniprot_ids[uniprot_id]))
+                text.append("")
 
                 # report UniProt ids with no mapping to Ensembl
             # missing_uniprot_id_xrefs
             logging.debug("report UniProt ids with no mapping to Ensembl")
             if nb_missing_uniprot_id_xrefs > 0:
-                text += "Warnings:\n"
-                text += "\t%i UniProt identifier(s) without cross-references to Ensembl found in %i (%.1f%s) of the records.\n" % (
-                len(missing_uniprot_id_xrefs), nb_missing_uniprot_id_xrefs,
-                nb_missing_uniprot_id_xrefs * 100 / nb_documents, '%')
-                text += "\tThe corresponding evidence strings have been discarded.\n"
+                text.append("Warnings:")
+                text.append("\t%i UniProt identifier(s) without cross-references to Ensembl found in %i (%.1f%s) of the records." % (
+                    len(missing_uniprot_id_xrefs), nb_missing_uniprot_id_xrefs,
+                    nb_missing_uniprot_id_xrefs * 100 / nb_documents, '%'))
+                text.append("\tThe corresponding evidence strings have been discarded.")
                 for uniprot_id in missing_uniprot_id_xrefs:
                     if missing_uniprot_id_xrefs[uniprot_id] == 1:
-                        text += "\t%s\t(reported once)\n" % (uniprot_id)
+                        text.append("\t%s\t(reported once)" % (uniprot_id))
                     else:
-                        text += "\t%s\t(reported %i times)\n" % (uniprot_id, missing_uniprot_id_xrefs[uniprot_id])
-                text += "\n"
+                        text.append("\t%s\t(reported %i times)" % (uniprot_id, missing_uniprot_id_xrefs[uniprot_id]))
+                text.append("")
 
             # report invalid Uniprot mapping entries
             logging.debug("report invalid Uniprot mapping entries")
             if nb_uniprot_invalid_mapping > 0:
-                text += "Warnings:\n"
-                text += "\t%i UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (that's %.2f%s) of the records.\n" % (
-                len(invalid_uniprot_id_mappings), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY,
-                nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping * 100 / nb_documents, '%')
-                text += "\tIf you think that might be an error in your submission, please use a UniProt identifier that will map to a reference assembly gene identifier.\n"
-                text += "\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifiers.\n"
+                text.append("Warnings:")
+                text.append("\t%i UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (that's %.2f%s) of the records." % (
+                    len(invalid_uniprot_id_mappings), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY,
+                    nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping * 100 / nb_documents, '%'))
+                text.append("\tIf you think that might be an error in your submission, please use a UniProt identifier that will map to a reference assembly gene identifier.")
+                text.append("\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifiers.")
                 for uniprot_id in invalid_uniprot_id_mappings:
                     if invalid_uniprot_id_mappings[uniprot_id] == 1:
-                        text += "\t%s\t(reported once) maps to %s\n" % (
-                        uniprot_id, self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
+                        text.append("\t%s\t(reported once) maps to %s" % (
+                            uniprot_id, self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"])))
                     else:
-                        text += "\t%s\t(reported %i times) maps to %s\n" % (
-                        uniprot_id, invalid_uniprot_id_mappings[uniprot_id],
-                        self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
-                text += "\n"
+                        text.append("\t%s\t(reported %i times) maps to %s" % (
+                            uniprot_id, invalid_uniprot_id_mappings[uniprot_id],
+                            self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"])))
+                text.append("")
 
-            # print(text)
+            text = '\n'.join(text)
 
             # A file is successfully validated if it meets the following conditions
             successfully_validated = (
@@ -1628,7 +1573,6 @@ class ElasticStorage():
         # Create a query for results you want to delete
 
         count = 0
-
         q = '{ "query": { "filtered": { "filter": { "type" : { "value" : "%s" } } } } }' % (data_source_name)
 
         res = es.search(
@@ -1644,7 +1588,7 @@ class ElasticStorage():
 
 
 
-        if (count > 0):
+        if count:
             logging.debug("Delete previous submitted data: %i evidence strings will be removed"%count)
 
             search = es.search(
@@ -1741,9 +1685,10 @@ class EvidenceChunkElasticStorage():
                         create_index=False)
 
     def storage_delete(self, data_source_name):
-        ElasticStorage.delete_prev_data_in_es(self.loader.es,
-                                              self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
-                                              data_source_name)
+        if self.loader.es.indices.exists(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)):
+            ElasticStorage.delete_prev_data_in_es(self.loader.es,
+                                                  self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
+                                                  data_source_name)
 
     def storage_flush(self):
         self.loader.flush()
@@ -2361,7 +2306,6 @@ class EvidenceValidationFileChecker():
         for w in validators:
             w.start()
 
-        sys.exit()
 
         'Audit the whole process and send e-mails'
         auditor = AuditTrailProcess(
