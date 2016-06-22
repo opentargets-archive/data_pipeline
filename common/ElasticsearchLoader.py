@@ -295,17 +295,19 @@ class Loader():
     def create_new_index(self, index_name, recreate = True):
         index_name = self.get_versioned_index(index_name)
 
-        try:
-            if recreate:
-                self.es.indices.delete(index_name, ignore=400)
-            else:
-                try:
-                    self.es.indices.delete(index_name)
-                except:
-                    logging.info("%s index already existing" % index_name)
-                    return
-        except NotFoundError:
-            pass
+        if self.es.indices.exists(index_name):
+            try:
+                if recreate:
+                    self.es.indices.delete(index_name, ignore=400)
+                else:
+                    try:
+                        self.es.indices.delete(index_name)
+                    except NotFoundError:
+                        pass
+                    except:
+                        logging.info("%s index already existing" % index_name)
+            except NotFoundError:
+                pass
 
         if Config.ELASTICSEARCH_DATA_INDEX_NAME in index_name:
             self.es.indices.create(index=index_name,

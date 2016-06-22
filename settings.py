@@ -13,7 +13,8 @@ iniparser.read('db.ini')
 class Config():
 
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'29.05'
+
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'07.16'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
@@ -71,15 +72,18 @@ class Config():
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
     EVIDENCEVALIDATION_PERCENT_SCALE = 20
+    EVIDENCEVALIDATION_JSON_SCHEMA_VERSION = '1.2.2'
     # Current genome Assembly
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     # Change this if you don't want to send e-mails
-    EVIDENCEVALIDATION_SEND_EMAIL = False
-    EVIDENCEVALIDATION_SENDER_ACCOUNT = 'data.pipeline@targetvalidation.org'
-    EVIDENCEVALIDATION_SENDER_PASSWORD = 'P@ssword'
+    EVIDENCEVALIDATION_SEND_EMAIL = True
+    EVIDENCEVALIDATION_SENDER_ACCOUNT = 'no_reply@targetvalidation.org'
+    MAILGUN_DOMAIN = "https://api.mailgun.net/v3/mg.targetvalidation.org"
+    MAILGUN_API_KEY = "key-b7986f9a29fe234733b0af3b1206b146"
+    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'mmaguire@ebi.ac.uk', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'zs1@sanger.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
@@ -830,16 +834,16 @@ class ElasticSearchConfiguration():
     for db in available_databases:
         validated_data_datasource_mappings[db]= validated_data_mapping
 
-    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
-                                           "number_of_replicas" : evidence_replicas_number,
+    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : 1,
+                                           "number_of_replicas" : 1,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
                                "mappings": validated_data_datasource_mappings,
     }
 
-    submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
-                                           "number_of_replicas" : evidence_replicas_number,
+    submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : 1,
+                                           "number_of_replicas" : 1,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
