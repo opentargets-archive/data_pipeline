@@ -15,11 +15,6 @@ import gzip
 import smtplib
 import time
 import iso8601
-from collections import defaultdict
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import Encoders
 import logging
 from StringIO import StringIO
 import json
@@ -303,7 +298,7 @@ class DirectoryCrawlerProcess():
                         logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
 
             except AuthenticationException:
-                print 'cannot connect with credentials: user:%s password:%s' % (u, p)
+                logging.error( 'cannot connect with credentials: user:%s password:%s' % (u, p))
 
         self.input_file_loading_finished.set()
         logger.info("%s finished" % self.__class__.__name__)
@@ -1105,7 +1100,7 @@ class AuditTrailProcess(multiprocessing.Process):
         text.append( "\nYours\nThe CTTV Core Platform Team")
         # text.append( signature
         text = '\n'.join(text)
-        print text
+        logging.info(text)
         requests.post(
             Config.MAILGUN_DOMAIN,
             auth=("api", Config.MAILGUN_API_KEY),
@@ -1498,6 +1493,7 @@ class AuditTrailProcess(multiprocessing.Process):
                 text.append("")
 
             text = '\n'.join(text)
+            # logging.info(text)
 
             # A file is successfully validated if it meets the following conditions
             successfully_validated = (
@@ -2031,7 +2027,6 @@ class EvidenceValidationFileChecker():
         '''
         logging.debug("Stitching everything together")
         data = {'symbols': self.symbols, 'uniprot': self.uniprot_current, 'ensembl': self.ensembl_current}
-        print(json.dumps(data, indent=4));
 
         now = datetime.utcnow()
         today = datetime.strptime("{:%Y-%m-%d}".format(datetime.now()), '%Y-%m-%d')
