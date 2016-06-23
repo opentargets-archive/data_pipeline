@@ -269,17 +269,17 @@ class PhenotypeSlim():
                     self.exclude_phenotypes(self.phenotype_map[p]['superclasses'])
             #return
 
-            print "\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            hfile.write("\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n")
 
             for k,v  in self.phenotype_map.iteritems():
                 count = 0
                 if k not in self.phenotype_excluded:
-                    print "<%s> rdfs:label \"%s\" ."%(k, v['label'])
+                    hfile.write("<%s> rdfs:label \"%s\" .\n"%(k, v['label']))
                     if k in self.phenotype_top_levels:
-                        print "<%s> rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0000651> ."%k
+                        hfile.write("<%s> rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0000651> .\n"%k)
                     else:
                         for p in v['superclasses']:
-                            print "<%s> rdfs:subClassOf <%s> ."%(k, p)
+                            hfile.write("<%s> rdfs:subClassOf <%s> .\n"%(k, p))
 
         hfile.close()
 
