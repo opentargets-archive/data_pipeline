@@ -264,7 +264,7 @@ class DirectoryCrawlerProcess():
 
         logger.info("%s started" % self.__class__.__name__)
 
-        self.evidence_chunk.storage_create_index(recreate=False)
+
         self.submission_audit.storage_create_index(recreate=False)
 
         '''scroll through remote  user directories and find the latest files'''
@@ -284,6 +284,7 @@ class DirectoryCrawlerProcess():
                     logging.info(data_source_name)
                     logfile = os.path.join('/tmp', file_version+ ".log")
                     logging.info("%s checking file: %s" % (self.__class__.__name__, file_version))
+                    self.evidence_chunk.storage_create_index(data_source_name,recreate=False)
 
 
                     try:
@@ -1230,7 +1231,7 @@ class AuditTrailProcess(multiprocessing.Process):
             '''
              refresh the indice
             '''
-            self.es.indices.refresh(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+            self.es.indices.refresh(index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'))
 
             '''
             Sum up numbers across chunks (map reduce)
@@ -1310,7 +1311,7 @@ class AuditTrailProcess(multiprocessing.Process):
             '''
             logging.debug("Count nb of inserted documents")
             search = self.es.search(
-                    index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
                     doc_type=data_source_name,
                     body='{ "query": { "match_all": {} } }',
                     search_type='count'
@@ -1329,7 +1330,7 @@ class AuditTrailProcess(multiprocessing.Process):
 
             logging.debug("Get top 20 targets")
             search = self.es.search(
-                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
+                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
                     doc_type=data_source_name,
                     body=TOP_20_TARGETS_QUERY,
             )
@@ -1359,7 +1360,7 @@ class AuditTrailProcess(multiprocessing.Process):
 
             logging.debug("Get top 20 diseases")
             search = self.es.search(
-                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
+                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
                     doc_type=data_source_name,
                     body=TOP_20_DISEASES_QUERY,
             )
@@ -1669,12 +1670,12 @@ class EvidenceChunkElasticStorage():
     def __init__(self, loader,):
         self.loader = loader
 
-    def storage_create_index(self, recreate=False):
-        self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME, recreate = recreate)
+    def storage_create_index(self,data_source_name, recreate=False):
+        self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name, recreate = recreate)
 
     def storage_add(self, id, evidence_string, data_source_name):
 
-        self.loader.put(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+        self.loader.put(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name,
                         data_source_name,
                         id,
                         evidence_string,
@@ -1682,9 +1683,10 @@ class EvidenceChunkElasticStorage():
 
     def storage_delete(self, data_source_name):
         if self.loader.es.indices.exists(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)):
-            ElasticStorage.delete_prev_data_in_es(self.loader.es,
-                                                  self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
-                                                  data_source_name)
+            self.loader.es.indices.delete(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name))
+            # ElasticStorage.delete_prev_data_in_es(self.loader.es,
+            #                                       self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
+            #                                       data_source_name)
 
     def storage_flush(self):
         self.loader.flush()
