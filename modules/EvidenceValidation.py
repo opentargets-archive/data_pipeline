@@ -1682,7 +1682,7 @@ class EvidenceChunkElasticStorage():
                         create_index=False)
 
     def storage_delete(self, data_source_name):
-        if self.loader.es.indices.exists(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)):
+        if self.loader.es.indices.exists(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)):
             self.loader.es.indices.delete(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name))
             # ElasticStorage.delete_prev_data_in_es(self.loader.es,
             #                                       self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
