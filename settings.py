@@ -10,6 +10,8 @@ iniparser.read('db.ini')
 
 class Config():
 
+    ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
+    ONTOLOGY_CONFIG.read('ontology_config.ini')
 
     RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'29.05'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
