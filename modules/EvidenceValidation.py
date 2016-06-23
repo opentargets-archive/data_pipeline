@@ -729,7 +729,7 @@ class ValidatorProcess(multiprocessing.Process):
                             if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'], list):
                                 mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
                                 python_raw['evidence']['known_mutations'] = [ mutations ]
-                                logging.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
+                                # logging.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
                                 obj = cttv.Literature_Curated.fromMap(python_raw)
                         elif data_type == 'known_drug':
                             obj = cttv.Drug.fromMap(python_raw)
