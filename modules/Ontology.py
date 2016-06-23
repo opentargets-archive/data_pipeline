@@ -117,7 +117,13 @@ class PhenotypeSlim():
         self.phenotype_top_levels = {}
         self.phenotype_excluded = set()
 
-    def get_ontology_top_levels(self, base_class):
+        self.disease_current = {}
+        self.disease_obsolete = {}
+        self.disease_map = {}
+        self.disease_top_levels = {}
+        self.disease_excluded = set()
+
+    def get_ontology_top_levels(self, base_class, top_level_map):
         sparql_query = TOP_LEVELS
         self.sparql.setQuery(sparql_query%base_class)
         self.sparql.setReturnFormat(JSON)
@@ -126,12 +132,12 @@ class PhenotypeSlim():
             #print json.dumps(result)
             top_level_label = result['top_level_label']['value']
             top_level = result['top_level']['value']
-            self.phenotype_top_levels[top_level] = top_level_label
+            top_level_map[top_level] = top_level_label
             print "%s %s"%(top_level, top_level_label)
 
     def get_ontology_path(self, base_class, term):
 
-        if term in self.phenotype_map:
+        if term in self.phenotype_map or term in self.disease_map:
             return
 
         #if term == 'http://purl.obolibrary.org/obo/HP_0001251':
@@ -160,20 +166,21 @@ class PhenotypeSlim():
                     #print "%i %s %s (direct child is %s %s)"%(count, parent_label, ancestor, direct_child_label, direct_child)
             print "---------"
 
-    def load_ontology(self, name, base_class, current, obsolete):
+    def load_ontology(self, prefix='', name_space='', base_class=None, current=None, obsolete=None):
         '''
         Load ontology to accept phenotype terms that are not
         :return:
         '''
         sparql_query = '''
+        %s
         SELECT DISTINCT ?ont_node ?label
-        FROM <http://purl.obolibrary.org/obo/%s.owl>
+        FROM %s
         {
         ?ont_node rdfs:subClassOf* <%s> .
         ?ont_node rdfs:label ?label
         }
         '''
-        self.sparql.setQuery(sparql_query%(name, base_class))
+        self.sparql.setQuery(sparql_query % (prefix, name_space, base_class))
         self.sparql.setReturnFormat(JSON)
         results = self.sparql.query().convert()
 
@@ -188,7 +195,7 @@ class PhenotypeSlim():
         PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
         PREFIX obo: <http://purl.obolibrary.org/obo/>
         SELECT DISTINCT ?hp_node ?label ?id ?hp_new
-         FROM <http://purl.obolibrary.org/obo/%s.owl>
+         FROM %s
          FROM <http://purl.obolibrary.org/obo/>
          {
             ?hp_node owl:deprecated true .
@@ -198,7 +205,7 @@ class PhenotypeSlim():
 
          }
         '''
-        self.sparql.setQuery(sparql_query%name)
+        self.sparql.setQuery(sparql_query % name_space)
         self.sparql.setReturnFormat(JSON)
         results = self.sparql.query().convert()
 
@@ -221,21 +228,43 @@ class PhenotypeSlim():
             obsolete[uri] = "Use %s label:%s"%(next_uri, new_label)
             print "%s %s"%(uri, obsolete[uri])
 
-    def load_hpo(self):
+    def load_hpo(self, base_class):
         '''
         Load HPO to accept phenotype terms that are not in EFO
         :return:
         '''
-        self.load_ontology('hp', 'http://purl.obolibrary.org/obo/HP_0000118', self.phenotype_current, self.phenotype_obsolete)
-        self.get_ontology_top_levels('http://purl.obolibrary.org/obo/HP_0000118')
+        self.load_ontology(
+            name_space='<http://purl.obolibrary.org/obo/hp.owl>',
+            base_class=base_class,
+            current=self.phenotype_current,
+            obsolete=self.phenotype_obsolete)
+        self.get_ontology_top_levels(base_class, top_level_map=self.phenotype_top_levels)
 
-    def load_mp(self):
+    def load_mp(self, root):
         '''
         Load MP to accept phenotype terms that are not in EFO
         :return:
         '''
-        self.load_ontology('mp', 'http://purl.obolibrary.org/obo/MP_0000001', self.phenotype_current, self.phenotype_obsolete)
-        self.get_ontology_top_levels('http://purl.obolibrary.org/obo/MP_0000001')
+        self.load_ontology(
+            name_space='<http://purl.obolibrary.org/obo/mp.owl>',
+            base_class=root,
+            current=self.phenotype_current,
+            obsolete=self.phenotype_obsolete)
+        self.get_ontology_top_levels(root, top_level_map=self.phenotype_top_levels)
+
+
+    def load_efo(self, root):
+        '''
+        Load EFO to accept rare disease terms that are not in EFO
+        :return:
+        '''
+        self.load_ontology(
+            prefix='PREFIX efo: <http://www.ebi.ac.uk/efo/>',
+            name_space='<http://www.ebi.ac.uk/efo/>',
+            base_class=root,
+            current=self.disease_current,
+            obsolete=self.disease_obsolete)
+        self.get_ontology_top_levels(root, top_level_map=self.disease_top_levels)
 
     def exclude_phenotypes(self, l):
         '''
@@ -269,7 +298,7 @@ class PhenotypeSlim():
                     self.exclude_phenotypes(self.phenotype_map[p]['superclasses'])
             #return
 
-            hfile.write("\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n")
+            hfile.write("@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n")
 
             for k,v  in self.phenotype_map.iteritems():
                 count = 0
@@ -285,12 +314,17 @@ class PhenotypeSlim():
 
     def create_phenotype_slim(self):
 
-        self.load_hpo()
-        self.load_mp()
+        self.load_hpo(base_class='http://purl.obolibrary.org/obo/HP_0000118')
+        self.load_mp(root='http://purl.obolibrary.org/obo/MP_0000001')
+        #self.load_efo(root='http://www.ebi.ac.uk/efo/EFO_0000508')
 
         for file_on_disk in Config.ONTOLOGY_PREPROCESSING_FILES:
 
             self.parse_gzipfile(file_on_disk)
+
+        # this is purely a test to see whether it works on Orphanet terms
+        #for id in ['http://www.orpha.net/ORDO/Orphanet_188', 'http://www.orpha.net/ORDO/Orphanet_217720', 'http://www.orpha.net/ORDO/Orphanet_251576' ]:
+        #    self.get_ontology_path('http://www.ebi.ac.uk/efo/EFO_0000508', id)
 
         self.generate_ttl_query(Config.ONTOLOGY_SLIM_FILE)
 
@@ -316,6 +350,9 @@ class PhenotypeSlim():
                     elif re.match('http://purl.obolibrary.org/obo/MP_\d+', id):
                         ''' get all terms '''
                         self.get_ontology_path('http://purl.obolibrary.org/obo/MP_0000001', id)
+                    elif re.match('http://www.orpha.net/ORDO/Orphanet_\d+', id):
+                        ''' just map to the genetic disorders '''
+                        self.get_ontology_path('http://www.ebi.ac.uk/efo/EFO_0000508', id)
 
 
         fh.close()
