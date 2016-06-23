@@ -9,6 +9,7 @@ import logging
 import json
 from common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
+from settings import Config
 
 __author__ = 'gautierk'
 
@@ -258,36 +259,40 @@ class PhenotypeSlim():
                     al.append(ancestor)
                     self.exclude_phenotypes(al)
 
-    def generate_ttl_query(self):
+    def generate_ttl_query(self, filename):
 
-        # create restricted list
-        print ",".join(self.phenotype_top_levels.keys())
-        for p in self.phenotype_top_levels:
-            if p in self.phenotype_map:
-                self.exclude_phenotypes(self.phenotype_map[p]['superclasses'])
-        #return
+        with open(filename, 'w') as hfile:
+            # create restricted list
+            print ",".join(self.phenotype_top_levels.keys())
+            for p in self.phenotype_top_levels:
+                if p in self.phenotype_map:
+                    self.exclude_phenotypes(self.phenotype_map[p]['superclasses'])
+            #return
 
-        print "\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            print "\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
 
-        for k,v  in self.phenotype_map.iteritems():
-            count = 0
-            if k not in self.phenotype_excluded:
-                print "<%s> rdfs:label \"%s\" ."%(k, v['label'])
-                if k in self.phenotype_top_levels:
-                    print "<%s> rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0000651> ."%k
-                else:
-                    for p in v['superclasses']:
-                        print "<%s> rdfs:subClassOf <%s> ."%(k, p)
+            for k,v  in self.phenotype_map.iteritems():
+                count = 0
+                if k not in self.phenotype_excluded:
+                    print "<%s> rdfs:label \"%s\" ."%(k, v['label'])
+                    if k in self.phenotype_top_levels:
+                        print "<%s> rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0000651> ."%k
+                    else:
+                        for p in v['superclasses']:
+                            print "<%s> rdfs:subClassOf <%s> ."%(k, p)
 
+        hfile.close()
 
     def create_phenotype_slim(self):
 
         self.load_hpo()
         self.load_mp()
-        file_on_disk = '/Users/koscieln/Documents/data/ftp/cttv008/upload/submissions/cttv008-14-03-2016.json.gz'
-        self.parse_gzipfile(file_on_disk)
 
-        self.generate_ttl_query()
+        for file_on_disk in Config.ONTOLOGY_PREPROCESSING_FILES:
+
+            self.parse_gzipfile(file_on_disk)
+
+        self.generate_ttl_query(Config.ONTOLOGY_SLIM_FILE)
 
     def parse_gzipfile(self, file_on_disk):
 
