@@ -23,6 +23,7 @@ from modules.Uniprot import UniProtActions,UniprotDownloader
 from modules.HGNC import HGNCActions, HGNCUploader
 from modules.Ensembl import EnsemblGeneInfo, EnsemblActions, EnsemblProcess
 from modules.MouseModels import MouseModelsActions, Phenodigm
+from modules.IntOGen import IntOGenActions, IntOGen
 from modules.Ontology import OntologyActions, PhenotypeSlim
 import argparse
 from settings import Config, ElasticSearchConfiguration
@@ -105,6 +106,8 @@ if __name__ == '__main__':
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
+    parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
+                        action="append_const", const = IntOGenActions.ALL)
     parser.add_argument("--onto", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.ALL)
     parser.add_argument("--qc", dest='qc',
@@ -201,6 +204,10 @@ if __name__ == '__main__':
                 Phenodigm(adapter, es, sparql).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(adapter, es, sparql).generate_evidence()
+        if args.intogen or run_full_pipeline:
+            do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
+            if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
+                IntOGen(es, sparql).read_intogen()
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
