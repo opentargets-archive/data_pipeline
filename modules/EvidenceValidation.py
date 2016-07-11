@@ -498,10 +498,13 @@ class FileReaderProcess(multiprocessing.Process):
         chunk = 1
         line_number = 0
 
+        cnopts = pysftp.CnOpts()
+        cnopts.hostkeys = None  # disable host key checking.
         with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
                                port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
                                username=provider_id,
                                password=Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[provider_id],
+                               cnopts=cnopts,
                                ) as srv:
 
             file_stat = srv.stat(file_path)
