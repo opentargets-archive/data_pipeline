@@ -96,7 +96,7 @@ class Config():
     EVIDENCEVALIDATION_FTP_HOST= dict( host = '192.168.1.150',
                                        port = 22)
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
-    # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
     #EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
@@ -112,7 +112,7 @@ class Config():
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
-    MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
+    MOUSEMODELS_CACHE_DIRECTORY = '~/.phenodigmcache'
 
     DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
     DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
@@ -125,7 +125,7 @@ class Config():
                                                 uniprot = 'CTTV011_UniProt',
                                                 eva = 'CTTV012_Variation',
                                                 # gwas_ibd = 'CTTV018_IBD_GWAS',
-                                                phenodigm = 'CTTV_External_MouseModels',
+                                                phenodigm = 'CTTV001_External_MouseModels',
                                                 cancer_gene_census = 'CTTV007_Cancer_Gene_Census',
                                                 europepmc = 'CTTV025_Literature',
                                                 disgenet = 'CTTV_External_DisGeNet',
@@ -139,7 +139,7 @@ class Config():
                                                          cttv011 = 'uniprot',
                                                          cttv012 = 'eva',
                                                          cttv018 = 'gwas_ibd',
-                                                         cttv_external_mousemodels = 'phenodigm',
+                                                         cttv001 = 'phenodigm',
                                                          cttv007 = 'cancer_gene_census',
                                                          cttv025 = 'europepmc',
                                                          cttv005 = 'rare2common',
