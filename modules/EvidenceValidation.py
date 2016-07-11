@@ -270,10 +270,13 @@ class DirectoryCrawlerProcess():
         '''scroll through remote  user directories and find the latest files'''
         for u, p in Config.EVIDENCEVALIDATION_FTP_ACCOUNTS.items():
             try:
+                cnopts = pysftp.CnOpts()
+                cnopts.hostkeys = None  # disable host key checking.
                 with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
                                        port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
                                        username=u,
                                        password=p,
+                                       cnopts = cnopts,
                                        ) as srv:
                     srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
                     latest_file = self._remote_filenames[u]['file_path']

@@ -20,7 +20,7 @@ https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.0.12.t
 SPARQLWrapper>=1.7.6
 grequests
 paramiko==1.17.0
-pysftp
+pysftp==0.2.9
 jsonpickle
 simplejson
 numpy
