@@ -191,7 +191,7 @@ class ESQuery(object):
                            },
                            scroll='12h',
                            # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'),
                            timeout="10m",
                            )
 
