@@ -760,7 +760,10 @@ class Evidence(JSONSerializable):
 
         '''check for minimum score '''
         if self.evidence['scores'] ['association_score'] < Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]:
-            raise AttributeError("Evidence String Rejected since score is too low: %s" % (self.get_id()))
+            raise AttributeError("Evidence String Rejected since score is too low: %s. score: %f, min score: %f" % (self.get_id(),
+                                                                                                                    self.evidence['scores'] ['association_score'],
+                                                                                                                    Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]
+                                                                                                                    ))
 
         '''modify scores accodigng to weights'''
         datasource_weight = Config.DATASOURCE_ASSOCIATION_SCORE_WEIGHT.get( self.evidence['sourceID'], 1.)
