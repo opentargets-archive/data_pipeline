@@ -1,5 +1,6 @@
 from collections import defaultdict
-from datetime import datetime, time
+from datetime import datetime
+import time
 import logging
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk, parallel_bulk

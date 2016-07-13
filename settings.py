@@ -282,6 +282,18 @@ def _get_evidence_string_generic_mapping():
                              # },
                          },
                      }
+                },
+                "literature": {
+                    "properties": {
+                        "references": {
+                            "properties": {
+                                "lit_id": {
+                                    "type": "string",
+                                    "index": "not_analyzed",
+                                }
+                            }
+                        }
+                    }
                 }
             },
         "dynamic_templates" : [
@@ -764,6 +776,16 @@ class ElasticSearchConfiguration():
     }
 
     validated_data_mapping = {
+                "dynamic_templates": [
+                    {
+                        "evidence_string_template": {
+                            "path_match": "evidence_string.*",
+                            "mapping": {
+                                "index": "no"
+                            }
+                        }
+                    },
+                ],
                 "properties" : {
                     "uniq_assoc_fields_hashdig" : {
                         "type" : "string",
@@ -773,10 +795,6 @@ class ElasticSearchConfiguration():
                         "type" : "string",
                         "index" : "not_analyzed",
                         },
-                    "evidence_string" : {
-                        # "type" : "object",
-                        "index": "no",
-                    },
                     "target_id" : {
                         "type" : "string",
                         "index" : "not_analyzed"
@@ -804,16 +822,13 @@ class ElasticSearchConfiguration():
                 }
     }
 
-    evidence_mappings = {}
-    for db in available_databases:
-        evidence_mappings[Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+db]= _get_evidence_string_generic_mapping()
 
     evidence_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                            "number_of_replicas" : evidence_replicas_number,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
-                              "mappings": evidence_mappings,
+                              "mappings": {"_default_": _get_evidence_string_generic_mapping()},
                             }
 
     relation_mappings = {}
@@ -830,17 +845,16 @@ class ElasticSearchConfiguration():
                              "mappings": relation_mappings,
                              }
 
-    validated_data_datasource_mappings = {}
-    for db in available_databases:
-        validated_data_datasource_mappings[db]= validated_data_mapping
+
 
     validated_data_settings_and_mappings = { "settings": {"number_of_shards" : 1,
                                            "number_of_replicas" : 1,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
-                               "mappings": validated_data_datasource_mappings,
-    }
+                               "mappings": {"_default_": validated_data_mapping},
+
+                               }
 
     submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : 1,
                                            "number_of_replicas" : 1,
