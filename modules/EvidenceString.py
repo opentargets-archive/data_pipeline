@@ -356,7 +356,8 @@ class EvidenceManager():
                 if available_score !=self.eco_scores[eco_uri]:
                     fixed = True
             else:
-                logger.warning("Cannot find a score for eco code %s in evidence id %s"%(eco_uri, evidence['id']))
+                if 'uniprot_literature' != evidence['SourceID']:
+                    logger.warning("Cannot find a score for eco code %s in evidence id %s"%(eco_uri, evidence['id']))
 
 
 
