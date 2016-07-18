@@ -147,7 +147,7 @@ if __name__ == '__main__':
         except socket.gaierror:
             wait_time = 5 * connection_attempt
             logging.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
-            logging.debug('/etc/hosts file: content: \n%s'%file('/etc/hosts').read())
+            logging.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
             time.sleep(wait_time)
             if connection_attempt > 5:
                 logging.error('Elasticsearch is not resolvable at %' % Config.ELASTICSEARCH_URL)
