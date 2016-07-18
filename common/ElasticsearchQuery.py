@@ -9,6 +9,7 @@ from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk, parallel_bulk
 from sqlalchemy import and_
 from common import Actions
+from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
 from common.PGAdapter import ElasticsearchLoad
 from common.processify import processify
@@ -43,14 +44,14 @@ class ESQuery(object):
         self.handler = es
 
     @staticmethod
-    def _get_soruce_from_fields(fields = None):
+    def _get_source_from_fields(fields = None):
         if fields is None:
             fields = ['*']
         source = {"include": fields}
         return source
 
     def get_all_targets(self, fields = None):
-        source = self._get_soruce_from_fields(fields)
+        source = self._get_source_from_fields(fields)
         res = helpers.scan(client=self.handler,
                             query={"query": {
                                       "match_all": {}
@@ -67,7 +68,7 @@ class ESQuery(object):
             yield hit['_source']
 
     def get_all_diseases(self, fields = None):
-        source = self._get_soruce_from_fields(fields)
+        source = self._get_source_from_fields(fields)
 
         res = helpers.scan(client=self.handler,
                             query={"query": {
@@ -86,7 +87,7 @@ class ESQuery(object):
 
 
     def get_all_eco(self, fields=None):
-        source = self._get_soruce_from_fields(fields)
+        source = self._get_source_from_fields(fields)
 
         res = helpers.scan(client=self.handler,
                            query={"query": {
@@ -103,8 +104,26 @@ class ESQuery(object):
         for hit in res:
             yield hit['_source']
 
-    def get_associations_for_target(self, target, fields = None, size = 100):
-        source = self._get_soruce_from_fields(fields)
+    def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
+        source = self._get_source_from_fields(fields)
+        aggs ={}
+        if get_top_hits:
+            aggs = {
+                       "direct_associations": {
+                           "filter": {"term": {"is_direct": True}},
+                           'aggs': {
+                               "top_direct_ass": {
+                                   "top_hits": {
+                                       "sort": {"harmonic-sum.overall": {"order": "desc"}},
+                                       "_source": source,
+
+                                       "size": size
+                                   },
+                               }
+                           },
+                       }
+                   }
+
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body={"query": {
@@ -116,28 +135,31 @@ class ESQuery(object):
                                         },
                                        "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
                                        '_source': source,
-                                       "aggs" : {
-                                            "direct_associations" : {
-                                                "filter" : { "term": { "is_direct": True}},
-                                                'aggs':{
-                                                   "top_direct_ass": {
-                                                        "top_hits": {
-                                                            "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
-                                                            "_source": source,
-
-                                                        "size" : size
-                                                        },
-                                                   }
-                                                },
-                                            }
-                                       },
+                                       "aggs" : aggs,
                                        'size': size,
                                        }
                                   )
         return AssociationSummary(res)
 
-    def get_associations_for_disease(self, disease, fields = None, size = 100):
-        source = self._get_soruce_from_fields(fields)
+    def get_associations_for_disease(self, disease, fields = None, size = 100, get_top_hits = True):
+        source = self._get_source_from_fields(fields)
+        aggs = {}
+        if get_top_hits:
+            aggs = {
+                "direct_associations": {
+                    "filter": {"term": {"is_direct": True}},
+                    'aggs': {
+                        "top_direct_ass": {
+                            "top_hits": {
+                                "sort": {"harmonic-sum.overall": {"order": "desc"}},
+                                "_source": source,
+
+                                "size": size
+                            },
+                        }
+                    },
+                }
+            }
 
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
@@ -150,21 +172,7 @@ class ESQuery(object):
                                         },
                                        "sort" : { "harmonic-sum.overall" : {"order":"desc"}},
                                        '_source': source,
-                                       "aggs" : {
-                                            "direct_associations" : {
-                                                "filter" : { "term": {"is_direct": True}},
-                                                'aggs':{
-                                                   "top_direct_ass": {
-                                                        "top_hits": {
-                                                            "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
-                                                            "_source": source,
-
-                                                        "size" :size
-                                                        },
-                                                   }
-                                                },
-                                            }
-                                       },
+                                       "aggs" : aggs,
                                        'size': size,
                                        }
                                   )
@@ -172,7 +180,7 @@ class ESQuery(object):
 
 
     def get_validated_evidence_strings(self, fields = None):
-        source = self._get_soruce_from_fields(fields)
+        source = self._get_source_from_fields(fields)
 
         res = helpers.scan(client=self.handler,
                            query={"query": {
@@ -183,7 +191,7 @@ class ESQuery(object):
                            },
                            scroll='12h',
                            # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'),
                            timeout="10m",
                            )
 
@@ -246,3 +254,80 @@ class ESQuery(object):
                                   )
         for hit in res['hits']['hits']:
             return hit['_source']
+
+    @property
+    def get_disease_to_targets_vectors(self):
+        #TODO: look at the multiquery api
+
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "term": {
+                                   "is_direct": True,
+                               }
+                           },
+                               '_source': {'include':["target.id", 'disease.id', 'harmonic-sum.overall']},
+                               'size': 1000,
+                           },
+                           scroll='12h',
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+                           timeout="10m",
+                           )
+
+        target_results = dict()
+        disease_results = dict()
+
+        c=0
+        for hit in res:
+            c+=1
+            hit = hit['_source']
+            '''store target associations'''
+            if hit['target']['id'] not in target_results:
+                target_results[hit['target']['id']] = SparseFloatDict()
+            target_results[hit['target']['id']][hit['disease']['id']]=hit['harmonic-sum']['overall']
+
+            '''store disease associations'''
+            if hit['disease']['id'] not in disease_results:
+                disease_results[hit['disease']['id']] = SparseFloatDict()
+            disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
+
+            if c%10000 ==0:
+                print c
+
+        return target_results, disease_results
+
+    def get_target_labels(self, ids):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "ids": {
+                                   "values": ids,
+                               }
+                           },
+                               '_source': 'approved_symbol',
+                               'size': 1,
+                           },
+                          scroll='12h',
+                          index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
+                          timeout="10m",
+                          )
+
+
+
+        return dict((hit['_id'],hit['_source']['approved_symbol']) for hit in res)
+
+    def get_disease_labels(self, ids):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "ids": {
+                                   "values": ids,
+                               }
+                           },
+                               '_source': 'label',
+                               'size': 1,
+                           },
+                           scroll='12h',
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME),
+                           timeout="10m",
+                           )
+
+        return dict((hit['_id'],hit['_source']['label']) for hit in res)
+

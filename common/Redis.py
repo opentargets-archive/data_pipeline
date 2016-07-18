@@ -2,6 +2,9 @@ import base64
 import json
 import logging
 import uuid
+
+import datetime
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -81,9 +84,14 @@ class RedisQueue(object):
         self.job_timeout = job_timeout
         self.max_queue_size = max_size
         self.default_ttl = ttl
+        self.started = False
+        self.start_time = time.time()
 
 
     def put(self, element, r_server=None):
+        if not self.started:
+            self.start_time = time.time()
+            self.started = True
         r_server = self._get_r_server(r_server)
         queue_size = r_server.llen(self.main_queue)
         if queue_size:
@@ -169,6 +177,7 @@ class RedisQueue(object):
         return self.queue_id
 
     def get_status(self, r_server=None):
+        now = time.time()
         r_server = self._get_r_server(r_server)
         lines = ['==== QUEUE: %s ====='%self.queue_id ]
         submitted = int(r_server.get(self.submitted_counter) or 0)
@@ -179,9 +188,13 @@ class RedisQueue(object):
             if processed:
                 error_percent = float(errors)/processed
             submission_finished = bool(r_server.getbit(self.submission_done, 1))
+            processing_speed = 0.
+            if processed:
+                processing_speed = round(processed/(now-self.start_time),2)
             lines.append('Submitted jobs: %i'%submitted)
             lines.append('Processed jobs: {} | {:.1%}'.format(processed, float(processed)/submitted))
             lines.append('Errors: {} | {:.1%}'.format(errors, error_percent))
+            lines.append('Processing speed: {:.1f} jobs per second'.format(processing_speed))
             lines.append('-'*50)
             queue_size = self.get_size(r_server)
             queue_size_status = 'empty'
@@ -207,6 +220,7 @@ class RedisQueue(object):
                 status = 'done'
             lines.append('-'*50)
             lines.append('STATUS: %s'%status)
+            lines.append('Elapsed time: %s'%datetime.timedelta(seconds=now-self.start_time))
         else:
             lines.append('Queue size: 0 | initialised')
         lines.append(('='*50))
@@ -246,16 +260,20 @@ class RedisQueue(object):
         pipe.expire(self.submission_done, self.default_ttl)
         pipe.execute()
 
+    def is_submission_finished(self, r_server = None):
+        r_server = self._get_r_server(r_server)
+        return r_server.getbit(self.submission_done, 1)
 
     def is_done(self, r_server = None):
         r_server = self._get_r_server(r_server)
-        submission_finished = r_server.getbit(self.submission_done, 1)
-        if submission_finished:
+        if self.is_submission_finished(r_server):
             pipe = r_server.pipeline()
             pipe.get(self.submitted_counter)
             pipe.get(self.processed_counter)
             submitted, processed = pipe.execute()
-            return submitted == processed
+            submitted = int(submitted or 0)
+            processed = int(processed or 0)
+            return submitted <= processed #temporary hack should check for equal
         return False
 
     def _get_r_server(self, r_server = None):
@@ -277,20 +295,71 @@ class RedisQueueStatusReporter(Process):
         self.queues = queues
         self.r_server = Redis(Config.REDISLITE_DB_PATH)
         self.interval = interval
+        self.logger = logging.getLogger()
 
     def run(self):
-        logging.info("reporter worker started")
+        self.logger.info("reporter worker started")
 
         while not self.is_done():
             for q in self.queues:
-                logging.info(q.get_status(self.r_server))
-                time.sleep(self.interval)
+                self.logger.info(q.get_status(self.r_server))
+            time.sleep(self.interval)
 
     def is_done(self):
         for q in self.queues:
             if not q.is_done(self.r_server):
                 return False
         return True
+
+class RedisQueueWorkerProcess(Process):
+    '''
+    Base class for workers attached to the RedisQueue class that runs in a separate process
+    it requires a queue in object to get data from, and a redis connection path.
+    if a queue out is specified it will push the output to that queue.
+    the implemented classes needs to add an implementation of the 'process' method, that either store the output or
+    returns it to be stored in a queue out
+    '''
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 queue_out = None,
+                 **kwargs
+                 ):
+
+
+        super(RedisQueueWorkerProcess, self).__init__()
+        self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
+        self.queue_out = queue_out
+        self.r_server = Redis(redis_path, serverconfig={'save': []})
+        self.logger = logging.getLogger()
+        self.logger.info('%s started' % self.name)
+
+
+    def run(self):
+        while not self.queue_in.is_done(r_server=self.r_server):
+            job = self.queue_in.get(r_server=self.r_server, timeout=1)
+            if job is None and self.queue_in.is_submission_finished(r_server=self.r_server):
+                break#this might leave some unprocessed jobs at the end of the queue if they are very slow to be processed ( takes more than the timeout)
+            if job is not None:
+                key, data = job
+                error = False
+                try:
+                    job_results = self.process(data)
+                    if self.queue_out is not None and \
+                        job_results is not None:
+                        self.queue_out.put(job_results, self.r_server)  # TODO: create an object here
+                except Exception, e:
+                    error = True
+                    self.logger.exception('Error processing key %s' % key)
+
+                self.queue_in.done(key, error=error, r_server=self.r_server)
+
+        self.logger.info('%s done processing' % self.name)
+
+
+    def process(self, data):
+        raise NotImplementedError('please add an implementation to process the data')
+
 
 
 class RedisLookupTable(object):

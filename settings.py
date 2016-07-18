@@ -1,6 +1,8 @@
 import uuid
 from collections import defaultdict, OrderedDict
 
+from common.DataStructure import RelationType
+
 __author__ = 'andreap'
 import os
 import ConfigParser
@@ -13,9 +15,12 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read('ontology_config.ini')
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'29.05'
+
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
+    ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
+    ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -41,6 +46,8 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
+    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data.test2'
+    ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
@@ -51,10 +58,12 @@ class Config():
             'username': iniparser.get(ENV, 'username'),
             'password': iniparser.get(ENV, 'password'),
             'database': iniparser.get(ENV, 'database')}
-    HPA_NORMAL_TISSUE_URL = 'http://v13.proteinatlas.org/download/normal_tissue.csv.zip'
-    HPA_CANCER_URL = 'http://v13.proteinatlas.org/download/cancer.csv.zip'
-    HPA_SUBCELLULAR_LOCATION_URL = 'http://v13.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'http://v13.proteinatlas.org/download/rna.csv.zip'
+    HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
+    HGNC_COMPLETE_SET_VPN = 'https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer'
+    HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
+    HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
+    HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
+    HPA_RNA_URL = 'http://v15.proteinatlas.org/download/rna.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
@@ -69,15 +78,18 @@ class Config():
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
     EVIDENCEVALIDATION_PERCENT_SCALE = 20
+    EVIDENCEVALIDATION_JSON_SCHEMA_VERSION = '1.2.2'
     # Current genome Assembly
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     # Change this if you don't want to send e-mails
-    EVIDENCEVALIDATION_SEND_EMAIL = False
-    EVIDENCEVALIDATION_SENDER_ACCOUNT = 'data.pipeline@targetvalidation.org'
-    EVIDENCEVALIDATION_SENDER_PASSWORD = 'P@ssword'
+    EVIDENCEVALIDATION_SEND_EMAIL = True
+    EVIDENCEVALIDATION_SENDER_ACCOUNT = 'no_reply@targetvalidation.org'
+    MAILGUN_DOMAIN = "https://api.mailgun.net/v3/mg.targetvalidation.org"
+    MAILGUN_API_KEY = "key-b7986f9a29fe234733b0af3b1206b146"
+    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'mmaguire@ebi.ac.uk', 'samiulh@targetvalidation.org', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'mmaguire@ebi.ac.uk', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'zs1@sanger.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
@@ -90,7 +102,7 @@ class Config():
     EVIDENCEVALIDATION_FTP_HOST= dict( host = '192.168.1.150',
                                        port = 22)
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
-    # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
     #EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
@@ -106,7 +118,7 @@ class Config():
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
-    MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
+    MOUSEMODELS_CACHE_DIRECTORY = '~/.phenodigmcache'
 
     DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
     DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
@@ -119,7 +131,7 @@ class Config():
                                                 uniprot = 'CTTV011_UniProt',
                                                 eva = 'CTTV012_Variation',
                                                 # gwas_ibd = 'CTTV018_IBD_GWAS',
-                                                phenodigm = 'CTTV_External_MouseModels',
+                                                phenodigm = 'CTTV001_External_MouseModels',
                                                 cancer_gene_census = 'CTTV007_Cancer_Gene_Census',
                                                 europepmc = 'CTTV025_Literature',
                                                 disgenet = 'CTTV_External_DisGeNet',
@@ -133,7 +145,7 @@ class Config():
                                                          cttv011 = 'uniprot',
                                                          cttv012 = 'eva',
                                                          cttv018 = 'gwas_ibd',
-                                                         cttv_external_mousemodels = 'phenodigm',
+                                                         cttv001 = 'phenodigm',
                                                          cttv007 = 'cancer_gene_census',
                                                          cttv025 = 'europepmc',
                                                          cttv005 = 'rare2common',
@@ -173,11 +185,11 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION=83
+    ENSEMBL_RELEASE_VERSION=84
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
-    UNIQUE_RUN_ID = str(uuid.uuid4())
+    UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 
 
     #dump file names
@@ -276,6 +288,18 @@ def _get_evidence_string_generic_mapping():
                              # },
                          },
                      }
+                },
+                "literature": {
+                    "properties": {
+                        "references": {
+                            "properties": {
+                                "lit_id": {
+                                    "type": "string",
+                                    "index": "not_analyzed",
+                                }
+                            }
+                        }
+                    }
                 }
             },
         "dynamic_templates" : [
@@ -319,6 +343,77 @@ def _get_evidence_string_generic_mapping():
         ]
        }
 
+def _get_relation_generic_mapping():
+    return {
+            "_all" : {"enabled" : True},
+            "_routing":{ "required":True},
+            "properties" : {
+                "subject" : {
+                     "properties" : {
+                         "id" : {
+                              "type" : "string",
+                              "index" : "not_analyzed",
+                         },
+                         # "target_type" : {
+                         #      "type" : "string",
+                         #      "index" : "not_analyzed",
+                         # },
+                         # "activity" : {
+                         #      "type" : "string",
+                         #      "index" : "not_analyzed",
+                         # },
+
+                     }
+                },
+                "object" : {
+                     "properties" : {
+                         "id" : {
+                              "type" : "string",
+                              "index" : "not_analyzed",
+                         },
+                         # "efo_info" : {
+                         #     "properties" : {
+                         #         "path": {
+                         #            "type": "string",
+                         #            "index": "not_analyzed",
+                         #         }
+                         #     }
+                         # }
+
+                     }
+                },
+                "type": {
+                    "type": "string",
+                    "index": "not_analyzed",
+                },
+                "id": {
+                    "type": "string",
+                    "index": "not_analyzed",
+                },
+                "shared_targets": {
+                    "type": "string",
+                    "index": "not_analyzed",
+                },
+                "shared_diseases": {
+                    "type": "string",
+                    "index": "not_analyzed",
+                },
+
+
+            },
+        "dynamic_templates" : [
+            {
+                "scores" : {
+                    "path_match" : "scores.*",
+                    "mapping" : {
+                         "type" : "double",
+                    }
+                }
+            },
+
+        ]
+       }
+
 
 
 class ElasticSearchConfiguration():
@@ -333,6 +428,8 @@ class ElasticSearchConfiguration():
         generic_replicas_number = 0
         evidence_shard_number = 3
         evidence_replicas_number = 1
+        relation_shard_number = 10
+        relation_replicas_number = 0
 
         bulk_load_chunk =1000
     else:
@@ -340,6 +437,8 @@ class ElasticSearchConfiguration():
         generic_replicas_number = 0
         evidence_shard_number = 3
         evidence_replicas_number = 0
+        relation_shard_number = 6
+        relation_replicas_number = 0
         bulk_load_chunk =1000
 
     uniprot_data_mapping = eco_data_mapping = {"mappings": {
@@ -406,7 +505,7 @@ class ElasticSearchConfiguration():
                                 },
                             },
                         },
-                    "_private" : {
+                    "private" : {
                         # "type" : "object",
                         "properties" : {
                             "suggestions" : {
@@ -683,6 +782,16 @@ class ElasticSearchConfiguration():
     }
 
     validated_data_mapping = {
+                "dynamic_templates": [
+                    {
+                        "evidence_string_template": {
+                            "path_match": "evidence_string.*",
+                            "mapping": {
+                                "index": "no"
+                            }
+                        }
+                    },
+                ],
                 "properties" : {
                     "uniq_assoc_fields_hashdig" : {
                         "type" : "string",
@@ -692,10 +801,6 @@ class ElasticSearchConfiguration():
                         "type" : "string",
                         "index" : "not_analyzed",
                         },
-                    "evidence_string" : {
-                        # "type" : "object",
-                        "index": "no",
-                    },
                     "target_id" : {
                         "type" : "string",
                         "index" : "not_analyzed"
@@ -723,32 +828,42 @@ class ElasticSearchConfiguration():
                 }
     }
 
-    evidence_mappings = {}
-    for db in available_databases:
-        evidence_mappings[Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+db]= _get_evidence_string_generic_mapping()
 
     evidence_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                            "number_of_replicas" : evidence_replicas_number,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
-                              "mappings": evidence_mappings,
+                              "mappings": {"_default_": _get_evidence_string_generic_mapping()},
                             }
 
-    validated_data_datasource_mappings = {}
-    for db in available_databases:
-        validated_data_datasource_mappings[db]= validated_data_mapping
+    relation_mappings = {}
+    for rt in [RelationType.SHARED_DISEASE,
+               RelationType.SHARED_TARGET,
+               ]:
+        relation_mappings[Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + rt] = _get_relation_generic_mapping()
 
-    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
-                                           "number_of_replicas" : evidence_replicas_number,
+    relation_data_mapping = {"settings": {"number_of_shards": relation_shard_number,
+                                          "number_of_replicas": relation_replicas_number,
+                                          # "index.store.type": "memory",
+                                          "refresh_interval": "60s",
+                                          },
+                             "mappings": relation_mappings,
+                             }
+
+
+
+    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : 1,
+                                           "number_of_replicas" : 1,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
-                               "mappings": validated_data_datasource_mappings,
-    }
+                               "mappings": {"_default_": validated_data_mapping},
 
-    submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : evidence_shard_number,
-                                           "number_of_replicas" : evidence_replicas_number,
+                               }
+
+    submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : 1,
+                                           "number_of_replicas" : 1,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },

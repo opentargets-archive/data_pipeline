@@ -1,12 +1,16 @@
 import logging
 import os
+import socket
 
 import sys
+
+import time
 from elasticsearch import Elasticsearch
 from SPARQLWrapper import SPARQLWrapper, JSON
 from common import Actions
 from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
 from common.PGAdapter import Adapter
+from modules.DataDrivenRelation import DataDrivenRelationActions, DataDrivenRelationProcess
 from modules.Dump import DumpActions, DumpGenerator
 from modules.ECO import EcoActions, EcoProcess, EcoUploader
 from modules.EFO import EfoActions, EfoProcess, EfoUploader
@@ -22,6 +26,7 @@ from modules.Uniprot import UniProtActions,UniprotDownloader
 from modules.HGNC import HGNCActions, HGNCUploader
 from modules.Ensembl import EnsemblGeneInfo, EnsemblActions, EnsemblProcess
 from modules.MouseModels import MouseModelsActions, Phenodigm
+from modules.IntOGen import IntOGenActions, IntOGen
 from modules.Ontology import OntologyActions, PhenotypeSlim
 import argparse
 from settings import Config, ElasticSearchConfiguration
@@ -58,8 +63,6 @@ if __name__ == '__main__':
                         action="append_const", const = UniProtActions.CACHE)
     parser.add_argument("--genm", dest='gen', help="merge the available gene information and store the resulting json objects in postgres",
                         action="append_const", const = GeneActions.MERGE)
-    parser.add_argument("--genu", dest='gen', help="upload the stored json gene object to elasticsearch",
-                        action="append_const", const = GeneActions.UPLOAD)
     parser.add_argument("--hgncu", dest='hgnc', help="upload the HGNC json file to the lookups schema in postgres",
                         action="append_const", const = HGNCActions.UPLOAD)
     parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
@@ -78,20 +81,12 @@ if __name__ == '__main__':
                         action="append_const", const = EcoActions.ALL)
     parser.add_argument("--evsp", dest='evs', help="process and validate the available evidence strings and store the resulting json object in postgres ",
                         action="append_const", const = EvidenceStringActions.PROCESS)
-    parser.add_argument("--evsu", dest='evs', help="upload the stored json evidence string object to elasticsearch",
-                        action="append_const", const = EvidenceStringActions.UPLOAD)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EvidenceStringActions.ALL)
-    parser.add_argument("--asse", dest='ass', help="extract data relevant to scoring",
-                        action="append_const", const = AssociationActions.EXTRACT)
     parser.add_argument("--assp", dest='ass', help="precompute association scores",
                         action="append_const", const = AssociationActions.PROCESS)
-    parser.add_argument("--assu", dest='ass', help="upload the stored precomputed score json object to elasticsearch",
-                        action="append_const", const = AssociationActions.UPLOAD)
     parser.add_argument("--ass", dest='ass', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = AssociationActions.ALL)
-    parser.add_argument("--esr", dest='es', help="clear all data in elasticsearch and load all the data stored in postgres for any index and any doc type",
-                        action="append_const", const = ElasticsearchActions.RELOAD)
     parser.add_argument("--valck", dest='val', help="check new json files submitted to ftp site and store the evidence strings to ElasticSearch",
                         action="append_const", const = ValidationActions.CHECKFILES)
     parser.add_argument("--valgm", dest='val', help="update gene protein mapping to database",
@@ -100,8 +95,10 @@ if __name__ == '__main__':
                         action="append_const", const = ValidationActions.ALL)
     parser.add_argument("--ens", dest='ens', help="retrieve and store latest ensembl gene records in elasticsearch",
                         action="append_const", const = EnsemblActions.ALL)
-    parser.add_argument("--seap", dest='sea', help="precompute search results",
+    parser.add_argument("--sea", dest='sea', help="precompute search results",
                         action="append_const", const = SearchObjectActions.PROCESS)
+    parser.add_argument("--ddr", dest='ddr', help="precompute data driven t2t and d2d relations",
+                        action="append_const", const=DataDrivenRelationActions.PROCESS)
     parser.add_argument("--persist-redis", dest='redisperist', help="use a fresh redislite db",
                         action='store_true', default=False)
     parser.add_argument("--musu", dest='mus', help="update mouse model data",
@@ -112,6 +109,8 @@ if __name__ == '__main__':
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
+    parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
+                        action="append_const", const = IntOGenActions.ALL)
     parser.add_argument("--onto", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.ALL)
     parser.add_argument("--qc", dest='qc',
@@ -122,21 +121,7 @@ if __name__ == '__main__':
                         action="append_const", const=DumpActions.ALL)
     args = parser.parse_args()
 
-    adapter = Adapter()
-    '''init es client'''
-    es = Elasticsearch(Config.ELASTICSEARCH_URL,
-                       maxsize=50,
-                       timeout=1800)
-    # es = Elasticsearch(["10.0.0.11:9200"],
-    # # sniff before doing anything
-    #                     sniff_on_start=True,
-    #                     # refresh nodes after a node fails to respond
-    #                     sniff_on_connection_fail=True,
-    #                     # and also every 60 seconds
-    #                     sniffer_timeout=60)
-    #
-    '''init sparql endpoint client'''
-    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
+    '''logger'''
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -147,10 +132,59 @@ if __name__ == '__main__':
     logging.getLogger('elasticsearch').setLevel(logging.ERROR)
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
-    logger.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
+
+    '''sqlalchemy adapter'''
+    adapter = Adapter()
+    '''init es client'''
+    connection_attempt = 1
+    while 1:
+        try:
+            socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
+            nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
+            hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
+            logging.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
+            break
+        except socket.gaierror:
+            wait_time = 5 * connection_attempt
+            logging.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
+            logging.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
+            time.sleep(wait_time)
+            if connection_attempt > 5:
+                logging.error('Elasticsearch is not resolvable at %' % Config.ELASTICSEARCH_URL)
+                break
+            connection_attempt+=1
+
+    es = Elasticsearch(hosts = hosts,
+                       maxsize=50,
+                       timeout=1800,
+                       sniff_on_connection_fail=True,
+                       retry_on_timeout=True,
+                       max_retries=10,
+                       )
+    connection_attempt = 1
+    while not es.ping():
+        wait_time = 5*connection_attempt
+        logging.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
+        time.sleep(wait_time)
+        if connection_attempt >5:
+            logging.error('Elasticsearch is not reachable at %'%Config.ELASTICSEARCH_URL)
+            break
+        connection_attempt += 1
+
+    # es = Elasticsearch(["10.0.0.11:9200"],
+    # # sniff before doing anything
+    #                     sniff_on_start=True,
+    #                     # refresh nodes after a node fails to respond
+    #                     sniff_on_connection_fail=True,
+    #                     # and also every 60 seconds
+    #                     sniffer_timeout=60)
+    #
+    '''init sparql endpoint client'''
+    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
+
     if not args.redisperist:
         clear_redislite_db()
-    r_server= Redis(Config.REDISLITE_DB_PATH)
+    r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
     with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
         run_full_pipeline = False
         if args.all  and (Actions.ALL in args.all):
@@ -208,6 +242,10 @@ if __name__ == '__main__':
                 Phenodigm(adapter, es, sparql).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(adapter, es, sparql).generate_evidence()
+        if args.intogen or run_full_pipeline:
+            do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
+            if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
+                IntOGen(es, sparql).read_intogen()
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
@@ -215,23 +253,21 @@ if __name__ == '__main__':
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es, sparql).map_genes()
+                EvidenceValidationFileChecker(adapter, es, sparql, r_server).map_genes()
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es, sparql).check_all()
+                EvidenceValidationFileChecker(adapter, es, sparql, r_server).check_all()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
                 EvidenceStringProcess(es, r_server).process_all()
-            # if (EvidenceStringActions.UPLOAD in args.evs) or do_all:
-            #     EvidenceStringUploader(adapter, loader).upload_all()
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
-            # if (AssociationActions.EXTRACT in args.ass) or do_all:
-            #     ScoringExtract(adapter).extract()
             if (AssociationActions.PROCESS in args.ass) or do_all:
                 ScoringProcess(adapter, loader).process_all()
-            # if (AssociationActions.UPLOAD in args.ass):# data will be uploaded also by the proces step
-            #     ScoringUploader(adapter, loader).upload_all()
+        if args.ddr or run_full_pipeline:
+            do_all = (DataDrivenRelationActions.ALL in args.ddr) or run_full_pipeline
+            if (DataDrivenRelationActions.PROCESS in args.ddr) or do_all:
+                DataDrivenRelationProcess(es, r_server).process_all()
         if args.sea or run_full_pipeline:
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:

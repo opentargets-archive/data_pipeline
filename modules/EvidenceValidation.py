@@ -5,6 +5,7 @@ from pprint import pprint
 
 import paramiko
 import pysftp
+import requests
 from paramiko import AuthenticationException
 
 from common.ElasticsearchLoader import Loader
@@ -14,11 +15,6 @@ import gzip
 import smtplib
 import time
 import iso8601
-from collections import defaultdict
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import Encoders
 import logging
 from StringIO import StringIO
 import json
@@ -28,6 +24,7 @@ from datetime import datetime, date
 from sqlalchemy import and_, or_, table, column, select, update, insert, desc
 from common import Actions
 from common.PGAdapter import *
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from common.UniprotIO import UniprotIterator, Parser
 import cttv.model.core as cttv
 import cttv.model.flatten as flat
@@ -46,8 +43,8 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 from multiprocessing import Manager
 
 # This bit is necessary for text mining data
-reload(sys);
-sys.setdefaultencoding("utf8");
+reload(sys)
+sys.setdefaultencoding("utf8")
 
 
 __author__ = 'gautierk'
@@ -74,14 +71,13 @@ UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF = 32
 DISEASE_ID_INVALID = 40
 DISEASE_ID_OBSOLETE = 41
 
-TOP_20_TARGETS_QUERY = '{  "size": 0, "aggs" : {  "group_by_targets" : {   "terms" : { "field" : "target_id", "order" : { "_count" : "desc" }, "size": 20 } } } }'
-TOP_20_DISEASES_QUERY = '{  "size": 0, "aggs" : {  "group_by_diseases" : {   "terms" : { "field" : "disease_id", "order" : { "_count" : "desc" }, "size": 20 } } } }'
-DISTINCT_TARGETS_QUERY = '{  "size": 0, "aggs" : {  "distinct_targets" : {  "cardinality" : { "field" : "target_id" } } } }'
-DISTINCT_DISEASES_QUERY = '{  "size": 0, "aggs" : {  "distinct_diseases" : {  "cardinality" : { "field" : "disease_id" } } } }'
+TOP_20_TARGETS_QUERY = {  "size": 0, "aggs" : {  "group_by_targets" : {   "terms" : { "field" : "target_id", "order" : { "_count" : "desc" }, "size": 20 } } } }
+TOP_20_DISEASES_QUERY = {  "size": 0, "aggs" : {  "group_by_diseases" : {   "terms" : { "field" : "disease_id", "order" : { "_count" : "desc" }, "size": 20 } } } }
+DISTINCT_TARGETS_QUERY = {  "size": 0, "aggs" : {  "distinct_targets" : {  "cardinality" : { "field" : "target_id" } } } }
+DISTINCT_DISEASES_QUERY = {  "size": 0, "aggs" : {  "distinct_diseases" : {  "cardinality" : { "field" : "disease_id" } } } }
 SUBMISSION_FILTER_FILENAME_QUERY = '''
 {
   "query": {
-    "filtered": {
     "filtered": {
       "filter": {
         "terms" : { "filename": ["%s"]}
@@ -91,9 +87,7 @@ SUBMISSION_FILTER_FILENAME_QUERY = '''
 }
 '''
 
-'''
-curl "localhost:9201/submission-audit/_search" -d '{ "query": { "filtered": { "filter": { "terms" : { "filename": ["/Users/koscieln/Documents/data/ftp/cttv008/upload/submissions/cttv008-04-03-2016.json.gz"]} } } } }'
-'''
+
 
 SUBMISSION_FILTER_MD5_QUERY = '''
 {
@@ -108,31 +102,6 @@ SUBMISSION_FILTER_MD5_QUERY = '''
 
 '''
 
-'''
-curl "localhost:9201/submission-audit/_search?" -d '
-{
-  "query": {
-    "filtered": {
-      "filter": {
-        "terms" : { "md5": ["c4053985ca0680dd5eb1c0e226ecd587"]}
-      }
-    }
-  }
-}
-'
-
-curl "localhost:9201/submission-audit/_search?" -d '
-{
-  "query": {
-    "filtered": {
-      "filter": {
-        "terms" : { "filename": ["/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-26-11-2015.json.gz"]}
-      }
-    }
-  }
-}
-'
-'''
 
 
 from time import strftime
@@ -141,16 +110,14 @@ from time import strftime
 VALIDATION_DATE = strftime("%Y%m%dT%H%M%SZ")
 
 # figlet -c "Validation Passed"
-messagePassed = '''
-
+messagePassed = '''-----------------
 VALIDATION PASSED
-
+-----------------
 '''
 
-messageFailed = '''
-
+messageFailed = '''-----------------
 VALIDATION FAILED
-
+-----------------
 '''
 
 eva_curated = {
@@ -250,18 +217,13 @@ class DirectoryCrawlerProcess():
     def __init__(self,
                  output_q,
                  es,
-                 input_file_loading_finished,
-                 input_file_count,
-                 lock):
+                 r_server):
         self.output_q = output_q
         self.es = es
         self.evidence_chunk = EvidenceChunkElasticStorage(loader = Loader(self.es))
         self.submission_audit = SubmissionAuditElasticStorage(loader = Loader(self.es))
         self.start_time = time.time()
-        self.input_file_loading_finished = input_file_loading_finished
-        self.input_file_count = input_file_count
-        self.start_time = time.time()  # reset timer start
-        self.lock = lock
+        self.r_server = r_server
         self._remote_filenames =dict()
 
     def _store_remote_filename(self, filename):
@@ -298,16 +260,19 @@ class DirectoryCrawlerProcess():
 
         logger.info("%s started" % self.__class__.__name__)
 
-        self.evidence_chunk.storage_create_index(recreate=False)
+
         self.submission_audit.storage_create_index(recreate=False)
 
         '''scroll through remote  user directories and find the latest files'''
         for u, p in Config.EVIDENCEVALIDATION_FTP_ACCOUNTS.items():
             try:
+                cnopts = pysftp.CnOpts()
+                cnopts.hostkeys = None  # disable host key checking.
                 with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
                                        port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
                                        username=u,
                                        password=p,
+                                       cnopts = cnopts,
                                        ) as srv:
                     srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
                     latest_file = self._remote_filenames[u]['file_path']
@@ -317,7 +282,8 @@ class DirectoryCrawlerProcess():
                     data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[u]
                     logging.info(data_source_name)
                     logfile = os.path.join('/tmp', file_version+ ".log")
-                    logging.Info("%s checking file: %s" % (self.__class__.__name__, file_version))
+                    logging.info("%s checking file: %s" % (self.__class__.__name__, file_version))
+                    self.evidence_chunk.storage_create_index(data_source_name,recreate=False)
 
 
                     try:
@@ -332,9 +298,10 @@ class DirectoryCrawlerProcess():
                         logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
 
             except AuthenticationException:
-                print 'cannot connect with credentials: user:%s password:%s' % (u, p)
+                logging.error( 'cannot connect with credentials: user:%s password:%s' % (u, p))
 
-        self.input_file_loading_finished.set()
+        self.output_q.set_submission_finished(self.r_server)
+
         logger.info("%s finished" % self.__class__.__name__)
 
     def md5_hash_local_file(self, filename):
@@ -419,102 +386,33 @@ class DirectoryCrawlerProcess():
 
                 self.submission_audit.storage_insert_or_update(submission, update=False)
 
-            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile))
-            with self.lock:
-                self.input_file_count.value += 1
+            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile),
+                              self.r_server)
 
         return
 
 
-class FileReaderProcess(multiprocessing.Process):
+class FileReaderProcess(RedisQueueWorkerProcess):
     def __init__(self,
-                 input_q,
-                 output_q,
-                 es,
-                 input_file_loading_finished,
-                 input_file_processing_finished,
-                 input_file_count,
-                 input_file_processed_count,
-                 evidence_loaded_count,
-                 lock):
-        super(FileReaderProcess, self).__init__()
-        self.input_q = input_q
-        self.output_q = output_q
+                 queue_in,
+                 redis_path,
+                 queue_out=None,
+                 es = None):
+        super(FileReaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.es = es
         self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
-        self.start_time = time.time()
-        self.input_file_loading_finished = input_file_loading_finished
-        self.input_file_processing_finished = input_file_processing_finished
-        self.input_file_count = input_file_count
-        self.input_file_processed_count = input_file_processed_count
-        self.evidence_loaded_count = evidence_loaded_count
         self.start_time = time.time()  # reset timer start
-        self.lock = lock
-
-    def run(self):
-        logger.info("%s started" % self.name)
-        while not ((self.input_file_count.value == self.input_file_processed_count.value) and \
-                           self.input_file_loading_finished.is_set()):
-            data = None
-            try:
-                data = self.input_q.get_nowait()
-            except Queue.Empty:
-                time.sleep(0.1)
-                pass
-            if data:
-                logger.critical("%s %i" % (self.name, self.input_file_count.value))
-                with self.lock:
-                    self.input_file_processed_count.value += 1
-                file_path, file_version, provider_id, data_source_name, md5_hash, logfile = data
-                logging.info('Starting to parse  file %s'%file_path)
-                ''' parse the file and put evidence in the queue '''
-                self.parse_gzipfile(file_path, file_version, provider_id, data_source_name, md5_hash,
-                                    logfile=logfile)
-
-                # try:
 
 
-                # except Exception, error:
-                #     # with self.lock:
-                #     #    self.processing_errors_count.value +=1
-                #     # UploadError(ev, error, idev).save()
-                #     # err += 1
-                #
-                #     if isinstance(error, AttributeError):
-                #         logger.error("Error loading data for id %s: %s" % (file_path, str(error)))
-                #         break
-                #         # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
-                #     #elif isinstance(error, elasticsearch.connection.exceptions.TransportError):
-                #     #    logger.error("Error updating data in ElasticSearch for id %s: %s" % (file_path, str(error)))
-                #     #    # we have to stop the program in case of an error
-                #     #    break
-                #
-                #     else:
-                #         logger.exception("Error loading data for id %s: %s" % (file_path, str(error)))
-                #         # traceback.print_exc(limit=1, file=sys.stdout)
-                #         break
-
-        self.input_file_processing_finished.set()
+    def process(self, data):
+        file_path, file_version, provider_id, data_source_name, md5_hash, logfile = data
+        logging.info('Starting to parse  file %s' % file_path)
+        ''' parse the file and put evidence in the queue '''
+        self.parse_gzipfile(file_path, file_version, provider_id, data_source_name, md5_hash,
+                            logfile=logfile)
         logger.info("%s finished" % self.name)
 
 
-    # file_stat = srv.stat(latest_file)
-    # file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
-    # with srv.open(latest_file, mode='rb', buffer=1) as f:
-    #     with gzip.GzipFile(filename = latest_file.split('/')[1],
-    #                        mode = 'rb',
-    #                        fileobj = f,
-    #                        mtime = file_mod_time) as afile:
-    #         line = afile.readline()
-    #         while line:
-    #             print line
-    # data = afile.read(BLOCKSIZE)
-    # c=0
-    # while data:
-    #     c+=len(data)
-    #     if int(round(c/(1024*1024.))) %100 ==0:
-    #         print round(c/(1024*1024.)), round(float(c)/size*100, 2),'%'
-    #     data = afile.read(BLOCKSIZE)
 
     def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None):
 
@@ -528,10 +426,13 @@ class FileReaderProcess(multiprocessing.Process):
         chunk = 1
         line_number = 0
 
+        cnopts = pysftp.CnOpts()
+        cnopts.hostkeys = None  # disable host key checking.
         with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
                                port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
                                username=provider_id,
                                password=Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[provider_id],
+                               cnopts=cnopts,
                                ) as srv:
 
             file_stat = srv.stat(file_path)
@@ -547,60 +448,56 @@ class FileReaderProcess(multiprocessing.Process):
                         line_number += 1
                         if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
                             logging.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-                            self.output_q.put(
+                            self.queue_out.put(
                                 (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
-                                 offset, list(line_buffer), False))
+                                 offset, list(line_buffer), False),
+                                self.r_server)
                             offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
                             chunk += 1
                             line_buffer = []
-                            with self.lock:
-                                self.evidence_loaded_count.value = line_number
+
                         line = fh.readline()
 
         if line_buffer:
             logging.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
-                               list(line_buffer), False))
+            self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
+                               list(line_buffer), False),
+                               self.r_server)
             offset += len(line_buffer)
             chunk += 1
             line_buffer = []
-            with self.lock:
-                self.evidence_loaded_count.value = line_number
+
 
         '''
         finally send a signal to inform that parsing is completed for this file and no other line are to be expected
         '''
         logging.info('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-        self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
-                           line_buffer, True))
+        self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
+                           line_buffer, True),
+                           self.r_server)
 
         return
 
 
-class ValidatorProcess(multiprocessing.Process):
+class ValidatorProcess(RedisQueueWorkerProcess):
     def __init__(self,
-                 input_q,
-                 output_q,
-                 es,
-                 efo_current,
-                 efo_uncat,
-                 efo_obsolete,
-                 hpo_current,
-                 hpo_obsolete,
-                 mp_current,
-                 mp_obsolete,
-                 uniprot_current,
-                 ensembl_current,
-                 input_file_processing_finished,
-                 input_file_validation_finished,
-                 input_file_processed_count,
-                 input_file_validated_count,
-                 evidence_loaded_count,
-                 evidence_validated_count,
-                 lock):
-        super(ValidatorProcess, self).__init__()
-        self.input_q = input_q
-        self.output_q = output_q
+                 queue_in,
+                 redis_path,
+                 queue_out=None,
+                 es=None,
+                 efo_current=None,
+                 efo_uncat=None,
+                 efo_obsolete=None,
+                 hpo_current=None,
+                 hpo_obsolete=None,
+                 mp_current=None,
+                 mp_obsolete=None,
+                 uniprot_current=None,
+                 ensembl_current=None,
+                 ):
+        super(ValidatorProcess, self).__init__(queue_in, redis_path, queue_out)
+        self.queue_in = queue_in
+        self.queue_out = queue_out
         self.es = es
         self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
         self.efo_current = efo_current
@@ -613,49 +510,16 @@ class ValidatorProcess(multiprocessing.Process):
         self.uniprot_current = uniprot_current
         self.ensembl_current = ensembl_current
         self.start_time = time.time()
-        self.input_file_validation_finished = input_file_validation_finished
-        self.input_file_processing_finished = input_file_processing_finished
-        self.input_file_validated_count = input_file_validated_count
-        self.input_file_processed_count = input_file_processed_count
-        self.evidence_loaded_count = evidence_loaded_count
-        self.evidence_validated_count = evidence_validated_count
-        self.start_time = time.time()  # reset timer start
-        self.lock = lock
         self.audit = list()
 
-    def run(self):
-        logger.info("%s started" % self.name)
-        ''' 3 conditions to fullfill to exit the loop:
-            1. make sure that each file has been validated: this is ensured by the last information sent in the queue
-            for every file to be validated
-            2. make sure all evidence strings have been validated, that is the number of evidence strings received is
-               equals to the number of evidence string processed.
-            3. make sure that the producer has finished processing the files
-        '''
-        with Loader(self.es) as es_loader:
-            while not ((self.evidence_loaded_count.value == self.evidence_validated_count.value) and
-                           (self.input_file_processed_count.value == self.input_file_validated_count.value) and
-                           self.input_file_processing_finished.is_set()):
-                # logger.info("%s %i %i"%(self.name,self.evidence_loaded_count.value, self.evidence_validated_count.value ))
-                data = None
-                try:
-                    data = self.input_q.get_nowait()
-                except Queue.Empty:
-                    time.sleep(0.1)
-                    pass
-                if data:
-                    file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
+    def process(self, data):
+        file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
+        self.validate_evidence(file_path, file_version, provider_id, data_source_name, md5_hash, chunk,
+                                   offset, line_buffer, end_of_transmission, logfile=logfile)
 
-                    self.validate_evidence(file_path, file_version, provider_id, data_source_name, md5_hash, chunk,
-                                               offset, line_buffer, end_of_transmission, es_loader, logfile=logfile)
-
-
-
-        self.input_file_validation_finished.set()
-        logger.info("%s finished" % self.name)
 
     def validate_evidence(self, file_path, file_version, provider_id, data_source_name, md5_hash, chunk, offset,
-                          line_buffer, end_of_transmission, es_loader, logfile=None):
+                          line_buffer, end_of_transmission, logfile=None):
         '''
         validate evidence strings from a chunk
         cumulate the logs, acquire a lock,
@@ -669,41 +533,37 @@ class ValidatorProcess(multiprocessing.Process):
             Send a message to the audit trail process with the md5 key of the file
             '''
 
-            self.output_q.put((file_path,
-                               file_version,
-                               provider_id,
-                               data_source_name,
-                               md5_hash,
-                               chunk,
-                               dict(nb_lines=0,
-                                    nb_valid=0,
-                                    nb_efo_invalid=0,
-                                    nb_efo_obsolete=0,
-                                    nb_ensembl_invalid=0,
-                                    nb_ensembl_nonref=0,
-                                    nb_uniprot_invalid=0,
-                                    nb_missing_uniprot_id_xrefs=0,
-                                    nb_uniprot_invalid_mapping=0,
-                                    invalid_diseases={},
-                                    obsolete_diseases={},
-                                    invalid_ensembl_ids={},
-                                    nonref_ensembl_ids={},
-                                    invalid_uniprot_ids={},
-                                    missing_uniprot_id_xrefs={},
-                                    invalid_uniprot_id_mappings={},
-                                    nb_errors=0,
-                                    nb_duplicates=0),
-                               list(),
-                               offset,
-                               len(line_buffer),
-                               logfile,
-                               end_of_transmission))
+            return (file_path,
+                   file_version,
+                   provider_id,
+                   data_source_name,
+                   md5_hash,
+                   chunk,
+                   dict(nb_lines=0,
+                        nb_valid=0,
+                        nb_efo_invalid=0,
+                        nb_efo_obsolete=0,
+                        nb_ensembl_invalid=0,
+                        nb_ensembl_nonref=0,
+                        nb_uniprot_invalid=0,
+                        nb_missing_uniprot_id_xrefs=0,
+                        nb_uniprot_invalid_mapping=0,
+                        invalid_diseases={},
+                        obsolete_diseases={},
+                        invalid_ensembl_ids={},
+                        nonref_ensembl_ids={},
+                        invalid_uniprot_ids={},
+                        missing_uniprot_id_xrefs={},
+                        invalid_uniprot_id_mappings={},
+                        nb_errors=0,
+                        nb_duplicates=0),
+                   list(),
+                   offset,
+                   len(line_buffer),
+                   logfile,
+                   end_of_transmission)
 
-            '''
-            Increment the number of file validated
-            '''
-            with self.lock:
-                self.input_file_validated_count.value += 1
+
         else:
             logging.debug('%s Validating %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
 
@@ -762,7 +622,7 @@ class ValidatorProcess(multiprocessing.Process):
                             if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'], list):
                                 mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
                                 python_raw['evidence']['known_mutations'] = [ mutations ]
-                                logging.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
+                                # logging.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
                                 obj = cttv.Literature_Curated.fromMap(python_raw)
                         elif data_type == 'known_drug':
                             obj = cttv.Drug.fromMap(python_raw)
@@ -1012,64 +872,58 @@ class ValidatorProcess(multiprocessing.Process):
             logging.debug('%s bulk insert complete' % (self.name))
 
             'Inform the audit trailer to generate a report and send an e-mail to the data provider'
-            self.output_q.put((file_path,
-                               file_version,
-                               provider_id,
-                               data_source_name,
-                               md5_hash,
-                               chunk,
-                               dict(nb_lines=lc,
-                                    nb_valid=nb_valid,
-                                    nb_efo_invalid=nb_efo_invalid,
-                                    nb_efo_obsolete=nb_efo_obsolete,
-                                    nb_ensembl_invalid=nb_ensembl_invalid,
-                                    nb_ensembl_nonref=nb_ensembl_nonref,
-                                    nb_uniprot_invalid=nb_uniprot_invalid,
-                                    nb_missing_uniprot_id_xrefs=nb_missing_uniprot_id_xrefs,
-                                    nb_uniprot_invalid_mapping=nb_uniprot_invalid_mapping,
-                                    invalid_diseases=invalid_diseases,
-                                    obsolete_diseases=obsolete_diseases,
-                                    invalid_ensembl_ids=invalid_ensembl_ids,
-                                    nonref_ensembl_ids=nonref_ensembl_ids,
-                                    invalid_uniprot_ids=invalid_uniprot_ids,
-                                    missing_uniprot_id_xrefs=missing_uniprot_id_xrefs,
-                                    invalid_uniprot_id_mappings=invalid_uniprot_id_mappings,
-                                    nb_errors=nb_errors,
-                                    nb_duplicates=nb_duplicates),
-                               audit,
-                               offset,
-                               len(line_buffer),
-                               logfile,
-                               end_of_transmission))
-
-            with self.lock:
-                self.evidence_validated_count.value += len(line_buffer)
-
-        return
+            return (file_path,
+                   file_version,
+                   provider_id,
+                   data_source_name,
+                   md5_hash,
+                   chunk,
+                   dict(nb_lines=lc,
+                        nb_valid=nb_valid,
+                        nb_efo_invalid=nb_efo_invalid,
+                        nb_efo_obsolete=nb_efo_obsolete,
+                        nb_ensembl_invalid=nb_ensembl_invalid,
+                        nb_ensembl_nonref=nb_ensembl_nonref,
+                        nb_uniprot_invalid=nb_uniprot_invalid,
+                        nb_missing_uniprot_id_xrefs=nb_missing_uniprot_id_xrefs,
+                        nb_uniprot_invalid_mapping=nb_uniprot_invalid_mapping,
+                        invalid_diseases=invalid_diseases,
+                        obsolete_diseases=obsolete_diseases,
+                        invalid_ensembl_ids=invalid_ensembl_ids,
+                        nonref_ensembl_ids=nonref_ensembl_ids,
+                        invalid_uniprot_ids=invalid_uniprot_ids,
+                        missing_uniprot_id_xrefs=missing_uniprot_id_xrefs,
+                        invalid_uniprot_id_mappings=invalid_uniprot_id_mappings,
+                        nb_errors=nb_errors,
+                        nb_duplicates=nb_duplicates),
+                   audit,
+                   offset,
+                   len(line_buffer),
+                   logfile,
+                   end_of_transmission)
 
 
-class AuditTrailProcess(multiprocessing.Process):
+
+
+
+class AuditTrailProcess(RedisQueueWorkerProcess):
     def __init__(self,
-                 input_q,
-                 es,
-                 ensembl_current,
-                 uniprot_current,
-                 symbols,
-                 efo_current,
-                 efo_obsolete,
-                 mp_current,
-                 mp_obsolete,
-                 hpo_current,
-                 hpo_obsolete,
-                 input_file_validation_finished,
-                 input_file_auditing_finished,
-                 input_file_validated_count,
-                 input_file_audited_count,
-                 lock):
-        super(AuditTrailProcess, self).__init__()
-        self.input_q = input_q
+                 queue_in,
+                 redis_path,
+                 es=None,
+                 ensembl_current=None,
+                 uniprot_current=None,
+                 symbols=None,
+                 efo_current=None,
+                 efo_obsolete=None,
+                 mp_current=None,
+                 mp_obsolete=None,
+                 hpo_current=None,
+                 hpo_obsolete=None,):
+        super(AuditTrailProcess, self).__init__(queue_in, redis_path )
+        self.queue_in = queue_in
         self.es = es
-        self.submission_audit = SubmissionAuditElasticStorage(es=self.es)
+        self.submission_audit = SubmissionAuditElasticStorage(loader=Loader(es))
         self.ensembl_current = ensembl_current
         self.uniprot_current = uniprot_current
         self.symbols = symbols
@@ -1080,100 +934,54 @@ class AuditTrailProcess(multiprocessing.Process):
         self.mp_current = mp_current
         self.mp_obsolete = mp_obsolete
         self.start_time = time.time()
-        self.input_file_auditing_finished = input_file_auditing_finished
-        self.input_file_validation_finished = input_file_validation_finished
-        self.input_file_audited_count = input_file_audited_count
-        self.input_file_validated_count = input_file_validated_count
-        self.start_time = time.time()  # reset timer start
-        self.lock = lock
         self.registry = dict()
 
-    def run(self):
-        logger.info("%s started" % self.name)
-        while not ((self.input_file_audited_count.value == self.input_file_validated_count.value) and
-                       self.input_file_validation_finished.is_set()):
-            # logger.info("%s %i"%(self.name, self.input_file_audited_count.value))
-            time.sleep(1)
-            data = None
-            try:
-                data = self.input_q.get_nowait()
-            except Queue.Empty:
-                pass
-            if data:
-                file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, offset, buffer_size, logfile, end_of_transmission = data
-                self.audit_submission(file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats,
-                                      audit, offset, buffer_size, end_of_transmission, logfile)
+    def process(self, data):
+        file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, offset, buffer_size, \
+        logfile, end_of_transmission = data
+        self.audit_submission(file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats,
+                              audit, offset, buffer_size, end_of_transmission, logfile)
 
-
-
-        self.input_file_auditing_finished.set()
-        logger.info("%s finished" % self.name)
 
     def send_email(self, bSend, provider_id, data_source_name, filename, bValidated, nb_records, errors, when, extra_text, logfile):
-        me = Config.EVIDENCEVALIDATION_SENDER_ACCOUNT
-        you = ",".join(Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id])
+        sender = Config.EVIDENCEVALIDATION_SENDER_ACCOUNT
+        recipient =Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id]
         status = "passed"
         if not bValidated:
             status = "failed"
-        # Create message container - the correct MIME type is multipart/alternative.
-        # msg = MIMEMultipart('alternative')
-        msg = MIMEMultipart()
-        msg['Subject'] = "CTTV: {0} validation {1} for {2}".format(data_source_name, status, filename)
-        msg['From'] = me
-        msg['To'] = you
-        rcpt = Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id]
-        if provider_id != 'cttv001':
-            rcpt.extend(Config.EVIDENCEVALIDATION_PROVIDER_EMAILS['cttv001'])
-            msg['Cc'] = ",".join(Config.EVIDENCEVALIDATION_PROVIDER_EMAILS['cttv001'])
 
-        text = "This is an automated message generated by the CTTV Core Platform Pipeline on {0}\n".format(when)
 
+        text = ["This is an automated message generated by the CTTV Core Platform Pipeline on {0}".format(when)]
         if bValidated:
-            text += messagePassed
-            text += "Congratulations :)\n"
+            text.append(messagePassed)
+            text.append("Congratulations :)")
         else:
-            text += messageFailed
-            text += "See details in the attachment {0}\n\n".format(os.path.basename(logfile))
-        text += "Data Provider:\t%s\n"%data_source_name
-        text += "JSON schema version:\t1.2.2\n"
-        text += "Number of records parsed:\t{0}\n".format(nb_records)
+            text.append(messageFailed)
+            text.append("See details in the attachment {0}\n".format(os.path.basename(logfile)))
+        text.append("Data Provider:\t%s"%data_source_name)
+        text.append("JSON schema version:\t%s"%Config.EVIDENCEVALIDATION_JSON_SCHEMA_VERSION)
+        text.append("Number of records parsed:\t{0}".format(nb_records))
         for key in errors:
-            text += "Number of {0}:\t{1}\n".format(key, errors[key])
-        text += "\n"
-        text += extra_text
-        text += "\nYours\nThe CTTV Core Platform Team"
-        # text += signature
-        # print text
-
-        if bSend:
-            logging.info("Send e-mail to data provider...")
-            # Record the MIME types of both parts - text/plain and text/html.
-            part1 = MIMEText(text, 'plain')
-
-            # Attach parts into message container.
-            # According to RFC 2046, the last part of a multipart message, in this case
-            # the HTML message, is best and preferred.
-            msg.attach(part1)
-
-            if not bValidated:
-                part2 = MIMEBase('application', "octet-stream")
-                part2.set_payload(open(logfile, "rb").read())
-                Encoders.encode_base64(part2)
-                part2.add_header('Content-Disposition', 'attachment; filename="{0}"'.format(os.path.basename(logfile)))
-                msg.attach(part2)
-
-            # Send the message via local SMTP server.
-            mail = smtplib.SMTP('smtp.office365.com', 587)
-
-            mail.ehlo()
-
-            mail.starttls()
-
-            mail.login(me, Config.EVIDENCEVALIDATION_SENDER_PASSWORD)
-            mail.sendmail(me, rcpt, msg.as_string())
-            mail.quit()
-            logging.info("e-mail sent")
-        return 0
+            text.append("Number of {0}:\t{1}".format(key, errors[key]))
+        text.append("")
+        text.append(extra_text)
+        text.append( "\nYours\nThe CTTV Core Platform Team")
+        # text.append( signature
+        text = '\n'.join(text)
+        logging.info(text)
+        requests.post(
+            Config.MAILGUN_DOMAIN,
+            auth=("api", Config.MAILGUN_API_KEY),
+            files=[(filename+".log", open(logfile)),],
+            data={"from": sender,
+                  "to": "andreap@ebi.ac.uk",#recipient,
+                  "bcc": Config.EVIDENCEVALIDATION_BCC_ACCOUNT,
+                  "subject": "CTTV: {0} validation {1} for {2}".format(data_source_name, status, filename),
+                  "text": text,
+                  # "html": "<html>HTML version of the body</html>"
+                  },
+            )
+        return
 
     def merge_dict_sum(self, x, y):
         # merge keys
@@ -1285,12 +1093,12 @@ class AuditTrailProcess(multiprocessing.Process):
 
             logging.info("%s generating report "%self.name)
 
-            text = ''
+            text = []
 
             '''
              refresh the indice
             '''
-            self.es.indices.refresh(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+            self.es.indices.refresh(index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'))
 
             '''
             Sum up numbers across chunks (map reduce)
@@ -1370,7 +1178,7 @@ class AuditTrailProcess(multiprocessing.Process):
             '''
             logging.debug("Count nb of inserted documents")
             search = self.es.search(
-                    index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
                     doc_type=data_source_name,
                     body='{ "query": { "match_all": {} } }',
                     search_type='count'
@@ -1389,13 +1197,13 @@ class AuditTrailProcess(multiprocessing.Process):
 
             logging.debug("Get top 20 targets")
             search = self.es.search(
-                    index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
                     doc_type=data_source_name,
                     body=TOP_20_TARGETS_QUERY,
             )
 
             if search:
-                text += "Top %i targets:\n" % Config.EVIDENCEVALIDATION_NB_TOP_TARGETS
+                text.append("Top %i targets:" % Config.EVIDENCEVALIDATION_NB_TOP_TARGETS)
                 for top_targets in search['aggregations']['group_by_targets']['buckets']:
                     id = top_targets['key']
                     doc_count = top_targets['doc_count']
@@ -1411,52 +1219,52 @@ class AuditTrailProcess(multiprocessing.Process):
                     # elif uniprotMatch:
                     #    uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
                     #    id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
-                    text += "\t-{0}:\t{1} ({2:.2f}%) {3}\n".format(id, doc_count, doc_count * 100.0 / nb_documents,
-                                                                   id_text)
-                text += "\n"
+                    text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(id, doc_count, doc_count * 100.0 / nb_documents,
+                                                                   id_text))
+                text.append("")
 
                 # logging.info(json.dumps(top_target))
 
             logging.debug("Get top 20 diseases")
             search = self.es.search(
-                    index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
                     doc_type=data_source_name,
                     body=TOP_20_DISEASES_QUERY,
             )
 
             if search:
-                text += "Top %i diseases:\n" % (Config.EVIDENCEVALIDATION_NB_TOP_DISEASES)
+                text.append("Top %i diseases:" % (Config.EVIDENCEVALIDATION_NB_TOP_DISEASES))
                 for top_diseases in search['aggregations']['group_by_diseases']['buckets']:
                     # logging.info(json.dumps(result))
                     disease = top_diseases['key']
                     doc_count = top_diseases['doc_count']
                     if top_diseases['key'] in self.efo_current:
-                        text += "\t-{0}:\t{1} ({2:.2f}%) {3}\n".format(disease, doc_count,
+                        text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(disease, doc_count,
                                                                        doc_count * 100.0 / nb_documents,
-                                                                       self.efo_current[disease])
+                                                                       self.efo_current[disease]))
                     else:
-                        text += "\t-{0}:\t{1} ({2:.2f}%)\n".format(disease, doc_count, doc_count * 100.0 / nb_documents)
-                text += "\n"
+                        text.append("\t-{0}:\t{1} ({2:.2f}%)".format(disease, doc_count, doc_count * 100.0 / nb_documents))
+                text.append("")
 
             # report invalid/obsolete EFO term
             logging.debug("report invalid EFO term")
             if nb_efo_invalid > 0:
-                text += "Errors:\n"
-                text += "\t%i invalid ontology term(s) found in %i (%.2f%s) of the records.\n" % (
-                len(invalid_diseases), nb_efo_invalid, nb_efo_invalid * 100.0 / nb_documents, '%')
+                text.append("Errors:")
+                text.append("\t%i invalid ontology term(s) found in %i (%.2f%s) of the records." % (
+                    len(invalid_diseases), nb_efo_invalid, nb_efo_invalid * 100.0 / nb_documents, '%'))
                 for disease_id in invalid_diseases:
                     if invalid_diseases[disease_id] == 1:
-                        text += "\t%s\t(reported once)\n" % disease_id
+                        text.append("\t%s\t(reported once)" % disease_id)
                     else:
-                        text += "\t%s\t(reported %i times)\n" % (disease_id, invalid_diseases[disease_id])
+                        text.append("\t%s\t(reported %i times)" % (disease_id, invalid_diseases[disease_id]))
 
-                text += "\n"
+                text.append("")
 
             logging.debug("report obsolete EFO term")
             if nb_efo_obsolete > 0:
-                text += "Errors:\n"
-                text += "\t%i obsolete ontology term(s) found in %i (%.1f%s) of the records.\n" % (
-                len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete * 100 / nb_documents, '%')
+                text.append("Errors:")
+                text.append("\t%i obsolete ontology term(s) found in %i (%.1f%s) of the records." % (
+                    len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete * 100 / nb_documents, '%'))
                 for disease_id in obsolete_diseases:
                     new_term = None
                     if disease_id in self.efo_obsolete:
@@ -1466,93 +1274,94 @@ class AuditTrailProcess(multiprocessing.Process):
                     else:
                         new_term = self.mp_obsolete[disease_id]
                     if obsolete_diseases[disease_id] == 1:
-                        text += "\t%s\t(reported once)\t%s\n" % (
-                        disease_id, new_term.replace("\n", " "))
+                        text.append("\t%s\t(reported once)\t%s" % (
+                            disease_id, new_term.replace("", " ")))
                     else:
-                        text += "\t%s\t(reported %i times)\t%s\n" % (
-                        disease_id, obsolete_diseases[disease_id], new_term.replace("\n", " "))
-                text += "\n"
+                        text.append("\t%s\t(reported %i times)\t%s" % (
+                            disease_id, obsolete_diseases[disease_id], new_term.replace("", " ")))
+                text.append("")
 
             # report invalid Ensembl genes
             logging.debug("report invalid Ensembl genes")
             if nb_ensembl_invalid > 0:
-                text += "Errors:\n"
-                text += "\t%i unknown Ensembl identifier(s) found in %i (%.1f%s) of the records.\n" % (
-                len(invalid_ensembl_ids), nb_ensembl_invalid, nb_ensembl_invalid * 100 / nb_documents, '%')
+                text.append("Errors:")
+                text.append("\t%i unknown Ensembl identifier(s) found in %i (%.1f%s) of the records." % (
+                    len(invalid_ensembl_ids), nb_ensembl_invalid, nb_ensembl_invalid * 100 / nb_documents, '%'))
                 for ensembl_id in invalid_ensembl_ids:
                     if invalid_ensembl_ids[ensembl_id] == 1:
-                        text += "\t%s\t(reported once)\n" % (ensembl_id)
+                        text.append("\t%s\t(reported once)" % (ensembl_id))
                     else:
-                        text += "\t%s\t(reported %i times)\n" % (ensembl_id, invalid_ensembl_ids[ensembl_id])
-                text += "\n"
+                        text.append("\t%s\t(reported %i times)" % (ensembl_id, invalid_ensembl_ids[ensembl_id]))
+                text.append("")
 
             # report Ensembl genes not on reference assembly
             logging.debug("report Ensembl genes not on reference assembly")
             if nb_ensembl_nonref > 0:
-                text += "Warnings:\n"
-                text += "\t%i Ensembl Human Alternative sequence Gene identifier(s) not mapped to the reference genome assembly %s found in %i (%.1f%s) of the records.\n" % (
-                len(nonref_ensembl_ids), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_ensembl_nonref,
-                nb_ensembl_nonref * 100 / nb_documents, '%')
-                text += "\tPlease map them to a reference assembly gene if possible.\n"
-                text += "\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifier.\n"
+                text.append("Warnings:")
+                text.append("\t%i Ensembl Human Alternative sequence Gene identifier(s) not mapped to the reference genome assembly %s found in %i (%.1f%s) of the records." % (
+                    len(nonref_ensembl_ids), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY, nb_ensembl_nonref,
+                    nb_ensembl_nonref * 100 / nb_documents, '%'))
+                text.append("\tPlease map them to a reference assembly gene if possible.")
+                text.append("\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifier.")
                 for ensembl_id in nonref_ensembl_ids:
                     if nonref_ensembl_ids[ensembl_id] == 1:
-                        text += "\t%s\t(reported once) maps to %s\n" % (
-                        ensembl_id, self.get_reference_gene_from_Ensembl(ensembl_id))
+                        text.append("\t%s\t(reported once) maps to %s" % (
+                            ensembl_id, self.get_reference_gene_from_Ensembl(ensembl_id)))
                     else:
-                        text += "\t%s\t(reported %i times) maps to %s\n" % (
-                        ensembl_id, nonref_ensembl_ids[ensembl_id], self.get_reference_gene_from_Ensembl(ensembl_id))
-                text += "\n"
+                        text.append("\t%s\t(reported %i times) maps to %s" % (
+                            ensembl_id, nonref_ensembl_ids[ensembl_id], self.get_reference_gene_from_Ensembl(ensembl_id)))
+                text.append("")
 
             # report invalid Uniprot entries
             logging.debug("report invalid Uniprot entries")
             if nb_uniprot_invalid > 0:
-                text += "Errors:\n"
-                text += "\t%i invalid UniProt identifier(s) found in %i (%.1f%s) of the records.\n" % (
-                len(invalid_uniprot_ids), nb_uniprot_invalid, nb_uniprot_invalid * 100 / nb_documents, '%')
+                text.append("Errors:")
+                text.append("\t%i invalid UniProt identifier(s) found in %i (%.1f%s) of the records." % (
+                    len(invalid_uniprot_ids), nb_uniprot_invalid, nb_uniprot_invalid * 100 / nb_documents, '%'))
                 for uniprot_id in invalid_uniprot_ids:
                     if invalid_uniprot_ids[uniprot_id] == 1:
-                        text += "\t%s\t(reported once)\n" % (uniprot_id)
+                        text.append("\t%s\t(reported once)" % (uniprot_id))
                     else:
-                        text += "\t%s\t(reported %i times)\n" % (uniprot_id, invalid_uniprot_ids[uniprot_id])
-                text += "\n"
+                        text.append("\t%s\t(reported %i times)" % (uniprot_id, invalid_uniprot_ids[uniprot_id]))
+                text.append("")
 
                 # report UniProt ids with no mapping to Ensembl
             # missing_uniprot_id_xrefs
             logging.debug("report UniProt ids with no mapping to Ensembl")
             if nb_missing_uniprot_id_xrefs > 0:
-                text += "Warnings:\n"
-                text += "\t%i UniProt identifier(s) without cross-references to Ensembl found in %i (%.1f%s) of the records.\n" % (
-                len(missing_uniprot_id_xrefs), nb_missing_uniprot_id_xrefs,
-                nb_missing_uniprot_id_xrefs * 100 / nb_documents, '%')
-                text += "\tThe corresponding evidence strings have been discarded.\n"
+                text.append("Warnings:")
+                text.append("\t%i UniProt identifier(s) without cross-references to Ensembl found in %i (%.1f%s) of the records." % (
+                    len(missing_uniprot_id_xrefs), nb_missing_uniprot_id_xrefs,
+                    nb_missing_uniprot_id_xrefs * 100 / nb_documents, '%'))
+                text.append("\tThe corresponding evidence strings have been discarded.")
                 for uniprot_id in missing_uniprot_id_xrefs:
                     if missing_uniprot_id_xrefs[uniprot_id] == 1:
-                        text += "\t%s\t(reported once)\n" % (uniprot_id)
+                        text.append("\t%s\t(reported once)" % (uniprot_id))
                     else:
-                        text += "\t%s\t(reported %i times)\n" % (uniprot_id, missing_uniprot_id_xrefs[uniprot_id])
-                text += "\n"
+                        text.append("\t%s\t(reported %i times)" % (uniprot_id, missing_uniprot_id_xrefs[uniprot_id]))
+                text.append("")
 
             # report invalid Uniprot mapping entries
             logging.debug("report invalid Uniprot mapping entries")
             if nb_uniprot_invalid_mapping > 0:
-                text += "Warnings:\n"
-                text += "\t%i UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (that's %.2f%s) of the records.\n" % (
-                len(invalid_uniprot_id_mappings), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY,
-                nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping * 100 / nb_documents, '%')
-                text += "\tIf you think that might be an error in your submission, please use a UniProt identifier that will map to a reference assembly gene identifier.\n"
-                text += "\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifiers.\n"
+                text.append("Warnings:")
+                text.append("\t%i UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (that's %.2f%s) of the records." % (
+                    len(invalid_uniprot_id_mappings), Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY,
+                    nb_uniprot_invalid_mapping, nb_uniprot_invalid_mapping * 100 / nb_documents, '%'))
+                text.append("\tIf you think that might be an error in your submission, please use a UniProt identifier that will map to a reference assembly gene identifier.")
+                text.append("\tOtherwise we will map them automatically to a reference genome assembly gene identifier or one of the alternative gene identifiers.")
                 for uniprot_id in invalid_uniprot_id_mappings:
                     if invalid_uniprot_id_mappings[uniprot_id] == 1:
-                        text += "\t%s\t(reported once) maps to %s\n" % (
-                        uniprot_id, self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
+                        text.append("\t%s\t(reported once) maps to %s" % (
+                            uniprot_id, self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"])))
                     else:
-                        text += "\t%s\t(reported %i times) maps to %s\n" % (
-                        uniprot_id, invalid_uniprot_id_mappings[uniprot_id],
-                        self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]))
-                text += "\n"
+                        text.append("\t%s\t(reported %i times) maps to %s" % (
+                            uniprot_id, invalid_uniprot_id_mappings[uniprot_id],
+                            self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"])))
+                text.append("")
 
-            # print(text)
+            text = '\n'.join(text)
+            # logging.info(text)
 
             # A file is successfully validated if it meets the following conditions
             successfully_validated = (
@@ -1612,8 +1421,6 @@ class AuditTrailProcess(multiprocessing.Process):
             '''
             del self.registry[md5_hash]
 
-            with self.lock:
-                self.input_file_audited_count.value += 1
 
         return
 
@@ -1628,7 +1435,6 @@ class ElasticStorage():
         # Create a query for results you want to delete
 
         count = 0
-
         q = '{ "query": { "filtered": { "filter": { "type" : { "value" : "%s" } } } } }' % (data_source_name)
 
         res = es.search(
@@ -1644,7 +1450,7 @@ class ElasticStorage():
 
 
 
-        if (count > 0):
+        if count:
             logging.debug("Delete previous submitted data: %i evidence strings will be removed"%count)
 
             search = es.search(
@@ -1729,21 +1535,23 @@ class EvidenceChunkElasticStorage():
     def __init__(self, loader,):
         self.loader = loader
 
-    def storage_create_index(self, recreate=False):
-        self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME, recreate = recreate)
+    def storage_create_index(self,data_source_name, recreate=False):
+        self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name, recreate = recreate)
 
     def storage_add(self, id, evidence_string, data_source_name):
 
-        self.loader.put(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
+        self.loader.put(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name,
                         data_source_name,
                         id,
                         evidence_string,
                         create_index=False)
 
     def storage_delete(self, data_source_name):
-        ElasticStorage.delete_prev_data_in_es(self.loader.es,
-                                              self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
-                                              data_source_name)
+        if self.loader.es.indices.exists(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)):
+            self.loader.es.indices.delete(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name))
+            # ElasticStorage.delete_prev_data_in_es(self.loader.es,
+            #                                       self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
+            #                                       data_source_name)
 
     def storage_flush(self):
         self.loader.flush()
@@ -1846,12 +1654,13 @@ class SubmissionAuditElasticStorage():
             self.cache = {}
 
 class EvidenceValidationFileChecker():
-    def __init__(self, adapter, es, sparql, chunk_size=1e4):
+    def __init__(self, adapter, es, sparql, r_server, chunk_size=1e4):
         self.adapter = adapter
         self.session = adapter.session
         self.es = es
         self.esquery = ESQuery(self.es)
         self.sparql = sparql
+        self.r_server = r_server
         self.chunk_size = chunk_size
         self.cache = {}
         self.counter = 0
@@ -2086,7 +1895,6 @@ class EvidenceValidationFileChecker():
         '''
         logging.debug("Stitching everything together")
         data = {'symbols': self.symbols, 'uniprot': self.uniprot_current, 'ensembl': self.ensembl_current}
-        print(json.dumps(data, indent=4));
 
         now = datetime.utcnow()
         today = datetime.strptime("{:%Y-%m-%d}".format(datetime.now()), '%Y-%m-%d')
@@ -2280,42 +2088,32 @@ class EvidenceValidationFileChecker():
         self.adapter.close()
 
         'Create queues'
-        file_q = multiprocessing.Queue(maxsize=NB_JSON_FILES)
-        evidence_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS + 1)
-        audit_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS)
+        file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
+                            max_size=NB_JSON_FILES,
+                            job_timeout=120)
+        evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_evidence_q',
+                            max_size=MAX_NB_EVIDENCE_CHUNKS+1,
+                            job_timeout=120)
+        audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
+                            max_size=MAX_NB_EVIDENCE_CHUNKS+1,
+                            job_timeout=120)
 
-        'Create events'
-        input_file_loading_finished = multiprocessing.Event()
-        input_file_processing_finished = multiprocessing.Event()
-        input_file_validation_finished = multiprocessing.Event()
-        input_file_auditing_finished = multiprocessing.Event()
+        q_reporter = RedisQueueStatusReporter([file_q,
+                                               evidence_q,
+                                               audit_q],
+                                              interval=60)
+        q_reporter.start()
 
-        'Create counters (shared memory objects)'
-        input_file_count = multiprocessing.Value('i', 0)
-        input_file_processed_count = multiprocessing.Value('i', 0)
-        input_file_validated_count = multiprocessing.Value('i', 0)
-        evidence_loaded_count = multiprocessing.Value('i', 0)
-        evidence_validated_count = multiprocessing.Value('i', 0)
-        input_file_audited_count = multiprocessing.Value('i', 0)
-
-        'create locks'
-        file_processing_lock = multiprocessing.Lock()
-        log_file_lock = multiprocessing.Lock()
-        audit_lock = multiprocessing.Lock()
 
         workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
 
+
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
+                                     self.r_server.db,
                                      evidence_q,
                                      self.es,
-                                     input_file_loading_finished,
-                                     input_file_processing_finished,
-                                     input_file_count,
-                                     input_file_processed_count,
-                                     evidence_loaded_count,
-                                     file_processing_lock
-                                     ) for i in range(1)]
+                                     ) for i in range(2)]
         # ) for i in range(2)]
         for w in readers:
             w.start()
@@ -2326,9 +2124,7 @@ class EvidenceValidationFileChecker():
         directory_crawler = DirectoryCrawlerProcess(
                 file_q,
                 self.es,
-                input_file_loading_finished,
-                input_file_count,
-                file_processing_lock)
+                self.r_server)
 
         directory_crawler.run()
 
@@ -2338,6 +2134,7 @@ class EvidenceValidationFileChecker():
         'Start validating the evidence in chunks on the evidence queue'
 
         validators = [ValidatorProcess(evidence_q,
+                                       self.r_server.db,
                                        audit_q,
                                        self.es,
                                        self.efo_current,
@@ -2349,19 +2146,10 @@ class EvidenceValidationFileChecker():
                                        self.mp_obsolete,
                                        self.uniprot_current,
                                        self.ensembl_current,
-                                       input_file_processing_finished,
-                                       input_file_validation_finished,
-                                       input_file_processed_count,
-                                       input_file_validated_count,
-                                       evidence_loaded_count,
-                                       evidence_validated_count,
-                                       log_file_lock
-                                       ) for i in range(workers_number+1)]
+                                       ) for i in range(workers_number)]
         # ) for i in range(2)]
         for w in validators:
             w.start()
-
-        sys.exit()
 
         'Audit the whole process and send e-mails'
         auditor = AuditTrailProcess(
@@ -2376,28 +2164,15 @@ class EvidenceValidationFileChecker():
                 self.hpo_obsolete,
                 self.mp_current,
                 self.mp_obsolete,
-                input_file_validation_finished,
-                input_file_auditing_finished,
-                input_file_validated_count,
-                input_file_audited_count,
-                audit_lock)
+            )
 
         auditor.start()
 
-        '''wait for other processes to finish'''
-        while not input_file_auditing_finished.is_set():
-            time.sleep(1)
-
-
-        for w in readers:
-            if w.is_alive():
-                w.terminate()
+        '''wait for the validator workers to finish'''
 
         for w in validators:
-            if w.is_alive():
-                w.terminate()
+            w.join()
 
-        if auditor.is_alive():
-            auditor.terminate()
+        audit_q.set_submission_finished(self.r_server)
 
         return

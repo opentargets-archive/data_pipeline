@@ -1,5 +1,6 @@
 from collections import defaultdict
-from datetime import datetime, time
+from datetime import datetime
+import time
 import logging
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk, parallel_bulk
@@ -196,29 +197,20 @@ class Loader():
             self.flush()
 
 
-    def flush(self):
-
-        try:
-            # for ok, results in parallel_bulk(
-            for ok, results in streaming_bulk(
-                    self.es,
-                    self.cache,
-                    chunk_size=self.chunk_size,
-                    request_timeout=60000,
-            ):
-
-                action, result = results.popitem()
-                self.results[result['_index']].append(result['_id'])
-                doc_id = '/%s/%s' % (result['_index'], result['_id'])
-                if (len(self.results[result['_index']]) % self.chunk_size) == 0:
-                    logging.debug(
-                        "%i entries uploaded in elasticsearch for index %s" % (len(self.results[result['_index']]), result['_index']))
-                if not ok:
-                    logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
+    def flush(self, max_retry=10):
+        retry = 0
+        while 1:
+            try:
+               self._flush()
+               break
+            except:
+                retry+=1
+                if retry >= max_retry:
+                    logging.exception("push to elasticsearch failed for chunk, retrying...")
+                    break
                 else:
-                    pass
-        except:
-            logging.exception("push to elasticsearch failed for chunk")
+                    logging.error("push to elasticsearch failed for chunk, retrying in 30s...")
+                    time.sleep(30)
         self.cache = []
 
 
@@ -227,6 +219,28 @@ class Loader():
         # else:
         #     for index_name in self.cache:
         #         self.cache[index_name] = []
+
+    def _flush(self):
+        # for ok, results in streaming_bulk(
+        for ok, results in parallel_bulk(
+                self.es,
+                self.cache,
+                chunk_size=self.chunk_size,
+                request_timeout=60000,
+            ):
+
+            action, result = results.popitem()
+            self.results[result['_index']].append(result['_id'])
+            doc_id = '/%s/%s' % (result['_index'], result['_id'])
+            if (len(self.results[result['_index']]) % self.chunk_size) == 0:
+                logging.debug(
+                    "%i entries uploaded in elasticsearch for index %s" % (
+                    len(self.results[result['_index']]), result['_index']))
+            if not ok:
+                logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
+
+            else:
+                pass
 
 
     def close(self):
@@ -295,17 +309,19 @@ class Loader():
     def create_new_index(self, index_name, recreate = True):
         index_name = self.get_versioned_index(index_name)
 
-        try:
-            if recreate:
-                self.es.indices.delete(index_name, ignore=400)
-            else:
-                try:
-                    self.es.indices.delete(index_name)
-                except:
-                    logging.info("%s index already existing" % index_name)
-                    return
-        except NotFoundError:
-            pass
+        if self.es.indices.exists(index_name):
+            try:
+                if recreate:
+                    self.es.indices.delete(index_name, ignore=400)
+                else:
+                    try:
+                        self.es.indices.delete(index_name)
+                    except NotFoundError:
+                        pass
+                    except:
+                        logging.info("%s index already existing" % index_name)
+            except NotFoundError:
+                pass
 
         if Config.ELASTICSEARCH_DATA_INDEX_NAME in index_name:
             self.es.indices.create(index=index_name,
@@ -356,6 +372,11 @@ class Loader():
             self.es.indices.create(index=index_name,
                                    ignore=400,
                                    body=ElasticSearchConfiguration.uniprot_data_mapping
+                                   )
+        elif Config.ELASTICSEARCH_RELATION_INDEX_NAME in index_name:
+            self.es.indices.create(index=index_name,
+                                   ignore=400,
+                                   body=ElasticSearchConfiguration.relation_data_mapping
                                    )
         else:
             self.es.indices.create(index=index_name, ignore=400)
