@@ -7,6 +7,7 @@ import paramiko
 import pysftp
 import requests
 from paramiko import AuthenticationException
+from requests.packages.urllib3.exceptions import HTTPError
 
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
@@ -969,7 +970,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         # text.append( signature
         text = '\n'.join(text)
         logging.info(text)
-        requests.post(
+        r = requests.post(
             Config.MAILGUN_DOMAIN,
             auth=("api", Config.MAILGUN_API_KEY),
             files=[(filename+".log", open(logfile)),],
@@ -981,6 +982,11 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                   # "html": "<html>HTML version of the body</html>"
                   },
             )
+        try:
+            r.raise_for_status()
+        except HTTPError, e:
+            logging.error(e)
+
         return
 
     def merge_dict_sum(self, x, y):
