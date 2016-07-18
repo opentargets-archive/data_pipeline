@@ -493,8 +493,8 @@ class GeneManager():
 
 
     def _get_hgnc_data_from_json(self):
-        # req = urllib2.Request('ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json')
-        req = urllib2.Request('https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer')
+        # req = urllib2.Request(HGNC_COMPLETE_SET)
+        req = urllib2.Request(HGNC_COMPLETE_SET_VPN)
         response = urllib2.urlopen(req)
         # print response.code
         # if response.code == '200':
