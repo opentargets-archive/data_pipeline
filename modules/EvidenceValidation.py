@@ -24,6 +24,7 @@ from datetime import datetime, date
 from sqlalchemy import and_, or_, table, column, select, update, insert, desc
 from common import Actions
 from common.PGAdapter import *
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from common.UniprotIO import UniprotIterator, Parser
 import cttv.model.core as cttv
 import cttv.model.flatten as flat
@@ -216,18 +217,13 @@ class DirectoryCrawlerProcess():
     def __init__(self,
                  output_q,
                  es,
-                 input_file_loading_finished,
-                 input_file_count,
-                 lock):
+                 r_server):
         self.output_q = output_q
         self.es = es
         self.evidence_chunk = EvidenceChunkElasticStorage(loader = Loader(self.es))
         self.submission_audit = SubmissionAuditElasticStorage(loader = Loader(self.es))
         self.start_time = time.time()
-        self.input_file_loading_finished = input_file_loading_finished
-        self.input_file_count = input_file_count
-        self.start_time = time.time()  # reset timer start
-        self.lock = lock
+        self.r_server = r_server
         self._remote_filenames =dict()
 
     def _store_remote_filename(self, filename):
@@ -304,7 +300,8 @@ class DirectoryCrawlerProcess():
             except AuthenticationException:
                 logging.error( 'cannot connect with credentials: user:%s password:%s' % (u, p))
 
-        self.input_file_loading_finished.set()
+        self.output_q.set_submission_finished(self.r_server)
+
         logger.info("%s finished" % self.__class__.__name__)
 
     def md5_hash_local_file(self, filename):
@@ -389,102 +386,33 @@ class DirectoryCrawlerProcess():
 
                 self.submission_audit.storage_insert_or_update(submission, update=False)
 
-            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile))
-            with self.lock:
-                self.input_file_count.value += 1
+            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile),
+                              self.r_server)
 
         return
 
 
-class FileReaderProcess(multiprocessing.Process):
+class FileReaderProcess(RedisQueueWorkerProcess):
     def __init__(self,
-                 input_q,
-                 output_q,
-                 es,
-                 input_file_loading_finished,
-                 input_file_processing_finished,
-                 input_file_count,
-                 input_file_processed_count,
-                 evidence_loaded_count,
-                 lock):
-        super(FileReaderProcess, self).__init__()
-        self.input_q = input_q
-        self.output_q = output_q
+                 queue_in,
+                 redis_path,
+                 queue_out=None,
+                 es = None):
+        super(FileReaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.es = es
         self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
-        self.start_time = time.time()
-        self.input_file_loading_finished = input_file_loading_finished
-        self.input_file_processing_finished = input_file_processing_finished
-        self.input_file_count = input_file_count
-        self.input_file_processed_count = input_file_processed_count
-        self.evidence_loaded_count = evidence_loaded_count
         self.start_time = time.time()  # reset timer start
-        self.lock = lock
-
-    def run(self):
-        logger.info("%s started" % self.name)
-        while not ((self.input_file_count.value == self.input_file_processed_count.value) and \
-                           self.input_file_loading_finished.is_set()):
-            data = None
-            try:
-                data = self.input_q.get_nowait()
-            except Queue.Empty:
-                time.sleep(0.1)
-                pass
-            if data:
-                logger.critical("%s %i" % (self.name, self.input_file_count.value))
-                with self.lock:
-                    self.input_file_processed_count.value += 1
-                file_path, file_version, provider_id, data_source_name, md5_hash, logfile = data
-                logging.info('Starting to parse  file %s'%file_path)
-                ''' parse the file and put evidence in the queue '''
-                self.parse_gzipfile(file_path, file_version, provider_id, data_source_name, md5_hash,
-                                    logfile=logfile)
-
-                # try:
 
 
-                # except Exception, error:
-                #     # with self.lock:
-                #     #    self.processing_errors_count.value +=1
-                #     # UploadError(ev, error, idev).save()
-                #     # err += 1
-                #
-                #     if isinstance(error, AttributeError):
-                #         logger.error("Error loading data for id %s: %s" % (file_path, str(error)))
-                #         break
-                #         # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
-                #     #elif isinstance(error, elasticsearch.connection.exceptions.TransportError):
-                #     #    logger.error("Error updating data in ElasticSearch for id %s: %s" % (file_path, str(error)))
-                #     #    # we have to stop the program in case of an error
-                #     #    break
-                #
-                #     else:
-                #         logger.exception("Error loading data for id %s: %s" % (file_path, str(error)))
-                #         # traceback.print_exc(limit=1, file=sys.stdout)
-                #         break
-
-        self.input_file_processing_finished.set()
+    def process(self, data):
+        file_path, file_version, provider_id, data_source_name, md5_hash, logfile = data
+        logging.info('Starting to parse  file %s' % file_path)
+        ''' parse the file and put evidence in the queue '''
+        self.parse_gzipfile(file_path, file_version, provider_id, data_source_name, md5_hash,
+                            logfile=logfile)
         logger.info("%s finished" % self.name)
 
 
-    # file_stat = srv.stat(latest_file)
-    # file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
-    # with srv.open(latest_file, mode='rb', buffer=1) as f:
-    #     with gzip.GzipFile(filename = latest_file.split('/')[1],
-    #                        mode = 'rb',
-    #                        fileobj = f,
-    #                        mtime = file_mod_time) as afile:
-    #         line = afile.readline()
-    #         while line:
-    #             print line
-    # data = afile.read(BLOCKSIZE)
-    # c=0
-    # while data:
-    #     c+=len(data)
-    #     if int(round(c/(1024*1024.))) %100 ==0:
-    #         print round(c/(1024*1024.)), round(float(c)/size*100, 2),'%'
-    #     data = afile.read(BLOCKSIZE)
 
     def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None):
 
@@ -520,60 +448,56 @@ class FileReaderProcess(multiprocessing.Process):
                         line_number += 1
                         if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
                             logging.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-                            self.output_q.put(
+                            self.queue_out.put(
                                 (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
-                                 offset, list(line_buffer), False))
+                                 offset, list(line_buffer), False),
+                                self.r_server)
                             offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
                             chunk += 1
                             line_buffer = []
-                            with self.lock:
-                                self.evidence_loaded_count.value = line_number
+
                         line = fh.readline()
 
         if line_buffer:
             logging.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
-                               list(line_buffer), False))
+            self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
+                               list(line_buffer), False),
+                               self.r_server)
             offset += len(line_buffer)
             chunk += 1
             line_buffer = []
-            with self.lock:
-                self.evidence_loaded_count.value = line_number
+
 
         '''
         finally send a signal to inform that parsing is completed for this file and no other line are to be expected
         '''
         logging.info('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-        self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
-                           line_buffer, True))
+        self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
+                           line_buffer, True),
+                           self.r_server)
 
         return
 
 
-class ValidatorProcess(multiprocessing.Process):
+class ValidatorProcess(RedisQueueWorkerProcess):
     def __init__(self,
-                 input_q,
-                 output_q,
-                 es,
-                 efo_current,
-                 efo_uncat,
-                 efo_obsolete,
-                 hpo_current,
-                 hpo_obsolete,
-                 mp_current,
-                 mp_obsolete,
-                 uniprot_current,
-                 ensembl_current,
-                 input_file_processing_finished,
-                 input_file_validation_finished,
-                 input_file_processed_count,
-                 input_file_validated_count,
-                 evidence_loaded_count,
-                 evidence_validated_count,
-                 lock):
-        super(ValidatorProcess, self).__init__()
-        self.input_q = input_q
-        self.output_q = output_q
+                 queue_in,
+                 redis_path,
+                 queue_out=None,
+                 es=None,
+                 efo_current=None,
+                 efo_uncat=None,
+                 efo_obsolete=None,
+                 hpo_current=None,
+                 hpo_obsolete=None,
+                 mp_current=None,
+                 mp_obsolete=None,
+                 uniprot_current=None,
+                 ensembl_current=None,
+                 ):
+        super(ValidatorProcess, self).__init__(queue_in, redis_path, queue_out)
+        self.queue_in = queue_in
+        self.queue_out = queue_out
         self.es = es
         self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
         self.efo_current = efo_current
@@ -586,49 +510,16 @@ class ValidatorProcess(multiprocessing.Process):
         self.uniprot_current = uniprot_current
         self.ensembl_current = ensembl_current
         self.start_time = time.time()
-        self.input_file_validation_finished = input_file_validation_finished
-        self.input_file_processing_finished = input_file_processing_finished
-        self.input_file_validated_count = input_file_validated_count
-        self.input_file_processed_count = input_file_processed_count
-        self.evidence_loaded_count = evidence_loaded_count
-        self.evidence_validated_count = evidence_validated_count
-        self.start_time = time.time()  # reset timer start
-        self.lock = lock
         self.audit = list()
 
-    def run(self):
-        logger.info("%s started" % self.name)
-        ''' 3 conditions to fullfill to exit the loop:
-            1. make sure that each file has been validated: this is ensured by the last information sent in the queue
-            for every file to be validated
-            2. make sure all evidence strings have been validated, that is the number of evidence strings received is
-               equals to the number of evidence string processed.
-            3. make sure that the producer has finished processing the files
-        '''
-        with Loader(self.es) as es_loader:
-            while not ((self.evidence_loaded_count.value == self.evidence_validated_count.value) and
-                           (self.input_file_processed_count.value == self.input_file_validated_count.value) and
-                           self.input_file_processing_finished.is_set()):
-                # logger.info("%s %i %i"%(self.name,self.evidence_loaded_count.value, self.evidence_validated_count.value ))
-                data = None
-                try:
-                    data = self.input_q.get_nowait()
-                except Queue.Empty:
-                    time.sleep(0.1)
-                    pass
-                if data:
-                    file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
+    def process(self, data):
+        file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
+        self.validate_evidence(file_path, file_version, provider_id, data_source_name, md5_hash, chunk,
+                                   offset, line_buffer, end_of_transmission, logfile=logfile)
 
-                    self.validate_evidence(file_path, file_version, provider_id, data_source_name, md5_hash, chunk,
-                                               offset, line_buffer, end_of_transmission, es_loader, logfile=logfile)
-
-
-
-        self.input_file_validation_finished.set()
-        logger.info("%s finished" % self.name)
 
     def validate_evidence(self, file_path, file_version, provider_id, data_source_name, md5_hash, chunk, offset,
-                          line_buffer, end_of_transmission, es_loader, logfile=None):
+                          line_buffer, end_of_transmission, logfile=None):
         '''
         validate evidence strings from a chunk
         cumulate the logs, acquire a lock,
@@ -642,41 +533,37 @@ class ValidatorProcess(multiprocessing.Process):
             Send a message to the audit trail process with the md5 key of the file
             '''
 
-            self.output_q.put((file_path,
-                               file_version,
-                               provider_id,
-                               data_source_name,
-                               md5_hash,
-                               chunk,
-                               dict(nb_lines=0,
-                                    nb_valid=0,
-                                    nb_efo_invalid=0,
-                                    nb_efo_obsolete=0,
-                                    nb_ensembl_invalid=0,
-                                    nb_ensembl_nonref=0,
-                                    nb_uniprot_invalid=0,
-                                    nb_missing_uniprot_id_xrefs=0,
-                                    nb_uniprot_invalid_mapping=0,
-                                    invalid_diseases={},
-                                    obsolete_diseases={},
-                                    invalid_ensembl_ids={},
-                                    nonref_ensembl_ids={},
-                                    invalid_uniprot_ids={},
-                                    missing_uniprot_id_xrefs={},
-                                    invalid_uniprot_id_mappings={},
-                                    nb_errors=0,
-                                    nb_duplicates=0),
-                               list(),
-                               offset,
-                               len(line_buffer),
-                               logfile,
-                               end_of_transmission))
+            return (file_path,
+                   file_version,
+                   provider_id,
+                   data_source_name,
+                   md5_hash,
+                   chunk,
+                   dict(nb_lines=0,
+                        nb_valid=0,
+                        nb_efo_invalid=0,
+                        nb_efo_obsolete=0,
+                        nb_ensembl_invalid=0,
+                        nb_ensembl_nonref=0,
+                        nb_uniprot_invalid=0,
+                        nb_missing_uniprot_id_xrefs=0,
+                        nb_uniprot_invalid_mapping=0,
+                        invalid_diseases={},
+                        obsolete_diseases={},
+                        invalid_ensembl_ids={},
+                        nonref_ensembl_ids={},
+                        invalid_uniprot_ids={},
+                        missing_uniprot_id_xrefs={},
+                        invalid_uniprot_id_mappings={},
+                        nb_errors=0,
+                        nb_duplicates=0),
+                   list(),
+                   offset,
+                   len(line_buffer),
+                   logfile,
+                   end_of_transmission)
 
-            '''
-            Increment the number of file validated
-            '''
-            with self.lock:
-                self.input_file_validated_count.value += 1
+
         else:
             logging.debug('%s Validating %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
 
@@ -985,62 +872,56 @@ class ValidatorProcess(multiprocessing.Process):
             logging.debug('%s bulk insert complete' % (self.name))
 
             'Inform the audit trailer to generate a report and send an e-mail to the data provider'
-            self.output_q.put((file_path,
-                               file_version,
-                               provider_id,
-                               data_source_name,
-                               md5_hash,
-                               chunk,
-                               dict(nb_lines=lc,
-                                    nb_valid=nb_valid,
-                                    nb_efo_invalid=nb_efo_invalid,
-                                    nb_efo_obsolete=nb_efo_obsolete,
-                                    nb_ensembl_invalid=nb_ensembl_invalid,
-                                    nb_ensembl_nonref=nb_ensembl_nonref,
-                                    nb_uniprot_invalid=nb_uniprot_invalid,
-                                    nb_missing_uniprot_id_xrefs=nb_missing_uniprot_id_xrefs,
-                                    nb_uniprot_invalid_mapping=nb_uniprot_invalid_mapping,
-                                    invalid_diseases=invalid_diseases,
-                                    obsolete_diseases=obsolete_diseases,
-                                    invalid_ensembl_ids=invalid_ensembl_ids,
-                                    nonref_ensembl_ids=nonref_ensembl_ids,
-                                    invalid_uniprot_ids=invalid_uniprot_ids,
-                                    missing_uniprot_id_xrefs=missing_uniprot_id_xrefs,
-                                    invalid_uniprot_id_mappings=invalid_uniprot_id_mappings,
-                                    nb_errors=nb_errors,
-                                    nb_duplicates=nb_duplicates),
-                               audit,
-                               offset,
-                               len(line_buffer),
-                               logfile,
-                               end_of_transmission))
-
-            with self.lock:
-                self.evidence_validated_count.value += len(line_buffer)
-
-        return
+            return (file_path,
+                   file_version,
+                   provider_id,
+                   data_source_name,
+                   md5_hash,
+                   chunk,
+                   dict(nb_lines=lc,
+                        nb_valid=nb_valid,
+                        nb_efo_invalid=nb_efo_invalid,
+                        nb_efo_obsolete=nb_efo_obsolete,
+                        nb_ensembl_invalid=nb_ensembl_invalid,
+                        nb_ensembl_nonref=nb_ensembl_nonref,
+                        nb_uniprot_invalid=nb_uniprot_invalid,
+                        nb_missing_uniprot_id_xrefs=nb_missing_uniprot_id_xrefs,
+                        nb_uniprot_invalid_mapping=nb_uniprot_invalid_mapping,
+                        invalid_diseases=invalid_diseases,
+                        obsolete_diseases=obsolete_diseases,
+                        invalid_ensembl_ids=invalid_ensembl_ids,
+                        nonref_ensembl_ids=nonref_ensembl_ids,
+                        invalid_uniprot_ids=invalid_uniprot_ids,
+                        missing_uniprot_id_xrefs=missing_uniprot_id_xrefs,
+                        invalid_uniprot_id_mappings=invalid_uniprot_id_mappings,
+                        nb_errors=nb_errors,
+                        nb_duplicates=nb_duplicates),
+                   audit,
+                   offset,
+                   len(line_buffer),
+                   logfile,
+                   end_of_transmission)
 
 
-class AuditTrailProcess(multiprocessing.Process):
+
+
+
+class AuditTrailProcess(RedisQueueWorkerProcess):
     def __init__(self,
-                 input_q,
-                 es,
-                 ensembl_current,
-                 uniprot_current,
-                 symbols,
-                 efo_current,
-                 efo_obsolete,
-                 mp_current,
-                 mp_obsolete,
-                 hpo_current,
-                 hpo_obsolete,
-                 input_file_validation_finished,
-                 input_file_auditing_finished,
-                 input_file_validated_count,
-                 input_file_audited_count,
-                 lock):
-        super(AuditTrailProcess, self).__init__()
-        self.input_q = input_q
+                 queue_in,
+                 redis_path,
+                 es=None,
+                 ensembl_current=None,
+                 uniprot_current=None,
+                 symbols=None,
+                 efo_current=None,
+                 efo_obsolete=None,
+                 mp_current=None,
+                 mp_obsolete=None,
+                 hpo_current=None,
+                 hpo_obsolete=None,):
+        super(AuditTrailProcess, self).__init__(queue_in, redis_path )
+        self.queue_in = queue_in
         self.es = es
         self.submission_audit = SubmissionAuditElasticStorage(loader=Loader(es))
         self.ensembl_current = ensembl_current
@@ -1053,34 +934,14 @@ class AuditTrailProcess(multiprocessing.Process):
         self.mp_current = mp_current
         self.mp_obsolete = mp_obsolete
         self.start_time = time.time()
-        self.input_file_auditing_finished = input_file_auditing_finished
-        self.input_file_validation_finished = input_file_validation_finished
-        self.input_file_audited_count = input_file_audited_count
-        self.input_file_validated_count = input_file_validated_count
-        self.start_time = time.time()  # reset timer start
-        self.lock = lock
         self.registry = dict()
 
-    def run(self):
-        logger.info("%s started" % self.name)
-        while not ((self.input_file_audited_count.value == self.input_file_validated_count.value) and
-                       self.input_file_validation_finished.is_set()):
-            # logger.info("%s %i"%(self.name, self.input_file_audited_count.value))
-            time.sleep(1)
-            data = None
-            try:
-                data = self.input_q.get_nowait()
-            except Queue.Empty:
-                pass
-            if data:
-                file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, offset, buffer_size, logfile, end_of_transmission = data
-                self.audit_submission(file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats,
-                                      audit, offset, buffer_size, end_of_transmission, logfile)
+    def process(self, data):
+        file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, offset, buffer_size, \
+        logfile, end_of_transmission = data
+        self.audit_submission(file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats,
+                              audit, offset, buffer_size, end_of_transmission, logfile)
 
-
-
-        self.input_file_auditing_finished.set()
-        logger.info("%s finished" % self.name)
 
     def send_email(self, bSend, provider_id, data_source_name, filename, bValidated, nb_records, errors, when, extra_text, logfile):
         sender = Config.EVIDENCEVALIDATION_SENDER_ACCOUNT
@@ -1560,8 +1421,6 @@ class AuditTrailProcess(multiprocessing.Process):
             '''
             del self.registry[md5_hash]
 
-            with self.lock:
-                self.input_file_audited_count.value += 1
 
         return
 
@@ -1795,12 +1654,13 @@ class SubmissionAuditElasticStorage():
             self.cache = {}
 
 class EvidenceValidationFileChecker():
-    def __init__(self, adapter, es, sparql, chunk_size=1e4):
+    def __init__(self, adapter, es, sparql, r_server, chunk_size=1e4):
         self.adapter = adapter
         self.session = adapter.session
         self.es = es
         self.esquery = ESQuery(self.es)
         self.sparql = sparql
+        self.r_server = r_server
         self.chunk_size = chunk_size
         self.cache = {}
         self.counter = 0
@@ -2228,42 +2088,32 @@ class EvidenceValidationFileChecker():
         self.adapter.close()
 
         'Create queues'
-        file_q = multiprocessing.Queue(maxsize=NB_JSON_FILES)
-        evidence_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS + 1)
-        audit_q = multiprocessing.Queue(maxsize=MAX_NB_EVIDENCE_CHUNKS)
+        file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
+                            max_size=NB_JSON_FILES,
+                            job_timeout=120)
+        evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_evidence_q',
+                            max_size=MAX_NB_EVIDENCE_CHUNKS+1,
+                            job_timeout=120)
+        audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
+                            max_size=MAX_NB_EVIDENCE_CHUNKS+1,
+                            job_timeout=120)
 
-        'Create events'
-        input_file_loading_finished = multiprocessing.Event()
-        input_file_processing_finished = multiprocessing.Event()
-        input_file_validation_finished = multiprocessing.Event()
-        input_file_auditing_finished = multiprocessing.Event()
+        q_reporter = RedisQueueStatusReporter([file_q,
+                                               evidence_q,
+                                               audit_q],
+                                              interval=60)
+        q_reporter.start()
 
-        'Create counters (shared memory objects)'
-        input_file_count = multiprocessing.Value('i', 0)
-        input_file_processed_count = multiprocessing.Value('i', 0)
-        input_file_validated_count = multiprocessing.Value('i', 0)
-        evidence_loaded_count = multiprocessing.Value('i', 0)
-        evidence_validated_count = multiprocessing.Value('i', 0)
-        input_file_audited_count = multiprocessing.Value('i', 0)
-
-        'create locks'
-        file_processing_lock = multiprocessing.Lock()
-        log_file_lock = multiprocessing.Lock()
-        audit_lock = multiprocessing.Lock()
 
         workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
 
+
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
+                                     self.r_server.db,
                                      evidence_q,
                                      self.es,
-                                     input_file_loading_finished,
-                                     input_file_processing_finished,
-                                     input_file_count,
-                                     input_file_processed_count,
-                                     evidence_loaded_count,
-                                     file_processing_lock
-                                     ) for i in range(1)]
+                                     ) for i in range(2)]
         # ) for i in range(2)]
         for w in readers:
             w.start()
@@ -2274,9 +2124,7 @@ class EvidenceValidationFileChecker():
         directory_crawler = DirectoryCrawlerProcess(
                 file_q,
                 self.es,
-                input_file_loading_finished,
-                input_file_count,
-                file_processing_lock)
+                self.r_server)
 
         directory_crawler.run()
 
@@ -2286,6 +2134,7 @@ class EvidenceValidationFileChecker():
         'Start validating the evidence in chunks on the evidence queue'
 
         validators = [ValidatorProcess(evidence_q,
+                                       self.r_server.db,
                                        audit_q,
                                        self.es,
                                        self.efo_current,
@@ -2297,18 +2146,10 @@ class EvidenceValidationFileChecker():
                                        self.mp_obsolete,
                                        self.uniprot_current,
                                        self.ensembl_current,
-                                       input_file_processing_finished,
-                                       input_file_validation_finished,
-                                       input_file_processed_count,
-                                       input_file_validated_count,
-                                       evidence_loaded_count,
-                                       evidence_validated_count,
-                                       log_file_lock
-                                       ) for i in range(workers_number+1)]
+                                       ) for i in range(workers_number)]
         # ) for i in range(2)]
         for w in validators:
             w.start()
-
 
         'Audit the whole process and send e-mails'
         auditor = AuditTrailProcess(
@@ -2323,28 +2164,15 @@ class EvidenceValidationFileChecker():
                 self.hpo_obsolete,
                 self.mp_current,
                 self.mp_obsolete,
-                input_file_validation_finished,
-                input_file_auditing_finished,
-                input_file_validated_count,
-                input_file_audited_count,
-                audit_lock)
+            )
 
         auditor.start()
 
-        '''wait for other processes to finish'''
-        while not input_file_auditing_finished.is_set():
-            time.sleep(1)
-
-
-        for w in readers:
-            if w.is_alive():
-                w.terminate()
+        '''wait for the validator workers to finish'''
 
         for w in validators:
-            if w.is_alive():
-                w.terminate()
+            w.join()
 
-        if auditor.is_alive():
-            auditor.terminate()
+        audit_q.set_submission_finished(self.r_server)
 
         return

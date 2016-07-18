@@ -142,7 +142,7 @@ if __name__ == '__main__':
             socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
             nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
             hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
-            logging.info('Elasticsearch resolved to: %s' % hosts)
+            logging.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
             break
         except socket.gaierror:
             wait_time = 5 * connection_attempt
@@ -253,9 +253,9 @@ if __name__ == '__main__':
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es, sparql).map_genes()
+                EvidenceValidationFileChecker(adapter, es, sparql, r_server).map_genes()
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es, sparql).check_all()
+                EvidenceValidationFileChecker(adapter, es, sparql, r_server).check_all()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
