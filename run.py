@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 
 import sys
 
@@ -135,10 +136,27 @@ if __name__ == '__main__':
     '''sqlalchemy adapter'''
     adapter = Adapter()
     '''init es client'''
-    es = Elasticsearch(Config.ELASTICSEARCH_URL,
+    connection_attempt = 1
+    while 1:
+        try:
+            socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
+            dns_info = socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
+            hosts = [dict(host=i[4][0], port=9200) for i in dns_info]
+            logging.info('Elasticsearch resolved to: %s' % hosts)
+            break
+        except socket.gaierror:
+            wait_time = 5 * connection_attempt
+            logging.warn('Cannot resolve Elasticsearch to ip list. retying in %i' % wait_time)
+            time.sleep(wait_time)
+            if connection_attempt > 5:
+                logging.error('Elasticsearch is not resolvable at %' % Config.ELASTICSEARCH_URL)
+                break
+            connection_attempt+=1
+
+    es = Elasticsearch(hosts = hosts,
                        maxsize=50,
                        timeout=1800,
-                       sniff_on_connection_fail=True,
+                       # sniff_on_connection_fail=True,
                        retry_on_timeout=True,
                        max_retries=10,
                        )
@@ -149,6 +167,8 @@ if __name__ == '__main__':
         time.sleep(wait_time)
         if connection_attempt >5:
             logging.error('Elasticsearch is not reachable at %'%Config.ELASTICSEARCH_URL)
+            break
+        connection_attempt += 1
 
     # es = Elasticsearch(["10.0.0.11:9200"],
     # # sniff before doing anything
