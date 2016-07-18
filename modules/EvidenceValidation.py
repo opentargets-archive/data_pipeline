@@ -2102,7 +2102,7 @@ class EvidenceValidationFileChecker():
                             job_timeout=120)
         audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
-                            job_timeout=120)
+                            job_timeout=1200)
 
         q_reporter = RedisQueueStatusReporter([file_q,
                                                evidence_q,
