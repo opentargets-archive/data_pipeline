@@ -54,10 +54,10 @@ class Config():
             'username': iniparser.get(ENV, 'username'),
             'password': iniparser.get(ENV, 'password'),
             'database': iniparser.get(ENV, 'database')}
-    HPA_NORMAL_TISSUE_URL = 'http://v13.proteinatlas.org/download/normal_tissue.csv.zip'
-    HPA_CANCER_URL = 'http://v13.proteinatlas.org/download/cancer.csv.zip'
-    HPA_SUBCELLULAR_LOCATION_URL = 'http://v13.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'http://v13.proteinatlas.org/download/rna.csv.zip'
+    HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
+    HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
+    HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
+    HPA_RNA_URL = 'http://v15.proteinatlas.org/download/rna.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
