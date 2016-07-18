@@ -1990,7 +1990,7 @@ class EvidenceValidationFileChecker():
                 next_uri = obsolete_classes[next_uri]
             new_label = current[next_uri]
             obsolete[uri] = "Use %s label:%s"%(next_uri, new_label)
-            print "%s %s"%(uri, obsolete[uri])
+            logging.warn("%s %s"%(uri, obsolete[uri]))
 
     def load_hpo(self):
         '''
