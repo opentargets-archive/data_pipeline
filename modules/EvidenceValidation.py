@@ -2154,6 +2154,7 @@ class EvidenceValidationFileChecker():
         'Audit the whole process and send e-mails'
         auditor = AuditTrailProcess(
                 audit_q,
+                self.r_server.db,
                 self.es,
                 self.ensembl_current,
                 self.uniprot_current,
