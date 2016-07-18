@@ -14,7 +14,7 @@ class Config():
 
 
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'07.16'
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
@@ -179,7 +179,7 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION=84
+    ENSEMBL_RELEASE_VERSION=85
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
