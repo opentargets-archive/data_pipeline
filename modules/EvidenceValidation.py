@@ -514,7 +514,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
     def process(self, data):
         file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
-        self.validate_evidence(file_path, file_version, provider_id, data_source_name, md5_hash, chunk,
+        return self.validate_evidence(file_path, file_version, provider_id, data_source_name, md5_hash, chunk,
                                    offset, line_buffer, end_of_transmission, logfile=logfile)
 
 
