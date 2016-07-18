@@ -2,6 +2,8 @@ import logging
 import os
 
 import sys
+
+import time
 from elasticsearch import Elasticsearch
 from SPARQLWrapper import SPARQLWrapper, JSON
 from common import Actions
@@ -118,21 +120,7 @@ if __name__ == '__main__':
                         action="append_const", const=DumpActions.ALL)
     args = parser.parse_args()
 
-    adapter = Adapter()
-    '''init es client'''
-    es = Elasticsearch(Config.ELASTICSEARCH_URL,
-                       maxsize=50,
-                       timeout=1800)
-    # es = Elasticsearch(["10.0.0.11:9200"],
-    # # sniff before doing anything
-    #                     sniff_on_start=True,
-    #                     # refresh nodes after a node fails to respond
-    #                     sniff_on_connection_fail=True,
-    #                     # and also every 60 seconds
-    #                     sniffer_timeout=60)
-    #
-    '''init sparql endpoint client'''
-    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
+    '''logger'''
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -143,7 +131,36 @@ if __name__ == '__main__':
     logging.getLogger('elasticsearch').setLevel(logging.ERROR)
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
-    logger.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
+
+    '''sqlalchemy adapter'''
+    adapter = Adapter()
+    '''init es client'''
+    es = Elasticsearch(Config.ELASTICSEARCH_URL,
+                       maxsize=50,
+                       timeout=1800,
+                       sniff_on_connection_fail=True,
+                       retry_on_timeout=True,
+                       max_retries=10,
+                       )
+    connection_attempt = 1
+    while not es.ping():
+        wait_time = 5*connection_attempt
+        logging.warn('Cannot connect to Elasticsearch retying in %i'%wait_time)
+        time.sleep(wait_time)
+        if connection_attempt >5:
+            logging.error('Elasticsearch is not reachable at %'%Config.ELASTICSEARCH_URL)
+
+    # es = Elasticsearch(["10.0.0.11:9200"],
+    # # sniff before doing anything
+    #                     sniff_on_start=True,
+    #                     # refresh nodes after a node fails to respond
+    #                     sniff_on_connection_fail=True,
+    #                     # and also every 60 seconds
+    #                     sniffer_timeout=60)
+    #
+    '''init sparql endpoint client'''
+    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
+
     if not args.redisperist:
         clear_redislite_db()
     r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
