@@ -140,13 +140,14 @@ if __name__ == '__main__':
     while 1:
         try:
             socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
-            dns_info = socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
-            hosts = [dict(host=i[4][0], port=9200) for i in dns_info]
+            nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
+            hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
             logging.info('Elasticsearch resolved to: %s' % hosts)
             break
         except socket.gaierror:
             wait_time = 5 * connection_attempt
-            logging.warn('Cannot resolve Elasticsearch to ip list. retying in %i' % wait_time)
+            logging.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
+            logging.debug('/etc/hosts file: content: \n%s'%file('/etc/hosts').read())
             time.sleep(wait_time)
             if connection_attempt > 5:
                 logging.error('Elasticsearch is not resolvable at %' % Config.ELASTICSEARCH_URL)
@@ -156,14 +157,14 @@ if __name__ == '__main__':
     es = Elasticsearch(hosts = hosts,
                        maxsize=50,
                        timeout=1800,
-                       # sniff_on_connection_fail=True,
+                       sniff_on_connection_fail=True,
                        retry_on_timeout=True,
                        max_retries=10,
                        )
     connection_attempt = 1
     while not es.ping():
         wait_time = 5*connection_attempt
-        logging.warn('Cannot connect to Elasticsearch retying in %i'%wait_time)
+        logging.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
         time.sleep(wait_time)
         if connection_attempt >5:
             logging.error('Elasticsearch is not reachable at %'%Config.ELASTICSEARCH_URL)
