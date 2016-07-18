@@ -493,8 +493,7 @@ class GeneManager():
 
 
     def _get_hgnc_data_from_json(self):
-        # req = urllib2.Request(HGNC_COMPLETE_SET)
-        req = urllib2.Request(HGNC_COMPLETE_SET_VPN)
+        req = urllib2.Request(Config.HGNC_COMPLETE_SET)
         response = urllib2.urlopen(req)
         # print response.code
         # if response.code == '200':
