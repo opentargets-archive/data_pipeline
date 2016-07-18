@@ -85,6 +85,7 @@ class Config():
     EVIDENCEVALIDATION_SEND_EMAIL = True
     EVIDENCEVALIDATION_SENDER_ACCOUNT = 'no_reply@targetvalidation.org'
     MAILGUN_DOMAIN = "https://api.mailgun.net/v3/mg.targetvalidation.org"
+    MAILGUN_MESSAGES = MAILGUN_DOMAIN+'/messages'
     MAILGUN_API_KEY = "key-b7986f9a29fe234733b0af3b1206b146"
     EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     # Change this if you want to change the list of recipients

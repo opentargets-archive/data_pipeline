@@ -971,9 +971,9 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         text = '\n'.join(text)
         logging.info(text)
         r = requests.post(
-            Config.MAILGUN_DOMAIN,
+            Config.MAILGUN_MESSAGES,
             auth=("api", Config.MAILGUN_API_KEY),
-            files=[(filename+".log", open(logfile)),],
+            files={'file':(filename+".log", open(logfile,'rb'))},
             data={"from": sender,
                   "to": "andreap@ebi.ac.uk",#recipient,
                   "bcc": Config.EVIDENCEVALIDATION_BCC_ACCOUNT,
