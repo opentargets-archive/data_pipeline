@@ -2182,4 +2182,6 @@ class EvidenceValidationFileChecker():
 
         audit_q.set_submission_finished(self.r_server)
 
+        auditor.join()
+
         return
