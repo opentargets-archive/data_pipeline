@@ -1,3 +1,4 @@
+
 import sys
 import httplib
 import time
@@ -32,7 +33,8 @@ __email__ = "gautierk@targetvalidation.org"
 __status__ = "Production"
 
 INTOGEN_RELEASE_DATE = ''
-INTOGEN_FILENAME = 'C:\Users\gk680303\github\data_pipeline\resources\intogen_opentargets.tsv'
+#INTOGEN_FILENAME = 'C:\Users\gk680303\github\data_pipeline\resources\intogen_opentargets.tsv'
+INTOGEN_FILENAME = '/Users/koscieln/Documents/work/gitlab/data_pipeline/resources/intogen_opentargets.tsv'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {
     'A' : 'the gene exhibits several signals of positive selection in the tumor type',
@@ -42,7 +44,8 @@ INTOGEN_SCORE_DOC = {
 INTOGEN_ROLE_MAP = {
     'Act' : 'http://identifiers.org/cttv.activity/gain_of_function',
     'LoF' : 'http://identifiers.org/cttv.activity/loss_of_function',
-    'Ambiguous': 'http://identifiers.org/cttv.activity/unknown'
+    'Ambiguous': 'http://identifiers.org/cttv.activity/unknown',
+    'ambiguous': 'http://identifiers.org/cttv.activity/unknown'
 }
 INTOGEN_TUMOR_TYPE_EFO_MAP = {
     'ALL' : { 'uri' :'http://www.ebi.ac.uk/efo/EFO_0000220', 'label': 'acute lymphoblastic leukemia' },
@@ -52,7 +55,7 @@ INTOGEN_TUMOR_TYPE_EFO_MAP = {
     'CLL' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000095', 'label' : 'chronic lymphocytic leukemia'},
     'CM' : { 'uri': 'http://www.ebi.ac.uk/efo/EFO_0000389', 'label' : 'cutaneous melanoma'},
     'COREAD' : { 'uri': 'http://www.ebi.ac.uk/efo/EFO_0000365', 'label' : 'colorectal adenocarcinoma' },
-    'DLBC': { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000403', 'label' : 'diffuse large B-cell lymphoma' },
+    'DLBCL': { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000403', 'label' : 'diffuse large B-cell lymphoma' },
     'ESCA' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0002916', 'label' : 'esophageal carcinoma' },
     'GBM' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000519', 'label' : 'glioblastoma multiforme' },
     'HC' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000182', 'label' : 'hepatocellular carcinoma' },
@@ -61,14 +64,16 @@ INTOGEN_TUMOR_TYPE_EFO_MAP = {
     'LUAD' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000571', 'label' : 'lung adenocarcinoma' },
     'LUSC' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000708', 'label' : 'squamous cell lung carcinoma' },
     'MB' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0002939', 'label' : 'medulloblastoma' },
+    'MEN' : { 'uri' : 'MEN IS UNKNOWN', 'label' : 'MEN'},
     'MM' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0001378', 'label' : 'multiple myeloma' },
     'NB' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000621', 'label' : 'neuroblastoma' },
     'NSCLC' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0003060' , 'label' : 'non-small cell lung carcinoma' },
     'OV' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0002917', 'label' : 'ovarian serous adenocarcinoma' },
     'PA' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000272', 'label' : 'astrocytoma' },
+    'PIA' : { 'uri' : 'PIA IS UNKNOWN', 'label' : 'PIA'},
     'PAAD' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_1000044', 'label' : 'pancreatic adenocarcinoma' },
     'PRAD' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000673', 'label' : 'prostate adenocarcinoma' },
-    'RCC' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000349', 'label' : 'clear cell renal carcinoma' },
+    'RCCC' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000349', 'label' : 'clear cell renal carcinoma' },
     'SCLC' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000702', 'label' : 'small cell lung carcinoma' },
     'STAD' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000503', 'label' : 'stomach adenocarcinoma' },
     'THCA' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0002892', 'label' : 'thyroid carcinoma' },
@@ -84,7 +89,7 @@ INTOGEN_TUMOR_TYPE_MAP = {
     'CLL' : 'chronic lymphocytic leukemia',
     'CM' : 'cutaneous melanoma',
     'COREAD' : 'colorectal adenocarcinoma',
-    'DLBC': 'diffuse large B cell lymphoma',
+    'DLBCL': 'diffuse large B cell lymphoma',
     'ESCA' : 'esophageal carcinoma',
     'GBM' : 'glioblastoma multiforme',
     'HC' : 'hepatocarcinoma',
@@ -93,14 +98,16 @@ INTOGEN_TUMOR_TYPE_MAP = {
     'LUAD' : 'lung adenocarcinoma',
     'LUSC' : 'lung squamous cell carcinoma',
     'MB' : 'medulloblastoma',
+    'MEN' : 'MEN Tumor Type',
     'MM' : 'multiple myeloma',
     'NB' : 'neuroblastoma',
     'NSCLC' : 'non small cell lung carcinoma',
     'OV' : 'serous ovarian adenocarcinoma',
     'PA' : 'pylocytic astrocytoma',
+    'PIA' : 'UNKNOWN PIA',
     'PAAD' : 'pancreas adenocarcinoma',
     'PRAD' : 'prostate adenocarcinoma',
-    'RCC' : 'renal clear cell carcinoma',
+    'RCCC' : 'renal clear cell carcinoma',
     'SCLC' : 'small cell lung carcinoma',
     'STAD' : 'stomach adenocarcinoma',
     'THCA' : 'thyroid carcinoma',
@@ -115,7 +122,7 @@ class IntOGen():
     def __init__(self, es, sparql):
         self.es = es
         self.sparql = sparql
-        self.ev = EvidenceValidationFileChecker(self.adapter, self.es, self.sparql)
+        self.evidence_strings = list()
         self.cache = {}
         self.counter = 0
         self.mmGenes = {}
@@ -133,7 +140,11 @@ class IntOGen():
         records = []
 
         now = datetime.datetime.now()
-        provenance_type= evidence_core.BaseProvenance_Type(database=evidence_core.BaseDatabase(id="IntOGen", version='current'))
+        provenance_type = evidence_core.BaseProvenance_Type(database=evidence_core.BaseDatabase(id="IntOGen", version='current'))
+        error = provenance_type.validate(logging)
+        if error > 0:
+            logging.error(provenance_type.to_JSON(indentation=4))
+            sys.exit(1)
 
         with open(INTOGEN_FILENAME, 'r') as intogen_file:
             n = 0
@@ -141,7 +152,7 @@ class IntOGen():
                 n +=1
                 if n>1:
 
-                    (Symbol,Ensg,Tumor_Type,Evidence,Role) = tuple(line.split('\t'))
+                    (Symbol,Ensg,Tumor_Type,Evidence,Role) = tuple(line.rstrip().split('\t'))
 
                     resource_score = association_score.Probability(type="probability", method= association_score.Method(description ="Pharmaprojects database"), value=INTOGEN_SCORE_MAP[Evidence])
 
@@ -157,17 +168,18 @@ class IntOGen():
                     evidenceString.unique_association_fields['tumor_type'] = INTOGEN_TUMOR_TYPE_MAP[Tumor_Type]
                     evidenceString.unique_association_fields['evidence_level'] = Evidence
                     evidenceString.unique_association_fields['role'] = Role
-                    evidenceString.unique_association_fields['role_description'] = INTOGEN_SCORE_DOC[Role]
+                    evidenceString.unique_association_fields['role_description'] = INTOGEN_ROLE_MAP[Role]
                     evidenceString.unique_association_fields['method'] = 'OncodriveROLE'
                     evidenceString.unique_association_fields['method_description'] = 'Classifying cancer driver genes into Loss of Function and Activating roles'
 
                     target_type = 'http://identifiers.org/cttv.target/gene_evidence'
 
-                    ''' target information '''
+                    ''' target information (root.target.target_type is required) '''
                     evidenceString.target = bioentity.Target(
                                             id=["http://identifiers.org/ensembl/{0}".format(Ensg)],
                                             target_name = Symbol,
                                             activity=INTOGEN_ROLE_MAP[Role],
+                                            target_type='http://identifiers.org/cttv.target/gene_evidence'
                                             )
 
                     ''' disease information '''
@@ -181,8 +193,8 @@ class IntOGen():
                     evidenceString.evidence.date_asserted = now.isoformat()
                     evidenceString.evidence.is_associated = True
                     evidenceString.evidence.evidence_codes = [ "http://purl.obolibrary.org/obo/ECO_0000053" ]
-                    evidenceString.evidence.provenance_type = provenance_type,
-                    evidenceString.evidence.resource_score = resource_score,
+                    evidenceString.evidence.provenance_type = provenance_type
+                    evidenceString.evidence.resource_score = resource_score
 
                     linkout = evidence_linkout.Linkout(
                         url = 'https://www.intogen.org/search?gene=%s&cancer=%s'%(Symbol, Tumor_Type),
@@ -200,7 +212,7 @@ class IntOGen():
 
                     error = evidenceString.validate(logging)
                     if error > 0:
-                        logging.error(evidenceString.to_JSON(indentation=4))
+                        logging.error(evidenceString.to_JSON())
                         sys.exit(1)
 
                     self.evidence_strings.append(evidenceString)
