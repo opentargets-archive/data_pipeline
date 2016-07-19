@@ -1,7 +1,10 @@
 import logging
 import os
+import socket
 
 import sys
+
+import time
 from elasticsearch import Elasticsearch
 from SPARQLWrapper import SPARQLWrapper, JSON
 from common import Actions
@@ -118,21 +121,7 @@ if __name__ == '__main__':
                         action="append_const", const=DumpActions.ALL)
     args = parser.parse_args()
 
-    adapter = Adapter()
-    '''init es client'''
-    es = Elasticsearch(Config.ELASTICSEARCH_URL,
-                       maxsize=50,
-                       timeout=1800)
-    # es = Elasticsearch(["10.0.0.11:9200"],
-    # # sniff before doing anything
-    #                     sniff_on_start=True,
-    #                     # refresh nodes after a node fails to respond
-    #                     sniff_on_connection_fail=True,
-    #                     # and also every 60 seconds
-    #                     sniffer_timeout=60)
-    #
-    '''init sparql endpoint client'''
-    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
+    '''logger'''
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -143,7 +132,56 @@ if __name__ == '__main__':
     logging.getLogger('elasticsearch').setLevel(logging.ERROR)
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
-    logger.info('pointing to elasticsearch at:'+Config.ELASTICSEARCH_URL)
+
+    '''sqlalchemy adapter'''
+    adapter = Adapter()
+    '''init es client'''
+    connection_attempt = 1
+    while 1:
+        try:
+            socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
+            nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
+            hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
+            logging.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
+            break
+        except socket.gaierror:
+            wait_time = 5 * connection_attempt
+            logging.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
+            logging.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
+            time.sleep(wait_time)
+            if connection_attempt > 5:
+                logging.error('Elasticsearch is not resolvable at %' % Config.ELASTICSEARCH_URL)
+                break
+            connection_attempt+=1
+
+    es = Elasticsearch(hosts = hosts,
+                       maxsize=50,
+                       timeout=1800,
+                       sniff_on_connection_fail=True,
+                       retry_on_timeout=True,
+                       max_retries=10,
+                       )
+    connection_attempt = 1
+    while not es.ping():
+        wait_time = 5*connection_attempt
+        logging.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
+        time.sleep(wait_time)
+        if connection_attempt >5:
+            logging.error('Elasticsearch is not reachable at %'%Config.ELASTICSEARCH_URL)
+            break
+        connection_attempt += 1
+
+    # es = Elasticsearch(["10.0.0.11:9200"],
+    # # sniff before doing anything
+    #                     sniff_on_start=True,
+    #                     # refresh nodes after a node fails to respond
+    #                     sniff_on_connection_fail=True,
+    #                     # and also every 60 seconds
+    #                     sniffer_timeout=60)
+    #
+    '''init sparql endpoint client'''
+    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
+
     if not args.redisperist:
         clear_redislite_db()
     r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
@@ -215,9 +253,9 @@ if __name__ == '__main__':
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es, sparql).map_genes()
+                EvidenceValidationFileChecker(adapter, es, sparql, r_server).map_genes()
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es, sparql).check_all()
+                EvidenceValidationFileChecker(adapter, es, sparql, r_server).check_all()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:

@@ -202,7 +202,7 @@ class RedisQueue(object):
                 if queue_size >= self.max_queue_size:
                     queue_size_status = "full"
                 else:
-                    queue_size_status = 'occepting jobs'
+                    queue_size_status = 'accepting jobs'
             lines.append('Queue size: %i | %s'%(queue_size, queue_size_status))
             lines.append('Jobs being processed: %i'%len(self.get_processing_jobs(r_server)))
             timedout_jobs = self.get_timedout_jobs(r_server)

@@ -12,11 +12,15 @@ iniparser.read('db.ini')
 
 class Config():
 
+    ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
+    ONTOLOGY_CONFIG.read('ontology_config.ini')
 
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'07.16'
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
+    ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
+    ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -54,10 +58,12 @@ class Config():
             'username': iniparser.get(ENV, 'username'),
             'password': iniparser.get(ENV, 'password'),
             'database': iniparser.get(ENV, 'database')}
-    HPA_NORMAL_TISSUE_URL = 'http://v13.proteinatlas.org/download/normal_tissue.csv.zip'
-    HPA_CANCER_URL = 'http://v13.proteinatlas.org/download/cancer.csv.zip'
-    HPA_SUBCELLULAR_LOCATION_URL = 'http://v13.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'http://v13.proteinatlas.org/download/rna.csv.zip'
+    # HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
+    HGNC_COMPLETE_SET = 'https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer'
+    HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
+    HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
+    HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
+    HPA_RNA_URL = 'http://v15.proteinatlas.org/download/rna.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
@@ -79,6 +85,7 @@ class Config():
     EVIDENCEVALIDATION_SEND_EMAIL = True
     EVIDENCEVALIDATION_SENDER_ACCOUNT = 'no_reply@targetvalidation.org'
     MAILGUN_DOMAIN = "https://api.mailgun.net/v3/mg.targetvalidation.org"
+    MAILGUN_MESSAGES = MAILGUN_DOMAIN+'/messages'
     MAILGUN_API_KEY = "key-b7986f9a29fe234733b0af3b1206b146"
     EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     # Change this if you want to change the list of recipients
@@ -96,7 +103,7 @@ class Config():
     EVIDENCEVALIDATION_FTP_HOST= dict( host = '192.168.1.150',
                                        port = 22)
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
-    # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
     #EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
@@ -112,7 +119,7 @@ class Config():
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
-    MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
+    MOUSEMODELS_CACHE_DIRECTORY = '~/.phenodigmcache'
 
     DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
     DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
@@ -125,7 +132,7 @@ class Config():
                                                 uniprot = 'CTTV011_UniProt',
                                                 eva = 'CTTV012_Variation',
                                                 # gwas_ibd = 'CTTV018_IBD_GWAS',
-                                                phenodigm = 'CTTV_External_MouseModels',
+                                                phenodigm = 'CTTV001_External_MouseModels',
                                                 cancer_gene_census = 'CTTV007_Cancer_Gene_Census',
                                                 europepmc = 'CTTV025_Literature',
                                                 disgenet = 'CTTV_External_DisGeNet',
@@ -139,7 +146,7 @@ class Config():
                                                          cttv011 = 'uniprot',
                                                          cttv012 = 'eva',
                                                          cttv018 = 'gwas_ibd',
-                                                         cttv_external_mousemodels = 'phenodigm',
+                                                         cttv001 = 'phenodigm',
                                                          cttv007 = 'cancer_gene_census',
                                                          cttv025 = 'europepmc',
                                                          cttv005 = 'rare2common',
@@ -179,7 +186,7 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION=83
+    ENSEMBL_RELEASE_VERSION=84
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
@@ -282,6 +289,18 @@ def _get_evidence_string_generic_mapping():
                              # },
                          },
                      }
+                },
+                "literature": {
+                    "properties": {
+                        "references": {
+                            "properties": {
+                                "lit_id": {
+                                    "type": "string",
+                                    "index": "not_analyzed",
+                                }
+                            }
+                        }
+                    }
                 }
             },
         "dynamic_templates" : [
@@ -764,6 +783,16 @@ class ElasticSearchConfiguration():
     }
 
     validated_data_mapping = {
+                "dynamic_templates": [
+                    {
+                        "evidence_string_template": {
+                            "path_match": "evidence_string.*",
+                            "mapping": {
+                                "index": "no"
+                            }
+                        }
+                    },
+                ],
                 "properties" : {
                     "uniq_assoc_fields_hashdig" : {
                         "type" : "string",
@@ -773,10 +802,6 @@ class ElasticSearchConfiguration():
                         "type" : "string",
                         "index" : "not_analyzed",
                         },
-                    "evidence_string" : {
-                        # "type" : "object",
-                        "index": "no",
-                    },
                     "target_id" : {
                         "type" : "string",
                         "index" : "not_analyzed"
@@ -804,16 +829,13 @@ class ElasticSearchConfiguration():
                 }
     }
 
-    evidence_mappings = {}
-    for db in available_databases:
-        evidence_mappings[Config.ELASTICSEARCH_DATA_DOC_NAME+'-'+db]= _get_evidence_string_generic_mapping()
 
     evidence_data_mapping = { "settings": {"number_of_shards" : evidence_shard_number,
                                            "number_of_replicas" : evidence_replicas_number,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
-                              "mappings": evidence_mappings,
+                              "mappings": {"_default_": _get_evidence_string_generic_mapping()},
                             }
 
     relation_mappings = {}
@@ -830,17 +852,16 @@ class ElasticSearchConfiguration():
                              "mappings": relation_mappings,
                              }
 
-    validated_data_datasource_mappings = {}
-    for db in available_databases:
-        validated_data_datasource_mappings[db]= validated_data_mapping
+
 
     validated_data_settings_and_mappings = { "settings": {"number_of_shards" : 1,
                                            "number_of_replicas" : 1,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
-                               "mappings": validated_data_datasource_mappings,
-    }
+                               "mappings": {"_default_": validated_data_mapping},
+
+                               }
 
     submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : 1,
                                            "number_of_replicas" : 1,
