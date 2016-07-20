@@ -334,18 +334,15 @@ class DirectoryCrawlerProcess():
 
         existing_submission= self.submission_audit.get_submission_md5(md5=md5_hash)
 
-        # if existing_submission:
-        #     md5 = existing_submission["_source"]["md5"]
-        #     if md5 == md5_hash:
-        #             logging.info('%s == %s' % (md5, md5_hash))
-        #             logging.info('%s file already recorded. Won\'t parse' % file_path)
-        #             ''' should be false, set to true if you want to parse anyway '''
-        #             validate = False
-        #     else:
-        #         logging.info('%s != %s' % (md5, md5_hash))
-        #         validate = True
-        # else:
-        #     validate = True
+        if existing_submission:
+            md5 = existing_submission["_source"]["md5"]
+            if md5 == md5_hash:
+                    logging.info('%s file already recorded. Won\'t parse' % file_path)
+                    ''' should be false, set to true if you want to parse anyway '''
+                    validate = False
+            else:
+                logging.info('file recorded with a different hash %s, revalidatiing.' % (md5))
+                validate = True
         logging.info('validate for file %s %r' % (file_version,validate))
 
         if validate == True:
