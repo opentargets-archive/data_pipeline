@@ -35,6 +35,7 @@ __status__ = "Production"
 INTOGEN_RELEASE_DATE = ''
 #INTOGEN_FILENAME = 'C:\Users\gk680303\github\data_pipeline\resources\intogen_opentargets.tsv'
 INTOGEN_FILENAME = '/Users/koscieln/Documents/work/gitlab/data_pipeline/resources/intogen_opentargets.tsv'
+INTOGEN_EVIDENCE_FILENAME = '/Users/koscieln/Documents/work/gitlab/data_pipeline/resources/cttv001_external_intogen-19-07-2016.json'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {
     'A' : 'the gene exhibits several signals of positive selection in the tumor type',
@@ -64,13 +65,12 @@ INTOGEN_TUMOR_TYPE_EFO_MAP = {
     'LUAD' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000571', 'label' : 'lung adenocarcinoma' },
     'LUSC' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000708', 'label' : 'squamous cell lung carcinoma' },
     'MB' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0002939', 'label' : 'medulloblastoma' },
-    'MEN' : { 'uri' : 'MEN IS UNKNOWN', 'label' : 'MEN'},
+    'MEN' : { 'uri' : 'http://purl.obolibrary.org/obo/HP_0002858', 'label' : 'Meningioma' },
     'MM' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0001378', 'label' : 'multiple myeloma' },
     'NB' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000621', 'label' : 'neuroblastoma' },
     'NSCLC' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0003060' , 'label' : 'non-small cell lung carcinoma' },
     'OV' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0002917', 'label' : 'ovarian serous adenocarcinoma' },
-    'PA' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000272', 'label' : 'astrocytoma' },
-    'PIA' : { 'uri' : 'PIA IS UNKNOWN', 'label' : 'PIA'},
+    'PIA' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000272', 'label' : 'astrocytoma' },
     'PAAD' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_1000044', 'label' : 'pancreatic adenocarcinoma' },
     'PRAD' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000673', 'label' : 'prostate adenocarcinoma' },
     'RCCC' : { 'uri' : 'http://www.ebi.ac.uk/efo/EFO_0000349', 'label' : 'clear cell renal carcinoma' },
@@ -98,13 +98,12 @@ INTOGEN_TUMOR_TYPE_MAP = {
     'LUAD' : 'lung adenocarcinoma',
     'LUSC' : 'lung squamous cell carcinoma',
     'MB' : 'medulloblastoma',
-    'MEN' : 'MEN Tumor Type',
+    'MEN' : 'meningioma',
     'MM' : 'multiple myeloma',
     'NB' : 'neuroblastoma',
     'NSCLC' : 'non small cell lung carcinoma',
     'OV' : 'serous ovarian adenocarcinoma',
-    'PA' : 'pylocytic astrocytoma',
-    'PIA' : 'UNKNOWN PIA',
+    'PIA' : 'pylocytic astrocytoma',
     'PAAD' : 'pancreas adenocarcinoma',
     'PRAD' : 'prostate adenocarcinoma',
     'RCCC' : 'renal clear cell carcinoma',
@@ -135,18 +134,28 @@ class IntOGen():
         self.diseases = {}
         self.hashkeys = {}
 
-    def read_intogen(self):
+    def process_intogen(self, infile=INTOGEN_FILENAME, outfile=INTOGEN_EVIDENCE_FILENAME):
+        self.read_intogen(filename=infile)
+        self.write_evidence_strings(filename=outfile)
+
+    def read_intogen(self, filename=INTOGEN_FILENAME):
 
         records = []
 
-        now = datetime.datetime.now()
-        provenance_type = evidence_core.BaseProvenance_Type(database=evidence_core.BaseDatabase(id="IntOGen", version='current'))
+        # the database was created in 2014
+        #now = datetime.datetime.now()
+        now = datetime.datetime(2014, 12, 1, 8, 30)
+        provenance_type = evidence_core.BaseProvenance_Type(
+            database=evidence_core.BaseDatabase(
+                id="IntOGen Cancer Drivers Database",
+                version='2014.12',
+                dbxref=evidence_core.BaseDbxref(url="https://www.intogen.org/search", id="IntOGen Cancer Drivers Database", version="2014.12")))
         error = provenance_type.validate(logging)
         if error > 0:
             logging.error(provenance_type.to_JSON(indentation=4))
             sys.exit(1)
 
-        with open(INTOGEN_FILENAME, 'r') as intogen_file:
+        with open(filename, 'r') as intogen_file:
             n = 0
             for line in intogen_file:
                 n +=1
@@ -154,7 +163,12 @@ class IntOGen():
 
                     (Symbol,Ensg,Tumor_Type,Evidence,Role) = tuple(line.rstrip().split('\t'))
 
-                    resource_score = association_score.Probability(type="probability", method= association_score.Method(description ="Pharmaprojects database"), value=INTOGEN_SCORE_MAP[Evidence])
+                    resource_score = association_score.Probability(
+                        type="probability",
+                        method= association_score.Method(
+                            description ="IntOGen Driver identification methods as described in Rubio-Perez, C., Tamborero, D., Schroeder, MP., Antolin, AA., Deu-Pons,J., Perez-Llamas, C., Mestres, J., Gonzalez-Perez, A., Lopez-Bigas, N. In silico prescription of anticancer drugs to cohorts of 28 tumor types reveals novel targeting opportunities. Cancer Cell 27 (2015), pp. 382-396",                            reference = "http://europepmc.org/abstract/MED/25759023",
+                            url = "https://www.intogen.org/about"),
+                        value=INTOGEN_SCORE_MAP[Evidence])
 
                     evidenceString = cttv.Literature_Curated()
                     evidenceString.validated_against_schema_version = '1.2.2'
@@ -162,7 +176,7 @@ class IntOGen():
                     evidenceString.type = "somatic_mutation"
                     evidenceString.sourceID = "intogen"
                     evidenceString.unique_association_fields = {}
-                    evidenceString.unique_association_fields['projectName'] = 'IntOGen'
+                    evidenceString.unique_association_fields['projectName'] = 'IntOGen Cancer Drivers Database'
                     evidenceString.unique_association_fields['symbol'] = Symbol
                     evidenceString.unique_association_fields['tumor_type_acronym'] = Tumor_Type
                     evidenceString.unique_association_fields['tumor_type'] = INTOGEN_TUMOR_TYPE_MAP[Tumor_Type]
@@ -218,10 +232,27 @@ class IntOGen():
                     self.evidence_strings.append(evidenceString)
 
 
-            logging.info(n)
-
+            logging.info("%s evidence parsed"%(n-1))
+            logging.info("%s evidence created"%len(self.evidence_strings))
 
         intogen_file.close()
+
+    def write_evidence_strings(self, filename=INTOGEN_EVIDENCE_FILENAME):
+        logging.info("Writing IntOGen evidence strings")
+        with open(filename, 'w') as tp_file:
+            n = 0
+            for evidence_string in self.evidence_strings:
+                n+=1
+                logging.info(evidence_string.disease.id[0])
+                # get max_phase_for_all_diseases
+                error = evidence_string.validate(logging)
+                if error == 0:
+                    tp_file.write(evidence_string.to_JSON(indentation=None)+"\n")
+                else:
+                    logging.error("REPORTING ERROR %i" % n)
+                    logging.error(evidence_string.to_JSON(indentation=4))
+                    #sys.exit(1)
+        tp_file.close()
 
 def main():
 

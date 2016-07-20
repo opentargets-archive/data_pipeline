@@ -245,7 +245,7 @@ if __name__ == '__main__':
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
-                IntOGen(es, sparql).read_intogen()
+                IntOGen(es, sparql).process_intogen()
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
