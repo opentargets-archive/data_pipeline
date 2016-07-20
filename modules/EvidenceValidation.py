@@ -283,7 +283,7 @@ class DirectoryCrawlerProcess():
                     if u in Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED:
                         data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[u]
                     else:
-                        data_source_name  = latest_file.split('-')[0].replace(u+'_','')
+                        data_source_name  = file_version.split('-')[0].replace(u+'_','')
                     logging.info(data_source_name)
                     logfile = os.path.join('/tmp', file_version+ ".log")
                     logging.info("%s checking file: %s" % (self.__class__.__name__, file_version))

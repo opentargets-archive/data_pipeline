@@ -209,8 +209,9 @@ class Loader():
                     logging.exception("push to elasticsearch failed for chunk, retrying...")
                     break
                 else:
-                    logging.error("push to elasticsearch failed for chunk, retrying in 30s...")
-                    time.sleep(30)
+                    time_to_wait = 5*retry
+                    logging.error("push to elasticsearch failed for chunk, retrying in %is..."%time_to_wait)
+                    time.sleep(time_to_wait)
         self.cache = []
 
 
