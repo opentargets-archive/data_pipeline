@@ -1184,9 +1184,10 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             '''
             logging.debug("Count nb of inserted documents")
             nb_documents = 0
-            if self.es.indices.exists(Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)):
+            versioned_index = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)
+            if self.es.indices.exists(versioned_index):
                 search = self.es.search(
-                        index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
+                        index=versioned_index,
                         doc_type=data_source_name,
                         body='{ "query": { "match_all": {} } }',
                         search_type='count'
@@ -1204,55 +1205,57 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             '''
 
             logging.debug("Get top 20 targets")
-            search = self.es.search(
-                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
-                    doc_type=data_source_name,
-                    body=TOP_20_TARGETS_QUERY,
-            )
+            if self.es.indices.exists(versioned_index):
+                search = self.es.search(
+                        index=versioned_index,
+                        doc_type=data_source_name,
+                        body=TOP_20_TARGETS_QUERY,
+                )
 
-            if search:
-                text.append("Top %i targets:" % Config.EVIDENCEVALIDATION_NB_TOP_TARGETS)
-                for top_targets in search['aggregations']['group_by_targets']['buckets']:
-                    id = top_targets['key']
-                    doc_count = top_targets['doc_count']
-                    id_text = None
-                    symbol = None
-                    # uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
-                    ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', id)
-                    # uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
-                    if ensemblMatch:
-                        ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
-                        id_text = self.get_reference_gene_from_Ensembl(ensembl_id)
-                        symbol = self.ensembl_current[ensembl_id]['display_name']
-                    # elif uniprotMatch:
-                    #    uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                    #    id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
-                    text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(id, doc_count, doc_count * 100.0 / nb_documents,
-                                                                   id_text))
-                text.append("")
+                if search['hits']['total']:
+                    text.append("Top %i targets:" % Config.EVIDENCEVALIDATION_NB_TOP_TARGETS)
+                    for top_targets in search['aggregations']['group_by_targets']['buckets']:
+                        id = top_targets['key']
+                        doc_count = top_targets['doc_count']
+                        id_text = None
+                        symbol = None
+                        # uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
+                        ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', id)
+                        # uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
+                        if ensemblMatch:
+                            ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
+                            id_text = self.get_reference_gene_from_Ensembl(ensembl_id)
+                            symbol = self.ensembl_current[ensembl_id]['display_name']
+                        # elif uniprotMatch:
+                        #    uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
+                        #    id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
+                        text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(id, doc_count, doc_count * 100.0 / nb_documents,
+                                                                       id_text))
+                    text.append("")
 
-                # logging.info(json.dumps(top_target))
+                    # logging.info(json.dumps(top_target))
 
             logging.debug("Get top 20 diseases")
-            search = self.es.search(
-                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
-                    doc_type=data_source_name,
-                    body=TOP_20_DISEASES_QUERY,
-            )
+            if self.es.indices.exists(versioned_index):
+                search = self.es.search(
+                        index=versioned_index,
+                        doc_type=data_source_name,
+                        body=TOP_20_DISEASES_QUERY,
+                )
 
-            if search:
-                text.append("Top %i diseases:" % (Config.EVIDENCEVALIDATION_NB_TOP_DISEASES))
-                for top_diseases in search['aggregations']['group_by_diseases']['buckets']:
-                    # logging.info(json.dumps(result))
-                    disease = top_diseases['key']
-                    doc_count = top_diseases['doc_count']
-                    if top_diseases['key'] in self.efo_current:
-                        text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(disease, doc_count,
-                                                                       doc_count * 100.0 / nb_documents,
-                                                                       self.efo_current[disease]))
-                    else:
-                        text.append("\t-{0}:\t{1} ({2:.2f}%)".format(disease, doc_count, doc_count * 100.0 / nb_documents))
-                text.append("")
+                if search['hits']['total']:
+                    text.append("Top %i diseases:" % (Config.EVIDENCEVALIDATION_NB_TOP_DISEASES))
+                    for top_diseases in search['aggregations']['group_by_diseases']['buckets']:
+                        # logging.info(json.dumps(result))
+                        disease = top_diseases['key']
+                        doc_count = top_diseases['doc_count']
+                        if top_diseases['key'] in self.efo_current:
+                            text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(disease, doc_count,
+                                                                           doc_count * 100.0 / nb_documents,
+                                                                           self.efo_current[disease]))
+                        else:
+                            text.append("\t-{0}:\t{1} ({2:.2f}%)".format(disease, doc_count, doc_count * 100.0 / nb_documents))
+                    text.append("")
 
             # report invalid/obsolete EFO term
             logging.debug("report invalid EFO term")
