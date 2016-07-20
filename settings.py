@@ -71,9 +71,6 @@ class Config():
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
     EVIDENCEVALIDATION_SCHEMA = "1.2.2"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
-    # path to the FTP files on the processing machine
-    EVIDENCEVALIDATION_FTP_SUBMISSION_PATH = '/Users/koscieln/Documents/data/ftp' #'/opt/share/data/ftp' # '/home/gk680303/windows/data/ftp',
-    EVIDENCEVALIDATION_FILENAME_REGEX = '^(cttv[0-9]{3}|cttv_external_mousemodels|cttv006_Networks_Reactome)\-\d{2}\-\d{2}\-\d{4}\.json\.gz$'
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
@@ -90,7 +87,7 @@ class Config():
     EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'mmaguire@ebi.ac.uk', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'zs1@sanger.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
@@ -125,20 +122,6 @@ class Config():
     DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
                                                         #phenodigm=dict(min=0.4, max= 1),
                                                         )
-    DATASOURCE_INTERNAL_NAME_TRANSLATION = dict(reactome = 'CTTV006_Networks_Reactome',
-                                                intact = 'CTTV006_Networks_IntAct',
-                                                chembl = 'CTTV008_ChEMBL',
-                                                gwas_catalog = 'CTTV009_GWAS_Catalog',
-                                                uniprot = 'CTTV011_UniProt',
-                                                eva = 'CTTV012_Variation',
-                                                # gwas_ibd = 'CTTV018_IBD_GWAS',
-                                                phenodigm = 'CTTV001_External_MouseModels',
-                                                cancer_gene_census = 'CTTV007_Cancer_Gene_Census',
-                                                europepmc = 'CTTV025_Literature',
-                                                disgenet = 'CTTV_External_DisGeNet',
-                                                rare2common = 'CTTV005_Rare2Common',
-                                                expression_atlas = 'CTTV010_Tissue_Specificity'
-                                                )
 
     DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(cttv006 = 'reactome',
                                                          cttv008 = 'chembl',
@@ -146,7 +129,6 @@ class Config():
                                                          cttv011 = 'uniprot',
                                                          cttv012 = 'eva',
                                                          cttv018 = 'gwas_ibd',
-                                                         cttv001 = 'phenodigm',
                                                          cttv007 = 'cancer_gene_census',
                                                          cttv025 = 'europepmc',
                                                          cttv005 = 'rare2common',
@@ -166,6 +148,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['europepmc'] = 'literature'
     DATASOURCE_TO_DATATYPE_MAPPING['disgenet'] = 'literature'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")

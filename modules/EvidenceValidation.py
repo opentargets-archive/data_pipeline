@@ -280,7 +280,10 @@ class DirectoryCrawlerProcess():
                     file_version = self._remote_filenames[u]['file_version']
                     logging.info(latest_file)
 
-                    data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[u]
+                    if u in Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED:
+                        data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[u]
+                    else:
+                        data_source_name  = latest_file.split('-')[0].replace(u+'_','')
                     logging.info(data_source_name)
                     logfile = os.path.join('/tmp', file_version+ ".log")
                     logging.info("%s checking file: %s" % (self.__class__.__name__, file_version))
@@ -1183,15 +1186,17 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             Count nb of documents
             '''
             logging.debug("Count nb of inserted documents")
-            search = self.es.search(
-                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
-                    doc_type=data_source_name,
-                    body='{ "query": { "match_all": {} } }',
-                    search_type='count'
-            )
+            nb_documents = 0
+            if self.es.indices.exists(Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)):
+                search = self.es.search(
+                        index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name),
+                        doc_type=data_source_name,
+                        body='{ "query": { "match_all": {} } }',
+                        search_type='count'
+                )
 
-            # {"hits": {"hits": [], "total": 9468, "max_score": 0.0}, "_shards": {"successful": 3, "failed": 0, "total": 3}, "took": 3, "timed_out": false}
-            nb_documents = search['hits']['total']
+                # {"hits": {"hits": [], "total": 9468, "max_score": 0.0}, "_shards": {"successful": 3, "failed": 0, "total": 3}, "took": 3, "timed_out": false}
+                nb_documents = search['hits']['total']
             if nb_documents == 0:
                 nb_documents = 1
 
