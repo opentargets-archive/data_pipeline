@@ -4,7 +4,7 @@ import sys
 reload(sys);
 sys.setdefaultencoding("utf8");
 import gzip
-import cttv.model.core as cttv
+import opentargets.model.core as opentargets
 import logging
 import json
 from common import Actions
@@ -301,7 +301,7 @@ class PhenotypeSlim():
 
         for line in fh:
             python_raw = json.loads(line)
-            obj = cttv.Drug.fromMap(python_raw)
+            obj = opentargets.Drug.fromMap(python_raw)
             if obj.disease.id:
                 for id in obj.disease.id:
                     if re.match('http://purl.obolibrary.org/obo/HP_\d+', id):
