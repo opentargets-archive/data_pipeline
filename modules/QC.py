@@ -6,6 +6,7 @@ from pprint import pprint
 from elasticsearch import helpers
 
 from common import Actions
+from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from settings import Config
 
@@ -39,7 +40,7 @@ class QCRunner(object):
                                     },
                                     scroll='1h',
                                     doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                    index=Config().get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+                                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                     timeout="10m",
                                     ):
             c+=1
@@ -79,7 +80,7 @@ class QCRunner(object):
                                            'size': 1000,
                                     },
                                     scroll = '1h',
-                                    index = Config().get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*'),
+                                    index = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*'),
                                     timeout = 60*10,
                                     ):
             count [ev_hit['_source']['sourceID']]+=1
