@@ -28,7 +28,7 @@ from common.PGAdapter import *
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from common.UniprotIO import UniprotIterator, Parser
 import opentargets.model.core as opentargets
-import opentargets.model.flatten as flat
+from  common.EvidenceJsonUtils import DatatStructureFlattener
 from settings import Config, ElasticSearchConfiguration
 import hashlib
 from lxml.etree import tostring
@@ -669,7 +669,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
                             # flatten
                             uniq_elements = obj.unique_association_fields
-                            uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
+                            uniq_elements_flat = DatatStructureFlattener(uniq_elements)
                             uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
 
                             'Validate evidence string'
@@ -812,7 +812,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                 # logger.info("Add evidence for %s %s " %(target_id, disease_id))
                                 # flatten data structure
                                 # logging.info('%s Adding to chunk %s %s'% (self.name, target_id, disease_id))
-                                json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest()
+                                json_doc_hashdig = DatatStructureFlattener(python_raw).get_hexdigest()
                                 self.evidence_chunk_storage.storage_add(uniq_elements_flat_hexdig,
                                                                         dict(
                                                                             uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
