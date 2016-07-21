@@ -14,11 +14,11 @@ from EvidenceValidation import EvidenceValidationFileChecker
 import elasticsearch
 from elasticsearch import Elasticsearch, helpers
 from SPARQLWrapper import SPARQLWrapper, JSON
-import cttv.model.core as cttv
-import cttv.model.bioentity as bioentity
-import cttv.model.evidence.phenotype as evidence_phenotype
-import cttv.model.evidence.core as evidence_core
-import cttv.model.evidence.association_score as association_score
+import opentargets.model.core as cttv
+import opentargets.model.bioentity as bioentity
+import opentargets.model.evidence.phenotype as evidence_phenotype
+import opentargets.model.evidence.core as evidence_core
+import opentargets.model.evidence.association_score as association_score
 
 __author__ = "Gautier Koscielny"
 __copyright__ = "Copyright 2014-2016, The Centre for Therapeutic Target Validation (CTTV)"
