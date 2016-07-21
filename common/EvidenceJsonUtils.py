@@ -1,5 +1,7 @@
 '''imported from cttv.model'''
-
+import hashlib
+import json
+from collections import OrderedDict
 
 
 class DatatStructureFlattener:
@@ -82,7 +84,7 @@ class CompareJsons:
         change_summary = []
         for element in key_change_set:
             try:
-                data_structure1_od[element]
+                self.data_structure1_od[element]
                 change_summary.append('%s is missing in data structure 2.' % (element,))
             except KeyError:
                 change_summary.append('%s is missing in data structure 1.' % (element,))
