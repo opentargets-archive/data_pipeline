@@ -15,13 +15,13 @@ from EvidenceValidation import EvidenceValidationFileChecker
 import elasticsearch
 from elasticsearch import Elasticsearch, helpers
 from SPARQLWrapper import SPARQLWrapper, JSON
-import cttv.model.core as cttv
-import cttv.model.bioentity as bioentity
-import cttv.model.evidence.phenotype as evidence_phenotype
-import cttv.model.evidence.core as evidence_core
-import cttv.model.evidence.linkout as evidence_linkout
-import cttv.model.evidence.association_score as association_score
-import cttv.model.evidence.mutation as evidence_mutation
+import opentargets.model.core as opentargets
+import opentargets.model.bioentity as bioentity
+import opentargets.model.evidence.phenotype as evidence_phenotype
+import opentargets.model.evidence.core as evidence_core
+import opentargets.model.evidence.linkout as evidence_linkout
+import opentargets.model.evidence.association_score as association_score
+import opentargets.model.evidence.mutation as evidence_mutation
 
 __author__ = "Gautier Koscielny"
 __copyright__ = "Copyright 2014-2016, Open Targets"
@@ -170,8 +170,8 @@ class IntOGen():
                             url = "https://www.intogen.org/about"),
                         value=INTOGEN_SCORE_MAP[Evidence])
 
-                    evidenceString = cttv.Literature_Curated()
-                    evidenceString.validated_against_schema_version = '1.2.2'
+                    evidenceString = opentargets.Literature_Curated()
+                    evidenceString.validated_against_schema_version = '1.2.3'
                     evidenceString.access_level = "public"
                     evidenceString.type = "somatic_mutation"
                     evidenceString.sourceID = "intogen"
