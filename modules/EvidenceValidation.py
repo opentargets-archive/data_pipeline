@@ -28,7 +28,7 @@ from common.PGAdapter import *
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from common.UniprotIO import UniprotIterator, Parser
 import opentargets.model.core as opentargets
-import opentargets.model.flatten as flat
+from  common.EvidenceJsonUtils import DatatStructureFlattener
 from settings import Config, ElasticSearchConfiguration
 import hashlib
 from lxml.etree import tostring
@@ -212,6 +212,7 @@ class ValidationActions(Actions):
     CHECKFILES = 'checkfiles'
     VALIDATE = 'validate'
     GENEMAPPING = 'genemapping'
+    RESET = 'reset'
 
 
 class DirectoryCrawlerProcess():
@@ -668,7 +669,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
                             # flatten
                             uniq_elements = obj.unique_association_fields
-                            uniq_elements_flat = flat.DatatStructureFlattener(uniq_elements)
+                            uniq_elements_flat = DatatStructureFlattener(uniq_elements)
                             uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
 
                             'Validate evidence string'
@@ -811,7 +812,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                 # logger.info("Add evidence for %s %s " %(target_id, disease_id))
                                 # flatten data structure
                                 # logging.info('%s Adding to chunk %s %s'% (self.name, target_id, disease_id))
-                                json_doc_hashdig = flat.DatatStructureFlattener(python_raw).get_hexdigest()
+                                json_doc_hashdig = DatatStructureFlattener(python_raw).get_hexdigest()
                                 self.evidence_chunk_storage.storage_add(uniq_elements_flat_hexdig,
                                                                         dict(
                                                                             uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
@@ -960,7 +961,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             text.append(messageFailed)
             text.append("See details in the attachment {0}\n".format(os.path.basename(logfile)))
         text.append("Data Provider:\t%s"%data_source_name)
-        text.append("JSON schema version:\t%s"%Config.EVIDENCEVALIDATION_JSON_SCHEMA_VERSION)
+        text.append("JSON schema version:\t%s"%Config.EVIDENCEVALIDATION_SCHEMA)
         text.append("Number of records parsed:\t{0}".format(nb_records))
         for key in errors:
             text.append("Number of {0}:\t{1}".format(key, errors[key]))
@@ -2189,4 +2190,17 @@ class EvidenceValidationFileChecker():
 
         auditor.join()
 
+        self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
+                              wait_if_ongoing=True)
+        self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'),
+                              wait_if_ongoing=True)
         return
+
+    def reset(self):
+        audit_index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME)
+        if self.es.indices.exists(audit_index_name):
+            self.es.indices.delete(audit_index_name)
+        data_indices = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
+        self.es.indices.delete(data_indices)
+        logging.info('Validation data deleted')
+
