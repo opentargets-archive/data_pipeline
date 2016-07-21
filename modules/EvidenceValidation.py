@@ -961,7 +961,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             text.append(messageFailed)
             text.append("See details in the attachment {0}\n".format(os.path.basename(logfile)))
         text.append("Data Provider:\t%s"%data_source_name)
-        text.append("JSON schema version:\t%s"%Config.EVIDENCEVALIDATION_JSON_SCHEMA_VERSION)
+        text.append("JSON schema version:\t%s"%Config.EVIDENCEVALIDATION_SCHEMA)
         text.append("Number of records parsed:\t{0}".format(nb_records))
         for key in errors:
             text.append("Number of {0}:\t{1}".format(key, errors[key]))
