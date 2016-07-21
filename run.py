@@ -93,6 +93,8 @@ if __name__ == '__main__':
                         action="append_const", const = ValidationActions.GENEMAPPING)
     parser.add_argument("--val", dest='val', help="check new json files submitted to ftp site, validate them and store them in postgres",
                         action="append_const", const = ValidationActions.ALL)
+    parser.add_argument("--valreset", dest='valreset', help="reset audit table and previously parsed evidencestrings",
+                        action="append_const", const=ValidationActions.RESET)
     parser.add_argument("--ens", dest='ens', help="retrieve and store latest ensembl gene records in elasticsearch",
                         action="append_const", const = EnsemblActions.ALL)
     parser.add_argument("--sea", dest='sea', help="precompute search results",
@@ -256,6 +258,8 @@ if __name__ == '__main__':
                 EvidenceValidationFileChecker(adapter, es, sparql, r_server).map_genes()
             if (ValidationActions.CHECKFILES in args.val) or do_all:
                 EvidenceValidationFileChecker(adapter, es, sparql, r_server).check_all()
+        if args.valreset:
+            EvidenceValidationFileChecker(adapter, es, sparql, r_server).reset()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:

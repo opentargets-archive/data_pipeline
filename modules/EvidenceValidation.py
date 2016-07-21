@@ -212,6 +212,7 @@ class ValidationActions(Actions):
     CHECKFILES = 'checkfiles'
     VALIDATE = 'validate'
     GENEMAPPING = 'genemapping'
+    RESET = 'reset'
 
 
 class DirectoryCrawlerProcess():
@@ -2189,4 +2190,17 @@ class EvidenceValidationFileChecker():
 
         auditor.join()
 
+        self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
+                              wait_if_ongoing=True)
+        self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'),
+                              wait_if_ongoing=True)
         return
+
+    def reset(self):
+        audit_index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME)
+        if self.es.indices.exists(audit_index_name):
+            self.es.indices.delete(audit_index_name)
+        data_indices = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
+        self.es.indices.delete(data_indices)
+        logging.info('Validation data deleted')
+
