@@ -22,6 +22,7 @@ import opentargets.model.evidence.core as evidence_core
 import opentargets.model.evidence.linkout as evidence_linkout
 import opentargets.model.evidence.association_score as association_score
 import opentargets.model.evidence.mutation as evidence_mutation
+from common.ElasticsearchQuery import ESQuery
 
 __author__ = "Gautier Koscielny"
 __copyright__ = "Copyright 2014-2016, Open Targets"
@@ -113,6 +114,19 @@ INTOGEN_TUMOR_TYPE_MAP = {
     'UCEC' : 'uterine corpus endometrioid carcinoma'
 }
 
+INTOGEN_SYMBOL_MAPPING = {
+    'C15orf55' : 'NUTM1',
+    'CSDA' : 'YBX3',
+    'EIF2C3' : 'AGO3',
+    'ERBB2IP' : 'ERBIN',
+    'FAM123B' : 'AMER1',
+    'HNRPDL' : 'HNRNPDL',
+    'MLL' : 'KMT2A',
+    'MLL2' : 'KMT2D',
+    'MLL3' : 'KMT2C',
+    'RQCD1' : 'CNOT9'
+}
+
 class IntOGenActions(Actions):
     GENERATE_EVIDENCE = 'generateevidence'
 
@@ -120,21 +134,40 @@ class IntOGen():
 
     def __init__(self, es, sparql):
         self.es = es
+        self.esquery = ESQuery(self.es)
         self.sparql = sparql
         self.evidence_strings = list()
-        self.cache = {}
-        self.counter = 0
-        self.mmGenes = {}
-        self.OMIMmap = {}
-        self.hgnc2mgis = {}
-        self.mgi2mouse_models = {}
-        self.mouse_model2diseases = {}
-        self.disease_gene_locus = {}
-        self.mouse_models = {}
-        self.diseases = {}
-        self.hashkeys = {}
+        self.ensembl_current = {}
+        self.symbols = {}
+
+    def load_Ensembl(self):
+
+        logging.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
+            Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+
+        for row in self.esquery.get_all_ensembl_genes():
+
+            self.ensembl_current[row["id"]] = row
+            # put the ensembl_id in symbols too
+            display_name = row["display_name"]
+            if display_name not in self.symbols:
+                self.symbols[display_name] = {}
+                self.symbols[display_name]["assembly_name"] = row["assembly_name"]
+                self.symbols[display_name]["ensembl_release"] = row["ensembl_release"]
+            if row["is_reference"]:
+                self.symbols[display_name]["ensembl_primary_id"] = row["id"]
+            else:
+                if "ensembl_secondary_id" not in self.symbols[display_name] or row["id"] < \
+                        self.symbols[display_name]["ensembl_secondary_id"]:
+                    self.symbols[display_name]["ensembl_secondary_id"] = row["id"];
+                if "ensembl_secondary_ids" not in self.symbols[display_name]:
+                    self.symbols[display_name]["ensembl_secondary_ids"] = []
+                self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
+
+        logging.debug("Loading ES Ensembl finished")
 
     def process_intogen(self, infile=INTOGEN_FILENAME, outfile=INTOGEN_EVIDENCE_FILENAME):
+        self.load_Ensembl()
         self.read_intogen(filename=infile)
         self.write_evidence_strings(filename=outfile)
 
@@ -188,9 +221,29 @@ class IntOGen():
 
                     target_type = 'http://identifiers.org/cttv.target/gene_evidence'
 
-                    ''' target information (root.target.target_type is required) '''
+                    '''
+                        target information (root.target.target_type is required)
+                        get the ensembl gene id from the symbol (mapping from 2014 won't work)
+                    '''
+                    ensembl_gene_id = None
+                    if Symbol in INTOGEN_SYMBOL_MAPPING:
+                        Symbol = INTOGEN_SYMBOL_MAPPING[Symbol]
+
+                    if Symbol in self.symbols:
+                        record = self.symbols[Symbol]
+                        if "ensembl_primary_id" in record:
+                            ensembl_gene_id = record["ensembl_primary_id"]
+                        elif "ensembl_secondary_ids" in record:
+                            ensembl_gene_id = record["ensembl_secondary_ids"][0]
+                        else:
+                            logging.error("%s is in Ensembl but could not find it"%Symbol)
+                            continue
+                    else:
+                        logging.error("%s is not found in Ensembl" % Symbol)
+                        continue
+
                     evidenceString.target = bioentity.Target(
-                                            id=["http://identifiers.org/ensembl/{0}".format(Ensg)],
+                                            id = [ "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id) ], #["http://identifiers.org/ensembl/{0}".format(Ensg)],
                                             target_name = Symbol,
                                             activity=INTOGEN_ROLE_MAP[Role],
                                             target_type='http://identifiers.org/cttv.target/gene_evidence'
