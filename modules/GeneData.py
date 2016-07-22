@@ -21,7 +21,7 @@ from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage, Loader
 from common.ElasticsearchQuery import ESQuery
 from common.PGAdapter import HgncGeneInfo, EnsemblGeneInfo, UniprotInfo, ElasticsearchLoad
-from common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter
+from common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from common.UniprotIO import UniprotIterator
 from modules.Reactome import ReactomeRetriever
 from settings import Config
@@ -471,37 +471,28 @@ class GeneSet():
         return stats
 
 
-class GeneObjectStorer(multiprocessing.Process):
+
+class GeneObjectStorer(RedisQueueWorkerProcess):
 
     def __init__(self, es, r_server, queue):
-        super(GeneObjectStorer, self).__init__()
+        super(GeneObjectStorer, self).__init__(queue, r_server.db)
         self.es = es
         self.r_server = r_server
         self.queue = queue
+        self.loader = Loader(self.es, chunk_size=100)
 
+    def process(self, data):
+        geneid, gene = data
+        '''process objects to simple search object'''
+        gene.preprocess()
+        self.loader.put(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                       Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                       geneid,
+                       gene.to_json(),
+                       create_index=False)
+    def close(self):
+        self.loader.close()
 
-    def run(self):
-        with Loader(self.es, chunk_size=100) as loader:
-            while not self.queue.is_done(r_server=self.r_server):
-                data = self.queue.get(r_server=self.r_server, timeout=1)
-                if data is not None:
-                    key, value = data
-                    geneid, gene = value
-                    error = False
-                    try:
-                        '''process objects to simple search object'''
-                        gene.preprocess()
-                        loader.put(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                   Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                                   geneid,
-                                   gene.to_json(),
-                                   create_index=False)
-                    except Exception, e:
-                        error = True
-                        logging.exception('Error processing key %s: %s' % (key, e))
-                    self.queue.done(key, error=error, r_server=self.r_server)
-                else:
-                    time.sleep(0.1)
 
 
 class GeneManager():
@@ -652,7 +643,7 @@ class GeneManager():
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
-        workers = [GeneObjectStorer(self.es,self.r_server,queue) for i in range(multiprocessing.cpu_count()*2)]
+        workers = [GeneObjectStorer(self.es,self.r_server,queue) for i in range(multiprocessing.cpu_count())]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()
@@ -662,8 +653,8 @@ class GeneManager():
 
         queue.set_submission_finished(r_server=self.r_server)
 
-        while not queue.is_done(r_server=self.r_server):
-            time.sleep(0.5)
+        for w in workers:
+            w.join()
 
         logging.info('all gene objects pushed to elasticsearch')
 
