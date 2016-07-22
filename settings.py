@@ -60,7 +60,8 @@ class Config():
             'database': iniparser.get(ENV, 'database')}
     # HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_COMPLETE_SET = 'https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer'
-    HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
+    # HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
+    HGNC_ORTHOLOGS = 'https://5.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9oY29wL2h1bWFuX2FsbF9oY29wX3NpeHRlZW5fY29sdW1uLnR4dC5neg%3D%3D&f=norefer'
     HGNC_ORTHOLOGS_SPECIES = {
         '9606':'human',
         '9598':'chimpanzee',
