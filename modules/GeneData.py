@@ -7,6 +7,10 @@ import logging
 from StringIO import StringIO
 import urllib2
 
+import requests
+import gzip
+import csv
+
 import sys
 
 import multiprocessing
@@ -117,6 +121,7 @@ class Gene(JSONSerializable):
         self.pfam = []
         self.interpro = []
         self.is_ensembl_reference = []
+        self.ortholog = {}
         self._private ={}
 
 
@@ -215,6 +220,36 @@ class Gene(JSONSerializable):
                     self.uniprot_id = self.uniprot_accessions[0]
             if 'pubmed_id' in data:
                 self.pubmed_ids = data['pubmed_id']
+
+
+    def load_ortholog_data(self, data):
+        '''loads data from the HCOP ortholog table
+        '''
+        if 'ortholog_species' in data:
+            if data['ortholog_species'] in Config.HGNC_ORTHOLOGS_SPECIES:
+                # get rid of some redundant (ie.human) field that we are going to
+                # get from other sources anyways
+                ortholog_data = dict((k, v) for (k, v) in data.iteritems() if k.startswith('ortholog'))
+
+                # split the fields with multiple values into lists
+                if 'ortholog_species_assert_ids' in data:
+                    ortholog_data['ortholog_species_assert_ids'] = data['ortholog_species_assert_ids'].split(',')
+                if 'support' in data:
+                    ortholog_data['support'] = data['support'].split(',')
+
+                # use a readable key for the species in the ortholog dictionary
+                species = Config.HGNC_ORTHOLOGS_SPECIES[ortholog_data['ortholog_species']]
+
+                try:
+                    # I am appending because there are more than one records
+                    # with the same ENSG id and the species.
+                    # They can come from the different orthology predictors
+                    # or just the case of multiple orthologs per gene.
+                    self.ortholog[species].append(ortholog_data)
+                except KeyError:
+                    self.ortholog[species] = [ortholog_data]
+
+
 
     def load_ensembl_data(self, data):
 
@@ -385,11 +420,12 @@ class GeneSet():
             if gene.id:
                 self.genes[gene.id] = gene
 
+    def __getitem__(self, geneid):
+        return self.genes[geneid]
+
     def get_gene(self, geneid):
-        try:
-            return copy.deepcopy(self.genes[geneid])
-        except KeyError:
-            return copy.deepcopy(self.genes[geneid.replace(ENS_ID_ORG_PREFIX, '')])
+        return self.genes[geneid]
+
 
     def iterate(self):
         for k, v in self.genes.items():
@@ -470,7 +506,7 @@ class GeneObjectStorer(multiprocessing.Process):
 
 class GeneManager():
     """
-    Merge data available in postgres into proper json objects
+    Merge data available in ?elasticsearch into proper json objects
     """
 
     def __init__(self,
@@ -487,16 +523,17 @@ class GeneManager():
 
     def merge_all(self):
         self._get_hgnc_data_from_json()
+        self._get_ortholog_data()
         self._get_ensembl_data()
         self._get_uniprot_data()
         self._store_data()
 
 
     def _get_hgnc_data_from_json(self):
+        logging.info("HGNC parsing - requesting from URL %s" % Config.HGNC_COMPLETE_SET)
         req = urllib2.Request(Config.HGNC_COMPLETE_SET)
         response = urllib2.urlopen(req)
-        # print response.code
-        # if response.code == '200':
+        logging.info("HGNC parsing - response code %s" % response.code)
         data = json.loads(response.read())
         for row in data['response']['docs']:
             gene = Gene()
@@ -504,6 +541,24 @@ class GeneManager():
             self.genes.add_gene(gene)
 
         logging.info("STATS AFTER HGNC PARSING:\n" + self.genes.get_stats())
+
+    def _get_ortholog_data(self):
+
+        logging.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
+        req = requests.get(Config.HGNC_ORTHOLOGS)
+        logging.info("Ortholog parsing - response code %s" % req.status_code)
+        req.raise_for_status()
+
+        # io.BytesIO is StringIO.StringIO in python 2
+        for row in csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)),delimiter="\t"):
+            if row['human_ensembl_gene'] in self.genes:
+                self.genes[row['human_ensembl_gene']].load_ortholog_data(row)
+
+
+
+
+        logging.info("STATS AFTER HGNC ortholog PARSING:\n" + self.genes.get_stats())
+
 
 
     def _get_ensembl_data(self):

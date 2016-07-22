@@ -174,7 +174,14 @@ class SearchObjectTarget(SearchObject, object):
         self.uniprot_accessions=json_input['uniprot_accessions']
         self.hgnc_id=json_input['hgnc_id']
         self.ensembl_gene_id=json_input['ensembl_gene_id']
-
+        if json_input['ortholog']:
+            for species,ortholist in json_input['ortholog'].items():
+                self.ortholog[species]=[
+                        {'ortholog_symbol': o["ortholog_species_symbol"],
+                         'ortholog_ids':    o["ortholog_species_assert_ids"],
+                         'ortholog_name':   o["ortholog_species_name"]}
+                        for o in ortholist
+                ]
 
 
 class SearchObjectDisease(SearchObject, object):

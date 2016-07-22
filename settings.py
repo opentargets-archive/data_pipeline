@@ -60,6 +60,21 @@ class Config():
             'database': iniparser.get(ENV, 'database')}
     # HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_COMPLETE_SET = 'https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer'
+    HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
+    HGNC_ORTHOLOGS_SPECIES = {
+        '9606':'human',
+        '9598':'chimpanzee',
+        '9544':'macaque',
+        '10090':'mouse',
+        '10116':'rat',
+        '9615':'dog',
+        '9823':'pig',
+        '8364':'frog',
+        '7955':'zebrafish',
+        '7227':'fly',
+        '6239':'worm',
+        '4932':'yeast'
+    }
     HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
