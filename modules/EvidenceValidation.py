@@ -974,7 +974,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         r = requests.post(
             Config.MAILGUN_MESSAGES,
             auth=("api", Config.MAILGUN_API_KEY),
-            files={'file':(filename+".log", open(logfile,'rb'))},
+            files=[("attachment", open(logfile,'rb'))],
             data={"from": sender,
                   "to": "andreap@ebi.ac.uk",#recipient,
                   "bcc": Config.EVIDENCEVALIDATION_BCC_ACCOUNT,
@@ -985,8 +985,11 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             )
         try:
             r.raise_for_status()
+            logging.info('Email sent to %s. Response: \n%s' % (recipient, r.text))
         except HTTPError, e:
+            logging.error("Email not sent")
             logging.error(e)
+
 
         return
 
@@ -2186,7 +2189,7 @@ class EvidenceValidationFileChecker():
         for w in validators:
             w.join()
 
-        audit_q.set_submission_finished(self.r_server)
+        # audit_q.set_submission_finished(self.r_server)
 
         auditor.join()
 

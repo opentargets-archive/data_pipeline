@@ -264,6 +264,9 @@ class RedisQueue(object):
         r_server = self._get_r_server(r_server)
         return r_server.getbit(self.submission_done, 1)
 
+    def is_empty(self, r_server = None):
+        return self.get_size(r_server) == 0
+
     def is_done(self, r_server = None):
         r_server = self._get_r_server(r_server)
         if self.is_submission_finished(r_server):
@@ -338,8 +341,7 @@ class RedisQueueWorkerProcess(Process):
     def run(self):
         while not self.queue_in.is_done(r_server=self.r_server):
             job = self.queue_in.get(r_server=self.r_server, timeout=1)
-            if job is None and self.queue_in.is_submission_finished(r_server=self.r_server):
-                break#this might leave some unprocessed jobs at the end of the queue if they are very slow to be processed ( takes more than the timeout)
+
             if job is not None:
                 key, data = job
                 error = False
@@ -347,14 +349,19 @@ class RedisQueueWorkerProcess(Process):
                     job_results = self.process(data)
                     if self.queue_out is not None and \
                         job_results is not None:
-                        self.queue_out.put(job_results, self.r_server)  # TODO: create an object here
+                        self.queue_out.put(job_results, self.r_server)
                 except Exception, e:
                     error = True
                     self.logger.exception('Error processing key %s' % key)
 
                 self.queue_in.done(key, error=error, r_server=self.r_server)
+            else:
+                # self.logger.info('nothing to do in '+self.name)
+                time.sleep(.1)
 
         self.logger.info('%s done processing' % self.name)
+        if self.queue_out is not None:
+            self.queue_out.set_submission_finished(self.r_server)
 
 
     def process(self, data):
