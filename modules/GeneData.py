@@ -226,28 +226,28 @@ class Gene(JSONSerializable):
         '''loads data from the HCOP ortholog table
         '''
         if 'ortholog_species' in data:
-            # take away the ortholog_species from the row and use it as
-            # the key in the ortholog dictionary
-            species = data.pop('ortholog_species')
+            if data['ortholog_species'] in Config.HGNC_ORTHOLOGS_SPECIES:
+                # get rid of some redundant (ie.human) field that we are going to
+                # get from other sources anyways
+                ortholog_data = dict((k, v) for (k, v) in data.iteritems() if k.startswith('ortholog'))
 
-            # get rid of some redundant (ie.human) field that we are going to
-            # get from other sources anyways
-            ortholog_data = dict((k, v) for (k, v) in data.iteritems() if k.startswith('ortholog'))
+                # split the fields with multiple values into lists
+                if 'ortholog_species_assert_ids' in data:
+                    ortholog_data['ortholog_species_assert_ids'] = data['ortholog_species_assert_ids'].split(',')
+                if 'support' in data:
+                    ortholog_data['support'] = data['support'].split(',')
 
-            # split the fields with multiple values into lists
-            if 'ortholog_species_assert_ids' in data:
-                ortholog_data['ortholog_species_assert_ids'] = data['ortholog_species_assert_ids'].split(',')
-            if 'support' in data:
-                ortholog_data['support'] = data['support'].split(',')
+                # use a readable key for the species in the ortholog dictionary
+                species = Config.HGNC_ORTHOLOGS_SPECIES[ortholog_data['ortholog_species']]
 
-            try:
-                # I am appending because there are more than one records
-                # with the same ENSG id and the species.
-                # They can come from the different orthology predictors
-                # or just the case of multiple orthologs per gene.
-                self.ortholog[species].append(ortholog_data)
-            except KeyError:
-                self.ortholog[species] = [ortholog_data]
+                try:
+                    # I am appending because there are more than one records
+                    # with the same ENSG id and the species.
+                    # They can come from the different orthology predictors
+                    # or just the case of multiple orthologs per gene.
+                    self.ortholog[species].append(ortholog_data)
+                except KeyError:
+                    self.ortholog[species] = [ortholog_data]
 
 
 
@@ -527,9 +527,6 @@ class GeneManager():
         self._get_ensembl_data()
         self._get_uniprot_data()
         self._store_data()
-        # #DEBUG - dump to take a peek at the objects
-        # with open('testout.txt', 'w') as outfile:
-        #     json.dump(self.genes, outfile)
 
 
     def _get_hgnc_data_from_json(self):
