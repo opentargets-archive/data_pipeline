@@ -177,9 +177,9 @@ class SearchObjectTarget(SearchObject, object):
         if json_input['ortholog']:
             for species,ortholist in json_input['ortholog'].items():
                 self.ortholog[species]=[
-                        {'ortholog_symbol': o["ortholog_species_symbol"],
-                         'ortholog_ids':    o["ortholog_species_assert_ids"],
-                         'ortholog_name':   o["ortholog_species_name"]}
+                        {'symbol': o["ortholog_species_symbol"],
+                         'id':     o["ortholog_species_assert_ids"],
+                         'name':   o["ortholog_species_name"]}
                         for o in ortholist
                 ]
 
