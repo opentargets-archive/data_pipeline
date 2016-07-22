@@ -998,12 +998,20 @@ class ElasticSearchConfiguration():
                                 "index_analyzer" : "whitespace_analyzer",
                                 "search_analyzer" : "whitespace_analyzer",
                                 "payloads" : True
-                                },
-
-
-                            },
-                        },
+                                }
+                            }
+                        }
                     },
+                "dynamic_templates" : [
+                        {
+                            "do_not_analyze_symbol" : {
+                                "path_match" : "ortholog.*.symbol",
+                                "mapping" : {
+                                    "index" : "not_analyzed"
+                                }
+                            }
+                        }
+                        ]
                 },
             },
         }
