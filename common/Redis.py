@@ -363,9 +363,19 @@ class RedisQueueWorkerProcess(Process):
         if self.queue_out is not None:
             self.queue_out.set_submission_finished(self.r_server)
 
+        self.close()
+
+    def close(self):
+        pass
 
     def process(self, data):
         raise NotImplementedError('please add an implementation to process the data')
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *args):
+        self.close()
 
 
 

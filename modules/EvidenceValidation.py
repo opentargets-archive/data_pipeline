@@ -1290,10 +1290,10 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                         new_term = self.mp_obsolete[disease_id]
                     if obsolete_diseases[disease_id] == 1:
                         text.append("\t%s\t(reported once)\t%s" % (
-                            disease_id, new_term.replace("", " ")))
+                            disease_id, new_term))
                     else:
                         text.append("\t%s\t(reported %i times)\t%s" % (
-                            disease_id, obsolete_diseases[disease_id], new_term.replace("", " ")))
+                            disease_id, obsolete_diseases[disease_id], new_term))
                 text.append("")
 
             # report invalid Ensembl genes
