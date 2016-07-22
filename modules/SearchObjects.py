@@ -157,6 +157,7 @@ class SearchObjectTarget(SearchObject, object):
                  ):
         super(SearchObjectTarget, self).__init__()
         self.type = SearchObjectTypes.TARGET
+        self.ortholog = dict()
 
     def digest(self, json_input):
         json_input = self._parse_json(json_input)
