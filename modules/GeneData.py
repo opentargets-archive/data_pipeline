@@ -420,11 +420,12 @@ class GeneSet():
             if gene.id:
                 self.genes[gene.id] = gene
 
+    def __getitem__(self, geneid):
+        return self.genes[geneid]
+
     def get_gene(self, geneid):
-        try:
-            return copy.deepcopy(self.genes[geneid])
-        except KeyError:
-            return copy.deepcopy(self.genes[geneid.replace(ENS_ID_ORG_PREFIX, '')])
+        return self.genes[geneid]
+
 
     def iterate(self):
         for k, v in self.genes.items():
@@ -522,9 +523,9 @@ class GeneManager():
 
     def merge_all(self):
         self._get_hgnc_data_from_json()
+        self._get_ortholog_data()
         self._get_ensembl_data()
         self._get_uniprot_data()
-        self._get_ortholog_data()
         self._store_data()
         # #DEBUG - dump to take a peek at the objects
         # with open('testout.txt', 'w') as outfile:
@@ -554,12 +555,10 @@ class GeneManager():
         # io.BytesIO is StringIO.StringIO in python 2
         for row in csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)),delimiter="\t"):
             if row['human_ensembl_gene'] in self.genes:
-                gene = self.genes.get_gene(row['human_ensembl_gene'])
-            else:
-                gene = Gene()
+                self.genes[row['human_ensembl_gene']].load_ortholog_data(row)
 
-            gene.load_ortholog_data(row)
-            self.genes.add_gene(gene)
+
+
 
         logging.info("STATS AFTER HGNC ortholog PARSING:\n" + self.genes.get_stats())
 
