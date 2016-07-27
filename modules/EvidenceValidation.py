@@ -1,47 +1,32 @@
 import os
 import sys
 import copy
-from pprint import pprint
-
-import paramiko
 import pysftp
 import requests
 from paramiko import AuthenticationException
 from requests.packages.urllib3.exceptions import HTTPError
-
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 import re
 import gzip
-import smtplib
 import time
-import iso8601
 import logging
 from StringIO import StringIO
 import json
-from json import JSONDecoder
-from json import JSONEncoder
 from datetime import datetime, date
 from sqlalchemy import and_, or_, table, column, select, update, insert, desc
 from common import Actions
 from common.PGAdapter import *
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from common.UniprotIO import UniprotIterator, Parser
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueueStatusReporterTQDM
 import opentargets.model.core as opentargets
 from  common.EvidenceJsonUtils import DatatStructureFlattener
 from settings import Config, ElasticSearchConfiguration
 import hashlib
-from lxml.etree import tostring
 from xml.etree import cElementTree as ElementTree
 from sqlalchemy.dialects.postgresql import JSON
 import multiprocessing
-import Queue
-from common.PGAdapter import Adapter
-import elasticsearch
-import itertools
 from elasticsearch import Elasticsearch, helpers
 from SPARQLWrapper import SPARQLWrapper, JSON
-from multiprocessing import Manager
 
 # This bit is necessary for text mining data
 reload(sys)
@@ -50,8 +35,8 @@ sys.setdefaultencoding("utf8")
 
 __author__ = 'gautierk'
 
-logger = logging.getLogger(__name__)
 logging.getLogger("paramiko").setLevel(logging.WARNING)
+
 
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
@@ -64,6 +49,7 @@ EVIDENCE_STRING_INVALID_SCHEMA_VERSION = 12
 EVIDENCE_STRING_INVALID_MISSING_TYPE = 13
 EVIDENCE_STRING_INVALID_MISSING_TARGET = 14
 EVIDENCE_STRING_INVALID_MISSING_DISEASE = 15
+EVIDENCE_STRING_INVALID_UNPARSABLE_JSON = 16
 ENSEMBL_GENE_ID_UNKNOWN = 20
 ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE = 21
 UNIPROT_PROTEIN_ID_UNKNOWN = 30
@@ -227,6 +213,7 @@ class DirectoryCrawlerProcess():
         self.start_time = time.time()
         self.r_server = r_server
         self._remote_filenames =dict()
+        self.logger = logging.getLogger(__name__)
 
     def _store_remote_filename(self, filename):
         if filename.startswith('/upload/submissions/') and \
@@ -248,10 +235,10 @@ class DirectoryCrawlerProcess():
                                                                 file_path=filename,
                                                                 file_version=version_name)
             except:
-                logger.debug('error getting remote file%s'%filename)
+                self.logger.debug('error getting remote file%s'%filename)
 
     def _callback_not_used(self, path):
-        logger.debug("skipped "+path)
+        self.logger.debug("skipped "+path)
 
     def run(self):
         '''
@@ -260,7 +247,7 @@ class DirectoryCrawlerProcess():
          the submitted files if it does not exists
         '''
 
-        logger.info("%s started" % self.__class__.__name__)
+        self.logger.info("%s started" % self.__class__.__name__)
 
 
         self.submission_audit.storage_create_index(recreate=False)
@@ -279,35 +266,35 @@ class DirectoryCrawlerProcess():
                     srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
                     latest_file = self._remote_filenames[u]['file_path']
                     file_version = self._remote_filenames[u]['file_version']
-                    logging.info(latest_file)
+                    self.logger.info(latest_file)
 
                     if u in Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED:
                         data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[u]
                     else:
                         data_source_name  = file_version.split('-')[0].replace(u+'_','')
-                    logging.info(data_source_name)
+                        self.logger.info(data_source_name)
                     logfile = os.path.join('/tmp', file_version+ ".log")
-                    logging.info("%s checking file: %s" % (self.__class__.__name__, file_version))
+                    self.logger.info("%s checking file: %s" % (self.__class__.__name__, file_version))
                     self.evidence_chunk.storage_create_index(data_source_name,recreate=False)
 
 
                     try:
                         ''' get md5 '''
                         md5_hash = self.md5_hash_remote_file(latest_file, srv)
-                        logging.debug("%s %s %s" % (self.__class__.__name__, file_version, md5_hash))
+                        self.logger.debug("%s %s %s" % (self.__class__.__name__, file_version, md5_hash))
                         self.check_file(latest_file, file_version, u, data_source_name,
                                         md5_hash, logfile)
-                        logging.debug("%s %s DONE" % (self.__class__.__name__, file_version))
+                        self.logger.debug("%s %s DONE" % (self.__class__.__name__, file_version))
 
                     except AttributeError, e:
-                        logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
+                        self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
 
             except AuthenticationException:
-                logging.error( 'cannot connect with credentials: user:%s password:%s' % (u, p))
+                self.logger.error( 'cannot connect with credentials: user:%s password:%s' % (u, p))
 
         self.output_q.set_submission_finished(self.r_server)
 
-        logger.info("%s finished" % self.__class__.__name__)
+        self.logger.info("%s finished" % self.__class__.__name__)
 
     def md5_hash_local_file(self, filename):
         return self.md5_hash_from_file_stat(os.stat(filename))
@@ -338,13 +325,13 @@ class DirectoryCrawlerProcess():
         if existing_submission:
             md5 = existing_submission["_source"]["md5"]
             if md5 == md5_hash:
-                    logging.info('%s file already recorded. Won\'t parse' % file_path)
+                    self.logger.info('%s file already recorded. Won\'t parse' % file_path)
                     ''' should be false, set to true if you want to parse anyway '''
                     validate = False
             else:
-                logging.info('file recorded with a different hash %s, revalidatiing.' % (md5))
+                self.logger.info('file recorded with a different hash %s, revalidatiing.' % (md5))
                 validate = True
-        logging.info('validate for file %s %r' % (file_version,validate))
+                self.logger.info('validate for file %s %r' % (file_version,validate))
 
         if validate == True:
 
@@ -404,24 +391,25 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         self.es = es
         self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
         self.start_time = time.time()  # reset timer start
+        self.logger = logging.getLogger(__name__)
 
 
     def process(self, data):
         file_path, file_version, provider_id, data_source_name, md5_hash, logfile = data
-        logging.info('Starting to parse  file %s' % file_path)
+        self.logger.info('Starting to parse  file %s' % file_path)
         ''' parse the file and put evidence in the queue '''
         self.parse_gzipfile(file_path, file_version, provider_id, data_source_name, md5_hash,
                             logfile=logfile)
-        logger.info("%s finished" % self.name)
+        self.logger.info("%s finished" % self.name)
 
 
 
     def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None):
 
-        logging.info('%s Delete previous data for %s' % (self.name, data_source_name))
+        self.logger.info('%s Delete previous data for %s' % (self.name, data_source_name))
         self.evidence_chunk_storage.storage_delete(data_source_name)
 
-        logging.info('%s Starting parsing %s' % (self.name, file_path))
+        self.logger.info('%s Starting parsing %s' % (self.name, file_path))
 
         line_buffer = []
         offset = 0
@@ -439,6 +427,18 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
             file_stat = srv.stat(file_path)
             file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
+            '''temprorary get lines total'''
+            lines = 0
+            with srv.open(file_path, mode='rb', bufsize=1) as f:
+                with gzip.GzipFile(filename=file_path.split('/')[1],
+                                   mode='rb',
+                                   fileobj=f,
+                                   mtime=file_mod_time) as fh:
+                    line = fh.readline()
+                    while line:
+                        lines +=1
+                        line = fh.readline()
+            self.queue_out.incr_total(lines, self.r_server)
             with srv.open(file_path, mode='rb', bufsize=1) as f:
                 with gzip.GzipFile(filename = file_path.split('/')[1],
                                    mode = 'rb',
@@ -449,7 +449,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                         line_buffer.append(line)
                         line_number += 1
                         if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
-                            logging.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
+                            self.logger.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
                             self.queue_out.put(
                                 (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
                                  offset, list(line_buffer), False),
@@ -461,7 +461,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                         line = fh.readline()
 
         if line_buffer:
-            logging.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
+            self.logger.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
             self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
                                list(line_buffer), False),
                                self.r_server)
@@ -473,7 +473,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         '''
         finally send a signal to inform that parsing is completed for this file and no other line are to be expected
         '''
-        logging.info('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
+        self.logger.info('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
         self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
                            line_buffer, True),
                            self.r_server)
@@ -513,6 +513,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.ensembl_current = ensembl_current
         self.start_time = time.time()
         self.audit = list()
+        self.logger = logging.getLogger(__name__)
 
     def process(self, data):
         file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
@@ -567,7 +568,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
 
         else:
-            logging.debug('%s Validating %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
+            self.logger.debug('%s Validating %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
 
             diseases = {}
             top_diseases = []
@@ -595,10 +596,17 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             nb_uniprot_invalid_mapping = 0
             audit = list()
 
-            for line in line_buffer:
 
-                python_raw = json.loads(line)
+            for line in line_buffer:
                 lc += 1
+                try:
+                    python_raw = json.loads(line)
+                except Exception, e:
+                    self.logger.error('cannot parse line %i: %s'%(lc, e))
+                    audit.append((lc, EVIDENCE_STRING_INVALID_UNPARSABLE_JSON, None))
+                    nb_errors += 1
+                    continue
+
 
                 # now validate
                 obj = None
@@ -624,7 +632,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                             if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'], list):
                                 mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
                                 python_raw['evidence']['known_mutations'] = [ mutations ]
-                                # logging.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
+                                # self.logger.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
                                 obj = opentargets.Literature_Curated.fromMap(python_raw)
                         elif data_type == 'known_drug':
                             obj = opentargets.Drug.fromMap(python_raw)
@@ -673,7 +681,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                             uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
 
                             'Validate evidence string'
-                            validation_result = obj.validate(logger)
+                            validation_result = obj.validate(self.logger)
                             nb_errors += validation_result
 
                             'Check EFO'
@@ -700,7 +708,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                         nb_efo_invalid += 1
                                     if disease_id in self.efo_obsolete:
                                         audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
-                                        # logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                        # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
                                         disease_failed = True
                                         if disease_id not in obsolete_diseases:
                                             obsolete_diseases[disease_id] = 1
@@ -709,7 +717,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                         nb_efo_obsolete += 1
                                     elif disease_id in self.hpo_obsolete or disease_id in self.mp_obsolete:
                                         audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
-                                        # logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                        # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
                                         disease_failed = True
                                         if disease_id not in obsolete_diseases:
                                             obsolete_diseases[disease_id] = 1
@@ -736,7 +744,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                         if not ensembl_id in self.ensembl_current:
                                             gene_failed = True
                                             audit.append((lc, ENSEMBL_GENE_ID_UNKNOWN, ensembl_id))
-                                            # logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            # self.logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not ensembl_id in invalid_ensembl_ids:
                                                 invalid_ensembl_ids[ensembl_id] = 1
                                             else:
@@ -745,7 +753,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                         elif self.ensembl_current[ensembl_id]['is_reference'] is False:
                                             gene_mapping_failed = True
                                             audit.append((lc, ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE, ensembl_id))
-                                            # logger.warning("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            # self.logger.warning("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not ensembl_id in invalid_ensembl_ids:
                                                 nonref_ensembl_ids[ensembl_id] = 1
                                             else:
@@ -757,7 +765,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                         if uniprot_id not in self.uniprot_current:
                                             gene_failed = True
                                             audit.append((lc, UNIPROT_PROTEIN_ID_UNKNOWN, uniprot_id))
-                                            # logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier".format(lc+1, uniprot_id))
+                                            # self.logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier".format(lc+1, uniprot_id))
                                             if uniprot_id not in invalid_uniprot_ids:
                                                 invalid_uniprot_ids[uniprot_id] = 1
                                             else:
@@ -768,7 +776,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                             # gene_mapping_failed = True
                                             gene_failed = True
                                             audit.append((lc, UNIPROT_PROTEIN_ID_MISSING_ENSEMBL_XREF, uniprot_id))
-                                            # logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
+                                            # self.logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
                                             if not uniprot_id in missing_uniprot_id_xrefs:
                                                 missing_uniprot_id_xrefs[uniprot_id] = 1
                                             else:
@@ -780,7 +788,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                                             self.uniprot_current[uniprot_id]["gene_ids"])):
                                             gene_mapping_failed = True
                                             audit.append((lc, UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF, uniprot_id))
-                                            # logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                            # self.logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not uniprot_id in invalid_uniprot_id_mappings:
                                                 invalid_uniprot_id_mappings[uniprot_id] = 1
                                             else:
@@ -796,9 +804,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                             else:
                                                 # get the first one, needs a better way
                                                 target_id = self.uniprot_current[uniprot_id]["gene_ids"][0]
-                                            # logger.info("Found target id being: %s for %s" %(target_id, uniprot_id))
+                                            # self.logger.info("Found target id being: %s for %s" %(target_id, uniprot_id))
                                             if target_id is None:
-                                                logger.info("Found no target id for %s" % (uniprot_id))
+                                                self.logger.info("Found no target id for %s" % (uniprot_id))
 
                             if obj.target.id is None or target_count == 0 or target_id is None:
                                 ''' no target id !!!! '''
@@ -809,9 +817,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                             ''' store the evidence '''
                             if validation_result == 0 and not disease_failed and not gene_failed:
                                 nb_valid += 1;
-                                # logger.info("Add evidence for %s %s " %(target_id, disease_id))
+                                # self.logger.info("Add evidence for %s %s " %(target_id, disease_id))
                                 # flatten data structure
-                                # logging.info('%s Adding to chunk %s %s'% (self.name, target_id, disease_id))
+                                # self.logger.info('%s Adding to chunk %s %s'% (self.name, target_id, disease_id))
                                 json_doc_hashdig = DatatStructureFlattener(python_raw).get_hexdigest()
                                 self.evidence_chunk_storage.storage_add(uniq_elements_flat_hexdig,
                                                                         dict(
@@ -834,13 +842,13 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                     nb_errors += 1
                         else:
                             audit.append((lc, EVIDENCE_STRING_INVALID))
-                            # logger.error("Line {0}: Not a valid 1.2.2 evidence string - There was an error parsing the JSON document. The document may contain an invalid field".format(lc+1))
+                            # self.logger.error("Line {0}: Not a valid 1.2.2 evidence string - There was an error parsing the JSON document. The document may contain an invalid field".format(lc+1))
                             nb_errors += 1
                             validation_failed = True
 
                     else:
                         audit.append((lc, EVIDENCE_STRING_INVALID_TYPE, data_type))
-                        # logger.error("Line {0}: '{1}' is not a valid 1.2.2 evidence string type".format(lc+1, data_type))
+                        # self.logger.error("Line {0}: '{1}' is not a valid 1.2.2 evidence string type".format(lc+1, data_type))
                         nb_errors += 1
                         validation_failed = True
 
@@ -850,13 +858,13 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                            )
                       ):
                     audit.append((lc, EVIDENCE_STRING_INVALID_SCHEMA_VERSION))
-                    # logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
+                    # self.logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
                     nb_errors += 1
                     validation_failed = True
                 else:
                     ''' type '''
                     audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_TYPE))
-                    logger.error(
+                    self.logger.error(
                         "Line {0}: Not a valid 1.2.2 evidence string - please add the mandatory 'type' attribute".format(
                             lc + 1))
                     nb_errors += 1
@@ -865,13 +873,13 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 cc += len(line)
                 # for line :)
 
-            logging.debug('%s nb line parsed %i (size %i)' % (self.name, lc, cc))
+            self.logger.debug('%s nb line parsed %i (size %i)' % (self.name, lc, cc))
 
             ''' write results in ES '''
 
             self.evidence_chunk_storage.storage_flush()
 
-            logging.debug('%s bulk insert complete' % (self.name))
+            self.logger.debug('%s bulk insert complete' % (self.name))
 
             'Inform the audit trailer to generate a report and send an e-mail to the data provider'
             return (file_path,
@@ -937,6 +945,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         self.mp_obsolete = mp_obsolete
         self.start_time = time.time()
         self.registry = dict()
+        self.logger = logging.getLogger(__name__)
 
     def process(self, data):
         file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit, offset, buffer_size, \
@@ -945,7 +954,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                               audit, offset, buffer_size, end_of_transmission, logfile)
 
 
-    def send_email(self, bSend, provider_id, data_source_name, filename, bValidated, nb_records, errors, when, extra_text, logfile):
+    def send_email(self, provider_id, data_source_name, filename, bValidated, nb_records, errors, when, extra_text, logfile):
         sender = Config.EVIDENCEVALIDATION_SENDER_ACCOUNT
         recipient =Config.EVIDENCEVALIDATION_PROVIDER_EMAILS[provider_id]
         status = "passed"
@@ -970,7 +979,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         text.append( "\nYours\nThe Open Targets Core Platform Team")
         # text.append( signature
         text = '\n'.join(text)
-        logging.info(text)
+        self.logger.info(text)
         r = requests.post(
             Config.MAILGUN_MESSAGES,
             auth=("api", Config.MAILGUN_API_KEY),
@@ -985,10 +994,10 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             )
         try:
             r.raise_for_status()
-            logging.info('Email sent to %s. Response: \n%s' % (recipient, r.text))
+            self.logger.info('Email sent to %s. Response: \n%s' % (recipient, r.text))
         except HTTPError, e:
-            logging.error("Email not sent")
-            logging.error(e)
+            self.logger.error("Email not sent")
+            self.logger.error(e)
 
 
         return
@@ -1043,7 +1052,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                 lfh.write("Line %i: missing disease information\n" % (item[0]))
             elif item[1] == EVIDENCE_STRING_INVALID_SCHEMA_VERSION:
                 lfh.write("Line %i: Not a valid 1.2.2 evidence string - please check the 'validated_against_schema_version' mandatory attribute\n" % (item[0]))
-            # logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
+            # self.logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
             elif item[1] == EVIDENCE_STRING_INVALID:
                 lfh.write("Line %i: Not a valid 1.2.2 evidence string - There was an error parsing the JSON document. The document may contain an invalid field\n" % (item[0]))
             elif item[1] == EVIDENCE_STRING_INVALID_MISSING_TYPE:
@@ -1064,14 +1073,14 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
     def audit_submission(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit,
                          offset, buffer_size, end_of_transmission, logfile=None):
 
-        logger.debug("%s %s chunk=%i nb_lines=%i nb_valid=%i nb_errors=%i"
+        self.logger.debug("%s %s chunk=%i nb_lines=%i nb_valid=%i nb_errors=%i"
                     % (self.name, md5_hash, chunk, stats["nb_lines"], stats["nb_valid"], stats["nb_errors"]))
 
         ''' check invalid disease and report it in the logs '''
         #for item in audit:
         #    if item[1] == DISEASE_ID_INVALID:
         #        # lc, DISEASE_ID_INVALID, disease_id
-        #        logger.info("Line %i: invalid disease %s" % (item[0], item[2]))
+        #        self.logger.info("Line %i: invalid disease %s" % (item[0], item[2]))
 
         ''' it's the first time we hear about this submission '''
         if not md5_hash in self.registry:
@@ -1101,7 +1110,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         '''
         if self.registry[md5_hash]['chunk_expected'] == self.registry[md5_hash]['chunk_received']:
 
-            logging.info("%s generating report "%self.name)
+            self.logger.info("%s generating report "%self.name)
 
             text = []
 
@@ -1137,14 +1146,14 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                               map(lambda x: x['stats']['nb_valid'], self.registry[md5_hash]['chunks']))
 
             for x in self.registry[md5_hash]['chunks']:
-                logging.debug("%s %i"%(data_source_name, x['chunk']))
+                self.logger.debug("%s %i"%(data_source_name, x['chunk']))
                 if x['stats']['invalid_diseases'] is not None:
-                    logging.debug("len invalid_diseases: %i"%len(x['stats']['invalid_diseases']))
+                    self.logger.debug("len invalid_diseases: %i"%len(x['stats']['invalid_diseases']))
                 else:
-                    logging.debug('None invalid_diseases')
+                    self.logger.debug('None invalid_diseases')
             invalid_diseases = reduce((lambda x, y: self.merge_dict_sum(x, y)), map(lambda x: x['stats']['invalid_diseases'].copy(),
                                                                       self.registry[md5_hash]['chunks']))
-            logging.debug("len TOTAL invalid_diseases: %i"%len(invalid_diseases))
+            self.logger.debug("len TOTAL invalid_diseases: %i"%len(invalid_diseases))
 
             obsolete_diseases = reduce((lambda x, y: self.merge_dict_sum(x, y)), map(lambda x: x['stats']['obsolete_diseases'].copy(),
                                                                        self.registry[md5_hash]['chunks']))
@@ -1166,27 +1175,27 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
 
 
 
-            logging.debug("not sorted chunks %i", len(self.registry[md5_hash]['chunks']))
+            self.logger.debug("not sorted chunks %i", len(self.registry[md5_hash]['chunks']))
             sortedChunks = sorted(self.registry[md5_hash]['chunks'], key=lambda k: k['chunk'])
-            logging.debug("sortedChunks %i", len(sortedChunks))
-            logging.debug("keys %s", ",".join(sortedChunks[0]))
+            self.logger.debug("sortedChunks %i", len(sortedChunks))
+            self.logger.debug("keys %s", ",".join(sortedChunks[0]))
 
 
             '''
             Write audit logs
             '''
-            logging.debug("Open log file")
+            self.logger.debug("Open log file")
             lfh = open(logfile, 'wb')
             for chunk in sortedChunks:
-                logging.debug("%i"%chunk['chunk'])
+                self.logger.debug("%i"%chunk['chunk'])
                 self.write_logs(lfh, chunk['audit'])
             lfh.close()
-            logging.debug("Close log file")
+            self.logger.debug("Close log file")
 
             '''
             Count nb of documents
             '''
-            logging.debug("Count nb of inserted documents")
+            self.logger.debug("Count nb of inserted documents")
             nb_documents = 0
             versioned_index = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)
             if self.es.indices.exists(versioned_index):
@@ -1208,7 +1217,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             {"hits": {"hits": [], "total": 9468, "max_score": 0.0}, "_shards": {"successful": 3, "failed": 0, "total": 3}, "took": 21, "aggregations": {"group_by_targets": {"buckets": [{"key": "ENSG00000146648", "doc_count": 4157}, {"key": "ENSG00000066468", "doc_count": 513}, {"key": "ENSG00000068078", "doc_count": 377}, {"key": "ENSG00000148400", "doc_count": 322}, {"key": "ENSG00000160867", "doc_count": 125}, {"key": "ENSG00000077782", "doc_count": 118}, {"key": "ENSG00000164690", "doc_count": 78}, {"key": "ENSG00000005075", "doc_count": 45}, {"key": "ENSG00000047315", "doc_count": 45}, {"key": "ENSG00000099817", "doc_count": 45}, {"key": "ENSG00000100142", "doc_count": 45}, {"key": "ENSG00000102978", "doc_count": 45}, {"key": "ENSG00000105258", "doc_count": 45}, {"key": "ENSG00000125651", "doc_count": 45}, {"key": "ENSG00000144231", "doc_count": 45}, {"key": "ENSG00000147669", "doc_count": 45}, {"key": "ENSG00000163882", "doc_count": 45}, {"key": "ENSG00000168002", "doc_count": 45}, {"key": "ENSG00000177700", "doc_count": 45}, {"key": "ENSG00000181222", "doc_count": 45}], "sum_other_doc_count": 3193, "doc_count_error_upper_bound": 18}}, "timed_out": false}
             '''
 
-            logging.debug("Get top 20 targets")
+            self.logger.debug("Get top 20 targets")
             if self.es.indices.exists(versioned_index):
                 search = self.es.search(
                         index=versioned_index,
@@ -1237,9 +1246,9 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                                                                        id_text))
                     text.append("")
 
-                    # logging.info(json.dumps(top_target))
+                    # self.logger.info(json.dumps(top_target))
 
-            logging.debug("Get top 20 diseases")
+            self.logger.debug("Get top 20 diseases")
             if self.es.indices.exists(versioned_index):
                 search = self.es.search(
                         index=versioned_index,
@@ -1250,7 +1259,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                 if search['hits']['total']:
                     text.append("Top %i diseases:" % (Config.EVIDENCEVALIDATION_NB_TOP_DISEASES))
                     for top_diseases in search['aggregations']['group_by_diseases']['buckets']:
-                        # logging.info(json.dumps(result))
+                        # self.logger.info(json.dumps(result))
                         disease = top_diseases['key']
                         doc_count = top_diseases['doc_count']
                         if top_diseases['key'] in self.efo_current:
@@ -1262,7 +1271,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                     text.append("")
 
             # report invalid/obsolete EFO term
-            logging.debug("report invalid EFO term")
+            self.logger.debug("report invalid EFO term")
             if nb_efo_invalid > 0:
                 text.append("Errors:")
                 text.append("\t%i invalid ontology term(s) found in %i (%.2f%s) of the records." % (
@@ -1275,7 +1284,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
 
                 text.append("")
 
-            logging.debug("report obsolete EFO term")
+            self.logger.debug("report obsolete EFO term")
             if nb_efo_obsolete > 0:
                 text.append("Errors:")
                 text.append("\t%i obsolete ontology term(s) found in %i (%.1f%s) of the records." % (
@@ -1297,7 +1306,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                 text.append("")
 
             # report invalid Ensembl genes
-            logging.debug("report invalid Ensembl genes")
+            self.logger.debug("report invalid Ensembl genes")
             if nb_ensembl_invalid > 0:
                 text.append("Errors:")
                 text.append("\t%i unknown Ensembl identifier(s) found in %i (%.1f%s) of the records." % (
@@ -1310,7 +1319,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                 text.append("")
 
             # report Ensembl genes not on reference assembly
-            logging.debug("report Ensembl genes not on reference assembly")
+            self.logger.debug("report Ensembl genes not on reference assembly")
             if nb_ensembl_nonref > 0:
                 text.append("Warnings:")
                 text.append("\t%i Ensembl Human Alternative sequence Gene identifier(s) not mapped to the reference genome assembly %s found in %i (%.1f%s) of the records." % (
@@ -1328,7 +1337,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                 text.append("")
 
             # report invalid Uniprot entries
-            logging.debug("report invalid Uniprot entries")
+            self.logger.debug("report invalid Uniprot entries")
             if nb_uniprot_invalid > 0:
                 text.append("Errors:")
                 text.append("\t%i invalid UniProt identifier(s) found in %i (%.1f%s) of the records." % (
@@ -1342,7 +1351,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
 
                 # report UniProt ids with no mapping to Ensembl
             # missing_uniprot_id_xrefs
-            logging.debug("report UniProt ids with no mapping to Ensembl")
+            self.logger.debug("report UniProt ids with no mapping to Ensembl")
             if nb_missing_uniprot_id_xrefs > 0:
                 text.append("Warnings:")
                 text.append("\t%i UniProt identifier(s) without cross-references to Ensembl found in %i (%.1f%s) of the records." % (
@@ -1357,7 +1366,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                 text.append("")
 
             # report invalid Uniprot mapping entries
-            logging.debug("report invalid Uniprot mapping entries")
+            self.logger.debug("report invalid Uniprot mapping entries")
             if nb_uniprot_invalid_mapping > 0:
                 text.append("Warnings:")
                 text.append("\t%i UniProt identifier(s) not mapped to Ensembl reference genome assembly %s gene identifiers found in %i (that's %.2f%s) of the records." % (
@@ -1376,7 +1385,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                 text.append("")
 
             text = '\n'.join(text)
-            # logging.info(text)
+            # self.logger.info(text)
 
             # A file is successfully validated if it meets the following conditions
             successfully_validated = (
@@ -1402,34 +1411,34 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
 
             self.submission_audit.storage_insert_or_update(submission, update=True)
 
-            logging.debug('%s updated %s file in the validation table' % (self.name, file_on_disk))
+            self.logger.debug('%s updated %s file in the validation table' % (self.name, file_on_disk))
 
             '''
             Send e-mail
             '''
+            if  Config.EVIDENCEVALIDATION_SEND_EMAIL:
 
-            self.send_email(
-                    Config.EVIDENCEVALIDATION_SEND_EMAIL,
-                    provider_id,
-                    data_source_name,
-                    filename,
-                    successfully_validated,
-                    self.registry[md5_hash]['nb_lines'],
-                    {'valid records': nb_valid,
-                     'JSON errors': nb_errors,
-                     'records with duplicates': nb_duplicates,
-                     'records with invalid EFO terms': nb_efo_invalid,
-                     'records with obsolete EFO terms': nb_efo_obsolete,
-                     'records with invalid Ensembl ids': nb_ensembl_invalid,
-                     'records with Human Alternative sequence Gene Ensembl ids (warning)': nb_ensembl_nonref,
-                     'records with invalid UniProt ids': nb_uniprot_invalid,
-                     'records with UniProt entries without x-refs to Ensembl (warning)': nb_missing_uniprot_id_xrefs,
-                     'records with UniProt ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping
-                     },
-                    now_nice,
-                    text,
-                    logfile
-            )
+                self.send_email(
+                        provider_id,
+                        data_source_name,
+                        filename,
+                        successfully_validated,
+                        self.registry[md5_hash]['nb_lines'],
+                        {'valid records': nb_valid,
+                         'JSON errors': nb_errors,
+                         'records with duplicates': nb_duplicates,
+                         'records with invalid EFO terms': nb_efo_invalid,
+                         'records with obsolete EFO terms': nb_efo_obsolete,
+                         'records with invalid Ensembl ids': nb_ensembl_invalid,
+                         'records with Human Alternative sequence Gene Ensembl ids (warning)': nb_ensembl_nonref,
+                         'records with invalid UniProt ids': nb_uniprot_invalid,
+                         'records with UniProt entries without x-refs to Ensembl (warning)': nb_missing_uniprot_id_xrefs,
+                         'records with UniProt ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping
+                         },
+                        now_nice,
+                        text,
+                        logfile
+                )
 
             '''
             Release space
@@ -1447,6 +1456,7 @@ class ElasticStorage():
 
     @staticmethod
     def delete_prev_data_in_es(es, index, data_source_name):
+        logger = logging.getLogger(__name__)
         # Create a query for results you want to delete
 
         count = 0
@@ -1466,7 +1476,7 @@ class ElasticStorage():
 
 
         if count:
-            logging.debug("Delete previous submitted data: %i evidence strings will be removed"%count)
+            logger.debug("Delete previous submitted data: %i evidence strings will be removed"%count)
 
             search = es.search(
                     index=index,
@@ -1483,7 +1493,7 @@ class ElasticStorage():
                 # try:
                 # Get the next page of results.
                 if nb_scroll % 10 == 0:
-                    logging.debug("Get Scroll %i and delete data for datasource %s"%(nb_scroll, data_source_name))
+                    logger.debug("Get Scroll %i and delete data for datasource %s"%(nb_scroll, data_source_name))
                 nb_scroll+=1
                 scroll = es.scroll(scroll_id=search['_scroll_id'], scroll='5m')
                 # Since scroll throws an error catch it and break the loop.
@@ -1497,9 +1507,9 @@ class ElasticStorage():
                 total_hits -= len(scroll['hits']['hits'])
                 # except Exception, error:
                 #     if isinstance(error, elasticsearch.exceptions.NotFoundError):
-                #         logger.error("ElasticSearch Error updating data in ElasticSearch %s" % (str(error)))
+                #         self.logger.error("ElasticSearch Error updating data in ElasticSearch %s" % (str(error)))
                 #     else:
-                #         logger.error("ElasticSearch Error %s" % (str(error)))
+                #         self.logger.error("ElasticSearch Error %s" % (str(error)))
                 #     break
 
                 # es.delete(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME, doc_type=data_source_name)
@@ -1510,6 +1520,7 @@ class ElasticStorage():
                     data_source_name,
                     data,
                     quiet=False):
+        logger = logging.getLogger(__name__)
 
         start_time = time.time()
         rows_to_insert = 0
@@ -1540,7 +1551,7 @@ class ElasticStorage():
         if len(actions) > 0:
             helpers.bulk(es, actions)
         # if not quiet:
-        logging.debug('EvidenceStringStorage: inserted %i rows of %s inserted in evidence_string took %ss' % (
+        logger.debug('EvidenceStringStorage: inserted %i rows of %s inserted in evidence_string took %ss' % (
         rows_to_insert, data_source_name, str(time.time() - start_time)))
 
         return rows_to_insert
@@ -1549,6 +1560,7 @@ class ElasticStorage():
 class EvidenceChunkElasticStorage():
     def __init__(self, loader,):
         self.loader = loader
+        self.logger = logging.getLogger(__name__)
 
     def storage_create_index(self,data_source_name, recreate=False):
         self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name, recreate = recreate)
@@ -1574,6 +1586,7 @@ class EvidenceChunkElasticStorage():
 class SubmissionAuditElasticStorage():
     def __init__(self, loader, chunk_size=1e3):
         self.loader = loader
+        self.logger = logging.getLogger(__name__)
 
     def storage_create_index(self, recreate=False):
         self.loader.create_new_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME, recreate)
@@ -1616,7 +1629,7 @@ class SubmissionAuditElasticStorage():
 
         actions = []
         if update:
-            logging.debug(json.dumps(submission, indent=4))
+            self.logger.debug(json.dumps(submission, indent=4))
             action = {
                 '_op_type': 'update',
                 '_index': '%s' % self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
@@ -1636,15 +1649,15 @@ class SubmissionAuditElasticStorage():
             }
             actions.append(action)
 
-        logging.debug(json.dumps(actions[0], indent=4))
+        self.logger.debug(json.dumps(actions[0], indent=4))
 
         success = helpers.bulk(self.loader.es, actions, stats_only=False)
-        logging.debug(json.dumps(success, indent=4))
+        self.logger.debug(json.dumps(success, indent=4))
         if success[0] !=1:
             # print("ERRORS REPORTED " + json.dumps(nb_errors))
-            logging.debug("SubmissionAuditElasticStorage: command failed:%s"%success[0])
+            self.logger.debug("SubmissionAuditElasticStorage: command failed:%s"%success[0])
         else:
-            logging.debug('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
+            self.logger.debug('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
 
         self.loader.es.indices.flush(index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME))
 
@@ -1657,7 +1670,7 @@ class SubmissionAuditElasticStorage():
 
     def storage_flush(self, data_source_name):
 
-        #logging.info("Flush storage for %s" % data_source_name)
+        #self.logger.info("Flush storage for %s" % data_source_name)
         if self.cache:
             ElasticStorage.store_to_es(self.loader.es,
                                        self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
@@ -1706,6 +1719,7 @@ class EvidenceValidationFileChecker():
         self.hgnc_current = {}
         self.eco_current = {}
         self.symbols = {}
+        self.logger = logging.getLogger(__name__)
 
     def startCapture(self, newLogLevel=None):
         """ Start capturing log output to a string buffer.
@@ -1759,7 +1773,7 @@ class EvidenceValidationFileChecker():
         Load HGNC information from the last version in database
         :return: None
         '''
-        logging.debug("Loading HGNC entries and mapping from Ensembl Gene Id to UniProt")
+        self.logger.debug("Loading HGNC entries and mapping from Ensembl Gene Id to UniProt")
         c = 0
         for row in self.session.query(HgncInfoLookup).order_by(desc(HgncInfoLookup.last_updated)).limit(1):
             # data = json.loads(row.data);
@@ -1769,7 +1783,7 @@ class EvidenceValidationFileChecker():
                 if "symbol" in doc:
                     gene_symbol = doc["symbol"];
                     if gene_symbol not in self.symbols:
-                        logging.debug("Adding missing symbol from Ensembl %s" % gene_symbol)
+                        self.logger.debug("Adding missing symbol from Ensembl %s" % gene_symbol)
                         self.symbols[gene_symbol] = {};
 
                     self.symbols[gene_symbol]["hgnc_id"] = doc["hgnc_id"]
@@ -1792,10 +1806,10 @@ class EvidenceValidationFileChecker():
                         if uniprot_id not in self.symbols[gene_symbol]["uniprot_ids"]:
                             self.symbols[gene_symbol]["uniprot_ids"].append(uniprot_id)
 
-        logging.debug("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
+        self.logger.debug("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
 
     def load_Uniprot(self):
-        logging.debug("Loading Uniprot identifiers and mappings to Gene Symbol and Ensembl Gene Id")
+        self.logger.debug("Loading Uniprot identifiers and mappings to Gene Symbol and Ensembl Gene Id")
         c = 0
         for row in self.session.query(UniprotInfo).yield_per(1000):
             # get the symbol too
@@ -1820,13 +1834,13 @@ class EvidenceValidationFileChecker():
                 #
                 if gene_symbol == 'PLSCR3':
                     gene_symbol = 'TMEM256-PLSCR3';
-                    logging.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
+                    self.logger.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
                 elif gene_symbol == 'LPPR4':
                     gene_symbol = 'PLPPR4';
-                    logging.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
+                    self.logger.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
                 elif gene_symbol == 'NSG2':
                     gene_symbol = 'HMP19';
-                    logging.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
+                    self.logger.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
 
                 self.uniprot_current[uniprot_accession]["gene_symbol"] = gene_symbol;
 
@@ -1871,14 +1885,14 @@ class EvidenceValidationFileChecker():
             # seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
             c += 1
             if c % 5000 == 0:
-                logging.debug("%i entries retrieved for uniprot" % c)
+                self.logger.debug("%i entries retrieved for uniprot" % c)
                 # for accession in seqrec.annotations['accessions']:
                 #    self.uniprot_current.append(accession)
-        logging.debug("%i entries retrieved for uniprot" % c)
+        self.logger.debug("%i entries retrieved for uniprot" % c)
 
     def load_Ensembl(self):
 
-        logging.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
+        self.logger.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
             Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
 
         for row in self.esquery.get_all_ensembl_genes():
@@ -1899,7 +1913,7 @@ class EvidenceValidationFileChecker():
                     self.symbols[display_name]["ensembl_secondary_ids"] = []
                 self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
 
-        logging.debug("Loading ES Ensembl finished")
+        self.logger.debug("Loading ES Ensembl finished")
 
 
     def store_gene_mapping(self):
@@ -1908,7 +1922,7 @@ class EvidenceValidationFileChecker():
             in one table called gene_mapping_lookup.
             It's a snapshot of the UniProt, Ensembl and HGNC information at a given time
         '''
-        logging.debug("Stitching everything together")
+        self.logger.debug("Stitching everything together")
         data = {'symbols': self.symbols, 'uniprot': self.uniprot_current, 'ensembl': self.ensembl_current}
 
         now = datetime.utcnow()
@@ -1921,7 +1935,7 @@ class EvidenceValidationFileChecker():
         )
         self.session.add(hr)
         self.session.commit()
-        logging.debug(
+        self.logger.debug(
             "inserted gene mapping information in JSONB format in the gene_mapping_lookup table at {:%d, %b %Y}".format(
                 today))
 
@@ -1931,18 +1945,18 @@ class EvidenceValidationFileChecker():
             from one table called gene_mapping_lookup.
         '''
 
-        logging.debug("Loading mapping between Ensembl, UniProt, HGNC and gene symbols")
+        self.logger.debug("Loading mapping between Ensembl, UniProt, HGNC and gene symbols")
         for row in self.session.query(GeneMappingLookup).order_by(desc(GeneMappingLookup.last_updated)).limit(1):
             data = row.data
             self.symbols = data['symbols']
             self.uniprot_current = data['uniprot']
-            #logging.info("Uniprot dictionary contains {0} entries".format(len(self.uniprot_current.keys())))
-            #logging.info(json.dumps(self.uniprot_current.keys()))
+            #self.logger.info("Uniprot dictionary contains {0} entries".format(len(self.uniprot_current.keys())))
+            #self.logger.info(json.dumps(self.uniprot_current.keys()))
             self.ensembl_current = data['ensembl']
 
     def load_eco(self):
 
-        logging.debug("Loading ECO current valid terms")
+        self.logger.debug("Loading ECO current valid terms")
         for row in self.session.query(ECONames):
             self.eco_current[row.uri] = row.label
 
@@ -2005,7 +2019,7 @@ class EvidenceValidationFileChecker():
                 next_uri = obsolete_classes[next_uri]
             new_label = current[next_uri]
             obsolete[uri] = "Use %s label:%s"%(next_uri, new_label)
-            logging.warn("%s %s"%(uri, obsolete[uri]))
+            self.logger.warn("%s %s"%(uri, obsolete[uri]))
 
     def load_hpo(self):
         '''
@@ -2023,7 +2037,7 @@ class EvidenceValidationFileChecker():
 
     def load_efo(self):
         # Change this in favor of paths
-        logging.info("Loading EFO current terms")
+        self.logger.info("Loading EFO current terms")
         efo_pattern = "http://www.ebi.ac.uk/efo/EFO_%"
         orphanet_pattern = "http://www.orpha.net/ORDO/Orphanet_%"
         hpo_pattern = "http://purl.obolibrary.org/obo/HP_%"
@@ -2052,11 +2066,11 @@ class EvidenceValidationFileChecker():
                         EFONames.uri.like(omim_pattern)
                 )
         ):
-            #logging.info(row.uri)
+            #self.logger.info(row.uri)
             # if row.uri not in uncat:
             self.efo_current[row.uri] = row.label
-        # logging.info(len(self.efo_current))
-        # logging.info("Loading EFO obsolete terms")
+        # self.logger.info(len(self.efo_current))
+        # self.logger.info("Loading EFO obsolete terms")
         for row in self.session.query(EFOObsoleteClass):
             #print "obsolete %s"%(row.uri)
             self.efo_obsolete[row.uri] = row.reason
@@ -2113,10 +2127,11 @@ class EvidenceValidationFileChecker():
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
                             job_timeout=1200)
 
-        q_reporter = RedisQueueStatusReporter([file_q,
+        q_reporter = RedisQueueStatusReporterTQDM([file_q,
                                                evidence_q,
-                                               audit_q],
-                                              interval=60)
+                                               # audit_q
+                                               ],
+                                              interval=10)
         q_reporter.start()
 
 
@@ -2205,5 +2220,5 @@ class EvidenceValidationFileChecker():
             self.es.indices.delete(audit_index_name)
         data_indices = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
         self.es.indices.delete(data_indices)
-        logging.info('Validation data deleted')
+        self.logger.info('Validation data deleted')
 

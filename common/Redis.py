@@ -2,19 +2,18 @@ import base64
 import json
 import logging
 import uuid
-
 import datetime
-
+from tqdm import tqdm
 try:
     import cPickle as pickle
 except ImportError:
     import pickle
 import time
 from multiprocessing import Process
-
 from redislite import Redis
-
 from settings import Config
+
+logger = logging.getLogger(__name__)
 
 
 class RedisQueue(object):
@@ -56,13 +55,15 @@ class RedisQueue(object):
     SUBMISSION_FINISH_STORE = "queue:submitionfinished:%(queue)s"
     PROCESSED_STORE = "queue:processed:%(queue)s"
     ERRORS_STORE = "queue:errors:%(queue)s"
+    TOTAL_STORE = "queue:total:%(queue)s"
 
     def __init__(self,
                  queue_id=None,
                  r_server = None,
                  max_size = 25000,
                  job_timeout = 30,
-                 ttl = 60*60*24+2):
+                 ttl = 60*60*24+2,
+                 total=None):
         '''
         :param queue_id: queue id to attach to preconfigured queues
         :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
@@ -80,12 +81,17 @@ class RedisQueue(object):
         self.processed_counter = self.PROCESSED_STORE % dict(queue = queue_id)
         self.errors_counter = self.ERRORS_STORE % dict(queue = queue_id)
         self.submission_done = self.SUBMISSION_FINISH_STORE % dict(queue = queue_id)
+        self.total_key = self.TOTAL_STORE % dict(queue=queue_id)
         self.r_server = r_server
         self.job_timeout = job_timeout
         self.max_queue_size = max_size
         self.default_ttl = ttl
         self.started = False
         self.start_time = time.time()
+        if total is not None:
+            self.total = total
+            if r_server is not None:
+                self.set_total(total, r_server)
 
 
     def put(self, element, r_server=None):
@@ -146,6 +152,18 @@ class RedisQueue(object):
     def _get_value_key(self, key):
         return self.VALUE_STORE % dict(queue = self.queue_id, key =key)
 
+    def get_total(self, r_server = None):
+        r_server = self._get_r_server(r_server)
+        return r_server.get(self.total_key)
+
+    def set_total(self, total, r_server=None):
+        r_server = self._get_r_server(r_server)
+        r_server.set(self.total_key, total)
+
+    def incr_total(self, increment, r_server=None):
+        r_server = self._get_r_server(r_server)
+        return r_server.incr(self.total_key, increment)
+
     def get_processing_jobs(self, r_server = None):
         r_server = self._get_r_server(r_server)
         return r_server.zrange(self.processing_key, 0, -1, withscores=True)
@@ -177,61 +195,29 @@ class RedisQueue(object):
         return self.queue_id
 
     def get_status(self, r_server=None):
-        now = time.time()
-        r_server = self._get_r_server(r_server)
-        lines = ['==== QUEUE: %s ====='%self.queue_id ]
-        submitted = int(r_server.get(self.submitted_counter) or 0)
-        if submitted:
-            processed = int(r_server.get(self.processed_counter) or 0)
-            errors = int(r_server.get(self.errors_counter) or 0)
-            error_percent = 0.
-            if processed:
-                error_percent = float(errors)/processed
-            submission_finished = bool(r_server.getbit(self.submission_done, 1))
-            processing_speed = 0.
-            if processed:
-                processing_speed = round(processed/(now-self.start_time),2)
-            lines.append('Submitted jobs: %i'%submitted)
-            lines.append('Processed jobs: {} | {:.1%}'.format(processed, float(processed)/submitted))
-            lines.append('Errors: {} | {:.1%}'.format(errors, error_percent))
-            lines.append('Processing speed: {:.1f} jobs per second'.format(processing_speed))
-            lines.append('-'*50)
-            queue_size = self.get_size(r_server)
-            queue_size_status = 'empty'
-            if queue_size:
-                if queue_size >= self.max_queue_size:
-                    queue_size_status = "full"
-                else:
-                    queue_size_status = 'accepting jobs'
-            lines.append('Queue size: %i | %s'%(queue_size, queue_size_status))
-            lines.append('Jobs being processed: %i'%len(self.get_processing_jobs(r_server)))
-            timedout_jobs = self.get_timedout_jobs(r_server)
-            if timedout_jobs:
-                self.put_back_timedout_jobs(r_server=r_server)
-            lines.append('Jobs timed out: %i'%len(timedout_jobs))
-            lines.append('Sumbission finished: %s'%submission_finished)
-            status = 'idle'
-            if submitted:
-                status = 'jobs sumbitted'
-            if processed:
-                status = 'processing'
-            if submission_finished and \
-                    (submitted == processed):
-                status = 'done'
-            lines.append('-'*50)
-            lines.append('STATUS: %s'%status)
-            lines.append('Elapsed time: %s'%datetime.timedelta(seconds=now-self.start_time))
-        else:
-            lines.append('Queue size: 0 | initialised')
-        lines.append(('='*50))
+        data = dict(queue_id=self.queue_id,
+                    submitted_counter=int(r_server.get(self.submitted_counter) or 0),
+                    processed_counter=int(r_server.get(self.processed_counter) or 0),
+                    errors_counter=int(r_server.get(self.errors_counter) or 0),
+                    submission_done=bool(r_server.getbit(self.submission_done, 1)),
+                    start_time=self.start_time,
+                    queue_size=self.get_size(r_server),
+                    max_queue_size=self.max_queue_size,
+                    processing_jobs=len(self.get_processing_jobs(r_server)),
+                    timedout_jobs=len(self.get_timedout_jobs(r_server)),
+                    total=self.get_total(r_server)
+                    )
 
-        return '\n'.join(lines)
+        if data['timedout_jobs']:
+            self.put_back_timedout_jobs(r_server=r_server)
+        return data
 
     def close(self, r_server=None):
         r_server = self._get_r_server(r_server)
-        #values_left = r_server.keys(self.VALUE_STORE % dict(queue = self.queue_id, key ='*')) #slow implementation. it will look over ALL the keys in redis. is slow if may other things are there.
-        values_left = [ self.VALUE_STORE % dict(queue = self.queue_id, key =key) \
-                        for key in r_server.lrange(self.main_queue, 0, -1)] # fast implementation
+        # values_left = r_server.keys(self.VALUE_STORE % dict(queue = self.queue_id, key ='*')) #slow
+        # implementation. it will look over ALL the keys in redis. is slow if may other things are there.
+        values_left = [self.VALUE_STORE % dict(queue=self.queue_id, key=key) \
+                       for key in r_server.lrange(self.main_queue, 0, -1)]  # fast implementation
         pipe = r_server.pipeline()
         for key in values_left:
             pipe.delete(key)
@@ -242,32 +228,32 @@ class RedisQueue(object):
         pipe.delete(self.errors_counter)
         pipe.execute()
 
-    def get_size(self, r_server= None):
+    def get_size(self, r_server=None):
         r_server = self._get_r_server(r_server)
         return r_server.llen(self.main_queue)
 
-    def get_value_for_key(self, key, r_server = None):
+    def get_value_for_key(self, key, r_server=None):
         r_server = self._get_r_server(r_server)
         value = r_server.get(self._get_value_key(key))
         if value:
             return pickle.loads(value)
         return None
 
-    def set_submission_finished(self, r_server = None):
+    def set_submission_finished(self, r_server=None):
         r_server = self._get_r_server(r_server)
         pipe = r_server.pipeline()
         pipe.setbit(self.submission_done, 1, 1)
         pipe.expire(self.submission_done, self.default_ttl)
         pipe.execute()
 
-    def is_submission_finished(self, r_server = None):
+    def is_submission_finished(self, r_server=None):
         r_server = self._get_r_server(r_server)
         return r_server.getbit(self.submission_done, 1)
 
-    def is_empty(self, r_server = None):
+    def is_empty(self, r_server=None):
         return self.get_size(r_server) == 0
 
-    def is_done(self, r_server = None):
+    def is_done(self, r_server=None):
         r_server = self._get_r_server(r_server)
         if self.is_submission_finished(r_server):
             pipe = r_server.pipeline()
@@ -276,10 +262,10 @@ class RedisQueue(object):
             submitted, processed = pipe.execute()
             submitted = int(submitted or 0)
             processed = int(processed or 0)
-            return submitted <= processed #temporary hack should check for equal
+            return submitted <= processed  # temporary hack should check for equal
         return False
 
-    def _get_r_server(self, r_server = None):
+    def _get_r_server(self, r_server=None):
         if not r_server:
             r_server = self.r_server
         if r_server is None:
@@ -290,22 +276,23 @@ class RedisQueueStatusReporter(Process):
     '''
     Cyclically logs the status of a list RedisQueue objects
     '''
+
     def __init__(self,
                  queues,
-                 interval = 15
+                 interval=15
                  ):
         super(RedisQueueStatusReporter, self).__init__()
         self.queues = queues
         self.r_server = Redis(Config.REDISLITE_DB_PATH)
         self.interval = interval
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger(__name__)
 
     def run(self):
         self.logger.info("reporter worker started")
 
         while not self.is_done():
             for q in self.queues:
-                self.logger.info(q.get_status(self.r_server))
+                self.logger.info(self.format(q.get_status(self.r_server)))
             time.sleep(self.interval)
 
     def is_done(self):
@@ -313,6 +300,139 @@ class RedisQueueStatusReporter(Process):
             if not q.is_done(self.r_server):
                 return False
         return True
+
+    def format(self, data):
+        now = time.time()
+        lines = ['==== QUEUE: %s =====' % data['queue_id']]
+        submitted = data['submitted_counter']
+        if submitted:
+            processed = data['processed_counter']
+            errors = data['errors_counter']
+            error_percent = 0.
+            if processed:
+                error_percent = float(errors) / processed
+            submission_finished = data['submission_done']
+            processing_speed = 0.
+            if processed:
+                processing_speed = round(processed / (now - data['start_time']), 2)
+            lines.append('Submitted jobs: %i' % submitted)
+            lines.append('Processed jobs: {} | {:.1%}'.format(processed, float(processed) / submitted))
+            lines.append('Errors: {} | {:.1%}'.format(errors, error_percent))
+            lines.append('Processing speed: {:.1f} jobs per second'.format(processing_speed))
+            lines.append('-' * 50)
+            queue_size = data['queue_size']
+            queue_size_status = 'empty'
+            if queue_size:
+                if queue_size >= data['max_queue_size']:
+                    queue_size_status = "full"
+                else:
+                    queue_size_status = 'accepting jobs'
+            lines.append('Queue size: %i | %s' % (queue_size, queue_size_status))
+            lines.append('Jobs being processed: %i' % data["processing_jobs"])
+            lines.append('Jobs timed out: %i' % data["timedout_jobs"])
+            lines.append('Sumbmission finished: %s' % submission_finished)
+            status = 'idle'
+            if submitted:
+                status = 'jobs sumbitted'
+            if processed:
+                status = 'processing'
+            if submission_finished and \
+                    (submitted == processed):
+                status = 'done'
+            lines.append('-' * 50)
+            lines.append('STATUS: %s' % status)
+            lines.append('Elapsed time: %s' % datetime.timedelta(seconds=now - data['start_time']))
+        else:
+            lines.append('Queue size: 0 | initialised')
+        lines.append(('=' * 50))
+
+        return '\n'.join(lines)
+
+class RedisQueueStatusReporterTQDM(Process):
+    '''
+    Cyclically logs the status of a list RedisQueue objects
+    '''
+
+    def __init__(self,
+                 queues,
+                 interval=15
+                 ):
+        super(RedisQueueStatusReporterTQDM, self).__init__()
+        self.queues = queues
+        self.r_server = Redis(Config.REDISLITE_DB_PATH)
+        self.interval = interval
+        self.logger = logging.getLogger(__name__)
+
+    def run(self):
+        self.logger.info("reporter worker started")
+
+        self.bars = {}
+        for q in self.queues:
+            queue_id = self._simplify_queue_id(q.queue_id)
+            self.bars[q.queue_id] = dict(
+                                         # queue_size=tqdm(desc='%s queue size' % queue_id,
+                                         #                 unit = ' jobs',
+                                         #                 total=q.max_queue_size,
+                                         #                 dynamic_ncols = True,
+                                         #                 ),
+                                         submitted_counter=tqdm(desc='%s submitted jobs' % queue_id,
+                                                                unit=' jobs',
+                                                                total=q.get_total(self.r_server) or 0,
+                                                                dynamic_ncols=True,
+                                                                ),
+                                         processed_counter=tqdm(desc='%s processed jobs' % queue_id,
+                                                                unit=' jobs',
+                                                                total=q.get_total(self.r_server) or 0,
+                                                                dynamic_ncols=True,
+                                                                ),
+                                         last_status = None
+                                        )
+
+        while not self.is_done():
+            for q in self.queues:
+                data = q.get_status(self.r_server)
+                last_data = self.bars[q.queue_id]['last_status']
+                submitted_counter = data['submitted_counter']
+                processed_counter = data['processed_counter']
+                if last_data:
+                    submitted_counter -= last_data['submitted_counter']
+                    processed_counter -= last_data['processed_counter']
+                if data['queue_size']:
+                    self.bars[q.queue_id]['queue_size'] = tqdm(desc='%s queue size' % queue_id,
+                                                             unit=' jobs',
+                                                             total=q.max_queue_size,
+                                                             dynamic_ncols=True,
+                                                             initial=data['queue_size']
+                                                             )
+                    # self.bars[q.queue_id]['queue_size'].initial(0)
+                    # self.bars[q.queue_id]['queue_size'].update(data['queue_size'])
+                if submitted_counter:
+                    self.bars[q.queue_id]['submitted_counter'].update(submitted_counter)
+                    if self.bars[q.queue_id]['submitted_counter'].total != data['total']:
+                        self.bars[q.queue_id]['processed_counter'].total = data['total']
+                if processed_counter:
+                    self.bars[q.queue_id]['processed_counter'].total = submitted_counter
+                    self.bars[q.queue_id]['processed_counter'].update(processed_counter)
+                self.bars[q.queue_id]['last_status'] = data
+
+
+            time.sleep(self.interval)
+            for q in self.queues:
+                try:
+                    self.bars[q.queue_id]['queue_size'].close()
+                except KeyError:
+                    pass
+
+    def is_done(self):
+        for q in self.queues:
+            if not q.is_done(self.r_server):
+                return False
+        return True
+
+    def _simplify_queue_id(self, queue_id):
+        if '|' in queue_id:
+            return queue_id.split('|')[-1]
+        return queue_id
 
 class RedisQueueWorkerProcess(Process):
     '''
@@ -334,7 +454,7 @@ class RedisQueueWorkerProcess(Process):
         self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
         self.queue_out = queue_out
         self.r_server = Redis(redis_path, serverconfig={'save': []})
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger(__name__)
         self.logger.info('%s started' % self.name)
 
 
