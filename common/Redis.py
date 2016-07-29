@@ -154,7 +154,10 @@ class RedisQueue(object):
 
     def get_total(self, r_server = None):
         r_server = self._get_r_server(r_server)
-        return r_server.get(self.total_key)
+        total = r_server.get(self.total_key)
+        if total is None:
+            return
+        return int(total)
 
     def set_total(self, total, r_server=None):
         r_server = self._get_r_server(r_server)
@@ -272,6 +275,7 @@ class RedisQueue(object):
             raise AttributeError('A redis server is required either at class instantation or at the method level')
         return r_server
 
+
 class RedisQueueStatusReporter(Process):
     '''
     Cyclically logs the status of a list RedisQueue objects
@@ -290,10 +294,80 @@ class RedisQueueStatusReporter(Process):
     def run(self):
         self.logger.info("reporter worker started")
 
+        self.bars = {}
+        for i,q in enumerate(self.queues):
+            queue_id = self._simplify_queue_id(q.queue_id)
+            queue_position=i*2
+            self.bars[q.queue_id] = dict(
+                                         # queue_size=tqdm(desc='%s queue size' % queue_id,
+                                         #                 unit = ' jobs',
+                                         #                 total=q.max_queue_size,
+                                         #                 dynamic_ncols = True,
+                                         #                 position=queue_position,
+                                         #                 ),
+                                         submitted_counter=tqdm(desc='%s submitted jobs' % queue_id,
+                                                                unit=' jobs',
+                                                                total=q.get_total(self.r_server),
+                                                                dynamic_ncols=True,
+                                                                # position=queue_position+0,
+                                                                ),
+                                         processed_counter=tqdm(desc='%s processed jobs' % queue_id,
+                                                                unit=' jobs',
+                                                                total=q.get_total(self.r_server),
+                                                                dynamic_ncols=True,
+                                                                # position=queue_position+1,
+                                                                ),
+                                         last_status = None
+                                        )
+
         while not self.is_done():
-            for q in self.queues:
-                self.logger.info(self.format(q.get_status(self.r_server)))
+            for i,q in enumerate(self.queues):
+                queue_position = i * 3
+                data = q.get_status(self.r_server)
+                self.log(data)
+                last_data = self.bars[q.queue_id]['last_status']
+                submitted_counter = data['submitted_counter']
+                processed_counter = data['processed_counter']
+                if last_data:
+                    submitted_counter -= last_data['submitted_counter']
+                    processed_counter -= last_data['processed_counter']
+                # if data['queue_size']:
+                #     # self.bars[q.queue_id]['queue_size'] = tqdm(desc='%s queue size' % queue_id,
+                #     #                                          unit=' jobs',
+                #     #                                          total=q.max_queue_size,
+                #     #                                          dynamic_ncols=True,
+                #     #                                          initial=data['queue_size']
+                #     #                                          )
+                #     self.bars[q.queue_id]['queue_size'].n = data['queue_size']
+                #     self.bars[q.queue_id]['queue_size'].refresh()
+                if submitted_counter:
+                    if data['total'] and self.bars[q.queue_id]['submitted_counter'].total != data['total']:
+                        self.bars[q.queue_id]['submitted_counter'].total = data['total']
+                    self.bars[q.queue_id]['submitted_counter'].update(submitted_counter)
+                    # self.bars[q.queue_id]['submitted_counter'].refresh()
+                        # self.bars[q.queue_id]['submitted_counter'].close()
+                        # self.bars[q.queue_id]['submitted_counter'] = tqdm(desc='%s processed jobs' % queue_id,
+                        #                                                   unit=' jobs',
+                        #                                                   total=data['total'],
+                        #                                                   dynamic_ncols=True,
+                        #                                                   initial= submitted_counter
+                        #                                                   )
+
+                if processed_counter:
+
+                    if data['total'] and self.bars[q.queue_id]['processed_counter'].total != data['total']:
+                        self.bars[q.queue_id]['processed_counter'].total = data['total']
+                    self.bars[q.queue_id]['processed_counter'].update(processed_counter)
+                    # self.bars[q.queue_id]['processed_counter'].refresh()
+                self.bars[q.queue_id]['last_status'] = data
+
+
             time.sleep(self.interval)
+            # for q in self.queues:
+            #     try:
+            #         self.bars[q.queue_id]['queue_size'].close()
+            #     except KeyError:
+            #         pass
 
     def is_done(self):
         for q in self.queues:
@@ -301,9 +375,17 @@ class RedisQueueStatusReporter(Process):
                 return False
         return True
 
+    def _simplify_queue_id(self, queue_id):
+        if '|' in queue_id:
+            return queue_id.split('|')[-1]
+        return queue_id
+
+    def log(self, data):
+        self.logger.info(self.format(data))
+
     def format(self, data):
         now = time.time()
-        lines = ['==== QUEUE: %s =====' % data['queue_id']]
+        lines = ['\n==== QUEUE: %s =====' % data['queue_id']]
         submitted = data['submitted_counter']
         if submitted:
             processed = data['processed_counter']
@@ -347,92 +429,6 @@ class RedisQueueStatusReporter(Process):
         lines.append(('=' * 50))
 
         return '\n'.join(lines)
-
-class RedisQueueStatusReporterTQDM(Process):
-    '''
-    Cyclically logs the status of a list RedisQueue objects
-    '''
-
-    def __init__(self,
-                 queues,
-                 interval=15
-                 ):
-        super(RedisQueueStatusReporterTQDM, self).__init__()
-        self.queues = queues
-        self.r_server = Redis(Config.REDISLITE_DB_PATH)
-        self.interval = interval
-        self.logger = logging.getLogger(__name__)
-
-    def run(self):
-        self.logger.info("reporter worker started")
-
-        self.bars = {}
-        for q in self.queues:
-            queue_id = self._simplify_queue_id(q.queue_id)
-            self.bars[q.queue_id] = dict(
-                                         # queue_size=tqdm(desc='%s queue size' % queue_id,
-                                         #                 unit = ' jobs',
-                                         #                 total=q.max_queue_size,
-                                         #                 dynamic_ncols = True,
-                                         #                 ),
-                                         submitted_counter=tqdm(desc='%s submitted jobs' % queue_id,
-                                                                unit=' jobs',
-                                                                total=q.get_total(self.r_server) or 0,
-                                                                dynamic_ncols=True,
-                                                                ),
-                                         processed_counter=tqdm(desc='%s processed jobs' % queue_id,
-                                                                unit=' jobs',
-                                                                total=q.get_total(self.r_server) or 0,
-                                                                dynamic_ncols=True,
-                                                                ),
-                                         last_status = None
-                                        )
-
-        while not self.is_done():
-            for q in self.queues:
-                data = q.get_status(self.r_server)
-                last_data = self.bars[q.queue_id]['last_status']
-                submitted_counter = data['submitted_counter']
-                processed_counter = data['processed_counter']
-                if last_data:
-                    submitted_counter -= last_data['submitted_counter']
-                    processed_counter -= last_data['processed_counter']
-                if data['queue_size']:
-                    self.bars[q.queue_id]['queue_size'] = tqdm(desc='%s queue size' % queue_id,
-                                                             unit=' jobs',
-                                                             total=q.max_queue_size,
-                                                             dynamic_ncols=True,
-                                                             initial=data['queue_size']
-                                                             )
-                    # self.bars[q.queue_id]['queue_size'].initial(0)
-                    # self.bars[q.queue_id]['queue_size'].update(data['queue_size'])
-                if submitted_counter:
-                    self.bars[q.queue_id]['submitted_counter'].update(submitted_counter)
-                    if self.bars[q.queue_id]['submitted_counter'].total != data['total']:
-                        self.bars[q.queue_id]['processed_counter'].total = data['total']
-                if processed_counter:
-                    self.bars[q.queue_id]['processed_counter'].total = submitted_counter
-                    self.bars[q.queue_id]['processed_counter'].update(processed_counter)
-                self.bars[q.queue_id]['last_status'] = data
-
-
-            time.sleep(self.interval)
-            for q in self.queues:
-                try:
-                    self.bars[q.queue_id]['queue_size'].close()
-                except KeyError:
-                    pass
-
-    def is_done(self):
-        for q in self.queues:
-            if not q.is_done(self.r_server):
-                return False
-        return True
-
-    def _simplify_queue_id(self, queue_id):
-        if '|' in queue_id:
-            return queue_id.split('|')[-1]
-        return queue_id
 
 class RedisQueueWorkerProcess(Process):
     '''

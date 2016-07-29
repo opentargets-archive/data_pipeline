@@ -5,6 +5,8 @@ import pysftp
 import requests
 from paramiko import AuthenticationException
 from requests.packages.urllib3.exceptions import HTTPError
+from tqdm import tqdm
+
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 import re
@@ -17,7 +19,7 @@ from datetime import datetime, date
 from sqlalchemy import and_, or_, table, column, select, update, insert, desc
 from common import Actions
 from common.PGAdapter import *
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueueStatusReporterTQDM
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 import opentargets.model.core as opentargets
 from  common.EvidenceJsonUtils import DatatStructureFlattener
 from settings import Config, ElasticSearchConfiguration
@@ -223,15 +225,23 @@ class DirectoryCrawlerProcess():
                 if '-' in version_name:
                     user, day, month, year = version_name.split('-')
                     if '_' in user:
+                        datasource = ''.join(user.split('_')[1:])
                         user = user.split('_')[0]
+                    else:
+                        datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED(user)
                     release_date = date(int(year),int(month), int(day))
                     if user not in self._remote_filenames:
-                        self._remote_filenames[user]=dict(date = release_date,
-                                                          file_path = filename,
-                                                          file_version = version_name)
+                        self._remote_filenames[user]={datasource : dict(date = release_date,
+                                                                          file_path = filename,
+                                                                          file_version = version_name)
+                                                      }
+                    elif datasource not in self._remote_filenames[user]:
+                        self._remote_filenames[user][datasource] = dict(date=release_date,
+                                                                        file_path=filename,
+                                                                        file_version=version_name)
                     else:
-                        if release_date > self._remote_filenames[user]['date']:
-                            self._remote_filenames[user] = dict(date=release_date,
+                        if release_date > self._remote_filenames[user][datasource]['date']:
+                            self._remote_filenames[user][datasource] = dict(date=release_date,
                                                                 file_path=filename,
                                                                 file_version=version_name)
             except:
@@ -253,7 +263,10 @@ class DirectoryCrawlerProcess():
         self.submission_audit.storage_create_index(recreate=False)
 
         '''scroll through remote  user directories and find the latest files'''
-        for u, p in Config.EVIDENCEVALIDATION_FTP_ACCOUNTS.items():
+
+        for u, p in tqdm(Config.EVIDENCEVALIDATION_FTP_ACCOUNTS.items(),
+                         desc='scanning ftp accounts',
+                         leave=False):
             try:
                 cnopts = pysftp.CnOpts()
                 cnopts.hostkeys = None  # disable host key checking.
@@ -264,30 +277,27 @@ class DirectoryCrawlerProcess():
                                        cnopts = cnopts,
                                        ) as srv:
                     srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
-                    latest_file = self._remote_filenames[u]['file_path']
-                    file_version = self._remote_filenames[u]['file_version']
-                    self.logger.info(latest_file)
+                    for datasource, file_data in tqdm(self._remote_filenames[u].items(),
+                                                      desc='scanning available datasource for account %s'%u,
+                                                      leave=False,):
+                        latest_file = file_data['file_path']
+                        file_version = file_data['file_version']
+                        self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
 
-                    if u in Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED:
-                        data_source_name = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[u]
-                    else:
-                        data_source_name  = file_version.split('-')[0].replace(u+'_','')
-                        self.logger.info(data_source_name)
-                    logfile = os.path.join('/tmp', file_version+ ".log")
-                    self.logger.info("%s checking file: %s" % (self.__class__.__name__, file_version))
-                    self.evidence_chunk.storage_create_index(data_source_name,recreate=False)
+                        logfile = os.path.join('/tmp', file_version+ ".log")
+                        self.logger.info("%s checking file: %s" % (self.__class__.__name__, file_version))
+                        self.evidence_chunk.storage_create_index(datasource,recreate=False)
 
 
-                    try:
-                        ''' get md5 '''
-                        md5_hash = self.md5_hash_remote_file(latest_file, srv)
-                        self.logger.debug("%s %s %s" % (self.__class__.__name__, file_version, md5_hash))
-                        self.check_file(latest_file, file_version, u, data_source_name,
-                                        md5_hash, logfile)
-                        self.logger.debug("%s %s DONE" % (self.__class__.__name__, file_version))
+                        try:
+                            ''' get md5 '''
+                            md5_hash = self.md5_hash_remote_file(latest_file, srv)
+                            self.logger.debug("%s %s %s" % (self.__class__.__name__, file_version, md5_hash))
+                            self.check_file(latest_file, file_version, u, datasource, md5_hash, logfile)
+                            self.logger.debug("%s %s DONE" % (self.__class__.__name__, file_version))
 
-                    except AttributeError, e:
-                        self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
+                        except AttributeError, e:
+                            self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
 
             except AuthenticationException:
                 self.logger.error( 'cannot connect with credentials: user:%s password:%s' % (u, p))
@@ -316,7 +326,6 @@ class DirectoryCrawlerProcess():
                    md5_hash,
                    logfile=None,
                    validate=True,
-                   rowToUpdate = None,
                    ):
         '''check if the file was already parsed in ES'''
 
@@ -434,11 +443,13 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                                    mode='rb',
                                    fileobj=f,
                                    mtime=file_mod_time) as fh:
-                    line = fh.readline()
-                    while line:
-                        lines +=1
-                        line = fh.readline()
-            self.queue_out.incr_total(lines, self.r_server)
+                    # lines = self._count_file_lines(fh)
+                    gzip_compression_estimate = 10.5
+                    lines = self._estimate_file_lines(fh, file_size*gzip_compression_estimate)
+            total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+            if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
+                total_chunks +=1
+            self.queue_out.incr_total(total_chunks, self.r_server)
             with srv.open(file_path, mode='rb', bufsize=1) as f:
                 with gzip.GzipFile(filename = file_path.split('/')[1],
                                    mode = 'rb',
@@ -479,6 +490,26 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                            self.r_server)
 
         return
+
+    def _count_file_lines(self, fh):
+        lines = 0
+        line = fh.readline()
+        while line:
+            lines += 1
+            line = fh.readline()
+        return lines
+
+    def _estimate_file_lines(self, fh, file_size, max_lines = 50000):
+        lines = 0
+        size = 0
+        line = fh.readline()
+        while line:
+            lines += 1
+            size += len(line)
+            line = fh.readline()
+            if lines > max_lines:
+                return int(round(file_size/(float(size)/max_lines)))
+        return lines
 
 
 class ValidatorProcess(RedisQueueWorkerProcess):
@@ -2109,12 +2140,26 @@ class EvidenceValidationFileChecker():
         #self.load_mp()
         #return;
 
+
+        progress = tqdm(desc='loading lookup data',
+                        unit=' step',
+                        total=5,
+                        dynamic_ncols=True,
+                        leave=False,
+                        )
+
         self.load_gene_mapping()
+        progress.update()
         self.load_efo()
+        progress.update()
         self.load_hpo()
+        progress.update()
         self.load_mp()
+        progress.update()
         self.load_eco()
+        progress.update()
         self.adapter.close()
+        progress.close()
 
         'Create queues'
         file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
@@ -2127,9 +2172,9 @@ class EvidenceValidationFileChecker():
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
                             job_timeout=1200)
 
-        q_reporter = RedisQueueStatusReporterTQDM([file_q,
+        q_reporter = RedisQueueStatusReporter([file_q,
                                                evidence_q,
-                                               # audit_q
+                                               audit_q
                                                ],
                                               interval=10)
         q_reporter.start()
@@ -2143,7 +2188,10 @@ class EvidenceValidationFileChecker():
                                      self.r_server.db,
                                      evidence_q,
                                      self.es,
-                                     ) for i in range(2)]
+                                     )
+                                     for i in range(1)
+                                     # for i in range(2)
+                                     ]
         # ) for i in range(2)]
         for w in readers:
             w.start()
