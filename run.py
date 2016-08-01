@@ -153,7 +153,7 @@ if __name__ == '__main__':
             logger.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
             time.sleep(wait_time)
             if connection_attempt > 5:
-                logger.error('Elasticsearch is not resolvable at %' % Config.ELASTICSEARCH_URL)
+                logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
                 break
             connection_attempt+=1
 
@@ -170,7 +170,7 @@ if __name__ == '__main__':
         logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
         time.sleep(wait_time)
         if connection_attempt >5:
-            logger.error('Elasticsearch is not reachable at %'%Config.ELASTICSEARCH_URL)
+            logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
             break
         connection_attempt += 1
 
