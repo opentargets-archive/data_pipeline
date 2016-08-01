@@ -675,7 +675,7 @@ class Evidence(JSONSerializable):
     def stamp_data_release(self):
         self.evidence['data_release'] = Config.RELEASE_VERSION
 
-        return json.dumps(self.evidence)
+        return
 
     def score_to_json(self):
         score = {}
