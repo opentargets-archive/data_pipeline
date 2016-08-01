@@ -132,6 +132,18 @@ class Config():
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
     MOUSEMODELS_CACHE_DIRECTORY = '~/.phenodigmcache'
 
+    # hardcoded folder of json file to be preprocessed to extract
+    # HP and MP terms not in EFO but that will be combined in a SLIM
+    ONTOLOGY_PREPROCESSING_DATASOURCES = [
+        'cttv008-14-03-2016.json.gz',
+        ''
+    ]
+
+    ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS = ["cttv008", "cttv012"]
+
+    # put the path to the file where you want to write the SLIM file (turtle format)
+    ONTOLOGY_SLIM_FILE = 'C:\users\gk680303\data\ontologies\opentargets_disease_phenotype_slim.ttl'
+
     DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
     DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
                                                         #phenodigm=dict(min=0.4, max= 1),
