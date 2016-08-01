@@ -36,7 +36,7 @@ __status__ = "Production"
 INTOGEN_RELEASE_DATE = ''
 #INTOGEN_FILENAME = 'C:\Users\gk680303\github\data_pipeline\resources\intogen_opentargets.tsv'
 INTOGEN_FILENAME = '/Users/koscieln/Documents/work/gitlab/data_pipeline/resources/intogen_opentargets.tsv'
-INTOGEN_EVIDENCE_FILENAME = '/Users/koscieln/Documents/work/gitlab/data_pipeline/resources/cttv001_external_intogen-19-07-2016.json'
+INTOGEN_EVIDENCE_FILENAME = '/Users/koscieln/Documents/data/ftp/cttv001/upload/submissions/cttv001_external_intogen-29-07-2016.json'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {
     'A' : 'the gene exhibits several signals of positive selection in the tumor type',
@@ -182,7 +182,11 @@ class IntOGen():
             database=evidence_core.BaseDatabase(
                 id="IntOGen Cancer Drivers Database",
                 version='2014.12',
-                dbxref=evidence_core.BaseDbxref(url="https://www.intogen.org/search", id="IntOGen Cancer Drivers Database", version="2014.12")))
+                dbxref=evidence_core.BaseDbxref(url="https://www.intogen.org/search", id="IntOGen Cancer Drivers Database", version="2014.12")),
+            literature = evidence_core.BaseLiterature(
+                references = [ evidence_core.Single_Lit_Reference(lit_id = "http://europepmc.org/abstract/MED/25759023") ]
+            )
+        )
         error = provenance_type.validate(logging)
         if error > 0:
             logging.error(provenance_type.to_JSON(indentation=4))
@@ -199,7 +203,8 @@ class IntOGen():
                     resource_score = association_score.Probability(
                         type="probability",
                         method= association_score.Method(
-                            description ="IntOGen Driver identification methods as described in Rubio-Perez, C., Tamborero, D., Schroeder, MP., Antolin, AA., Deu-Pons,J., Perez-Llamas, C., Mestres, J., Gonzalez-Perez, A., Lopez-Bigas, N. In silico prescription of anticancer drugs to cohorts of 28 tumor types reveals novel targeting opportunities. Cancer Cell 27 (2015), pp. 382-396",                            reference = "http://europepmc.org/abstract/MED/25759023",
+                            description ="IntOGen Driver identification methods as described in Rubio-Perez, C., Tamborero, D., Schroeder, MP., Antolin, AA., Deu-Pons,J., Perez-Llamas, C., Mestres, J., Gonzalez-Perez, A., Lopez-Bigas, N. In silico prescription of anticancer drugs to cohorts of 28 tumor types reveals novel targeting opportunities. Cancer Cell 27 (2015), pp. 382-396",
+                            reference = "http://europepmc.org/abstract/MED/25759023",
                             url = "https://www.intogen.org/about"),
                         value=INTOGEN_SCORE_MAP[Evidence])
 
@@ -270,10 +275,18 @@ class IntOGen():
 
                     evidenceString.evidence.urls = [ linkout ]
 
+                    # gain_of_function would become "Dominant", loss_of_function would be Recessive
+                    inheritance_pattern = 'unknown'
+                    if Role == 'Act':
+                        inheritance_pattern = 'dominant'
+                    elif Role == 'LoF':
+                        inheritance_pattern = 'recessive'
+
                     ''' gene_variant '''
                     mutation = evidence_mutation.Mutation(
                         functional_consequence = 'http://purl.obolibrary.org/obo/SO_0001564',
-                        preferred_name = '%s_%s'%(Symbol, Tumor_Type))
+                        preferred_name = 'gene_variant',
+                        inheritance_pattern = inheritance_pattern)
 
                     evidenceString.evidence.known_mutations = [ mutation ]
 
