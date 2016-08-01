@@ -2,6 +2,8 @@ import json
 from UserDict import UserDict
 from json import JSONEncoder
 
+from settings import Config
+
 __author__ = 'andreap'
 
 class PipelineEncoder(JSONEncoder):
@@ -14,6 +16,7 @@ class PipelineEncoder(JSONEncoder):
 
 class JSONSerializable():
     def to_json(self):
+        self.stamp_data_release()
         return json.dumps(self,
                           default=lambda o: o.__dict__,
                           sort_keys=True,
@@ -27,6 +30,10 @@ class JSONSerializable():
             self.__dict__.update(**data)
         else:
             raise AttributeError("cannot load object from %s type"%str(type(data)))
+
+    def stamp_data_release(self):
+        self.__dict__['data_release'] = Config.RELEASE_VERSION
+
 
 class TreeNode(object):
 
