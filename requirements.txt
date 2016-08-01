@@ -25,3 +25,4 @@ jsonpickle
 simplejson
 numpy
 scipy
+tqdm=4.8.1

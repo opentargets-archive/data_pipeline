@@ -116,7 +116,7 @@ class Config():
                                        port = 22)
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
-    #EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
+    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv010"] = 'c2a64557'
@@ -1004,8 +1004,9 @@ class ElasticSearchConfiguration():
                     },
                 "dynamic_templates" : [
                         {
-                            "do_not_analyze_symbol" : {
-                                "path_match" : "ortholog.*.symbol",
+                            "do_not_analyze_ortholog" : {
+                                "match_mapping_type": "string",
+                                "path_match" : "ortholog*symbol",
                                 "mapping" : {
                                     "index" : "not_analyzed"
                                 }

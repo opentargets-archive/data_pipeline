@@ -32,6 +32,14 @@ import argparse
 from settings import Config, ElasticSearchConfiguration
 from redislite import Redis
 
+'''setup module default logging'''
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename = 'output.log',
+                    format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+logging.getLogger('elasticsearch').setLevel(logging.ERROR)
+logging.getLogger("requests").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 def clear_redislite_db():
     if os.path.exists(Config.REDISLITE_DB_PATH):
@@ -125,15 +133,8 @@ if __name__ == '__main__':
 
     '''logger'''
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    for handler in logger.handlers:
-        handler.setFormatter(formatter)
 
-    logging.basicConfig(level=logging.INFO)
-    logging.getLogger('elasticsearch').setLevel(logging.ERROR)
-    logging.getLogger("requests").setLevel(logging.ERROR)
-    logging.getLogger("urllib3").setLevel(logging.ERROR)
+
 
     '''sqlalchemy adapter'''
     adapter = Adapter()
@@ -144,15 +145,15 @@ if __name__ == '__main__':
             socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
             nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
             hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
-            logging.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
+            logger.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
             break
         except socket.gaierror:
             wait_time = 5 * connection_attempt
-            logging.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
-            logging.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
+            logger.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
+            logger.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
             time.sleep(wait_time)
             if connection_attempt > 5:
-                logging.error('Elasticsearch is not resolvable at %' % Config.ELASTICSEARCH_URL)
+                logger.error('Elasticsearch is not resolvable at %' % Config.ELASTICSEARCH_URL)
                 break
             connection_attempt+=1
 
@@ -166,12 +167,13 @@ if __name__ == '__main__':
     connection_attempt = 1
     while not es.ping():
         wait_time = 5*connection_attempt
-        logging.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
+        logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
         time.sleep(wait_time)
         if connection_attempt >5:
-            logging.error('Elasticsearch is not reachable at %'%Config.ELASTICSEARCH_URL)
+            logger.error('Elasticsearch is not reachable at %'%Config.ELASTICSEARCH_URL)
             break
         connection_attempt += 1
+
 
     # es = Elasticsearch(["10.0.0.11:9200"],
     # # sniff before doing anything
