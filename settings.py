@@ -1,7 +1,6 @@
 import uuid
 from collections import defaultdict, OrderedDict
 
-from common.DataStructure import RelationType
 
 __author__ = 'andreap'
 import os
@@ -116,7 +115,7 @@ class Config():
                                        port = 22)
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
+    # # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv010"] = 'c2a64557'
@@ -164,6 +163,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['disgenet'] = 'literature'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
@@ -837,6 +837,7 @@ class ElasticSearchConfiguration():
                             }
 
     relation_mappings = {}
+    from common.DataStructure import RelationType
     for rt in [RelationType.SHARED_DISEASE,
                RelationType.SHARED_TARGET,
                ]:
