@@ -1,7 +1,6 @@
 import json
 from UserDict import UserDict
 from json import JSONEncoder
-
 from settings import Config
 
 __author__ = 'andreap'
