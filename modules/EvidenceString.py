@@ -13,7 +13,7 @@ from elasticsearch import Elasticsearch
 from sqlalchemy import and_
 import sys
 from common import Actions
-from common.DataStructure import JSONSerializable
+from common.DataStructure import JSONSerializable, PipelineEncoder
 from common.ElasticsearchLoader import JSONObjectStorage, Loader
 from common.ElasticsearchQuery import ESQuery
 from modules import GeneData
@@ -666,6 +666,15 @@ class Evidence(JSONSerializable):
         return self.evidence['id']
 
     def to_json(self):
+        self.stamp_data_release()
+        return json.dumps(self.evidence,
+                          sort_keys=True,
+                          # indent=4,
+                          cls=PipelineEncoder)
+
+    def stamp_data_release(self):
+        self.evidence['data_release'] = Config.RELEASE_VERSION
+
         return json.dumps(self.evidence)
 
     def score_to_json(self):
