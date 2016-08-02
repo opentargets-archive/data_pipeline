@@ -26,3 +26,6 @@ simplejson
 numpy
 scipy
 tqdm==4.8.1
+cement==2.10.2
+colorlog
+argcomplete
