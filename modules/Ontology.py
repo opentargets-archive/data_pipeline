@@ -155,11 +155,23 @@ class PhenotypeSlim():
         #if term == 'http://purl.obolibrary.org/obo/HP_0001251':
         if True:
 
-            print "---------"
             for sparql_query in [DIRECT_ANCESTORS, INDIRECT_ANCESTORS]:
                 self.sparql.setQuery(sparql_query%(term, term))
                 self.sparql.setReturnFormat(JSON)
-                results = self.sparql.query().convert()
+                results = None
+                n = 0
+                while (n < 2):
+                    try:
+                        results = self.sparql.query().convert()
+                        n = 3
+                    except SPARQLWrapper.SPARQLExceptions.EndPointNotFound, e:
+                        print e
+                        self.logger.error(e)
+                        if n > 2:
+                            raise e
+                        else:
+                            n=n+1
+
                 #print len(results)
                 #print json.dumps(results)
 
@@ -175,8 +187,9 @@ class PhenotypeSlim():
                     if ancestor not in self.phenotype_map[direct_child]['superclasses']:
                         self.phenotype_map[direct_child]['superclasses'].append(ancestor)
                         print "%i %s %s (direct child is %s %s)"%(count, parent_label, ancestor, direct_child_label, direct_child)
+                        print "---------"
                     #print "%i %s %s (direct child is %s %s)"%(count, parent_label, ancestor, direct_child_label, direct_child)
-            print "---------"
+
 
     def load_ontology(self, prefix='', name_space='', base_class=None, current=None, obsolete=None):
         '''
@@ -384,68 +397,84 @@ class PhenotypeSlim():
                                        cnopts = cnopts,
                                        ) as srv:
                     srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
+                    srv.close()
                     for datasource, file_data in tqdm(self._remote_filenames[u].items(),
                                                       desc='scanning available datasource for account %s'%u,
                                                       leave=False,):
                         latest_file = file_data['file_path']
                         file_version = file_data['file_version']
                         self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
-
-                        logfile = os.path.join('/tmp', file_version+ ".log")
-                        self.logger.info("%s checking file: %s" % (self.__class__.__name__, file_version))
-                        self.parse_gzipfile(latest_file)
-
+                        self.parse_gzipfile(latest_file, u, p)
             except AuthenticationException:
                 self.logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
 
         self.generate_ttl_query(Config.ONTOLOGY_SLIM_FILE)
 
-    def parse_gzipfile(self, file_on_disk):
+    def parse_gzipfile(self, file_path, u, p):
+        print "---->%s"%file_path
+        self.logger.info("%s %s" % (u, p))
+        cnopts = pysftp.CnOpts()
+        cnopts.hostkeys = None  # disable host key checking.
+        with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
+                               port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
+                               username=u,
+                               password=p,
+                               cnopts=cnopts,
+                               ) as srv:
 
-        logging.info('Starting parsing %s' %file_on_disk)
+            file_stat = srv.stat(file_path)
+            file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
 
-        fh = gzip.GzipFile(file_on_disk, "r")
-        line_buffer = []
-        offset = 0
-        chunk = 1
-        line_number = 0
+            with srv.open(file_path, mode='rb', bufsize=1) as f:
+                with gzip.GzipFile(filename=file_path.split('/')[1],
+                                   mode='rb',
+                                   fileobj=f,
+                                   mtime=file_mod_time) as fh:
 
-        for line in fh:
-            python_raw = json.loads(line)
-            obj = None
-            data_type = python_raw['type']
-            if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
-                if data_type == 'genetic_association':
-                    obj = opentargets.Genetics.fromMap(python_raw)
-                elif data_type == 'rna_expression':
-                    obj = opentargets.Expression.fromMap(python_raw)
-                elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
-                    obj = opentargets.Literature_Curated.fromMap(python_raw)
-                    if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'],
-                                                                          list):
-                        mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
-                        python_raw['evidence']['known_mutations'] = [mutations]
-                        # self.logger.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
-                        obj = opentargets.Literature_Curated.fromMap(python_raw)
-                elif data_type == 'known_drug':
-                    obj = opentargets.Drug.fromMap(python_raw)
-                elif data_type == 'literature':
-                    obj = opentargets.Literature_Mining.fromMap(python_raw)
-                elif data_type == 'animal_model':
-                    obj = opentargets.Animal_Models.fromMap(python_raw)
+                    logging.info('Starting parsing %s' %file_path)
 
-            if obj.disease.id:
-                for id in obj.disease.id:
-                    if re.match('http://purl.obolibrary.org/obo/HP_\d+', id):
-                        ''' get all terms '''
-                        self.get_ontology_path('http://purl.obolibrary.org/obo/HP_0000118', id)
+                    line_buffer = []
+                    offset = 0
+                    chunk = 1
+                    line_number = 0
 
-                    elif re.match('http://purl.obolibrary.org/obo/MP_\d+', id):
-                        ''' get all terms '''
-                        self.get_ontology_path('http://purl.obolibrary.org/obo/MP_0000001', id)
-                    elif re.match('http://www.orpha.net/ORDO/Orphanet_\d+', id):
-                        ''' just map to the genetic disorders '''
-                        self.get_ontology_path('http://www.ebi.ac.uk/efo/EFO_0000508', id)
+                    for line in fh:
+                        python_raw = json.loads(line)
+                        obj = None
+                        data_type = python_raw['type']
+                        if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
+                            if data_type == 'genetic_association':
+                                obj = opentargets.Genetics.fromMap(python_raw)
+                            elif data_type == 'rna_expression':
+                                obj = opentargets.Expression.fromMap(python_raw)
+                            elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
+                                obj = opentargets.Literature_Curated.fromMap(python_raw)
+                                if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'],
+                                                                                      list):
+                                    mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
+                                    python_raw['evidence']['known_mutations'] = [mutations]
+                                    # self.logger.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
+                                    obj = opentargets.Literature_Curated.fromMap(python_raw)
+                            elif data_type == 'known_drug':
+                                obj = opentargets.Drug.fromMap(python_raw)
+                            elif data_type == 'literature':
+                                obj = opentargets.Literature_Mining.fromMap(python_raw)
+                            elif data_type == 'animal_model':
+                                obj = opentargets.Animal_Models.fromMap(python_raw)
 
-        fh.close()
+                        if obj.disease.id:
+                            for id in obj.disease.id:
+                                if re.match('http://purl.obolibrary.org/obo/HP_\d+', id):
+                                    ''' get all terms '''
+                                    self.get_ontology_path('http://purl.obolibrary.org/obo/HP_0000118', id)
+
+                                elif re.match('http://purl.obolibrary.org/obo/MP_\d+', id):
+                                    ''' get all terms '''
+                                    self.get_ontology_path('http://purl.obolibrary.org/obo/MP_0000001', id)
+                                elif re.match('http://www.orpha.net/ORDO/Orphanet_\d+', id):
+                                    ''' just map to the genetic disorders '''
+                                    self.get_ontology_path('http://www.ebi.ac.uk/efo/EFO_0000508', id)
+
+                fh.close()
+            srv.close()
         return
