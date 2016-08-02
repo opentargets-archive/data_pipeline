@@ -36,7 +36,7 @@ __status__ = "Production"
 INTOGEN_RELEASE_DATE = ''
 #INTOGEN_FILENAME = 'C:\Users\gk680303\github\data_pipeline\resources\intogen_opentargets.tsv'
 INTOGEN_FILENAME = '/Users/koscieln/Documents/work/gitlab/data_pipeline/resources/intogen_opentargets.tsv'
-INTOGEN_EVIDENCE_FILENAME = '/Users/koscieln/Documents/data/ftp/cttv001/upload/submissions/cttv001_external_intogen-29-07-2016.json'
+INTOGEN_EVIDENCE_FILENAME = '/Users/koscieln/Documents/data/ftp/cttv001/upload/submissions/cttv001_intogen-29-07-2016.json'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {
     'A' : 'the gene exhibits several signals of positive selection in the tumor type',
@@ -327,7 +327,6 @@ def main():
     logging.info("Load IntOGen data")
     itg = IntOGen()
     itg.read_intogen('')
-    #pp.write_evidence_strings(options.pharmaprojects_json)
 
 if __name__ == "__main__":
     main()
