@@ -51,7 +51,7 @@ class G2P():
                                           target_name=symbol)
             # http://www.ontobee.org/ontology/ECO?iri=http://purl.obolibrary.org/obo/ECO_0000204 -- An evidence type that is based on an assertion by the author of a paper, which is read by a curator.
             resource_score = association_score.Probability(
-                type="NA",
+                type="probability",
                 method=association_score.Method(
                     description="NA",
                     reference="NA",
@@ -100,7 +100,7 @@ def main():
     source_file = sys.argv[1]
     g2p = G2P()
     g2p.read_file(source_file)
-    g2p.write_evidence_strings('/Users/koscieln/Documents/data/ftp/cttv001/upload/submissions/cttv001_external_gene2phenotype-29-07-2016.json')
+    g2p.write_evidence_strings('/Users/koscieln/Documents/data/ftp/cttv001/upload/submissions/cttv001_gene2phenotype-29-07-2016.json')
 
 if __name__ == "__main__":
     main()
