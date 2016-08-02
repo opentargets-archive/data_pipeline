@@ -228,7 +228,7 @@ class DirectoryCrawlerProcess():
                         datasource = ''.join(user.split('_')[1:])
                         user = user.split('_')[0]
                     else:
-                        datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED(user)
+                        datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
                     release_date = date(int(year),int(month), int(day))
                     if user not in self._remote_filenames:
                         self._remote_filenames[user]={datasource : dict(date = release_date,
@@ -244,8 +244,8 @@ class DirectoryCrawlerProcess():
                             self._remote_filenames[user][datasource] = dict(date=release_date,
                                                                 file_path=filename,
                                                                 file_version=version_name)
-            except:
-                self.logger.debug('error getting remote file%s'%filename)
+            except Exception, e:
+                self.logger.error('error getting remote file %s: %s'%(filename, e))
 
     def _callback_not_used(self, path):
         self.logger.debug("skipped "+path)
