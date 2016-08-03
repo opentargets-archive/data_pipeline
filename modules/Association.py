@@ -10,6 +10,9 @@ from sqlalchemy import and_, func
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import joinedload, subqueryload, defer
 import time
+
+from tqdm import tqdm
+
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage, Loader
@@ -611,7 +614,7 @@ class TargetDiseasePairProducer(Process):
         self.init_data_cache()
         c=0
         last_gene = ''
-        for row in self._get_data_stream():
+        for row in tqdm(self._get_data_stream(), desc='fetching target-disease pairs', unit=' pairs', unit_scale=True):
             c+=1
             if row['target_id'] != last_gene:
                 '''produce pairs'''
