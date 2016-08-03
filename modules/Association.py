@@ -218,15 +218,15 @@ class HarmonicSumScorer():
         else:
             self.min = 0.
 
-    def score(self,**kwargs):
-        return self.harmonic_sum(self.data, **kwargs)
+    def score(self, *args,**kwargs):
+        return self.harmonic_sum(self.data, *args, **kwargs)
 
     @staticmethod
     def harmonic_sum(data,
-                     scale_index = 1,
+                     scale_factor = 1,
                      cap = None):
         data.sort(reverse=True)
-        harmonic_sum = sum(s/((i+1)**scale_index) for i,s in enumerate(data))
+        harmonic_sum = sum(s / ((i+1) ** scale_factor) for i, s in enumerate(data))
         if cap is not None and \
                         harmonic_sum > cap:
             return cap
