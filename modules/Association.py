@@ -257,7 +257,7 @@ class Scorer():
 
         "compute scores"
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
-            self._harmonic_sum(evidence_scores, ass)
+            self._harmonic_sum(evidence_scores, ass, scale_factor=2)
         if (method == ScoringMethods.SUM) or (method is None):
             self._sum(evidence_scores, ass)
         if (method == ScoringMethods.MAX) or (method is None):
@@ -265,7 +265,7 @@ class Scorer():
 
         return ass
 
-    def _harmonic_sum(self, evidence_scores, ass, max_entries = 1000):
+    def _harmonic_sum(self, evidence_scores, ass, max_entries = 100, scale_factor = 1):
         har_sum_score = ass.get_scoring_method(ScoringMethods.HARMONIC_SUM)
         datasource_scorers = {}
         for e in evidence_scores:
@@ -275,7 +275,7 @@ class Scorer():
         '''compute datasource scores'''
         overall_scorer = HarmonicSumScorer(buffer=max_entries)
         for datasource in datasource_scorers:
-            har_sum_score.datasources[datasource]=datasource_scorers[datasource].score()
+            har_sum_score.datasources[datasource]=datasource_scorers[datasource].score(scale_factor=scale_factor)
             overall_scorer.add(har_sum_score.datasources[datasource])
         '''compute datatype scores'''
         datatypes_scorers = dict()
@@ -285,9 +285,9 @@ class Scorer():
                 datatypes_scorers[dt]=HarmonicSumScorer(buffer=max_entries)
             datatypes_scorers[dt].add(har_sum_score.datasources[ds])
         for datatype in datatypes_scorers:
-            har_sum_score.datatypes[datatype]=datatypes_scorers[datatype].score()
+            har_sum_score.datatypes[datatype]=datatypes_scorers[datatype].score(scale_factor=scale_factor)
         '''compute overall scores'''
-        har_sum_score.overall = overall_scorer.score()
+        har_sum_score.overall = overall_scorer.score(scale_factor=scale_factor)
 
         return ass
 
