@@ -13,7 +13,9 @@ from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
 from common.PGAdapter import ElasticsearchLoad
 from common.processify import processify
-from settings import ElasticSearchConfiguration, Config
+from settings import Config
+from elasticsearch_config import ElasticSearchConfiguration
+
 
 class AssociationSummary(object):
 

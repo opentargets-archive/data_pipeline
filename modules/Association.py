@@ -191,7 +191,7 @@ class EvidenceScore():
 
 class HarmonicSumScorer():
 
-    def __init__(self, buffer = 1000):
+    def __init__(self, buffer = 100):
         '''
         will get every score,
         keep in memory the top max number
@@ -199,29 +199,39 @@ class HarmonicSumScorer():
         :return:calculated score
         '''
         self.buffer = buffer
-        self.data = [0.]*buffer
+        self.data = []
         self.refresh()
-        self.total = 0
 
     def add(self, score):
-        self.total+=1
-        if score >self.min:
-            for i, old_score in enumerate(self.data):
-                if old_score==self.min:
-                    self.data[i] = score
-                    break
+        if len(self.data)>= self.buffer:
+            if score >self.min:
+                self.data[self.data.index(self.min)] = float(score)
+                self.refresh()
+        else:
+            self.data.append(float(score))
             self.refresh()
 
-    def refresh(self):
-        self.min = min(self.data)
 
-    def score(self):
-        return self.harmonic_sum(self.data)
+    def refresh(self):
+        if self.data:
+            self.min = min(self.data)
+        else:
+            self.min = 0.
+
+    def score(self,**kwargs):
+        return self.harmonic_sum(self.data, **kwargs)
 
     @staticmethod
-    def harmonic_sum(data):
+    def harmonic_sum(data,
+                     scale_index = 1,
+                     cap = None):
         data.sort(reverse=True)
-        return sum(s/(i+1) for i,s in enumerate(data))
+        harmonic_sum = sum(s/((i+1)**scale_index) for i,s in enumerate(data))
+        if cap is not None and \
+                        harmonic_sum > cap:
+            return cap
+        return harmonic_sum
+
 
 
 

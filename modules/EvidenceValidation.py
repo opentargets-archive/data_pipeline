@@ -22,7 +22,8 @@ from common.PGAdapter import *
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 import opentargets.model.core as opentargets
 from  common.EvidenceJsonUtils import DatatStructureFlattener
-from settings import Config, ElasticSearchConfiguration
+from settings import Config
+from elasticsearch_config import ElasticSearchConfiguration
 import hashlib
 from xml.etree import cElementTree as ElementTree
 from sqlalchemy.dialects.postgresql import JSON
@@ -218,8 +219,7 @@ class DirectoryCrawlerProcess():
         self.logger = logging.getLogger(__name__)
 
     def _store_remote_filename(self, filename):
-        if filename.startswith('/upload/submissions/') and \
-            filename.endswith('.json.gz'):
+        if re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename):
             try:
                 version_name = filename.split('/')[3].split('.')[0]
                 if '-' in version_name:
@@ -723,9 +723,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                     disease_count += 1
                                     efo_id = disease_id
                                     # fix for EVA data for release 1.0
-                                    #if disease_id in eva_curated:
-                                    #    obj.disease.id[index] = eva_curated[disease_id];
-                                    #    disease_id = obj.disease.id[index];
+                                    if disease_id in eva_curated:
+                                       obj.disease.id[index] = eva_curated[disease_id];
+                                       disease_id = obj.disease.id[index];
                                     index += 1
 
                                     ' Check disease term or phenotype term '

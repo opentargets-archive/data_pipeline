@@ -8,7 +8,8 @@ from sqlalchemy import and_
 from common import Actions
 from common.PGAdapter import ElasticsearchLoad
 from common.processify import processify
-from settings import ElasticSearchConfiguration, Config
+from settings import Config
+from elasticsearch_config import ElasticSearchConfiguration
 
 __author__ = 'andreap'
 
@@ -203,14 +204,14 @@ class Loader():
             try:
                self._flush()
                break
-            except:
+            except Exception, e:
                 retry+=1
                 if retry >= max_retry:
-                    logging.exception("push to elasticsearch failed for chunk, retrying...")
+                    logging.exception("push to elasticsearch failed for chunk, giving up...")
                     break
                 else:
                     time_to_wait = 5*retry
-                    logging.error("push to elasticsearch failed for chunk, retrying in %is..."%time_to_wait)
+                    logging.error("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(e,time_to_wait))
                     time.sleep(time_to_wait)
         self.cache = []
 

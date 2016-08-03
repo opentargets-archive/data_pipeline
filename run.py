@@ -29,7 +29,8 @@ from modules.MouseModels import MouseModelsActions, Phenodigm
 from modules.IntOGen import IntOGenActions, IntOGen
 from modules.Ontology import OntologyActions, PhenotypeSlim
 import argparse
-from settings import Config, ElasticSearchConfiguration
+from settings import Config
+from elasticsearch_config import ElasticSearchConfiguration
 from redislite import Redis
 
 '''setup module default logging'''

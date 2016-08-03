@@ -381,7 +381,7 @@ class RedisQueueStatusReporter(Process):
         return queue_id
 
     def log(self, data):
-        self.logger.info(self.format(data))
+        self.logger.debug(self.format(data))
 
     def format(self, data):
         now = time.time()
