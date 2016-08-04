@@ -1129,7 +1129,7 @@ class EvidenceStringProcess():
     def get_evidence(self, page_size = 5000):
 
         c = 0
-        for row in self.es_query.get_validated_evidence_strings():
+        for row in self.es_query.get_validated_evidence_strings(size=page_size):
             c += 1
             if c % page_size == 0:
                 logger.info("loaded %i ev from db to process" % c)
