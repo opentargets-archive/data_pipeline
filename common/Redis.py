@@ -473,7 +473,7 @@ class RedisQueueWorkerProcess(Process):
                 self.queue_in.done(key, error=error, r_server=self.r_server)
             else:
                 # self.logger.info('nothing to do in '+self.name)
-                time.sleep(.1)
+                time.sleep(.01)
 
         self.logger.info('%s done processing' % self.name)
         if self.queue_out is not None:

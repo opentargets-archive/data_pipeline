@@ -193,7 +193,7 @@ class ESQuery(object):
         return AssociationSummary(res)
 
 
-    def get_validated_evidence_strings(self, fields = None):
+    def get_validated_evidence_strings(self, fields = None, size=10000):
         source = self._get_source_from_fields(fields)
 
         res = helpers.scan(client=self.handler,
@@ -201,7 +201,7 @@ class ESQuery(object):
                                "match_all": {}
                            },
                                '_source': source,
-                               'size': 10000,
+                               'size': size,
                            },
                            scroll='12h',
                            # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,

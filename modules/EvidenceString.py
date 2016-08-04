@@ -954,7 +954,8 @@ class EvidenceProcesser(multiprocessing.Process):
                     logger.info("%i processed | %i errors | processing %1.2f evidence per second"%(self.output_computed_count.value,
                                                                                                            self.processing_errors_count.value,
                                                                                                        float(self.input_processed_count.value)/(time.time()-self.start_time)))
-
+            else:
+                time.sleep(0.01)
         self.output_computation_finished.set()
         logger.info("%s finished"%self.name)
 
@@ -998,6 +999,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
                             self.total_loaded.value+=1
                         if self.total_loaded.value % (self.chunk_size*5) ==0:
                             logger.info("pushed %i entries to es"%self.total_loaded.value)
+                    else:
+                        time.sleep(0.01)
                     # print self.name, (((self.output_generated_count.value == self.total_loaded.value) and \
                     #         self.processing_finished.is_set()) or self.signal_finish.is_set()), self.output_generated_count.value == self.total_loaded.value,self.processing_finished.is_set(),  self.signal_finish.is_set(), self.total_loaded.value
 
@@ -1034,7 +1037,7 @@ class EvidenceStringProcess():
 
         evidence_start_time = time.time()
         lookup_data = EvidenceManagerLookUpDataRetrieval(self.es, self.r_server).lookup
-        get_evidence_page_size = 25000
+        get_evidence_page_size = 5000
 
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
@@ -1122,7 +1125,7 @@ class EvidenceStringProcess():
 
 
 
-    def get_evidence(self, page_size = 50000):
+    def get_evidence(self, page_size = 5000):
 
         c = 0
         for row in self.es_query.get_validated_evidence_strings():
