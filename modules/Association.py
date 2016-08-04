@@ -889,7 +889,7 @@ class ScoringProcess():
         while 1:
             if target_disease_pairs_generated_count.value >0:
                 break
-            time.sleep(0.05)
+            time.sleep(0.01)
         '''start reporting worker'''
         reporter = StatusQueueReporter(target_disease_pair_q,
                                        score_data_q,

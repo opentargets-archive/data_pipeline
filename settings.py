@@ -146,10 +146,12 @@ class Config():
     # put the path to the file where you want to write the SLIM file (turtle format)
     ONTOLOGY_SLIM_FILE = 'C:\users\gk680303\data\ontologies\opentargets_disease_phenotype_slim.ttl'
 
-    DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
-    DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
-                                                        #phenodigm=dict(min=0.4, max= 1),
-                                                        )
+    DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
+        # gwas_catalog=2.5
+        )
+    DATASOURCE_EVIDENCE_SCORE_AUTO_EXTEND_RANGE=dict(
+                                                     # phenodigm=dict(min=0.4, max= 1),
+                                                    )
 
     DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(cttv006 = 'reactome',
                                                          cttv008 = 'chembl',

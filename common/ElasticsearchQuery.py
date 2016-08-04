@@ -189,7 +189,7 @@ class ESQuery(object):
                                "match_all": {}
                            },
                                '_source': source,
-                               'size': 1000,
+                               'size': 10000,
                            },
                            scroll='12h',
                            # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
@@ -207,6 +207,18 @@ class ESQuery(object):
 
         for hit in res:
             yield hit['_source']
+
+    def get_validated_evidence_strings_count(self,):
+
+        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'),
+                                  body={"query": {
+                                      "match_all": {}
+                                        },
+                                       '_source': False,
+                                      'size':0,
+                                       }
+                                  )
+        return res['hits']['total']
 
 
     def get_all_ensembl_genes(self):
