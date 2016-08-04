@@ -248,7 +248,8 @@ class EvidenceManagerLookUpDataRetrieval():
         start_time = time.time()
         load_bar = tqdm(desc='loading lookup data',
              total=3,
-             unit=' steps',)
+             unit=' steps',
+             leave=False,)
         self._get_gene_info()
         logger.info("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
         load_bar.update()
