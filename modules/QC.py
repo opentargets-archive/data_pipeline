@@ -13,6 +13,7 @@ from settings import Config
 
 class QCActions(Actions):
     QC='qc'
+    CGC_ANALYSIS='cancer_gene_census_analysis'
 
 
 def defauldict(param):
@@ -26,7 +27,7 @@ class QCRunner(object):
         self.es = es
         self.esquery = ESQuery(es)
 
-        self.run_associationQC()
+        # self.run_associationQC()
 
     def run_associationQC(self):
         c=0
@@ -86,6 +87,44 @@ class QCRunner(object):
             count [ev_hit['_source']['sourceID']]+=1
 
         return count
+
+    def analyse_cancer_gene_census(self):
+        c=0
+        o=0
+        for ev_hit in helpers.scan(client=self.es,
+                                   query={"query": {
+                                       "filtered": {
+                                           "filter": {
+                                               "bool": {
+                                                   "must": [
+                                                       {"terms": {"sourceID": ['cancer_gene_census']}},
+                                                   ]
+                                               }
+                                           }
+                                       }
+                                   },
+                                       '_source': True,
+                                       'size': 100,
+                                   },
+                                   scroll='1h',
+                                   index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
+                                   timeout='10m',
+                                   ):
+            c+=1
+            if len(ev_hit['_source']['evidence']['known_mutations']) >1:
+                o+=1
+            else:
+                data = ev_hit['_source']
+                tot, mut =  float(data['evidence']['known_mutations'][0]['number_mutated_samples']), float(data['evidence']['known_mutations'][0]['number_samples_with_mutation_type'])
+                print '%s\t%s\t%i\t%i\t%.3f'%(data['target']['gene_info']['symbol'],
+                                              data['disease']['efo_info']['label'],
+                                              tot,
+                                              mut,
+                                              mut/tot)
+
+        print c,o
+
+        return
 
 
 

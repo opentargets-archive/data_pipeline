@@ -127,6 +127,9 @@ if __name__ == '__main__':
     parser.add_argument("--qc", dest='qc',
                         help="Run quality control scripts",
                         action="append_const", const=QCActions.ALL)
+    parser.add_argument("--qccgc", dest='qc',
+                        help="Run quality control scripts",
+                        action="append_const", const=QCActions.CGC_ANALYSIS)
     parser.add_argument("--dump", dest='dump',
                         help="dump core data to local gzipped files",
                         action="append_const", const=DumpActions.ALL)
@@ -283,6 +286,8 @@ if __name__ == '__main__':
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:
                 QCRunner(es)
+            if (QCActions.CGC_ANALYSIS in args.qc) or do_all:
+                QCRunner(es).analyse_cancer_gene_census()
         if args.dump or run_full_pipeline:
             do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
             if (DumpActions.DUMP in args.dump) or do_all:

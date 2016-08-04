@@ -16,6 +16,9 @@ import sys
 import multiprocessing
 from sqlalchemy import and_
 import ujson as json
+
+from tqdm import tqdm
+
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage, Loader
@@ -721,7 +724,12 @@ class GeneLookUpTable(object):
             self._load_gene_data(r_server)
 
     def _load_gene_data(self, r_server = None):
-        for target in self._es_query.get_all_targets():
+        for target in tqdm(self._es_query.get_all_targets(),
+                           desc = 'loading genes',
+                           unit=' genes',
+                           unit_scale=True,
+                           total= self._es_query.count_all_targets(),
+                           ):
             self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
     def get_gene(self, target_id, r_server = None):

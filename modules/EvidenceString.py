@@ -246,55 +246,40 @@ class EvidenceManagerLookUpDataRetrieval():
             self.esquery = ESQuery(es)
         self.lookup = EvidenceManagerLookUpData()
         start_time = time.time()
-        tqdm(desc='loading lookup data',
-             total=3)
+        load_bar = tqdm(desc='loading lookup data',
+             total=3,
+             unit=' steps',)
         self._get_gene_info()
         logger.info("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
-        tqdm.update()
+        load_bar.update()
         self._get_available_efos()
         logger.info("finished self._get_available_efos(), took %ss"%str(time.time()-start_time))
-        tqdm.update()
+        load_bar.update()
         self._get_available_ecos()
         logger.info("finished self._get_available_ecos(), took %ss"%str(time.time()-start_time))
-        tqdm.update()
+        load_bar.update()
 
 
     def _get_available_efos(self):
         logger.info('getting efos')
         self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
-        # self.lookup.available_efo_objects = dict()
-        # for row in self.esquery.get_all_diseases():
-        #     efo_obj = EFO(get_ontology_code_from_url(row['code']))
-        #     efo_obj.load_json(row)
-        #     self.lookup.available_efo_objects[efo_obj.get_id()]= efo_obj
-        # self.lookup.available_efos = frozenset(self.lookup.available_efo_objects.keys())
 
     def _get_available_ecos(self):
         logger.info('getting ecos')
         self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
-        # self.lookup.available_eco_objects = dict()
-        # for row in self.esquery.get_all_eco():
-        #     eco_obj = ECO(get_ontology_code_from_url(row['code']))
-        #     eco_obj.load_json(row)
-        #     self.lookup.available_eco_objects[eco_obj.get_id()]= eco_obj
-        #
-        # self.lookup.available_ecos = frozenset(self.lookup.available_eco_objects.keys())
 
 
     def _get_gene_info(self):
         logger.info('getting gene info')
         self.lookup.uni2ens = {}
-        self.lookup.available_gene_objects={}
-        for gene in self.esquery.get_all_targets():
-            gene_obj = Gene()
-            gene_obj.load_json(gene)
-            # self.lookup.available_gene_objects[gene_obj.id]=gene_obj
+        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
+        for gene_id in tqdm(self.lookup.available_genes.keys(),
+                            desc='getting mappings uni2ens'):
+            gene = GeneLookUpTable.get_gene(gene_id)
             if gene['uniprot_id']:
                 self.lookup.uni2ens[gene['uniprot_id']] = gene_obj.id
             for accession in gene['uniprot_accessions']:
-                self.lookup.uni2ens[accession]=gene_obj.id
-        # self.lookup.available_genes = frozenset(self.lookup.available_gene_objects.keys())
-        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
+                self.lookup.uni2ens[accession] = gene_obj.id
         self._get_non_reference_gene_mappings()
 
     def _get_non_reference_gene_mappings(self):
@@ -1102,8 +1087,9 @@ class EvidenceStringProcess():
 
         for row in tqdm(self.get_evidence(page_size = get_evidence_page_size),
                         desc='Reading available evidence_strings',
-                        total = self.es_query.get_validated_evidence_strings_count(),
-                        unit=' evidence'):
+                        total = self.es_query.count_validated_evidence_strings(),
+                        unit=' evidence',
+                        unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource= row['data_source_name'])
             idev = row['uniq_assoc_fields_hashdig']
             ev.evidence['id'] = idev
