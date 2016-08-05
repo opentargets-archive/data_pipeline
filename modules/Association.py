@@ -756,9 +756,10 @@ class ScoreProducer(Process):
                 target, disease, evidence, is_direct = data
                 if evidence:
                     score = self.scorer.score(target, disease, evidence, is_direct)
-                    score.set_target_data(self.gene_retriever.get_gene(target))
-                    score.set_disease_data(self.efo_retriever.get_efo(disease))
-                    self.score_q.put((target, disease,score))
+                    if score.get_scoring_method(ScoringMethods.HARMONIC_SUM).overall !=0:#skip associations only with data with score 0
+                        score.set_target_data(self.gene_retriever.get_gene(target))
+                        score.set_disease_data(self.efo_retriever.get_efo(disease))
+                        self.score_q.put((target, disease,score))
                 with self.lock:
                     self.global_counter.value +=1
             except Empty:
