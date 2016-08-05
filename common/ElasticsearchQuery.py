@@ -196,6 +196,9 @@ class ESQuery(object):
     def get_validated_evidence_strings(self, fields = None, size=1000):
         source = self._get_source_from_fields(fields)
 
+        # TODO: do a scroll to get all the ids without sorting, and use many async mget queries to fetch the sources
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
+
         res = helpers.scan(client=self.handler,
                            query={"query": {
                                "match_all": {}
