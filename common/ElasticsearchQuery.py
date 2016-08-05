@@ -194,21 +194,27 @@ class ESQuery(object):
 
 
     def get_validated_evidence_strings(self, fields = None, size=1000):
+        def get_ids(ids):
+            return self.handler.mget(index=index_name,
+                                   body={'docs': ids},
+                                   _source=True)
+
+
         source = self._get_source_from_fields(fields)
 
         # TODO: do a scroll to get all the ids without sorting, and use many async mget queries to fetch the sources
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
         res = helpers.scan(client=self.handler,
                            query={"query": {
                                "match_all": {}
                            },
-                               '_source': source,
-                               'size': 10000,
+                               '_source': False,
+                               'size': 1000,
                            },
                            scroll='12h',
                            # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'),
+                           index=index_name,
                            timeout="10m",
                            )
 
@@ -220,8 +226,31 @@ class ESQuery(object):
         #
         #                           )
 
+        # for hit in res:
+        #     yield hit['_source']
+
+        ids = []
         for hit in res:
-            yield hit['_source']
+            ids.append({"_index" : hit["_index"],
+                        "_id" : hit["_id"]
+                        },)
+            if len(ids) == size:
+                res_get = get_ids(ids)
+                for doc in res_get['docs']:
+                    if doc['found']:
+                        yield doc['_source']
+                    else:
+                        raise ValueError('document with id %s not found'%(doc['_id']))
+                ids = []
+        if ids:
+            res_get = get_ids(ids)
+            for doc in res_get['docs']:
+                if doc['found']:
+                    yield doc['_source']
+                else:
+                    raise ValueError('document with id %s not found' % (doc['_id']))
+
+
 
     def count_validated_evidence_strings(self, ):
 
