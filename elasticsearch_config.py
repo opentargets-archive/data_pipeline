@@ -226,21 +226,28 @@ class ElasticSearchConfiguration():
 
     if os.environ.get('CTTV_EL_LOADER')== 'prod' or \
             os.environ.get('CTTV_EL_LOADER')== 'stag':
-        generic_shard_number = 3
-        generic_replicas_number = 0
-        evidence_shard_number = 3
-        evidence_replicas_number = 1
-        relation_shard_number = 10
-        relation_replicas_number = 0
-
+        generic_shard_number = '3'
+        generic_replicas_number = '0'
+        evidence_shard_number = '3'
+        evidence_replicas_number = '1'
+        relation_shard_number = '10'
+        relation_replicas_number = '0'
+        validation_shard_number = '1'
+        validation_replicas_number = '1'
+        submission_audit_shard_number = '1'
+        submission_audit_replicas_number = '1'
         bulk_load_chunk =1000
     else:
-        generic_shard_number = 3
-        generic_replicas_number = 0
-        evidence_shard_number = 3
-        evidence_replicas_number = 0
-        relation_shard_number = 6
-        relation_replicas_number = 0
+        generic_shard_number = '3'
+        generic_replicas_number = '0'
+        evidence_shard_number = '3'
+        evidence_replicas_number = '0'
+        relation_shard_number = '6'
+        relation_replicas_number = '0'
+        validation_shard_number = '1'
+        validation_replicas_number = '1'
+        submission_audit_shard_number = '1'
+        submission_audit_replicas_number = '1'
         bulk_load_chunk =1000
 
     uniprot_data_mapping = eco_data_mapping = {"mappings": {
@@ -253,8 +260,8 @@ class ElasticSearchConfiguration():
                                                  }
                     }
                 },
-                    "settings": {"number_of_shards": 1,
-                                 "number_of_replicas": 0,
+                    "settings": {"number_of_shards": '1',
+                                 "number_of_replicas": '1',
                                  "refresh_interval": "60s",
                                  },
                 }
@@ -543,42 +550,33 @@ class ElasticSearchConfiguration():
                         },
                    "nb_submission" : {
                         "type" : "integer",
-                        "index" : "not_analyzed"
                         },
                    "nb_records" : {
                         "type" : "integer",
-                        "index" : "not_analyzed"
                         },
                    "nb_passed_validation" : {
                         "type" : "integer",
-                        "index" : "not_analyzed"
                         },
                    "nb_errors" : {
                         "type" : "integer",
-                        "index" : "not_analyzed"
                         },
                    "nb_duplicates" : {
                         "type" : "integer",
-                        "index" : "not_analyzed"
                         },
                    "successfully_validated" : {
                         "type" : "boolean",
-                        "index" : "not_analyzed"
                         },
                    "date_created" : {
                         "type" : "date",
                         "format" : "basic_date_time_no_millis",
-                        "index" : "no"
                         },
                    "date_validated" : {
                         "type" : "date",
                         "format" : "basic_date_time_no_millis",
-                        "index" : "no"
                         },
                    "date_modified" : {
                         "type" : "date",
                         "format" : "basic_date_time_no_millis",
-                        "index" : "no"
                         }
                 }
     }
@@ -621,7 +619,6 @@ class ElasticSearchConfiguration():
                         },
                    "json_doc_version" : {
                         "type" : "integer",
-                        "index" : "not_analyzed"
                         },
                    "release_date" : {
                         "type" : "date",
@@ -656,8 +653,8 @@ class ElasticSearchConfiguration():
 
 
 
-    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : 1,
-                                           "number_of_replicas" : 1,
+    validated_data_settings_and_mappings = { "settings": {"number_of_shards" : validation_shard_number,
+                                           "number_of_replicas" : validation_replicas_number,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
@@ -665,8 +662,8 @@ class ElasticSearchConfiguration():
 
                                }
 
-    submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : 1,
-                                           "number_of_replicas" : 1,
+    submission_audit_settings_and_mappings = { "settings": {"number_of_shards" : submission_audit_shard_number,
+                                           "number_of_replicas" : submission_audit_replicas_number,
                                            # "index.store.type": "memory",
                                            "refresh_interval" : "60s",
                                            },
@@ -820,3 +817,16 @@ class ElasticSearchConfiguration():
                 },
             },
         }
+
+    INDEX_MAPPPINGS={Config.ELASTICSEARCH_DATA_INDEX_NAME : evidence_data_mapping,
+                     Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME :score_data_mapping,
+                     Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME : efo_data_mapping,
+                     Config.ELASTICSEARCH_ECO_INDEX_NAME : eco_data_mapping,
+                     Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME : gene_data_mapping,
+                     Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME : expression_data_mapping,
+                     Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME : search_obj_data_mapping,
+                     Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME : validated_data_settings_and_mappings,
+                     Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME : submission_audit_settings_and_mappings,
+                     Config.ELASTICSEARCH_UNIPROT_INDEX_NAME : uniprot_data_mapping,
+                     Config.ELASTICSEARCH_RELATION_INDEX_NAME : relation_data_mapping,
+                }

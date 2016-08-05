@@ -1,11 +1,20 @@
+import json
 from collections import defaultdict
 from datetime import datetime
 import time
 import logging
+from difflib import Differ
+from pprint import pprint
+from unittest import TestCase
+
+import collections
+
+import sys
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk, parallel_bulk
 from sqlalchemy import and_
 from common import Actions
+from common.EvidenceJsonUtils import assertJSONEqual
 from common.PGAdapter import ElasticsearchLoad
 from common.processify import processify
 from settings import Config
@@ -308,85 +317,44 @@ class Loader():
         self.es.indices.put_settings(index=index_name,
                                      body =settings)
 
+
+    def _safe_create_index(self, index_name, body, ignore=400):
+        res = self.es.indices.create(index=index_name,
+                                     ignore=ignore,
+                                     body=body
+                                     )
+        if res['acknowledged'] == False:
+            raise ValueError('creation of index %s was not acknowledged')
+        mappings = self.es.indices.get_mapping(index=index_name)
+        settings = self.es.indices.get_settings(index=index_name)
+
+        assertJSONEqual(mappings[index_name]['mappings'],
+                        body['mappings'],
+                        msg='mappings in elasticsearch are different from the ones sent')
+        assertJSONEqual(settings[index_name]['settings']['index'],
+                        body['settings'],
+                        msg='settings in elasticsearch are different from the ones sent',
+                        keys=['number_of_replicas','number_of_shards','refresh_interval'])
+
     def create_new_index(self, index_name, recreate = True):
         index_name = self.get_versioned_index(index_name)
-
         if self.es.indices.exists(index_name):
-            try:
-                if recreate:
-                    self.es.indices.delete(index_name, ignore=400)
-                else:
-                    try:
-                        self.es.indices.delete(index_name)
-                    except NotFoundError:
-                        pass
-                    except:
-                        logging.info("%s index already existing" % index_name)
-            except NotFoundError:
-                pass
+            if recreate:
+                self.es.indices.delete(index_name)
+            else:
+                logging.info("%s index already existing" % index_name)
+                return
 
-        if Config.ELASTICSEARCH_DATA_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.evidence_data_mapping,
-                                   )
-        elif Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.score_data_mapping,
-                                   )
-        elif Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.efo_data_mapping
-                                   )
-        elif Config.ELASTICSEARCH_ECO_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.eco_data_mapping
-                                   )
-        elif Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.gene_data_mapping
-                                   )
-        elif Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.expression_data_mapping
-                                   )
-        elif Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.search_obj_data_mapping
-                                   )
-        elif Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.validated_data_settings_and_mappings
-                                   )
-        elif Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.submission_audit_settings_and_mappings
-                                   )
-        elif Config.ELASTICSEARCH_UNIPROT_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.uniprot_data_mapping
-                                   )
-        elif Config.ELASTICSEARCH_RELATION_INDEX_NAME in index_name:
-            self.es.indices.create(index=index_name,
-                                   ignore=400,
-                                   body=ElasticSearchConfiguration.relation_data_mapping
-                                   )
-        else:
-            self.es.indices.create(index=index_name, ignore=400)
+        index_created = False
+        for index_root,mapping in ElasticSearchConfiguration.INDEX_MAPPPINGS.items():
+            if index_root in index_name:
+                self._safe_create_index(index_name, mapping)
+                index_created=True
+                break
 
-
-
+        if not index_created:
+            raise ValueError('Cannot create index %s because no mappings are set'%index_name)
         logging.info("%s index created"%index_name)
-
         return
 
     def clear_index(self, index_name):

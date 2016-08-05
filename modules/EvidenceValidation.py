@@ -415,8 +415,8 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
     def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None):
 
-        self.logger.info('%s Delete previous data for %s' % (self.name, data_source_name))
-        self.evidence_chunk_storage.storage_delete(data_source_name)
+        # self.logger.info('%s Delete previous data for %s' % (self.name, data_source_name))
+        # self.evidence_chunk_storage.storage_delete(data_source_name)
 
         self.logger.info('%s Starting parsing %s' % (self.name, file_path))
 
@@ -1245,7 +1245,6 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             '''
             Get top 20 diseases
             Get top 20 targets
-            {"hits": {"hits": [], "total": 9468, "max_score": 0.0}, "_shards": {"successful": 3, "failed": 0, "total": 3}, "took": 21, "aggregations": {"group_by_targets": {"buckets": [{"key": "ENSG00000146648", "doc_count": 4157}, {"key": "ENSG00000066468", "doc_count": 513}, {"key": "ENSG00000068078", "doc_count": 377}, {"key": "ENSG00000148400", "doc_count": 322}, {"key": "ENSG00000160867", "doc_count": 125}, {"key": "ENSG00000077782", "doc_count": 118}, {"key": "ENSG00000164690", "doc_count": 78}, {"key": "ENSG00000005075", "doc_count": 45}, {"key": "ENSG00000047315", "doc_count": 45}, {"key": "ENSG00000099817", "doc_count": 45}, {"key": "ENSG00000100142", "doc_count": 45}, {"key": "ENSG00000102978", "doc_count": 45}, {"key": "ENSG00000105258", "doc_count": 45}, {"key": "ENSG00000125651", "doc_count": 45}, {"key": "ENSG00000144231", "doc_count": 45}, {"key": "ENSG00000147669", "doc_count": 45}, {"key": "ENSG00000163882", "doc_count": 45}, {"key": "ENSG00000168002", "doc_count": 45}, {"key": "ENSG00000177700", "doc_count": 45}, {"key": "ENSG00000181222", "doc_count": 45}], "sum_other_doc_count": 3193, "doc_count_error_upper_bound": 18}}, "timed_out": false}
             '''
 
             self.logger.debug("Get top 20 targets")
@@ -1605,11 +1604,9 @@ class EvidenceChunkElasticStorage():
                         create_index=False)
 
     def storage_delete(self, data_source_name):
-        if self.loader.es.indices.exists(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)):
-            self.loader.es.indices.delete(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name))
-            # ElasticStorage.delete_prev_data_in_es(self.loader.es,
-            #                                       self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
-            #                                       data_source_name)
+        versioned_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)
+        if self.loader.es.indices.exists(versioned_name):
+            self.loader.es.indices.delete(versioned_name)
 
     def storage_flush(self):
         self.loader.flush()
