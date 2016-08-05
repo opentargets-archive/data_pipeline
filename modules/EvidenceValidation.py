@@ -44,7 +44,7 @@ logging.getLogger("paramiko").setLevel(logging.WARNING)
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
 MAX_NB_EVIDENCE_CHUNKS = 1000
-EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 1000
+EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 10
 
 EVIDENCE_STRING_INVALID = 10
 EVIDENCE_STRING_INVALID_TYPE = 11
@@ -211,8 +211,8 @@ class DirectoryCrawlerProcess():
                  r_server):
         self.output_q = output_q
         self.es = es
-        self.evidence_chunk = EvidenceChunkElasticStorage(loader = Loader(self.es))
-        self.submission_audit = SubmissionAuditElasticStorage(loader = Loader(self.es))
+        self.evidence_chunk = EvidenceChunkElasticStorage(loader = Loader(self.es, chunk_size=100))
+        self.submission_audit = SubmissionAuditElasticStorage(loader = Loader(self.es, chunk_size=100))
         self.start_time = time.time()
         self.r_server = r_server
         self._remote_filenames =dict()
@@ -336,7 +336,7 @@ class DirectoryCrawlerProcess():
             if md5 == md5_hash:
                     self.logger.info('%s file already recorded. Won\'t parse' % file_path)
                     ''' should be false, set to true if you want to parse anyway '''
-                    validate = False
+                    validate = Config.EVIDENCEVALIDATION_FORCE_VALIDATION
             else:
                 self.logger.info('file recorded with a different hash %s, revalidatiing.' % (md5))
                 validate = True
@@ -398,7 +398,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                  es = None):
         super(FileReaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.es = es
-        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
+        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es, chunk_size=100))
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
 
@@ -532,7 +532,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.queue_in = queue_in
         self.queue_out = queue_out
         self.es = es
-        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
+        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es, chunk_size=100))
         self.efo_current = efo_current
         self.efo_uncat = efo_uncat
         self.efo_obsolete = efo_obsolete
