@@ -167,6 +167,7 @@ class ECOLookUpTable(object):
                         unit=' eco',
                         unit_scale=True,
                         total=self._es_query.count_all_eco(),
+                        leave=False,
                        ):
             self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 

@@ -204,7 +204,7 @@ class ProcessedEvidenceStorer():
                            ev.get_doc_name(),
                            id,
                            ev.to_json(),
-                           create_index = True,
+                           create_index = False,
                            routing = ev.evidence['target']['id'])
 
 
@@ -1039,6 +1039,9 @@ class EvidenceStringProcess():
         evidence_start_time = time.time()
         lookup_data = EvidenceManagerLookUpDataRetrieval(self.es, self.r_server).lookup
         get_evidence_page_size = 5000
+
+        '''create and overwrite old data'''
+        Loader(self.es).create_new_index(Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME), recreate=True)
 
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)

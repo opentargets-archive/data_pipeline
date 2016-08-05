@@ -269,7 +269,8 @@ class EFOLookUpTable(object):
                         unit=' diseases',
                         unit_scale=True,
                         total=self._es_query.count_all_diseases(),
-                           ):
+                        leave=False,
+                        ):
             self._table.set(get_ontology_code_from_url(efo['code']),efo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
     def get_efo(self, efo_id, r_server = None):

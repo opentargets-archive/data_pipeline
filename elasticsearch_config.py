@@ -78,16 +78,7 @@ def _get_evidence_string_generic_mapping():
                          },
                          "provenance_type": {
                              "enabled": False,
-                             # "properties" : {
-                             #    "database" : {
-                             #        "properties": {
-                             #            "version": {
-                             #                "type": "string",
-                             #                "index": "not_analyzed",
-                             #            },
-                             #        },
-                             #    },
-                             # },
+                             "type": "object"
                          },
                      }
                 },
