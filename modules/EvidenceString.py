@@ -1036,12 +1036,13 @@ class EvidenceStringProcess():
         logger.debug("Starting Evidence Manager")
 
 
-        evidence_start_time = time.time()
         lookup_data = EvidenceManagerLookUpDataRetrieval(self.es, self.r_server).lookup
         get_evidence_page_size = 5000
-
         '''create and overwrite old data'''
-        Loader(self.es).create_new_index(Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME), recreate=True)
+        loader = Loader(self.es)
+        for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
+            loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=True)
+        loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'])
 
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
