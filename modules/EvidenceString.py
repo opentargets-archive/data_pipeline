@@ -772,7 +772,7 @@ class Evidence(JSONSerializable):
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['disease_model_association']['resource_score']['value'])
             elif self.evidence['type']=='somatic_mutation':
                 frequency = 1.
-                if 'known_mutations' in self.evidence and self.evidence['evidence']['known_mutations']:
+                if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
                     frequency = float(self.evidence['known_mutations']['number_mutated_samples'])/float(self.evidence['known_mutations']['known_mutations'])
                     frequency=DataNormaliser.renormalize(frequency,[0.,9.],[.5, 1.])
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])*frequency
