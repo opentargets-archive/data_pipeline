@@ -44,7 +44,7 @@ logging.getLogger("paramiko").setLevel(logging.WARNING)
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
 MAX_NB_EVIDENCE_CHUNKS = 1000
-EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 10
+EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 100
 
 EVIDENCE_STRING_INVALID = 10
 EVIDENCE_STRING_INVALID_TYPE = 11
@@ -2195,16 +2195,6 @@ class EvidenceValidationFileChecker():
 
 
 
-        'Start crawling the FTP directory'
-        directory_crawler = DirectoryCrawlerProcess(
-                file_q,
-                self.es,
-                self.r_server)
-
-        directory_crawler.run()
-
-
-
 
         'Start validating the evidence in chunks on the evidence queue'
 
@@ -2243,6 +2233,14 @@ class EvidenceValidationFileChecker():
             )
 
         auditor.start()
+
+        'Start crawling the FTP directory'
+        directory_crawler = DirectoryCrawlerProcess(
+                file_q,
+                self.es,
+                self.r_server)
+
+        directory_crawler.run()
 
         '''wait for the validator workers to finish'''
 
