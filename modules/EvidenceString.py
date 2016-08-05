@@ -390,7 +390,7 @@ class EvidenceManager():
                     logger.warning("Cannot find a score for eco code %s in evidence id %s"%(eco_uri, evidence['id']))
 
         '''use just one mutation per somatic data'''
-        if 'known_mutations' in evidence and evidence['evidence']['known_mutations']:
+        if 'known_mutations' in evidence['evidence'] and evidence['evidence']['known_mutations']:
             if len(evidence['evidence']['known_mutations'])==1:
                 evidence['evidence']['known_mutations'] = evidence['evidence']['known_mutations'][0]
             else:
@@ -775,7 +775,7 @@ class Evidence(JSONSerializable):
                 if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
                     frequency = float(self.evidence['evidence']['known_mutations']['number_samples_with_mutation_type'])/float(self.evidence['evidence']['known_mutations']['number_mutated_samples'])
                     frequency=DataNormaliser.renormalize(frequency,[0.,9.],[.5, 1.])
-                self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])*frequency
+                self.evidence['scores']['association_score']= float(self.evidence['evidence']['resource_score']['value'])*frequency
             elif self.evidence['type']=='literature':
                 score=  float(self.evidence['evidence']['resource_score']['value'])
                 if self.evidence['sourceID']=='europepmc':
