@@ -806,7 +806,7 @@ class Evidence(JSONSerializable):
             # elif self.evidence['sourceID']=='disgenet':
             #     pass
         except Exception, e:
-            logger.warn("Cannot score evidence %s of type %s. Error: %s"%(self.evidence['id'],self.evidence['type'],e))
+            logger.error("Cannot score evidence %s of type %s. Error: %s"%(self.evidence['id'],self.evidence['type'],e))
 
         '''check for minimum score '''
         if self.evidence['scores'] ['association_score'] < Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]:

@@ -234,16 +234,19 @@ class ESQuery(object):
             ids.append({"_index" : hit["_index"],
                         "_id" : hit["_id"]
                         },)
-            if len(ids) == size:
-                res_get = get_ids(ids)
+        id_buffer =[]
+        for doc_id in ids:
+            id_buffer.append(doc_id)
+            if len(id_buffer) == size:
+                res_get = get_ids(id_buffer)
                 for doc in res_get['docs']:
                     if doc['found']:
                         yield doc['_source']
                     else:
                         raise ValueError('document with id %s not found'%(doc['_id']))
-                ids = []
-        if ids:
-            res_get = get_ids(ids)
+                id_buffer = []
+        if id_buffer:
+            res_get = get_ids(id_buffer)
             for doc in res_get['docs']:
                 if doc['found']:
                     yield doc['_source']
