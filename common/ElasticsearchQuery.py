@@ -59,7 +59,7 @@ class ESQuery(object):
                                       "match_all": {}
                                     },
                                    '_source': source,
-                                   'size': 100,
+                                   'size': 20,
                                    },
                             scroll='12h',
                             doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
@@ -193,7 +193,7 @@ class ESQuery(object):
         return AssociationSummary(res)
 
 
-    def get_validated_evidence_strings(self, fields = None, size=1000):
+    def get_validated_evidence_strings(self, fields = None, size=1000, datasource = []):
         def get_ids(ids):
             return self.handler.mget(index=index_name,
                                    body={'docs': ids},
@@ -205,10 +205,15 @@ class ESQuery(object):
         # TODO: do a scroll to get all the ids without sorting, and use many async mget queries to fetch the sources
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
+        filter = {"match_all": {}}
+        if datasource:
+            filter ={ "filtered": {
+                                   "filter": {
+                                       "terms": {"sourceID": ['europepmc']}
+                                   }
+                               }}
         res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                           },
+                           query={"query": filter,
                                '_source': False,
                                'size': 1000,
                            },
@@ -394,4 +399,85 @@ class ESQuery(object):
                                   }
                                   )
         return res['hits']['total']
+
+    def get_evidence_simple(self, targets = None):
+
+        def get_ids(ids):
+            return self.handler.mget(index=index_name,
+                                   body={'docs': ids},
+                                   _source= {"include": ["target.id",
+                                                        "private.efo_codes",
+                                                        "disease.id",
+                                                        "scores.association_score",
+                                                        "sourceID",
+                                                        "id",
+                                                        ],
+                                            })
+
+        if targets is None:
+            targets = self.get_all_target_ids_with_evidence_data()
+
+
+        for target in targets:
+            query_body = {
+                "query": { "filtered": {
+                                       "filter": {
+                                           "terms": {"target.id": target}
+                                       }
+                                   }},
+                '_source':  {"include": ["target.id",
+                                        "disease.id",
+                            ]},
+                "sort": ["target.id", "disease.id"],
+            }
+
+            res = helpers.scan(client=self.handler,
+                               query=query_body,
+                               scroll='1h',
+                               index=Config.RELEASE_VERSION + '_' + Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',
+                               timeout="1h",
+                               request_timeout=2 * 60 * 60,
+                               size=5000,
+                               preserve_order=True
+                               )
+            ids = []
+            for hit in res:
+                ids.append({"_index": hit["_index"],
+                                "_id" : hit["_id"]
+                                },)
+            id_buffer = []
+            for doc_id in ids:
+                id_buffer.append(doc_id)
+                if len(id_buffer) == 1000:
+                    res_get = get_ids(id_buffer)
+                    for doc in res_get['docs']:
+                        if doc['found']:
+                            yield doc['_source']
+                        else:
+                            raise ValueError('document with id %s not found'%(doc['_id']))
+                    id_buffer = []
+            if id_buffer:
+                res_get = get_ids(id_buffer)
+                for doc in res_get['docs']:
+                    if doc['found']:
+                        yield doc['_source']
+                    else:
+                        raise ValueError('document with id %s not found' % (doc['_id']))
+
+
+    def get_all_target_ids_with_evidence_data(self):
+        #TODO: use an aggregation to get those with just data
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "match_all": {}
+                           },
+                               '_source': False,
+                               'size': 100,
+                           },
+                           scroll='12h',
+                           doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
+                           timeout="30m",
+                           )
+        return [t['_id'] for t in res]
 

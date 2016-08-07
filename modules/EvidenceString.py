@@ -274,13 +274,15 @@ class EvidenceManagerLookUpDataRetrieval():
         logger.info('getting gene info')
         self.lookup.uni2ens = {}
         self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
-        for gene_id in tqdm(self.lookup.available_genes.keys(),
+        gene_ids = self.lookup.available_genes.keys()
+        for gene_id in tqdm(gene_ids,
                             desc='getting mappings uni2ens'):
-            gene = GeneLookUpTable.get_gene(gene_id)
-            if gene['uniprot_id']:
-                self.lookup.uni2ens[gene['uniprot_id']] = gene.id
-            for accession in gene['uniprot_accessions']:
-                self.lookup.uni2ens[accession] = gene.id
+            gene = self.lookup.available_genes.get_gene(gene_id)
+            if gene:
+                if gene['uniprot_id']:
+                    self.lookup.uni2ens[gene['uniprot_id']] = gene.id
+                for accession in gene['uniprot_accessions']:
+                    self.lookup.uni2ens[accession] = gene.id
         self._get_non_reference_gene_mappings()
 
     def _get_non_reference_gene_mappings(self):
@@ -1021,12 +1023,12 @@ class EvidenceStringProcess():
         self.es_query = ESQuery(es)
         self.r_server = r_server
 
-    def process_all(self):
-        self._process_evidence_string_data()
+    def process_all(self, datasource = []):
+        self._process_evidence_string_data(datasource)
 
 
 
-    def _process_evidence_string_data(self):
+    def _process_evidence_string_data(self, datasource = []):
 
 
         base_id = 0
@@ -1094,7 +1096,7 @@ class EvidenceStringProcess():
             w.start()
 
 
-        for row in tqdm(self.get_evidence(page_size = get_evidence_page_size),
+        for row in tqdm(self.get_evidence(page_size = get_evidence_page_size, datasource= datasource),
                         desc='Reading available evidence_strings',
                         total = self.es_query.count_validated_evidence_strings(),
                         unit=' evidence',
@@ -1131,10 +1133,10 @@ class EvidenceStringProcess():
 
 
 
-    def get_evidence(self, page_size = 5000):
+    def get_evidence(self, page_size = 5000, datasource = []):
 
         c = 0
-        for row in self.es_query.get_validated_evidence_strings(size=page_size):
+        for row in self.es_query.get_validated_evidence_strings(size=page_size, datasource = datasource):
             c += 1
             if c % page_size == 0:
                 logger.info("loaded %i ev from db to process" % c)

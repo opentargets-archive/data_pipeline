@@ -503,7 +503,7 @@ class RedisLookupTable(object):
     '''
 
     LOOK_UPTABLE_NAMESPACE = 'lookuptable:%(namespace)s'
-    KEY_NAMESPACE = 'lookuptable:%(namespace)s:%(key)s'
+    KEY_NAMESPACE = '%(namespace)s:%(key)s'
 
     def __init__(self,
                  namespace = None,
@@ -533,7 +533,7 @@ class RedisLookupTable(object):
 
     def keys(self, r_server = None):
         r_server = self._get_r_server(r_server)
-        return [key.replace(self.namespace,'') for key in r_server.keys(self.namespace+'*')]
+        return [key.replace(self.namespace+':','') for key in r_server.keys(self.namespace+'*')]
 
 
     def _get_r_server(self, r_server = None):

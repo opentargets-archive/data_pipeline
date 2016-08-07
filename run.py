@@ -133,6 +133,8 @@ if __name__ == '__main__':
     parser.add_argument("--dump", dest='dump',
                         help="dump core data to local gzipped files",
                         action="append_const", const=DumpActions.ALL)
+    parser.add_argument("--datasource", dest='datasource', help="just process this datasource",
+                        action='append', default=[])
     args = parser.parse_args()
 
     '''logger'''
@@ -269,7 +271,7 @@ if __name__ == '__main__':
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                EvidenceStringProcess(es, r_server).process_all()
+                EvidenceStringProcess(es, r_server).process_all(datasource = args.datasource)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:

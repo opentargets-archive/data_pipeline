@@ -16,6 +16,7 @@ from tqdm import tqdm
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage, Loader
+from common.ElasticsearchQuery import ESQuery
 from common.PGAdapter import ElasticsearchLoad, TargetToDiseaseAssociationScoreMap, Adapter, \
     TargetToDiseaseAssociationScoreMapAnalysed
 from modules.EFO import EfoRetriever
@@ -599,6 +600,7 @@ class TargetDiseasePairProducer(Process):
         # self.adapter=Adapter()
         # self.session=self.adapter.session
         self.es = Elasticsearch(Config.ELASTICSEARCH_URL, timeout = 10*60)
+        self.es_query = ESQuery(self.es)
         self.n_consumers=n_consumers
         self.start_time = start_time
         self.signal_finish = signal_finish
@@ -643,31 +645,9 @@ class TargetDiseasePairProducer(Process):
 
 
     def _get_data_stream(self,page_size = 10000):
-        local_data =dict()
-
-        query_body = {
-              "query": {"match_all": {} },
-              '_source':  {"include": ["target.id",
-                                       "private.efo_codes",
-                                       "disease.id",
-                                       "scores.association_score",
-                                       "sourceID",
-                                       "id",
-                                       ],
-                           },
-              "sort":["target.id", "disease.id"],
-          }
 
 
-        res = helpers.scan(client=self.es,
-                           query=query_body,
-                           scroll='2h',
-                           index=Config.RELEASE_VERSION+'_'+Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
-                           timeout="2h",
-                           request_timeout=2*60*60,
-                           size = 5000,
-                           preserve_order=True
-        )
+        res = self.es_query.get_evidence_simple()
 
         c=0
         e=0
