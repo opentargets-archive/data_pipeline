@@ -280,9 +280,9 @@ class EvidenceManagerLookUpDataRetrieval():
             gene = self.lookup.available_genes.get_gene(gene_id)
             if gene:
                 if gene['uniprot_id']:
-                    self.lookup.uni2ens[gene['uniprot_id']] = gene.id
+                    self.lookup.uni2ens[gene['uniprot_id']] = gene['id']
                 for accession in gene['uniprot_accessions']:
-                    self.lookup.uni2ens[accession] = gene.id
+                    self.lookup.uni2ens[accession] = gene['id']
         self._get_non_reference_gene_mappings()
 
     def _get_non_reference_gene_mappings(self):
