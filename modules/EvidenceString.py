@@ -765,7 +765,6 @@ class Evidence(JSONSerializable):
                     if self.evidence['sourceID']=='gwas_catalog':
                         sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
                         score =self._score_gwascatalog(v2d_score, sample_size,g2v_score)
-                        logger.info("gwas score: %f | %f %f %f"%(score,v2d_score, sample_size,g2v_score))
                     else:
                         score = g2v_score*v2d_score
                 else:
@@ -855,8 +854,10 @@ class Evidence(JSONSerializable):
 
         normalised_sample_size = DataNormaliser.renormalize(sample_size, [0,5000], [0,1])
 
-        return normalised_pvalue*normalised_sample_size*severity
+        score = normalised_pvalue*normalised_sample_size*severity
 
+        logger.info("gwas score: %f | pvalue %f %f | sample size%f %f |severity %f" % (score, pvalue, normalised_pvalue, sample_size,normalised_sample_size, severity))
+        return score
 
 class UploadError():
     def __init__(self, evidence, trace, id, logdir='errorlogs'):
