@@ -505,7 +505,8 @@ class ESQuery(object):
         if expected is not None and expected <10000:
             query_body['size']=10000
             res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
-                                      body=query_body
+                                      body=query_body,
+                                      routing=target,
                                       )
             for hit in res['hits']['hits']:
                 yield hit['_source']
@@ -517,6 +518,7 @@ class ESQuery(object):
                                timeout="1h",
                                request_timeout=2 * 60 * 60,
                                size=1000,
+                               routing=target,
                                )
             for hit in res:
                 yield hit['_source']
@@ -535,7 +537,8 @@ class ESQuery(object):
                                         },
                                         '_source': False,
                                         'size': 0,
-                                    }
+                                    },
+                                  routing=target,
                                   )
         return res['hits']['total']
 
