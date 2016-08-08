@@ -263,17 +263,17 @@ class EvidenceManagerLookUpDataRetrieval():
 
     def _get_available_efos(self):
         logger.info('getting efos')
-        self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
+        self.lookup.available_efos ={}# EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
 
     def _get_available_ecos(self):
         logger.info('getting ecos')
-        self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
+        self.lookup.available_ecos ={}# ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
 
 
     def _get_gene_info(self):
         logger.info('getting gene info')
         self.lookup.uni2ens = {}
-        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
+        self.lookup.available_genes ={}# GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
         gene_ids = self.lookup.available_genes.keys()
         for gene_id in tqdm(gene_ids,
                             desc='getting mappings uni2ens'):
@@ -762,6 +762,7 @@ class Evidence(JSONSerializable):
                     if self.evidence['sourceID']=='gwas_catalog':
                         sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
                         score =self._score_gwascatalog(v2d_score, sample_size,g2v_score)
+                        print "gwas score: %f | %f %f %f"%(score,v2d_score, sample_size,g2v_score)
                     else:
                         score = g2v_score*v2d_score
                 else:
@@ -1023,12 +1024,12 @@ class EvidenceStringProcess():
         self.es_query = ESQuery(es)
         self.r_server = r_server
 
-    def process_all(self, datasource = []):
-        self._process_evidence_string_data(datasource)
+    def process_all(self, datasources = []):
+        self._process_evidence_string_data(datasources= datasources)
 
 
 
-    def _process_evidence_string_data(self, datasource = []):
+    def _process_evidence_string_data(self, datasources = []):
 
 
         base_id = 0
@@ -1044,9 +1045,9 @@ class EvidenceStringProcess():
         '''create and overwrite old data'''
         loader = Loader(self.es)
         for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
-            loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=True)
+            loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=bool(datasources))
         loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'],
-                                recreate=True)
+                                recreate=bool(datasources))
 
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
@@ -1097,9 +1098,9 @@ class EvidenceStringProcess():
             w.start()
 
 
-        for row in tqdm(self.get_evidence(page_size = get_evidence_page_size, datasource= datasource),
+        for row in tqdm(self.get_evidence(page_size = get_evidence_page_size, datasources= datasources),
                         desc='Reading available evidence_strings',
-                        total = self.es_query.count_validated_evidence_strings(),
+                        total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                         unit=' evidence',
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource= row['data_source_name'])
@@ -1134,10 +1135,10 @@ class EvidenceStringProcess():
 
 
 
-    def get_evidence(self, page_size = 5000, datasource = []):
+    def get_evidence(self, page_size = 5000, datasources = []):
 
         c = 0
-        for row in self.es_query.get_validated_evidence_strings(size=page_size, datasource = datasource):
+        for row in self.es_query.get_validated_evidence_strings(size=page_size, datasources = datasources):
             c += 1
             if c % page_size == 0:
                 logger.info("loaded %i ev from db to process" % c)

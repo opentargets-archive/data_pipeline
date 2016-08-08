@@ -193,7 +193,7 @@ class ESQuery(object):
         return AssociationSummary(res)
 
 
-    def get_validated_evidence_strings(self, fields = None, size=1000, datasource = []):
+    def get_validated_evidence_strings(self, fields = None, size=1000, datasources = []):
         def get_ids(ids):
             return self.handler.mget(index=index_name,
                                    body={'docs': ids},
@@ -205,20 +205,17 @@ class ESQuery(object):
         # TODO: do a scroll to get all the ids without sorting, and use many async mget queries to fetch the sources
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
-        filter = {"match_all": {}}
-        if datasource:
-            filter ={ "filtered": {
-                                   "filter": {
-                                       "terms": {"sourceID": ['europepmc']}
-                                   }
-                               }}
+        doc_type = None
+
+        if datasources:
+            doc_type = datasources
         res = helpers.scan(client=self.handler,
-                           query={"query": filter,
-                               '_source': False,
+                           query={"query":  {"match_all": {}},
+                               '_source': True,
                                'size': 1000,
                            },
                            scroll='12h',
-                           # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
+                           doc_type=doc_type,
                            index=index_name,
                            timeout="10m",
                            )
@@ -231,38 +228,43 @@ class ESQuery(object):
         #
         #                           )
 
-        # for hit in res:
-        #     yield hit['_source']
-
-        ids = []
         for hit in res:
-            ids.append({"_index" : hit["_index"],
-                        "_id" : hit["_id"]
-                        },)
-        id_buffer =[]
-        for doc_id in ids:
-            id_buffer.append(doc_id)
-            if len(id_buffer) == size:
-                res_get = get_ids(id_buffer)
-                for doc in res_get['docs']:
-                    if doc['found']:
-                        yield doc['_source']
-                    else:
-                        raise ValueError('document with id %s not found'%(doc['_id']))
-                id_buffer = []
-        if id_buffer:
-            res_get = get_ids(id_buffer)
-            for doc in res_get['docs']:
-                if doc['found']:
-                    yield doc['_source']
-                else:
-                    raise ValueError('document with id %s not found' % (doc['_id']))
+            yield hit['_source']
+
+        # ids = []
+        # for hit in res:
+        #     ids.append({"_index" : hit["_index"],
+        #                 "_id" : hit["_id"]
+        #                 },)
+        # id_buffer =[]
+        # for doc_id in ids:
+        #     id_buffer.append(doc_id)
+        #     if len(id_buffer) == size:
+        #         res_get = get_ids(id_buffer)
+        #         for doc in res_get['docs']:
+        #             if doc['found']:
+        #                 yield doc['_source']
+        #             else:
+        #                 raise ValueError('document with id %s not found'%(doc['_id']))
+        #         id_buffer = []
+        # if id_buffer:
+        #     res_get = get_ids(id_buffer)
+        #     for doc in res_get['docs']:
+        #         if doc['found']:
+        #             yield doc['_source']
+        #         else:
+        #             raise ValueError('document with id %s not found' % (doc['_id']))
 
 
 
-    def count_validated_evidence_strings(self, ):
+    def count_validated_evidence_strings(self, datasources = []):
 
-        return self._count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
+        doc_type = None
+        if datasources:
+            doc_type = datasources
+
+        return self._count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
+                                             doc_type = doc_type)
 
 
     def get_all_ensembl_genes(self):
@@ -389,8 +391,9 @@ class ESQuery(object):
 
         return dict((hit['_id'],hit['_source']['label']) for hit in res)
 
-    def _count_elements_in_index(self, index_name):
+    def _count_elements_in_index(self, index_name, doc_type=None):
         res = self.handler.search(index=Loader.get_versioned_index(index_name),
+                                  doc_type=doc_type,
                                   body={"query": {
                                       "match_all": {}
                                   },
