@@ -75,6 +75,8 @@ class HarmonicSumTestCase(unittest.TestCase):
         self.assertEqual(value, 0)
         value = DataNormaliser.renormalize(100005, [1, 100000], [0., 1])
         self.assertEqual(value, 1)
+        value = DataNormaliser.renormalize(2500., [0, 5000], [0., 1])
+        self.assertEqual(value, 0.5)
 
 
 

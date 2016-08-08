@@ -107,6 +107,7 @@ class DataNormaliser(object):
 
     @staticmethod
     def renormalize(n, start_range, new_range, cap=True):
+        n=float(n)
         max_new_range = max(new_range)
         min_new_range = min(new_range)
         delta1 = start_range[1] - start_range[0]
@@ -115,7 +116,7 @@ class DataNormaliser(object):
             try:
                 normalized = (delta2 * (n - start_range[0]) / delta1) + new_range[0]
             except ZeroDivisionError:
-                normalized = 0.
+                normalized = new_range[0]
         else:
             normalized = n
         if cap:
@@ -764,7 +765,9 @@ class Evidence(JSONSerializable):
                         v2d_score = 0.
                     if self.evidence['sourceID']=='gwas_catalog':
                         sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
-                        score =self._score_gwascatalog(v2d_score, sample_size,g2v_score)
+                        score =self._score_gwascatalog(self.evidence['evidence']['variant2disease']['resource_score']['value'],
+                                                       sample_size,
+                                                       g2v_score)
                     else:
                         score = g2v_score*v2d_score
                 else:
