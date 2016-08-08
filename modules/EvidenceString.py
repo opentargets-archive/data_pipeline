@@ -859,7 +859,7 @@ class Evidence(JSONSerializable):
 
         score = normalised_pvalue*normalised_sample_size*severity
 
-        logger.info("gwas score: %f | pvalue %f %f | sample size%f %f |severity %f" % (score, pvalue, normalised_pvalue, sample_size,normalised_sample_size, severity))
+        logger.debug("gwas score: %f | pvalue %f %f | sample size%f %f |severity %f" % (score, pvalue, normalised_pvalue, sample_size,normalised_sample_size, severity))
         return score
 
 class UploadError():

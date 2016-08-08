@@ -148,7 +148,7 @@ class Config():
     ONTOLOGY_SLIM_FILE = 'C:\users\gk680303\data\ontologies\opentargets_disease_phenotype_slim.ttl'
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
-        gwas_catalog=2.5
+        # gwas_catalog=2.5
         )
     DATASOURCE_EVIDENCE_SCORE_AUTO_EXTEND_RANGE=dict(
                                                      # phenodigm=dict(min=0.4, max= 1),
