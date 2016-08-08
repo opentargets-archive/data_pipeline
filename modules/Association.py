@@ -606,6 +606,10 @@ class TargetDiseasePairProducer(Process):
         self.signal_finish = signal_finish
         self.pairs_generated = pairs_generated
         self.lock = lock
+        self.total_pairs_bar = tqdm(desc='Generationg Target-Disease pairs',
+                                    unit=' pairs',
+                                    unit_scale=True,
+                                    )
 
 
     def run(self):
@@ -613,30 +617,33 @@ class TargetDiseasePairProducer(Process):
         # total_assocaition_pairs = self.session.query(TargetToDiseaseAssociationScoreMap).count()
         # logging.info("starting to analyse %s association pairs"%(millify(total_assocaition_pairs)))
         self.total_jobs = 0
-        self.init_data_cache()
-        c=0
-        last_gene = ''
-        for row in tqdm(self._get_data_stream(), desc='fetching target-disease pairs', unit=' pairs', unit_scale=True):
-            c+=1
-            if row['target_id'] != last_gene:
-                '''produce pairs'''
+
+        for target in tqdm(self.es_query.get_all_target_ids_with_evidence_data(),
+                           desc='fetching evidence for targets',
+                           unit=' targets',
+                           unit_scale=True,
+                           total = self.es_query.count_all_targets()):
+            available_evidence = self.es_query.count_evidence_for_target(target)
+            if available_evidence:
+
+                self.init_data_cache()
+                for evidence in tqdm(self.es_query.get_evidence_for_target_simple(target, available_evidence),
+                                   desc='fetching evidence for target %s'%target,
+                                   unit=' evidence',
+                                   unit_scale=True,
+                                   total=available_evidence):
+                    for efo in evidence['private']['efo_codes']:
+                        row = EvidenceScore(
+                            score=evidence['scores']['association_score'] * Config.SCORING_WEIGHTS[evidence['sourceID']],
+                            datatype=Config.DATASOURCE_TO_DATATYPE_MAPPING[evidence['sourceID']],
+                            datasource=evidence['sourceID'],
+                            is_direct=efo == evidence['disease']['id'])
+                        key = (evidence['target']['id'], evidence['disease']['id'])
+                        if key not in self.data_cache:
+                            self.data_cache[key] = []
+                        self.data_cache[key].append(row)
+
                 self.produce_pairs()
-                last_gene = row['target_id']
-            key = (row['target_id'], row['disease_id'])
-            if key not in self.data_cache:
-                self.data_cache[key] =[]
-            self.data_cache[key].append(self.get_score_from_row(row))
-            if c%5e5 == 0:
-                logging.info(('%s rows read'%millify(c)))
-            # print c
-            # if c==10000:
-            #     break
-
-
-
-        self.produce_pairs()
-        # for w in range(self.n_consumers):
-        #     self.q.put(None)#kill consumers when done
         logging.info("task loading done: %s loaded in %is"%(millify(self.total_jobs), time.time()-self.start_time))
         with self.lock:
             self.pairs_generated.value = self.total_jobs
@@ -685,15 +692,11 @@ class TargetDiseasePairProducer(Process):
                     break
             self.q.put((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
+        self.total_pairs_bar.update(c)
         self.total_jobs +=c
         with self.lock:
             self.pairs_generated.value =  self.total_jobs
 
-    def get_score_from_row(self, row):
-        return EvidenceScore(score = row['association_score']*Config.SCORING_WEIGHTS[row['datasource']],
-                             datatype= Config.DATASOURCE_TO_DATATYPE_MAPPING[row['datasource']],
-                             datasource=row['datasource'],
-                             is_direct=row['is_direct'])
 
 
 class ScoreProducer(Process):

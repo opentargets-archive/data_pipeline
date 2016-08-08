@@ -733,7 +733,7 @@ class GeneLookUpTable(object):
                            ):
             self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
-    def get_gene(self, target_id, r_server = None):
+    def get_gene(self, target_id, r_server = None):#TODO: return a gene object not a dictionary
         return self._table.get(target_id, r_server=self._get_r_server(r_server))
 
     def set_gene(self, target, r_server = None):

@@ -434,7 +434,7 @@ class ESQuery(object):
             res = helpers.scan(client=self.handler,
                                query=query_body,
                                scroll='1h',
-                               index=Config.RELEASE_VERSION + '_' + Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',
+                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
                                timeout="1h",
                                request_timeout=2 * 60 * 60,
                                size=5000,
@@ -479,5 +479,63 @@ class ESQuery(object):
                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
                            timeout="30m",
                            )
-        return [t['_id'] for t in res]
+        for target in res:
+            yield  target['_id']
+
+
+    def get_evidence_for_target_simple(self, target, expected = None):
+        query_body = {"query": {
+                                "bool": {
+                                  "filter": {
+                                    "term": {
+                                      "target.id": target
+                                    }
+                                  }
+                                }
+                            },
+            '_source': {"include": ["target.id",
+                                    "private.efo_codes",
+                                    "disease.id",
+                                    "scores.association_score",
+                                    "sourceID",
+                                    "id",
+                                    ]},
+            }
+
+        if expected is not None and expected <10000:
+            query_body['size']=10000
+            res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
+                                      body=query_body
+                                      )
+            for hit in res['hits']['hits']:
+                yield hit['_source']
+        else:
+            res = helpers.scan(client=self.handler,
+                               query=query_body,
+                               scroll='1h',
+                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
+                               timeout="1h",
+                               request_timeout=2 * 60 * 60,
+                               size=1000,
+                               )
+            for hit in res:
+                yield hit['_source']
+
+    def count_evidence_for_target(self, target):
+        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
+                                  body={
+                                        "query": {
+                                            "bool": {
+                                              "filter": {
+                                                "term": {
+                                                  "target.id": target
+                                                }
+                                              }
+                                            }
+                                        },
+                                        '_source': False,
+                                        'size': 0,
+                                    }
+                                  )
+        return res['hits']['total']
 
