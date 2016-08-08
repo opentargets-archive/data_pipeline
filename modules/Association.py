@@ -806,10 +806,7 @@ class ScoreStorerWorker(Process):
 class ScoringProcess():
 
     def __init__(self,
-                 adapter,
                  es_loader):
-        self.adapter=adapter
-        self.session=adapter.session
         self.es_loader = es_loader
         # self.scorer = Scorer()
 
@@ -901,11 +898,7 @@ class ScoringProcess():
 
 
 
-        # JSONObjectStorage.delete_prev_data_in_pg(self.session,
-        #                                  Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-        #                                  )
-        self.session.commit()
-        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
+        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=True)
         #
         #
         #

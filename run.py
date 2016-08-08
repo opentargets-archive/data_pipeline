@@ -275,7 +275,7 @@ if __name__ == '__main__':
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:
-                ScoringProcess(adapter, loader).process_all()
+                ScoringProcess(loader).process_all()
         if args.ddr or run_full_pipeline:
             do_all = (DataDrivenRelationActions.ALL in args.ddr) or run_full_pipeline
             if (DataDrivenRelationActions.PROCESS in args.ddr) or do_all:
