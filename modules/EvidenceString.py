@@ -1044,10 +1044,11 @@ class EvidenceStringProcess():
         get_evidence_page_size = 5000
         '''create and overwrite old data'''
         loader = Loader(self.es)
+        overwrite_indices = not bool(datasources)
         for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
-            loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=bool(datasources))
+            loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=overwrite_indices)
         loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'],
-                                recreate=bool(datasources))
+                                recreate=overwrite_indices)
 
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
