@@ -754,7 +754,10 @@ class Evidence(JSONSerializable):
                 if 'gene2variant' in  self.evidence['evidence']:
                     g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
                     if self.evidence['evidence']['variant2disease']['resource_score']['type'] =='pvalue':
-                        v2d_score = self._get_score_from_pvalue_linear(self.evidence['evidence']['variant2disease']['resource_score']['value'])
+                        if self.evidence['sourceID']=='gwas_catalog':#temporary fix
+                            v2d_score = self._get_score_from_pvalue_linear(float(self.evidence['unique_association_fields']['pvalue']))
+                        else:
+                            v2d_score = self._get_score_from_pvalue_linear(self.evidence['evidence']['variant2disease']['resource_score']['value'])
                     elif self.evidence['evidence']['variant2disease']['resource_score']['type'] =='probability':
                         v2d_score = self.evidence['evidence']['variant2disease']['resource_score']['value']
                     else:
