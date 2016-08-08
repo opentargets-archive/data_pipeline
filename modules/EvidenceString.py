@@ -263,17 +263,17 @@ class EvidenceManagerLookUpDataRetrieval():
 
     def _get_available_efos(self):
         logger.info('getting efos')
-        self.lookup.available_efos ={}# EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
+        self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
 
     def _get_available_ecos(self):
         logger.info('getting ecos')
-        self.lookup.available_ecos ={}# ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
+        self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
 
 
     def _get_gene_info(self):
         logger.info('getting gene info')
         self.lookup.uni2ens = {}
-        self.lookup.available_genes ={}# GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
+        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
         gene_ids = self.lookup.available_genes.keys()
         for gene_id in tqdm(gene_ids,
                             desc='getting mappings uni2ens'):
@@ -762,7 +762,7 @@ class Evidence(JSONSerializable):
                     if self.evidence['sourceID']=='gwas_catalog':
                         sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
                         score =self._score_gwascatalog(v2d_score, sample_size,g2v_score)
-                        print "gwas score: %f | %f %f %f"%(score,v2d_score, sample_size,g2v_score)
+                        #print "gwas score: %f | %f %f %f"%(score,v2d_score, sample_size,g2v_score)
                     else:
                         score = g2v_score*v2d_score
                 else:
