@@ -277,7 +277,8 @@ if __name__ == '__main__':
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                EvidenceStringProcess(es, r_server).process_all(datasources = args.datasource)
+                EvidenceStringProcess(es, r_server).process_all(datasources = args.datasource,
+                                                                dry_run=args.dry_run)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:

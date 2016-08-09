@@ -466,7 +466,9 @@ class ScoringProcess():
         # logging.info("%s targets available | %s diseases available | %s estimated combinations to precalculate"%(millify(target_total),
         #                                                                                                         millify(disease_total),
         #                                                                                                         millify(estimated_total)))
-        overwrite_indices = not bool(targets)
+        overwrite_indices = not dry_run
+        if not dry_run:
+            overwrite_indices = not bool(targets)
         if not targets:
             targets = self.es_query.get_all_target_ids_with_evidence_data()
 

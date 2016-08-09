@@ -897,6 +897,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
                  output_generated_count,
                  lock,
                  chunk_size = 1e4,
+                 dry_run = False
                  ):
         super(EvidenceStorerWorker, self).__init__()
         self.q= processing_output_q
@@ -907,10 +908,11 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.total_loaded = submitted_to_storage
         self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
         self.lock = lock
+        self.dry_run = dry_run
 
     def run(self):
         logger.info("worker %s started"%self.name)
-        with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
+        with Loader(self.es, chunk_size=self.chunk_size, dry_run = self.dry_run) as es_loader:
             with ProcessedEvidenceStorer( es_loader, chunk_size=self.chunk_size, quiet=False) as storer:
                 while not (((self.output_generated_count.value == self.total_loaded.value) and \
                         self.processing_finished.is_set()) or self.signal_finish.is_set()):
@@ -943,12 +945,15 @@ class EvidenceStringProcess():
         self.es_query = ESQuery(es)
         self.r_server = r_server
 
-    def process_all(self, datasources = []):
-        self._process_evidence_string_data(datasources= datasources)
+    def process_all(self, datasources = [], dry_run = False):
+        self._process_evidence_string_data(datasources= datasources,
+                                           dry_run = dry_run )
 
 
 
-    def _process_evidence_string_data(self, datasources = []):
+    def _process_evidence_string_data(self,
+                                      datasources = [],
+                                      dry_run = False):
 
 
         base_id = 0
@@ -963,7 +968,9 @@ class EvidenceStringProcess():
         get_evidence_page_size = 5000
         '''create and overwrite old data'''
         loader = Loader(self.es)
-        overwrite_indices = not bool(datasources)
+        overwrite_indices = not dry_run
+        if not dry_run:
+            overwrite_indices = not bool(datasources)
         for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
             loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=overwrite_indices)
         loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'],
@@ -1011,7 +1018,8 @@ class EvidenceStringProcess():
                                         data_storage_finished,
                                         submitted_to_storage_count,
                                         output_computed_count,
-                                        data_storage_lock
+                                        data_storage_lock,
+                                        dry_run,
                                      )  for i in range(workers_number)]
                                   # ) for i in range(1)]
         for w in storers:
