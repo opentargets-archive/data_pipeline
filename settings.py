@@ -192,9 +192,9 @@ class Config():
     # setup the weights for evidence strings score
     SCORING_WEIGHTS = defaultdict(lambda: 1)
     SCORING_WEIGHTS['phenodigm'] = 0.2
-    # SCORING_WEIGHTS['expression_atlas'] = 0.2
+    SCORING_WEIGHTS['expression_atlas'] = 0.5
     SCORING_WEIGHTS['europepmc'] = 0.2
-    SCORING_WEIGHTS['gwas_catalog'] = 1.5
+    # SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
     # setup a minimum score value for an evidence string to be accepted.
     SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)

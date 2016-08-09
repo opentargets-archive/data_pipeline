@@ -171,14 +171,17 @@ class Loader():
     Loads data to elasticsearch
     """
 
-    def __init__(self, es, chunk_size=1000):
+    def __init__(self,
+                 es,
+                 chunk_size=1000,
+                 dry_run = False):
 
         self.es = es
         self.cache = []
         self.results = defaultdict(list)
         self.chunk_size = chunk_size
         self.index_created=[]
-        logging.debug("loader chunk_size: %i"%chunk_size)
+        self.dry_run = dry_run
 
     @staticmethod
     def get_versioned_index(index_name):
@@ -234,26 +237,27 @@ class Loader():
         #         self.cache[index_name] = []
 
     def _flush(self):
-        # for ok, results in streaming_bulk(
-        for ok, results in parallel_bulk(
-                self.es,
-                self.cache,
-                chunk_size=self.chunk_size,
-                request_timeout=60000,
-            ):
+        if not self.dry_run:
+            # for ok, results in streaming_bulk(
+            for ok, results in parallel_bulk(
+                    self.es,
+                    self.cache,
+                    chunk_size=self.chunk_size,
+                    request_timeout=60000,
+                ):
 
-            action, result = results.popitem()
-            self.results[result['_index']].append(result['_id'])
-            doc_id = '/%s/%s' % (result['_index'], result['_id'])
-            if (len(self.results[result['_index']]) % self.chunk_size) == 0:
-                logging.debug(
-                    "%i entries uploaded in elasticsearch for index %s" % (
-                    len(self.results[result['_index']]), result['_index']))
-            if not ok:
-                logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
+                action, result = results.popitem()
+                self.results[result['_index']].append(result['_id'])
+                doc_id = '/%s/%s' % (result['_index'], result['_id'])
+                if (len(self.results[result['_index']]) % self.chunk_size) == 0:
+                    logging.debug(
+                        "%i entries uploaded in elasticsearch for index %s" % (
+                        len(self.results[result['_index']]), result['_index']))
+                if not ok:
+                    logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
 
-            else:
-                pass
+                else:
+                    pass
 
 
     def close(self):

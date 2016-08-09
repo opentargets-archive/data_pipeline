@@ -720,8 +720,10 @@ class GeneLookUpTable(object):
         self._es = es
         self._es_query = ESQuery(es)
         self.r_server = r_server
+        self.uniprot2ensembl = {}
         if r_server is not None:
             self._load_gene_data(r_server)
+
 
     def _load_gene_data(self, r_server = None):
         for target in tqdm(self._es_query.get_all_targets(),
@@ -732,6 +734,10 @@ class GeneLookUpTable(object):
                            leave=False,
                            ):
             self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
+            if target['uniprot_id']:
+                self.uniprot2ensembl[target['uniprot_id']] = target['id']
+            for accession in target['uniprot_accessions']:
+                self.uniprot2ensembl[accession] = target['id']
 
     def get_gene(self, target_id, r_server = None):#TODO: return a gene object not a dictionary
         return self._table.get(target_id, r_server=self._get_r_server(r_server))

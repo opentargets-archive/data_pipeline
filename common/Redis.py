@@ -272,7 +272,10 @@ class RedisQueue(object):
         if not r_server:
             r_server = self.r_server
         if r_server is None:
-            raise AttributeError('A redis server is required either at class instantation or at the method level')
+            try:
+               r_server = Redis(Config.REDISLITE_DB_PATH)
+            except:
+                raise AttributeError('A redis server is required either at class instantiation or at the method level')
         return r_server
 
 
@@ -482,6 +485,10 @@ class RedisQueueWorkerProcess(Process):
         self.close()
 
     def close(self):
+        '''
+        implement in subclass to clean up loaders and other trailing elements when the processer is done
+        :return:
+        '''
         pass
 
     def process(self, data):

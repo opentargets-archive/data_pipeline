@@ -1,33 +1,23 @@
-import ctypes
-import pprint
-from collections import defaultdict, OrderedDict
 import copy
-from datetime import datetime
 import json
 import logging
-import os
-import pickle
-import traceback
-
 import math
-from elasticsearch import Elasticsearch
-from sqlalchemy import and_
-import sys
+import multiprocessing
+import time
 
+from elasticsearch import Elasticsearch
 from tqdm import tqdm
 
 from common import Actions
 from common.DataStructure import JSONSerializable, PipelineEncoder
-from common.ElasticsearchLoader import JSONObjectStorage, Loader
+from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
+from common.LookupHelpers import LookUpDataRetriever
 from modules import GeneData
-from modules.ECO import ECO, EcoRetriever, ECOLookUpTable
-from modules.EFO import EFO, get_ontology_code_from_url, EfoRetriever, EFOLookUpTable
-from modules.GeneData import Gene, GeneRetriever, GeneLookUpTable
+from modules.ECO import ECO
+from modules.EFO import EFO, get_ontology_code_from_url
+from modules.GeneData import Gene
 from settings import Config
-from dateutil import parser as smart_date_parser
-import time
-import multiprocessing
 
 logger = logging.getLogger(__name__)
 # logger = multiprocessing.get_logger()
@@ -222,84 +212,6 @@ class ProcessedEvidenceStorer():
 
     def __exit__(self, type, value, traceback):
         self.close()
-
-class EvidenceManagerLookUpData():
-    def __init__(self):
-        self.available_genes = None
-        self.available_efos = None
-        self.available_ecos = None
-        self.uni2ens = None
-        self.non_reference_genes = None
-        self.available_gene_objects = None
-        self.available_efo_objects = None
-        self.available_eco_objects = None
-
-
-
-class EvidenceManagerLookUpDataRetrieval():
-    def __init__(self,
-                 es = None,
-                 r_server = None):
-
-        self.es = es
-        self.r_server = r_server
-        if es is not None:
-            self.esquery = ESQuery(es)
-        self.lookup = EvidenceManagerLookUpData()
-        start_time = time.time()
-        load_bar = tqdm(desc='loading lookup data',
-             total=3,
-             unit=' steps',
-             leave=False,)
-        self._get_gene_info()
-        logger.info("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
-        load_bar.update()
-        self._get_available_efos()
-        logger.info("finished self._get_available_efos(), took %ss"%str(time.time()-start_time))
-        load_bar.update()
-        self._get_available_ecos()
-        logger.info("finished self._get_available_ecos(), took %ss"%str(time.time()-start_time))
-        load_bar.update()
-
-
-    def _get_available_efos(self):
-        logger.info('getting efos')
-        self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
-
-    def _get_available_ecos(self):
-        logger.info('getting ecos')
-        self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
-
-
-    def _get_gene_info(self):
-        logger.info('getting gene info')
-        self.lookup.uni2ens = {}
-        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
-        gene_ids = self.lookup.available_genes.keys()
-        for gene_id in tqdm(gene_ids,
-                            desc='getting mappings uni2ens'):
-            gene = self.lookup.available_genes.get_gene(gene_id)
-            if gene:
-                if gene['uniprot_id']:
-                    self.lookup.uni2ens[gene['uniprot_id']] = gene['id']
-                for accession in gene['uniprot_accessions']:
-                    self.lookup.uni2ens[accession] = gene['id']
-        self._get_non_reference_gene_mappings()
-
-    def _get_non_reference_gene_mappings(self):
-        self.lookup.non_reference_genes = {}
-        skip_header=True
-        for line in file('resources/genes_with_non_reference_ensembl_ids.tsv'):
-            if skip_header:
-                skip_header=False
-            symbol, ensg, assembly, chr, is_ref = line.split()
-            if symbol not in self.lookup.non_reference_genes:
-                self.lookup.non_reference_genes[symbol]=dict(reference='',
-                                                      alternative=[])
-            if is_ref == 't':
-                self.lookup.non_reference_genes[symbol]['reference']=ensg
-            else:
-                self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
 
 
 class EvidenceManager():
@@ -1047,7 +959,7 @@ class EvidenceStringProcess():
         logger.debug("Starting Evidence Manager")
 
 
-        lookup_data = EvidenceManagerLookUpDataRetrieval(self.es, self.r_server).lookup
+        lookup_data = LookUpDataRetriever(self.es, self.r_server).lookup
         get_evidence_page_size = 5000
         '''create and overwrite old data'''
         loader = Loader(self.es)

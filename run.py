@@ -133,8 +133,12 @@ if __name__ == '__main__':
     parser.add_argument("--dump", dest='dump',
                         help="dump core data to local gzipped files",
                         action="append_const", const=DumpActions.ALL)
-    parser.add_argument("--datasource", dest='datasource', help="just process this datasource",
+    parser.add_argument("--datasource", dest='datasource', help="just process data for this datasource. Does not work with all the steps!!",
                         action='append', default=[])
+    parser.add_argument("--targets", dest='targets', help="just process data for this target. Does not work with all the steps!!",
+                        action='append', default=[])
+    parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
+                        action='store_true', default=False)
     args = parser.parse_args()
 
     '''logger'''
@@ -195,7 +199,9 @@ if __name__ == '__main__':
     if not args.redisperist:
         clear_redislite_db()
     r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
-    with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
+    with Loader(es,
+                chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
+                dry_run = args.dry_run) as loader:
         run_full_pipeline = False
         if args.all  and (Actions.ALL in args.all):
             run_full_pipeline = True
@@ -275,7 +281,8 @@ if __name__ == '__main__':
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:
-                ScoringProcess(loader).process_all()
+                ScoringProcess(loader, r_server).process_all(targets = args.targets,
+                                                             dry_run=args.dry_run)
         if args.ddr or run_full_pipeline:
             do_all = (DataDrivenRelationActions.ALL in args.ddr) or run_full_pipeline
             if (DataDrivenRelationActions.PROCESS in args.ddr) or do_all:
