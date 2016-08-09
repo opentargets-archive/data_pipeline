@@ -115,11 +115,9 @@ class Association(JSONSerializable):
         #TODO: handle domains
         genes_info=ExtendedInfoGene(gene)
 
-        if 'reactome' in gene._private['facets']:
+        if 'facets' in gene._private and 'reactome' in gene._private['facets']:
             pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
             pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
-            # except Exception:
-            #     logging.warning("Cannot get generic info for gene: %s" % aboutid)
         if gene.go:
             for go_code,data in gene.go.items():
                 try:
