@@ -477,7 +477,7 @@ class ScoringProcess():
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
-                              max_size=number_of_workers*2,
+                              max_size=number_of_workers*10,
                               job_timeout=3600,
                               r_server=self.r_server,
                               total=len(targets))
@@ -522,7 +522,7 @@ class ScoringProcess():
         readers = [TargetDiseaseEvidenceProducer(target_q,
                                                  self.r_server.db,
                                                  target_disease_pair_q,
-                                                ) for i in range(number_of_workers)]
+                                                ) for i in range(number_of_workers*2)]
         for w in readers:
             w.start()
 

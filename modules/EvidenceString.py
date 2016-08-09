@@ -1025,7 +1025,7 @@ class EvidenceStringProcess():
         for w in storers:
             w.start()
 
-
+        targets_with_data = set()
         for row in tqdm(self.get_evidence(page_size = get_evidence_page_size, datasources= datasources),
                         desc='Reading available evidence_strings',
                         total = self.es_query.count_validated_evidence_strings(datasources= datasources),
@@ -1036,7 +1036,7 @@ class EvidenceStringProcess():
             ev.evidence['id'] = idev
             input_q.put((idev, ev))
             input_generated_count.value += 1
-
+            targets_with_data.add(ev.evidencep['target']['id'])
             if input_generated_count.value % 1e4 == 0:
                 logger.info("%i entries submitted for process" % (input_generated_count.value))
         input_loading_finished.set()
@@ -1053,11 +1053,13 @@ class EvidenceStringProcess():
                 w.terminate()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
 
-
-        logging.info('flushing data to index')
+        logger.info('flushing data to index')
         self.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
                               wait_if_ongoing=True)
-        return
+
+        logger.info('Processed data for %i targets'%len(targets_with_data))
+
+        return list(targets_with_data)
 
 
 

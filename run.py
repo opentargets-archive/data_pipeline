@@ -196,6 +196,7 @@ if __name__ == '__main__':
     '''init sparql endpoint client'''
     sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
 
+    targets = args.targets
     if not args.redisperist:
         clear_redislite_db()
     r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
@@ -277,12 +278,12 @@ if __name__ == '__main__':
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                EvidenceStringProcess(es, r_server).process_all(datasources = args.datasource,
-                                                                dry_run=args.dry_run)
+                targets = EvidenceStringProcess(es, r_server).process_all(datasources = args.datasource,
+                                                                          dry_run=args.dry_run)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:
-                ScoringProcess(loader, r_server).process_all(targets = args.targets,
+                ScoringProcess(loader, r_server).process_all(targets = targets,
                                                              dry_run=args.dry_run)
         if args.ddr or run_full_pipeline:
             do_all = (DataDrivenRelationActions.ALL in args.ddr) or run_full_pipeline
