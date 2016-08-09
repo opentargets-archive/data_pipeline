@@ -814,23 +814,12 @@ class ScoringProcess():
         self.score_target_disease_pairs()
 
     def score_target_disease_pairs(self):
-        # with ScoreStorer(self.adapter) as storer:
-        target_total = self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                        ElasticsearchLoad.active==True,
-                        )
-                    ).count()
-        disease_total = self.session.query(ElasticsearchLoad.id).filter(and_(
-                        ElasticsearchLoad.index==Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                        ElasticsearchLoad.type==Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                        ElasticsearchLoad.active==True,
-                        )
-                    ).count()
-        estimated_total = target_total*disease_total
-        logging.info("%s targets available | %s diseases available | %s estimated combinations to precalculate"%(millify(target_total),
-                                                                                                                millify(disease_total),
-                                                                                                                millify(estimated_total)))
+        # # with ScoreStorer(self.adapter) as storer:
+
+        # estimated_total = target_total*disease_total
+        # logging.info("%s targets available | %s diseases available | %s estimated combinations to precalculate"%(millify(target_total),
+        #                                                                                                         millify(disease_total),
+        #                                                                                                         millify(estimated_total)))
 
         c=0.
         combination_with_data = 0.
