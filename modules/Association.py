@@ -470,7 +470,7 @@ class ScoringProcess():
         if not dry_run:
             overwrite_indices = not bool(targets)
         if not targets:
-            targets = self.es_query.get_all_target_ids_with_evidence_data()
+            targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
         lookup_data = LookUpDataRetriever(self.es, self.r_server).lookup
 
