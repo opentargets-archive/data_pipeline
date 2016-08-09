@@ -344,14 +344,14 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
             #                    total=available_evidence):
             for evidence in evidence_iterator:
                 for efo in evidence['private']['efo_codes']:
+                    key = (evidence['target']['id'], efo)
+                    if key not in self.data_cache:
+                        self.data_cache[key] = []
                     row = EvidenceScore(
                         score=evidence['scores']['association_score'] * Config.SCORING_WEIGHTS[evidence['sourceID']],
                         datatype=Config.DATASOURCE_TO_DATATYPE_MAPPING[evidence['sourceID']],
                         datasource=evidence['sourceID'],
                         is_direct=efo == evidence['disease']['id'])
-                    key = (evidence['target']['id'], evidence['disease']['id'])
-                    if key not in self.data_cache:
-                        self.data_cache[key] = []
                     self.data_cache[key].append(row)
 
             self.produce_pairs()
