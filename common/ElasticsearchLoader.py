@@ -334,13 +334,15 @@ class Loader():
         mappings = self.es.indices.get_mapping(index=index_name)
         settings = self.es.indices.get_settings(index=index_name)
 
-        assertJSONEqual(mappings[index_name]['mappings'],
-                        body['mappings'],
-                        msg='mappings in elasticsearch are different from the ones sent')
-        assertJSONEqual(settings[index_name]['settings']['index'],
-                        body['settings'],
-                        msg='settings in elasticsearch are different from the ones sent',
-                        keys=['number_of_replicas','number_of_shards','refresh_interval'])
+        if 'mappings' in body:
+            assertJSONEqual(mappings[index_name]['mappings'],
+                            body['mappings'],
+                            msg='mappings in elasticsearch are different from the ones sent')
+        if 'settings' in body:
+            assertJSONEqual(settings[index_name]['settings']['index'],
+                            body['settings'],
+                            msg='settings in elasticsearch are different from the ones sent',
+                            keys=['number_of_replicas','number_of_shards','refresh_interval'])
 
     def create_new_index(self, index_name, recreate = False):
         index_name = self.get_versioned_index(index_name)
