@@ -1036,7 +1036,7 @@ class EvidenceStringProcess():
             ev.evidence['id'] = idev
             input_q.put((idev, ev))
             input_generated_count.value += 1
-            targets_with_data.add(ev.evidencep['target']['id'])
+            targets_with_data.add(ev.evidence['target']['id'])
             if input_generated_count.value % 1e4 == 0:
                 logger.info("%i entries submitted for process" % (input_generated_count.value))
         input_loading_finished.set()
