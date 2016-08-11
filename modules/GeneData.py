@@ -289,7 +289,7 @@ class Gene(JSONSerializable):
         self.is_ensembl_reference = is_reference
 
 
-    def load_uniprot_entry(self, seqrec):
+    def load_uniprot_entry(self, seqrec, reactome_retriever):
         self.uniprot_id = seqrec.id
         self.is_in_swissprot = True
         if seqrec.dbxrefs:
@@ -330,7 +330,7 @@ class Gene(JSONSerializable):
             self.go = seqrec.annotations['dbxref_extended']['GO']
         if 'Reactome' in  seqrec.annotations['dbxref_extended']:
             self.reactome = seqrec.annotations['dbxref_extended']['Reactome']
-            # self._extend_reactome_data()
+            self._extend_reactome_data(reactome_retriever)
         if 'PDB' in  seqrec.annotations['dbxref_extended']:
             self.pdb = seqrec.annotations['dbxref_extended']['PDB']
         if 'ChEMBL' in  seqrec.annotations['dbxref_extended']:
@@ -341,6 +341,30 @@ class Gene(JSONSerializable):
             self.pfam = seqrec.annotations['dbxref_extended']['Pfam']
         if 'InterPro' in  seqrec.annotations['dbxref_extended']:
             self.interpro = seqrec.annotations['dbxref_extended']['InterPro']
+
+    def _extend_reactome_data(self, reactome_retriever):
+        for r in self.reactome:
+            r['pathway types'] = []
+            key, reaction = r['id'], r['value']
+            for reaction_type in self._get_pathway_type(key, reactome_retriever):
+                r['pathway types'].append(reaction_type)
+        return
+
+    def _get_pathway_type(self, reaction_id, reactome_retriever):
+        types = []
+        try:
+            reaction = reactome_retriever.get_reaction(reaction_id)
+            type_codes =[]
+            for path in reaction.path:
+                if len(path)>1:
+                    type_codes.append(path[1])
+            for type_code in type_codes:
+                types.append({'pathway type':type_code,
+                              'pathway type name': reactome_retriever.get_reaction(type_code).label
+                              })
+        except:
+            logging.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
+        return types
 
     def get_id_org(self):
         return ENS_ID_ORG_PREFIX + self.ensembl_gene_id
@@ -477,12 +501,12 @@ class GeneSet():
 
 class GeneObjectStorer(RedisQueueWorkerProcess):
 
-    def __init__(self, es, r_server, queue):
+    def __init__(self, es, r_server, queue, dry_run=False):
         super(GeneObjectStorer, self).__init__(queue, r_server.db)
         self.es = es
         self.r_server = r_server
         self.queue = queue
-        self.loader = Loader(self.es, chunk_size=100)
+        self.loader = Loader(self.es, chunk_size=100, dry_run=dry_run)
 
     def process(self, data):
         geneid, gene = data
@@ -504,23 +528,32 @@ class GeneManager():
     """
 
     def __init__(self,
-                 es, r_server):
+                 loader,
+                 r_server):
 
 
-        self.es = es
+        self.loader = loader
         self.r_server = r_server
-        self.esquery = ESQuery(es)
+        self.esquery = ESQuery(loader.es)
         self.genes = GeneSet()
-        self.reactome_retriever=ReactomeRetriever(es)
+        self.reactome_retriever=ReactomeRetriever(loader.es)
 
 
 
-    def merge_all(self):
-        self._get_hgnc_data_from_json()
-        self._get_ortholog_data()
-        self._get_ensembl_data()
+    def merge_all(self, dry_run = False):
+        bar = tqdm(desc='Merging data from available databases',
+                   total = 5,
+                   unit= 'steps')
+        # self._get_hgnc_data_from_json()
+        bar.update()
+        # self._get_ortholog_data()
+        bar.update()
+        # self._get_ensembl_data()
+        bar.update()
         self._get_uniprot_data()
-        self._store_data()
+        bar.update()
+        # self._store_data(dry_run=dry_run)
+        bar.update()
 
 
     def _get_hgnc_data_from_json(self):
@@ -529,7 +562,11 @@ class GeneManager():
         response = urllib2.urlopen(req)
         logging.info("HGNC parsing - response code %s" % response.code)
         data = json.loads(response.read())
-        for row in data['response']['docs']:
+        for row in tqdm(data['response']['docs'],
+                        desc='loading genes from HGNC',
+                        unit_scale=True,
+                        unit='genes',
+                        leave=False):
             gene = Gene()
             gene.load_hgnc_data_from_json(row)
             self.genes.add_gene(gene)
@@ -544,7 +581,11 @@ class GeneManager():
         req.raise_for_status()
 
         # io.BytesIO is StringIO.StringIO in python 2
-        for row in csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)),delimiter="\t"):
+        for row in tqdm(csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)),delimiter="\t"),
+                        desc='loading orthologues genes from HGNC',
+                        unit_scale=True,
+                        unit='genes',
+                        leave=False):
             if row['human_ensembl_gene'] in self.genes:
                 self.genes[row['human_ensembl_gene']].load_ortholog_data(row)
 
@@ -556,7 +597,11 @@ class GeneManager():
 
 
     def _get_ensembl_data(self):
-        for row in self.esquery.get_all_ensembl_genes():
+        for row in tqdm(self.esquery.get_all_ensembl_genes(),
+                        desc='loading genes from Ensembl',
+                        unit_scale=True,
+                        unit='genes',
+                        leave=False):
             if row['id'] in self.genes:
                 gene = self.genes.get_gene(row['id'])
                 gene.load_ensembl_data(row)
@@ -578,7 +623,11 @@ class GeneManager():
     # @do_profile
     def _get_uniprot_data(self):
         c = 0
-        for seqrec in self.esquery.get_all_uniprot_entries():
+        for seqrec in tqdm(self.esquery.get_all_uniprot_entries(),
+                           desc='loading genes from UniProt',
+                           unit_scale=True,
+                           unit='genes',
+                           leave=False):
             c += 1
             if c % 1000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
@@ -592,9 +641,7 @@ class GeneManager():
                 for ensembl_id in ensembl_genes_id:
                     if ensembl_id in self.genes:
                         gene = self.genes.get_gene(ensembl_id)
-                        gene.load_uniprot_entry(seqrec)
-                        if gene.reactome:
-                            gene = self._extend_reactome_data(gene)
+                        gene.load_uniprot_entry(seqrec, self.reactome_retriever)
                         self.genes.add_gene(gene)
                         success=True
                         break
@@ -606,38 +653,11 @@ class GeneManager():
 
         logging.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
 
-    def _extend_reactome_data(self, gene):
-        reaction_types = dict()
-        for r in gene.reactome:
-            key, reaction = r['id'], r['value']
-            for reaction_type in self._get_pathway_type(key):
-                reaction_types[reaction_type['pathway type']]=reaction_type
-        for r in gene.reactome:
-            if r['id']==key:
-                r['pathway types']=reaction_types.values()
-        return gene
-
-    def _get_pathway_type(self, reaction_id):
-        types = []
-        try:
-            reaction = self.reactome_retriever.get_reaction(reaction_id)
-            type_codes =[]
-            for path in reaction.path:
-                if len(path)>1:
-                    type_codes.append(path[1])
-            for type_code in type_codes:
-                types.append({'pathway type':type_code,
-                              'pathway type name': self.reactome_retriever.get_reaction(type_code).label
-                              })
-        except:
-            logging.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
-        return types
 
 
-    def _store_data(self):
+    def _store_data(self, dry_run = False):
 
-        with Loader(self.es) as loader:
-            loader.create_new_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        self.loader.create_new_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|gene_data_storage',
                            r_server=self.r_server,
                            max_size=10000,
@@ -646,7 +666,7 @@ class GeneManager():
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
-        workers = [GeneObjectStorer(self.es,self.r_server,queue) for i in range(multiprocessing.cpu_count())]
+        workers = [GeneObjectStorer(self.loader.es,self.r_server,queue, dry_run=dry_run) for i in range(multiprocessing.cpu_count())]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()
