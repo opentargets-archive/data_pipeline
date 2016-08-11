@@ -923,8 +923,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
                            ev)
                         with self.lock:
                             self.total_loaded.value+=1
-                        if self.total_loaded.value % (self.chunk_size*5) ==0:
-                            logger.info("pushed %i entries to es"%self.total_loaded.value)
+                        # if self.total_loaded.value % (self.chunk_size*5) ==0:
+                        #     logger.info("pushed %i entries to es"%self.total_loaded.value)
                     else:
                         time.sleep(0.01)
                     # print self.name, (((self.output_generated_count.value == self.total_loaded.value) and \
