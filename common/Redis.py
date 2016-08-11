@@ -272,7 +272,10 @@ class RedisQueue(object):
         if not r_server:
             r_server = self.r_server
         if r_server is None:
-            raise AttributeError('A redis server is required either at class instantation or at the method level')
+            try:
+               r_server = Redis(Config.REDISLITE_DB_PATH)
+            except:
+                raise AttributeError('A redis server is required either at class instantiation or at the method level')
         return r_server
 
 
@@ -381,7 +384,7 @@ class RedisQueueStatusReporter(Process):
         return queue_id
 
     def log(self, data):
-        self.logger.info(self.format(data))
+        self.logger.debug(self.format(data))
 
     def format(self, data):
         now = time.time()
@@ -473,7 +476,7 @@ class RedisQueueWorkerProcess(Process):
                 self.queue_in.done(key, error=error, r_server=self.r_server)
             else:
                 # self.logger.info('nothing to do in '+self.name)
-                time.sleep(.1)
+                time.sleep(.01)
 
         self.logger.info('%s done processing' % self.name)
         if self.queue_out is not None:
@@ -482,6 +485,10 @@ class RedisQueueWorkerProcess(Process):
         self.close()
 
     def close(self):
+        '''
+        implement in subclass to clean up loaders and other trailing elements when the processer is done
+        :return:
+        '''
         pass
 
     def process(self, data):
@@ -503,7 +510,7 @@ class RedisLookupTable(object):
     '''
 
     LOOK_UPTABLE_NAMESPACE = 'lookuptable:%(namespace)s'
-    KEY_NAMESPACE = 'lookuptable:%(namespace)s:%(key)s'
+    KEY_NAMESPACE = '%(namespace)s:%(key)s'
 
     def __init__(self,
                  namespace = None,
@@ -533,7 +540,7 @@ class RedisLookupTable(object):
 
     def keys(self, r_server = None):
         r_server = self._get_r_server(r_server)
-        return [key.replace(self.namespace,'') for key in r_server.keys(self.namespace+'*')]
+        return [key.replace(self.namespace+':','') for key in r_server.keys(self.namespace+'*')]
 
 
     def _get_r_server(self, r_server = None):

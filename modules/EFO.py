@@ -4,6 +4,8 @@ import logging
 
 import sys
 
+from tqdm import tqdm
+
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import JSONObjectStorage
@@ -262,7 +264,13 @@ class EFOLookUpTable(object):
             self._load_efo_data(r_server)
 
     def _load_efo_data(self, r_server = None):
-        for efo in self._es_query.get_all_diseases():
+        for efo in tqdm(self._es_query.get_all_diseases(),
+                        desc='loading diseases',
+                        unit=' diseases',
+                        unit_scale=True,
+                        total=self._es_query.count_all_diseases(),
+                        leave=False,
+                        ):
             self._table.set(get_ontology_code_from_url(efo['code']),efo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
     def get_efo(self, efo_id, r_server = None):

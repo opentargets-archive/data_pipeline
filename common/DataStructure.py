@@ -28,7 +28,7 @@ class JSONSerializable():
         elif isinstance(data, dict):#already parsed json obj
             self.__dict__.update(**data)
         else:
-            raise AttributeError("cannot load object from %s type"%str(type(data)))
+            raise AttributeError("cannot load JSON object from %s type"%str(type(data)))
 
     def stamp_data_release(self):
         self.__dict__['data_release'] = Config.RELEASE_VERSION

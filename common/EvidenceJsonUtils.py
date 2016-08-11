@@ -2,7 +2,29 @@
 import hashlib
 import json
 from collections import OrderedDict
+from difflib import Differ
 
+import sys
+
+
+def assertJSONEqual(a, b, msg='Values are not equal', keys = []):
+    if not(isinstance(a, str) or isinstance(a, unicode)):
+        if keys and isinstance(a, dict):
+            a=dict((k,v) for k,v in a.items() if k in keys)
+        a=json.dumps(a, indent=4, sort_keys=True)
+    if not(isinstance(b, str) or isinstance(b, unicode)):
+        if keys and isinstance(a, dict):
+            b=dict((k,v) for k,v in b.items() if k in keys)
+        b=json.dumps(b, indent=4, sort_keys=True)
+    d = Differ()
+    result = list(
+        d.compare(a.splitlines(1),
+                  b.splitlines(1)))
+    for line in result:
+        if line[0] != ' ':
+            sys.stderr.writelines(result)
+            raise ValueError(msg)
+    return True
 
 class DatatStructureFlattener:
     '''

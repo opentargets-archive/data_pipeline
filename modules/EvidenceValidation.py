@@ -22,7 +22,8 @@ from common.PGAdapter import *
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 import opentargets.model.core as opentargets
 from  common.EvidenceJsonUtils import DatatStructureFlattener
-from settings import Config, ElasticSearchConfiguration
+from settings import Config
+from elasticsearch_config import ElasticSearchConfiguration
 import hashlib
 from xml.etree import cElementTree as ElementTree
 from sqlalchemy.dialects.postgresql import JSON
@@ -43,7 +44,7 @@ logging.getLogger("paramiko").setLevel(logging.WARNING)
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
 MAX_NB_EVIDENCE_CHUNKS = 1000
-EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 1000
+EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 100
 
 EVIDENCE_STRING_INVALID = 10
 EVIDENCE_STRING_INVALID_TYPE = 11
@@ -210,16 +211,15 @@ class DirectoryCrawlerProcess():
                  r_server):
         self.output_q = output_q
         self.es = es
-        self.evidence_chunk = EvidenceChunkElasticStorage(loader = Loader(self.es))
-        self.submission_audit = SubmissionAuditElasticStorage(loader = Loader(self.es))
+        self.evidence_chunk = EvidenceChunkElasticStorage(loader = Loader(self.es, chunk_size=100))
+        self.submission_audit = SubmissionAuditElasticStorage(loader = Loader(self.es, chunk_size=100))
         self.start_time = time.time()
         self.r_server = r_server
         self._remote_filenames =dict()
         self.logger = logging.getLogger(__name__)
 
     def _store_remote_filename(self, filename):
-        if filename.startswith('/upload/submissions/') and \
-            filename.endswith('.json.gz'):
+        if re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename):
             try:
                 version_name = filename.split('/')[3].split('.')[0]
                 if '-' in version_name:
@@ -244,8 +244,8 @@ class DirectoryCrawlerProcess():
                             self._remote_filenames[user][datasource] = dict(date=release_date,
                                                                 file_path=filename,
                                                                 file_version=version_name)
-            except:
-                self.logger.debug('error getting remote file%s'%filename)
+            except Exception, e:
+                self.logger.error('error getting remote file %s: %s'%(filename, e))
 
     def _callback_not_used(self, path):
         self.logger.debug("skipped "+path)
@@ -336,7 +336,7 @@ class DirectoryCrawlerProcess():
             if md5 == md5_hash:
                     self.logger.info('%s file already recorded. Won\'t parse' % file_path)
                     ''' should be false, set to true if you want to parse anyway '''
-                    validate = False
+                    validate = Config.EVIDENCEVALIDATION_FORCE_VALIDATION
             else:
                 self.logger.info('file recorded with a different hash %s, revalidatiing.' % (md5))
                 validate = True
@@ -398,7 +398,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                  es = None):
         super(FileReaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.es = es
-        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
+        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es, chunk_size=100))
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
 
@@ -415,8 +415,8 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
     def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None):
 
-        self.logger.info('%s Delete previous data for %s' % (self.name, data_source_name))
-        self.evidence_chunk_storage.storage_delete(data_source_name)
+        # self.logger.info('%s Delete previous data for %s' % (self.name, data_source_name))
+        # self.evidence_chunk_storage.storage_delete(data_source_name)
 
         self.logger.info('%s Starting parsing %s' % (self.name, file_path))
 
@@ -532,7 +532,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.queue_in = queue_in
         self.queue_out = queue_out
         self.es = es
-        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es))
+        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es, chunk_size=100))
         self.efo_current = efo_current
         self.efo_uncat = efo_uncat
         self.efo_obsolete = efo_obsolete
@@ -723,9 +723,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                     disease_count += 1
                                     efo_id = disease_id
                                     # fix for EVA data for release 1.0
-                                    #if disease_id in eva_curated:
-                                    #    obj.disease.id[index] = eva_curated[disease_id];
-                                    #    disease_id = obj.disease.id[index];
+                                    if disease_id in eva_curated:
+                                       obj.disease.id[index] = eva_curated[disease_id];
+                                       disease_id = obj.disease.id[index];
                                     index += 1
 
                                     ' Check disease term or phenotype term '
@@ -1245,7 +1245,6 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             '''
             Get top 20 diseases
             Get top 20 targets
-            {"hits": {"hits": [], "total": 9468, "max_score": 0.0}, "_shards": {"successful": 3, "failed": 0, "total": 3}, "took": 21, "aggregations": {"group_by_targets": {"buckets": [{"key": "ENSG00000146648", "doc_count": 4157}, {"key": "ENSG00000066468", "doc_count": 513}, {"key": "ENSG00000068078", "doc_count": 377}, {"key": "ENSG00000148400", "doc_count": 322}, {"key": "ENSG00000160867", "doc_count": 125}, {"key": "ENSG00000077782", "doc_count": 118}, {"key": "ENSG00000164690", "doc_count": 78}, {"key": "ENSG00000005075", "doc_count": 45}, {"key": "ENSG00000047315", "doc_count": 45}, {"key": "ENSG00000099817", "doc_count": 45}, {"key": "ENSG00000100142", "doc_count": 45}, {"key": "ENSG00000102978", "doc_count": 45}, {"key": "ENSG00000105258", "doc_count": 45}, {"key": "ENSG00000125651", "doc_count": 45}, {"key": "ENSG00000144231", "doc_count": 45}, {"key": "ENSG00000147669", "doc_count": 45}, {"key": "ENSG00000163882", "doc_count": 45}, {"key": "ENSG00000168002", "doc_count": 45}, {"key": "ENSG00000177700", "doc_count": 45}, {"key": "ENSG00000181222", "doc_count": 45}], "sum_other_doc_count": 3193, "doc_count_error_upper_bound": 18}}, "timed_out": false}
             '''
 
             self.logger.debug("Get top 20 targets")
@@ -1605,11 +1604,9 @@ class EvidenceChunkElasticStorage():
                         create_index=False)
 
     def storage_delete(self, data_source_name):
-        if self.loader.es.indices.exists(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)):
-            self.loader.es.indices.delete(self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name))
-            # ElasticStorage.delete_prev_data_in_es(self.loader.es,
-            #                                       self.loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME),
-            #                                       data_source_name)
+        versioned_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)
+        if self.loader.es.indices.exists(versioned_name):
+            self.loader.es.indices.delete(versioned_name)
 
     def storage_flush(self):
         self.loader.flush()
@@ -2198,16 +2195,6 @@ class EvidenceValidationFileChecker():
 
 
 
-        'Start crawling the FTP directory'
-        directory_crawler = DirectoryCrawlerProcess(
-                file_q,
-                self.es,
-                self.r_server)
-
-        directory_crawler.run()
-
-
-
 
         'Start validating the evidence in chunks on the evidence queue'
 
@@ -2246,6 +2233,14 @@ class EvidenceValidationFileChecker():
             )
 
         auditor.start()
+
+        'Start crawling the FTP directory'
+        directory_crawler = DirectoryCrawlerProcess(
+                file_q,
+                self.es,
+                self.r_server)
+
+        directory_crawler.run()
 
         '''wait for the validator workers to finish'''
 

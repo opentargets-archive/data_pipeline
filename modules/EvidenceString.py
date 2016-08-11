@@ -1,29 +1,23 @@
-import ctypes
-import pprint
-from collections import defaultdict, OrderedDict
 import copy
-from datetime import datetime
 import json
 import logging
-import os
-import pickle
-import traceback
+import math
+import multiprocessing
+import time
 
 from elasticsearch import Elasticsearch
-from sqlalchemy import and_
-import sys
+from tqdm import tqdm
+
 from common import Actions
 from common.DataStructure import JSONSerializable, PipelineEncoder
-from common.ElasticsearchLoader import JSONObjectStorage, Loader
+from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
+from common.LookupHelpers import LookUpDataRetriever
 from modules import GeneData
-from modules.ECO import ECO, EcoRetriever, ECOLookUpTable
-from modules.EFO import EFO, get_ontology_code_from_url, EfoRetriever, EFOLookUpTable
-from modules.GeneData import Gene, GeneRetriever, GeneLookUpTable
+from modules.ECO import ECO
+from modules.EFO import EFO, get_ontology_code_from_url
+from modules.GeneData import Gene
 from settings import Config
-from dateutil import parser as smart_date_parser
-import time
-import multiprocessing
 
 logger = logging.getLogger(__name__)
 # logger = multiprocessing.get_logger()
@@ -85,6 +79,42 @@ class EvidenceStringActions(Actions):
 #         return evs_set(dic.get(key, {}), *keys)
 #     dic[key]=value
 
+
+
+
+class DataNormaliser(object):
+    def __init__(self, min_value, max_value, old_min_value=0., old_max_value = 1., cap=True):
+        self.min = float(min_value)
+        self.max = float(max_value)
+        self.old_min = old_min_value
+        self.old_max = old_max_value
+        self.cap = cap
+    def __call__(self, value):
+        return self.renormalize(value,
+                                (self.old_min, self.old_max),
+                                (self.min, self.max),
+                                self.cap)
+
+    @staticmethod
+    def renormalize(n, start_range, new_range, cap=True):
+        n=float(n)
+        max_new_range = max(new_range)
+        min_new_range = min(new_range)
+        delta1 = start_range[1] - start_range[0]
+        delta2 = new_range[1] - new_range[0]
+        if delta1 or delta2:
+            try:
+                normalized = (delta2 * (n - start_range[0]) / delta1) + new_range[0]
+            except ZeroDivisionError:
+                normalized = new_range[0]
+        else:
+            normalized = n
+        if cap:
+            if normalized > max_new_range:
+                return max_new_range
+            elif normalized < min_new_range:
+                return min_new_range
+        return normalized
 
 class ExtendedInfo():
     data = dict()
@@ -165,7 +195,7 @@ class ProcessedEvidenceStorer():
                            ev.get_doc_name(),
                            id,
                            ev.to_json(),
-                           create_index = True,
+                           create_index = False,
                            routing = ev.evidence['target']['id'])
 
 
@@ -182,91 +212,6 @@ class ProcessedEvidenceStorer():
 
     def __exit__(self, type, value, traceback):
         self.close()
-
-class EvidenceManagerLookUpData():
-    def __init__(self):
-        self.available_genes = None
-        self.available_efos = None
-        self.available_ecos = None
-        self.uni2ens = None
-        self.non_reference_genes = None
-        self.available_gene_objects = None
-        self.available_efo_objects = None
-        self.available_eco_objects = None
-
-
-
-class EvidenceManagerLookUpDataRetrieval():
-    def __init__(self,
-                 es = None,
-                 r_server = None):
-
-        self.es = es
-        self.r_server = r_server
-        if es is not None:
-            self.esquery = ESQuery(es)
-        self.lookup = EvidenceManagerLookUpData()
-        start_time = time.time()
-        self._get_gene_info()
-        logger.info("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
-        self._get_available_efos()
-        logger.info("finished self._get_available_efos(), took %ss"%str(time.time()-start_time))
-        self._get_available_ecos()
-        logger.info("finished self._get_available_ecos(), took %ss"%str(time.time()-start_time))
-
-
-    def _get_available_efos(self):
-        logger.info('getting efos')
-        self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
-        # self.lookup.available_efo_objects = dict()
-        # for row in self.esquery.get_all_diseases():
-        #     efo_obj = EFO(get_ontology_code_from_url(row['code']))
-        #     efo_obj.load_json(row)
-        #     self.lookup.available_efo_objects[efo_obj.get_id()]= efo_obj
-        # self.lookup.available_efos = frozenset(self.lookup.available_efo_objects.keys())
-
-    def _get_available_ecos(self):
-        logger.info('getting ecos')
-        self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
-        # self.lookup.available_eco_objects = dict()
-        # for row in self.esquery.get_all_eco():
-        #     eco_obj = ECO(get_ontology_code_from_url(row['code']))
-        #     eco_obj.load_json(row)
-        #     self.lookup.available_eco_objects[eco_obj.get_id()]= eco_obj
-        #
-        # self.lookup.available_ecos = frozenset(self.lookup.available_eco_objects.keys())
-
-
-    def _get_gene_info(self):
-        logger.info('getting gene info')
-        self.lookup.uni2ens = {}
-        self.lookup.available_gene_objects={}
-        for gene in self.esquery.get_all_targets():
-            gene_obj = Gene()
-            gene_obj.load_json(gene)
-            # self.lookup.available_gene_objects[gene_obj.id]=gene_obj
-            if gene['uniprot_id']:
-                self.lookup.uni2ens[gene['uniprot_id']] = gene_obj.id
-            for accession in gene['uniprot_accessions']:
-                self.lookup.uni2ens[accession]=gene_obj.id
-        # self.lookup.available_genes = frozenset(self.lookup.available_gene_objects.keys())
-        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
-        self._get_non_reference_gene_mappings()
-
-    def _get_non_reference_gene_mappings(self):
-        self.lookup.non_reference_genes = {}
-        skip_header=True
-        for line in file('resources/genes_with_non_reference_ensembl_ids.tsv'):
-            if skip_header:
-                skip_header=False
-            symbol, ensg, assembly, chr, is_ref = line.split()
-            if symbol not in self.lookup.non_reference_genes:
-                self.lookup.non_reference_genes[symbol]=dict(reference='',
-                                                      alternative=[])
-            if is_ref == 't':
-                self.lookup.non_reference_genes[symbol]['reference']=ensg
-            else:
-                self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
 
 
 class EvidenceManager():
@@ -359,7 +304,13 @@ class EvidenceManager():
                 if 'uniprot_literature' != evidence['sourceID']:
                     logger.warning("Cannot find a score for eco code %s in evidence id %s"%(eco_uri, evidence['id']))
 
-
+        '''use just one mutation per somatic data'''
+        if 'known_mutations' in evidence['evidence'] and evidence['evidence']['known_mutations']:
+            if len(evidence['evidence']['known_mutations'])==1:
+                evidence['evidence']['known_mutations'] = evidence['evidence']['known_mutations'][0]
+            else:
+                raise AttributeError('only one mutation is allowed. %i submitted for evidence id %s'%(len(evidence['evidence']['known_mutations']),
+                                                                                                      evidence['id']))
 
 
         '''remove identifiers.org from genes and map to ensembl ids'''
@@ -628,7 +579,7 @@ class EvidenceManager():
 
     def _get_score_modifiers(self):
         self.score_modifiers = {}
-        for datasource, values in Config.DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE.items():
+        for datasource, values in Config.DATASOURCE_EVIDENCE_SCORE_AUTO_EXTEND_RANGE.items():
             self.score_modifiers[datasource]=DataNormaliser(values['min'],values['max'])
 
 
@@ -703,7 +654,7 @@ class Evidence(JSONSerializable):
                     float(self.evidence['evidence']['drug2clinic']['resource_score']['value']) * \
                     float(self.evidence['evidence']['target2drug']['resource_score']['value'])
             elif self.evidence['type']=='rna_expression':
-                pvalue = self._get_score_from_pvalue(self.evidence['evidence']['resource_score']['value'])
+                pvalue = self._get_score_from_pvalue_linear(self.evidence['evidence']['resource_score']['value'])
                 log2_fold_change = self.evidence['evidence']['log2_fold_change']['value']
                 fold_scale_factor = abs(log2_fold_change)/10.
                 rank = self.evidence['evidence']['log2_fold_change']['percentile_rank']/100.
@@ -716,26 +667,36 @@ class Evidence(JSONSerializable):
                 if 'gene2variant' in  self.evidence['evidence']:
                     g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
                     if self.evidence['evidence']['variant2disease']['resource_score']['type'] =='pvalue':
-                        v2d_score = self._get_score_from_pvalue(self.evidence['evidence']['variant2disease']['resource_score']['value'])
+                        # if self.evidence['sourceID']=='gwas_catalog':#temporary fix
+                        #     v2d_score = self._get_score_from_pvalue_linear(float(self.evidence['unique_association_fields']['pvalue']))
+                        # else:
+                        v2d_score = self._get_score_from_pvalue_linear(self.evidence['evidence']['variant2disease']['resource_score']['value'])
                     elif self.evidence['evidence']['variant2disease']['resource_score']['type'] =='probability':
                         v2d_score = self.evidence['evidence']['variant2disease']['resource_score']['value']
                     else:
                         v2d_score = 0.
                     if self.evidence['sourceID']=='gwas_catalog':
                         sample_size =  self.evidence['evidence']['variant2disease']['gwas_sample_size']
-                        score =self._score_gwascatalog(v2d_score, sample_size,g2v_score)
+                        score =self._score_gwascatalog(self.evidence['evidence']['variant2disease']['resource_score']['value'],
+                                                       sample_size,
+                                                       g2v_score)
                     else:
                         score = g2v_score*v2d_score
                 else:
                     if self.evidence['evidence']['resource_score']['type']=='probability':
                         score=self.evidence['evidence']['resource_score']['value']
                     elif self.evidence['evidence']['resource_score']['type']=='pvalue':
-                        score=self._get_score_from_pvalue(self.evidence['evidence']['resource_score']['value'])
+                        score=self._get_score_from_pvalue_linear(self.evidence['evidence']['resource_score']['value'])
                 self.evidence['scores'] ['association_score']= score
             elif self.evidence['type']=='animal_model':
                 self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['disease_model_association']['resource_score']['value'])
             elif self.evidence['type']=='somatic_mutation':
-                self.evidence['scores'] ['association_score']= float(self.evidence['evidence']['resource_score']['value'])
+                frequency = 1.
+                if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
+                    if 'number_samples_with_mutation_type' in self.evidence['evidence']['known_mutations']:
+                        frequency = float(self.evidence['evidence']['known_mutations']['number_samples_with_mutation_type'])/float(self.evidence['evidence']['known_mutations']['number_mutated_samples'])
+                        frequency=DataNormaliser.renormalize(frequency,[0.,9.],[.5, 1.])
+                self.evidence['scores']['association_score']= float(self.evidence['evidence']['resource_score']['value'])*frequency
             elif self.evidence['type']=='literature':
                 score=  float(self.evidence['evidence']['resource_score']['value'])
                 if self.evidence['sourceID']=='europepmc':
@@ -765,8 +726,8 @@ class Evidence(JSONSerializable):
             #     pass
             # elif self.evidence['sourceID']=='disgenet':
             #     pass
-        except:
-            logger.warn("Cannot score evidence %s of type %s"%(self.evidence['id'],self.evidence['type']))
+        except Exception, e:
+            logger.error("Cannot score evidence %s of type %s. Error: %s"%(self.evidence['id'],self.evidence['type'],e))
 
         '''check for minimum score '''
         if self.evidence['scores'] ['association_score'] < Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]:
@@ -776,7 +737,7 @@ class Evidence(JSONSerializable):
                                                                                                                     ))
 
         '''modify scores accodigng to weights'''
-        datasource_weight = Config.DATASOURCE_ASSOCIATION_SCORE_WEIGHT.get( self.evidence['sourceID'], 1.)
+        datasource_weight = Config.DATASOURCE_EVIDENCE_SCORE_WEIGHT.get(self.evidence['sourceID'], 1.)
         if datasource_weight !=1:
             weighted_score =  self.evidence['scores'] ['association_score']*datasource_weight
             if weighted_score >1:
@@ -788,86 +749,30 @@ class Evidence(JSONSerializable):
             self.evidence['scores'] ['association_score'] =  modifiers[self.evidence['sourceID']]( self.evidence['scores'] ['association_score'])
 
 
-    def _get_score_from_pvalue(self, pvalue):
-        score = 0.
-        if pvalue <= 1e-10:
-            score=1.
-        elif pvalue <= 1e-9:
-            score=.9
-        elif pvalue <= 1e-8:
-            score=.8
-        elif pvalue <= 1e-7:
-            score=.7
-        elif pvalue <= 1e-6:
-            score=.6
-        elif pvalue <= 1e-5:
-            score=.5
-        elif pvalue <= 1e-4:
-            score=.4
-        elif pvalue <= 1e-3:
-            score=.3
-        elif pvalue <= 1e-2:
-            score=.2
-        elif pvalue <= 1e-1:
-            score=.1
-        elif pvalue <= 1:
-            score=0.
-        return score
+
+    @staticmethod
+    def _get_score_from_pvalue_linear( pvalue, range_min=1, range_max=1e-10):
+        def get_log(n):
+            try:
+               return math.log10(n)
+            except ValueError:
+                return 300
+        min_score = get_log(range_min)
+        max_score = get_log(range_max)
+        score = get_log(pvalue)
+        return DataNormaliser.renormalize(score, [min_score, max_score], [0., 1.] )
 
     def _score_gwascatalog(self,pvalue,sample_size, severity):
 
-        normalised_pvalue = 0.
-        if pvalue <= 1e-15:
-            normalised_pvalue=1.
-        elif pvalue <= 1e-10:
-            normalised_pvalue=7/8.
-        elif pvalue <= 1e-9:
-            normalised_pvalue=6/8.
-        elif pvalue <= 1e-8:
-            normalised_pvalue=5/8.
-        elif pvalue <= 1e-7:
-            normalised_pvalue=4/8.
-        elif pvalue <= 1e-6:
-            normalised_pvalue=3/8.
-        elif pvalue <= 1e-5:
-            normalised_pvalue=2/8.
-        elif pvalue <= 1:
-            normalised_pvalue=1/8.
-
-        normalised_sample_size = 0.
-        if sample_size >= 100000 :
-            normalised_sample_size=1.
-        elif sample_size  >= 75000 :
-            normalised_sample_size=13/14.
-        elif sample_size  >= 50000 :
-            normalised_sample_size=12/14.
-        elif sample_size  >= 25000 :
-            normalised_sample_size=11/14.
-        elif sample_size  >= 10000 :
-            normalised_sample_size=10/14.
-        elif sample_size  >= 7500 :
-            normalised_sample_size=9/14.
-        elif sample_size  >= 5000 :
-            normalised_sample_size=8/14.
-        elif sample_size  >= 4000 :
-            normalised_sample_size=7/14.
-        elif sample_size  >= 3000 :
-            normalised_sample_size=6/14.
-        elif sample_size  >= 2000 :
-            normalised_sample_size=5/14.
-        elif sample_size  >= 1000 :
-            normalised_sample_size=4/14.
-        elif sample_size  >= 750 :
-            normalised_sample_size=3/14.
-        elif sample_size  >= 500 :
-            normalised_sample_size=2/14.
-        elif sample_size  >= 1 :
-            normalised_sample_size=1/14.
+        normalised_pvalue = self._get_score_from_pvalue_linear(pvalue, range_min=1, range_max=1e-15)
 
 
+        normalised_sample_size = DataNormaliser.renormalize(sample_size, [0,5000], [0,1])
 
-        return normalised_pvalue*normalised_sample_size*severity
+        score = normalised_pvalue*normalised_sample_size*severity
 
+        logger.debug("gwas score: %f | pvalue %f %f | sample size%f %f |severity %f" % (score, pvalue, normalised_pvalue, sample_size,normalised_sample_size, severity))
+        return score
 
 class UploadError():
     def __init__(self, evidence, trace, id, logdir='errorlogs'):
@@ -897,12 +802,6 @@ class UploadError():
         # json.dump(self.evidence, open(filename + '.json', 'w'))
 
 
-class DataNormaliser(object):
-    def __init__(self, min_value, max_value):
-        self.min = float(min_value)
-        self.max = float(max_value)
-    def __call__(self, value):
-        return (value-self.min)/(self.max-self.min)
 
 
 class EvidenceProcesser(multiprocessing.Process):
@@ -979,7 +878,8 @@ class EvidenceProcesser(multiprocessing.Process):
                     logger.info("%i processed | %i errors | processing %1.2f evidence per second"%(self.output_computed_count.value,
                                                                                                            self.processing_errors_count.value,
                                                                                                        float(self.input_processed_count.value)/(time.time()-self.start_time)))
-
+            else:
+                time.sleep(0.01)
         self.output_computation_finished.set()
         logger.info("%s finished"%self.name)
 
@@ -997,6 +897,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
                  output_generated_count,
                  lock,
                  chunk_size = 1e4,
+                 dry_run = False
                  ):
         super(EvidenceStorerWorker, self).__init__()
         self.q= processing_output_q
@@ -1007,10 +908,11 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.total_loaded = submitted_to_storage
         self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
         self.lock = lock
+        self.dry_run = dry_run
 
     def run(self):
         logger.info("worker %s started"%self.name)
-        with Loader(self.es, chunk_size=self.chunk_size) as es_loader:
+        with Loader(self.es, chunk_size=self.chunk_size, dry_run = self.dry_run) as es_loader:
             with ProcessedEvidenceStorer( es_loader, chunk_size=self.chunk_size, quiet=False) as storer:
                 while not (((self.output_generated_count.value == self.total_loaded.value) and \
                         self.processing_finished.is_set()) or self.signal_finish.is_set()):
@@ -1023,6 +925,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
                             self.total_loaded.value+=1
                         if self.total_loaded.value % (self.chunk_size*5) ==0:
                             logger.info("pushed %i entries to es"%self.total_loaded.value)
+                    else:
+                        time.sleep(0.01)
                     # print self.name, (((self.output_generated_count.value == self.total_loaded.value) and \
                     #         self.processing_finished.is_set()) or self.signal_finish.is_set()), self.output_generated_count.value == self.total_loaded.value,self.processing_finished.is_set(),  self.signal_finish.is_set(), self.total_loaded.value
 
@@ -1041,12 +945,15 @@ class EvidenceStringProcess():
         self.es_query = ESQuery(es)
         self.r_server = r_server
 
-    def process_all(self):
-        self._process_evidence_string_data()
+    def process_all(self, datasources = [], dry_run = False):
+        self._process_evidence_string_data(datasources= datasources,
+                                           dry_run = dry_run )
 
 
 
-    def _process_evidence_string_data(self):
+    def _process_evidence_string_data(self,
+                                      datasources = [],
+                                      dry_run = False):
 
 
         base_id = 0
@@ -1057,9 +964,17 @@ class EvidenceStringProcess():
         logger.debug("Starting Evidence Manager")
 
 
-        evidence_start_time = time.time()
-        lookup_data = EvidenceManagerLookUpDataRetrieval(self.es, self.r_server).lookup
-        get_evidence_page_size = 25000
+        lookup_data = LookUpDataRetriever(self.es, self.r_server).lookup
+        get_evidence_page_size = 5000
+        '''create and overwrite old data'''
+        loader = Loader(self.es)
+        overwrite_indices = not dry_run
+        if not dry_run:
+            overwrite_indices = not bool(datasources)
+        for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
+            loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=overwrite_indices)
+        loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'],
+                                recreate=overwrite_indices)
 
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
@@ -1103,50 +1018,57 @@ class EvidenceStringProcess():
                                         data_storage_finished,
                                         submitted_to_storage_count,
                                         output_computed_count,
-                                        data_storage_lock
+                                        data_storage_lock,
+                                        dry_run,
                                      )  for i in range(workers_number)]
                                   # ) for i in range(1)]
         for w in storers:
             w.start()
 
-
-        for row in self.get_evidence(page_size = get_evidence_page_size):
+        targets_with_data = set()
+        for row in tqdm(self.get_evidence(page_size = get_evidence_page_size, datasources= datasources),
+                        desc='Reading available evidence_strings',
+                        total = self.es_query.count_validated_evidence_strings(datasources= datasources),
+                        unit=' evidence',
+                        unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource= row['data_source_name'])
             idev = row['uniq_assoc_fields_hashdig']
             ev.evidence['id'] = idev
             input_q.put((idev, ev))
             input_generated_count.value += 1
-
+            targets_with_data.add(ev.evidencep['target']['id'])
             if input_generated_count.value % 1e4 == 0:
                 logger.info("%i entries submitted for process" % (input_generated_count.value))
         input_loading_finished.set()
 
         '''wait for other processes to finish'''
         while not data_storage_finished.is_set():
-                time.sleep(1)
+                time.sleep(.1)
         for w in scorers:
             if w.is_alive():
                 w.terminate()
         for w in storers:
             if w.is_alive():
-                time.sleep(1)
+                time.sleep(.1)
                 w.terminate()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
 
-
-        logging.info('flushing data to index')
+        logger.info('flushing data to index')
         self.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
                               wait_if_ongoing=True)
-        return
+
+        logger.info('Processed data for %i targets'%len(targets_with_data))
+
+        return list(targets_with_data)
 
 
 
 
 
-    def get_evidence(self, page_size = 50000):
+    def get_evidence(self, page_size = 5000, datasources = []):
 
         c = 0
-        for row in self.es_query.get_validated_evidence_strings():
+        for row in self.es_query.get_validated_evidence_strings(size=page_size, datasources = datasources):
             c += 1
             if c % page_size == 0:
                 logger.info("loaded %i ev from db to process" % c)

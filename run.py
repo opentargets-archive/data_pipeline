@@ -29,7 +29,8 @@ from modules.MouseModels import MouseModelsActions, Phenodigm
 from modules.IntOGen import IntOGenActions, IntOGen
 from modules.Ontology import OntologyActions, PhenotypeSlim
 import argparse
-from settings import Config, ElasticSearchConfiguration
+from settings import Config
+from elasticsearch_config import ElasticSearchConfiguration
 from redislite import Redis
 
 '''setup module default logging'''
@@ -126,9 +127,18 @@ if __name__ == '__main__':
     parser.add_argument("--qc", dest='qc',
                         help="Run quality control scripts",
                         action="append_const", const=QCActions.ALL)
+    parser.add_argument("--qccgc", dest='qc',
+                        help="Run quality control scripts",
+                        action="append_const", const=QCActions.CGC_ANALYSIS)
     parser.add_argument("--dump", dest='dump',
                         help="dump core data to local gzipped files",
                         action="append_const", const=DumpActions.ALL)
+    parser.add_argument("--datasource", dest='datasource', help="just process data for this datasource. Does not work with all the steps!!",
+                        action='append', default=[])
+    parser.add_argument("--targets", dest='targets', help="just process data for this target. Does not work with all the steps!!",
+                        action='append', default=[])
+    parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
+                        action='store_true', default=False)
     args = parser.parse_args()
 
     '''logger'''
@@ -186,10 +196,13 @@ if __name__ == '__main__':
     '''init sparql endpoint client'''
     sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
 
+    targets = args.targets
     if not args.redisperist:
         clear_redislite_db()
     r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
-    with Loader(es, chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
+    with Loader(es,
+                chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
+                dry_run = args.dry_run) as loader:
         run_full_pipeline = False
         if args.all  and (Actions.ALL in args.all):
             run_full_pipeline = True
@@ -265,11 +278,13 @@ if __name__ == '__main__':
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                EvidenceStringProcess(es, r_server).process_all()
+                targets = EvidenceStringProcess(es, r_server).process_all(datasources = args.datasource,
+                                                                          dry_run=args.dry_run)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:
-                ScoringProcess(adapter, loader).process_all()
+                ScoringProcess(loader, r_server).process_all(targets = targets,
+                                                             dry_run=args.dry_run)
         if args.ddr or run_full_pipeline:
             do_all = (DataDrivenRelationActions.ALL in args.ddr) or run_full_pipeline
             if (DataDrivenRelationActions.PROCESS in args.ddr) or do_all:
@@ -282,6 +297,8 @@ if __name__ == '__main__':
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:
                 QCRunner(es)
+            if (QCActions.CGC_ANALYSIS in args.qc) or do_all:
+                QCRunner(es).analyse_cancer_gene_census()
         if args.dump or run_full_pipeline:
             do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
             if (DumpActions.DUMP in args.dump) or do_all:
