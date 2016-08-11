@@ -90,6 +90,7 @@ class Config():
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
     EVIDENCEVALIDATION_PERCENT_SCALE = 20
+    EVIDENCEVALIDATION_FORCE_VALIDATION = True
     # Current genome Assembly
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     # Change this if you don't want to send e-mails
@@ -113,9 +114,9 @@ class Config():
     # ftp user and passwords
     EVIDENCEVALIDATION_FTP_HOST= dict( host = '192.168.1.150',
                                        port = 22)
+    EVIDENCEVALIDATION_FILENAME_REGEX = r"/upload/submissions/cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}\.json\.gz$"
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
-    # # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv010"] = 'c2a64557'
@@ -124,6 +125,8 @@ class Config():
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv008"] = '409a0d21'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv007"] = 'a6052a3b'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv025"] = 'd2b315fa'
+    # # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
+
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
     WORKERS_NUMBER = None
@@ -142,12 +145,14 @@ class Config():
     ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS = ["cttv008", "cttv012"]
 
     # put the path to the file where you want to write the SLIM file (turtle format)
-    ONTOLOGY_SLIM_FILE = 'C:\users\gk680303\data\ontologies\opentargets_disease_phenotype_slim.ttl'
+    ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
 
-    DATASOURCE_ASSOCIATION_SCORE_WEIGHT=dict(gwas_catalog=2.5)
-    DATASOURCE_ASSOCIATION_SCORE_AUTO_EXTEND_RANGE=dict(
-                                                        #phenodigm=dict(min=0.4, max= 1),
-                                                        )
+    DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
+        # gwas_catalog=2.5
+        )
+    DATASOURCE_EVIDENCE_SCORE_AUTO_EXTEND_RANGE=dict(
+                                                     # phenodigm=dict(min=0.4, max= 1),
+                                                    )
 
     DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(cttv006 = 'reactome',
                                                          cttv008 = 'chembl',
@@ -187,9 +192,9 @@ class Config():
     # setup the weights for evidence strings score
     SCORING_WEIGHTS = defaultdict(lambda: 1)
     SCORING_WEIGHTS['phenodigm'] = 0.2
-    # SCORING_WEIGHTS['expression_atlas'] = 0.2
+    SCORING_WEIGHTS['expression_atlas'] = 0.5
     SCORING_WEIGHTS['europepmc'] = 0.2
-    SCORING_WEIGHTS['gwas_catalog'] = 1.5
+    # SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
     # setup a minimum score value for an evidence string to be accepted.
     SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
