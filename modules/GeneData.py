@@ -544,15 +544,15 @@ class GeneManager():
         bar = tqdm(desc='Merging data from available databases',
                    total = 5,
                    unit= 'steps')
-        # self._get_hgnc_data_from_json()
+        self._get_hgnc_data_from_json()
         bar.update()
-        # self._get_ortholog_data()
+        self._get_ortholog_data()
         bar.update()
-        # self._get_ensembl_data()
+        self._get_ensembl_data()
         bar.update()
         self._get_uniprot_data()
         bar.update()
-        # self._store_data(dry_run=dry_run)
+        self._store_data(dry_run=dry_run)
         bar.update()
 
 
