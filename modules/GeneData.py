@@ -601,7 +601,8 @@ class GeneManager():
                         desc='loading genes from Ensembl',
                         unit_scale=True,
                         unit='genes',
-                        leave=False):
+                        leave=False,
+                        total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
             if row['id'] in self.genes:
                 gene = self.genes.get_gene(row['id'])
                 gene.load_ensembl_data(row)
@@ -627,7 +628,8 @@ class GeneManager():
                            desc='loading genes from UniProt',
                            unit_scale=True,
                            unit='genes',
-                           leave=False):
+                           leave=False,
+                           total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
             c += 1
             if c % 1000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
