@@ -292,7 +292,6 @@ class ESQuery(object):
                                'size': 100,
                            },
                            scroll='12h',
-                           # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME),
                            timeout="10m",
                            )

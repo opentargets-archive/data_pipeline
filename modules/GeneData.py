@@ -344,10 +344,10 @@ class Gene(JSONSerializable):
 
     def _extend_reactome_data(self, reactome_retriever):
         for r in self.reactome:
-            r['pathway types'] = []
             key, reaction = r['id'], r['value']
+            reaction['pathway types'] = []
             for reaction_type in self._get_pathway_type(key, reactome_retriever):
-                r['pathway types'].append(reaction_type)
+                reaction['pathway types'].append(reaction_type)
         return
 
     def _get_pathway_type(self, reaction_id, reactome_retriever):
@@ -653,7 +653,7 @@ class GeneManager():
                 logging.debug('Cannot find ensembl mapping in the uniprot entry %s' % seqrec.id)
         logging.info("%i entries retrieved for uniprot" % c)
 
-        logging.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
+        # logging.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
 
 
 
