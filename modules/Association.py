@@ -274,7 +274,7 @@ class Scorer():
         '''compute datasource scores'''
         overall_scorer = HarmonicSumScorer(buffer=max_entries)
         for datasource in datasource_scorers:
-            har_sum_score.datasources[datasource]=datasource_scorers[datasource].score(scale_factor=scale_factor)
+            har_sum_score.datasources[datasource]=datasource_scorers[datasource].score(scale_factor=scale_factor, cap=1)
             overall_scorer.add(har_sum_score.datasources[datasource])
         '''compute datatype scores'''
         datatypes_scorers = dict()
