@@ -140,7 +140,7 @@ class DumpGenerator(object):
                     break
 
     def _get_auth_token(self):
-        r= requests.get(self.api_url+'/api/latest/public/auth/request_token?secret=32rZb5EqAm3QsC509uO8Oe53X4l5jC46&app_name=load-test')#&expiry=%i'%60*60)
+        r= requests.get(self.api_url+'/api/latest/public/auth/request_token?secret=1RT6L519zkcTH9i3F99OjeYn13k79Wep&app_name=load-test')#&expiry=%i'%60*60)
         return r.json()['token']
 
 
