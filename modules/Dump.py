@@ -90,8 +90,9 @@ class DumpGenerator(object):
                     if r.status_code != 200:
                         i=0
                         while (r.status_code != 200) and (i<max_retry):
-                            logging.error('invalid status code %s in request:%s | trying again in 3 seconds...' % (r.status_code,r.url))
-                            time.sleep(30*i)
+                            wait=30*i
+                            logging.error('invalid status code %s in request:%s | trying again in %i seconds...' % (r.status_code,r.url, wait))
+                            time.sleep(wait)
                             r = requests.get(r.url, headers=headers, timeout=120)
                             if r.status_code == 200:
                                 logging.debug('invalid status code in request:%s | fixed' % r.url)
