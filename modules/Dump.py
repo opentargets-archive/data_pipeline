@@ -55,7 +55,7 @@ class DumpGenerator(object):
 
 
 
-    def get_data(self, query, filename = Config.DUMP_FILE_EVIDENCE):
+    def get_data(self, query, filename = Config.DUMP_FILE_EVIDENCE, max_retry = 5):
         import grequests
 
 
@@ -86,20 +86,17 @@ class DumpGenerator(object):
                         time_wait = float(r.headers['retry-after'])
                         logging.warn('Usage Limit exceeded!!!! sleeping for %fs | 10s limit %s | 1h limit %s'%(time_wait, r.headers['x-usage-remaining-10s'], r.headers['x-usage-remaining-1h']))
                         time.sleep(time_wait+2)#TODO check wait time is computed properly in the backend
-                        r = requests.get(r.url, headers = headers, timeout = 60)
+                        r = requests.get(r.url, headers = headers, timeout = 120)
                     if r.status_code != 200:
-                        logging.error('invalid status code in request:%s | trying again in 3 seconds...' % r.url)
-                        time.sleep(3)
-                        r = requests.get(r.url, headers=headers, timeout=60)
-                        if r.status_code != 200:
-                            logging.error('invalid status code in request:%s | trying again in 30 seconds...' % r.url)
-                            time.sleep(30)
-                            r = requests.get(r.url, headers=headers, timeout=60)
-                            if r.status_code != 200:
-                                logging.error('invalid status code in request:%s | giving up' % r.url)
-                                raise Exception("error in response", r.status_code)
-                        if r.status_code == 200:
-                            logging.debug('invalid status code in request:%s | fixed' % r.url)
+                        i=0
+                        while (r.status_code != 200) and (i<max_retry):
+                            logging.error('invalid status code %s in request:%s | trying again in 3 seconds...' % (r.status_code,r.url))
+                            time.sleep(30*i)
+                            r = requests.get(r.url, headers=headers, timeout=120)
+                            if r.status_code == 200:
+                                logging.debug('invalid status code in request:%s | fixed' % r.url)
+                                break
+                            i+=1
 
                     if r.status_code == 200:
                         try:
