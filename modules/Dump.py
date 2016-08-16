@@ -33,10 +33,10 @@ class DumpGenerator(object):
     def dump(self):
 
 
-        # '''dump evidence data'''
-        # logging.info('Dumping evidence data')
-        # # self.get_data('/api/latest/public/evidence/filter', Config.DUMP_FILE_EVIDENCE)
-        # self.put_files_together(Config.DUMP_FILE_EVIDENCE)
+        '''dump evidence data'''
+        logging.info('Dumping evidence data')
+        self.get_data('/api/latest/public/evidence/filter', Config.DUMP_FILE_EVIDENCE)
+        self.put_files_together(Config.DUMP_FILE_EVIDENCE)
         # # with gzip.open(Config.DUMP_FILE_EVIDENCE, 'wb') as dump_file:
         #     # for row in self.get_data_concurrently('/api/latest/public/evidence/filter'):
         #     #     dump_file.write(row+'\n')
