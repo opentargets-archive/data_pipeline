@@ -69,45 +69,53 @@ class PublicationFetcher(object):
         self.logger = logging.getLogger(__name__)
 
 
-    def get_publication(self, pub_id):
+    def get_publication(self, pub_ids):
+
+        if isinstance(pub_ids, (str, unicode)):
+            pub_ids=[pub_ids]
 
         '''get from elasticsearch cache'''
-        print "getting pub id ", pub_id
-        for pub_source in self.es_query.get_publications_by_id([pub_id]):
+        print "getting pub id ", pub_ids
+        pubs ={}
+        for pub_source in self.es_query.get_publications_by_id(pub_ids):
             print 'got pub from cache'
             pub = AnalisedPublication()
             pub.load_json(pub_source)
-            return pub
-        print 'getting pub from remote', self._QUERY_BY_EXT_ID.format(pub_id)
-        r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
-        r.raise_for_status()
-        result = r.json()['resultList']['result'][0]
-        pub = AnalisedPublication(pub_id=pub_id,
-                                  title=result['title'],
-                                  abstract=result['abstractText'],
-                                  authors=result['authorList'],
-                                  year=int(result['pubYear']),
-                                  date=result["firstPublicationDate"],
-                                  journal=result['journalInfo'],
-                                  full_text=u"",
-                                  full_text_url=result['fullTextUrlList']['fullTextUrl'],
-                                  epmc_keywords=result['keywordList']['keyword'],
-                                  doi=result['doi'],
-                                  cited_by=result['citedByCount'],
-                                  has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
-                                  is_open_access=result['isOpenAccess'] == u'Y',
-                                  pub_type=result['pubTypeList']['pubType'],
-                                  )
-        if pub.has_text_mined_entities:
-            self.get_epmc_text_mined_entities(pub)
+            pubs[pub.pub_id]=pub
+        if len(pubs)<pub_ids:
+            for pub_id in pub_ids:
+                if pub_id not in pubs:
+                    print 'getting pub from remote', self._QUERY_BY_EXT_ID.format(pub_id)
+                    r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
+                    r.raise_for_status()
+                    result = r.json()['resultList']['result'][0]
+                    pub = AnalisedPublication(pub_id=pub_id,
+                                              title=result['title'],
+                                              abstract=result['abstractText'],
+                                              authors=result['authorList'],
+                                              year=int(result['pubYear']),
+                                              date=result["firstPublicationDate"],
+                                              journal=result['journalInfo'],
+                                              full_text=u"",
+                                              full_text_url=result['fullTextUrlList']['fullTextUrl'],
+                                              epmc_keywords=result['keywordList']['keyword'],
+                                              doi=result['doi'],
+                                              cited_by=result['citedByCount'],
+                                              has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
+                                              is_open_access=result['isOpenAccess'] == u'Y',
+                                              pub_type=result['pubTypeList']['pubType'],
+                                              )
+                    if pub.has_text_mined_entities:
+                        self.get_epmc_text_mined_entities(pub)
 
-        self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-                        Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                        pub_id,
-                        pub.to_json(),
-                        routing=None)
-        self.loader.flush()
-        return pub
+                    self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                                    Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                                    pub_id,
+                                    pub.to_json(),
+                                    routing=None)
+                    pubs[pub.pub_id]=pub
+            self.loader.flush()
+        return pubs
 
     def get_epmc_text_mined_entities(self, pub):
         r = requests.get(self._QUERY_TEXT_MINED.format(pub.pub_id))
@@ -212,11 +220,13 @@ class Literature(object):
                    '26646452',
                    '26774881',
                    '26629442',
+                   '26371324',
+                   '24817865',
                    ]
         pub_fetcher = PublicationFetcher(self.es)
-        for pid in pub_ids:
-            pub = pub_fetcher.get_publication(pid)
-            print pub.title
+        pubs = pub_fetcher.get_publication(pub_ids)
+        for pid, pub in pubs.items():
+            print pid, pub.title
 
     def process(self):
         #TODO: process everything with an analyser in parallel
@@ -230,12 +240,14 @@ class Literature(object):
                    '26646452',
                    '26774881',
                    '26629442',
+                   '26371324',
+                   '24817865',
                    ]
 
         # for t in [text, text2, text3, text4, text5, text6]:
         pub_fetcher = PublicationFetcher(self.es)
-        for pid in pub_ids:
-            pub = pub_fetcher.get_publication(pid)
+        pubs = pub_fetcher.get_publication(pub_ids)
+        for pid, pub in pubs.items():
             t = unicode(pub['title'] + ' ' + pub['abstractText'])
             print('*' * 80)
             pprint(t)
