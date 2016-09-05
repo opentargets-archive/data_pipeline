@@ -544,3 +544,29 @@ class ESQuery(object):
                                   )
         return res['hits']['total']
 
+
+    def get_publications_by_id(self, ids):
+        query_body = {"query": {
+                               "ids": {
+                                   "values": ids,
+                               }
+                           },
+                               '_source': True,
+                               'size': 100,
+                           }
+        if len(ids) <10000:
+            query_body['size']=10000
+            res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                                      body=query_body,
+                                      )
+            for hit in res['hits']['hits']:
+                yield hit['_source']
+        else:
+            res = helpers.scan(client=self.handler,
+                               query=query_body,
+                               scroll='12h',
+                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                               timeout="10m",
+                               )
+            for hit in res:
+                yield hit['_source']

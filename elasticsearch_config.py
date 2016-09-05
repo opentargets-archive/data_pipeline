@@ -809,6 +809,16 @@ class ElasticSearchConfiguration():
             },
         }
 
+    publication_data_mapping = {
+        "settings": {
+            "number_of_shards": generic_shard_number,
+            "number_of_replicas": generic_replicas_number,
+            "refresh_interval": "1s",
+        },
+        "mappings": {
+        },
+    }
+
     INDEX_MAPPPINGS={Config.ELASTICSEARCH_DATA_INDEX_NAME : evidence_data_mapping,
                      Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME :score_data_mapping,
                      Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME : efo_data_mapping,
@@ -820,4 +830,5 @@ class ElasticSearchConfiguration():
                      Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME : submission_audit_settings_and_mappings,
                      Config.ELASTICSEARCH_UNIPROT_INDEX_NAME : uniprot_data_mapping,
                      Config.ELASTICSEARCH_RELATION_INDEX_NAME : relation_data_mapping,
+                     Config.ELASTICSEARCH_PUBLICATION_DOC_NAME: publication_data_mapping,
                 }

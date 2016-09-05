@@ -157,6 +157,7 @@ if __name__ == '__main__':
     adapter = Adapter()
     '''init es client'''
     connection_attempt = 1
+    hosts=[]
     while 1:
         try:
             socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
@@ -183,11 +184,12 @@ if __name__ == '__main__':
                        )
     connection_attempt = 1
     while not es.ping():
-        wait_time = 5*connection_attempt
+        wait_time = 3*connection_attempt
         logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
         time.sleep(wait_time)
         if connection_attempt >5:
             logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
+            sys.exit(1)
             break
         connection_attempt += 1
 
@@ -270,7 +272,7 @@ if __name__ == '__main__':
             do_all = (ValidationActions.ALL in args.lit) or run_full_pipeline
             if (LiteratureActions.FETCH in args.lit) or do_all:
                 Literature(es).fetch()
-            if (LiteratureActions.PROCESS in args.val) or do_all:
+            if (LiteratureActions.PROCESS in args.lit) or do_all:
                 Literature(es).process()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline

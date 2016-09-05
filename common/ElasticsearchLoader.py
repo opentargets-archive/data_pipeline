@@ -187,6 +187,8 @@ class Loader():
     def get_versioned_index(index_name):
         if index_name.startswith(Config.RELEASE_VERSION+'_'):
             raise ValueError('Cannot add %s twice to index %s'%(Config.RELEASE_VERSION, index_name))
+        if index_name.startswith('!'):
+            return index_name
         return Config.RELEASE_VERSION + '_' + index_name
 
 
@@ -329,7 +331,7 @@ class Loader():
                                      ignore=ignore,
                                      body=body
                                      )
-        if res['acknowledged'] == False:
+        if ('acknowledged' not in res) or (res['acknowledged'] == False):
             raise ValueError('creation of index %s was not acknowledged')
         mappings = self.es.indices.get_mapping(index=index_name)
         settings = self.es.indices.get_settings(index=index_name)

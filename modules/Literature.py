@@ -14,6 +14,9 @@ from collections import Counter
 
 from common import Actions
 from common.DataStructure import JSONSerializable
+from common.ElasticsearchLoader import Loader
+from common.ElasticsearchQuery import ESQuery
+from settings import Config
 
 
 class LiteratureActions(Actions):
@@ -59,40 +62,84 @@ class PublicationFetcher(object):
     _QUERY_BY_EXT_ID= '''http://www.ebi.ac.uk/europepmc/webservices/rest/search?pagesize=10&query=EXT_ID:{}&format=json&resulttype=core'''
     _QUERY_TEXT_MINED='''http://www.ebi.ac.uk/europepmc/webservices/rest/MED/{}/textMinedTerms//1/1000/json'''
 
-    def __init__(self):
+    def __init__(self, es):
+        self.es = es
+        self.es_query=ESQuery(es)
+        self.loader=Loader(es)
         self.logger = logging.getLogger(__name__)
 
 
     def get_publication(self, pub_id):
+
+        '''get from elasticsearch cache'''
+        print "getting pub id ", pub_id
+        for pub_source in self.es_query.get_publications_by_id([pub_id]):
+            print 'got pub from cache'
+            pub = AnalisedPublication()
+            pub.load_json(pub_source)
+            return pub
+        print 'getting pub from remote', self._QUERY_BY_EXT_ID.format(pub_id)
         r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
         r.raise_for_status()
         result = r.json()['resultList']['result'][0]
-        return result
+        pub = AnalisedPublication(pub_id=pub_id,
+                                  title=result['title'],
+                                  abstract=result['abstractText'],
+                                  authors=result['authorList'],
+                                  year=int(result['pubYear']),
+                                  date=result["firstPublicationDate"],
+                                  journal=result['journalInfo'],
+                                  full_text=u"",
+                                  full_text_url=result['fullTextUrlList']['fullTextUrl'],
+                                  epmc_keywords=result['keywordList']['keyword'],
+                                  doi=result['doi'],
+                                  cited_by=result['citedByCount'],
+                                  has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
+                                  is_open_access=result['isOpenAccess'] == u'Y',
+                                  pub_type=result['pubTypeList']['pubType'],
+                                  )
+        if pub.has_text_mined_entities:
+            self.get_epmc_text_mined_entities(pub)
 
-    def get_epmc_text_mined_entities(self, pub_id):
-        r = requests.get(self._QUERY_TEXT_MINED.format(pub_id))
+        self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                        Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                        pub_id,
+                        pub.to_json(),
+                        routing=None)
+        self.loader.flush()
+        return pub
+
+    def get_epmc_text_mined_entities(self, pub):
+        r = requests.get(self._QUERY_TEXT_MINED.format(pub.pub_id))
         r.raise_for_status()
         if 'semanticTypeList' in r.json():
             result = r.json()['semanticTypeList']['semanticType']
-            return result
+            pub.epmc_text_mined_entities = result
+        return pub
 
 
 class AnalisedPublication(JSONSerializable):
 
     def __init__(self,
-                 pub_id = "",
-                 title = "",
-                 abstract = "",
+                 pub_id = u"",
+                 title = u"",
+                 abstract = u"",
                  authors = [],
                  year = None,
-                 date = "",
-                 journal = "",
-                 full_text = "",
+                 date = u"",
+                 journal = u"",
+                 full_text = u"",
                  lemmas={},
                  noun_chunks={},
                  epmc_text_mined_entities = {},
                  epmc_keywords = [],
                  n_analysed_sentences = 1,
+                 full_text_url=[],
+                 doi=u'',
+                 cited_by=None,
+                 has_text_mined_terms=None,
+                 is_open_access=None,
+                 pub_type=[],
                  ):
         self.pub_id = pub_id
         self.title = title
@@ -107,6 +154,13 @@ class AnalisedPublication(JSONSerializable):
         self.epmc_text_mined_entities = epmc_text_mined_entities
         self.epmc_keywords = epmc_keywords
         self.n_analysed_sentences = n_analysed_sentences
+        self.full_text_url = full_text_url
+        self.doi = doi
+        self.cited_by = cited_by
+        self.has_text_mined_entities = has_text_mined_terms
+        self.is_open_access = is_open_access
+        self.pub_type = pub_type
+
 
 
 
@@ -116,18 +170,14 @@ class PublicationAnalyser(object):
         self.logger = logging.getLogger(__name__)
 
 
-    def analyse_publication(self, text_to_parse=None, pub_id= None):
+    def analyse_publication(self, text_to_parse=None, pub_id= None, analyser = 'spacy'):
         pub = AnalisedPublication()
         if pub_id:
-            pub_data = self.fetcher.get_publication(pub_id=pub_id)
-            pub.epmc_text_mined_entities = self.fetcher.get_epmc_text_mined_entities(pub_id)
-            text_to_parse = unicode(pub_data['title'] + ' ' + pub_data['abstractText'])
-            pub.pub_id = pub_id
-            pub.title = pub_data['title']
-            pub.abstract = pub_data['abstractText']
+            pub = self.fetcher.get_publication(pub_id=pub_id)
+            text_to_parse = unicode(pub.title + ' ' + pub.abstract)
 
-
-        pub.lemmas, pub.noun_chunks, pub.n_analysed_sentences = self._spacy_analyser(text_to_parse)
+        if analyser == 'spacy':
+            pub.lemmas, pub.noun_chunks, pub.n_analysed_sentences = self._spacy_analyser(text_to_parse)
 
         return pub
 
@@ -143,8 +193,14 @@ class Literature(object):
                  es,
                  ):
         self.es = es
+        self.loader = Loader(es)
+        self.logger = logging.getLogger(__name__)
+
 
     def fetch(self):
+        if not self.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
+            self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
+
         #TODO: load everything with a fetcher in parallel
         pub_ids = ['24523595',
                    '26784250',
@@ -157,10 +213,10 @@ class Literature(object):
                    '26774881',
                    '26629442',
                    ]
-        pub_fetcher = PublicationFetcher()
+        pub_fetcher = PublicationFetcher(self.es)
         for pid in pub_ids:
             pub = pub_fetcher.get_publication(pid)
-            print pub
+            print pub.title
 
     def process(self):
         #TODO: process everything with an analyser in parallel
@@ -177,7 +233,7 @@ class Literature(object):
                    ]
 
         # for t in [text, text2, text3, text4, text5, text6]:
-        pub_fetcher = PublicationFetcher()
+        pub_fetcher = PublicationFetcher(self.es)
         for pid in pub_ids:
             pub = pub_fetcher.get_publication(pid)
             t = unicode(pub['title'] + ' ' + pub['abstractText'])

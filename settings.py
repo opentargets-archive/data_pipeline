@@ -45,8 +45,10 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
-    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data.test2'
+    ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
+    ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
+    ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
