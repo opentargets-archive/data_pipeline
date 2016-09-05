@@ -12,7 +12,13 @@ import re
 from spacy.en import English
 from collections import Counter
 
+from common import Actions
 from common.DataStructure import JSONSerializable
+
+
+class LiteratureActions(Actions):
+    FETCH='fetch'
+    PROCESS= 'process'
 
 parser = English()
 
@@ -130,6 +136,80 @@ class PublicationAnalyser(object):
         #TODO: see code below
         pass
 
+
+class Literature(object):
+
+    def __init__(self,
+                 es,
+                 ):
+        self.es = es
+
+    def fetch(self):
+        #TODO: load everything with a fetcher in parallel
+        pub_ids = ['24523595',
+                   '26784250',
+                   '27409410',
+                   '26290144',
+                   '25787843',
+                   '26836588',
+                   '26781615',
+                   '26646452',
+                   '26774881',
+                   '26629442',
+                   ]
+        pub_fetcher = PublicationFetcher()
+        for pid in pub_ids:
+            pub = pub_fetcher.get_publication(pid)
+            print pub
+
+    def process(self):
+        #TODO: process everything with an analyser in parallel
+        pub_ids = ['24523595',
+                   '26784250',
+                   '27409410',
+                   '26290144',
+                   '25787843',
+                   '26836588',
+                   '26781615',
+                   '26646452',
+                   '26774881',
+                   '26629442',
+                   ]
+
+        # for t in [text, text2, text3, text4, text5, text6]:
+        pub_fetcher = PublicationFetcher()
+        for pid in pub_ids:
+            pub = pub_fetcher.get_publication(pid)
+            t = unicode(pub['title'] + ' ' + pub['abstractText'])
+            print('*' * 80)
+            pprint(t)
+            tokens, parsedEx = tokenizeText(t)
+            parsed_vector = transform_doc(parsedEx)
+            tl = t.lower()
+            sents_count = len(list(parsedEx.sents))
+            ec = Counter()
+            #    print('ENTITIES:')
+            for e in parsedEx.ents:
+                e_str = u' '.join(t.orth_ for t in e).encode('utf-8').lower()
+                if ((not e.label_) or (e.label_ == u'ENT')) and not (e_str in STOPLIST) and not (e_str in SYMBOLS):
+                    if e_str not in ec:
+                        try:
+                            ec[e_str] += tl.count(e_str)
+                        except:
+                            print(e_str)
+                            #            print( e_str, e_str in STOPLIST)
+                            #        print (e.label, repr(e.label_),  ' '.join(t.orth_ for t in e))
+            print('FILTERED NOUN CHUNKS')
+            for k, v in ec.most_common(50):
+                print k, round(float(v) / sents_count, 3)
+
+            mined_data = pub_fetcher.get_epmc_text_mined_entities(pid)
+            print('EUROPEPMC TEXT MINING')
+            if mined_data:
+                for d in mined_data:
+                    print(d['name'])
+                    for i in d['tmSummary']:
+                        print '\t', i['term'], i['dbName'], round(float(i['count']) / sents_count, 3)
 
 # Every step in a pipeline needs to be a "transformer".
 # Define a custom transformer to clean text using spaCy
@@ -302,52 +382,9 @@ def transform_doc(doc):
     else:
         return ''
 
-pub_ids=['24523595',
-         '26784250',
-         '27409410',
-         '26290144',
-         '25787843',
-         '26836588',
-         '26781615',
-         '26646452',
-         '26774881',
-         '26629442',
-         ]
 
-# for t in [text, text2, text3, text4, text5, text6]:
-pub_fetcher = PublicationFetcher()
-for pid in pub_ids:
-    pub = pub_fetcher.get_publication(pid)
-    t=unicode(pub['title']+' '+pub['abstractText'])
-    print('*'*80)
-    pprint(t)
-    tokens, parsedEx = tokenizeText(t)
-    parsed_vector = transform_doc(parsedEx)
-    tl = t.lower()
-    sents_count = len(list(parsedEx.sents))
-    ec = Counter()
-    #    print('ENTITIES:')
-    for e in parsedEx.ents:
-        e_str = u' '.join(t.orth_ for t in e).encode('utf-8').lower()
-        if ((not e.label_) or (e.label_ == u'ENT')) and not (e_str in STOPLIST) and not (e_str in SYMBOLS):
-            if e_str not in ec:
-                try:
-                    ec[e_str] += tl.count(e_str)
-                except:
-                    print(e_str)
-                #            print( e_str, e_str in STOPLIST)
-                #        print (e.label, repr(e.label_),  ' '.join(t.orth_ for t in e))
-    print('FILTERED NOUN CHUNKS')
-    for k, v in ec.most_common(50):
-        print k, round(float(v) / sents_count, 3)
 
-    mined_data = pub_fetcher.get_text_mined(pid)
-    print('EUROPEPMC TEXT MINING')
-    if mined_data:
-        for d in mined_data:
-            print(d['name'])
-            for i in d['tmSummary']:
-                print '\t', i['term'], i['dbName'], round(float(i['count']) / sents_count, 3)
+
 
 # print(parsedEx)
 # for token in parsedEx:

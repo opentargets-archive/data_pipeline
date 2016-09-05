@@ -18,6 +18,7 @@ from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
+from modules.Literature import LiteratureActions, Literature
 from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
 from modules.Association import AssociationActions, ScoringProcess
@@ -124,6 +125,12 @@ if __name__ == '__main__':
                         action="append_const", const = IntOGenActions.ALL)
     parser.add_argument("--onto", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.ALL)
+    parser.add_argument("--lit", dest='lit', help="fetch and process literature data",
+                        action="append_const", const=LiteratureActions.ALL)
+    parser.add_argument("--lit-fetch", dest='lit', help="fetch literature data",
+                        action="append_const", const=LiteratureActions.FETCH)
+    parser.add_argument("--lit-process", dest='lit', help="fetch literature data",
+                        action="append_const", const=LiteratureActions.PROCESS)
     parser.add_argument("--qc", dest='qc',
                         help="Run quality control scripts",
                         action="append_const", const=QCActions.ALL)
@@ -259,6 +266,12 @@ if __name__ == '__main__':
                 Phenodigm(adapter, es, sparql).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(adapter, es, sparql).generate_evidence()
+        if args.lit or run_full_pipeline:
+            do_all = (ValidationActions.ALL in args.lit) or run_full_pipeline
+            if (LiteratureActions.FETCH in args.lit) or do_all:
+                Literature(es).fetch()
+            if (LiteratureActions.PROCESS in args.val) or do_all:
+                Literature(es).process()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:

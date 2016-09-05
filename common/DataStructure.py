@@ -1,4 +1,5 @@
 import json
+from ConfigParser import NoSectionError
 from UserDict import UserDict
 from json import JSONEncoder
 from settings import Config
