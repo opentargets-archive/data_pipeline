@@ -33,10 +33,10 @@ class DumpGenerator(object):
     def dump(self):
 
 
-        # '''dump evidence data'''
-        # logging.info('Dumping evidence data')
-        # # self.get_data('/api/latest/public/evidence/filter', Config.DUMP_FILE_EVIDENCE)
-        # self.put_files_together(Config.DUMP_FILE_EVIDENCE)
+        '''dump evidence data'''
+        logging.info('Dumping evidence data')
+        self.get_data('/api/latest/public/evidence/filter', Config.DUMP_FILE_EVIDENCE)
+        self.put_files_together(Config.DUMP_FILE_EVIDENCE)
         # # with gzip.open(Config.DUMP_FILE_EVIDENCE, 'wb') as dump_file:
         #     # for row in self.get_data_concurrently('/api/latest/public/evidence/filter'):
         #     #     dump_file.write(row+'\n')
@@ -55,7 +55,7 @@ class DumpGenerator(object):
 
 
 
-    def get_data(self, query, filename = Config.DUMP_FILE_EVIDENCE):
+    def get_data(self, query, filename = Config.DUMP_FILE_EVIDENCE, max_retry = 5):
         import grequests
 
 
@@ -86,20 +86,18 @@ class DumpGenerator(object):
                         time_wait = float(r.headers['retry-after'])
                         logging.warn('Usage Limit exceeded!!!! sleeping for %fs | 10s limit %s | 1h limit %s'%(time_wait, r.headers['x-usage-remaining-10s'], r.headers['x-usage-remaining-1h']))
                         time.sleep(time_wait+2)#TODO check wait time is computed properly in the backend
-                        r = requests.get(r.url, headers = headers, timeout = 60)
+                        r = requests.get(r.url, headers = headers, timeout = 120)
                     if r.status_code != 200:
-                        logging.error('invalid status code in request:%s | trying again in 3 seconds...' % r.url)
-                        time.sleep(3)
-                        r = requests.get(r.url, headers=headers, timeout=60)
-                        if r.status_code != 200:
-                            logging.error('invalid status code in request:%s | trying again in 30 seconds...' % r.url)
-                            time.sleep(30)
-                            r = requests.get(r.url, headers=headers, timeout=60)
-                            if r.status_code != 200:
-                                logging.error('invalid status code in request:%s | giving up' % r.url)
-                                raise Exception("error in response", r.status_code)
-                        if r.status_code == 200:
-                            logging.debug('invalid status code in request:%s | fixed' % r.url)
+                        i=0
+                        while (r.status_code != 200) and (i<max_retry):
+                            wait=30*i
+                            logging.error('invalid status code %s in request:%s | trying again in %i seconds...' % (r.status_code,r.url, wait))
+                            time.sleep(wait)
+                            r = requests.get(r.url, headers=headers, timeout=120)
+                            if r.status_code == 200:
+                                logging.debug('invalid status code in request:%s | fixed' % r.url)
+                                break
+                            i+=1
 
                     if r.status_code == 200:
                         try:
@@ -140,7 +138,7 @@ class DumpGenerator(object):
                     break
 
     def _get_auth_token(self):
-        r= requests.get(self.api_url+'/api/latest/public/auth/request_token?secret=32rZb5EqAm3QsC509uO8Oe53X4l5jC46&app_name=load-test')#&expiry=%i'%60*60)
+        r= requests.get(self.api_url+'/api/latest/public/auth/request_token?secret=1RT6L519zkcTH9i3F99OjeYn13k79Wep&app_name=load-test')#&expiry=%i'%60*60)
         return r.json()['token']
 
 

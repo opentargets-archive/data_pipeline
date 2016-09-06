@@ -71,7 +71,7 @@ class ESQuery(object):
     
     def count_all_targets(self):
 
-        return self._count_elements_in_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        return self.count_elements_in_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
 
     def get_all_diseases(self, fields = None):
         source = self._get_source_from_fields(fields)
@@ -93,7 +93,7 @@ class ESQuery(object):
 
     def count_all_diseases(self):
 
-        return self._count_elements_in_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
+        return self.count_elements_in_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
 
 
     def get_all_eco(self, fields=None):
@@ -116,7 +116,7 @@ class ESQuery(object):
 
     def count_all_eco(self):
 
-        return self._count_elements_in_index(Config.ELASTICSEARCH_ECO_INDEX_NAME)
+        return self.count_elements_in_index(Config.ELASTICSEARCH_ECO_INDEX_NAME)
 
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
@@ -263,8 +263,8 @@ class ESQuery(object):
         if datasources:
             doc_type = datasources
 
-        return self._count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
-                                             doc_type = doc_type)
+        return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '*',
+                                            doc_type = doc_type)
 
 
     def get_all_ensembl_genes(self):
@@ -292,7 +292,6 @@ class ESQuery(object):
                                'size': 100,
                            },
                            scroll='12h',
-                           # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME),
                            timeout="10m",
                            )
@@ -391,7 +390,7 @@ class ESQuery(object):
 
         return dict((hit['_id'],hit['_source']['label']) for hit in res)
 
-    def _count_elements_in_index(self, index_name, doc_type=None):
+    def count_elements_in_index(self, index_name, doc_type=None):
         res = self.handler.search(index=Loader.get_versioned_index(index_name),
                                   doc_type=doc_type,
                                   body={"query": {
