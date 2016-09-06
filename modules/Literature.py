@@ -59,8 +59,11 @@ class PublicationFetcher(object):
     """
     Retireve data about a publication
     """
-    _QUERY_BY_EXT_ID= '''http://www.ebi.ac.uk/europepmc/webservices/rest/search?pagesize=10&query=EXT_ID:{}&format=json&resulttype=core'''
+    _QUERY_BY_EXT_ID= '''http://www.ebi.ac.uk/europepmc/webservices/rest/search?pagesize=10&query=EXT_ID:{}&format=json&resulttype=core&page=1&pageSize=1000'''
     _QUERY_TEXT_MINED='''http://www.ebi.ac.uk/europepmc/webservices/rest/MED/{}/textMinedTerms//1/1000/json'''
+    _QUERY_REFERENCE='''http://www.ebi.ac.uk/europepmc/webservices/rest/MED/{}/references//json'''
+
+    #"EXT_ID:17440703 OR EXT_ID:17660818 OR EXT_ID:18092167 OR EXT_ID:18805785 OR EXT_ID:19442247 OR EXT_ID:19808788 OR EXT_ID:19849817 OR EXT_ID:20192983 OR EXT_ID:20871604 OR EXT_ID:21270825"
 
     def __init__(self, es):
         self.es = es
@@ -79,7 +82,7 @@ class PublicationFetcher(object):
         pubs ={}
         for pub_source in self.es_query.get_publications_by_id(pub_ids):
             print 'got pub from cache'
-            pub = AnalisedPublication()
+            pub = Publication()
             pub.load_json(pub_source)
             pubs[pub.pub_id]=pub
         if len(pubs)<pub_ids:
@@ -89,24 +92,33 @@ class PublicationFetcher(object):
                     r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
                     r.raise_for_status()
                     result = r.json()['resultList']['result'][0]
-                    pub = AnalisedPublication(pub_id=pub_id,
-                                              title=result['title'],
-                                              abstract=result['abstractText'],
-                                              authors=result['authorList'],
-                                              year=int(result['pubYear']),
-                                              date=result["firstPublicationDate"],
-                                              journal=result['journalInfo'],
-                                              full_text=u"",
-                                              full_text_url=result['fullTextUrlList']['fullTextUrl'],
-                                              epmc_keywords=result['keywordList']['keyword'],
-                                              doi=result['doi'],
-                                              cited_by=result['citedByCount'],
-                                              has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
-                                              is_open_access=result['isOpenAccess'] == u'Y',
-                                              pub_type=result['pubTypeList']['pubType'],
-                                              )
+                    pub = Publication(pub_id=pub_id,
+                                      title=result['title'],
+                                      abstract=result['abstractText'],
+                                      authors=result['authorList'],
+                                      year=int(result['pubYear']),
+                                      date=result["firstPublicationDate"],
+                                      journal=result['journalInfo'],
+                                      full_text=u"",
+                                      full_text_url=result['fullTextUrlList']['fullTextUrl'],
+                                      epmc_keywords=result['keywordList']['keyword'],
+                                      doi=result['doi'],
+                                      cited_by=result['citedByCount'],
+                                      has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
+                                      has_references=result['hasReferences'] == u'Y',
+                                      is_open_access=result['isOpenAccess'] == u'Y',
+                                      pub_type=result['pubTypeList']['pubType'],
+                                      )
+                    if 'meshHeadingList' in result:
+                        pub. mesh_headings = result['meshHeadingList']['meshHeading']
+                    if 'chemicalList' in result:
+                        pub.chemicals = result['chemicalList']['chemical']
+                    if 'dateOfRevision' in result:
+                        pub.date_of_revision = result["dateOfRevision"]
                     if pub.has_text_mined_entities:
                         self.get_epmc_text_mined_entities(pub)
+                    if pub.has_references:
+                        self.get_epmc_ref_list(pub)
 
                     self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                                     Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
@@ -120,13 +132,23 @@ class PublicationFetcher(object):
     def get_epmc_text_mined_entities(self, pub):
         r = requests.get(self._QUERY_TEXT_MINED.format(pub.pub_id))
         r.raise_for_status()
-        if 'semanticTypeList' in r.json():
-            result = r.json()['semanticTypeList']['semanticType']
+        json_response = r.json()
+        if u'semanticTypeList' in json_response:
+            result = json_response[u'semanticTypeList'][u'semanticType']
             pub.epmc_text_mined_entities = result
         return pub
 
+    def get_epmc_ref_list(self, pub):
+        r = requests.get(self._QUERY_REFERENCE.format(pub.pub_id))
+        r.raise_for_status()
+        json_response = r.json()
+        if u'referenceList' in json_response:
+            result = [i[u'id'] for i in json_response[u'referenceList'][u'reference'] if u'id' in i]
+            pub.references=result
+        return pub
 
-class AnalisedPublication(JSONSerializable):
+
+class Publication(JSONSerializable):
 
     def __init__(self,
                  pub_id = u"",
@@ -148,6 +170,12 @@ class AnalisedPublication(JSONSerializable):
                  has_text_mined_terms=None,
                  is_open_access=None,
                  pub_type=[],
+                 date_of_revision=u"",
+                 has_references=None,
+                 references=[],
+                 mesh_headings=[],
+                 chemicals=[],
+
                  ):
         self.pub_id = pub_id
         self.title = title
@@ -168,6 +196,12 @@ class AnalisedPublication(JSONSerializable):
         self.has_text_mined_entities = has_text_mined_terms
         self.is_open_access = is_open_access
         self.pub_type = pub_type
+        self.date_of_revision = date_of_revision
+        self.has_references = has_references
+        self.references = references
+        self.mesh_headings = mesh_headings
+        self.chemicals = chemicals
+
 
 
 
@@ -179,7 +213,7 @@ class PublicationAnalyser(object):
 
 
     def analyse_publication(self, text_to_parse=None, pub_id= None, analyser = 'spacy'):
-        pub = AnalisedPublication()
+        pub = Publication()
         if pub_id:
             pub = self.fetcher.get_publication(pub_id=pub_id)
             text_to_parse = unicode(pub.title + ' ' + pub.abstract)
