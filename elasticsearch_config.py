@@ -808,7 +808,19 @@ class ElasticSearchConfiguration():
             "refresh_interval": "1s",
         },
         "mappings": {
-                Config.ELASTICSEARCH_PUBLICATION_DOC_NAME: {},
+                Config.ELASTICSEARCH_PUBLICATION_DOC_NAME: {
+                    "properties": {
+                        "date_of_revision": {
+                            "type": "date",
+                            "format": "strict_date_optional_time||epoch_millis",
+
+                        },
+                        "date": {
+                            "type": "date",
+                            "format": "strict_date_optional_time||epoch_millis",
+                        }
+                    }
+                },
                 Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME: {
                     "_parent": {
                         "type": Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,

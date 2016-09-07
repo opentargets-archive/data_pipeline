@@ -161,7 +161,7 @@ class Publication(JSONSerializable):
                  abstract = u"",
                  authors = [],
                  year = None,
-                 date = u"",
+                 date = None,
                  journal = u"",
                  full_text = u"",
                  epmc_text_mined_entities = {},
@@ -172,7 +172,7 @@ class Publication(JSONSerializable):
                  has_text_mined_terms=None,
                  is_open_access=None,
                  pub_type=[],
-                 date_of_revision=u"",
+                 date_of_revision=None,
                  has_references=None,
                  references=[],
                  mesh_headings=[],
@@ -222,12 +222,11 @@ class PublicationAnalysisSpacy(PublicationAnalysis):
 
     def __init__(self,
                  pub_id,
-                 lemmas={},
-                 noun_chunks={},
+                 lemmas=(),
+                 noun_chunks=(),
                  analysed_sentences_count=1,
                  ):
         super(PublicationAnalysisSpacy, self).__init__(pub_id)
-        self.lemmas = []
         self.lemmas = lemmas
         self.noun_chunks = noun_chunks
         self.analysed_sentences_count = analysed_sentences_count
@@ -254,6 +253,8 @@ class PublicationAnalyserSpacy(object):
         text_to_parse = unicode(pub.title + ' ' + pub.abstract)
 
         lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
+        lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
+        noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
 
         analysed_pub = PublicationAnalysisSpacy(pub_id = pub_id,
                                         lemmas=lemmas,
@@ -264,7 +265,6 @@ class PublicationAnalyserSpacy(object):
 
 
     def _spacy_analyser(self, abstract):
-        print "analysing this text: \n%s"%abstract
         # #TODO: see PriYanka notebook tests, and/or code below
         print('*' * 80)
         pprint(abstract)
@@ -371,19 +371,19 @@ class Literature(object):
         self.es_query=ESQuery(es)
         self.loader = loader
         self.logger = logging.getLogger(__name__)
+        if not self.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
+            self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
 
     def fetch(self,
               datasources=[],
               ):
-        if not self.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
-            self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
         #TODO: load everything with a fetcher in parallel
         pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
         fetched_pub_ids=set()
         for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
-                    desc='Reading available evidence_strings',
+                    desc='Reading available evidence_strings to fetch publications ids',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                     unit=' evidence',
                     unit_scale=True):
@@ -405,8 +405,9 @@ class Literature(object):
         # for t in [text, text2, text3, text4, text5, text6]:
         pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
         pub_analyser = PublicationAnalyserSpacy(pub_fetcher, self.es, self.loader)
+        #todo, add method to process all cached publications??
         for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
-                    desc='Reading available evidence_strings',
+                    desc='Reading available evidence_strings to analyse publications',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                     unit=' evidence',
                     unit_scale=True):
