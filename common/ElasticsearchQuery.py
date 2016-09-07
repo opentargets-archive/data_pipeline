@@ -520,6 +520,7 @@ class ESQuery(object):
         if len(ids) <10000:
             query_body['size']=10000
             res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                                      doc_type = Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                                       body=query_body,
                                       )
             for hit in res['hits']['hits']:
@@ -529,6 +530,7 @@ class ESQuery(object):
                                query=query_body,
                                scroll='12h',
                                index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                               doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                                timeout="10m",
                                )
             for hit in res:
