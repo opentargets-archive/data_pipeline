@@ -9,6 +9,12 @@ from paramiko import AuthenticationException
 import opentargets.model.core as opentargets
 import logging
 import json
+import rdflib
+from rdflib import URIRef
+from rdflib import Namespace
+#from rdflib.amespace import OWL, RDF
+
+import pprint
 from common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
 from settings import Config
@@ -108,6 +114,61 @@ order by ?count
 
 class OntologyActions(Actions):
     PHENOTYPESLIM = 'phenotypeslim'
+    DISEASEPHENOTYPES = 'diseasephenotypes'
+
+class DiseasePhenotypes():
+
+    def __init__(self):
+        self.rdf_graph = None
+        pass
+
+    # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/
+    # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw
+    def parse_owl_url(self):
+        # we care about namespaces
+        #oban = Namespace('http://purl.org/oban/')
+        self.rdf_graph = rdflib.Graph()
+        # load HPO:
+        print ("parse HPO")
+        self.rdf_graph.parse('/Users/koscieln/Downloads/hp.owl', format='xml')
+        print ("parse MP")
+        self.rdf_graph.parse('/Users/koscieln/Downloads/mp.owl', format='xml')
+        #print ("parse EFO")
+        #self.rdf_graph.parse('/Users/koscieln/Downloads/hp.owl', format='xml')
+        for dp in ['/Users/koscieln/Downloads/ibd_2_pheno_associations.owl',
+                   '/Users/koscieln/Downloads/immune_disease_2_pheno.owl',
+                   '/Users/koscieln/Downloads/rareAlbuminuria_associations_03Jun15.owl',
+                   '/Users/koscieln/Downloads/rareIBDpheno.owl',
+                   '/Users/koscieln/Downloads/ordo_hpo_mappings.owl',
+                   '/Users/koscieln/Downloads/charite_HP_ORDO_07Oct15.owl' ]:
+            print ("merge phenotypes from %s" % dp)
+            self.rdf_graph.parse(dp, format='xml')
+
+        #graph.parse('https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw', format='xml')
+
+        #for subject, predicate, obj in self.rdf_graph:
+        #    print subject, predicate, obj
+        #for stmt in graph:
+        #    pprint.pprint(stmt)
+
+        qres = self.rdf_graph.query(
+            """
+            PREFIX obo: <http://purl.obolibrary.org/obo/>
+            PREFIX oban: <http://purl.org/oban/>
+            select DISTINCT ?disease_id ?phenotype_label ?phenotype_id
+            where {
+              ?code oban:association_has_subject ?disease_id .
+              ?code oban:association_has_object ?phenotype_id .
+              ?phenotype_id rdfs:label ?phenotype_label
+            }
+            """
+        )
+
+        for row in qres:
+            print ("%s hasPhenotype %s (%s)" % row)
+
+        # EXTRACT THE GOOD BITS
+
 
 class PhenotypeSlim():
 
@@ -478,3 +539,10 @@ class PhenotypeSlim():
                 fh.close()
             srv.close()
         return
+
+def main():
+    obj = DiseasePhenotypes()
+    obj.parse_owl_url()
+
+if __name__ == "__main__":
+    main()
