@@ -334,7 +334,7 @@ class Loader():
                                      body=body
                                      )
         if ('acknowledged' not in res) or (res['acknowledged'] == False):
-            raise ValueError('creation of index %s was not acknowledged')
+            raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
         mappings = self.es.indices.get_mapping(index=index_name)
         settings = self.es.indices.get_settings(index=index_name)
 

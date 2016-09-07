@@ -194,10 +194,6 @@ class ESQuery(object):
 
 
     def get_validated_evidence_strings(self, fields = None, size=1000, datasources = []):
-        def get_ids(ids):
-            return self.handler.mget(index=index_name,
-                                   body={'docs': ids},
-                                   _source=True)
 
 
         source = self._get_source_from_fields(fields)
@@ -211,7 +207,7 @@ class ESQuery(object):
             doc_type = datasources
         res = helpers.scan(client=self.handler,
                            query={"query":  {"match_all": {}},
-                               '_source': True,
+                               '_source': source,
                                'size': 1000,
                            },
                            scroll='12h',
@@ -220,42 +216,9 @@ class ESQuery(object):
                            timeout="10m",
                            )
 
-        # res = self.handler.search(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
-        #                           body={"query": { "match_all": {}},
-        #                                  '_source': True,
-        #                                  'size': 10,
-        #                                 }
-        #
-        #                           )
 
         for hit in res:
             yield hit['_source']
-
-        # ids = []
-        # for hit in res:
-        #     ids.append({"_index" : hit["_index"],
-        #                 "_id" : hit["_id"]
-        #                 },)
-        # id_buffer =[]
-        # for doc_id in ids:
-        #     id_buffer.append(doc_id)
-        #     if len(id_buffer) == size:
-        #         res_get = get_ids(id_buffer)
-        #         for doc in res_get['docs']:
-        #             if doc['found']:
-        #                 yield doc['_source']
-        #             else:
-        #                 raise ValueError('document with id %s not found'%(doc['_id']))
-        #         id_buffer = []
-        # if id_buffer:
-        #     res_get = get_ids(id_buffer)
-        #     for doc in res_get['docs']:
-        #         if doc['found']:
-        #             yield doc['_source']
-        #         else:
-        #             raise ValueError('document with id %s not found' % (doc['_id']))
-
-
 
     def count_validated_evidence_strings(self, datasources = []):
 
@@ -405,7 +368,7 @@ class ESQuery(object):
     def get_evidence_simple(self, targets = None):
 
         def get_ids(ids):
-            return self.handler.mget(index=index_name,
+            return self.handler.mget(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
                                    body={'docs': ids},
                                    _source= {"include": ["target.id",
                                                         "private.efo_codes",
@@ -570,3 +533,22 @@ class ESQuery(object):
                                )
             for hit in res:
                 yield hit['_source']
+
+
+    def get_all_pub_ids_from_evidence(self,):
+        #TODO: get all the validated evidencestrings and fetch medline abstracts there
+        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='literature.references.lit_id'
+
+        return ['http://europepmc.org/abstract/MED/24523595',
+               'http://europepmc.org/abstract/MED/26784250',
+               'http://europepmc.org/abstract/MED/27409410',
+               'http://europepmc.org/abstract/MED/26290144',
+               'http://europepmc.org/abstract/MED/25787843',
+               'http://europepmc.org/abstract/MED/26836588',
+               'http://europepmc.org/abstract/MED/26781615',
+               'http://europepmc.org/abstract/MED/26646452',
+               'http://europepmc.org/abstract/MED/26774881',
+               'http://europepmc.org/abstract/MED/26629442',
+               'http://europepmc.org/abstract/MED/26371324',
+               'http://europepmc.org/abstract/MED/24817865',
+               ]

@@ -12,6 +12,8 @@ import re
 from spacy.en import English
 from collections import Counter
 
+from tqdm import tqdm
+
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
@@ -360,57 +362,70 @@ class PublicationAnalyserSpacy(object):
 
 class Literature(object):
 
-    _test_pub_ids =['24523595',
-                   '26784250',
-                   '27409410',
-                   '26290144',
-                   '25787843',
-                   '26836588',
-                   '26781615',
-                   '26646452',
-                   '26774881',
-                   '26629442',
-                   '26371324',
-                   '24817865',
-                   ]
 
     def __init__(self,
                  es,
                  loader,
                  ):
         self.es = es
+        self.es_query=ESQuery(es)
         self.loader = loader
         self.logger = logging.getLogger(__name__)
 
 
-    def fetch(self):
+    def fetch(self,
+              datasources=[],
+              ):
         if not self.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
         #TODO: load everything with a fetcher in parallel
         pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
-        pubs = pub_fetcher.get_publication(self._test_pub_ids)
-        for pid, pub in pubs.items():
-            print pid, pub.title
+        fetched_pub_ids=set()
+        for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
+                    desc='Reading available evidence_strings',
+                    total = self.es_query.count_validated_evidence_strings(datasources= datasources),
+                    unit=' evidence',
+                    unit_scale=True):
+            pub_id= self.get_pub_id_from_url(ev)
+            if pub_id not in fetched_pub_ids:
+                pubs = pub_fetcher.get_publication(pub_id)
+                fetched_pub_ids.add(pub_id)
 
-    def process(self):
+                #todo remove this, just for debugging
+                for pid, pub in pubs.items():
+                    print pid, pub.title
+
+    def process(self,
+                datasources=[],
+                ):
         #TODO: process everything with an analyser in parallel
 
 
         # for t in [text, text2, text3, text4, text5, text6]:
-        pub_fetcher = PublicationFetcher(self.es)
+        pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
         pub_analyser = PublicationAnalyserSpacy(pub_fetcher, self.es, self.loader)
-        pubs = pub_fetcher.get_publication(self._test_pub_ids)
-        for pub_id, pub in pubs.items():
-            spacy_analysed_pub = pub_analyser.analyse_publication(pub_id=pub_id,
-                                                                  pub = pub)
-            self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-                            doc_type=spacy_analysed_pub.get_type(),
-                            ID=pub_id,
-                            body=spacy_analysed_pub.to_json(),
-                            parent=pub_id,
-                            )
+        for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
+                    desc='Reading available evidence_strings',
+                    total = self.es_query.count_validated_evidence_strings(datasources= datasources),
+                    unit=' evidence',
+                    unit_scale=True):
+            pub_id= self.get_pub_id_from_url(ev)
+            pubs = pub_fetcher.get_publication(pub_id)
+            for pub_id, pub in pubs.items():
+                spacy_analysed_pub = pub_analyser.analyse_publication(pub_id=pub_id,
+                                                                      pub = pub)
+                self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                                doc_type=spacy_analysed_pub.get_type(),
+                                ID=pub_id,
+                                body=spacy_analysed_pub.to_json(),
+                                parent=pub_id,
+                                )
         self.loader.flush()
+
+    @staticmethod
+    def get_pub_id_from_url(url):
+        return url.split('/')[-1]
 
 
 # Every step in a pipeline needs to be a "transformer".

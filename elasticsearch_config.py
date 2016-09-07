@@ -808,19 +808,21 @@ class ElasticSearchConfiguration():
             "refresh_interval": "1s",
         },
         "mappings": {
-            "mappings": {
                 Config.ELASTICSEARCH_PUBLICATION_DOC_NAME: {},
                 Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME: {
                     "_parent": {
                         "type": Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                         "fielddata": {
                             "loading": "eager_global_ordinals"
-                        }
+                        },
+                    },
+                    "_routing": {
+                        "required": True
                     }
                 }
             }
         }
-    }
+
 
     INDEX_MAPPPINGS = {Config.ELASTICSEARCH_DATA_INDEX_NAME: evidence_data_mapping,
                        Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME: score_data_mapping,
