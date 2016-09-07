@@ -271,9 +271,9 @@ if __name__ == '__main__':
         if args.lit or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.lit) or run_full_pipeline
             if (LiteratureActions.FETCH in args.lit) or do_all:
-                Literature(es).fetch()
+                Literature(es, loader).fetch()
             if (LiteratureActions.PROCESS in args.lit) or do_all:
-                Literature(es).process()
+                Literature(es, loader).process()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:

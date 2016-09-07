@@ -14,6 +14,7 @@ from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import streaming_bulk, parallel_bulk
 from sqlalchemy import and_
 from common import Actions
+from common.DataStructure import JSONSerializable
 from common.EvidenceJsonUtils import assertJSONEqual
 from common.PGAdapter import ElasticsearchLoad
 from common.processify import processify
@@ -199,6 +200,8 @@ class Loader():
             if create_index:
                 self.create_new_index(index_name)
             self.index_created.append(index_name)
+        if isinstance(body, JSONSerializable):
+            body = body.to_json()
         submission_dict = dict(_index=self.get_versioned_index(index_name),
                                _type=doc_type,
                                _id=ID,

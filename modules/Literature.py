@@ -204,7 +204,7 @@ class PublicationAnalysis(JSONSerializable):
 
     def __init__(self,
                  pub_id):
-        self.pub_ud = pub_id
+        self.pub_id = pub_id
 
     def get_type(self):
         '''Define the type for elasticsearch here'''
@@ -235,7 +235,7 @@ class PublicationAnalysisSpacy(PublicationAnalysis):
 
 
 
-class PublicationAnalyser(object):
+class PublicationAnalyserSpacy(object):
     def __init__(self, fetcher, es, loader = None):
         if loader is None:
             self.loader = Loader(es)
@@ -262,37 +262,98 @@ class PublicationAnalyser(object):
     def _spacy_analyser(self, abstract):
         print "analysing this text: \n%s"%abstract
         # #TODO: see PriYanka notebook tests, and/or code below
-        # print('*' * 80)
-        # pprint(abstract)
-        # tokens, parsedEx = tokenizeText(abstract)
-        # parsed_vector = transform_doc(parsedEx)
-        # tl = abstract.lower()
-        # sents_count = len(list(parsedEx.sents))
-        # ec = Counter()
-        # #    print('ENTITIES:')
-        # for e in parsedEx.ents:
-        #     e_str = u' '.join(t.orth_ for t in e).encode('utf-8').lower()
-        #     if ((not e.label_) or (e.label_ == u'ENT')) and not (e_str in STOPLIST) and not (e_str in SYMBOLS):
-        #         if e_str not in ec:
-        #             try:
-        #                 ec[e_str] += tl.count(e_str)
-        #             except:
-        #                 print(e_str)
-        #                 #            print( e_str, e_str in STOPLIST)
-        #                 #        print (e.label, repr(e.label_),  ' '.join(t.orth_ for t in e))
-        # print('FILTERED NOUN CHUNKS')
-        # for k, v in ec.most_common(50):
-        #     print k, round(float(v) / sents_count, 3)
-        #
-        # mined_data = pub_fetcher.get_epmc_text_mined_entities(pid)
-        # print('EUROPEPMC TEXT MINING')
-        # if mined_data:
-        #     for d in mined_data:
-        #         print(d['name'])
-        #         for i in d['tmSummary']:
-        #             print '\t', i['term'], i['dbName'], round(float(i['count']) / sents_count, 3)
+        print('*' * 80)
+        pprint(abstract)
+        lemmas, tokens, parsedEx = self.tokenizeText(abstract)
+        parsed_vector = self.transform_doc(parsedEx)
+        tl = abstract.lower()
+        sents_count = len(list(parsedEx.sents))
+        ec = Counter()
+        #    print('ENTITIES:')
+        for e in parsedEx.ents:
+            e_str = u' '.join(t.orth_ for t in e).encode('utf-8').lower()
+            if ((not e.label_) or (e.label_ == u'ENT')) and not (e_str in STOPLIST) and not (e_str in SYMBOLS):
+                if e_str not in ec:
+                    try:
+                        ec[e_str] += tl.count(e_str)
+                    except:
+                        print(e_str)
+                        #            print( e_str, e_str in STOPLIST)
+                        #        print (e.label, repr(e.label_),  ' '.join(t.orth_ for t in e))
+        print('FILTERED NOUN CHUNKS:')
+        for k, v in ec.most_common(5):
+            print k, round(float(v) / sents_count, 3)
 
-        return {}, {}, 1
+        return lemmas, ec, sents_count
+
+
+    # A custom function to tokenize the text using spaCy
+    # and convert to lemmas
+    def tokenizeText(self, sample):
+        # get the tokens using spaCy
+        tokens_all = parser(unicode(sample))
+        #    for t in tokens_all.noun_chunks:
+        #        print(t, list(t.subtree))
+        # lemmatize
+        lemmas = []
+        for tok in tokens_all:
+            lemmas.append(tok.lemma_.lower().strip() if tok.lemma_ != "-PRON-" else tok.lower_)
+        tokens = lemmas
+
+        # stoplist the tokens
+        tokens = [tok for tok in tokens if tok.encode('utf-8') not in STOPLIST]
+
+        # stoplist symbols
+        tokens = [tok for tok in tokens if tok.encode('utf-8') not in SYMBOLS]
+
+        # remove large strings of whitespace
+        while "" in tokens:
+            tokens.remove("")
+        while " " in tokens:
+            tokens.remove(" ")
+        while "\n" in tokens:
+            tokens.remove("\n")
+        while "\n\n" in tokens:
+            tokens.remove("\n\n")
+        filtered = []
+        for tok in tokens_all:
+            if tok.lemma_.lower().strip() in tokens and tok.pos_ in ['PROP', 'PROPN', 'NOUN', 'ORG', 'FCA', 'PERSON']:
+                filtered.append(tok)
+        c = Counter([tok.lemma_.lower().strip() for tok in filtered])
+        sents_count = len(list(tokens_all.sents))
+        print 'COMMON LEMMAS'
+        for i in c.most_common(5):
+            if i[1] > 1:
+                print i[0], round(float(i[1]) / sents_count, 3)
+        return c, tokens, tokens_all
+
+    def represent_word(self, word):
+        if word.like_url:
+            return '%%URL|X'
+        text = re.sub(r'\s', '_', word.text)
+        tag = LABELS.get(word.ent_type_, word.pos_)
+        if not tag:
+            tag = '?'
+        return text + '|' + tag
+
+    def transform_doc(self, doc):
+        for ent in doc.ents:
+            ent.merge(ent.root.tag_, ent.text, LABELS[ent.label_])
+        for np in list(doc.noun_chunks):
+            #        print (np, np.root.tag_, np.text, np.root.ent_type_)
+            while len(np) > 1 and np[0].dep_ not in ('advmod', 'amod', 'compound'):
+                np = np[1:]
+            # print (np, np.root.tag_, np.text, np.root.ent_type_)
+
+            np.merge(np.root.tag_, np.text, np.root.ent_type_)
+        strings = []
+        for sent in doc.sents:
+            if sent.text.strip():
+                strings.append(' '.join(self.represent_word(w) for w in sent if not w.is_space))
+        if strings:
+            return '\n'.join(strings) + '\n'
+        else:
+            return ''
 
 
 class Literature(object):
@@ -313,9 +374,10 @@ class Literature(object):
 
     def __init__(self,
                  es,
+                 loader,
                  ):
         self.es = es
-        self.loader = Loader(es)
+        self.loader = loader
         self.logger = logging.getLogger(__name__)
 
 
@@ -324,7 +386,7 @@ class Literature(object):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
         #TODO: load everything with a fetcher in parallel
-        pub_fetcher = PublicationFetcher(self.es)
+        pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
         pubs = pub_fetcher.get_publication(self._test_pub_ids)
         for pid, pub in pubs.items():
             print pid, pub.title
@@ -335,13 +397,18 @@ class Literature(object):
 
         # for t in [text, text2, text3, text4, text5, text6]:
         pub_fetcher = PublicationFetcher(self.es)
-        pub_analyser = PublicationAnalyser(pub_fetcher)
+        pub_analyser = PublicationAnalyserSpacy(pub_fetcher, self.es, self.loader)
         pubs = pub_fetcher.get_publication(self._test_pub_ids)
         for pub_id, pub in pubs.items():
             spacy_analysed_pub = pub_analyser.analyse_publication(pub_id=pub_id,
                                                                   pub = pub)
-            print spacy_analysed_pub.to_json()
-
+            self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                            doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME,
+                            ID=pub_id,
+                            body=spacy_analysed_pub.to_json(),
+                            parent=pub_id,
+                            )
+        self.loader.flush()
 
 
 # Every step in a pipeline needs to be a "transformer".
@@ -377,83 +444,4 @@ def cleanText(text):
     text = text.lower()
 
     return text
-
-
-# A custom function to tokenize the text using spaCy
-# and convert to lemmas
-def tokenizeText(sample):
-    # get the tokens using spaCy
-    tokens_all = parser(unicode(sample))
-    #    for t in tokens_all.noun_chunks:
-    #        print(t, list(t.subtree))
-    # lemmatize
-    lemmas = []
-    for tok in tokens_all:
-        lemmas.append(tok.lemma_.lower().strip() if tok.lemma_ != "-PRON-" else tok.lower_)
-    tokens = lemmas
-
-    # stoplist the tokens
-    tokens = [tok for tok in tokens if tok.encode('utf-8') not in STOPLIST]
-
-    # stoplist symbols
-    tokens = [tok for tok in tokens if tok.encode('utf-8') not in SYMBOLS]
-
-    # remove large strings of whitespace
-    while "" in tokens:
-        tokens.remove("")
-    while " " in tokens:
-        tokens.remove(" ")
-    while "\n" in tokens:
-        tokens.remove("\n")
-    while "\n\n" in tokens:
-        tokens.remove("\n\n")
-    filtered = []
-    for tok in tokens_all:
-        #        if tok.lemma_.lower().strip() in tokens and tok.pos_ in ['PROP', 'PROPN', 'VERB','NOUN']:
-        if tok.lemma_.lower().strip() in tokens and tok.pos_ in ['PROP', 'PROPN', 'NOUN', 'ORG', 'FCA', 'PERSON']:
-            filtered.append(tok)
-            #        else:
-            #            print(tok.lemma_.lower().strip(), tok.pos_ )
-    c = Counter([tok.lemma_.lower().strip() for tok in filtered])
-    sents_count = len(list(tokens_all.sents))
-    print 'COMMON LEMMAS'
-    for i in c.most_common(50):
-        if i[1] > 1:
-            print i[0], round(float(i[1]) / sents_count,3)
-    return tokens, tokens_all
-
-
-
-def represent_word(word):
-    if word.like_url:
-        return '%%URL|X'
-    text = re.sub(r'\s', '_', word.text)
-    tag = LABELS.get(word.ent_type_, word.pos_)
-    if not tag:
-        tag = '?'
-    return text + '|' + tag
-
-
-def transform_doc(doc):
-    for ent in doc.ents:
-        ent.merge(ent.root.tag_, ent.text, LABELS[ent.label_])
-    for np in list(doc.noun_chunks):
-        #        print (np, np.root.tag_, np.text, np.root.ent_type_)
-        while len(np) > 1 and np[0].dep_ not in ('advmod', 'amod', 'compound'):
-            np = np[1:]
-        # print (np, np.root.tag_, np.text, np.root.ent_type_)
-
-        np.merge(np.root.tag_, np.text, np.root.ent_type_)
-    strings = []
-    for sent in doc.sents:
-        if sent.text.strip():
-            strings.append(' '.join(represent_word(w) for w in sent if not w.is_space))
-    if strings:
-        return '\n'.join(strings) + '\n'
-    else:
-        return ''
-
-
-
-
 
