@@ -193,23 +193,22 @@ class Loader():
 
 
 
-    def put(self, index_name, doc_type, ID, body, create_index = True, routing = None):
+    def put(self, index_name, doc_type, ID, body, create_index = True, routing = None, parent = None):
 
         if index_name not in self.index_created:
             if create_index:
                 self.create_new_index(index_name)
             self.index_created.append(index_name)
-        if routing is None:
-            self.cache.append(dict(_index=self.get_versioned_index(index_name),
-                                   _type=doc_type,
-                                   _id=ID,
-                                   _source=body))
-        else:
-            self.cache.append(dict(_index=self.get_versioned_index(index_name),
-                                   _type=doc_type,
-                                   _id=ID,
-                                   _source=body,
-                                   _routing=routing))
+        submission_dict = dict(_index=self.get_versioned_index(index_name),
+                               _type=doc_type,
+                               _id=ID,
+                               _source=body)
+        if routing is not None:
+            submission_dict['_routing']=routing
+        if parent is not None:
+            submission_dict['_parent']=parent
+        self.cache.append(submission_dict)
+
         if len(self.cache) == self.chunk_size:
             self.flush()
 

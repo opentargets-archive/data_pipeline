@@ -14,7 +14,7 @@ class PipelineEncoder(JSONEncoder):
             pass
         return o.__dict__
 
-class JSONSerializable():
+class JSONSerializable(object):
     def to_json(self):
         self.stamp_data_release()
         return json.dumps(self,
