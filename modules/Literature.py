@@ -68,6 +68,8 @@ class PublicationFetcher(object):
     def __init__(self, es, loader = None):
         if loader is None:
             self.loader = Loader(es)
+        else:
+            self.loader=loader
         self.es = es
         self.es_query=ESQuery(es)
         self.logger = logging.getLogger(__name__)
@@ -403,7 +405,7 @@ class Literature(object):
             spacy_analysed_pub = pub_analyser.analyse_publication(pub_id=pub_id,
                                                                   pub = pub)
             self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-                            doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME,
+                            doc_type=spacy_analysed_pub.get_type(),
                             ID=pub_id,
                             body=spacy_analysed_pub.to_json(),
                             parent=pub_id,
