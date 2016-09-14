@@ -18,8 +18,15 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
+from common.Redis import RedisQueueWorkerProcess
+import multiprocessing
 from settings import Config
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 
+from toolz import partition
+import time
+
+MAX_PUBLICATION_CHUNKS =1000
 
 class LiteratureActions(Actions):
     FETCH='fetch'
@@ -28,7 +35,7 @@ class LiteratureActions(Actions):
 parser = English()
 
 # A custom stoplist
-STOPLIST = set(stopwords.words('english') + ["n't", "'s", "'m", "ca"] + list(ENGLISH_STOP_WORDS))
+STOPLIST = set(stopwords.words('english') + ["n't", "'s", "'m", "ca","p","t"] + list(ENGLISH_STOP_WORDS))
 ALLOWED_STOPLIST=set(('non'))
 STOPLIST = STOPLIST-ALLOWED_STOPLIST
 # List of symbols we don't care about
@@ -89,7 +96,7 @@ class PublicationFetcher(object):
             print 'got pub %s from cache'%pub_source['pub_id']
             pub = Publication()
             pub.load_json(pub_source)
-            pubs[pub.pub_id]=pub
+            pubs[pub.pub_id] = pub
         if len(pubs)<pub_ids:
             for pub_id in pub_ids:
                 if pub_id not in pubs:
@@ -130,7 +137,7 @@ class PublicationFetcher(object):
                                     pub_id,
                                     pub.to_json(),
                                     )
-                    pubs[pub.pub_id]=pub
+                    pubs[pub.pub_id] = pub
             self.loader.flush()
         return pubs
 
@@ -249,13 +256,12 @@ class PublicationAnalyserSpacy(object):
     def analyse_publication(self, pub_id, pub = None):
 
         if pub is None:
-            pub = self.fetcher.get_publication(pub_id=pub_id)
-        text_to_parse = unicode(pub.title + ' ' + pub.abstract)
+            pub = self.fetcher.get_publication(pub_ids=pub_id)
 
+        text_to_parse = unicode(pub.title + ' ' + pub.abstract)
         lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
         lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
         noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
-
         analysed_pub = PublicationAnalysisSpacy(pub_id = pub_id,
                                         lemmas=lemmas,
                                         noun_chunks=noun_chunks,
@@ -341,8 +347,11 @@ class PublicationAnalyserSpacy(object):
         return text + '|' + tag
 
     def transform_doc(self, doc):
+
         for ent in doc.ents:
+
             ent.merge(ent.root.tag_, ent.text, LABELS[ent.label_])
+            print(ent)
         for np in list(doc.noun_chunks):
             #        print (np, np.root.tag_, np.text, np.root.ent_type_)
             while len(np) > 1 and np[0].dep_ not in ('advmod', 'amod', 'compound'):
@@ -366,10 +375,12 @@ class Literature(object):
     def __init__(self,
                  es,
                  loader,
+                 r_server=None,
                  ):
         self.es = es
         self.es_query=ESQuery(es)
         self.loader = loader
+        self.r_server = r_server
         self.logger = logging.getLogger(__name__)
         if not self.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
@@ -405,7 +416,29 @@ class Literature(object):
         # for t in [text, text2, text3, text4, text5, text6]:
         pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
         pub_analyser = PublicationAnalyserSpacy(pub_fetcher, self.es, self.loader)
+
         #todo, add method to process all cached publications??
+
+        # Literature Queue
+        literature_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_analyzer_q',
+                                  max_size=MAX_PUBLICATION_CHUNKS,
+                                  job_timeout=120)
+
+        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        print("No of workers " + str(no_of_workers))
+        # Start literature-analyser-worker processes
+        analyzers = [LiteratureAnalyzerProcess(literature_q,
+                                               self.r_server.db,
+                                               pub_analyser,
+                                               self.loader,
+                                               self.es,
+                                               ) for i in range(no_of_workers)]
+
+        for a in analyzers:
+            a.start()
+
+        #TODO : Use separate queue for retrieving evidences?
+
         for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
                     desc='Reading available evidence_strings to analyse publications',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
@@ -413,16 +446,20 @@ class Literature(object):
                     unit_scale=True):
             pub_id= self.get_pub_id_from_url(ev)
             pubs = pub_fetcher.get_publication(pub_id)
-            for pub_id, pub in pubs.items():
-                spacy_analysed_pub = pub_analyser.analyse_publication(pub_id=pub_id,
-                                                                      pub = pub)
-                self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-                                doc_type=spacy_analysed_pub.get_type(),
-                                ID=pub_id,
-                                body=spacy_analysed_pub.to_json(),
-                                parent=pub_id,
-                                )
-        self.loader.flush()
+
+            literature_q.put(pubs)
+            # TODO - auditing?
+        #wait for all spacy workers to finish
+        for a in analyzers:
+                a.join()
+
+        logging.info('flushing data to index')
+        self.es_loader.es.indices.flush(
+            Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+            wait_if_ongoing=True)
+
+        logging.info("DONE")
+
 
     @staticmethod
     def get_pub_id_from_url(url):
@@ -462,4 +499,39 @@ def cleanText(text):
     text = text.lower()
 
     return text
+
+
+class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 pub_analyser,
+                 loader,
+                 es=None,
+
+                 ):
+        super(LiteratureAnalyzerProcess, self).__init__(queue_in, redis_path)
+        self.queue_in = queue_in
+        self.redis_path = redis_path
+        self.es = es
+        self.pub_analyser = pub_analyser
+        self.loader = loader
+        self.start_time = time.time()
+        self.audit = list()
+        self.logger = logging.getLogger(__name__)
+
+    def process(self, data):
+        publications = data
+        print("In LiteratureAnalyzerProcess- " + self.name)
+        for pub_id, pub in publications.items():
+
+            spacy_analysed_pub = self.pub_analyser.analyse_publication(pub_id=pub_id,
+                                                                       pub=pub)
+
+            self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                            doc_type=spacy_analysed_pub.get_type(),
+                            ID=pub_id,
+                            body=spacy_analysed_pub.to_json(),
+                            parent=pub_id,
+                            )
 
