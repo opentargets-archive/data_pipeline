@@ -5,6 +5,7 @@ from common.ElasticsearchLoader import Loader
 from elasticsearch import Elasticsearch
 from redislite import Redis
 from settings import Config
+import logging
 
 class LiteratureTestCase(unittest.TestCase):
 #     
@@ -23,7 +24,11 @@ class LiteratureTestCase(unittest.TestCase):
 #                   PublicationAnalyserSpacy]
     
     def test_analyse_publication(self):
+        logging.basicConfig(filename='output.log',
+                            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                            level=logging.INFO)
         r_server = Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
+        #TODO : ES mocking for unit tests?
         es = Elasticsearch(hosts = [{'host': 'localhost', 'port': 9200}],
                        maxsize=50,
                        timeout=1800,
@@ -31,13 +36,13 @@ class LiteratureTestCase(unittest.TestCase):
                        retry_on_timeout=True,
                        max_retries=10,
                        )
-        loader = Loader(es=es)
-        # pub_fetcher = PublicationFetcher(es, loader=loader)
-        # pub_analyser = PublicationAnalyserSpacy(pub_fetcher, es, loader)
-        # pub_id = '26290144'
-        
-        #spacy_analysed_pub = pub_analyser.analyse_publication(pub_id=pub_id)
+        loader = Loader(es=es,chunk_size=1)
         Literature(es, loader, r_server).process()
+
+
+
+
+
        
 
 if __name__ == '__main__':

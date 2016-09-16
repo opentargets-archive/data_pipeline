@@ -90,17 +90,17 @@ class PublicationFetcher(object):
             pub_ids=[pub_ids]
 
         '''get from elasticsearch cache'''
-        print "getting pub id ", pub_ids
+        logging.info( "getting pub id {}".format( pub_ids))
         pubs ={}
         for pub_source in self.es_query.get_publications_by_id(pub_ids):
-            print 'got pub %s from cache'%pub_source['pub_id']
+            logging.info( 'got pub %s from cache'%pub_source['pub_id'])
             pub = Publication()
             pub.load_json(pub_source)
             pubs[pub.pub_id] = pub
         if len(pubs)<pub_ids:
             for pub_id in pub_ids:
                 if pub_id not in pubs:
-                    print 'getting pub from remote', self._QUERY_BY_EXT_ID.format(pub_id)
+                    logging.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
                     r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
                     r.raise_for_status()
                     result = r.json()['resultList']['result'][0]
@@ -272,8 +272,7 @@ class PublicationAnalyserSpacy(object):
 
     def _spacy_analyser(self, abstract):
         # #TODO: see PriYanka notebook tests, and/or code below
-        print('*' * 80)
-        pprint(abstract)
+
         lemmas, tokens, parsedEx = self.tokenizeText(abstract)
         parsed_vector = self.transform_doc(parsedEx)
         tl = abstract.lower()
@@ -287,12 +286,12 @@ class PublicationAnalyserSpacy(object):
                     try:
                         ec[e_str] += tl.count(e_str)
                     except:
-                        print(e_str)
+                     logging.info(e_str)
                         #            print( e_str, e_str in STOPLIST)
                         #        print (e.label, repr(e.label_),  ' '.join(t.orth_ for t in e))
-        print('FILTERED NOUN CHUNKS:')
-        for k, v in ec.most_common(5):
-            print k, round(float(v) / sents_count, 3)
+        # print('FILTERED NOUN CHUNKS:')
+        # for k, v in ec.most_common(5):
+        #     print k, round(float(v) / sents_count, 3)
 
         return lemmas, ec, sents_count
 
@@ -331,10 +330,10 @@ class PublicationAnalyserSpacy(object):
                 filtered.append(tok)
         c = Counter([tok.lemma_.lower().strip() for tok in filtered])
         sents_count = len(list(tokens_all.sents))
-        print 'COMMON LEMMAS'
-        for i in c.most_common(5):
-            if i[1] > 1:
-                print i[0], round(float(i[1]) / sents_count, 3)
+        # print 'COMMON LEMMAS'
+        # for i in c.most_common(5):
+        #     if i[1] > 1:
+        #         print i[0], round(float(i[1]) / sents_count, 3)
         return c, tokens, tokens_all
 
     def represent_word(self, word):
@@ -351,7 +350,7 @@ class PublicationAnalyserSpacy(object):
         for ent in doc.ents:
 
             ent.merge(ent.root.tag_, ent.text, LABELS[ent.label_])
-            print(ent)
+
         for np in list(doc.noun_chunks):
             #        print (np, np.root.tag_, np.text, np.root.ent_type_)
             while len(np) > 1 and np[0].dep_ not in ('advmod', 'amod', 'compound'):
@@ -403,9 +402,6 @@ class Literature(object):
                 pubs = pub_fetcher.get_publication(pub_id)
                 fetched_pub_ids.add(pub_id)
 
-                #todo remove this, just for debugging
-                for pid, pub in pubs.items():
-                    print pid, pub.title
 
     def process(self,
                 datasources=[],
@@ -425,7 +421,8 @@ class Literature(object):
                                   job_timeout=120)
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-        print("No of workers " + str(no_of_workers))
+        logging.info("No of workers {} ".format(no_of_workers))
+
         # Start literature-analyser-worker processes
         analyzers = [LiteratureAnalyzerProcess(literature_q,
                                                self.r_server.db,
@@ -454,12 +451,10 @@ class Literature(object):
                 a.join()
 
         logging.info('flushing data to index')
-        self.es_loader.es.indices.flush(
-            Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+
+        self.es_loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
             wait_if_ongoing=True)
-
         logging.info("DONE")
-
 
     @staticmethod
     def get_pub_id_from_url(url):
@@ -522,7 +517,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
 
     def process(self, data):
         publications = data
-        print("In LiteratureAnalyzerProcess- " + self.name)
+        logging.info("In LiteratureAnalyzerProcess- {} ".format(self.name))
         for pub_id, pub in publications.items():
 
             spacy_analysed_pub = self.pub_analyser.analyse_publication(pub_id=pub_id,
@@ -534,4 +529,3 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
                             body=spacy_analysed_pub.to_json(),
                             parent=pub_id,
                             )
-
