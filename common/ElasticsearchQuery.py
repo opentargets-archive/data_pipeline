@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, Counter
 from datetime import datetime, time
 import logging
 from pprint import pprint
@@ -61,6 +61,28 @@ class ESQuery(object):
                                    '_source': source,
                                    'size': 20,
                                    },
+                            scroll='12h',
+                            doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
+                            timeout="30m",
+                            )
+        for hit in res:
+            yield hit['_source']
+
+    def get_targets_by_id(self, ids, fields = None):
+        if not isinstance(ids, list):
+            ids = [ids]
+
+        source = self._get_source_from_fields(fields)
+        res = helpers.scan(client=self.handler,
+                            query={"query": {
+                                            "ids" : {
+                                                "values" : ids
+                                              }
+                                          },
+                                          '_source': source,
+                                          'size': 20,
+                                      },
                             scroll='12h',
                             doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                             index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
@@ -554,3 +576,82 @@ class ESQuery(object):
                'http://europepmc.org/abstract/MED/26371324',
                'http://europepmc.org/abstract/MED/24817865',
                ]
+
+    def get_all_associations_ids(self,):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "match_all": {}
+                           },
+                               '_source': False,
+                               'size': 1000,
+                           },
+                           scroll='1h',
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+                           timeout="10m",
+                           )
+        for hit in res:
+            yield hit['_id']
+
+    def get_all_associations(self,):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "match_all": {}
+                           },
+                               '_source': True,
+                               'size': 1000,
+                           },
+                           scroll='1h',
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+                           timeout="10m",
+                           )
+        for hit in res:
+            yield hit['_source']
+
+    def get_all_target_disease_pair_from_evidence(self, only_direct=False):
+
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                                    "match_all": {}
+                                    },
+                                 '_source': self._get_source_from_fields(['target.id', 'disease.id', 'private.efo_codes','scores.association_score']),
+                                 'size': 1000,
+                                 },
+                           scroll='6h',
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
+                           timeout="1h",
+                           request_timeout=2 * 60 * 60,
+                           )
+
+        for hit in res:
+            if hit['_source']['scores']['association_score']>0:
+                if only_direct:
+                    yield '-'.join([hit['_source']['target']['id'],hit['_source']['disease']['id']])
+                else:
+                    for efo_id in hit['_source']['private']['efo_codes']:
+                        yield '-'.join([hit['_source']['target']['id'],efo_id])
+
+    def count_evidence_sourceIDs(self, target, disease):
+        count = Counter()
+        for ev_hit in helpers.scan(client=self.handler,
+                                    query={"query": {
+                                              "filtered": {
+                                                  "filter": {
+                                                      "bool": {
+                                                          "must": [
+                                                              {"terms": {"target.id": [target]}},
+                                                              {"terms": {"private.efo_codes": [disease]}},
+                                                                    ]
+                                                      }
+                                                  }
+                                              }
+                                            },
+                                           '_source': dict(include=['sourceID']),
+                                           'size': 1000,
+                                    },
+                                    scroll = '1h',
+                                    index = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*'),
+                                    timeout = '1h',
+                                    ):
+            count [ev_hit['_source']['sourceID']]+=1
+
+        return count

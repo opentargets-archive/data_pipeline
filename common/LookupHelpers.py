@@ -22,7 +22,8 @@ class LookUpData():
 class LookUpDataRetriever():
     def __init__(self,
                  es = None,
-                 r_server = None):
+                 r_server = None,
+                 targets = []):
 
         self.es = es
         self.r_server = r_server
@@ -35,7 +36,7 @@ class LookUpDataRetriever():
              total=3,
              unit=' steps',
              leave=False,)
-        self._get_gene_info()
+        self._get_gene_info(targets)
         self.logger.info("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
         load_bar.update()
         self._get_available_efos()
@@ -55,9 +56,9 @@ class LookUpDataRetriever():
         self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
 
 
-    def _get_gene_info(self):
+    def _get_gene_info(self, targets=[]):
         self.logger.info('getting gene info')
-        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server)
+        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server, targets = targets)
         self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
         self._get_non_reference_gene_mappings()
 

@@ -735,7 +735,8 @@ class GeneLookUpTable(object):
                  es,
                  namespace = None,
                  r_server = None,
-                 ttl = 60*60*24+7):
+                 ttl = 60*60*24+7,
+                 targets = []):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = r_server,
                                             ttl = ttl)
@@ -744,15 +745,21 @@ class GeneLookUpTable(object):
         self.r_server = r_server
         self.uniprot2ensembl = {}
         if r_server is not None:
-            self._load_gene_data(r_server)
+            self._load_gene_data(r_server, targets)
 
 
-    def _load_gene_data(self, r_server = None):
-        for target in tqdm(self._es_query.get_all_targets(),
+    def _load_gene_data(self, r_server = None, targets = []):
+        if targets:
+            data = self._es_query.get_targets_by_id(targets)
+            total = len(targets)
+        else:
+            data = self._es_query.get_all_targets()
+            total = self._es_query.count_all_targets()
+        for target in tqdm(data,
                            desc = 'loading genes',
                            unit=' genes',
                            unit_scale=True,
-                           total= self._es_query.count_all_targets(),
+                           total= total,
                            leave=False,
                            ):
             self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches

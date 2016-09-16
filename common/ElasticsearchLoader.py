@@ -175,7 +175,8 @@ class Loader():
     def __init__(self,
                  es,
                  chunk_size=1000,
-                 dry_run = False):
+                 dry_run = False,
+                 max_flush_interval = 10):
 
         self.es = es
         self.cache = []
@@ -183,6 +184,8 @@ class Loader():
         self.chunk_size = chunk_size
         self.index_created=[]
         self.dry_run = dry_run
+        self.max_flush_interval = 10
+        self._last_flush_time = time.time()
 
     @staticmethod
     def get_versioned_index(index_name):
@@ -212,7 +215,8 @@ class Loader():
             submission_dict['_parent']=parent
         self.cache.append(submission_dict)
 
-        if len(self.cache) == self.chunk_size:
+        if self.cache and ((len(self.cache) == self.chunk_size) or
+                (time.time() - self._last_flush_time >= self.max_flush_interval)):
             self.flush()
 
 

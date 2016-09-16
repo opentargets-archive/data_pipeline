@@ -21,6 +21,7 @@ import math
 
 
 global_reporting_step = 5e5
+logger = logging.getLogger(__name__)
 
 
 class AssociationActions(Actions):
@@ -435,7 +436,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
                                create_index=False,
                                routing=score.target['id'])
         else:
-            logging.warning('Skipped association %s'%element_id)
+            logger.warning('Skipped association %s'%element_id)
 
     def close(self):
         self.loader.close()
@@ -463,7 +464,7 @@ class ScoringProcess():
         # # with ScoreStorer(self.adapter) as storer:
 
         # estimated_total = target_total*disease_total
-        # logging.info("%s targets available | %s diseases available | %s estimated combinations to precalculate"%(millify(target_total),
+        # logger.info("%s targets available | %s diseases available | %s estimated combinations to precalculate"%(millify(target_total),
         #                                                                                                         millify(disease_total),
         #                                                                                                         millify(estimated_total)))
         overwrite_indices = not dry_run
@@ -472,10 +473,12 @@ class ScoringProcess():
         if not targets:
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
-        lookup_data = LookUpDataRetriever(self.es, self.r_server).lookup
+        lookup_data = LookUpDataRetriever(self.es, self.r_server, targets=targets).lookup
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        if targets and len(targets) <number_of_workers:
+            number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
                               max_size=number_of_workers*10,
                               job_timeout=3600,
@@ -537,6 +540,7 @@ class ScoringProcess():
                            unit=' targets',
                            unit_scale=True):
             target_q.put(target)
+        target_q.set_submission_finished()
 
         '''wait for all workers to finish'''
         for w in readers:
@@ -546,12 +550,12 @@ class ScoringProcess():
         for w in storers:
             w.join()
 
-        logging.info('flushing data to index')
+        logger.info('flushing data to index')
         self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                         wait_if_ongoing =True)
 
 
-        logging.info("DONE")
+        logger.info("DONE")
 
 
 

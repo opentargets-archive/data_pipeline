@@ -4,11 +4,13 @@ from collections import Counter
 from pprint import pprint
 
 from elasticsearch import helpers
+from tqdm import tqdm
 
 from common import Actions
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from settings import Config
+logger = logging.getLogger(__name__)
 
 
 class QCActions(Actions):
@@ -30,101 +32,101 @@ class QCRunner(object):
         # self.run_associationQC()
 
     def run_associationQC(self):
+        self.run_association2evidenceQC()
+        self.run_evidence2associationQC()
+
+    def run_association2evidenceQC(self):
         c=0
         e=0
-        for ass_hit in helpers.scan(client=self.es,
-                                    query={"query": {
-                                        "match_all": {}
-                                    },
-                                        '_source': True,
-                                        'size': 1000,
-                                    },
-                                    scroll='1h',
-                                    doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                    index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
-                                    timeout="10m",
-                                    ):
-            c+=1
-            if c %100 == 0:
-                logging.info('%i association processed, %i errors found'%(c, e))
+        for ass in tqdm(self.esquery.get_all_associations(),
+                           desc = 'checking associations are computed on all the evidence',
+                           unit=' associations',
+                           unit_scale=True,
+                           total= self.esquery.count_elements_in_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+                           leave=True,
+                           ):
 
-            ass = ass_hit['_source']
+            c+=1
+            if c %1000 == 0:
+                logger.info('%i association processed, %i errors found'%(c, e))
+
             ass_ev_counts = ass['evidence_count']['datasources']
             target, disease = ass['target']['id'], ass['disease']['id']
-            db_ev_counts = self.count_evidence_sourceIDs(target, disease )
+            db_ev_counts = self.esquery.count_evidence_sourceIDs(target, disease )
 
             for ds in ass_ev_counts:
                 correct = ass_ev_counts[ds]==db_ev_counts[ds]
                 if not correct:
-                    logging.error("evidence count mismatch for association %s for datasource %s. association object:%i, evidence objects available:%i"%(ass['id'],ds, ass_ev_counts[ds], db_ev_counts[ds]))
+                    logger.error("evidence count mismatch for association %s for datasource %s. association object:%i, evidence objects available:%i"%(ass['id'],ds, ass_ev_counts[ds], db_ev_counts[ds]))
                     e+=1
                     break
-        logging.info('%i association processed, %i errors found' % (c, e))
-        logging.info('DONE')
+        logger.info('%i association processed, %i errors found' % (c, e))
+        logger.info('DONE')
 
-    def count_evidence_sourceIDs(self, target, disease):
-        count = Counter()
-        for ev_hit in helpers.scan(client=self.es,
-                                    query={"query": {
-                                              "filtered": {
-                                                  "filter": {
-                                                      "bool": {
-                                                          "must": [
-                                                              {"terms": {"target.id": [target]}},
-                                                              {"terms": {"private.efo_codes": [disease]}},
-                                                                    ]
-                                                      }
-                                                  }
-                                              }
-                                            },
-                                           '_source': dict(include=['sourceID']),
-                                           'size': 1000,
-                                    },
-                                    scroll = '1h',
-                                    index = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*'),
-                                    timeout = 60*10,
-                                    ):
-            count [ev_hit['_source']['sourceID']]+=1
 
-        return count
 
-    def analyse_cancer_gene_census(self):
-        c=0
-        o=0
-        for ev_hit in helpers.scan(client=self.es,
-                                   query={"query": {
-                                       "filtered": {
-                                           "filter": {
-                                               "bool": {
-                                                   "must": [
-                                                       {"terms": {"sourceID": ['cancer_gene_census']}},
-                                                   ]
-                                               }
-                                           }
-                                       }
-                                   },
-                                       '_source': True,
-                                       'size': 100,
-                                   },
-                                   scroll='1h',
-                                   index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
-                                   timeout='10m',
-                                   ):
-            c+=1
-            if len(ev_hit['_source']['evidence']['known_mutations']) >1:
-                o+=1
-            else:
-                data = ev_hit['_source']
-                tot, mut =  float(data['evidence']['known_mutations'][0]['number_mutated_samples']), float(data['evidence']['known_mutations'][0]['number_samples_with_mutation_type'])
-                print '%s\t%s\t%i\t%i\t%.3f'%(data['target']['gene_info']['symbol'],
-                                              data['disease']['efo_info']['label'],
-                                              tot,
-                                              mut,
-                                              mut/tot)
+    def run_evidence2associationQC(self):
+        computed_assocations_ids = set(self.esquery.get_all_associations_ids())
+        missing_assocations_ids = set()
+        total_evidence = self.esquery.count_elements_in_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
+        logger.info('Starting to analyse %i evidence'%total_evidence)
+        for as_id in tqdm(self.esquery.get_all_target_disease_pair_from_evidence(),
+                           desc = 'checking t-d pairs in evidence data',
+                           unit=' t-d pairs',
+                           unit_scale=True,
+                           total= total_evidence*5,# estimate t-d pairs
+                           leave=True,
+                           ):
+            if as_id not in computed_assocations_ids:
+                logger.error('Association id %s was not computed or stored'%as_id)
+                missing_assocations_ids.add(as_id)
 
-        print c,o
+        if missing_assocations_ids:
+            logger.error('%i associations not found'%len(missing_assocations_ids))
+            logger.error('\n'.join(list(missing_assocations_ids)))
+        else:
+            logger.info('no missing annotation found')
 
-        return
+
+    # def analyse_cancer_gene_census(self):
+    #     c=0
+    #     o=0
+    #     for ev_hit in helpers.scan(client=self.es,
+    #                                query={"query": {
+    #                                    "filtered": {
+    #                                        "filter": {
+    #                                            "bool": {
+    #                                                "must": [
+    #                                                    {"terms": {"sourceID": ['cancer_gene_census']}},
+    #                                                ]
+    #                                            }
+    #                                        }
+    #                                    }
+    #                                },
+    #                                    '_source': True,
+    #                                    'size': 100,
+    #                                },
+    #                                scroll='1h',
+    #                                index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*'),
+    #                                timeout='10m',
+    #                                ):
+    #         c+=1
+    #         if len(ev_hit['_source']['evidence']['known_mutations']) >1:
+    #             o+=1
+    #         else:
+    #             data = ev_hit['_source']
+    #             tot, mut =  float(data['evidence']['known_mutations'][0]['number_mutated_samples']), float(data['evidence']['known_mutations'][0]['number_samples_with_mutation_type'])
+    #             print '%s\t%s\t%i\t%i\t%.3f'%(data['target']['gene_info']['symbol'],
+    #                                           data['disease']['efo_info']['label'],
+    #                                           tot,
+    #                                           mut,
+    #                                           mut/tot)
+    #
+    #     print c,o
+    #
+    #     return
+
+
 
 
 

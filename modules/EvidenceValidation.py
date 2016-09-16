@@ -196,6 +196,10 @@ eva_curated = {
 # POLG : Mitochondrial DNA depletion syndrome
 }
 
+class FileTypes():
+    LOCAL='local'
+    SFTP='sftp'
+    S3='s3'
 
 class ValidationActions(Actions):
     CHECKFILES = 'checkfiles'
@@ -208,7 +212,8 @@ class DirectoryCrawlerProcess():
     def __init__(self,
                  output_q,
                  es,
-                 r_server):
+                 r_server,
+                 local_files = []):
         self.output_q = output_q
         self.es = es
         self.evidence_chunk = EvidenceChunkElasticStorage(loader = Loader(self.es, chunk_size=100))
@@ -216,6 +221,7 @@ class DirectoryCrawlerProcess():
         self.start_time = time.time()
         self.r_server = r_server
         self._remote_filenames =dict()
+        self.local_files = local_files
         self.logger = logging.getLogger(__name__)
 
     def _store_remote_filename(self, filename):
@@ -264,43 +270,72 @@ class DirectoryCrawlerProcess():
 
         '''scroll through remote  user directories and find the latest files'''
 
-        for u, p in tqdm(Config.EVIDENCEVALIDATION_FTP_ACCOUNTS.items(),
-                         desc='scanning ftp accounts',
-                         leave=False):
-            try:
-                cnopts = pysftp.CnOpts()
-                cnopts.hostkeys = None  # disable host key checking.
-                with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
-                                       port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
-                                       username=u,
-                                       password=p,
-                                       cnopts = cnopts,
-                                       ) as srv:
-                    srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
-                    for datasource, file_data in tqdm(self._remote_filenames[u].items(),
-                                                      desc='scanning available datasource for account %s'%u,
-                                                      leave=False,):
-                        latest_file = file_data['file_path']
-                        file_version = file_data['file_version']
-                        self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
-
-                        logfile = os.path.join('/tmp', file_version+ ".log")
-                        self.logger.info("%s checking file: %s" % (self.__class__.__name__, file_version))
-                        self.evidence_chunk.storage_create_index(datasource,recreate=False)
-
-
+        if self.local_files:
+            for f in self.local_files:
+                if re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, f):
+                    version_name = f.split('/')[-1].split('.')[0]
+                    if '-' in version_name:
+                        user, day, month, year = version_name.split('-')
+                        if '_' in user:
+                            datasource = ''.join(user.split('_')[1:])
+                            user = user.split('_')[0]
+                        else:
+                            datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
+                        release_date = date(int(year), int(month), int(day))
                         try:
                             ''' get md5 '''
-                            md5_hash = self.md5_hash_remote_file(latest_file, srv)
-                            self.logger.debug("%s %s %s" % (self.__class__.__name__, file_version, md5_hash))
-                            self.check_file(latest_file, file_version, u, datasource, md5_hash, logfile)
-                            self.logger.debug("%s %s DONE" % (self.__class__.__name__, file_version))
+                            md5_hash = self.md5_hash_local_file(f)
+                            self.logger.debug("%s %s %s" % (self.__class__.__name__, f, md5_hash))
+                            logfile = os.path.join('/tmp', version_name + ".log")
+                            self.check_file(f, version_name, user, datasource, md5_hash, logfile, FileTypes.LOCAL)
+                            self.logger.debug("%s %s DONE" % (self.__class__.__name__, version_name))
 
                         except AttributeError, e:
-                            self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
+                            self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, f, e))
+                else:
+                    raise AttributeError('invalid filename, should match regex: %s'%Config.EVIDENCEVALIDATION_FILENAME_REGEX)
 
-            except AuthenticationException:
-                self.logger.error( 'cannot connect with credentials: user:%s password:%s' % (u, p))
+
+
+        else:
+
+            for u, p in tqdm(Config.EVIDENCEVALIDATION_FTP_ACCOUNTS.items(),
+                             desc='scanning ftp accounts',
+                             leave=False):
+                try:
+                    cnopts = pysftp.CnOpts()
+                    cnopts.hostkeys = None  # disable host key checking.
+                    with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
+                                           port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
+                                           username=u,
+                                           password=p,
+                                           cnopts = cnopts,
+                                           ) as srv:
+                        srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
+                        for datasource, file_data in tqdm(self._remote_filenames[u].items(),
+                                                          desc='scanning available datasource for account %s'%u,
+                                                          leave=False,):
+                            latest_file = file_data['file_path']
+                            file_version = file_data['file_version']
+                            self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
+
+                            logfile = os.path.join('/tmp', file_version+ ".log")
+                            self.logger.info("%s checking file: %s" % (self.__class__.__name__, file_version))
+                            self.evidence_chunk.storage_create_index(datasource,recreate=False)
+
+
+                            try:
+                                ''' get md5 '''
+                                md5_hash = self.md5_hash_remote_file(latest_file, srv)
+                                self.logger.debug("%s %s %s" % (self.__class__.__name__, file_version, md5_hash))
+                                self.check_file(latest_file, file_version, u, datasource, md5_hash, logfile, FileTypes.SFTP)
+                                self.logger.debug("%s %s DONE" % (self.__class__.__name__, file_version))
+
+                            except AttributeError, e:
+                                self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
+
+                except AuthenticationException:
+                    self.logger.error( 'cannot connect with credentials: user:%s password:%s' % (u, p))
 
         self.output_q.set_submission_finished(self.r_server)
 
@@ -325,7 +360,9 @@ class DirectoryCrawlerProcess():
                    data_source_name,
                    md5_hash,
                    logfile=None,
+                   file_type= FileTypes.SFTP,
                    validate=True,
+
                    ):
         '''check if the file was already parsed in ES'''
 
@@ -384,7 +421,7 @@ class DirectoryCrawlerProcess():
 
                 self.submission_audit.storage_insert_or_update(submission, update=False)
 
-            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile),
+            self.output_q.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, file_type),
                               self.r_server)
 
         return
@@ -404,16 +441,16 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
 
     def process(self, data):
-        file_path, file_version, provider_id, data_source_name, md5_hash, logfile = data
+        file_path, file_version, provider_id, data_source_name, md5_hash, logfile, file_type = data
         self.logger.info('Starting to parse  file %s' % file_path)
         ''' parse the file and put evidence in the queue '''
         self.parse_gzipfile(file_path, file_version, provider_id, data_source_name, md5_hash,
-                            logfile=logfile)
+                            logfile=logfile, file_type= file_type)
         self.logger.info("%s finished" % self.name)
 
 
 
-    def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None):
+    def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None, file_type = FileTypes.SFTP):
 
         # self.logger.info('%s Delete previous data for %s' % (self.name, data_source_name))
         # self.evidence_chunk_storage.storage_delete(data_source_name)
@@ -427,30 +464,68 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None  # disable host key checking.
-        with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
-                               port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
-                               username=provider_id,
-                               password=Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[provider_id],
-                               cnopts=cnopts,
-                               ) as srv:
+        if file_type == FileTypes.SFTP:
+            with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
+                                   port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
+                                   username=provider_id,
+                                   password=Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[provider_id],
+                                   cnopts=cnopts,
+                                   ) as srv:
 
-            file_stat = srv.stat(file_path)
+                file_stat = srv.stat(file_path)
+                file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
+                '''temprorary get lines total'''
+                lines = 0
+                with srv.open(file_path, mode='rb', bufsize=1) as f:
+                    with gzip.GzipFile(filename=file_path.split('/')[1],
+                                       mode='rb',
+                                       fileobj=f,
+                                       mtime=file_mod_time) as fh:
+                        # lines = self._count_file_lines(fh)
+                        gzip_compression_estimate = 10.5
+                        lines = self._estimate_file_lines(fh, file_size*gzip_compression_estimate)
+                total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+                if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
+                    total_chunks +=1
+                self.queue_out.incr_total(total_chunks, self.r_server)
+                with srv.open(file_path, mode='rb', bufsize=1) as f:
+                    with gzip.GzipFile(filename = file_path.split('/')[1],
+                                       mode = 'rb',
+                                       fileobj = f,
+                                       mtime = file_mod_time) as fh:
+                        line = fh.readline()
+                        while line:
+                            line_buffer.append(line)
+                            line_number += 1
+                            if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
+                                self.logger.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
+                                self.queue_out.put(
+                                    (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                                     offset, list(line_buffer), False),
+                                    self.r_server)
+                                offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+                                chunk += 1
+                                line_buffer = []
+
+                            line = fh.readline()
+        elif file_type == FileTypes.LOCAL:
+
+
+            file_stat = os.stat(file_path)
             file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
             '''temprorary get lines total'''
             lines = 0
-            with srv.open(file_path, mode='rb', bufsize=1) as f:
+            with open(file_path, mode='rb') as f:
                 with gzip.GzipFile(filename=file_path.split('/')[1],
                                    mode='rb',
                                    fileobj=f,
                                    mtime=file_mod_time) as fh:
-                    # lines = self._count_file_lines(fh)
-                    gzip_compression_estimate = 10.5
-                    lines = self._estimate_file_lines(fh, file_size*gzip_compression_estimate)
+                    lines = self._count_file_lines(fh)
             total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
             if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
                 total_chunks +=1
             self.queue_out.incr_total(total_chunks, self.r_server)
-            with srv.open(file_path, mode='rb', bufsize=1) as f:
+            with open(file_path, mode='rb',) as f:
                 with gzip.GzipFile(filename = file_path.split('/')[1],
                                    mode = 'rb',
                                    fileobj = f,
@@ -470,6 +545,8 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                             line_buffer = []
 
                         line = fh.readline()
+        else:
+            raise AttributeError('File type %s is not supported'%file_type)
 
         if line_buffer:
             self.logger.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
@@ -1710,7 +1787,13 @@ class SubmissionAuditElasticStorage():
             self.cache = {}
 
 class EvidenceValidationFileChecker():
-    def __init__(self, adapter, es, sparql, r_server, chunk_size=1e4):
+    def __init__(self,
+                 adapter,
+                 es,
+                 sparql,
+                 r_server,
+                 chunk_size=1e4,
+                 ):
         self.adapter = adapter
         self.session = adapter.session
         self.es = es
@@ -2128,7 +2211,7 @@ class EvidenceValidationFileChecker():
         self.load_HGNC()
         self.store_gene_mapping()
 
-    def check_all(self):
+    def check_all(self, local_files = []):
         '''
         Check every given evidence string
         :return:
@@ -2234,11 +2317,13 @@ class EvidenceValidationFileChecker():
 
         auditor.start()
 
+
         'Start crawling the FTP directory'
         directory_crawler = DirectoryCrawlerProcess(
                 file_q,
                 self.es,
-                self.r_server)
+                self.r_server,
+                local_files)
 
         directory_crawler.run()
 

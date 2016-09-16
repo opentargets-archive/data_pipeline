@@ -38,7 +38,7 @@ from redislite import Redis
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logging.basicConfig(filename = 'output.log',
                     format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+                    level=logging.DEBUG)
 logging.getLogger('elasticsearch').setLevel(logging.ERROR)
 logging.getLogger("requests").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
@@ -146,6 +146,9 @@ if __name__ == '__main__':
                         action='append', default=[])
     parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
                         action='store_true', default=False)
+    parser.add_argument("--local-file", dest='local_file',
+                        help="pass the path to a local gzipped file to use as input for the data validation step",
+                        action='append', default=[])
     args = parser.parse_args()
 
     '''logger'''
@@ -154,7 +157,11 @@ if __name__ == '__main__':
 
 
     '''sqlalchemy adapter'''
-    adapter = Adapter()
+    try:
+        adapter = Adapter()
+    except:
+        logger.error('Cannot connect to Postgres database. skipping creation of adapter')
+        adapter= None
     '''init es client'''
     connection_attempt = 1
     hosts=[]
@@ -287,7 +294,7 @@ if __name__ == '__main__':
             if (ValidationActions.GENEMAPPING in args.val) or do_all:
                 EvidenceValidationFileChecker(adapter, es, sparql, r_server).map_genes()
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es, sparql, r_server).check_all()
+                EvidenceValidationFileChecker(adapter, es, sparql, r_server).check_all(args.local_file)
         if args.valreset:
             EvidenceValidationFileChecker(adapter, es, sparql, r_server).reset()
         if args.evs or run_full_pipeline:
@@ -311,9 +318,9 @@ if __name__ == '__main__':
         if args.qc or run_full_pipeline:
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:
-                QCRunner(es)
-            if (QCActions.CGC_ANALYSIS in args.qc) or do_all:
-                QCRunner(es).analyse_cancer_gene_census()
+                QCRunner(es).run_associationQC()
+            # if (QCActions.CGC_ANALYSIS in args.qc) or do_all:
+            #     QCRunner(es).analyse_cancer_gene_census()
         if args.dump or run_full_pipeline:
             do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
             if (DumpActions.DUMP in args.dump) or do_all:
