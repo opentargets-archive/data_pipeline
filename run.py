@@ -280,7 +280,7 @@ if __name__ == '__main__':
             if (LiteratureActions.FETCH in args.lit) or do_all:
                 Literature(es, loader).fetch()
             if (LiteratureActions.PROCESS in args.lit) or do_all:
-                Literature(es, loader).process()
+                Literature(es, loader, r_server).process()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
