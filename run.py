@@ -28,7 +28,7 @@ from modules.HGNC import HGNCActions, HGNCUploader
 from modules.Ensembl import EnsemblGeneInfo, EnsemblActions, EnsemblProcess
 from modules.MouseModels import MouseModelsActions, Phenodigm
 from modules.IntOGen import IntOGenActions, IntOGen
-from modules.Ontology import OntologyActions, PhenotypeSlim
+from modules.Ontology import OntologyActions, PhenotypeSlim, DiseasePhenotypes
 import argparse
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
@@ -123,7 +123,11 @@ if __name__ == '__main__':
                         action="append_const", const = MouseModelsActions.ALL)
     parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
                         action="append_const", const = IntOGenActions.ALL)
-    parser.add_argument("--onto", dest='onto', help="create phenotype slim",
+    parser.add_argument("--ontodp", dest='onto', help="parse and store disease phenotypes",
+                        action="append_const", const= OntologyActions.DISEASEPHENOTYPES)
+    parser.add_argument("--ontos", dest='onto', help="create phenotype slim",
+                        action="append_const", const = OntologyActions.PHENOTYPESLIM)
+    parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
                         action="append_const", const = OntologyActions.ALL)
     parser.add_argument("--lit", dest='lit', help="fetch and process literature data",
                         action="append_const", const=LiteratureActions.ALL)
@@ -289,6 +293,8 @@ if __name__ == '__main__':
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
                 PhenotypeSlim(sparql).create_phenotype_slim()
+            if (OntologyActions.DISEASEPHENOTYPES in args.onto) or do_all:
+                DiseasePhenotypes().parse_owl_url()
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.GENEMAPPING in args.val) or do_all:

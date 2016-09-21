@@ -148,7 +148,7 @@ class Config():
     ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS = ["cttv008", "cttv012"]
 
     # put the path to the file where you want to write the SLIM file (turtle format)
-    ONTOLOGY_SLIM_FILE = 'C:\users\gk680303\data\ontologies\opentargets_disease_phenotype_slim.ttl'
+    ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
