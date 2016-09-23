@@ -53,13 +53,24 @@ class Config():
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
-    SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
-    POSTGRES_DATABASE = {'drivername': 'postgres',
+    try:
+        SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
+    except ConfigParser.NoOptionError:
+        print 'no virtuoso instance'
+
+    try:
+        POSTGRES_DATABASE = {'drivername': 'postgres',
             'host': iniparser.get(ENV, 'host'),
             'port': iniparser.get(ENV, 'port'),
             'username': iniparser.get(ENV, 'username'),
             'password': iniparser.get(ENV, 'password'),
             'database': iniparser.get(ENV, 'database')}
+    except ConfigParser.NoOptionError:
+        # the official logger is not loaded yet. not moving things around as we
+        # will likely put all of this in a config file.
+        print 'no postgres instance'
+        POSTGRES_DATABASE = {}
+
     # HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_COMPLETE_SET = 'https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer'
     # HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
@@ -220,6 +231,3 @@ class Config():
     DUMP_REMOTE_API = 'https://beta.targetvalidation.org'
     DUMP_REMOTE_API_SECRET = '1RT6L519zkcTH9i3F99OjeYn13k79Wep'
     DUMP_REMOTE_API_APPNAME = 'load-test'
-
-
-
