@@ -217,6 +217,9 @@ class Config():
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
+    DUMP_REMOTE_API = 'https://beta.targetvalidation.org'
+    DUMP_REMOTE_API_SECRET = '1RT6L519zkcTH9i3F99OjeYn13k79Wep'
+    DUMP_REMOTE_API_APPNAME = 'load-test'
 
 
 

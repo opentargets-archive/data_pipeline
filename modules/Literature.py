@@ -18,12 +18,10 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisQueueWorkerProcess
 import multiprocessing
 from settings import Config
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 
-from toolz import partition
 import time
 
 MAX_PUBLICATION_CHUNKS =1000

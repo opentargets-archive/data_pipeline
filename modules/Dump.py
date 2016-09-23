@@ -23,7 +23,7 @@ class DumpActions(Actions):
 
 class DumpGenerator(object):
 
-    def __init__(self, es, api_url = 'https://alpha.targetvalidation.org'):
+    def __init__(self, es, api_url = Config.DUMP_REMOTE_API):
 
         self.es = es
         self.esquery = ESQuery(es)
@@ -33,14 +33,14 @@ class DumpGenerator(object):
     def dump(self):
 
 
-        '''dump evidence data'''
-        logging.info('Dumping evidence data')
-        self.get_data('/api/latest/public/evidence/filter', Config.DUMP_FILE_EVIDENCE)
-        self.put_files_together(Config.DUMP_FILE_EVIDENCE)
-        # # with gzip.open(Config.DUMP_FILE_EVIDENCE, 'wb') as dump_file:
-        #     # for row in self.get_data_concurrently('/api/latest/public/evidence/filter'):
-        #     #     dump_file.write(row+'\n')
-        #
+        # '''dump evidence data'''
+        # logging.info('Dumping evidence data')
+        # self.get_data('/api/latest/public/evidence/filter', Config.DUMP_FILE_EVIDENCE)
+        # self.put_files_together(Config.DUMP_FILE_EVIDENCE)
+        # # # with gzip.open(Config.DUMP_FILE_EVIDENCE, 'wb') as dump_file:
+        # #     # for row in self.get_data_concurrently('/api/latest/public/evidence/filter'):
+        # #     #     dump_file.write(row+'\n')
+        # #
 
         '''dump association data'''
         logging.info('Dumping association data')
@@ -147,8 +147,10 @@ class DumpGenerator(object):
 
         def doWork():
             r_token = requests.get(
-                self.api_url + '/api/latest/public/auth/request_token?secret=32rZb5EqAm3QsC509uO8Oe53X4l5jC46'
-                               '&app_name=load-test')
+                self.api_url + '/api/latest/public/auth/request_token',
+                params=dict(secret=Config.DUMP_REMOTE_API_SECRET,
+                            app_name=Config.DUMP_REMOTE_API_APPNAME),
+                             )
             auth_token = r_token.json()['token']
             # print "worker started with token", auth_token
             while True:
