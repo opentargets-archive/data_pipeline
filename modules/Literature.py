@@ -30,8 +30,6 @@ class LiteratureActions(Actions):
     FETCH='fetch'
     PROCESS= 'process'
 
-parser = English()
-
 # A custom stoplist
 STOPLIST = set(stopwords.words('english') + ["n't", "'s", "'m", "ca","p","t"] + list(ENGLISH_STOP_WORDS))
 ALLOWED_STOPLIST=set(('non'))
@@ -249,6 +247,7 @@ class PublicationAnalyserSpacy(object):
             self.loader = Loader(es)
         self.fetcher = fetcher
         self.logger = logging.getLogger(__name__)
+        self.parser = English()
 
 
     def analyse_publication(self, pub_id, pub = None):
@@ -298,7 +297,7 @@ class PublicationAnalyserSpacy(object):
     # and convert to lemmas
     def tokenizeText(self, sample):
         # get the tokens using spaCy
-        tokens_all = parser(unicode(sample))
+        tokens_all = self.parser(unicode(sample))
         #    for t in tokens_all.noun_chunks:
         #        print(t, list(t.subtree))
         # lemmatize
