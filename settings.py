@@ -57,6 +57,7 @@ class Config():
         SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
     except ConfigParser.NoOptionError:
         print 'no virtuoso instance'
+        SPARQL_ENDPOINT_URL = ''
 
     try:
         POSTGRES_DATABASE = {'drivername': 'postgres',

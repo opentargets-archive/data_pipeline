@@ -30,10 +30,6 @@ class LiteratureActions(Actions):
     FETCH='fetch'
     PROCESS= 'process'
 
-# A custom stoplist
-STOPLIST = set(stopwords.words('english') + ["n't", "'s", "'m", "ca","p","t"] + list(ENGLISH_STOP_WORDS))
-ALLOWED_STOPLIST=set(('non'))
-STOPLIST = STOPLIST-ALLOWED_STOPLIST
 # List of symbols we don't care about
 SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "“", "”", "'ve"]
 
@@ -248,6 +244,10 @@ class PublicationAnalyserSpacy(object):
         self.fetcher = fetcher
         self.logger = logging.getLogger(__name__)
         self.parser = English()
+        # A custom stoplist
+        STOPLIST = set(stopwords.words('english') + ["n't", "'s", "'m", "ca","p","t"] + list(ENGLISH_STOP_WORDS))
+        ALLOWED_STOPLIST=set(('non'))
+        self.STOPLIST = STOPLIST - ALLOWED_STOPLIST
 
 
     def analyse_publication(self, pub_id, pub = None):
