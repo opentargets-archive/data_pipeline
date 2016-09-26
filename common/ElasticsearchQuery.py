@@ -222,25 +222,28 @@ class ESQuery(object):
 
         # TODO: do a scroll to get all the ids without sorting, and use many async mget queries to fetch the sources
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
+        # TODO : commented for testing,append correct datasource name to valiadated index name testing is complete
+        #index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
+        index_name = Loader.get_versioned_index(index_name = 'evidence-data-generic')
+
         doc_type = None
 
         if datasources:
             doc_type = datasources
+        #TODO : disease name hardcoded for testing, change the query to get all evidences.
         res = helpers.scan(client=self.handler,
-                           query={"query":  {"match_all": {}},
-                               '_source': source,
-                               'size': 1000,
+                           query={"query": {"bool": {"must": [{"term": {"disease.id": "EFO_0003767"}}]}}
                            },
                            scroll='12h',
-                           doc_type=doc_type,
+                           doc_type='evidencestring-europepmc',
                            index=index_name,
                            timeout="10m",
                            )
 
 
+        #for hit in res['hits']['hits']:
         for hit in res:
-            yield hit['_source']
+             yield hit['_source']
 
     def count_validated_evidence_strings(self, datasources = []):
 
@@ -376,7 +379,7 @@ class ESQuery(object):
         return dict((hit['_id'],hit['_source']['label']) for hit in res)
 
     def count_elements_in_index(self, index_name, doc_type=None):
-        res = self.handler.search(index=Loader.get_versioned_index(index_name),
+        res = self.handler.search(index='evidence-data-generic',
                                   doc_type=doc_type,
                                   body={"query": {
                                       "match_all": {}
@@ -561,21 +564,22 @@ class ESQuery(object):
 
     def get_all_pub_ids_from_evidence(self,):
         #TODO: get all the validated evidencestrings and fetch medline abstracts there
-        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='literature.references.lit_id'
+        return self.get_validated_evidence_strings(fields='literature.references.lit_id')
 
-        return ['http://europepmc.org/abstract/MED/24523595',
-               'http://europepmc.org/abstract/MED/26784250',
-               'http://europepmc.org/abstract/MED/27409410',
-               'http://europepmc.org/abstract/MED/26290144',
-               'http://europepmc.org/abstract/MED/25787843',
-               'http://europepmc.org/abstract/MED/26836588',
-               'http://europepmc.org/abstract/MED/26781615',
-               'http://europepmc.org/abstract/MED/26646452',
-               'http://europepmc.org/abstract/MED/26774881',
-               'http://europepmc.org/abstract/MED/26629442',
-               'http://europepmc.org/abstract/MED/26371324',
-               'http://europepmc.org/abstract/MED/24817865',
-               ]
+
+        # return ['http://europepmc.org/abstract/MED/24523595',
+        #        'http://europepmc.org/abstract/MED/26784250',
+        #        'http://europepmc.org/abstract/MED/27409410',
+        #        'http://europepmc.org/abstract/MED/26290144',
+        #        'http://europepmc.org/abstract/MED/25787843',
+        #        'http://europepmc.org/abstract/MED/26836588',
+        #        'http://europepmc.org/abstract/MED/26781615',
+        #        'http://europepmc.org/abstract/MED/26646452',
+        #        'http://europepmc.org/abstract/MED/26774881',
+        #        'http://europepmc.org/abstract/MED/26629442',
+        #        'http://europepmc.org/abstract/MED/26371324',
+        #        'http://europepmc.org/abstract/MED/24817865',
+        #        ]
 
     def get_all_associations_ids(self,):
         res = helpers.scan(client=self.handler,

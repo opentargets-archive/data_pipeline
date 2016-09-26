@@ -1,5 +1,7 @@
 import unittest
 
+from modules.EvidenceString import EvidenceStringProcess
+from modules.EvidencePublicationAdapter import EvidenceStringPublicationAdapter
 from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, Literature
 from common.ElasticsearchLoader import Loader
 from elasticsearch import Elasticsearch
@@ -23,12 +25,12 @@ class LiteratureTestCase(unittest.TestCase):
 #                     '24817865',
 #                   PublicationAnalyserSpacy]
     
-    def test_analyse_publication(self):
+    def analyse_publication(self):
         logging.basicConfig(filename='output.log',
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                             level=logging.INFO)
         r_server = Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
-        #TODO : ES mocking for unit tests?
+        #TODO : ES mocking for unit tests - use dryrun
         es = Elasticsearch(hosts = [{'host': 'localhost', 'port': 9200}],
                        maxsize=50,
                        timeout=1800,
@@ -36,8 +38,29 @@ class LiteratureTestCase(unittest.TestCase):
                        retry_on_timeout=True,
                        max_retries=10,
                        )
-        loader = Loader(es=es,chunk_size=1)
+        loader = Loader(es=es)
         Literature(es, loader, r_server).process()
+
+    def test_evidence_publication_adapter(self):
+
+        logging.basicConfig(filename='output.log',
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        level=logging.INFO)
+
+
+        r_server = Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
+        es = Elasticsearch(hosts=[{'host': 'localhost', 'port': 9200}],
+                   maxsize=50,
+                   timeout=1800,
+                   sniff_on_connection_fail=True,
+                   retry_on_timeout=True,
+                   max_retries=10,
+                   )
+        loader = Loader(es=es)
+
+        EvidenceStringPublicationAdapter(es, loader, r_server).process_evidence_string()
+
+
 
 
 

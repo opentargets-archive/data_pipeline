@@ -105,17 +105,18 @@ class PublicationFetcher(object):
                     r.raise_for_status()
                     result = r.json()['resultList']['result'][0]
                     pub = Publication(pub_id=pub_id,
-                                      title=result['title'],
-                                      abstract=result['abstractText'],
-                                      authors=result['authorList'],
-                                      year=int(result['pubYear']),
-                                      date=result["firstPublicationDate"],
-                                      journal=result['journalInfo'],
+                                      title=result.get('title'),
+                                      abstract=result.get('abstractText'),
+                                      authors=result.get('authorList'),
+                                      year=int(result.get('pubYear')),
+                                      date=result.get("firstPublicationDate"),
+                                      journal=result.get('journalInfo'),
                                       full_text=u"",
-                                      full_text_url=result['fullTextUrlList']['fullTextUrl'],
-                                      epmc_keywords=result['keywordList']['keyword'],
-                                      doi=result['doi'],
-                                      cited_by=result['citedByCount'],
+                                      #TODO : Commented for testing
+                                      #full_text_url=result.get('fullTextUrlList').get('fullTextUrl'),
+                                     # epmc_keywords=result['keywordList']['keyword'],
+                                      doi=result.get('doi'),
+                                      cited_by=result.get('citedByCount'),
                                       has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
                                       has_references=result['hasReferences'] == u'Y',
                                       is_open_access=result['isOpenAccess'] == u'Y',
@@ -436,6 +437,11 @@ class Literature(object):
 
         #TODO : Use separate queue for retrieving evidences?
 
+        # for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
+        #             desc='Reading available evidence_strings to analyse publications',
+        #             total = self.es_query.count_validated_evidence_strings(datasources= datasources),
+        #             unit=' evidence',
+        #             unit_scale=True):
         for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
                     desc='Reading available evidence_strings to analyse publications',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
