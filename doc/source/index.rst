@@ -12,6 +12,7 @@ Contents:
    :maxdepth: 2
 
    ontology.rst
+   project_codes.rst
 
 Indices and tables
 ==================
