@@ -12,7 +12,7 @@ import json
 import rdflib
 from rdflib import URIRef
 from rdflib import Namespace
-#from rdflib.amespace import OWL, RDF
+from rdflib.namespace import OWL, RDF, RDFS
 
 import pprint
 from common import Actions
@@ -122,9 +122,118 @@ class DiseasePhenotypes():
         self.rdf_graph = None
         pass
 
+    def get_subclasses(self, node, node_lable):
+        subclasses = list(node.transitive_subjects(RDFS.subClassOf))
+        for c in subclasses:
+            if node.qname() != c.qname():
+                print c
+                label = c.value(RDFS.label)
+                synonyms = []
+                # get synonyms by filtering on triples
+                for subject, predicate, obj in self.rdf_graph.triples(
+                        (rdflib.term.URIRef("http://purl.obolibrary.org/obo/SO_0001060"),
+                         rdflib.term.URIRef('http://www.geneontology.org/formats/oboInOwl#hasExactSynonym'),
+                         None)):
+                    print subject, predicate, obj
+                    synonyms.append(obj)
+
+                print "%s -> %s (%s) synonyms:%s" %(node.qname(), c.qname(), label, ",".join(synonyms))
+                self.get_subclasses(c, label)
+
     # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/
     # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw
     def parse_owl_url(self):
+        self.get_eco_paths()
+
+    def get_eco_paths(self):
+
+        eco_paths = {}
+
+
+        '''
+        CTTV evidence => evidence
+        "[{"uri": "http://www.targetvalidation.org/disease/cttv_evidence", "label": "CTTV evidence"}, {"uri": "http://purl.obolibrary.org/obo/ECO_0000360", "label": "biological target-disease association via drug"}, {"uri": "http://identifiers.org/eco/drug_disease" (...)"
+        "[{"uri": "http://www.targetvalidation.org/disease/cttv_evidence", "label": "CTTV evidence"}, {"uri": "http://purl.obolibrary.org/obo/ECO_0000360", "label": "biological target-disease association via drug"}, {"uri": "http://identifiers.org/eco/target_drug", (...)"
+            animal model system study evidence
+            author statement
+            "http://www.targetvalidation.org/evidence/literature_mining"
+            similarity
+
+        :return:
+        '''
+
+        # https://raw.githubusercontent.com/evidenceontology/evidenceontology/master/eco.owl
+        query='''
+        PREFIX obo: <http://purl.obolibrary.org/obo/>
+        SELECT ?node_uri ?parent_uri sample(?parent_label) AS ?parent_label ?dist ?path
+        WHERE
+        {
+            {
+            SELECT *
+            WHERE
+            {
+            ?node_uri rdfs:subClassOf ?y .
+            ?node_uri rdfs:label ?parent_label
+            }
+        }
+        OPTION ( TRANSITIVE, T_NO_CYCLES, T_DISTINCT, t_min(1), t_in (?y), t_out (?node_uri), t_step (?y) as ?parent_uri, t_step ('step_no') as ?dist, t_step ('path_id') as ?path ) .
+        FILTER ( ?y = <http://www.targetvalidation.org/evidence/cttv_evidence> )
+        }
+        ORDER BY ?path ?dist
+        '''
+
+        self.rdf_graph = rdflib.Graph()
+        print ("parse ECO")
+        self.rdf_graph.parse('/Users/koscieln/Downloads/eco.owl', format='xml')
+        self.rdf_graph.parse('/Users/koscieln/Downloads/so-xp.owl', format='xml')
+
+        # assertion method
+        subject = root = rdflib.term.URIRef("http://purl.obolibrary.org/obo/ECO_0000217")
+        root_a = rdflib.resource.Resource(self.rdf_graph, subject)
+        root_b = rdflib.resource.Resource(self.rdf_graph, rdflib.term.URIRef("http://purl.obolibrary.org/obo/ECO_0000000"))
+
+        #sequence variant
+        so_root_d = rdflib.resource.Resource(self.rdf_graph, rdflib.term.URIRef("http://purl.obolibrary.org/obo/SO_0001060"))
+
+
+        print ("prepare query")
+        for triple in self.rdf_graph.triples((subject, None, None)):
+        #for triple in self.rdf_graph.triples((subject, RDFS.subClassOf, None)):
+            print triple
+
+        print ("Subclasses")
+        subclasses = list(root_a.transitive_subjects(RDFS.subClassOf))
+        for c in subclasses:
+            print c
+            print c.qname()
+
+        label_a = root_a.value(RDFS.label)
+        self.get_subclasses(root_a, label_a)
+
+        for triple in self.rdf_graph.triples((rdflib.term.URIRef("http://purl.obolibrary.org/obo/SO_0001060"), None, None)):
+            print triple
+
+        for triple in self.rdf_graph.triples(
+                    (rdflib.term.URIRef("http://purl.obolibrary.org/obo/SO_0001060"),
+                     rdflib.term.URIRef('http://www.geneontology.org/formats/oboInOwl#hasExactSynonym'),
+                     None)):
+            print triple
+        #so_root_d_label = so_root_d.value(RDFS.label)
+        #self.get_subclasses(so_root_d, so_root_d_label)
+
+        #label_b = root_b.value(RDFS.label)
+        #self.get_subclasses(root_b, label_b)
+
+        #print ("")
+        #for i in self.rdf_graph.subjects(RDFS.subClassOf, subject):
+        #    yield i
+        #for i in graph.subjects()
+        #qres = self.rdf_graph.query(query)
+
+        #for row in qres:
+        #    print ("node_uri:%s parent_uri:%s parent_label:%s dist:%s path:%s" % row)
+
+    def get_disease_phenotypes(self):
         # we care about namespaces
         #oban = Namespace('http://purl.org/oban/')
         self.rdf_graph = rdflib.Graph()
