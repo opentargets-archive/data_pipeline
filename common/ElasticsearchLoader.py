@@ -184,7 +184,7 @@ class Loader():
         self.chunk_size = chunk_size
         self.index_created=[]
         self.dry_run = dry_run
-        self.max_flush_interval = 10
+        self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
 
     @staticmethod

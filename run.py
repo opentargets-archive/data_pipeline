@@ -316,7 +316,7 @@ if __name__ == '__main__':
         if args.ddr or run_full_pipeline:
             do_all = (DataDrivenRelationActions.ALL in args.ddr) or run_full_pipeline
             if (DataDrivenRelationActions.PROCESS in args.ddr) or do_all:
-                DataDrivenRelationProcess(es, r_server).process_all()
+                DataDrivenRelationProcess(es, r_server).process_all(dry_run = args.dry_run)
         if args.sea or run_full_pipeline:
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
