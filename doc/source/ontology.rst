@@ -13,7 +13,7 @@ Ontology sources
 Evidence and Conclusion Ontology
 --------------------------------
 
-ECO is the main ontology to describe and organise the knowledge around evidence in Open Targets.
+ECO is one of the two ontologies to describe and organise the knowledge around evidence in Open Targets.
 Each type of evidence from individual datasources are tagged with one or more evidence codes.
 When the project was originally developed, extra evidence IRI were created to cope with the fact that some evidence were
 specific to Open Targets. For instance, text mining evidence would be represented as
@@ -43,14 +43,13 @@ other dimensions such as regulatory space. It includes terms and relations to de
 genomic phenomena such as transposons and repeats. We are primarily interested in using SO because it also describes
 variations and the consequences of variation.
 
-We use SO terms to determine the functional consequence of the variants that are sent by the data providers (GWAS
-Catalog, EVA, UniProt). Additionally, the consequence is used to assign a score to an evidence. See mapping table in
+We use SO terms to determine the functional consequence of the variants that are provided by GWAS
+Catalog, EVA, and UniProt. Additionally, the consequence is used to assign a score to an evidence. See mapping table in
 data_pipeline/resources/eco_scores (which really should be called functional consequence scores).
 
 We had a few terms not represented in SO but we decided to map them to existing SO classes.
 
 For end-users, the documentation is located in https://www.targetvalidation.org/variants
-
 
 Nearest gene 5' end
 +++++++++++++++++++
@@ -58,7 +57,7 @@ Nearest gene 5' end
 http://targetvalidation.org/sequence/regulatory_nearest_gene_five_prime_end, Nearest regulatory gene from 5' end
 
 This term refers to the outcome of the current SNP to effector nearest gene method which assigns the nearest 5' end of
-a gene. Note that this is not necessarily upstream (only close by the 5' end).
+a gene. Note that this is not necessarily upstream (only close to the 5' end of an ensembl gene).
 
 The current method is based on using the Bio::EnsEMBL::DBSQL::BaseFeatureAdaptor::fetch_all_by_outward_search method.
 This method, given a variation feature (a SNP), a range (1Kb), a max range (50,000), a limit of features to return (40)
