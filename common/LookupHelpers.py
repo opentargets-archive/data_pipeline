@@ -5,13 +5,14 @@ from common.ElasticsearchQuery import ESQuery
 from modules.ECO import ECOLookUpTable
 from modules.EFO import EFOLookUpTable
 from modules.GeneData import GeneLookUpTable
-
+from modules.Literature import LiteratureLookUpTable
 
 class LookUpData():
     def __init__(self):
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
+        self.available_publications = None
         self.uni2ens = None
         self.non_reference_genes = None
         self.available_gene_objects = None
@@ -33,7 +34,7 @@ class LookUpDataRetriever():
         self.logger = logging.getLogger(__name__)
         start_time = time.time()
         load_bar = tqdm(desc='loading lookup data',
-             total=3,
+             total=4,
              unit=' steps',
              leave=False,)
         self._get_gene_info(targets)
@@ -44,6 +45,9 @@ class LookUpDataRetriever():
         load_bar.update()
         self._get_available_ecos()
         self.logger.info("finished self._get_available_ecos(), took %ss"%str(time.time()-start_time))
+        load_bar.update()
+        self._get_available_publications()
+        self.logger.info("finished self._get_available_publications(), took %ss" % str(time.time() - start_time))
         load_bar.update()
 
 
@@ -76,3 +80,7 @@ class LookUpDataRetriever():
                 self.lookup.non_reference_genes[symbol]['reference']=ensg
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
+
+    def _get_available_publications(self):
+        self.logger.info('getting literature/publications')
+        self.lookup.available_publications = LiteratureLookUpTable(self.es, 'LITERATURE_LOOKUP', self.r_server)

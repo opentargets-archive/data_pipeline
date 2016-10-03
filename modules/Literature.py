@@ -365,7 +365,7 @@ class PublicationAnalyserSpacy(object):
             return ''
 
 
-class Literature(object):
+class LiteratureProcess(object):
 
 
     def __init__(self,
@@ -433,15 +433,17 @@ class Literature(object):
 
         #TODO : Use separate queue for retrieving evidences?
 
-        for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
+        for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(datasources= datasources),
                     desc='Reading available evidence_strings to analyse publications',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                     unit=' evidence',
                     unit_scale=True):
-            pub_id= self.get_pub_id_from_url(ev)
+            pub_id= self.get_pub_id_from_url(ev['evidence_string']['literature']['references'][0]['lit_id'])
             pubs = pub_fetcher.get_publication(pub_id)
 
             literature_q.put(pubs)
+        literature_q.set_submission_finished(r_server=self.r_server)
+
             # TODO - auditing?
         #wait for all spacy workers to finish
         for a in analyzers:
@@ -449,7 +451,7 @@ class Literature(object):
 
         logging.info('flushing data to index')
 
-        self.es_loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+        self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
             wait_if_ongoing=True)
         logging.info("DONE")
 
@@ -493,6 +495,83 @@ def cleanText(text):
     return text
 
 
+class Literature(JSONSerializable):
+    def __init__(self,
+                 pmid,
+                 abstract='',
+                 journal='',
+                 year='',
+                 abstract_lemmas=''):
+        self.pmid = pmid
+        self.abstract = abstract
+        self.journal = journal
+        self.year = year
+        self.abstract_lemmas = abstract_lemmas
+
+
+class LiteratureLookUpTable(object):
+    """
+    A redis-based pickable literature look up table
+    """
+
+    def __init__(self,
+                 es,
+                 namespace = None,
+                 r_server = None,
+                 ttl = 60*60*24+7):
+        self._table = RedisLookupTablePickle(namespace = namespace,
+                                            r_server = r_server,
+                                            ttl = ttl)
+        self._es = es
+        self._es_query = ESQuery(es)
+        self.r_server = r_server
+        if r_server is not None:
+            self._load_literature_data(r_server)
+
+    def _load_literature_data(self, r_server = None):
+        for parent_publication, analyzed_publication in tqdm(self._es_query.get_all_publications(),
+                        desc='loading publications',
+                        unit=' publication',
+                        unit_scale=True,
+                        total=self._es_query.count_all_publications(),
+                        leave=False,
+                        ):
+            literature = parent_publication
+            literature['abstract_lemmas'] = analyzed_publication['lemmas']
+            self.set_literature(literature,self._get_r_server(
+                    r_server))# TODO can be improved by sending elements in batches
+
+    def get_literature(self, pmid, r_server = None):
+        return self._table.get(pmid, r_server=r_server)
+
+    def set_literature(self, literature, r_server = None):
+        self._table.set((literature['pub_id']), literature, r_server=self._get_r_server(
+            r_server))
+
+    def get_available_literature_ids(self, r_server = None):
+        return self._table.keys()
+
+    def __contains__(self, key, r_server=None):
+        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
+
+    def __getitem__(self, key, r_server=None):
+        return self.get_literature(key, r_server)
+
+    def __setitem__(self, key, value, r_server=None):
+        self._table.set(key, value, r_server=self._get_r_server(r_server))
+
+    def _get_r_server(self, r_server=None):
+        if not r_server:
+            r_server = self.r_server
+        if r_server is None:
+            raise AttributeError('A redis server is required either at class instantation or at the method level')
+        return r_server
+
+    def keys(self):
+        return self._table.keys()
+
+
+
 class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
     def __init__(self,
                  queue_in,
@@ -526,3 +605,5 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
                             body=spacy_analysed_pub.to_json(),
                             parent=pub_id,
                             )
+            logging.info("Literature data updated for pmid {}".format(pub_id))
+

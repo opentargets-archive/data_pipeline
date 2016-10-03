@@ -140,6 +140,36 @@ class ESQuery(object):
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_ECO_INDEX_NAME)
 
+    def get_all_publications(self, fields=None):
+        source = self._get_source_from_fields(fields)
+        # inner hits to get child documents containing abstract_lemmas , along with parent publications
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                                     "has_child": {
+                                        "type": "publication-analysis-spacy",
+                                            "query": {
+                                                "match_all": {}
+                                                    },"inner_hits": {}
+                                        }
+                                     },
+
+                               '_source': source,
+                               'size': 1000
+                           },
+                           scroll='2h',
+                           doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                           timeout="10m",
+                           )
+        for hit in res:
+            parent_publication = hit['_source']
+            analyzed_publication = hit['inner_hits']['publication-analysis-spacy']['hits']['hits'][0]['_source']
+            yield parent_publication, analyzed_publication
+
+    def count_all_publications(self):
+
+        return self.count_elements_in_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
+
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
         aggs ={}
@@ -561,7 +591,7 @@ class ESQuery(object):
 
     def get_all_pub_ids_from_evidence(self,):
         #TODO: get all the validated evidencestrings and fetch medline abstracts there
-        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='literature.references.lit_id'
+        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='evidence_string.literature.references.lit_id'
 
         return ['http://europepmc.org/abstract/MED/24523595',
                'http://europepmc.org/abstract/MED/26784250',
