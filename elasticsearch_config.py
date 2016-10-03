@@ -65,6 +65,17 @@ def _get_evidence_string_generic_mapping():
                                         "index": "not_analyzed",
                                     },
                                 }
+                            },
+                            "abstract_lemmas":{
+                                "properties": {
+                                    "count": {
+                                        "type": "long"
+                                    },
+                                    "values": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    }
+                                }
                             }
                         }
                     }
@@ -90,6 +101,34 @@ def _get_evidence_string_generic_mapping():
                                 "type": "string",
                                 "index": "not_analyzed",
                             }
+                        }
+                    },
+                    "abstract": {
+                        "type": "string",
+                        "analyzer": "english"
+
+                    },
+                    "title": {
+                        "type": "string",
+                        "analyzer": "english"
+
+                    },
+                    "year": {
+                        "type": "date",
+                        "format": "yyyy"
+
+                    },
+                    "journal_data":{
+                        "properties":{
+                            "journal":{
+                                "properties":{
+                                    "medlineAbbreviation":{
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    }
+                                }
+                            }
+
                         }
                     }
                 }

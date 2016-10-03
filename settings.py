@@ -26,6 +26,7 @@ class Config():
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME = 'submission'
     ELASTICSEARCH_DATA_INDEX_NAME = 'evidence-data'
+    ELASTICSEARCH_NEW_DATA_INDEX_NAME = '10.16_evidence-data'
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
     ELASTICSEARCH_EFO_LABEL_DOC_NAME = 'efo'
@@ -53,7 +54,7 @@ class Config():
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
-    SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
+    #SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
     POSTGRES_DATABASE = {'drivername': 'postgres',
             'host': iniparser.get(ENV, 'host'),
             'port': iniparser.get(ENV, 'port'),

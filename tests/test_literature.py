@@ -2,7 +2,7 @@ import unittest
 
 from modules.EvidenceString import EvidenceStringProcess
 from modules.EvidencePublicationAdapter import EvidenceStringPublicationAdapter
-from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, Literature
+from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, Literature, LiteratureProcess
 from common.ElasticsearchLoader import Loader
 from elasticsearch import Elasticsearch
 from redislite import Redis
@@ -30,8 +30,9 @@ class LiteratureTestCase(unittest.TestCase):
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                             level=logging.INFO)
         r_server = Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
+
         #TODO : ES mocking for unit tests - use dryrun
-        es = Elasticsearch(hosts = [{'host': 'localhost', 'port': 9200}],
+        es = Elasticsearch(hosts = [{'host': 'targethub-es.gdosand.aws.biogen.com', 'port': 80}],
                        maxsize=50,
                        timeout=1800,
                        sniff_on_connection_fail=True,
@@ -39,9 +40,29 @@ class LiteratureTestCase(unittest.TestCase):
                        max_retries=10,
                        )
         loader = Loader(es=es)
-        Literature(es, loader, r_server).process()
+        LiteratureProcess(es, loader, r_server).process(['europepmc'])
 
-    def test_evidence_publication_adapter(self):
+
+    def test_evidence_publication_loading(self):
+
+        logging.basicConfig(filename='output.log',
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        level=logging.INFO)
+
+        r_server = Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
+
+        # TODO : ES mocking for unit tests - use dryrun
+        es = Elasticsearch(hosts=[{'host': 'targethub-es.gdosand.aws.biogen.com', 'port': 80}],
+                           maxsize=50,
+                           timeout=1800,
+                           sniff_on_connection_fail=True,
+                           retry_on_timeout=True,
+                           max_retries=10,
+                           )
+        loader = Loader(es=es,dry_run=True)
+        EvidenceStringProcess(es, r_server).process_all(datasources=['europepmc'])
+
+    def evidence_publication_adapter(self):
 
         logging.basicConfig(filename='output.log',
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
