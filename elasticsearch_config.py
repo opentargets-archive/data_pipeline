@@ -618,7 +618,7 @@ class ElasticSearchConfiguration():
                                           "number_of_replicas": evidence_replicas_number,
                                           # "index.store.type": "memory",
                                           "refresh_interval": "60s",
-                                          "max_result_window":10e6,
+                                          "index.max_result_window":10e6,
                                           },
                              "mappings": {"_default_": _get_evidence_string_generic_mapping()},
                              }
@@ -662,7 +662,7 @@ class ElasticSearchConfiguration():
                                        "number_of_replicas": evidence_replicas_number,
                                        # "index.store.type": "memory",
                                        "refresh_interval": "60s",
-                                       "max_result_window": 5e6,
+                                       "index.max_result_window": 5e6,
                                        },
                           "mappings": {
                               Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {
