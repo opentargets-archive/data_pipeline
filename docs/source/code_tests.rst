@@ -5,6 +5,12 @@ Unit Testing
 
 Pipeline modules tests are located in the tests directory.
 
+Ontology module
+===============
+
+* Test HPO can be loaded in a graph
+* Test MP can be loaded in a graph
+
 Run Nose Tests
 ==============
 
