@@ -485,8 +485,8 @@ class ScoringProcess():
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-        # number_of_storers = number_of_workers/2 + 1
-        number_of_storers = 1
+        number_of_storers = number_of_workers/2 + 1
+        # number_of_storers = 1
         if targets and len(targets) <number_of_workers:
             number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
