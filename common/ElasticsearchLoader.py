@@ -11,7 +11,7 @@ import collections
 
 import sys
 from elasticsearch.exceptions import NotFoundError
-from elasticsearch.helpers import streaming_bulk, parallel_bulk
+from elasticsearch.helpers import parallel_bulk
 from sqlalchemy import and_
 from common import Actions
 from common.DataStructure import JSONSerializable
@@ -250,11 +250,13 @@ class Loader():
 
     def _flush(self):
         if not self.dry_run:
-            # for ok, results in streaming_bulk(
+            thread_count = 10
+            chunk_size = int(self.chunk_size/thread_count)
             for ok, results in parallel_bulk(
                     self.es,
                     self.cache,
-                    chunk_size=self.chunk_size,
+                    thread_count=thread_count,
+                    chunk_size=chunk_size,
                     request_timeout=60000,
                 ):
 
@@ -289,13 +291,13 @@ class Loader():
         if not self.dry_run:
             old_cluster_settings = self.es.cluster.get_settings()
             try:
-                if old_cluster_settings['transient']['indices']['store']['throttle']['type']=='none':
+                if old_cluster_settings['persistent']['indices']['store']['throttle']['type']=='none':
                     pass
                 else:
                     raise ValueError
             except (KeyError, ValueError):
                 transient_cluster_settings = {
-                                            "transient" : {
+                                            "persistent" : {
                                                 "indices.store.throttle.type" : "none"
                                             }
                                         }
@@ -328,8 +330,12 @@ class Loader():
                                      ignore=ignore,
                                      body=body
                                      )
-        if ('acknowledged' not in res) or (res['acknowledged'] == False):
-            raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
+        if not self._check_is_aknowledge(res):
+            if res['error']['root_cause'][0]['reason']== 'already exists':
+                logging.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
+                return
+            else:
+                raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
         mappings = self.es.indices.get_mapping(index=index_name)
         settings = self.es.indices.get_settings(index=index_name)
 
@@ -348,7 +354,16 @@ class Loader():
         index_name = self.get_versioned_index(index_name)
         if self.es.indices.exists(index_name):
             if recreate:
-                self.es.indices.delete(index_name)
+                res = self.es.indices.delete(index_name)
+                if not self._check_is_aknowledge(res):
+                    raise ValueError(
+                        'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
+                try:
+                    self.es.indices.flush(index_name,  wait_if_ongoing =True)
+                except NotFoundError:
+                    pass
+                logging.debug("%s index deleted: %s" %(index_name, str(res)))
+
             else:
                 logging.info("%s index already existing" % index_name)
                 return
@@ -379,3 +394,6 @@ class Loader():
             self.es.indices.optimize(index=index_name, max_num_segments=5, wait_for_merge = False)
         except:
             logging.warn('optimisation of index %s failed'%index_name)
+
+    def _check_is_aknowledge(self, res):
+        return (u'acknowledged' in res) and (res[u'acknowledged'] == True)
