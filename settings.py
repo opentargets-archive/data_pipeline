@@ -7,13 +7,12 @@ import os
 import ConfigParser
 
 iniparser = ConfigParser.ConfigParser()
-iniparser.read('db.ini')
+iniparser.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'db.ini'))
 
 class Config():
 
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
-    ONTOLOGY_CONFIG.read('ontology_config.ini')
-
+    ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
     RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
