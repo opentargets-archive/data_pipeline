@@ -20,7 +20,6 @@ from common.PGAdapter import ElasticsearchLoad
 from common.processify import processify
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
-
 __author__ = 'andreap'
 
 class ElasticsearchActions(Actions):
@@ -223,7 +222,6 @@ class Loader():
                 (time.time() - self._last_flush_time >= self.max_flush_interval)):
             self.flush()
 
-
     def flush(self, max_retry=10):
         retry = 0
         while 1:
@@ -247,31 +245,36 @@ class Loader():
         # else:
         #     for index_name in self.cache:
         #         self.cache[index_name] = []
-
+    # @profile
     def _flush(self):
         if not self.dry_run:
             thread_count = 10
             chunk_size = int(self.chunk_size/thread_count)
-            for ok, results in parallel_bulk(
-                    self.es,
-                    self.cache,
-                    thread_count=thread_count,
-                    chunk_size=chunk_size,
-                    request_timeout=60000,
-                ):
+            parallel_bulk(
+                self.es,
+                self.cache,
+                thread_count=thread_count,
+                chunk_size=chunk_size,)
+            # for ok, results in parallel_bulk(
+            #         self.es,
+            #         self.cache,
+            #         thread_count=thread_count,
+            #         chunk_size=chunk_size,
+            #         request_timeout=60000,
+                # ):
 
-                action, result = results.popitem()
-                self.results[result['_index']].append(result['_id'])
-                doc_id = '/%s/%s' % (result['_index'], result['_id'])
-                try:
-                    if (len(self.results[result['_index']]) % self.chunk_size) == 0:
-                        logging.debug(
-                            "%i entries uploaded in elasticsearch for index %s" % (
-                            len(self.results[result['_index']]), result['_index']))
-                    if not ok:
-                        logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
-                except ZeroDivisionError:
-                    pass
+                # action, result = results.popitem()
+                # self.results[result['_index']].append(result['_id'])
+                # doc_id = '/%s/%s' % (result['_index'], result['_id'])
+                # try:
+                #     if (len(self.results[result['_index']]) % self.chunk_size) == 0:
+                #         logging.debug(
+                #             "%i entries uploaded in elasticsearch for index %s" % (
+                #             len(self.results[result['_index']]), result['_index']))
+                #     if not ok:
+                #         logging.error('Failed to %s document %s: %r' % (action, doc_id, result))
+                # except ZeroDivisionError:
+                #     pass
 
 
     def close(self):
