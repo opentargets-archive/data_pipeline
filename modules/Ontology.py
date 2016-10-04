@@ -20,6 +20,8 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 from settings import Config
 from tqdm import tqdm
 from datetime import datetime, date
+from settings import Config
+
 
 __author__ = 'gautierk'
 
@@ -112,9 +114,122 @@ group by ?class ?parent_label
 order by ?count
 '''
 
+'''
+subclass generators: yield a series of values
+'''
+def get_subclasses2(arg, graph):
+    print "[get_subclasses2] %i"%len(arg)
+    node = arg[0]
+    depth = arg[1]
+    path = arg[2]
+    #print node.qname()
+    print node.value(RDFS.label)
+    subclasses = list(node.transitive_subjects(RDFS.subClassOf))
+    for c in subclasses:
+        if node.qname() != c.qname():
+            print c
+            label = c.value(RDFS.label)
+            synonyms = []
+            # get synonyms by filtering on triples
+            for subject, predicate, obj in graph.triples(
+                    (c,
+                     rdflib.term.URIRef('http://www.geneontology.org/formats/oboInOwl#hasExactSynonym'),
+                     None)):
+                print subject, predicate, obj
+            # create the path here
+            yield (c, depth+1, path + (node,))
+
+
 class OntologyActions(Actions):
     PHENOTYPESLIM = 'phenotypeslim'
     DISEASEPHENOTYPES = 'diseasephenotypes'
+
+class OntologyClassReader():
+
+    def __init__(self):
+        self.rdf_graph = None
+        pass
+
+    def get_ontology_classes(self, uri):
+
+        self.rdf_graph = rdflib.Graph()
+        self.rdf_graph.parse(uri, format='xml')
+        # get all classes with label and synonyms
+
+
+    def load_ontology(self, name, base_class, current, obsolete):
+        '''
+        Load ontology to accept phenotype terms that are not
+        :return:
+        '''
+        sparql_query = '''
+        SELECT DISTINCT ?ont_node ?label
+        FROM <http://purl.obolibrary.org/obo/%s.owl>
+        {
+        ?ont_node rdfs:subClassOf* <%s> .
+        ?ont_node rdfs:label ?label
+        }
+        '''
+        self.sparql.setQuery(sparql_query % (name, base_class))
+        self.sparql.setReturnFormat(JSON)
+        results = self.sparql.query().convert()
+
+        for result in results["results"]["bindings"]:
+            uri = result['ont_node']['value']
+            label = result['label']['value']
+            current[uri] = label
+            # print(json.dumps(result, indent=4))
+            # print("%s %s"%(uri, label))
+
+        sparql_query = '''
+        PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
+        PREFIX obo: <http://purl.obolibrary.org/obo/>
+        SELECT DISTINCT ?hp_node ?label ?id ?hp_new
+         FROM <http://purl.obolibrary.org/obo/%s.owl>
+         FROM <http://purl.obolibrary.org/obo/>
+         {
+            ?hp_node owl:deprecated true .
+            ?hp_node oboInOwl:id ?id .
+            ?hp_node obo:IAO_0100001 ?hp_new .
+            ?hp_node rdfs:label ?label
+
+         }
+        '''
+        self.sparql.setQuery(sparql_query % name)
+        self.sparql.setReturnFormat(JSON)
+        results = self.sparql.query().convert()
+
+        obsolete_classes = {}
+
+        for result in results["results"]["bindings"]:
+            uri = result['hp_node']['value']
+            label = result['label']['value']
+            id = result['label']['value']
+            hp_new = result['hp_new']['value']
+            new_label = ''
+            if (not re.match('http:\/\/purl.obolibrary\.org', hp_new)):
+                hp_new = "http://purl.obolibrary.org/obo/%s" % hp_new.replace(':', '_')
+            obsolete_classes[uri] = hp_new
+        for uri in obsolete_classes:
+            next_uri = obsolete_classes[uri]
+            while next_uri in obsolete_classes:
+                next_uri = obsolete_classes[next_uri]
+            new_label = current[next_uri]
+            obsolete[uri] = "Use %s label:%s" % (next_uri, new_label)
+            self.logger.warn("%s %s" % (uri, obsolete[uri]))
+
+
+    def load_mp(self, base_class):
+        '''
+        Load MP to accept phenotype terms that are not in EFO
+        :return:
+        '''
+        self.load_ontology(
+            name_space='<http://purl.obolibrary.org/obo/mp.owl>',
+            base_class=base_class,
+            current=self.phenotype_current,
+            obsolete=self.phenotype_obsolete)
+        self.get_ontology_top_levels(base_class, top_level_map=self.phenotype_top_levels)
 
 class DiseasePhenotypes():
 
@@ -139,6 +254,8 @@ class DiseasePhenotypes():
 
                 print "%s -> %s (%s) synonyms:%s" %(node.qname(), c.qname(), label, ",".join(synonyms))
                 self.get_subclasses(c, label)
+
+
 
     # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/
     # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw
@@ -209,6 +326,31 @@ class DiseasePhenotypes():
 
         label_a = root_a.value(RDFS.label)
         self.get_subclasses(root_a, label_a)
+
+        print "-User-defined transitive closures"
+        for tuple in self.rdf_graph.transitiveClosure(get_subclasses2, (root_a, 0, ()) ):
+            print tuple
+        print "-end of function"
+
+        classes_path = dict()
+
+        genomic_context = rdflib.resource.Resource(self.rdf_graph, rdflib.term.URIRef("http://purl.obolibrary.org/obo/ECO_0000177"))
+        print "* User-defined transitive closures 2"
+        for entity in self.rdf_graph.transitiveClosure(get_subclasses2, (genomic_context, 0, ())):
+            node = entity[0]
+            depth = entity[1]
+            path = entity[2]
+            if node not in classes_path:
+                classes_path[node] = []
+            js_struct = []
+            for n in path:
+                js_struct.append({'uri': str(n), 'label': n.value(RDFS.label)})
+            js_struct.append({'uri': str(node), 'label': node.value(RDFS.label)})
+            classes_path[node].append(js_struct)
+            print json.dumps(js_struct, indent=2)
+
+        print "* end of function 2"
+
 
         for triple in self.rdf_graph.triples((rdflib.term.URIRef("http://purl.obolibrary.org/obo/SO_0001060"), None, None)):
             print triple
