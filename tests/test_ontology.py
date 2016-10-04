@@ -21,9 +21,11 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from modules.Ontology import OntologyClassReader
+from modules.Ontology import OntologyClassReader, PhenotypeSlim
+from SPARQLWrapper import SPARQLWrapper, JSON
 from settings import Config
 import logging
+import os
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -65,3 +67,11 @@ def test_mp_load():
     assert not obj == None
     obj.get_ontology_classes(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
 
+@with_setup(my_setup_function, my_teardown_function)
+def test_parse_local_files():
+    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
+    assert not sparql == None
+    obj = PhenotypeSlim(sparql)
+    assert not obj == None
+    local_files = [ os.path.join(os.path.abspath(os.path.dirname(__file__)), '../samples/cttv008-22-07-2016.json.gz') ]
+    obj.create_phenotype_slim(local_files=local_files)
