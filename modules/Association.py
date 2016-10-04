@@ -9,7 +9,7 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
-from common.LookupHelpers import LookUpDataRetriever
+from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter
 from modules.EFO import EFO
 from modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
@@ -436,7 +436,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
                                create_index=False,
                                routing=score.target['id'])
         else:
-            logger.warning('Skipped association %s'%element_id)
+            logger.warning('Skipped association with score 0: %s'%element_id)
 
     def close(self):
         self.loader.close()
@@ -473,14 +473,23 @@ class ScoringProcess():
         if not targets:
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
-        lookup_data = LookUpDataRetriever(self.es, self.r_server, targets=targets).lookup
+        lookup_data = LookUpDataRetriever(self.es,
+                                          self.r_server,
+                                          targets=targets,
+                                          data_types=(
+                                                      LookUpDataType.DISEASE,
+                                                      LookUpDataType.TARGET,
+                                                      LookUpDataType.ECO,
+                                                      )
+                                          ).lookup
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        number_of_storers = number_of_workers/2 + 1
         if targets and len(targets) <number_of_workers:
             number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
-                              max_size=number_of_workers*10,
+                              max_size=number_of_workers*2,
                               job_timeout=3600,
                               r_server=self.r_server,
                               total=len(targets))
@@ -507,7 +516,7 @@ class ScoringProcess():
                                      self.r_server.db,
                                      chunk_size=1000,
                                      dry_run = dry_run,
-                                     ) for i in range(number_of_workers)]
+                                     ) for i in range(number_of_storers)]
 
         for w in storers:
             w.start()
