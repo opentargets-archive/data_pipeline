@@ -258,14 +258,14 @@ class RedisQueue(object):
 
     def is_done(self, r_server=None):
         r_server = self._get_r_server(r_server)
-        if self.is_submission_finished(r_server):
+        if self.is_submission_finished(r_server) and self.is_empty():
             pipe = r_server.pipeline()
             pipe.get(self.submitted_counter)
             pipe.get(self.processed_counter)
             submitted, processed = pipe.execute()
             submitted = int(submitted or 0)
             processed = int(processed or 0)
-            return submitted <= processed  # temporary hack should check for equal
+            return submitted <= processed
         return False
 
     def _get_r_server(self, r_server=None):
