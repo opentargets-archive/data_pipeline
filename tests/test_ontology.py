@@ -57,5 +57,11 @@ def my_teardown_function():
 def test_hpo_load():
     obj = OntologyClassReader()
     assert not obj == None
+    obj.get_ontology_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
 
+@with_setup(my_setup_function, my_teardown_function)
+def test_mp_load():
+    obj = OntologyClassReader()
+    assert not obj == None
+    obj.get_ontology_classes(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
 
