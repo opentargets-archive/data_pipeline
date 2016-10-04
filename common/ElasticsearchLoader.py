@@ -306,7 +306,8 @@ class Loader():
             temp_index_settings = {
                         "index" : {
                             "refresh_interval" : "-1",
-                            "number_of_replicas" : 0
+                            "number_of_replicas" : 0,
+                            "translog.durability" : 'async',
                         }
             }
             self.es.indices.put_settings(index=index_name,
@@ -314,7 +315,8 @@ class Loader():
             self.indexes_optimised[index_name]= dict(settings_to_restore={
                         "index" : {
                             "refresh_interval" : "1s",
-                            "number_of_replicas" : old_index_settings[index_name]['settings']['index']['number_of_replicas']
+                            "number_of_replicas" : old_index_settings[index_name]['settings']['index']['number_of_replicas'],
+                            "translog.durability": 'request',
                         }
                 })
     def restore_after_bulk_indexing(self):

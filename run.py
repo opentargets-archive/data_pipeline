@@ -167,24 +167,31 @@ if __name__ == '__main__':
         logger.error('Cannot connect to Postgres database. skipping creation of adapter')
         adapter= None
     '''init es client'''
-    connection_attempt = 1
+    connection_attempt = 3
     hosts=[]
     while 1:
-        try:
-            socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
-            nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
-            hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
-            logger.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
+        import socket
+
+        try:#is a valid ip
+            socket.inet_aton(Config.ELASTICSEARCH_HOST)
+            hosts = [Config.ELASTICSEARCH_HOST]
             break
-        except socket.gaierror:
-            wait_time = 5 * connection_attempt
-            logger.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
-            logger.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
-            time.sleep(wait_time)
-            if connection_attempt > 5:
-                logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
+        except socket.error:#resolve nameserver to list of ips
+            try:
+                socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
+                nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
+                hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
+                logger.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
                 break
-            connection_attempt+=1
+            except socket.gaierror:
+                wait_time = 5 * connection_attempt
+                logger.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
+                logger.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
+                time.sleep(wait_time)
+                if connection_attempt > 5:
+                    logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
+                    break
+                connection_attempt+=1
 
     es = Elasticsearch(hosts = hosts,
                        maxsize=50,
