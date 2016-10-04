@@ -20,7 +20,7 @@ from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 import multiprocessing
 from settings import Config
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
 
 import time
 
