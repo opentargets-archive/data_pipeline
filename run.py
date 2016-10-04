@@ -167,14 +167,14 @@ if __name__ == '__main__':
         logger.error('Cannot connect to Postgres database. skipping creation of adapter')
         adapter= None
     '''init es client'''
-    connection_attempt = 3
+    connection_attempt = 1
     hosts=[]
     while 1:
         import socket
 
         try:#is a valid ip
             socket.inet_aton(Config.ELASTICSEARCH_HOST)
-            hosts = [Config.ELASTICSEARCH_HOST]
+            hosts = [dict(host=Config.ELASTICSEARCH_HOST, port=Config.ELASTICSEARCH_PORT)]
             break
         except socket.error:#resolve nameserver to list of ips
             try:
