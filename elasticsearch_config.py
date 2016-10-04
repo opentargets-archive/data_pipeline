@@ -65,6 +65,17 @@ def _get_evidence_string_generic_mapping():
                                         "index": "not_analyzed",
                                     },
                                 }
+                            },
+                            "abstract_lemmas": {
+                                "properties": {
+                                    "count": {
+                                        "type": "long"
+                                    },
+                                    "values": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    }
+                                }
                             }
                         }
                     }
@@ -90,6 +101,34 @@ def _get_evidence_string_generic_mapping():
                                 "type": "string",
                                 "index": "not_analyzed",
                             }
+                        }
+                    },
+                    "abstract": {
+                        "type": "string",
+                        "analyzer": "english"
+
+                    },
+                    "title": {
+                        "type": "string",
+                        "analyzer": "english"
+
+                    },
+                    "year": {
+                        "type": "date",
+                        "format": "yyyy"
+
+                    },
+                    "journal_data": {
+                        "properties": {
+                            "journal": {
+                                "properties": {
+                                    "medlineAbbreviation": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    }
+                                }
+                            }
+
                         }
                     }
                 }
@@ -618,7 +657,7 @@ class ElasticSearchConfiguration():
                                           "number_of_replicas": evidence_replicas_number,
                                           # "index.store.type": "memory",
                                           "refresh_interval": "60s",
-                                          "max_result_window":10e6,
+                                          "max_result_window": str(10e6),
                                           },
                              "mappings": {"_default_": _get_evidence_string_generic_mapping()},
                              }
@@ -662,7 +701,7 @@ class ElasticSearchConfiguration():
                                        "number_of_replicas": evidence_replicas_number,
                                        # "index.store.type": "memory",
                                        "refresh_interval": "60s",
-                                       "max_result_window": 5e6,
+                                       "max_result_window": str(5e6),
                                        },
                           "mappings": {
                               Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {

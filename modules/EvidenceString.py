@@ -17,6 +17,7 @@ from modules import GeneData
 from modules.ECO import ECO
 from modules.EFO import EFO, get_ontology_code_from_url
 from modules.GeneData import Gene
+from modules.Literature import Literature
 from settings import Config
 
 logger = logging.getLogger(__name__)
@@ -177,6 +178,22 @@ class ExtendedInfoECO(ExtendedInfo):
         self.data = dict(eco_id = eco.get_id(),
                           label=eco.label),
 
+class ExtendedInfoLiterature(ExtendedInfo):
+    root = "literature"
+
+    def __init__(self, literature):
+        if isinstance(literature, Literature):
+            self.extract_info(literature)
+        else:
+            raise AttributeError("you need to pass a Literature not a: " + str(type(literature)))
+
+    def extract_info(self, literature):
+
+        self.data = dict( abstract = literature.abstract,
+                          journal=literature.journal,
+                          year=literature.year,
+                          abstract_lemmas=literature.abstract_lemmas)
+
 class ProcessedEvidenceStorer():
     def __init__(self,  es_loader, chunk_size=1e4, quiet = False):
 
@@ -219,6 +236,7 @@ class EvidenceManager():
         self.available_genes = lookup_data.available_genes
         self.available_efos =  lookup_data.available_efos
         self.available_ecos =  lookup_data.available_ecos
+        self.available_publications = lookup_data.available_publications
         self.uni2ens =  lookup_data.uni2ens
         self.non_reference_genes =  lookup_data.non_reference_genes
         self._get_eco_scoring_values()
@@ -504,7 +522,21 @@ class EvidenceManager():
                 data.append(eco_info.data)
             extended_evidence['evidence'][ExtendedInfoECO.root] = data
 
-        '''Add private objects used just for indexing'''
+        ''' Add literature data '''
+        pmid_url = extended_evidence['literature']['references'][0]['lit_id']
+        pmid = pmid_url.split('/')[-1]
+        literature = self._get_literature_obj(pmid)
+        #TODO: check introduced for testing!!!
+        if literature.abstract:
+
+            literature_info = ExtendedInfoLiterature(literature)
+            extended_evidence['literature']['year'] = literature_info.data['year']
+            extended_evidence['literature']['abstract'] = literature_info.data['abstract']
+            extended_evidence['literature']['journal'] = literature_info.data['journal']
+
+
+
+        '''Add private objects used just for faceting'''
 
         extended_evidence['private']['efo_codes'] = all_efo_codes
         extended_evidence['private']['eco_codes'] = all_eco_codes
@@ -519,7 +551,8 @@ class EvidenceManager():
             GO_terms['molecular_function'] or \
             GO_terms['cellular_component'] :
             extended_evidence['private']['facets']['go'] = GO_terms
-
+        if literature.abstract:
+            extended_evidence['private']['facets']['abstract_lemmas'] = literature_info.data['abstract_lemmas']
 
         return Evidence(extended_evidence)
 
@@ -540,6 +573,16 @@ class EvidenceManager():
         eco = ECO(ecoid)
         eco.load_json(self.available_ecos[ecoid])
         return eco
+
+    def _get_literature_obj(self, pmid):
+
+        literature = Literature(pmid)
+
+        available_pub = self.available_publications[pmid]
+        #TODO : check For testing
+        if(available_pub):
+            literature.load_json(available_pub)
+        return literature
 
 
     def _get_non_reference_gene_mappings(self):

@@ -350,7 +350,8 @@ class Loader():
             assertJSONEqual(settings[index_name]['settings']['index'],
                             body['settings'],
                             msg='settings in elasticsearch are different from the ones sent',
-                            keys=['number_of_replicas','number_of_shards','refresh_interval'])
+                            keys=body['settings'].keys(),#['number_of_replicas','number_of_shards','refresh_interval']
+                            )
 
     def create_new_index(self, index_name, recreate = False):
         index_name = self.get_versioned_index(index_name)

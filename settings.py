@@ -16,9 +16,11 @@ class Config():
 
     RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
-    ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
     ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
     ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+    ELASTICSEARCH_URL = 'http://'+ELASTICSEARCH_HOST
+    if ELASTICSEARCH_PORT:
+        ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
