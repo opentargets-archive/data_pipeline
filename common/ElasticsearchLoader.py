@@ -182,7 +182,8 @@ class Loader():
         self.cache = []
         self.results = defaultdict(list)
         self.chunk_size = chunk_size
-        self.index_created=[]
+        self.indexes_created=[]
+        self.indexes_optimised = {}
         self.dry_run = dry_run
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
@@ -199,13 +200,16 @@ class Loader():
 
     def put(self, index_name, doc_type, ID, body, create_index = True, routing = None, parent = None):
 
-        if index_name not in self.index_created:
+        if index_name not in self.indexes_created:
             if create_index:
                 self.create_new_index(index_name)
-            self.index_created.append(index_name)
+            self.indexes_created.append(index_name)
+        versioned_index_name = self.get_versioned_index(index_name)
+        if versioned_index_name not in self.indexes_optimised:
+            self.prepare_for_bulk_indexing(versioned_index_name)
         if isinstance(body, JSONSerializable):
             body = body.to_json()
-        submission_dict = dict(_index=self.get_versioned_index(index_name),
+        submission_dict = dict(_index=versioned_index_name,
                                _type=doc_type,
                                _id=ID,
                                _source=body)
@@ -271,19 +275,8 @@ class Loader():
     def close(self):
 
         self.flush()
-        for index_name in self.index_created:
-            self.restore_after_bulk_indexing(index_name)
+        self.restore_after_bulk_indexing()
 
-    #
-    # def load_single(self, index_name, doc_type, ID, body):
-    # self.results[index_name].append(
-    #         self.es.index(index=index_name,
-    #                       doc_type=doc_type,
-    #                       id=ID,
-    #                       body=body)
-    #     )
-    #     if (len(self.results[index_name]) % 1000) == 0:
-    #         logging.info("%i entries processed for index %s" % (len(self.results[index_name]), index_name))
 
     def __enter__(self):
         return self
@@ -293,43 +286,41 @@ class Loader():
         self.close()
 
     def prepare_for_bulk_indexing(self, index_name):
-        settings = {
-                    "index" : {
-                        "refresh_interval" : "-1",
-                        "number_of_replicas" : 0
-                    }
-        }
-        self.es.indices.put_settings(index=index_name,
-                                     body =settings)
-    def restore_after_bulk_indexing(self, index_name):
-        settings = {
-                    "index" : {
-                        "refresh_interval" : "60s",
-                        "number_of_replicas" : 1
-                    }
-        }
-        index_name = self.get_versioned_index(index_name)
-
-        def update_settings(base_settings, specific_settings):
-            for key in ["refresh_interval", "number_of_replicas"]:
-                if key in specific_settings['settings']:
-                    base_settings["index"][key]= specific_settings['settings'][key]
-            return base_settings
-        if Config.ELASTICSEARCH_DATA_INDEX_NAME in index_name:
-            settings=update_settings(settings,ElasticSearchConfiguration.evidence_data_mapping)
-        elif Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME in index_name:
-            settings=update_settings(settings,ElasticSearchConfiguration.score_data_mapping)
-        elif Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME in index_name:
-            settings=update_settings(settings,ElasticSearchConfiguration.efo_data_mapping)
-        elif Config.ELASTICSEARCH_ECO_INDEX_NAME in index_name:
-            settings=update_settings(settings,ElasticSearchConfiguration.eco_data_mapping)
-        elif Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME in index_name:
-            settings=update_settings(settings,ElasticSearchConfiguration.gene_data_mapping)
-        elif Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME in index_name:
-            settings=update_settings(settings,ElasticSearchConfiguration.expression_data_mapping)
-
-        self.es.indices.put_settings(index=index_name,
-                                     body =settings)
+        if not self.dry_run:
+            old_cluster_settings = self.es.cluster.get_settings()
+            try:
+                if old_cluster_settings['transient']['indices']['store']['throttle']['type']=='none':
+                    pass
+                else:
+                    raise ValueError
+            except (KeyError, ValueError):
+                transient_cluster_settings = {
+                                            "transient" : {
+                                                "indices.store.throttle.type" : "none"
+                                            }
+                                        }
+                self.es.cluster.put_settings(transient_cluster_settings)
+            old_index_settings = self.es.indices.get_settings(index=index_name)
+            temp_index_settings = {
+                        "index" : {
+                            "refresh_interval" : "-1",
+                            "number_of_replicas" : 0
+                        }
+            }
+            self.es.indices.put_settings(index=index_name,
+                                         body =temp_index_settings)
+            self.indexes_optimised[index_name]= dict(settings_to_restore={
+                        "index" : {
+                            "refresh_interval" : "1s",
+                            "number_of_replicas" : old_index_settings[index_name]['settings']['index']['number_of_replicas']
+                        }
+                })
+    def restore_after_bulk_indexing(self):
+        if not self.dry_run:
+            for index_name in self.indexes_optimised:
+                self.es.indices.put_settings(index=index_name,
+                                             body=self.indexes_optimised[index_name]['settings_to_restore'])
+                self.optimize_index(index_name)
 
 
     def _safe_create_index(self, index_name, body, ignore=400):
@@ -385,6 +376,6 @@ class Loader():
 
     def optimize_index(self, index_name):
         try:
-            self.es.indices.optimize(index=self.get_versioned_index(index_name), max_num_segments=5, wait_for_merge = False)
+            self.es.indices.optimize(index=index_name, max_num_segments=5, wait_for_merge = False)
         except:
             logging.warn('optimisation of index %s failed'%index_name)
