@@ -796,11 +796,7 @@ class DataDrivenRelationProcess(object):
         for data in rel_handler.produce_d2d_pairs():
             d2d_queue_processing.put(data, self.r_server)
         logger.info('disease to disease distances pair push done')
-
-        '''stop d2d specifc workers'''
         d2d_queue_processing.set_submission_finished(self.r_server)
-        for w in d2d_workers:
-            w.join()
 
         '''start workers for t2t'''
 
@@ -817,12 +813,16 @@ class DataDrivenRelationProcess(object):
 
         ''' compute target to target distances'''
         logger.info('Starting to push pairs for target to target distances computation')
-        for data in rel_handler.produce_d2d_pairs():
+        for data in rel_handler.produce_t2t_pairs():
             t2t_queue_processing.put(data, self.r_server)
         logger.info('target to target distances pair push done')
+        t2t_queue_processing.set_submission_finished(self.r_server)
+
+        '''stop d2d specifc workers'''
+        for w in d2d_workers:
+            w.join()
 
         '''stop t2t specifc workers'''
-        t2t_queue_processing.set_submission_finished(self.r_server)
         for w in t2t_workers:
             w.join()
 
