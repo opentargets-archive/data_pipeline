@@ -26,8 +26,8 @@ import math
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from settings import Config
 
-STORAGE_CHUNK_SIZE = 5000
-STORAGE_WORKERS = multiprocessing.cpu_count()/2
+STORAGE_CHUNK_SIZE = 1000
+STORAGE_WORKERS = multiprocessing.cpu_count()
 
 logger = logging.getLogger(__name__)
 
@@ -757,7 +757,7 @@ class DataDrivenRelationProcess(object):
                                       ttl=60 * 60 * 24 * 14)
 
         queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
-                                   max_size=int(STORAGE_CHUNK_SIZE*STORAGE_WORKERS*1.2),
+                                   max_size=int(STORAGE_CHUNK_SIZE*STORAGE_WORKERS),
                                    job_timeout=20)
         '''start shared workers'''
         q_reporter = RedisQueueStatusReporter([
