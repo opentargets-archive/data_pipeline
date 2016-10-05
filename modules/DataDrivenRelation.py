@@ -71,17 +71,19 @@ class DistanceComputationWorker(RedisQueueWorkerProcess):
                  row_labels,
                  rows_ids,
                  column_ids,
+                 threshold = 0.,
                  ):
         super(DistanceComputationWorker, self).__init__(queue_in, r_server, queue_out)
         self.type = type
         self.row_labels = row_labels
         self.rows_ids = rows_ids
         self.column_ids = column_ids
+        self.threshold = threshold
 
     def process(self, data):
         subject_index, subject_data, object_index, object_data = data
         distance, subject_nz, subject_nz, intersection, union = OverlapDistance.compute_distance(subject_data, object_data)
-        if (distance == 0.) or (not intersection):
+        if (distance <= self.threshold) or (not intersection) :
             return
         subject = dict(id=self.rows_ids[subject_index],
                        label=self.row_labels[subject_index],
@@ -788,6 +790,7 @@ class DataDrivenRelationProcess(object):
                                                  disease_labels,
                                                  disease_keys,
                                                  target_keys,
+                                                 0.2,
                                                  ) for i in range(multiprocessing.cpu_count())]
         for w in d2d_workers:
             w.start()
@@ -809,6 +812,7 @@ class DataDrivenRelationProcess(object):
                                                  target_labels,
                                                  target_keys,
                                                  disease_keys,
+                                                 0.4,
                                                  ) for i in range(multiprocessing.cpu_count())]
         for w in t2t_workers:
             w.start()
