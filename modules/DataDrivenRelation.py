@@ -81,6 +81,8 @@ class DistanceComputationWorker(RedisQueueWorkerProcess):
     def process(self, data):
         subject_index, subject_data, object_index, object_data = data
         distance, subject_nz, subject_nz, intersection, union = OverlapDistance.compute_distance(subject_data, object_data)
+        if (distance == 0.) or (not intersection):
+            return
         subject = dict(id=self.rows_ids[subject_index],
                        label=self.row_labels[subject_index],
                        links={})
