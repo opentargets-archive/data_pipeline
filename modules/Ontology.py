@@ -185,6 +185,8 @@ class OntologyClassReader():
         Declares an RDF graph that will contain an ontology representation.
         """
         self.rdf_graph = None
+        self.current_classes = dict()
+        self.obsolete_classes = dict()
 
     def get_ontology_classes(self, uri):
         """Returns all current and obsolete classes from an ontology.
@@ -208,29 +210,29 @@ class OntologyClassReader():
         # get all classes with label and synonyms
 
 
-    def load_ontology(self, name, base_class, current, obsolete):
+    def load_ontology(self, base_class):
         '''
         :return:
         '''
 
         sparql_query = '''
         SELECT DISTINCT ?ont_node ?label
-        FROM <http://purl.obolibrary.org/obo/%s.owl>
         {
         ?ont_node rdfs:subClassOf* <%s> .
         ?ont_node rdfs:label ?label
         }
         '''
-        self.sparql.setQuery(sparql_query % (name, base_class))
-        self.sparql.setReturnFormat(JSON)
-        results = self.sparql.query().convert()
 
-        for result in results["results"]["bindings"]:
-            uri = result['ont_node']['value']
-            label = result['label']['value']
-            current[uri] = label
-            # print(json.dumps(result, indent=4))
-            # print("%s %s"%(uri, label))
+        count = 0
+        qres = self.rdf_graph.query(sparql_query % base_class)
+
+        for row in qres:
+            uri = str(row[0])
+            label = str(row[1])
+            self.current_classes[uri] = label
+            count +=1
+            #logger.info("RDFLIB '%s' '%s'" % (uri, label))
+        logger.info("%i"%count)
 
         sparql_query = '''
         PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
@@ -245,12 +247,36 @@ class OntologyClassReader():
             ?hp_node rdfs:label ?label
 
          }
+         '''
+
+        sparql_query = '''
+        SELECT DISTINCT ?hp_node ?label ?id ?hp_new
+         {
+            ?hp_node owl:deprecated true .
+            ?hp_node oboInOwl:id ?id .
+            ?hp_node obo:IAO_0100001 ?hp_new .
+            ?hp_node rdfs:label ?label
+         }
+        '''
+
+        count = 0
+        qres = self.rdf_graph.query(sparql_query)
+
+        for row in qres:
+            uri = str(row[0])
+            label = str(row[1])
+            id = str(row[2])
+            hp_new = str(row[3])
+            self.current_classes[uri] = label
+            count +=1
+            logger.info("RDFLIB '%s' '%s' %s %s" % (uri, label, id, hp_new))
+        logger.info("%i"%count)
+        return
+
         '''
         self.sparql.setQuery(sparql_query % name)
         self.sparql.setReturnFormat(JSON)
         results = self.sparql.query().convert()
-
-        obsolete_classes = {}
 
         for result in results["results"]["bindings"]:
             uri = result['hp_node']['value']
@@ -260,15 +286,15 @@ class OntologyClassReader():
             new_label = ''
             if (not re.match('http:\/\/purl.obolibrary\.org', hp_new)):
                 hp_new = "http://purl.obolibrary.org/obo/%s" % hp_new.replace(':', '_')
-            obsolete_classes[uri] = hp_new
+            self.obsolete_classes[uri] = hp_new
         for uri in obsolete_classes:
             next_uri = obsolete_classes[uri]
             while next_uri in obsolete_classes:
                 next_uri = obsolete_classes[next_uri]
-            new_label = current[next_uri]
-            obsolete[uri] = "Use %s label:%s" % (next_uri, new_label)
-            self.logger.warn("%s %s" % (uri, obsolete[uri]))
-
+            new_label = current_classes[next_uri]
+            self.obsolete_classes[uri] = "Use %s label:%s" % (next_uri, new_label)
+            self.logger.warn("%s %s" % (uri, obsolete_classes[uri]))
+        '''
 
     def load_mp(self, base_class):
         '''
@@ -278,8 +304,8 @@ class OntologyClassReader():
         self.load_ontology(
             name_space='<http://purl.obolibrary.org/obo/mp.owl>',
             base_class=base_class,
-            current=self.phenotype_current,
-            obsolete=self.phenotype_obsolete)
+            current_classes=self.phenotype_current,
+            obsolete_classes=self.phenotype_obsolete)
         self.get_ontology_top_levels(base_class, top_level_map=self.phenotype_top_levels)
 
 class DiseasePhenotypes():

@@ -68,6 +68,30 @@ def test_mp_load():
     obj.get_ontology_classes(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
 
 @with_setup(my_setup_function, my_teardown_function)
+def test_hpo_load_classes():
+
+    obj = OntologyClassReader()
+    assert not obj == None
+    obj.get_ontology_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+    base_class = 'http://purl.obolibrary.org/obo/HP_0000118'
+    obj.load_ontology(base_class=base_class)
+    logger.info(len(obj.current_classes))
+    count = 0
+    for k,v in obj.current_classes.iteritems():
+        logger.info("%s => %s "%(k, v))
+        assert obj.current_classes[k] == v
+        count +=1
+        if (count > 20):
+            break
+    #logger.info(obj.current_classes['http://purl.obolibrary.org/obo/HP_0001347'])
+    #assert obj.current_classes['http://purl.obolibrary.org/obo/HP_0001347'] == 'Hyperreflexia"
+    logger.info("'%s'"%obj.current_classes["http://purl.obolibrary.org/obo/HP_0008074"] )
+    assert obj.current_classes["http://purl.obolibrary.org/obo/HP_0008074"] == "Metatarsal periosteal thickening"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/HP_0000924"] == "Abnormality of the skeletal system"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/HP_0002715"] == "Abnormality of the immune system"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/HP_0000118"] == "Phenotypic abnormality"
+
+@with_setup(my_setup_function, my_teardown_function)
 def test_parse_local_files():
     sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
     assert not sparql == None
