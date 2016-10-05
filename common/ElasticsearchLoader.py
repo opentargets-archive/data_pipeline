@@ -11,7 +11,7 @@ import collections
 
 import sys
 from elasticsearch.exceptions import NotFoundError
-from elasticsearch.helpers import parallel_bulk
+from elasticsearch.helpers import parallel_bulk, bulk
 from sqlalchemy import and_
 from common import Actions
 from common.DataStructure import JSONSerializable
@@ -248,13 +248,16 @@ class Loader():
     # @profile
     def _flush(self):
         if not self.dry_run:
-            thread_count = 10
-            chunk_size = int(self.chunk_size/thread_count)
-            parallel_bulk(
-                self.es,
+            bulk(self.es,
                 self.cache,
-                thread_count=thread_count,
-                chunk_size=chunk_size,)
+                 stats_only=True)
+            # thread_count = 10
+            # chunk_size = int(self.chunk_size/thread_count)
+            # parallel_bulk(
+            #     self.es,
+            #     self.cache,
+            #     thread_count=thread_count,
+            #     chunk_size=chunk_size,)
             # for ok, results in parallel_bulk(
             #         self.es,
             #         self.cache,
