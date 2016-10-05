@@ -26,7 +26,7 @@ import math
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from settings import Config
 
-STORAGE_CHUNK_SIZE = 100
+STORAGE_CHUNK_SIZE = 5000
 STORAGE_WORKERS = multiprocessing.cpu_count()/2
 
 logger = logging.getLogger(__name__)
@@ -572,9 +572,6 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
             data_vector = data_vector > 0
             data_vector = data_vector.astype(int)
         transformed_data = tdidf_transformer.fit_transform(data_vector)
-        from nearpy import Engine
-        from nearpy.hashes import RandomBinaryProjections
-
         sums_vector = np.squeeze(np.asarray(transformed_data.sum(1)).ravel())
         limit = -1  # debugging
         buckets_number = sample_size
