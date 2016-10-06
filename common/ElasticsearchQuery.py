@@ -99,7 +99,7 @@ class ESQuery(object):
         source = self._get_source_from_fields(fields)
         #TODO - disease specific query for testing!!! Replace with original match_all query
         res = helpers.scan(client=self.handler,
-                           query={"query":  {"bool": {"must": [{"match": {"code": "EFO_0003767"}}]}},
+                           query={"query":  {"bool": {"must": [{"match": {"code": "EFO_0000206"}}]}},
                                    '_source': source,
                                    'size': 1000,
                                    },
@@ -278,9 +278,17 @@ class ESQuery(object):
         #                    index=index_name,
         #                    timeout="10m",
         #                    )
+        #ibd = EFO_0003767 ENSG00000167207 1154
+        #als =EFO_0000253 ENSG00000142168 2k
+        #asthma = EFO_0000270 ENSG00000166311
+        #parkinsons = EFO_0002508 ENSG00000145335
+        #cancer = EFO_0000311 ENSG00000066468 815
+        #stage II endometrioid carcinoma - EFO_0000206 ENSG00000121879
+
 
         res = helpers.scan(client=self.handler,
-                           query={"query": {"bool": {"must": [{"match": {"evidence_string.disease.id": "EFO_0003767"}}]}},
+                           query={"query": {"bool": {"must": [{"match": {"evidence_string.disease.id": "EFO_0000206"}}
+                               , {"match": {"target_id": "ENSG00000121879"}}]}},
                                   '_source': source,
                                   'size': 10000,
                                   },
@@ -442,13 +450,44 @@ class ESQuery(object):
         #                           }
         #                           )
 
-        res = self.handler.search(index=Loader.get_versioned_index(index_name),
+        if index_name == Config.ELASTICSEARCH_NEW_DATA_INDEX_NAME:
+            res = self.handler.search(index=Loader.get_versioned_index(index_name),
                                   doc_type=doc_type,
-                                  body={"query": {"bool": {"must": [{"match": {"evidence_string.disease.id": "EFO_0003767"}}]}},
+                                  body={"query": {"bool": {"must": [{"match": {"evidence_string.disease.id": "EFO_0000206"}}
+                                      , {"match": {"target_id": "ENSG00000121879"}}]}},
                                       '_source': False,
                                       'size': 0,
                                   }
                                   )
+        elif index_name == Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME:
+            res = self.handler.search(index=Loader.get_versioned_index(index_name),
+                                      doc_type=doc_type,
+                                      body={"query": {
+                                          "bool": {"must": [{"match": {"code": "EFO_0000206"}}]}},
+                                            '_source': False,
+                                            'size': 0,
+                                            }
+                                      )
+        elif index_name == Config.ELASTICSEARCH_ECO_INDEX_NAME:
+            res = self.handler.search(index=Loader.get_versioned_index(index_name),
+                                      doc_type=doc_type,
+                                      body={"query": {"bool": {"should": [{"match": {"code": "http://purl.obolibrary.org/obo/ECO_0000213"}},
+                                                                          {"match": {"code": "http://www.targetvalidation.org/evidence/literature_mining"}}]}},
+                                            '_source': False,
+                                            'size': 0,
+                                            }
+                                      )
+        else:
+            res = self.handler.search(index=Loader.get_versioned_index(index_name),
+                                      doc_type=doc_type,
+                                      body={"query": {
+                                          "match_all": {}
+                                      },
+                                          '_source': False,
+                                          'size': 0,
+                                      }
+                                      )
+
         return res['hits']['total']
 
     def get_evidence_simple(self, targets = None):
@@ -595,6 +634,8 @@ class ESQuery(object):
 
 
     def get_publications_by_id(self, ids):
+        print "Publication ids "
+        print ids
         query_body = {"query": {
                                "ids": {
                                    "values": ids,

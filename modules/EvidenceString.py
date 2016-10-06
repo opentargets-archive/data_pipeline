@@ -190,6 +190,7 @@ class ExtendedInfoLiterature(ExtendedInfo):
     def extract_info(self, literature):
 
         self.data = dict( abstract = literature.abstract,
+                          title = literature.title,
                           journal=literature.journal,
                           year=literature.year,
                           abstract_lemmas=literature.abstract_lemmas)
@@ -533,7 +534,10 @@ class EvidenceManager():
             literature_info = ExtendedInfoLiterature(literature)
             extended_evidence['literature']['year'] = literature_info.data['year']
             extended_evidence['literature']['abstract'] = literature_info.data['abstract']
-            extended_evidence['literature']['journal'] = literature_info.data['journal']
+            print "Title"
+            print literature_info.data['title']
+            extended_evidence['literature']['title'] = literature_info.data['title']
+            extended_evidence['literature']['journal_data'] = literature_info.data['journal']
 
 
         '''Add private objects used just for indexing'''

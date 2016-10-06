@@ -71,7 +71,7 @@ def _get_evidence_string_generic_mapping():
                                     "count": {
                                         "type": "long"
                                     },
-                                    "values": {
+                                    "value": {
                                         "type": "string",
                                         "index": "not_analyzed"
                                     }
