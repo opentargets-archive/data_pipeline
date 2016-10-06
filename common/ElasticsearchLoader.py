@@ -179,12 +179,14 @@ class Loader():
                  max_flush_interval = 10):
 
         self.es = es
+        self.dry_run = dry_run
+        if es is None:
+            self.dry_run = True
         self.cache = []
         self.results = defaultdict(list)
         self.chunk_size = chunk_size
         self.indexes_created=[]
         self.indexes_optimised = {}
-        self.dry_run = dry_run
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
 

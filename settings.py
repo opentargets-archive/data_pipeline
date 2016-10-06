@@ -1,3 +1,4 @@
+import logging
 import uuid
 from collections import defaultdict, OrderedDict
 
@@ -5,6 +6,9 @@ from collections import defaultdict, OrderedDict
 __author__ = 'andreap'
 import os
 import ConfigParser
+
+'''logger'''
+logger = logging.getLogger()
 
 iniparser = ConfigParser.ConfigParser()
 iniparser.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'db.ini'))
@@ -16,11 +20,18 @@ class Config():
 
     RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
-    ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
-    ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
-    ELASTICSEARCH_URL = 'http://'+ELASTICSEARCH_HOST
-    if ELASTICSEARCH_PORT:
-        ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
+    try:
+        ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
+        ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+        ELASTICSEARCH_URL = 'http://'+ELASTICSEARCH_HOST
+        if ELASTICSEARCH_PORT:
+            ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
+    except ConfigParser.NoOptionError:
+        logger.error('elasticsearch host and port not provided in db.ini file ')
+        ELASTICSEARCH_HOST = None
+        ELASTICSEARCH_PORT = None
+        ELASTICSEARCH_URL = None
+
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -57,7 +68,7 @@ class Config():
     try:
         SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
     except ConfigParser.NoOptionError:
-        print 'no virtuoso instance'
+        print('no virtuoso instance')
         SPARQL_ENDPOINT_URL = ''
 
     try:
@@ -70,7 +81,7 @@ class Config():
     except ConfigParser.NoOptionError:
         # the official logger is not loaded yet. not moving things around as we
         # will likely put all of this in a config file.
-        print 'no postgres instance'
+        print('no postgres instance')
         POSTGRES_DATABASE = {}
 
     # HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
