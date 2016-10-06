@@ -608,7 +608,7 @@ class DataDrivenRelationProcess(object):
 
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         number_of_storers = number_of_workers / 2 + 1
-        queue_per_worker =50
+        queue_per_worker =250
 
         # rel_handler = RelationHandlerProduceAll(target_data=target_data,
         rel_handler = RelationHandlerEuristicOverlapEstimation(target_data=target_data,
@@ -633,15 +633,17 @@ class DataDrivenRelationProcess(object):
         '''create the queues'''
         d2d_pair_producing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_pair_producting',
                                           max_size=number_of_workers* 5,
-                                          job_timeout=20)
+                                          job_timeout=60 * 60 * 24,
+                                          ttl=60 * 60 * 24 * 14)
         t2t_pair_producing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_pair_producting',
                                           max_size=number_of_workers * 5,
-                                          job_timeout=20,
+                                          job_timeout=60 * 60 * 24,
                                           ttl=60 * 60 * 24 * 14)
 
         d2d_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_processing',
                                           max_size=number_of_workers * queue_per_worker*5,
-                                          job_timeout=20)
+                                          job_timeout=20,
+                                          ttl=60 * 60 * 24 * 14)
         t2t_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_processing',
                                           max_size=number_of_workers * queue_per_worker*5,
                                           job_timeout=20,
