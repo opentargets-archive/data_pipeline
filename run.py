@@ -44,6 +44,7 @@ logging.basicConfig(filename = 'output.log',
 logging.getLogger('elasticsearch').setLevel(logging.ERROR)
 logging.getLogger("requests").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("redislite.client").setLevel(logging.ERROR)
 
 '''logger'''
 logger = logging.getLogger(__name__)
