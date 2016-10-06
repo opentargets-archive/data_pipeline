@@ -17,6 +17,7 @@ from modules import GeneData
 from modules.ECO import ECO
 from modules.EFO import EFO, get_ontology_code_from_url
 from modules.GeneData import Gene
+from modules.Literature import Literature
 from settings import Config
 
 logger = logging.getLogger(__name__)
@@ -177,6 +178,23 @@ class ExtendedInfoECO(ExtendedInfo):
         self.data = dict(eco_id = eco.get_id(),
                           label=eco.label),
 
+class ExtendedInfoLiterature(ExtendedInfo):
+    root = "literature"
+
+    def __init__(self, literature):
+        if isinstance(literature, Literature):
+            self.extract_info(literature)
+        else:
+            raise AttributeError("you need to pass a Literature not a: " + str(type(literature)))
+
+    def extract_info(self, literature):
+
+        self.data = dict( abstract = literature.abstract,
+                          title = literature.title,
+                          journal=literature.journal,
+                          year=literature.year,
+                          abstract_lemmas=literature.abstract_lemmas)
+
 class ProcessedEvidenceStorer():
     def __init__(self,  es_loader, chunk_size=1e4, quiet = False):
 
@@ -191,7 +209,8 @@ class ProcessedEvidenceStorer():
 
         # self.cache[id] = ev
         self.counter +=1
-        self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+
+        self.es_loader.put(Config.ELASTICSEARCH_NEW_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
                            ev.get_doc_name(),
                            id,
                            ev.to_json(),
@@ -219,6 +238,7 @@ class EvidenceManager():
         self.available_genes = lookup_data.available_genes
         self.available_efos =  lookup_data.available_efos
         self.available_ecos =  lookup_data.available_ecos
+        self.available_publications = lookup_data.available_publications
         self.uni2ens =  lookup_data.uni2ens
         self.non_reference_genes =  lookup_data.non_reference_genes
         self._get_eco_scoring_values()
@@ -504,6 +524,22 @@ class EvidenceManager():
                 data.append(eco_info.data)
             extended_evidence['evidence'][ExtendedInfoECO.root] = data
 
+        ''' Add literature data '''
+        pmid_url = extended_evidence['literature']['references'][0]['lit_id']
+        pmid = pmid_url.split('/')[-1]
+        literature = self._get_literature_obj(pmid)
+        #TODO: check introduced for testing!!!
+        if literature.abstract:
+
+            literature_info = ExtendedInfoLiterature(literature)
+            extended_evidence['literature']['year'] = literature_info.data['year']
+            extended_evidence['literature']['abstract'] = literature_info.data['abstract']
+            print "Title"
+            print literature_info.data['title']
+            extended_evidence['literature']['title'] = literature_info.data['title']
+            extended_evidence['literature']['journal_data'] = literature_info.data['journal']
+
+
         '''Add private objects used just for indexing'''
 
         extended_evidence['private']['efo_codes'] = all_efo_codes
@@ -519,7 +555,8 @@ class EvidenceManager():
             GO_terms['molecular_function'] or \
             GO_terms['cellular_component'] :
             extended_evidence['private']['facets']['go'] = GO_terms
-
+        if literature.abstract:
+            extended_evidence['private']['facets']['abstract_lemmas'] = literature_info.data['abstract_lemmas']
 
         return Evidence(extended_evidence)
 
@@ -540,6 +577,17 @@ class EvidenceManager():
         eco = ECO(ecoid)
         eco.load_json(self.available_ecos[ecoid])
         return eco
+
+    def _get_literature_obj(self, pmid):
+
+        literature = Literature(pmid)
+
+        available_pub = self.available_publications[pmid]
+        #TODO : check For testing
+        if(available_pub):
+            literature.load_json(available_pub)
+        return literature
+
 
 
     def _get_non_reference_gene_mappings(self):
@@ -962,19 +1010,27 @@ class EvidenceStringProcess():
 
 
         logger.debug("Starting Evidence Manager")
+        #TODO - Testing - Targets specific to IBD !!
+        targets = []
+        for row in self.es_query.get_validated_evidence_strings(size=10000,fields='target_id', datasources=datasources):
+            target = row['target_id'].split('/')[-1]
+            targets.append(target)
 
-
-        lookup_data = LookUpDataRetriever(self.es, self.r_server).lookup
+        lookup_data = LookUpDataRetriever(self.es, self.r_server,targets).lookup
         get_evidence_page_size = 5000
         '''create and overwrite old data'''
         loader = Loader(self.es)
         overwrite_indices = not dry_run
         if not dry_run:
             overwrite_indices = not bool(datasources)
-        for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
-            loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=overwrite_indices)
-        loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'],
-                                recreate=overwrite_indices)
+        #TODO : commented for testing
+        # for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
+        #     loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=overwrite_indices)
+        # loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'],
+        #                         recreate=overwrite_indices)
+        loader.create_new_index(
+            Config.ELASTICSEARCH_NEW_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'],
+            recreate=overwrite_indices)
 
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
@@ -1054,7 +1110,7 @@ class EvidenceStringProcess():
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
 
         logger.info('flushing data to index')
-        self.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
+        self.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_NEW_DATA_INDEX_NAME),
                               wait_if_ongoing=True)
 
         logger.info('Processed data for %i targets'%len(targets_with_data))

@@ -18,7 +18,7 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisQueueWorkerProcess
+from common.Redis import RedisQueueWorkerProcess, RedisLookupTablePickle
 import multiprocessing
 from settings import Config
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
@@ -92,11 +92,11 @@ class PublicationFetcher(object):
         '''get from elasticsearch cache'''
         logging.info( "getting pub id {}".format( pub_ids))
         pubs ={}
-        for pub_source in self.es_query.get_publications_by_id(pub_ids):
-            logging.info( 'got pub %s from cache'%pub_source['pub_id'])
-            pub = Publication()
-            pub.load_json(pub_source)
-            pubs[pub.pub_id] = pub
+        # for pub_source in self.es_query.get_publications_by_id(pub_ids):
+        #     logging.info( 'got pub %s from cache'%pub_source['pub_id'])
+        #     pub = Publication()
+        #     pub.load_json(pub_source)
+        #     pubs[pub.pub_id] = pub
         if len(pubs)<pub_ids:
             for pub_id in pub_ids:
                 if pub_id not in pubs:
@@ -105,17 +105,18 @@ class PublicationFetcher(object):
                     r.raise_for_status()
                     result = r.json()['resultList']['result'][0]
                     pub = Publication(pub_id=pub_id,
-                                      title=result['title'],
-                                      abstract=result['abstractText'],
-                                      authors=result['authorList'],
-                                      year=int(result['pubYear']),
-                                      date=result["firstPublicationDate"],
-                                      journal=result['journalInfo'],
+                                      title=result.get('title'),
+                                      abstract=result.get('abstractText'),
+                                      authors=result.get('authorList'),
+                                      year=int(result.get('pubYear')),
+                                      date=result.get("firstPublicationDate"),
+                                      journal=result.get('journalInfo'),
                                       full_text=u"",
-                                      full_text_url=result['fullTextUrlList']['fullTextUrl'],
-                                      epmc_keywords=result['keywordList']['keyword'],
-                                      doi=result['doi'],
-                                      cited_by=result['citedByCount'],
+                                      #TODO : Commented for testing
+                                      #full_text_url=result.get('fullTextUrlList').get('fullTextUrl'),
+                                     # epmc_keywords=result['keywordList']['keyword'],
+                                      doi=result.get('doi'),
+                                      cited_by=result.get('citedByCount'),
                                       has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
                                       has_references=result['hasReferences'] == u'Y',
                                       is_open_access=result['isOpenAccess'] == u'Y',
@@ -257,12 +258,13 @@ class PublicationAnalyserSpacy(object):
 
         if pub is None:
             pub = self.fetcher.get_publication(pub_ids=pub_id)
-
-        text_to_parse = unicode(pub.title + ' ' + pub.abstract)
-        lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
-        lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
-        noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
-        analysed_pub = PublicationAnalysisSpacy(pub_id = pub_id,
+        analysed_pub = None
+        if pub.title and pub.abstract:
+            text_to_parse = unicode(pub.title + ' ' + pub.abstract)
+            lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
+            lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
+            noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
+            analysed_pub = PublicationAnalysisSpacy(pub_id = pub_id,
                                         lemmas=lemmas,
                                         noun_chunks=noun_chunks,
                                         analysed_sentences_count=analysed_sentences_count)
@@ -368,7 +370,7 @@ class PublicationAnalyserSpacy(object):
             return ''
 
 
-class Literature(object):
+class LiteratureProcess(object):
 
 
     def __init__(self,
@@ -436,15 +438,21 @@ class Literature(object):
 
         #TODO : Use separate queue for retrieving evidences?
 
+        # for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
+        #             desc='Reading available evidence_strings to analyse publications',
+        #             total = self.es_query.count_validated_evidence_strings(datasources= datasources),
+        #             unit=' evidence',
+        #             unit_scale=True):
         for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
                     desc='Reading available evidence_strings to analyse publications',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                     unit=' evidence',
                     unit_scale=True):
-            pub_id= self.get_pub_id_from_url(ev)
+            pub_id = self.get_pub_id_from_url(ev['evidence_string']['literature']['references'][0]['lit_id'])
             pubs = pub_fetcher.get_publication(pub_id)
 
             literature_q.put(pubs)
+        literature_q.set_submission_finished(r_server=self.r_server)
             # TODO - auditing?
         #wait for all spacy workers to finish
         for a in analyzers:
@@ -452,7 +460,7 @@ class Literature(object):
 
         logging.info('flushing data to index')
 
-        self.es_loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+        self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
             wait_if_ongoing=True)
         logging.info("DONE")
 
@@ -495,6 +503,85 @@ def cleanText(text):
 
     return text
 
+class Literature(JSONSerializable):
+    def __init__(self,
+                 pmid,
+                 abstract='',
+                 title='',
+                 journal='',
+                 year='',
+                 abstract_lemmas=''):
+        self.pmid = pmid
+        self.abstract = abstract
+        self.title = title
+        self.journal = journal
+        self.year = year
+        self.abstract_lemmas = abstract_lemmas
+
+
+class LiteratureLookUpTable(object):
+    """
+    A redis-based pickable literature look up table
+    """
+
+    def __init__(self,
+                 es,
+                 namespace = None,
+                 r_server = None,
+                 ttl = 60*60*24+7):
+        self._table = RedisLookupTablePickle(namespace = namespace,
+                                            r_server = r_server,
+                                            ttl = ttl)
+        self._es = es
+        self._es_query = ESQuery(es)
+        self.r_server = r_server
+        if r_server is not None:
+            self._load_literature_data(r_server)
+
+    def _load_literature_data(self, r_server = None):
+        for parent_publication, analyzed_publication in tqdm(self._es_query.get_all_publications(),
+                        desc='loading publications',
+                        unit=' publication',
+                        unit_scale=True,
+                        total=self._es_query.count_all_publications(),
+                        leave=False,
+                        ):
+            literature = parent_publication
+            literature['abstract_lemmas'] = analyzed_publication['lemmas']
+            self.set_literature(literature,self._get_r_server(
+                    r_server))# TODO can be improved by sending elements in batches
+
+    def get_literature(self, pmid, r_server = None):
+        return self._table.get(pmid, r_server=r_server)
+
+    def set_literature(self, literature, r_server = None):
+        self._table.set((literature['pub_id']), literature, r_server=self._get_r_server(
+            r_server))
+
+    def get_available_literature_ids(self, r_server = None):
+        return self._table.keys()
+
+    def __contains__(self, key, r_server=None):
+        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
+
+    def __getitem__(self, key, r_server=None):
+        return self.get_literature(key, r_server)
+
+    def __setitem__(self, key, value, r_server=None):
+        self._table.set(key, value, r_server=self._get_r_server(r_server))
+
+    def _get_r_server(self, r_server=None):
+        if not r_server:
+            r_server = self.r_server
+        if r_server is None:
+            raise AttributeError('A redis server is required either at class instantation or at the method level')
+        return r_server
+
+    def keys(self):
+        return self._table.keys()
+
+
+
 
 class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
     def __init__(self,
@@ -513,7 +600,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
         self.loader = loader
         self.start_time = time.time()
         self.audit = list()
-        self.logger = logging.getLogger(__name__)
+
 
     def process(self, data):
         publications = data
@@ -523,9 +610,15 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
             spacy_analysed_pub = self.pub_analyser.analyse_publication(pub_id=pub_id,
                                                                        pub=pub)
 
-            self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+            if (spacy_analysed_pub != None):
+                self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                             doc_type=spacy_analysed_pub.get_type(),
                             ID=pub_id,
                             body=spacy_analysed_pub.to_json(),
                             parent=pub_id,
                             )
+                logging.info("Literature data updated for pmid {}".format(pub_id))
+            else:
+                logging.info("Literature data not present for pmid {}".format(pub_id))
+
+

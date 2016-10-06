@@ -191,11 +191,9 @@ class Loader():
     def get_versioned_index(index_name):
         if index_name.startswith(Config.RELEASE_VERSION+'_'):
             raise ValueError('Cannot add %s twice to index %s'%(Config.RELEASE_VERSION, index_name))
-        if index_name.startswith('!'):
+        if index_name.startswith('!') or index_name.startswith('10.16'):
             return index_name
         return Config.RELEASE_VERSION + '_' + index_name
-
-
 
     def put(self, index_name, doc_type, ID, body, create_index = True, routing = None, parent = None):
 
@@ -352,7 +350,7 @@ class Loader():
                             msg='settings in elasticsearch are different from the ones sent',
                             keys=['number_of_replicas','number_of_shards','refresh_interval'])
 
-    def create_new_index(self, index_name, recreate = False):
+    def create_new_index(self, index_name, recreate=False):
         index_name = self.get_versioned_index(index_name)
         if self.es.indices.exists(index_name):
             if recreate:
