@@ -39,15 +39,12 @@ import rdflib
 from rdflib import URIRef
 from rdflib import Namespace
 from rdflib.namespace import OWL, RDF, RDFS
-
-import pprint
 from common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
 from settings import Config
 from tqdm import tqdm
 from datetime import datetime, date
 from settings import Config
-
 
 __author__ = "Gautier Koscielny"
 __copyright__ = "Copyright 2014-2016, Open Targets"
@@ -58,6 +55,9 @@ __maintainer__ = "Gautier Koscielny"
 __email__ = "gautierk@targetvalidation.org"
 __status__ = "Production"
 
+from logging.config import fileConfig
+
+fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
 logger = logging.getLogger(__name__)
 
 TOP_LEVELS = '''
@@ -188,33 +188,42 @@ class OntologyClassReader():
         self.current_classes = dict()
         self.obsolete_classes = dict()
 
-    def get_ontology_classes(self, uri):
-        """Returns all current and obsolete classes from an ontology.
+    def load_ontology_graph(self, uri):
+        """Loads the ontology from a URI in a RDFLib graph.
 
-        Given a uri pointing to a OWL file, load the ontology representation in a graph,
-        extracts the classes and returns a set of current and obsolete classes in dictionaries
+        Given a uri pointing to a OWL file, load the ontology representation in a graph.
 
         Args:
             uri (str): the URI for the ontology representation in OWL.
 
         Returns:
-            A tuple of dictionaries
+            None
 
         Raises:
             None
 
-        :return:
         """
         self.rdf_graph = rdflib.Graph()
         self.rdf_graph.parse(uri, format='xml')
         # get all classes with label and synonyms
 
+    def load_ontology_classes(self, base_class):
+        """Loads all current and obsolete classes from an ontology stored in RDFLin
 
-    def load_ontology(self, base_class):
-        '''
-        :return:
-        '''
+        Given a base class in the ontology, extracts the classes and stores the sets of
+        current and obsolete classes in dictionaries. This avoids traversing all the graph if only a few branches
+        are required.
 
+        Args:
+            base_class (str): the root of the ontology to start from.
+
+        Returns:
+            None
+
+        Raises:
+            None
+
+        """
         sparql_query = '''
         SELECT DISTINCT ?ont_node ?label
         {
@@ -231,8 +240,8 @@ class OntologyClassReader():
             label = str(row[1])
             self.current_classes[uri] = label
             count +=1
-            #logger.info("RDFLIB '%s' '%s'" % (uri, label))
-        logger.info("%i"%count)
+            logger.info("RDFLIB '%s' '%s'" % (uri, label))
+        logger.debug("%i"%count)
 
         sparql_query = '''
         PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
@@ -250,63 +259,59 @@ class OntologyClassReader():
          '''
 
         sparql_query = '''
-        SELECT DISTINCT ?hp_node ?label ?id ?hp_new
+        SELECT DISTINCT ?ont_node ?label ?id ?ont_new
          {
-            ?hp_node owl:deprecated true .
-            ?hp_node oboInOwl:id ?id .
-            ?hp_node obo:IAO_0100001 ?hp_new .
-            ?hp_node rdfs:label ?label
+            ?ont_node owl:deprecated true .
+            ?ont_node oboInOwl:id ?id .
+            ?ont_node obo:IAO_0100001 ?ont_new_id .
+            ?ont_new oboInOwl:id ?ont_new_id .
+            ?ont_node rdfs:label ?label
          }
         '''
 
-        count = 0
         qres = self.rdf_graph.query(sparql_query)
-
+        obsoletes = dict()
         for row in qres:
             uri = str(row[0])
             label = str(row[1])
             id = str(row[2])
-            hp_new = str(row[3])
-            self.current_classes[uri] = label
+            new_uri = str(row[3])
+            # point to the new URI
+            obsoletes[uri] = { 'label': label, 'new_uri' : new_uri }
             count +=1
-            logger.info("RDFLIB '%s' '%s' %s %s" % (uri, label, id, hp_new))
-        logger.info("%i"%count)
+            logger.info("Obsolete %s '%s' %s" % (uri, label, new_uri))
+        """
+        Still need to loop over to find the next new class to replace the
+        old URI with the latest URI (some intermediate classes can be obsolete too)
+        """
+
+        for old_uri in obsoletes.keys():
+            next_uri = obsoletes[old_uri]['new_uri']
+            while next_uri in obsoletes.keys():
+                next_uri = obsoletes[next_uri]['new_uri']
+            new_label = self.current_classes[next_uri]
+            logger.warn("%s => %s" % (old_uri, obsoletes[old_uri]))
+            self.obsolete_classes[old_uri] = "Use %s label:%s" % (next_uri, new_label)
+
         return
 
-        '''
-        self.sparql.setQuery(sparql_query % name)
-        self.sparql.setReturnFormat(JSON)
-        results = self.sparql.query().convert()
+    def load_hpo_classes(self):
+        """Loads the HPO graph and extracts the current and obsolete classes.
+           Status: production
+        """
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+        base_class = 'http://purl.obolibrary.org/obo/HP_0000118'
+        self.load_ontology_classes(base_class=base_class)
 
-        for result in results["results"]["bindings"]:
-            uri = result['hp_node']['value']
-            label = result['label']['value']
-            id = result['label']['value']
-            hp_new = result['hp_new']['value']
-            new_label = ''
-            if (not re.match('http:\/\/purl.obolibrary\.org', hp_new)):
-                hp_new = "http://purl.obolibrary.org/obo/%s" % hp_new.replace(':', '_')
-            self.obsolete_classes[uri] = hp_new
-        for uri in obsolete_classes:
-            next_uri = obsolete_classes[uri]
-            while next_uri in obsolete_classes:
-                next_uri = obsolete_classes[next_uri]
-            new_label = current_classes[next_uri]
-            self.obsolete_classes[uri] = "Use %s label:%s" % (next_uri, new_label)
-            self.logger.warn("%s %s" % (uri, obsolete_classes[uri]))
-        '''
+    def load_mp_classes(self):
+        """Loads the HPO graph and extracts the current and obsolete classes.
+           Status: production
+        """
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+        base_class = 'http://purl.obolibrary.org/obo/MP_0000001'
+        self.load_ontology_classes(base_class=base_class)
 
-    def load_mp(self, base_class):
-        '''
-        Load MP to accept phenotype terms that are not in EFO
-        :return:
-        '''
-        self.load_ontology(
-            name_space='<http://purl.obolibrary.org/obo/mp.owl>',
-            base_class=base_class,
-            current_classes=self.phenotype_current,
-            obsolete_classes=self.phenotype_obsolete)
-        self.get_ontology_top_levels(base_class, top_level_map=self.phenotype_top_levels)
+        #self.get_ontology_top_levels(base_class, top_level_map=self.phenotype_top_levels)
 
 class DiseasePhenotypes():
 
