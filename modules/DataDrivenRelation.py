@@ -658,7 +658,8 @@ class DataDrivenRelationProcess(object):
                                                d2d_queue_processing,
                                                t2t_queue_processing,
                                                queue_storage],
-                                              interval=60)
+                                              interval=15,
+                                              history=True)
         q_reporter.start()
 
         storage_workers = [DistanceStorageWorker(queue_storage,

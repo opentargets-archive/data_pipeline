@@ -40,7 +40,7 @@ __author__ = 'andreap'
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logging.basicConfig(filename = 'output.log',
                     format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+                    level=logging.DEBUG)
 logging.getLogger('elasticsearch').setLevel(logging.ERROR)
 logging.getLogger("requests").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
@@ -138,7 +138,8 @@ class PipelineConnectors():
 
         if not redispersist:
             self.clear_redislite_db()
-        self.r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
+        self.r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': [],
+                                                                     'maxclients': 10000})
 
 
 if __name__ == '__main__':
@@ -246,17 +247,24 @@ if __name__ == '__main__':
     parser.add_argument("--local-file", dest='local_file',
                         help="pass the path to a local gzipped file to use as input for the data validation step",
                         action='append', default=[])
+    parser.add_argument("--log-level", dest='loglevel',
+                        help="set the log level",
+                        action='store', default='INFO')
     args = parser.parse_args()
 
     targets = args.targets
 
     connectors = PipelineConnectors()
 
-    try:
-        connectors.init_services_connections(redispersist=args.redispersist)
-    except Exception, err:
-        print Exception, err
-        sys.exit(1)
+    if args.loglevel:
+        try:
+            logging.basicConfig(level=args.loglevel)
+        except:
+            pass
+    '''get local logger'''
+    logger = logging.getLogger(__name__)
+
+    connectors.init_services_connections(redispersist=args.redispersist)
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,

@@ -3,6 +3,9 @@ import json
 import logging
 import uuid
 import datetime
+
+import numpy as np
+from sparklines import sparklines
 from tqdm import tqdm
 try:
     import cPickle as pickle
@@ -198,6 +201,7 @@ class RedisQueue(object):
         return self.queue_id
 
     def get_status(self, r_server=None):
+        r_server = self._get_r_server(r_server)
         data = dict(queue_id=self.queue_id,
                     submitted_counter=int(r_server.get(self.submitted_counter) or 0),
                     processed_counter=int(r_server.get(self.processed_counter) or 0),
@@ -208,7 +212,8 @@ class RedisQueue(object):
                     max_queue_size=self.max_queue_size,
                     processing_jobs=len(self.get_processing_jobs(r_server)),
                     timedout_jobs=len(self.get_timedout_jobs(r_server)),
-                    total=self.get_total(r_server)
+                    total=self.get_total(r_server),
+                    client_data = r_server.info('clients'),
                     )
 
         if data['timedout_jobs']:
@@ -286,13 +291,28 @@ class RedisQueueStatusReporter(Process):
 
     def __init__(self,
                  queues,
-                 interval=15
+                 interval=15,
+                 history = False,
+                 history_resolution = 100,
                  ):
         super(RedisQueueStatusReporter, self).__init__()
         self.queues = queues
         self.r_server = Redis(Config.REDISLITE_DB_PATH)
         self.interval = interval
         self.logger = logging.getLogger(__name__)
+        self.history = history
+        self.historical_data = dict()
+        self.history_resolution = 100
+        if history:
+            for queue in queues:
+                self.historical_data[queue.queue_id] = dict(processing_jobs = [],
+                                                            queue_size = [],
+                                                            timedout_jobs=[],
+                                                            processing_speed = [],
+                                                            submission_speed = [],
+                                                            processed_jobs = [],
+                                                            submitted_jobs = [],
+                                                            )
 
     def run(self):
         self.logger.info("reporter worker started")
@@ -388,8 +408,8 @@ class RedisQueueStatusReporter(Process):
 
     def format(self, data):
         now = time.time()
-        lines = ['\n==== QUEUE: %s =====' % data['queue_id']]
         submitted = data['submitted_counter']
+        status = 'initialised'
         if submitted:
             processed = data['processed_counter']
             errors = data['errors_counter']
@@ -400,11 +420,6 @@ class RedisQueueStatusReporter(Process):
             processing_speed = 0.
             if processed:
                 processing_speed = round(processed / (now - data['start_time']), 2)
-            lines.append('Submitted jobs: %i' % submitted)
-            lines.append('Processed jobs: {} | {:.1%}'.format(processed, float(processed) / submitted))
-            lines.append('Errors: {} | {:.1%}'.format(errors, error_percent))
-            lines.append('Processing speed: {:.1f} jobs per second'.format(processing_speed))
-            lines.append('-' * 50)
             queue_size = data['queue_size']
             queue_size_status = 'empty'
             if queue_size:
@@ -412,10 +427,7 @@ class RedisQueueStatusReporter(Process):
                     queue_size_status = "full"
                 else:
                     queue_size_status = 'accepting jobs'
-            lines.append('Queue size: %i | %s' % (queue_size, queue_size_status))
-            lines.append('Jobs being processed: %i' % data["processing_jobs"])
-            lines.append('Jobs timed out: %i' % data["timedout_jobs"])
-            lines.append('Sumbmission finished: %s' % submission_finished)
+
             status = 'idle'
             if submitted:
                 status = 'jobs sumbitted'
@@ -424,14 +436,74 @@ class RedisQueueStatusReporter(Process):
             if submission_finished and \
                     (submitted == processed):
                 status = 'done'
-            lines.append('-' * 50)
-            lines.append('STATUS: %s' % status)
-            lines.append('Elapsed time: %s' % datetime.timedelta(seconds=now - data['start_time']))
+            lines = ['\n****** QUEUE: %s | STATUS %s ******' % (data['queue_id'], status)]
+            if self.history:#log history
+                historical_data = self.historical_data[data['queue_id']]
+                if not historical_data['processed_jobs']:
+                    processing_speed = float(data['processed_counter'])/self.interval
+                    submission_speed = float(data['submitted_counter']) / self.interval
+                else:
+                    processing_speed = float(data['processed_counter']-historical_data['processed_jobs'][-1]) / self.interval
+                    submission_speed = float(data['submitted_counter']-historical_data['submitted_jobs'][-1]) / self.interval
+                historical_data['queue_size'].append(data["queue_size"])
+                historical_data['processing_jobs'].append(data["processing_jobs"])
+                historical_data['timedout_jobs'].append(data["timedout_jobs"])
+                historical_data['processing_speed'].append(processing_speed)
+                historical_data['submission_speed'].append(submission_speed)
+                historical_data['processed_jobs'].append(data['processed_counter'])
+                historical_data['submitted_jobs'].append(data['submitted_counter'])
+
+                lines.append(self._compose_history_line(data['queue_id'], 'submitted_jobs'))
+                lines.append(self._compose_history_line(data['queue_id'], 'submission_speed'))
+                lines.append(self._compose_history_line(data['queue_id'], 'processed_jobs'))
+                lines.append(self._compose_history_line(data['queue_id'], 'processing_speed'))
+                lines.append(self._compose_history_line(data['queue_id'], 'processing_jobs'))
+                lines.append(self._compose_history_line(data['queue_id'], 'timedout_jobs'))
+                lines.append(self._compose_history_line(data['queue_id'], 'queue_size', queue_size_status))
+            else:#log single datapoint
+
+                    lines.append('Submitted jobs: %i' % submitted)
+                    lines.append('Processed jobs: {} | {:.1%}'.format(processed, float(processed) / submitted))
+                    lines.append('Errors: {} | {:.1%}'.format(errors, error_percent))
+                    lines.append('Processing speed: {:.1f} jobs per second'.format(processing_speed))
+                    lines.append('-' * 50)
+                    lines.append('Queue size: %i | %s' % (queue_size, queue_size_status))
+                    lines.append('Jobs being processed: %i' % data["processing_jobs"])
+                    lines.append('Jobs timed out: %i' % data["timedout_jobs"])
+                    lines.append('Sumbmission finished: %s' % submission_finished)
+                    status = 'idle'
+                    if submitted:
+                        status = 'jobs sumbitted'
+                    if processed:
+                        status = 'processing'
+                    if submission_finished and \
+                            (submitted == processed):
+                        status = 'done'
+                    lines.append('-' * 50)
+                    lines.append('STATUS: %s' % status)
+                    lines.append('Elapsed time: %s' % datetime.timedelta(seconds=now - data['start_time']))
+            lines.append(('=' * 50))
         else:
-            lines.append('Queue size: 0 | initialised')
-        lines.append(('=' * 50))
+            lines = ['****** QUEUE: %s | STATUS: %s ******' % (data['queue_id'], status)]
 
         return '\n'.join(lines)
+
+    def _average_long_interval(self,data,):
+        if len(data) > self.history_resolution:
+            np_data = np.array(data)
+            np.mean(np_data[:-(len(data) % self.history_resolution)].reshape(-1, self.history_resolution), axis=1)
+            return np_data.tolist()
+        return data
+
+    def _compose_history_line(self, queue_id, key, status = None):
+        data = self.historical_data[queue_id][key]
+        label = key.capitalize().replace('_',' ')
+        if status is None:
+            if data:
+                status = data[-1]
+        averaged_data = self._average_long_interval(data)
+        return '%s:\t %s | %s'%(label, sparklines(averaged_data)[0], status)
+
 
 class RedisQueueWorkerProcess(Process):
     '''
