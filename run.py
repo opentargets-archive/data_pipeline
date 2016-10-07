@@ -81,50 +81,47 @@ class PipelineConnectors():
         '''init es client'''
         connection_attempt = 1
         hosts=[]
-        es = None
-        if Config.ELASTICSEARCH_HOST and Config.ELASTICSEARCH_PORT:
+        while 1:
+            import socket
 
-            while 1:
-                import socket
-
-                try:#is a valid ip
-                    socket.inet_aton(Config.ELASTICSEARCH_HOST)
-                    hosts = [dict(host=Config.ELASTICSEARCH_HOST, port=Config.ELASTICSEARCH_PORT)]
+            try:#is a valid ip
+                socket.inet_aton(Config.ELASTICSEARCH_HOST)
+                hosts = [dict(host=Config.ELASTICSEARCH_HOST, port=Config.ELASTICSEARCH_PORT)]
+                break
+            except socket.error:#resolve nameserver to list of ips
+                try:
+                    socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
+                    nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
+                    hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
+                    logger.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
                     break
-                except socket.error:#resolve nameserver to list of ips
-                    try:
-                        socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
-                        nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
-                        hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
-                        logger.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
+                except socket.gaierror:
+                    wait_time = 5 * connection_attempt
+                    logger.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
+                    logger.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
+                    time.sleep(wait_time)
+                    if connection_attempt > 5:
+                        logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
                         break
-                    except socket.gaierror:
-                        wait_time = 5 * connection_attempt
-                        logger.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
-                        logger.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
-                        time.sleep(wait_time)
-                        if connection_attempt > 5:
-                            logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
-                            break
-                        connection_attempt+=1
+                    connection_attempt+=1
 
-            self.es = Elasticsearch(hosts = hosts,
-                               maxsize=50,
-                               timeout=1800,
-                               sniff_on_connection_fail=True,
-                               retry_on_timeout=True,
-                               max_retries=10,
-                               )
-            connection_attempt = 1
-            while not self.es.ping():
-                wait_time = 3*connection_attempt
-                logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
-                time.sleep(wait_time)
-                if connection_attempt >5:
-                    logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
-                    sys.exit(1)
-                    break
-                connection_attempt += 1
+        self.es = Elasticsearch(hosts = hosts,
+                           maxsize=50,
+                           timeout=1800,
+                           sniff_on_connection_fail=True,
+                           retry_on_timeout=True,
+                           max_retries=10,
+                           )
+        connection_attempt = 1
+        while not self.es.ping():
+            wait_time = 3*connection_attempt
+            logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
+            time.sleep(wait_time)
+            if connection_attempt >5:
+                logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
+                sys.exit(1)
+                break
+            connection_attempt += 1
 
 
         # es = Elasticsearch(["10.0.0.11:9200"],
