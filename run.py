@@ -106,23 +106,23 @@ class PipelineConnectors():
                             break
                         connection_attempt+=1
 
-            self.es = Elasticsearch(hosts = hosts,
-                               maxsize=50,
-                               timeout=1800,
-                               sniff_on_connection_fail=True,
-                               retry_on_timeout=True,
-                               max_retries=10,
-                               )
-            connection_attempt = 1
-            while not self.es.ping():
-                wait_time = 3*connection_attempt
-                logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
-                time.sleep(wait_time)
-                if connection_attempt >5:
-                    logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
-                    sys.exit(1)
-                    break
-                connection_attempt += 1
+        self.es = Elasticsearch(hosts = hosts,
+                           maxsize=50,
+                           timeout=1800,
+                           sniff_on_connection_fail=True,
+                           retry_on_timeout=True,
+                           max_retries=10,
+                           )
+        connection_attempt = 1
+        while not self.es.ping():
+            wait_time = 3*connection_attempt
+            logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
+            time.sleep(wait_time)
+            if connection_attempt >5:
+                logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
+                sys.exit(1)
+                break
+            connection_attempt += 1
 
 
         # es = Elasticsearch(["10.0.0.11:9200"],
