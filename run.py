@@ -34,20 +34,113 @@ from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
 from redislite import Redis
 
+__author__ = 'andreap'
+
 '''setup module default logging'''
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logging.basicConfig(filename = 'output.log',
                     format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.DEBUG)
+                    level=logging.INFO)
 logging.getLogger('elasticsearch').setLevel(logging.ERROR)
 logging.getLogger("requests").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("redislite.client").setLevel(logging.ERROR)
 
-def clear_redislite_db():
-    if os.path.exists(Config.REDISLITE_DB_PATH):
-        os.remove(Config.REDISLITE_DB_PATH)
+'''logger'''
+logger = logging.getLogger(__name__)
 
-__author__ = 'andreap'
+class PipelineConnectors():
+
+    def __init__(self):
+        """Initialises the class
+
+        Declares the connector parts
+        """
+
+        ''' sqlalchemy adapter '''
+        self.adapter = None
+        ''' Elastic Search connection'''
+        self.es = None
+        ''' sparql endpoint client'''
+        self.sparql = None
+        ''' redis '''
+        self.r_server = None
+
+    def clear_redislite_db(self):
+        if os.path.exists(Config.REDISLITE_DB_PATH):
+            os.remove(Config.REDISLITE_DB_PATH)
+
+    def init_services_connections(self, redispersist=False):
+
+        try:
+            self.adapter = Adapter()
+        except:
+            logger.error('Cannot connect to Postgres database. skipping creation of adapter')
+            self.adapter= None
+
+        '''init es client'''
+        connection_attempt = 1
+        hosts=[]
+        while 1:
+            import socket
+
+            try:#is a valid ip
+                socket.inet_aton(Config.ELASTICSEARCH_HOST)
+                hosts = [dict(host=Config.ELASTICSEARCH_HOST, port=Config.ELASTICSEARCH_PORT)]
+                break
+            except socket.error:#resolve nameserver to list of ips
+                try:
+                    socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
+                    nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
+                    hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
+                    logger.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
+                    break
+                except socket.gaierror:
+                    wait_time = 5 * connection_attempt
+                    logger.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
+                    logger.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
+                    time.sleep(wait_time)
+                    if connection_attempt > 5:
+                        logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
+                        break
+                    connection_attempt+=1
+
+        self.es = Elasticsearch(hosts = hosts,
+                           maxsize=50,
+                           timeout=1800,
+                           sniff_on_connection_fail=True,
+                           retry_on_timeout=True,
+                           max_retries=10,
+                           )
+        connection_attempt = 1
+        while not self.es.ping():
+            wait_time = 3*connection_attempt
+            logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
+            time.sleep(wait_time)
+            if connection_attempt >5:
+                logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
+                sys.exit(1)
+                break
+            connection_attempt += 1
+
+
+        # es = Elasticsearch(["10.0.0.11:9200"],
+        # # sniff before doing anything
+        #                     sniff_on_start=True,
+        #                     # refresh nodes after a node fails to respond
+        #                     sniff_on_connection_fail=True,
+        #                     # and also every 60 seconds
+        #                     sniffer_timeout=60)
+        #
+        '''init sparql endpoint client'''
+        self.sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
+
+
+        if not redispersist:
+            self.clear_redislite_db()
+        self.r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='CTTV processing pipeline')
@@ -111,7 +204,7 @@ if __name__ == '__main__':
                         action="append_const", const = SearchObjectActions.PROCESS)
     parser.add_argument("--ddr", dest='ddr', help="precompute data driven t2t and d2d relations",
                         action="append_const", const=DataDrivenRelationActions.PROCESS)
-    parser.add_argument("--persist-redis", dest='redisperist', help="use a fresh redislite db",
+    parser.add_argument("--persist-redis", dest='redispersist', help="use a fresh redislite db",
                         action='store_true', default=False)
     parser.add_argument("--musu", dest='mus', help="update mouse model data",
                         action="append_const", const = MouseModelsActions.UPDATE_CACHE)
@@ -155,12 +248,10 @@ if __name__ == '__main__':
                         action='append', default=[])
     args = parser.parse_args()
 
-    '''logger'''
-    logger = logging.getLogger(__name__)
+    targets = args.targets
 
+    connectors = PipelineConnectors()
 
-
-    '''sqlalchemy adapter'''
     try:
         adapter = Adapter()
     except:
@@ -211,26 +302,12 @@ if __name__ == '__main__':
                     logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
                     break
                 connection_attempt+=1
+        connectors.init_services_connections(redispersist=args.redispersist)
+    except Exception, err:
+        print Exception, err
+        sys.exit(1)
 
-
-
-
-    # es = Elasticsearch(["10.0.0.11:9200"],
-    # # sniff before doing anything
-    #                     sniff_on_start=True,
-    #                     # refresh nodes after a node fails to respond
-    #                     sniff_on_connection_fail=True,
-    #                     # and also every 60 seconds
-    #                     sniffer_timeout=60)
-    #
-    '''init sparql endpoint client'''
-    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
-
-    targets = args.targets
-    if not args.redisperist:
-        clear_redislite_db()
-    r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
-    with Loader(es,
+    with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
                 dry_run = args.dry_run) as loader:
         run_full_pipeline = False
@@ -239,19 +316,19 @@ if __name__ == '__main__':
         if args.hpa or run_full_pipeline:
             do_all = (HPAActions.ALL in args.hpa) or run_full_pipeline
             if (HPAActions.DOWNLOAD in args.hpa) or do_all:
-                HPADataDownloader(adapter).retrieve_all()
+                HPADataDownloader(connectors.adapter).retrieve_all()
             if (HPAActions.PROCESS in args.hpa) or do_all:
-                HPAProcess(adapter).process_all()
+                HPAProcess(connectors.adapter).process_all()
             if (HPAActions.UPLOAD in args.hpa) or do_all:
-                HPAUploader(adapter, loader).upload_all()
+                HPAUploader(connectors.adapter, loader).upload_all()
         if args.rea or run_full_pipeline:
             do_all = (ReactomeActions.ALL in args.rea) or run_full_pipeline
             if (ReactomeActions.DOWNLOAD in args.rea) or do_all:
-                ReactomeDataDownloader(adapter).retrieve_all()
+                ReactomeDataDownloader(connectors.adapter).retrieve_all()
             if (ReactomeActions.PROCESS in args.rea) or do_all:
-                ReactomeProcess(adapter).process_all()
+                ReactomeProcess(connectors.adapter).process_all()
             if (ReactomeActions.UPLOAD in args.rea) or do_all:
-                ReactomeUploader(adapter, loader).upload_all()
+                ReactomeUploader(connectors.adapter, loader).upload_all()
         if args.uni or run_full_pipeline:
             do_all = (UniProtActions.ALL in args.uni) or run_full_pipeline
             if (UniProtActions.CACHE in args.uni) or do_all:
@@ -259,7 +336,7 @@ if __name__ == '__main__':
         if args.hgnc or run_full_pipeline:
             do_all = (HGNCActions.ALL in args.hgnc) or run_full_pipeline
             if (HGNCActions.UPLOAD in args.hgnc) or do_all:
-                HGNCUploader(adapter).upload()
+                HGNCUploader(connectors.adapter).upload()
         if args.ens or run_full_pipeline:
             do_all = (EnsemblActions.ALL in args.ens) or run_full_pipeline
             if (EnsemblActions.PROCESS in args.ens) or do_all:
@@ -268,79 +345,79 @@ if __name__ == '__main__':
         if args.gen or run_full_pipeline:
             do_all = (GeneActions.ALL in args.gen) or run_full_pipeline
             if (GeneActions.MERGE in args.gen) or do_all:
-                GeneManager(loader,r_server).merge_all(dry_run=args.dry_run)
+                GeneManager(loader,connectors.r_server).merge_all(dry_run=args.dry_run)
         if args.efo or run_full_pipeline:
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:
-                EfoProcess(adapter).process_all()
+                EfoProcess(connectors.adapter).process_all()
             if (EfoActions.UPLOAD in args.efo) or do_all:
-                EfoUploader(adapter, loader).upload_all()
+                EfoUploader(connectors.adapter, loader).upload_all()
         if args.eco or run_full_pipeline:
             do_all = (EcoActions.ALL in args.eco) or run_full_pipeline
             if (EcoActions.PROCESS in args.eco) or do_all:
-                EcoProcess(adapter).process_all()
+                EcoProcess(connectors.adapter).process_all()
             if (EcoActions.UPLOAD in args.eco) or do_all:
-                EcoUploader(adapter, loader).upload_all()
+                EcoUploader(connectors.adapter, loader).upload_all()
         if args.mus or run_full_pipeline:
             do_all = (MouseModelsActions.ALL in args.mus) or run_full_pipeline
             if (MouseModelsActions.UPDATE_CACHE in args.mus) or do_all:
-                Phenodigm(adapter, es, sparql).update_cache()
+                Phenodigm(connectors.adapter, connectors.es, connectors.sparql).update_cache()
             if (MouseModelsActions.UPDATE_GENES in args.mus) or do_all:
-                Phenodigm(adapter, es, sparql).update_genes()
+                Phenodigm(connectors.adapter, connectors.es, connectors.sparql).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
-                Phenodigm(adapter, es, sparql).generate_evidence()
+                Phenodigm(connectors.adapter, connectors.es, connectors.sparql).generate_evidence()
         if args.lit or run_full_pipeline:
-            do_all = (ValidationActions.ALL in args.lit) or run_full_pipeline
+            do_all = (LiteratureActions.ALL in args.lit) or run_full_pipeline
             if (LiteratureActions.FETCH in args.lit) or do_all:
-                Literature(es, loader).fetch()
+                Literature(connectors.es, loader).fetch()
             if (LiteratureActions.PROCESS in args.lit) or do_all:
-                Literature(es, loader, r_server).process()
+                Literature(connectors.es, loader, connectors.r_server).process()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
-                IntOGen(es, sparql).process_intogen()
+                IntOGen(connectors.es, connectors.sparql).process_intogen()
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
-                PhenotypeSlim(sparql).create_phenotype_slim()
+                PhenotypeSlim(connectors.sparql).create_phenotype_slim(args.local_file)
             if (OntologyActions.DISEASEPHENOTYPES in args.onto) or do_all:
                 DiseasePhenotypes().parse_owl_url()
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es, sparql, r_server).map_genes()
+                EvidenceValidationFileChecker(connectors.adapter, connectors.es, connectors.r_server).map_genes()
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(adapter, es, sparql, r_server).check_all(args.local_file)
+                EvidenceValidationFileChecker(connectors.adapter, connectors.es, connectors.r_server).check_all(args.local_file)
         if args.valreset:
-            EvidenceValidationFileChecker(adapter, es, sparql, r_server).reset()
+            EvidenceValidationFileChecker(connectors.adapter, connectors.es, connectors.r_server).reset()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                targets = EvidenceStringProcess(es, r_server).process_all(datasources = args.datasource,
+                targets = EvidenceStringProcess(connectors.es, connectors.r_server).process_all(datasources = args.datasource,
                                                                           dry_run=args.dry_run)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:
-                ScoringProcess(loader, r_server).process_all(targets = targets,
+                ScoringProcess(loader, connectors.r_server).process_all(targets = targets,
                                                              dry_run=args.dry_run)
         if args.ddr or run_full_pipeline:
             do_all = (DataDrivenRelationActions.ALL in args.ddr) or run_full_pipeline
             if (DataDrivenRelationActions.PROCESS in args.ddr) or do_all:
-                DataDrivenRelationProcess(es, r_server).process_all(dry_run = args.dry_run)
+                DataDrivenRelationProcess(connectors.es, connectors.r_server).process_all(dry_run = args.dry_run)
         if args.sea or run_full_pipeline:
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
-                SearchObjectProcess(adapter, loader, r_server).process_all()
+                SearchObjectProcess(connectors.adapter, loader, connectors.r_server).process_all()
         if args.qc or run_full_pipeline:
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:
-                QCRunner(es).run_associationQC()
+                QCRunner(connectors.es).run_associationQC()
             # if (QCActions.CGC_ANALYSIS in args.qc) or do_all:
             #     QCRunner(es).analyse_cancer_gene_census()
         if args.dump or run_full_pipeline:
             do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
             if (DumpActions.DUMP in args.dump) or do_all:
-                DumpGenerator(es).dump()
+                DumpGenerator(connectors.es).dump()
 
 
 

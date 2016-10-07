@@ -21,13 +21,12 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from modules.Ontology import OntologyClassReader
+from modules.Ontology import OntologyClassReader, PhenotypeSlim
+from SPARQLWrapper import SPARQLWrapper, JSON
 from settings import Config
 import logging
-
-logging.basicConfig()
-logger = logging.getLogger(__name__)
-import datetime
+import os
+from logging.config import fileConfig
 
 __author__ = "Gautier Koscielny"
 __copyright__ = "Copyright 2014-2016, Open Targets"
@@ -38,13 +37,14 @@ __maintainer__ = "Gautier Koscielny"
 __email__ = "gautierk@targetvalidation.org"
 __status__ = "Production"
 
+fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
+logger = logging.getLogger()
 
 def setup_module(module):
-    print("")  # this is to get a newline after the dots
-    print("setup_module before anything in this file")
+    logger.info("Setting up the ontology tests")
 
 def teardown_module(module):
-    print("teardown_module after everything in this file")
+    logger.info("Tearing down the ontology tests")
 
 def my_setup_function():
     print("my_setup_function")
@@ -57,11 +57,59 @@ def my_teardown_function():
 def test_hpo_load():
     obj = OntologyClassReader()
     assert not obj == None
-    obj.get_ontology_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+    obj.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
 
 @with_setup(my_setup_function, my_teardown_function)
 def test_mp_load():
     obj = OntologyClassReader()
     assert not obj == None
-    obj.get_ontology_classes(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+    obj.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
 
+@with_setup(my_setup_function, my_teardown_function)
+def test_load_hpo_classes():
+
+    obj = OntologyClassReader()
+    assert not obj == None
+    obj.load_hpo_classes()
+
+    logger.info(len(obj.current_classes))
+
+    assert obj.current_classes["http://purl.obolibrary.org/obo/HP_0008074"] == "Metatarsal periosteal thickening"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/HP_0000924"] == "Abnormality of the skeletal system"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/HP_0002715"] == "Abnormality of the immune system"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/HP_0000118"] == "Phenotypic abnormality"
+
+    # Display obsolete terms
+    logger.info(len(obj.obsolete_classes))
+    for k,v in obj.obsolete_classes.iteritems():
+        logger.info("%s => %s "%(k, v))
+        assert obj.obsolete_classes[k] == v
+
+@with_setup(my_setup_function, my_teardown_function)
+def test_load_mp_classes():
+
+    obj = OntologyClassReader()
+    assert not obj == None
+    obj.load_mp_classes()
+
+    logger.info(len(obj.current_classes))
+
+    assert obj.current_classes["http://purl.obolibrary.org/obo/MP_0005559"] == "increased circulating glucose level"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/MP_0005376"] == "homeostasis/metabolism phenotype"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/MP_0003631"] == "nervous system phenotype"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/MP_0005370"] == "liver/biliary system phenotype"
+
+    # Display obsolete terms
+    logger.info(len(obj.obsolete_classes))
+    for k,v in obj.obsolete_classes.iteritems():
+        logger.info("%s => %s "%(k, v))
+        assert obj.obsolete_classes[k] == v
+
+@with_setup(my_setup_function, my_teardown_function)
+def test_parse_local_files():
+    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
+    assert not sparql == None
+    obj = PhenotypeSlim(sparql)
+    assert not obj == None
+    local_files = [ os.path.join(os.path.abspath(os.path.dirname(__file__)), '../samples/cttv008-22-07-2016.json.gz') ]
+    obj.create_phenotype_slim(local_files=local_files)

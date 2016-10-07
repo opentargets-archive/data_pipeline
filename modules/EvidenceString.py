@@ -1016,8 +1016,12 @@ class EvidenceStringProcess():
             overwrite_indices = not bool(datasources)
         for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
             loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=overwrite_indices)
+            loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v))
         loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'],
                                 recreate=overwrite_indices)
+        loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
+                                                                    Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
+
 
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
@@ -1096,6 +1100,7 @@ class EvidenceStringProcess():
                 w.terminate()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
 
+        loader.closer()
         logger.info('flushing data to index')
         self.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
                               wait_if_ongoing=True)

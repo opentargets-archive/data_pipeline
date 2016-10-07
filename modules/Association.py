@@ -468,7 +468,7 @@ class ScoringProcess():
         #                                                                                                         millify(disease_total),
         #                                                                                                         millify(estimated_total)))
         overwrite_indices = not dry_run
-        if not dry_run:
+        if overwrite_indices:
             overwrite_indices = not bool(targets)
         if not targets:
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
@@ -486,6 +486,7 @@ class ScoringProcess():
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         number_of_storers = number_of_workers/2 + 1
+        # number_of_storers = 1
         if targets and len(targets) <number_of_workers:
             number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
@@ -539,8 +540,8 @@ class ScoringProcess():
             w.start()
 
 
-        if not dry_run:
-            self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
+        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
+        self.es_loader.prepare_for_bulk_indexing(self.es_loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
 
 
 

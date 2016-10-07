@@ -1,8 +1,34 @@
-import os
+"""
+Copyright 2014-2016 EMBL - European Bioinformatics Institute, Wellcome
+Trust Sanger Institute, GlaxoSmithKline and Biogen
+
+This software was developed as part of Open Targets. For more information please see:
+
+	http://targetvalidation.org
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+.. module:: Ontology
+    :platform: Unix, Linux
+    :synopsis: A data pipeline module to extract information from ontologies.
+.. moduleauthor:: Gautier Koscielny <gautierk@opentargets.org>
+"""
+
 import re
 import sys
 reload(sys);
 sys.setdefaultencoding("utf8");
+import os
 import pysftp
 import gzip
 from paramiko import AuthenticationException
@@ -13,8 +39,6 @@ import rdflib
 from rdflib import URIRef
 from rdflib import Namespace
 from rdflib.namespace import OWL, RDF, RDFS
-
-import pprint
 from common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
 from settings import Config
@@ -22,9 +46,21 @@ from tqdm import tqdm
 from datetime import datetime, date
 from settings import Config
 
+__author__ = "Gautier Koscielny"
+__copyright__ = "Copyright 2014-2016, Open Targets"
+__credits__ = []
+__license__ = "Apache 2.0"
+__version__ = ""
+__maintainer__ = "Gautier Koscielny"
+__email__ = "gautierk@targetvalidation.org"
+__status__ = "Production"
 
-__author__ = 'gautierk'
+from logging.config import fileConfig
 
+try:
+    fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
+except:
+    pass
 logger = logging.getLogger(__name__)
 
 TOP_LEVELS = '''
@@ -147,39 +183,68 @@ class OntologyActions(Actions):
 class OntologyClassReader():
 
     def __init__(self):
+        """Initialises the class
+
+        Declares an RDF graph that will contain an ontology representation.
+        """
         self.rdf_graph = None
-        pass
+        self.current_classes = dict()
+        self.obsolete_classes = dict()
 
-    def get_ontology_classes(self, uri):
+    def load_ontology_graph(self, uri):
+        """Loads the ontology from a URI in a RDFLib graph.
 
+        Given a uri pointing to a OWL file, load the ontology representation in a graph.
+
+        Args:
+            uri (str): the URI for the ontology representation in OWL.
+
+        Returns:
+            None
+
+        Raises:
+            None
+
+        """
         self.rdf_graph = rdflib.Graph()
         self.rdf_graph.parse(uri, format='xml')
         # get all classes with label and synonyms
 
+    def load_ontology_classes(self, base_class):
+        """Loads all current and obsolete classes from an ontology stored in RDFLin
 
-    def load_ontology(self, name, base_class, current, obsolete):
-        '''
-        Load ontology to accept phenotype terms that are not
-        :return:
-        '''
+        Given a base class in the ontology, extracts the classes and stores the sets of
+        current and obsolete classes in dictionaries. This avoids traversing all the graph if only a few branches
+        are required.
+
+        Args:
+            base_class (str): the root of the ontology to start from.
+
+        Returns:
+            None
+
+        Raises:
+            None
+
+        """
         sparql_query = '''
         SELECT DISTINCT ?ont_node ?label
-        FROM <http://purl.obolibrary.org/obo/%s.owl>
         {
         ?ont_node rdfs:subClassOf* <%s> .
         ?ont_node rdfs:label ?label
         }
         '''
-        self.sparql.setQuery(sparql_query % (name, base_class))
-        self.sparql.setReturnFormat(JSON)
-        results = self.sparql.query().convert()
 
-        for result in results["results"]["bindings"]:
-            uri = result['ont_node']['value']
-            label = result['label']['value']
-            current[uri] = label
-            # print(json.dumps(result, indent=4))
-            # print("%s %s"%(uri, label))
+        count = 0
+        qres = self.rdf_graph.query(sparql_query % base_class)
+
+        for row in qres:
+            uri = str(row[0])
+            label = str(row[1])
+            self.current_classes[uri] = label
+            count +=1
+            logger.info("RDFLIB '%s' '%s'" % (uri, label))
+        logger.debug("%i"%count)
 
         sparql_query = '''
         PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
@@ -194,42 +259,62 @@ class OntologyClassReader():
             ?hp_node rdfs:label ?label
 
          }
+         '''
+
+        sparql_query = '''
+        SELECT DISTINCT ?ont_node ?label ?id ?ont_new
+         {
+            ?ont_node owl:deprecated true .
+            ?ont_node oboInOwl:id ?id .
+            ?ont_node obo:IAO_0100001 ?ont_new_id .
+            ?ont_new oboInOwl:id ?ont_new_id .
+            ?ont_node rdfs:label ?label
+         }
         '''
-        self.sparql.setQuery(sparql_query % name)
-        self.sparql.setReturnFormat(JSON)
-        results = self.sparql.query().convert()
 
-        obsolete_classes = {}
+        qres = self.rdf_graph.query(sparql_query)
+        obsoletes = dict()
+        for row in qres:
+            uri = str(row[0])
+            label = str(row[1])
+            id = str(row[2])
+            new_uri = str(row[3])
+            # point to the new URI
+            obsoletes[uri] = { 'label': label, 'new_uri' : new_uri }
+            count +=1
+            logger.info("Obsolete %s '%s' %s" % (uri, label, new_uri))
+        """
+        Still need to loop over to find the next new class to replace the
+        old URI with the latest URI (some intermediate classes can be obsolete too)
+        """
 
-        for result in results["results"]["bindings"]:
-            uri = result['hp_node']['value']
-            label = result['label']['value']
-            id = result['label']['value']
-            hp_new = result['hp_new']['value']
-            new_label = ''
-            if (not re.match('http:\/\/purl.obolibrary\.org', hp_new)):
-                hp_new = "http://purl.obolibrary.org/obo/%s" % hp_new.replace(':', '_')
-            obsolete_classes[uri] = hp_new
-        for uri in obsolete_classes:
-            next_uri = obsolete_classes[uri]
-            while next_uri in obsolete_classes:
-                next_uri = obsolete_classes[next_uri]
-            new_label = current[next_uri]
-            obsolete[uri] = "Use %s label:%s" % (next_uri, new_label)
-            self.logger.warn("%s %s" % (uri, obsolete[uri]))
+        for old_uri in obsoletes.keys():
+            next_uri = obsoletes[old_uri]['new_uri']
+            while next_uri in obsoletes.keys():
+                next_uri = obsoletes[next_uri]['new_uri']
+            new_label = self.current_classes[next_uri]
+            logger.warn("%s => %s" % (old_uri, obsoletes[old_uri]))
+            self.obsolete_classes[old_uri] = "Use %s label:%s" % (next_uri, new_label)
 
+        return
 
-    def load_mp(self, base_class):
-        '''
-        Load MP to accept phenotype terms that are not in EFO
-        :return:
-        '''
-        self.load_ontology(
-            name_space='<http://purl.obolibrary.org/obo/mp.owl>',
-            base_class=base_class,
-            current=self.phenotype_current,
-            obsolete=self.phenotype_obsolete)
-        self.get_ontology_top_levels(base_class, top_level_map=self.phenotype_top_levels)
+    def load_hpo_classes(self):
+        """Loads the HPO graph and extracts the current and obsolete classes.
+           Status: production
+        """
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+        base_class = 'http://purl.obolibrary.org/obo/HP_0000118'
+        self.load_ontology_classes(base_class=base_class)
+
+    def load_mp_classes(self):
+        """Loads the HPO graph and extracts the current and obsolete classes.
+           Status: production
+        """
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+        base_class = 'http://purl.obolibrary.org/obo/MP_0000001'
+        self.load_ontology_classes(base_class=base_class)
+
+        #self.get_ontology_top_levels(base_class, top_level_map=self.phenotype_top_levels)
 
 class DiseasePhenotypes():
 
@@ -688,41 +773,103 @@ class PhenotypeSlim():
     def _callback_not_used(self, path):
         self.logger.debug("skipped "+path)
 
-    def create_phenotype_slim(self):
+    def create_phenotype_slim(self, local_files = []):
 
         self.load_hpo(base_class='http://purl.obolibrary.org/obo/HP_0000118')
         self.load_mp(base_class='http://purl.obolibrary.org/obo/MP_0000001')
         self.load_efo(base_class='http://www.ebi.ac.uk/efo/EFO_0000508')
 
-        for u in tqdm(Config.ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS,
-                         desc='scanning ftp accounts',
-                         leave=False):
-            try:
-                p = Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[u]
-                self.logger.info("%s %s"%(u, p))
-                cnopts = pysftp.CnOpts()
-                cnopts.hostkeys = None  # disable host key checking.
-                with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
-                                       port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
-                                       username=u,
-                                       password=p,
-                                       cnopts = cnopts,
-                                       ) as srv:
-                    srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
-                    srv.close()
-                    for datasource, file_data in tqdm(self._remote_filenames[u].items(),
-                                                      desc='scanning available datasource for account %s'%u,
-                                                      leave=False,):
-                        latest_file = file_data['file_path']
-                        file_version = file_data['file_version']
-                        self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
-                        self.parse_gzipfile(latest_file, u, p)
-            except AuthenticationException:
-                self.logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
+        if local_files:
+
+            for file_path in local_files:
+                self.logger.info("Parsing file %s" % (file_path))
+                file_size, file_mod_time = os.path.getsize(file_path), os.path.getmtime(file_path)
+                with open(file_path, mode='rb') as f:
+                    self.parse_gzipfile(filename=file_path, mode='rb', fileobj=f, mtime=file_mod_time)
+        else:
+
+            for u in tqdm(Config.ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS,
+                             desc='scanning ftp accounts',
+                             leave=False):
+                try:
+                    p = Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[u]
+                    self.logger.info("%s %s"%(u, p))
+                    cnopts = pysftp.CnOpts()
+                    cnopts.hostkeys = None  # disable host key checking.
+                    with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
+                                           port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
+                                           username=u,
+                                           password=p,
+                                           cnopts = cnopts,
+                                           ) as srv:
+                        srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
+                        srv.close()
+                        for datasource, file_data in tqdm(self._remote_filenames[u].items(),
+                                                          desc='scanning available datasource for account %s'%u,
+                                                          leave=False,):
+                            latest_file = file_data['file_path']
+                            file_version = file_data['file_version']
+                            self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
+                            self.parse_gzipfile(latest_file, u, p)
+                except AuthenticationException:
+                    self.logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
 
         self.generate_ttl_query(Config.ONTOLOGY_SLIM_FILE)
 
-    def parse_gzipfile(self, file_path, u, p):
+    def parse_gzipfile(self, filename, mode, fileobj, mtime):
+
+        with gzip.GzipFile(filename=filename,
+                           mode=mode,
+                           fileobj=fileobj,
+                           mtime=mtime) as fh:
+
+            logging.info('Starting parsing %s' % filename)
+
+            line_buffer = []
+            offset = 0
+            chunk = 1
+            line_number = 0
+
+            for line in fh:
+                python_raw = json.loads(line)
+                obj = None
+                data_type = python_raw['type']
+                if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
+                    if data_type == 'genetic_association':
+                        obj = opentargets.Genetics.fromMap(python_raw)
+                    elif data_type == 'rna_expression':
+                        obj = opentargets.Expression.fromMap(python_raw)
+                    elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
+                        obj = opentargets.Literature_Curated.fromMap(python_raw)
+                        if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'],
+                                                                              list):
+                            mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
+                            python_raw['evidence']['known_mutations'] = [mutations]
+                            # self.logger.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
+                            obj = opentargets.Literature_Curated.fromMap(python_raw)
+                    elif data_type == 'known_drug':
+                        obj = opentargets.Drug.fromMap(python_raw)
+                    elif data_type == 'literature':
+                        obj = opentargets.Literature_Mining.fromMap(python_raw)
+                    elif data_type == 'animal_model':
+                        obj = opentargets.Animal_Models.fromMap(python_raw)
+
+                if obj.disease.id:
+                    for id in obj.disease.id:
+                        if re.match('http://purl.obolibrary.org/obo/HP_\d+', id):
+                            ''' get all terms '''
+                            self.get_ontology_path('http://purl.obolibrary.org/obo/HP_0000118', id)
+
+                        elif re.match('http://purl.obolibrary.org/obo/MP_\d+', id):
+                            ''' get all terms '''
+                            self.get_ontology_path('http://purl.obolibrary.org/obo/MP_0000001', id)
+                        elif re.match('http://www.orpha.net/ORDO/Orphanet_\d+', id):
+                            ''' just map to the genetic disorders '''
+                            self.get_ontology_path('http://www.ebi.ac.uk/efo/EFO_0000508', id)
+
+        fh.close()
+
+    def parse_sftp_gzipfile(self, file_path, u, p):
         print "---->%s"%file_path
         self.logger.info("%s %s" % (u, p))
         cnopts = pysftp.CnOpts()
@@ -738,56 +885,7 @@ class PhenotypeSlim():
             file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
 
             with srv.open(file_path, mode='rb', bufsize=1) as f:
-                with gzip.GzipFile(filename=file_path.split('/')[1],
-                                   mode='rb',
-                                   fileobj=f,
-                                   mtime=file_mod_time) as fh:
-
-                    logging.info('Starting parsing %s' %file_path)
-
-                    line_buffer = []
-                    offset = 0
-                    chunk = 1
-                    line_number = 0
-
-                    for line in fh:
-                        python_raw = json.loads(line)
-                        obj = None
-                        data_type = python_raw['type']
-                        if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
-                            if data_type == 'genetic_association':
-                                obj = opentargets.Genetics.fromMap(python_raw)
-                            elif data_type == 'rna_expression':
-                                obj = opentargets.Expression.fromMap(python_raw)
-                            elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
-                                obj = opentargets.Literature_Curated.fromMap(python_raw)
-                                if data_type == 'somatic_mutation' and not isinstance(python_raw['evidence']['known_mutations'],
-                                                                                      list):
-                                    mutations = copy.deepcopy(python_raw['evidence']['known_mutations'])
-                                    python_raw['evidence']['known_mutations'] = [mutations]
-                                    # self.logger.error(json.dumps(python_raw['evidence']['known_mutations'], indent=4))
-                                    obj = opentargets.Literature_Curated.fromMap(python_raw)
-                            elif data_type == 'known_drug':
-                                obj = opentargets.Drug.fromMap(python_raw)
-                            elif data_type == 'literature':
-                                obj = opentargets.Literature_Mining.fromMap(python_raw)
-                            elif data_type == 'animal_model':
-                                obj = opentargets.Animal_Models.fromMap(python_raw)
-
-                        if obj.disease.id:
-                            for id in obj.disease.id:
-                                if re.match('http://purl.obolibrary.org/obo/HP_\d+', id):
-                                    ''' get all terms '''
-                                    self.get_ontology_path('http://purl.obolibrary.org/obo/HP_0000118', id)
-
-                                elif re.match('http://purl.obolibrary.org/obo/MP_\d+', id):
-                                    ''' get all terms '''
-                                    self.get_ontology_path('http://purl.obolibrary.org/obo/MP_0000001', id)
-                                elif re.match('http://www.orpha.net/ORDO/Orphanet_\d+', id):
-                                    ''' just map to the genetic disorders '''
-                                    self.get_ontology_path('http://www.ebi.ac.uk/efo/EFO_0000508', id)
-
-                fh.close()
+                self.parse_gzipfile(filename=file_path.split('/')[1], mode='rb', filepbj=f, mtime=file_mod_time)
             srv.close()
         return
 

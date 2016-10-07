@@ -2,7 +2,7 @@ redislite
 argparse==1.3.0
 dateutils==0.6.6
 decorator==3.4.2
-elasticsearch==2.3.0
+elasticsearch==2.4.0
 networkx==1.9.1
 psycopg2==2.6
 python-dateutil==2.4.2
@@ -34,4 +34,3 @@ nltk==3.2.1
 nose==1.3.7
 biopython==1.65
 rdflib
-sphinx==1.4.6
