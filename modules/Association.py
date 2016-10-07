@@ -540,8 +540,8 @@ class ScoringProcess():
             w.start()
 
 
-        if not dry_run:
-            self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
+        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
+        self.es_loader.prepare_for_bulk_indexing(self.es_loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
 
 
 

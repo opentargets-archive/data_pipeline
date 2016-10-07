@@ -172,7 +172,7 @@ class Loader():
     """
 
     def __init__(self,
-                 es,
+                 es = None,
                  chunk_size=1000,
                  dry_run = False,
                  max_flush_interval = 10):
@@ -184,6 +184,8 @@ class Loader():
         self.indexes_created=[]
         self.indexes_optimised = {}
         self.dry_run = dry_run
+        if es is None:
+            self.dry_run = True
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
 
@@ -197,14 +199,14 @@ class Loader():
 
 
 
-    def put(self, index_name, doc_type, ID, body, create_index = True, routing = None, parent = None):
+    def put(self, index_name, doc_type, ID, body, create_index = True, routing = None, parent = None, auto_optimise = False):
 
         if index_name not in self.indexes_created:
             if create_index:
                 self.create_new_index(index_name)
             self.indexes_created.append(index_name)
         versioned_index_name = self.get_versioned_index(index_name)
-        if versioned_index_name not in self.indexes_optimised:
+        if auto_optimise and (versioned_index_name not in self.indexes_optimised):
             self.prepare_for_bulk_indexing(versioned_index_name)
         if isinstance(body, JSONSerializable):
             body = body.to_json()
@@ -223,21 +225,22 @@ class Loader():
             self.flush()
 
     def flush(self, max_retry=10):
-        retry = 0
-        while 1:
-            try:
-               self._flush()
-               break
-            except Exception, e:
-                retry+=1
-                if retry >= max_retry:
-                    logging.exception("push to elasticsearch failed for chunk, giving up...")
-                    break
-                else:
-                    time_to_wait = 5*retry
-                    logging.error("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e)[:250],time_to_wait))
-                    time.sleep(time_to_wait)
-        self.cache = []
+        if self.cache:
+            retry = 0
+            while 1:
+                try:
+                   self._flush()
+                   break
+                except Exception, e:
+                    retry+=1
+                    if retry >= max_retry:
+                        logging.exception("push to elasticsearch failed for chunk, giving up...")
+                        break
+                    else:
+                        time_to_wait = 5*retry
+                        logging.error("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e)[:250],time_to_wait))
+                        time.sleep(time_to_wait)
+            self.cache = []
 
 
         # if index_name:
@@ -334,74 +337,79 @@ class Loader():
 
 
     def _safe_create_index(self, index_name, body, ignore=400):
-        res = self.es.indices.create(index=index_name,
-                                     ignore=ignore,
-                                     body=body
-                                     )
-        if not self._check_is_aknowledge(res):
-            if res['error']['root_cause'][0]['reason']== 'already exists':
-                logging.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
-                return
-            else:
-                raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
-        mappings = self.es.indices.get_mapping(index=index_name)
-        settings = self.es.indices.get_settings(index=index_name)
+        if not self.dry_run:
+            res = self.es.indices.create(index=index_name,
+                                         ignore=ignore,
+                                         body=body
+                                         )
+            if not self._check_is_aknowledge(res):
+                if res['error']['root_cause'][0]['reason']== 'already exists':
+                    logging.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
+                    return
+                else:
+                    raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
+            mappings = self.es.indices.get_mapping(index=index_name)
+            settings = self.es.indices.get_settings(index=index_name)
 
-        if 'mappings' in body:
-            assertJSONEqual(mappings[index_name]['mappings'],
-                            body['mappings'],
-                            msg='mappings in elasticsearch are different from the ones sent')
-        if 'settings' in body:
-            assertJSONEqual(settings[index_name]['settings']['index'],
-                            body['settings'],
-                            msg='settings in elasticsearch are different from the ones sent',
-                            keys=body['settings'].keys(),#['number_of_replicas','number_of_shards','refresh_interval']
-                            )
+            if 'mappings' in body:
+                assertJSONEqual(mappings[index_name]['mappings'],
+                                body['mappings'],
+                                msg='mappings in elasticsearch are different from the ones sent')
+            if 'settings' in body:
+                assertJSONEqual(settings[index_name]['settings']['index'],
+                                body['settings'],
+                                msg='settings in elasticsearch are different from the ones sent',
+                                keys=body['settings'].keys(),#['number_of_replicas','number_of_shards','refresh_interval']
+                                )
 
     def create_new_index(self, index_name, recreate = False):
-        index_name = self.get_versioned_index(index_name)
-        if self.es.indices.exists(index_name):
-            if recreate:
-                res = self.es.indices.delete(index_name)
-                if not self._check_is_aknowledge(res):
-                    raise ValueError(
-                        'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
-                try:
-                    self.es.indices.flush(index_name,  wait_if_ongoing =True)
-                except NotFoundError:
-                    pass
-                logging.debug("%s index deleted: %s" %(index_name, str(res)))
+        if not self.dry_run:
+            index_name = self.get_versioned_index(index_name)
+            if self.es.indices.exists(index_name):
+                if recreate:
+                    res = self.es.indices.delete(index_name)
+                    if not self._check_is_aknowledge(res):
+                        raise ValueError(
+                            'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
+                    try:
+                        self.es.indices.flush(index_name,  wait_if_ongoing =True)
+                    except NotFoundError:
+                        pass
+                    logging.debug("%s index deleted: %s" %(index_name, str(res)))
 
-            else:
-                logging.info("%s index already existing" % index_name)
-                return
+                else:
+                    logging.info("%s index already existing" % index_name)
+                    return
 
-        index_created = False
-        for index_root,mapping in ElasticSearchConfiguration.INDEX_MAPPPINGS.items():
-            if index_root in index_name:
-                self._safe_create_index(index_name, mapping)
-                index_created=True
-                break
+            index_created = False
+            for index_root,mapping in ElasticSearchConfiguration.INDEX_MAPPPINGS.items():
+                if index_root in index_name:
+                    self._safe_create_index(index_name, mapping)
+                    index_created=True
+                    break
 
-        if not index_created:
-            raise ValueError('Cannot create index %s because no mappings are set'%index_name)
-        logging.info("%s index created"%index_name)
-        return
+            if not index_created:
+                raise ValueError('Cannot create index %s because no mappings are set'%index_name)
+            logging.info("%s index created"%index_name)
+            return
 
     def clear_index(self, index_name):
-        self.es.indices.delete(index=index_name)
+        if not self.dry_run:
+            self.es.indices.delete(index=index_name)
 
     def optimize_all(self):
-        try:
-            self.es.indices.optimize(index='', max_num_segments=5, wait_for_merge = False)
-        except:
-            logging.warn('optimisation of all indexes failed')
+        if not self.dry_run:
+            try:
+                self.es.indices.optimize(index='', max_num_segments=5, wait_for_merge = False)
+            except:
+                logging.warn('optimisation of all indexes failed')
 
     def optimize_index(self, index_name):
-        try:
-            self.es.indices.optimize(index=index_name, max_num_segments=5, wait_for_merge = False)
-        except:
-            logging.warn('optimisation of index %s failed'%index_name)
+        if not self.dry_run:
+            try:
+                self.es.indices.optimize(index=index_name, max_num_segments=5, wait_for_merge = False)
+            except:
+                logging.warn('optimisation of index %s failed'%index_name)
 
     def _check_is_aknowledge(self, res):
         return (u'acknowledged' in res) and (res[u'acknowledged'] == True)

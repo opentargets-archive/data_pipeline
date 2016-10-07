@@ -40,10 +40,11 @@ __author__ = 'andreap'
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logging.basicConfig(filename = 'output.log',
                     format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.DEBUG)
+                    level=logging.INFO)
 logging.getLogger('elasticsearch').setLevel(logging.ERROR)
 logging.getLogger("requests").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("redislite.client").setLevel(logging.ERROR)
 
 '''logger'''
 logger = logging.getLogger(__name__)
@@ -317,7 +318,7 @@ if __name__ == '__main__':
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.adapter, connectors.es, connectors.sparql).generate_evidence()
         if args.lit or run_full_pipeline:
-            do_all = (ValidationActions.ALL in args.lit) or run_full_pipeline
+            do_all = (LiteratureActions.ALL in args.lit) or run_full_pipeline
             if (LiteratureActions.FETCH in args.lit) or do_all:
                 Literature(connectors.es, loader).fetch()
             if (LiteratureActions.PROCESS in args.lit) or do_all:
@@ -361,13 +362,13 @@ if __name__ == '__main__':
         if args.qc or run_full_pipeline:
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:
-                QCRunner(es).run_associationQC()
+                QCRunner(connectors.es).run_associationQC()
             # if (QCActions.CGC_ANALYSIS in args.qc) or do_all:
             #     QCRunner(es).analyse_cancer_gene_census()
         if args.dump or run_full_pipeline:
             do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
             if (DumpActions.DUMP in args.dump) or do_all:
-                DumpGenerator(es).dump()
+                DumpGenerator(connectors.es).dump()
 
 
 
