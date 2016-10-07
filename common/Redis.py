@@ -515,7 +515,7 @@ class RedisQueueStatusReporter(Process):
                 else:
                     status = unicode(data[-1])
         averaged_data = self._average_long_interval(data)
-        output = u'%s:\t\t %s | %s'%(label, self.sparkplot(averaged_data), status)
+        output = u'%s |%s| %s'%(label.ljust(20), self.sparkplot(averaged_data), status)
         return output.encode('utf8')
 
     def sparkplot(self, data):
