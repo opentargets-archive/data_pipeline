@@ -21,7 +21,7 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from modules.Ontology import OntologyClassReader, PhenotypeSlim
+from modules.Ontology import OntologyClassReader, DiseasePhenotypes, PhenotypeSlim
 from SPARQLWrapper import SPARQLWrapper, JSON
 from settings import Config
 import logging
@@ -34,7 +34,7 @@ __credits__ = []
 __license__ = "Apache 2.0"
 __version__ = ""
 __maintainer__ = "Gautier Koscielny"
-__email__ = "gautierk@targetvalidation.org"
+__email__ = "gautierk@opentargets.org"
 __status__ = "Production"
 
 fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
@@ -104,6 +104,12 @@ def test_load_mp_classes():
     for k,v in obj.obsolete_classes.iteritems():
         logger.info("%s => %s "%(k, v))
         assert obj.obsolete_classes[k] == v
+
+@with_setup(my_setup_function, my_teardown_function)
+def test_get_disease_phenotypes():
+    obj = DiseasePhenotypes()
+    assert not obj == None
+    obj.get_disease_phenotypes()
 
 @with_setup(my_setup_function, my_teardown_function)
 def test_parse_local_files():

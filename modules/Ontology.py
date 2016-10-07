@@ -52,7 +52,7 @@ __credits__ = []
 __license__ = "Apache 2.0"
 __version__ = ""
 __maintainer__ = "Gautier Koscielny"
-__email__ = "gautierk@targetvalidation.org"
+__email__ = "gautierk@opentargets.org"
 __status__ = "Production"
 
 from logging.config import fileConfig
@@ -186,6 +186,8 @@ class OntologyClassReader():
         """Initialises the class
 
         Declares an RDF graph that will contain an ontology representation.
+        Current classes are extracted in the current_classes dictionary
+        Obsolete classes are extracted in the obsolete_classes dictionary
         """
         self.rdf_graph = None
         self.current_classes = dict()
@@ -208,14 +210,13 @@ class OntologyClassReader():
         """
         self.rdf_graph = rdflib.Graph()
         self.rdf_graph.parse(uri, format='xml')
-        # get all classes with label and synonyms
 
     def load_ontology_classes(self, base_class):
-        """Loads all current and obsolete classes from an ontology stored in RDFLin
+        """Loads all current and obsolete classes from an ontology stored in RDFLib
 
         Given a base class in the ontology, extracts the classes and stores the sets of
-        current and obsolete classes in dictionaries. This avoids traversing all the graph if only a few branches
-        are required.
+        current and obsolete classes in dictionaries. This avoids traversing all the graph
+        if only a few branches are required.
 
         Args:
             base_class (str): the root of the ontology to start from.
@@ -245,21 +246,6 @@ class OntologyClassReader():
             count +=1
             logger.info("RDFLIB '%s' '%s'" % (uri, label))
         logger.debug("%i"%count)
-
-        sparql_query = '''
-        PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
-        PREFIX obo: <http://purl.obolibrary.org/obo/>
-        SELECT DISTINCT ?hp_node ?label ?id ?hp_new
-         FROM <http://purl.obolibrary.org/obo/%s.owl>
-         FROM <http://purl.obolibrary.org/obo/>
-         {
-            ?hp_node owl:deprecated true .
-            ?hp_node oboInOwl:id ?id .
-            ?hp_node obo:IAO_0100001 ?hp_new .
-            ?hp_node rdfs:label ?label
-
-         }
-         '''
 
         sparql_query = '''
         SELECT DISTINCT ?ont_node ?label ?id ?ont_new
@@ -466,19 +452,14 @@ class DiseasePhenotypes():
         self.rdf_graph = rdflib.Graph()
         # load HPO:
         print ("parse HPO")
-        self.rdf_graph.parse('/Users/koscieln/Downloads/hp.owl', format='xml')
+        self.rdf_graph.parse(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'), format='xml')
         print ("parse MP")
-        self.rdf_graph.parse('/Users/koscieln/Downloads/mp.owl', format='xml')
+        self.rdf_graph.parse(Config.ONTOLOGY_CONFIG.get('uris', 'mp'), format='xml')
         #print ("parse EFO")
         #self.rdf_graph.parse('/Users/koscieln/Downloads/hp.owl', format='xml')
-        for dp in ['/Users/koscieln/Downloads/ibd_2_pheno_associations.owl',
-                   '/Users/koscieln/Downloads/immune_disease_2_pheno.owl',
-                   '/Users/koscieln/Downloads/rareAlbuminuria_associations_03Jun15.owl',
-                   '/Users/koscieln/Downloads/rareIBDpheno.owl',
-                   '/Users/koscieln/Downloads/ordo_hpo_mappings.owl',
-                   '/Users/koscieln/Downloads/charite_HP_ORDO_07Oct15.owl' ]:
-            print ("merge phenotypes from %s" % dp)
-            self.rdf_graph.parse(dp, format='xml')
+        for key, uri in Config.ONTOLOGY_CONFIG.items('disease_phenotypes_uris'):
+            print ("merge phenotypes from %s" % uri)
+            self.rdf_graph.parse(uri, format='xml')
 
         #graph.parse('https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw', format='xml')
 
