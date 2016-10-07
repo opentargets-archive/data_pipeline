@@ -658,7 +658,7 @@ class DataDrivenRelationProcess(object):
                                                d2d_queue_processing,
                                                t2t_queue_processing,
                                                queue_storage],
-                                              interval=15,
+                                              interval=60,
                                               history=True)
         q_reporter.start()
 

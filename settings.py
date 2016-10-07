@@ -1,4 +1,3 @@
-import logging
 import uuid
 from collections import defaultdict, OrderedDict
 
@@ -7,8 +6,6 @@ __author__ = 'andreap'
 import os
 import ConfigParser
 
-'''logger'''
-logger = logging.getLogger()
 
 iniparser = ConfigParser.ConfigParser()
 iniparser.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'db.ini'))
@@ -27,7 +24,6 @@ class Config():
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
     except ConfigParser.NoOptionError:
-        logger.error('elasticsearch host and port not provided in db.ini file ')
         ELASTICSEARCH_HOST = None
         ELASTICSEARCH_PORT = None
         ELASTICSEARCH_URL = None

@@ -260,7 +260,9 @@ if __name__ == '__main__':
 
     if args.loglevel:
         try:
-            logging.basicConfig(level=args.loglevel)
+            logging.basicConfig(filename = 'output.log',
+                                format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                                level=args.loglevel)
         except:
             pass
     '''get local logger'''

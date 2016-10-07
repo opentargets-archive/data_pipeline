@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import base64
 import json
 import logging
@@ -5,7 +8,6 @@ import uuid
 import datetime
 
 import numpy as np
-from sparklines import sparklines
 from tqdm import tqdm
 try:
     import cPickle as pickle
@@ -289,6 +291,10 @@ class RedisQueueStatusReporter(Process):
     Cyclically logs the status of a list RedisQueue objects
     '''
 
+    _history_plot = u" ▁▂▃▄▅▆▇█" # get more options from here: http://unicode.org/charts/#symbols
+    _history_plot_max = u"◆"
+    _history_plot_interval = len(_history_plot)-1
+
     def __init__(self,
                  queues,
                  interval=15,
@@ -313,6 +319,7 @@ class RedisQueueStatusReporter(Process):
                                                             processed_jobs = [],
                                                             submitted_jobs = [],
                                                             )
+
 
     def run(self):
         self.logger.info("reporter worker started")
@@ -489,20 +496,41 @@ class RedisQueueStatusReporter(Process):
         return '\n'.join(lines)
 
     def _average_long_interval(self,data,):
+        np_data = np.array(data).astype(float)
         if len(data) > self.history_resolution:
-            np_data = np.array(data)
             np.mean(np_data[:-(len(data) % self.history_resolution)].reshape(-1, self.history_resolution), axis=1)
-            return np_data.tolist()
-        return data
+        np_data /= np.max(np.abs(np_data), axis=0) # normalize by max value
+        if np_data.max() >0:
+            np_data *= (self._history_plot_interval / np_data.max()) #map to interval
+        return np_data
 
     def _compose_history_line(self, queue_id, key, status = None):
         data = self.historical_data[queue_id][key]
-        label = key.capitalize().replace('_',' ')
+        label = unicode(key.capitalize().replace('_',' '))
         if status is None:
             if data:
                 status = data[-1]
+                if isinstance(status, float):
+                    status = u'%.2f'%data[-1]
+                else:
+                    status = unicode(data[-1])
         averaged_data = self._average_long_interval(data)
-        return '%s:\t %s | %s'%(label, sparklines(averaged_data)[0], status)
+        output = u'%s:\t\t %s | %s'%(label, self.sparkplot(averaged_data), status)
+        return output.encode('utf8')
+
+    def sparkplot(self, data):
+        output = []
+        max_data = data.max()
+        rounded_data = np.round(data).astype(int)
+        for i, value in enumerate(data):
+            if value==max_data:
+                data_char = self._history_plot_max
+            elif 0.< value <  self._history_plot_interval:
+                data_char = self._history_plot[rounded_data[i]]
+            else:
+                data_char = self._history_plot[0]
+            output.append(data_char)
+        return u''.join(output)
 
 
 class RedisQueueWorkerProcess(Process):
