@@ -68,7 +68,7 @@ class Config():
     try:
         SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
     except ConfigParser.NoOptionError:
-        print('no virtuoso instance')
+        print 'no virtuoso instance'
         SPARQL_ENDPOINT_URL = ''
 
     try:
@@ -81,7 +81,7 @@ class Config():
     except ConfigParser.NoOptionError:
         # the official logger is not loaded yet. not moving things around as we
         # will likely put all of this in a config file.
-        print('no postgres instance')
+        print 'no postgres instance'
         POSTGRES_DATABASE = {}
 
     # HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
