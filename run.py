@@ -83,7 +83,6 @@ class PipelineConnectors():
         hosts=[]
         es = None
         if Config.ELASTICSEARCH_HOST and Config.ELASTICSEARCH_PORT:
-
             while 1:
                 import socket
 
