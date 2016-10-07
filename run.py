@@ -85,7 +85,6 @@ class PipelineConnectors():
         if Config.ELASTICSEARCH_HOST and Config.ELASTICSEARCH_PORT:
             while 1:
                 import socket
-
                 try:#is a valid ip
                     socket.inet_aton(Config.ELASTICSEARCH_HOST)
                     hosts = [dict(host=Config.ELASTICSEARCH_HOST, port=Config.ELASTICSEARCH_PORT)]
