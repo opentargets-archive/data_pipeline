@@ -431,7 +431,7 @@ class RedisQueueStatusReporter(Process):
             if submission_finished and \
                     (submitted == processed):
                 status = Fore.RED + 'done' + Fore.RESET
-            lines = ['\n****** QUEUE: %s | STATUS %s ******' % (Back.RED+Fore.BLACK+Style.DIM+data['queue_id']+Style.RESET_ALL, status)]
+            lines = ['\n****** QUEUE: %s | STATUS %s ******' % (Back.RED+Style.DIM+data['queue_id']+Style.RESET_ALL, status)]
             if self.history:#log history
                 historical_data = self.historical_data[data['queue_id']]
                 if not historical_data['processed_jobs']:
@@ -471,7 +471,7 @@ class RedisQueueStatusReporter(Process):
                     lines.append('Elapsed time: %s' % datetime.timedelta(seconds=now - data['start_time']))
             lines.append(('=' * 50))
         else:
-            lines = ['****** QUEUE: %s | STATUS: %s ******' % (Back.RED+Fore.BLACK+Style.DIM+data['queue_id']+Style.RESET_ALL, status)]
+            lines = ['****** QUEUE: %s | STATUS: %s ******' % (Back.RED+Style.DIM+data['queue_id']+Style.RESET_ALL, status)]
 
         return '\n'.join(lines)
 
