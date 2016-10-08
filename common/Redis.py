@@ -8,6 +8,7 @@ import uuid
 import datetime
 
 import numpy as np
+np.seterr(divide='warn', invalid='warn')
 from tqdm import tqdm
 try:
     import cPickle as pickle
