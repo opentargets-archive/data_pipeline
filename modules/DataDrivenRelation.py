@@ -71,8 +71,12 @@ class DistanceComputationWorker(RedisQueueWorkerProcess):
                  rows_ids,
                  column_ids,
                  threshold = 0.,
+                 auto_signal_submission_finished = True
                  ):
-        super(DistanceComputationWorker, self).__init__(queue_in, r_server, queue_out)
+        super(DistanceComputationWorker, self).__init__(queue_in,
+                                                        r_server,
+                                                        queue_out,
+                                                        auto_signal_submission_finished = auto_signal_submission_finished)
         self.type = type
         self.row_labels = row_labels
         self.rows_ids = rows_ids
@@ -658,7 +662,7 @@ class DataDrivenRelationProcess(object):
                                                d2d_queue_processing,
                                                t2t_queue_processing,
                                                queue_storage],
-                                              interval=60,
+                                              interval=30,
                                               history=True)
         q_reporter.start()
 
@@ -683,6 +687,7 @@ class DataDrivenRelationProcess(object):
                                                  disease_keys,
                                                  target_keys,
                                                  0.2,
+                                                 auto_signal_submission_finished = False,# don't signal submission is done until t2t workers are done
                                                  ) for i in range(multiprocessing.cpu_count())]
         for w in d2d_workers:
             w.start()

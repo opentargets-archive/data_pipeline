@@ -18,6 +18,7 @@ import time
 from multiprocessing import Process
 from redislite import Redis
 from settings import Config
+from colorama import Fore, Back, Style
 
 logger = logging.getLogger(__name__)
 
@@ -308,14 +309,14 @@ class RedisQueueStatusReporter(Process):
     '''
 
     _history_plot = u" ▁▂▃▄▅▆▇█" # get more options from here: http://unicode.org/charts/#symbols
-    _history_plot_max = u"◆"
+    _history_plot_max = u"▓"
     _history_plot_interval = len(_history_plot)-1
 
     def __init__(self,
                  queues,
                  interval=15,
                  history = False,
-                 history_resolution = 100,
+                 history_resolution = 40,
                  ):
         super(RedisQueueStatusReporter, self).__init__()
         self.queues = queues
@@ -324,7 +325,7 @@ class RedisQueueStatusReporter(Process):
         self.logger = logging.getLogger(__name__)
         self.history = history
         self.historical_data = dict()
-        self.history_resolution = 100
+        self.history_resolution = history_resolution
         if history:
             for queue in queues:
                 self.historical_data[queue.queue_id] = dict(processing_jobs = [],
@@ -343,14 +344,7 @@ class RedisQueueStatusReporter(Process):
         self.bars = {}
         for i,q in enumerate(self.queues):
             queue_id = self._simplify_queue_id(q.queue_id)
-            queue_position=i*2
             self.bars[q.queue_id] = dict(
-                                         # queue_size=tqdm(desc='%s queue size' % queue_id,
-                                         #                 unit = ' jobs',
-                                         #                 total=q.max_queue_size,
-                                         #                 dynamic_ncols = True,
-                                         #                 position=queue_position,
-                                         #                 ),
                                          submitted_counter=tqdm(desc='%s submitted jobs' % queue_id,
                                                                 unit=' jobs',
                                                                 total=q.get_total(self.r_server),
@@ -377,43 +371,21 @@ class RedisQueueStatusReporter(Process):
                 if last_data:
                     submitted_counter -= last_data['submitted_counter']
                     processed_counter -= last_data['processed_counter']
-                # if data['queue_size']:
-                #     # self.bars[q.queue_id]['queue_size'] = tqdm(desc='%s queue size' % queue_id,
-                #     #                                          unit=' jobs',
-                #     #                                          total=q.max_queue_size,
-                #     #                                          dynamic_ncols=True,
-                #     #                                          initial=data['queue_size']
-                #     #                                          )
-                #     self.bars[q.queue_id]['queue_size'].n = data['queue_size']
-                #     self.bars[q.queue_id]['queue_size'].refresh()
                 if submitted_counter:
                     if data['total'] and self.bars[q.queue_id]['submitted_counter'].total != data['total']:
                         self.bars[q.queue_id]['submitted_counter'].total = data['total']
                     self.bars[q.queue_id]['submitted_counter'].update(submitted_counter)
-                    # self.bars[q.queue_id]['submitted_counter'].refresh()
-                        # self.bars[q.queue_id]['submitted_counter'].close()
-                        # self.bars[q.queue_id]['submitted_counter'] = tqdm(desc='%s processed jobs' % queue_id,
-                        #                                                   unit=' jobs',
-                        #                                                   total=data['total'],
-                        #                                                   dynamic_ncols=True,
-                        #                                                   initial= submitted_counter
-                        #                                                   )
+
 
                 if processed_counter:
 
                     if data['total'] and self.bars[q.queue_id]['processed_counter'].total != data['total']:
                         self.bars[q.queue_id]['processed_counter'].total = data['total']
                     self.bars[q.queue_id]['processed_counter'].update(processed_counter)
-                    # self.bars[q.queue_id]['processed_counter'].refresh()
                 self.bars[q.queue_id]['last_status'] = data
 
 
             time.sleep(self.interval)
-            # for q in self.queues:
-            #     try:
-            #         self.bars[q.queue_id]['queue_size'].close()
-            #     except KeyError:
-            #         pass
 
     def is_done(self):
         for q in self.queues:
@@ -432,7 +404,7 @@ class RedisQueueStatusReporter(Process):
     def format(self, data):
         now = time.time()
         submitted = data['submitted_counter']
-        status = 'initialised'
+        status = Fore.CYAN+'initialised'+ Fore.RESET
         if submitted:
             processed = data['processed_counter']
             errors = data['errors_counter']
@@ -451,15 +423,15 @@ class RedisQueueStatusReporter(Process):
                 else:
                     queue_size_status = 'accepting jobs'
 
-            status = 'idle'
+            status = Fore.BLUE +'idle'+ Fore.RESET
             if submitted:
-                status = 'jobs sumbitted'
+                status = Fore.LIGHTYELLOW_EX + 'jobs sumbitted' + Fore.RESET
             if processed:
-                status = 'processing'
+                status = Fore.GREEN + 'processing' + Fore.RESET
             if submission_finished and \
                     (submitted == processed):
-                status = 'done'
-            lines = ['\n****** QUEUE: %s | STATUS %s ******' % (data['queue_id'], status)]
+                status = Fore.RED + 'done' + Fore.RESET
+            lines = ['\n****** QUEUE: %s | STATUS %s ******' % (Back.RED+Fore.BLACK+Style.DIM+data['queue_id']+Style.RESET_ALL, status)]
             if self.history:#log history
                 historical_data = self.historical_data[data['queue_id']]
                 if not historical_data['processed_jobs']:
@@ -494,20 +466,12 @@ class RedisQueueStatusReporter(Process):
                     lines.append('Jobs being processed: %i' % data["processing_jobs"])
                     lines.append('Jobs timed out: %i' % data["timedout_jobs"])
                     lines.append('Sumbmission finished: %s' % submission_finished)
-                    status = 'idle'
-                    if submitted:
-                        status = 'jobs sumbitted'
-                    if processed:
-                        status = 'processing'
-                    if submission_finished and \
-                            (submitted == processed):
-                        status = 'done'
                     lines.append('-' * 50)
                     lines.append('STATUS: %s' % status)
                     lines.append('Elapsed time: %s' % datetime.timedelta(seconds=now - data['start_time']))
             lines.append(('=' * 50))
         else:
-            lines = ['****** QUEUE: %s | STATUS: %s ******' % (data['queue_id'], status)]
+            lines = ['****** QUEUE: %s | STATUS: %s ******' % (Back.RED+Fore.BLACK+Style.DIM+data['queue_id']+Style.RESET_ALL, status)]
 
         return '\n'.join(lines)
 
@@ -536,7 +500,7 @@ class RedisQueueStatusReporter(Process):
         rounded_data = np.round(data).astype(int)
         for i, value in enumerate(data):
             if value==max_data:
-                data_char = self._history_plot_max
+                data_char = Fore.YELLOW+self._history_plot_max+Fore.RESET
             elif 0.< value <  self._history_plot_interval:
                 data_char = self._history_plot[rounded_data[i]]
             else:
@@ -556,7 +520,8 @@ class RedisQueueWorkerProcess(Process):
     def __init__(self,
                  queue_in,
                  redis_path,
-                 queue_out = None,
+                 queue_out=None,
+                 auto_signal_submission_finished=True,
                  **kwargs
                  ):
 
@@ -565,6 +530,7 @@ class RedisQueueWorkerProcess(Process):
         self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
         self.queue_out = queue_out
         self.r_server = Redis(redis_path, serverconfig={'save': []})
+        self.auto_signal = auto_signal_submission_finished
         self.logger = logging.getLogger(__name__)
         self.logger.info('%s started' % self.name)
 
@@ -591,7 +557,7 @@ class RedisQueueWorkerProcess(Process):
                 time.sleep(.01)
 
         self.logger.info('%s done processing' % self.name)
-        if self.queue_out is not None:
+        if (self.queue_out is not None) and self.auto_signal:
             self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
 
         self.close()
@@ -603,6 +569,7 @@ class RedisQueueWorkerProcess(Process):
         '''
         pass
 
+    #TODO: enforce timeout
     def process(self, data):
         raise NotImplementedError('please add an implementation to process the data')
 
