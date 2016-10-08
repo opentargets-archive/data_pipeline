@@ -25,10 +25,10 @@ def millify(n):
     try:
         n = float(n)
         millnames=['','K','M','G','P']
-        millidx=max(0,min(len(millnames)-1,
-                          int(math.floor(math.log10(abs(n))/3))))
+        millidx=max(0, min(len(millnames) - 1,
+                           int(np.math.floor(np.math.log10(abs(n)) / 3))))
         return '%.1f%s'%(n/10**(3*millidx),millnames[millidx])
-    except:
+    except Exception, e:
         return n
 
 class RedisQueue(object):
@@ -519,7 +519,7 @@ class RedisQueueStatusReporter(Process):
         label = unicode(key.capitalize().replace('_',' '))
         if status is None:
             if data:
-                status = u'Current: %s | Max: %s'%(unicode(millify(data[-1])),unicode(millify(max(data[-1]))))
+                status = u'Current: %s | Max: %s'%(unicode(millify(data[-1])),unicode(millify(max(data))))
         averaged_data = self._average_long_interval(data)
         output = u'%s |%s| %s'%(label.ljust(20), self.sparkplot(averaged_data), status)
         return output.encode('utf8')
@@ -586,7 +586,7 @@ class RedisQueueWorkerProcess(Process):
 
         self.logger.info('%s done processing' % self.name)
         if self.queue_out is not None:
-            self.queue_out.set_submission_finished(self.r_server)
+            self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
 
         self.close()
 

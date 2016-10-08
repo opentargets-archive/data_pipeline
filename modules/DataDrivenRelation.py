@@ -520,7 +520,7 @@ class RelationHandlerEuristicOverlapEstimationPairProducer(RedisQueueWorkerProce
                  sums_vector,
                  data_vector,
                  ):
-        super(RelationHandlerEuristicOverlapEstimationPairProducer, self).__init__(queue_in, redis_path)
+        super(RelationHandlerEuristicOverlapEstimationPairProducer, self).__init__(queue_in, redis_path, queue_out)
         self.vector_hashes = vector_hashes
         self.buckets = buckets
         self.threshold = threshold
