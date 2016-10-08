@@ -193,7 +193,9 @@ class RedisQueue(object):
             timeout = self.job_timeout
         if not r_server:
             r_server = self.r_server
-        return [i[0] for i in r_server.zrange(self.processing_key, 0, -1, withscores=True) if time.time() - i[1] > timeout]
+        timedout_jobs = [i[0] for i in r_server.zrange(self.processing_key, 0, -1, withscores=True) if time.time() - i[1] > timeout]
+        logger.debug('%i jobs timedout jobs in queue %s'%(len(timedout_jobs), self.queue_id))
+        return timedout_jobs
 
     def put_back(self, key, r_server=None, ):
         r_server = self._get_r_server(r_server)
@@ -208,6 +210,9 @@ class RedisQueue(object):
             if time.time()-key[1]>timeout:
                 if r_server.zrem(self.processing_key, key[0]):
                     r_server.lpush(self.main_queue, key[0])
+                    logger.debug('%s job is timedout and was put back in queue %s' %(key[0],self.queue_id))
+                else:
+                    logger.debug('%s job is timedout and was NOT put back in queue %s' % (key[0], self.queue_id))
 
     def __str__(self):
         return self.queue_id
