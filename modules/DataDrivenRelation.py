@@ -641,11 +641,11 @@ class DataDrivenRelationProcess(object):
                                           ttl=60 * 60 * 24 * 14)
 
         d2d_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_processing',
-                                          max_size=number_of_workers * queue_per_worker*5,
+                                          max_size=number_of_workers * queue_per_worker,
                                           job_timeout=300,
                                           ttl=60 * 60 * 24 * 14)
         t2t_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_processing',
-                                          max_size=number_of_workers * queue_per_worker*5,
+                                          max_size=number_of_workers * queue_per_worker,
                                           job_timeout=300,
                                           ttl=60 * 60 * 24 * 14)
 
