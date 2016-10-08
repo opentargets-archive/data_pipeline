@@ -382,7 +382,7 @@ class RelationHandler(object):
                                      subject_analysis_queue=subject_analysis_queue,
                                      produced_pairs_queue=produced_pairs_queue,
                                      redis_path = redis_path)
-        produced_pairs_queue.set_submission_finished(self.r_server)
+        subject_analysis_queue.set_submission_finished(self.r_server)
 
     def produce_t2t_pairs(self,  subject_analysis_queue=None, produced_pairs_queue=None, redis_path=None):
 
@@ -395,7 +395,7 @@ class RelationHandler(object):
                                      subject_analysis_queue=subject_analysis_queue,
                                      produced_pairs_queue=produced_pairs_queue,
                                      redis_path = redis_path)
-        produced_pairs_queue.set_submission_finished(self.r_server)
+        subject_analysis_queue.set_submission_finished(self.r_server)
 
 
 
