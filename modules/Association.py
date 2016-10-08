@@ -35,15 +35,7 @@ class ScoringMethods():
     SUM = 'sum'
     MAX = 'max'
 
-def millify(n):
-    try:
-        n = float(n)
-        millnames=['','K','M','G','P']
-        millidx=max(0,min(len(millnames)-1,
-                          int(math.floor(math.log10(abs(n))/3))))
-        return '%.1f%s'%(n/10**(3*millidx),millnames[millidx])
-    except:
-        return n
+
 
 class AssociationScore(JSONSerializable):
 
@@ -461,12 +453,7 @@ class ScoringProcess():
     def score_target_disease_pairs(self,
                                    targets = [],
                                    dry_run = False):
-        # # with ScoreStorer(self.adapter) as storer:
 
-        # estimated_total = target_total*disease_total
-        # logger.info("%s targets available | %s diseases available | %s estimated combinations to precalculate"%(millify(target_total),
-        #                                                                                                         millify(disease_total),
-        #                                                                                                         millify(estimated_total)))
         overwrite_indices = not dry_run
         if overwrite_indices:
             overwrite_indices = not bool(targets)

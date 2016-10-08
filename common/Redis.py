@@ -20,6 +20,15 @@ from settings import Config
 
 logger = logging.getLogger(__name__)
 
+def millify(n):
+    try:
+        n = float(n)
+        millnames=['','K','M','G','P']
+        millidx=max(0,min(len(millnames)-1,
+                          int(math.floor(math.log10(abs(n))/3))))
+        return '%.1f%s'%(n/10**(3*millidx),millnames[millidx])
+    except:
+        return n
 
 class RedisQueue(object):
     '''
@@ -510,8 +519,8 @@ class RedisQueueStatusReporter(Process):
         if status is None:
             if data:
                 status = data[-1]
-                if isinstance(status, float):
-                    status = u'%.2f'%data[-1]
+                if isinstance(status, (int,float)):
+                    status = unicode(millify(data[-1]))
                 else:
                     status = unicode(data[-1])
         averaged_data = self._average_long_interval(data)
