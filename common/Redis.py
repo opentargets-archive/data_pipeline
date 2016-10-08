@@ -518,7 +518,7 @@ class RedisQueueStatusReporter(Process):
         label = unicode(key.capitalize().replace('_',' '))
         if status is None:
             if data:
-                status = unicode(millify(data[-1]))
+                status = u'Current: %s | Max: %s'%(unicode(millify(data[-1])),unicode(millify(max(data[-1]))))
         averaged_data = self._average_long_interval(data)
         output = u'%s |%s| %s'%(label.ljust(20), self.sparkplot(averaged_data), status)
         return output.encode('utf8')

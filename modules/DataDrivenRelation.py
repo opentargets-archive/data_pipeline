@@ -495,7 +495,7 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
         for i in tqdm(range(len(subject_ids[:limit])),
                       desc='getting neighbors'):
             subject_analysis_queue.put(i, r_server=redis_path)
-        subject_analysis_queue.set_submission_finished(self.r_server)
+        subject_analysis_queue.set_submission_finished(r_server=redis_path)
 
         for w in pair_producers:
             w.join()
@@ -520,7 +520,7 @@ class RelationHandlerEuristicOverlapEstimationPairProducer(RedisQueueWorkerProce
                  sums_vector,
                  data_vector,
                  ):
-        super(RelationHandlerEuristicOverlapEstimationPairProducer, self).__init__(queue_in, redis_path, queue_out)
+        super(RelationHandlerEuristicOverlapEstimationPairProducer, self).__init__(queue_in, redis_path)
         self.vector_hashes = vector_hashes
         self.buckets = buckets
         self.threshold = threshold
