@@ -688,7 +688,7 @@ class DataDrivenRelationProcess(object):
                                                  target_keys,
                                                  0.2,
                                                  auto_signal_submission_finished = False,# don't signal submission is done until t2t workers are done
-                                                 ) for i in range(multiprocessing.cpu_count())]
+                                                 ) for i in range(number_of_workers*2)]
         for w in d2d_workers:
             w.start()
 
@@ -709,7 +709,7 @@ class DataDrivenRelationProcess(object):
                                                  target_keys,
                                                  disease_keys,
                                                  0.4,
-                                                 ) for i in range(number_of_workers)]
+                                                 ) for i in range(number_of_workers*2)]
         for w in t2t_workers:
             w.start()
 
