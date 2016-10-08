@@ -194,7 +194,8 @@ class RedisQueue(object):
         if not r_server:
             r_server = self.r_server
         timedout_jobs = [i[0] for i in r_server.zrange(self.processing_key, 0, -1, withscores=True) if time.time() - i[1] > timeout]
-        logger.debug('%i jobs timedout jobs in queue %s'%(len(timedout_jobs), self.queue_id))
+        if timedout_jobs:
+            logger.debug('%i jobs timedout jobs in queue %s'%(len(timedout_jobs), self.queue_id))
         return timedout_jobs
 
     def put_back(self, key, r_server=None, ):
