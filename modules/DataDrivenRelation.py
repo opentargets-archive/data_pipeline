@@ -491,7 +491,7 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
                                                                                sums_vector,
                                                                                data_vector
                                                                                )
-                          for i in range(multiprocessing.cpu_count())]
+                          for i in range(multiprocessing.cpu_count()*2)]
         for w in pair_producers:
             w.start()
         for i in tqdm(range(len(subject_ids[:limit])),
