@@ -642,16 +642,16 @@ class DataDrivenRelationProcess(object):
 
         d2d_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_processing',
                                           max_size=number_of_workers * queue_per_worker*5,
-                                          job_timeout=20,
+                                          job_timeout=120,
                                           ttl=60 * 60 * 24 * 14)
         t2t_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_processing',
                                           max_size=number_of_workers * queue_per_worker*5,
-                                          job_timeout=20,
+                                          job_timeout=120,
                                           ttl=60 * 60 * 24 * 14)
 
         queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
                                    max_size=int(queue_per_worker * number_of_storers),
-                                   job_timeout=20)
+                                   job_timeout=120)
         '''start shared workers'''
         q_reporter = RedisQueueStatusReporter([d2d_pair_producing,
                                                t2t_pair_producing,
