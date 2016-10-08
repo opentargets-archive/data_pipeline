@@ -1,4 +1,5 @@
 import json
+import random
 from collections import defaultdict
 from datetime import datetime
 import time
@@ -175,7 +176,7 @@ class Loader():
                  es = None,
                  chunk_size=1000,
                  dry_run = False,
-                 max_flush_interval = 10):
+                 max_flush_interval = random.choice(range(8,16))):
 
         self.es = es
         self.cache = []
