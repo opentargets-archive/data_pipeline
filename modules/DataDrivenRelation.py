@@ -608,7 +608,7 @@ class DataDrivenRelationProcess(object):
 
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         number_of_storers = number_of_workers / 2 + 1
-        queue_per_worker =250
+        queue_per_worker =150
 
         # rel_handler = RelationHandlerProduceAll(target_data=target_data,
         rel_handler = RelationHandlerEuristicOverlapEstimation(target_data=target_data,
@@ -650,7 +650,7 @@ class DataDrivenRelationProcess(object):
                                           ttl=60 * 60 * 24 * 14)
 
         queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
-                                   max_size=int(queue_per_worker * number_of_storers),
+                                   max_size=int(queue_per_worker * number_of_storers*10),
                                    job_timeout=120)
         '''start shared workers'''
         q_reporter = RedisQueueStatusReporter([d2d_pair_producing,
