@@ -102,38 +102,31 @@ class PipelineConnectors():
                         logger.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
                         logger.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
                         time.sleep(wait_time)
-                        if connection_attempt > 5:
+                        if connection_attempt >= 3:
                             logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
                             break
                         connection_attempt+=1
+            if hosts:
+                self.es = Elasticsearch(hosts = hosts,
+                                   maxsize=50,
+                                   timeout=1800,
+                                   sniff_on_connection_fail=True,
+                                   retry_on_timeout=True,
+                                   max_retries=10,
+                                   )
+                connection_attempt = 1
+                while not self.es.ping():
+                    wait_time = 3*connection_attempt
+                    logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
+                    time.sleep(wait_time)
+                    if connection_attempt >=3:
+                        logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
+                        break
+                    connection_attempt += 1
+            else:
+                self.es=None
 
-            self.es = Elasticsearch(hosts = hosts,
-                               maxsize=50,
-                               timeout=1800,
-                               sniff_on_connection_fail=True,
-                               retry_on_timeout=True,
-                               max_retries=10,
-                               )
-            connection_attempt = 1
-            while not self.es.ping():
-                wait_time = 3*connection_attempt
-                logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
-                time.sleep(wait_time)
-                if connection_attempt >5:
-                    logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
-                    sys.exit(1)
-                    break
-                connection_attempt += 1
 
-
-        # es = Elasticsearch(["10.0.0.11:9200"],
-        # # sniff before doing anything
-        #                     sniff_on_start=True,
-        #                     # refresh nodes after a node fails to respond
-        #                     sniff_on_connection_fail=True,
-        #                     # and also every 60 seconds
-        #                     sniffer_timeout=60)
-        #
         '''init sparql endpoint client'''
         self.sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
 
