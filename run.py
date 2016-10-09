@@ -245,6 +245,9 @@ if __name__ == '__main__':
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
                         action='store', default='INFO')
+    parser.add_argument("--do-nothing", dest='do_nothing',
+                        help="to be used just for test",
+                        action='store_true', default=False)
     args = parser.parse_args()
 
     targets = args.targets
@@ -262,6 +265,9 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     connectors.init_services_connections(redispersist=args.redispersist)
+
+    if args.do_nothing:
+        sys.exit(0)
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
