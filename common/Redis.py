@@ -316,7 +316,7 @@ class RedisQueueStatusReporter(Process):
                  queues,
                  interval=15,
                  history = False,
-                 history_resolution = 40,
+                 history_resolution = 3,
                  ):
         super(RedisQueueStatusReporter, self).__init__()
         self.queues = queues
@@ -433,7 +433,7 @@ class RedisQueueStatusReporter(Process):
                 status = Fore.RED + 'done' + Fore.RESET
             lines = ['\n****** QUEUE: %s | STATUS %s ******' % (Back.RED+Style.DIM+data['queue_id']+Style.RESET_ALL, status)]
             if self.history:#log history
-                if status != 'done':
+                if 'done' not in status:
                     historical_data = self.historical_data[data['queue_id']]
                     if not historical_data['processed_jobs']:
                         processing_speed = float(data['processed_counter'])/self.interval
@@ -523,6 +523,8 @@ class RedisQueueWorkerProcess(Process):
                  redis_path,
                  queue_out=None,
                  auto_signal_submission_finished=True,
+                 queue_in_as_batch = False,
+                 queue_out_batch_size = 1,
                  **kwargs
                  ):
 
@@ -532,11 +534,14 @@ class RedisQueueWorkerProcess(Process):
         self.queue_out = queue_out
         self.r_server = Redis(redis_path, serverconfig={'save': []})
         self.auto_signal = auto_signal_submission_finished
+        self.queue_in_as_batch = queue_in_as_batch
+        self.queue_out_batch_size = queue_out_batch_size
         self.logger = logging.getLogger(__name__)
         self.logger.info('%s started' % self.name)
 
 
     def run(self):
+        job_result_cache = []
         while not self.queue_in.is_done(r_server=self.r_server):
             job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
@@ -544,10 +549,27 @@ class RedisQueueWorkerProcess(Process):
                 key, data = job
                 error = False
                 try:
-                    job_results = self.process(data)
+                    if self.queue_in_as_batch:
+                        job_results = (self.process(d) for d in data)
+                    else:
+                        job_results = self.process(data)
                     if self.queue_out is not None and \
                         job_results is not None:
-                        self.queue_out.put(job_results, self.r_server)
+                        if self.queue_out_batch_size >1:
+                            if self.queue_in_as_batch:
+                                for batch in self._split_iterable(job_results):
+                                    self.queue_out.put(batch, self.r_server)
+                            else:
+                                job_result_cache.append(job_results)
+                                if len(job_result_cache) >= self.queue_out_batch_size:
+                                    self.queue_out.put(job_result_cache, self.r_server)
+                                    job_result_cache = []
+                        else:
+                            if self.queue_in_as_batch:
+                                for r in job_results:
+                                    self.queue_out.put(r, self.r_server)
+                            else:
+                                self.queue_out.put(job_results, self.r_server)
                 except Exception, e:
                     error = True
                     self.logger.exception('Error processing key %s' % key)
@@ -557,11 +579,18 @@ class RedisQueueWorkerProcess(Process):
                 # self.logger.info('nothing to do in '+self.name)
                 time.sleep(.01)
 
+        if job_result_cache:
+            self.queue_out.put(job_result_cache, self.r_server)
+            job_result_cache = []
         self.logger.info('%s done processing' % self.name)
         if (self.queue_out is not None) and self.auto_signal:
             self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
 
         self.close()
+
+    def _split_iterable(self, input, size):
+            for i in range(0, len(input), size):
+                yield input[i:i + size]
 
     def close(self):
         '''
