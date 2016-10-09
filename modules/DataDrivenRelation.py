@@ -611,7 +611,7 @@ class DataDrivenRelationProcess(object):
         target_keys = target_data.keys()
 
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-        number_of_storers = number_of_workers / 2 + 1
+        number_of_storers = number_of_workers
         queue_per_worker =150
 
         # rel_handler = RelationHandlerProduceAll(target_data=target_data,
