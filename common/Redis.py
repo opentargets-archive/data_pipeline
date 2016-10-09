@@ -72,6 +72,7 @@ class RedisQueue(object):
     PROCESSED_STORE = "queue:processed:%(queue)s"
     ERRORS_STORE = "queue:errors:%(queue)s"
     TOTAL_STORE = "queue:total:%(queue)s"
+    BATCH_SIZE_STORE = "queue:total:%(queue)s"
 
     def __init__(self,
                  queue_id=None,
@@ -79,7 +80,8 @@ class RedisQueue(object):
                  max_size = 25000,
                  job_timeout = 30,
                  ttl = 60*60*24+2,
-                 total=None):
+                 total=None,
+                 batch_size=1):
         '''
         :param queue_id: queue id to attach to preconfigured queues
         :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
@@ -98,10 +100,12 @@ class RedisQueue(object):
         self.errors_counter = self.ERRORS_STORE % dict(queue = queue_id)
         self.submission_done = self.SUBMISSION_FINISH_STORE % dict(queue = queue_id)
         self.total_key = self.TOTAL_STORE % dict(queue=queue_id)
+        self.batch_size_key = self.BATCH_SIZE_STORE % dict(queue=queue_id)
         self.r_server = r_server
-        self.job_timeout = job_timeout
-        self.max_queue_size = max_size
-        self.default_ttl = ttl
+        self.job_timeout = job_timeout#todo: store in redis
+        self.max_queue_size = max_size#todo: store in redis
+        self.default_ttl = ttl#todo: store in redis
+        self.batch_size = batch_size  # todo: store in redis
         self.started = False
         self.start_time = time.time()
         if total is not None:
@@ -524,8 +528,6 @@ class RedisQueueWorkerProcess(Process):
                  redis_path,
                  queue_out=None,
                  auto_signal_submission_finished=True,
-                 queue_in_as_batch = False,
-                 queue_out_batch_size = 1,
                  **kwargs
                  ):
 
@@ -535,8 +537,9 @@ class RedisQueueWorkerProcess(Process):
         self.queue_out = queue_out
         self.r_server = Redis(redis_path, serverconfig={'save': []})
         self.auto_signal = auto_signal_submission_finished
-        self.queue_in_as_batch = queue_in_as_batch
-        self.queue_out_batch_size = queue_out_batch_size
+        self.queue_in_as_batch = queue_in.batch_size >1
+        if self.queue_out:
+            self.queue_out_batch_size = queue_out.batch_size
         self.logger = logging.getLogger(__name__)
         self.logger.info('%s started' % self.name)
 
@@ -563,7 +566,7 @@ class RedisQueueWorkerProcess(Process):
                             else:
                                 job_result_cache.append(job_results)
                                 if len(job_result_cache) >= self.queue_out_batch_size:
-                                    self.queue_out.put(job_result_cache, self.r_searver)
+                                    self.queue_out.put(job_result_cache, self.r_server)
                                     job_result_cache = []
                         else:
                             if self.queue_in_as_batch:
