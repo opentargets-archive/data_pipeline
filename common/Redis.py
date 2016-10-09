@@ -316,7 +316,7 @@ class RedisQueueStatusReporter(Process):
                  queues,
                  interval=15,
                  history = False,
-                 history_resolution = 3,
+                 history_resolution = 30,
                  ):
         super(RedisQueueStatusReporter, self).__init__()
         self.queues = queues
@@ -479,7 +479,8 @@ class RedisQueueStatusReporter(Process):
     def _average_long_interval(self,data,):
         np_data = np.array(data).astype(float)
         if len(data) > self.history_resolution:
-            np.mean(np_data[:-(len(data) % self.history_resolution)].reshape(-1, self.history_resolution), axis=1)
+            normalisation = int(round(len(data)/self.history_resolution))
+            np.mean(np_data[:-(len(data) % normalisation)].reshape(-1, normalisation), axis=1)
         np_data /= np.max(np.abs(np_data), axis=0) # normalize by max value
         if np_data.max() >0:
             np_data *= (self._history_plot_interval / np_data.max()) #map to interval
@@ -562,7 +563,7 @@ class RedisQueueWorkerProcess(Process):
                             else:
                                 job_result_cache.append(job_results)
                                 if len(job_result_cache) >= self.queue_out_batch_size:
-                                    self.queue_out.put(job_result_cache, self.r_server)
+                                    self.queue_out.put(job_result_cache, self.r_searver)
                                     job_result_cache = []
                         else:
                             if self.queue_in_as_batch:
