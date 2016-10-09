@@ -433,20 +433,21 @@ class RedisQueueStatusReporter(Process):
                 status = Fore.RED + 'done' + Fore.RESET
             lines = ['\n****** QUEUE: %s | STATUS %s ******' % (Back.RED+Style.DIM+data['queue_id']+Style.RESET_ALL, status)]
             if self.history:#log history
-                historical_data = self.historical_data[data['queue_id']]
-                if not historical_data['processed_jobs']:
-                    processing_speed = float(data['processed_counter'])/self.interval
-                    submission_speed = float(data['submitted_counter']) / self.interval
-                else:
-                    processing_speed = float(data['processed_counter']-historical_data['processed_jobs'][-1]) / self.interval
-                    submission_speed = float(data['submitted_counter']-historical_data['submitted_jobs'][-1]) / self.interval
-                historical_data['queue_size'].append(data["queue_size"])
-                historical_data['processing_jobs'].append(data["processing_jobs"])
-                historical_data['timedout_jobs'].append(data["timedout_jobs"])
-                historical_data['processing_speed'].append(processing_speed)
-                historical_data['submission_speed'].append(submission_speed)
-                historical_data['processed_jobs'].append(data['processed_counter'])
-                historical_data['submitted_jobs'].append(data['submitted_counter'])
+                if status != 'done':
+                    historical_data = self.historical_data[data['queue_id']]
+                    if not historical_data['processed_jobs']:
+                        processing_speed = float(data['processed_counter'])/self.interval
+                        submission_speed = float(data['submitted_counter']) / self.interval
+                    else:
+                        processing_speed = float(data['processed_counter']-historical_data['processed_jobs'][-1]) / self.interval
+                        submission_speed = float(data['submitted_counter']-historical_data['submitted_jobs'][-1]) / self.interval
+                    historical_data['queue_size'].append(data["queue_size"])
+                    historical_data['processing_jobs'].append(data["processing_jobs"])
+                    historical_data['timedout_jobs'].append(data["timedout_jobs"])
+                    historical_data['processing_speed'].append(processing_speed)
+                    historical_data['submission_speed'].append(submission_speed)
+                    historical_data['processed_jobs'].append(data['processed_counter'])
+                    historical_data['submitted_jobs'].append(data['submitted_counter'])
 
                 lines.append(self._compose_history_line(data['queue_id'], 'submitted_jobs'))
                 lines.append(self._compose_history_line(data['queue_id'], 'submission_speed'))
