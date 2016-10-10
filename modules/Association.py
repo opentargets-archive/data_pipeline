@@ -517,7 +517,7 @@ class ScoringProcess():
                                  self.r_server.db,
                                  score_data_q,
                                  lookup_data,
-                                 ) for i in range(number_of_workers)]
+                                 ) for i in range(number_of_workers*2)]
         for w in scorers:
             w.start()
 
