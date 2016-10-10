@@ -486,12 +486,12 @@ class ScoringProcess():
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
                                            max_size=queue_per_worker * number_of_workers,
                                            job_timeout=1200,
-                                           batch_size=10,
+                                           batch_size=100,
                                            r_server=self.r_server)
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
                                   max_size=queue_per_worker * number_of_storers,
                                   job_timeout=1200,
-                                  batch_size=10,
+                                  batch_size=100,
                                   r_server=self.r_server)
 
         q_reporter = RedisQueueStatusReporter([target_q,

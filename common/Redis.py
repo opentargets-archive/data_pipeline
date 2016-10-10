@@ -338,9 +338,9 @@ class RedisQueueStatusReporter(Process):
                                                             queue_size = [],
                                                             timedout_jobs=[],
                                                             processing_speed = [],
-                                                            submission_speed = [],
+                                                            reception_speed = [],
                                                             processed_jobs = [],
-                                                            submitted_jobs = [],
+                                                            received_jobs = [],
                                                             )
 
 
@@ -351,13 +351,13 @@ class RedisQueueStatusReporter(Process):
         for i,q in enumerate(self.queues):
             queue_id = self._simplify_queue_id(q.queue_id)
             self.bars[q.queue_id] = dict(
-                                         submitted_counter=tqdm(desc='%s submitted jobs' % queue_id,
+                                         submitted_counter=tqdm(desc='%s received jobs [batch size: %i]'%(queue_id,q.batch_size),
                                                                 unit=' jobs',
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
                                                                 # position=queue_position+0,
                                                                 ),
-                                         processed_counter=tqdm(desc='%s processed jobs' % queue_id,
+                                         processed_counter=tqdm(desc='%s processed jobs [batch size: %i]'%(queue_id,q.batch_size),
                                                                 unit=' jobs',
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
@@ -443,20 +443,20 @@ class RedisQueueStatusReporter(Process):
                     historical_data = self.historical_data[data['queue_id']]
                     if not historical_data['processed_jobs']:
                         processing_speed = float(data['processed_counter'])/self.interval
-                        submission_speed = float(data['submitted_counter']) / self.interval
+                        reception_speed = float(data['submitted_counter']) / self.interval
                     else:
                         processing_speed = float(data['processed_counter']-historical_data['processed_jobs'][-1]) / self.interval
-                        submission_speed = float(data['submitted_counter']-historical_data['submitted_jobs'][-1]) / self.interval
+                        reception_speed = float(data['submitted_counter']-historical_data['received_jobs'][-1]) / self.interval
                     historical_data['queue_size'].append(data["queue_size"])
                     historical_data['processing_jobs'].append(data["processing_jobs"])
                     historical_data['timedout_jobs'].append(data["timedout_jobs"])
                     historical_data['processing_speed'].append(processing_speed)
-                    historical_data['submission_speed'].append(submission_speed)
+                    historical_data['reception_speed'].append(reception_speed)
                     historical_data['processed_jobs'].append(data['processed_counter'])
-                    historical_data['submitted_jobs'].append(data['submitted_counter'])
+                    historical_data['received_jobs'].append(data['submitted_counter'])
 
-                lines.append(self._compose_history_line(data['queue_id'], 'submitted_jobs'))
-                lines.append(self._compose_history_line(data['queue_id'], 'submission_speed'))
+                lines.append(self._compose_history_line(data['queue_id'], 'received_jobs'))
+                lines.append(self._compose_history_line(data['queue_id'], 'reception_speed'))
                 lines.append(self._compose_history_line(data['queue_id'], 'processed_jobs'))
                 lines.append(self._compose_history_line(data['queue_id'], 'processing_speed'))
                 lines.append(self._compose_history_line(data['queue_id'], 'processing_jobs'))
@@ -464,7 +464,7 @@ class RedisQueueStatusReporter(Process):
                 lines.append(self._compose_history_line(data['queue_id'], 'queue_size', queue_size_status))
             else:#log single datapoint
 
-                    lines.append('Submitted jobs: %i' % submitted)
+                    lines.append('Received jobs: %i' % submitted)
                     lines.append('Processed jobs: {} | {:.1%}'.format(processed, float(processed) / submitted))
                     lines.append('Errors: {} | {:.1%}'.format(errors, error_percent))
                     lines.append('Processing speed: {:.1f} jobs per second'.format(processing_speed))
