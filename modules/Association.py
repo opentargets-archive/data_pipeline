@@ -362,7 +362,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                 if e.is_direct:
                     is_direct = True
                     break
-            self.target_disease_pair_q.put((key[0],key[1], evidence, is_direct))
+            self.put_into_queue_out((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
 
 
@@ -418,6 +418,8 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 
 
     def process(self, data):
+        if data is None:
+            pass
         target, disease, score = data
         element_id = '%s-%s' % (target, disease)
         if score: #bypass associations with overall score=0
@@ -484,17 +486,19 @@ class ScoringProcess():
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
                                            max_size=10001,
                                            job_timeout=1200,
+                                           batch_size=10,
                                            r_server=self.r_server)
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
                                   max_size=10000,
                                   job_timeout=1200,
+                                  batch_size=10,
                                   r_server=self.r_server)
 
         q_reporter = RedisQueueStatusReporter([target_q,
                                                target_disease_pair_q,
                                                score_data_q
                                                ],
-                                              interval=10,
+                                              interval=30,
                                               )
         q_reporter.start()
 

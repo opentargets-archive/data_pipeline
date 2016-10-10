@@ -115,6 +115,8 @@ class RedisQueue(object):
 
 
     def put(self, element, r_server=None):
+        if element is None:
+            pass
         if not self.started:
             self.start_time = time.time()
             self.started = True
@@ -319,7 +321,7 @@ class RedisQueueStatusReporter(Process):
     def __init__(self,
                  queues,
                  interval=15,
-                 history = False,
+                 history = True,
                  history_resolution = 30,
                  ):
         super(RedisQueueStatusReporter, self).__init__()
@@ -542,10 +544,10 @@ class RedisQueueWorkerProcess(Process):
             self.queue_out_batch_size = queue_out.batch_size
         self.logger = logging.getLogger(__name__)
         self.logger.info('%s started' % self.name)
+        self.job_result_cache = []
 
 
     def run(self):
-        job_result_cache = []
         while not self.queue_in.is_done(r_server=self.r_server):
             job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
@@ -554,26 +556,11 @@ class RedisQueueWorkerProcess(Process):
                 error = False
                 try:
                     if self.queue_in_as_batch:
-                        job_results = (self.process(d) for d in data)
+                        job_results = [self.process(d) for d in data]
                     else:
                         job_results = self.process(data)
-                    if self.queue_out is not None and \
-                        job_results is not None:
-                        if self.queue_out_batch_size >1:
-                            if self.queue_in_as_batch:
-                                for batch in self._split_iterable(job_results):
-                                    self.queue_out.put(batch, self.r_server)
-                            else:
-                                job_result_cache.append(job_results)
-                                if len(job_result_cache) >= self.queue_out_batch_size:
-                                    self.queue_out.put(job_result_cache, self.r_server)
-                                    job_result_cache = []
-                        else:
-                            if self.queue_in_as_batch:
-                                for r in job_results:
-                                    self.queue_out.put(r, self.r_server)
-                            else:
-                                self.queue_out.put(job_results, self.r_server)
+                    if self.queue_out is not None and job_results is not None:
+                        self.put_into_queue_out(job_results, aggregated_input = self.queue_in_as_batch)
                 except Exception, e:
                     error = True
                     self.logger.exception('Error processing key %s' % key)
@@ -583,9 +570,9 @@ class RedisQueueWorkerProcess(Process):
                 # self.logger.info('nothing to do in '+self.name)
                 time.sleep(.01)
 
-        if job_result_cache:
-            self.queue_out.put(job_result_cache, self.r_server)
-            job_result_cache = []
+        if self.job_result_cache:
+            self._clear_job_results_cache()
+
         self.logger.info('%s done processing' % self.name)
         if (self.queue_out is not None) and self.auto_signal:
             self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
@@ -595,6 +582,28 @@ class RedisQueueWorkerProcess(Process):
     def _split_iterable(self, input, size):
             for i in range(0, len(input), size):
                 yield input[i:i + size]
+
+    def put_into_queue_out(self, result, aggregated_input = False ):
+        if result is not None:
+            if self.queue_out_batch_size > 1:
+                if aggregated_input:
+                    not_none_results = [r for r in result if r is not None]
+                    for batch in self._split_iterable(not_none_results, self.queue_out_batch_size):
+                        self.queue_out.put(batch, self.r_server)
+                else:
+                    self.job_result_cache.append(result)
+                    if len(self.job_result_cache) >= self.queue_out_batch_size:
+                        self._clear_job_results_cache()
+            else:
+                if aggregated_input:
+                    for r in result:
+                        self.queue_out.put(r, self.r_server)
+                else:
+                    self.queue_out.put(result, self.r_server)
+
+    def _clear_job_results_cache(self):
+        self.queue_out.put(self.job_result_cache, self.r_server)
+        self.job_result_cache = []
 
     def close(self):
         '''
