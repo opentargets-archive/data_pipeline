@@ -113,61 +113,61 @@ class DistanceComputationWorker(RedisQueueWorkerProcess):
         r = Relation(subject, object, dist, self.type, **body)
         return r
 
-    def old_run(self):
-        while not self.queue_in.is_done(r_server=self.r_server):
-            job = self.queue_in.get(r_server=self.r_server, timeout=1)
-            if job is not None:
-                key, data = job
-                error = False
-                try:
-                    subject_id, subject_data, subject_label, object_id, object_data, object_label = data
-                    subject = dict(id=subject_id,
-                                   label = subject_label,
-                                   links={})
-                    object = dict(id=object_id,
-                                  label=object_label,
-                                  links={})
-                    union_keys = set(subject_data.keys()) | set(object_data.keys())
-                    shared_keys = set(subject_data.keys()) & set(object_data.keys())
-                    if self.filtered_keys:
-                        union_keys = union_keys - self.filtered_keys # remove filtered keys if needed
-                        shared_keys = shared_keys - self.filtered_keys
-                    shared_keys = self._get_ordered_keys(subject_data, object_data, shared_keys)
-                    if union_keys:
-                        w_neg = sum([1./self.weights[i] for i in union_keys])
-                        w_pos = sum([1./self.weights[i] for i in shared_keys])
-                        pos = len(shared_keys)
-                        neg = len(union_keys)
-                        jackard, jackard_weighted = 0., 0.
-                        if neg:
-                            jackard = float(pos)/neg
-                            jackard_weighted = float(w_pos)/w_neg
-                        dist = {
-                                'jaccard': jackard,
-                                'jackard_weighted': jackard_weighted,
-                                }
-                        dist.update(self._compute_vector_based_distances(subject_data, object_data, union_keys))
-                        body = dict()
-                        body['counts'] = {'shared_count': pos,
-                                          'union_count': neg,
-                                          }
-                        if self.type == RelationType.SHARED_TARGET:
-                            subject['links']['targets_count'] =len(subject_data)
-                            object['links']['targets_count'] = len(object_data)
-                            body['shared_targets'] = list(shared_keys)
-                        elif self.type == RelationType.SHARED_DISEASE:
-                            subject['links']['diseases_count'] = len(subject_data)
-                            object['links']['diseases_count'] = len(object_data)
-                            body['shared_diseases'] = list(shared_keys)
-                        r = Relation(subject, object, dist, self.type, **body)
-                        self.queue_out.put(r, self.r_server)#TODO: create an object here
-                except Exception, e:
-                    error = True
-                    logger.exception('Error processing key %s' % key)
+    # def old_run(self):
+    #     while not self.queue_in.is_done(r_server=self.r_server):
+    #         job = self.queue_in.get(r_server=self.r_server, timeout=1)
+    #         if job is not None:
+    #             key, data = job
+    #             error = False
+    #             try:
+    #                 subject_id, subject_data, subject_label, object_id, object_data, object_label = data
+    #                 subject = dict(id=subject_id,
+    #                                label = subject_label,
+    #                                links={})
+    #                 object = dict(id=object_id,
+    #                               label=object_label,
+    #                               links={})
+    #                 union_keys = set(subject_data.keys()) | set(object_data.keys())
+    #                 shared_keys = set(subject_data.keys()) & set(object_data.keys())
+    #                 if self.filtered_keys:
+    #                     union_keys = union_keys - self.filtered_keys # remove filtered keys if needed
+    #                     shared_keys = shared_keys - self.filtered_keys
+    #                 shared_keys = self._get_ordered_keys(subject_data, object_data, shared_keys)
+    #                 if union_keys:
+    #                     w_neg = sum([1./self.weights[i] for i in union_keys])
+    #                     w_pos = sum([1./self.weights[i] for i in shared_keys])
+    #                     pos = len(shared_keys)
+    #                     neg = len(union_keys)
+    #                     jackard, jackard_weighted = 0., 0.
+    #                     if neg:
+    #                         jackard = float(pos)/neg
+    #                         jackard_weighted = float(w_pos)/w_neg
+    #                     dist = {
+    #                             'jaccard': jackard,
+    #                             'jackard_weighted': jackard_weighted,
+    #                             }
+    #                     dist.update(self._compute_vector_based_distances(subject_data, object_data, union_keys))
+    #                     body = dict()
+    #                     body['counts'] = {'shared_count': pos,
+    #                                       'union_count': neg,
+    #                                       }
+    #                     if self.type == RelationType.SHARED_TARGET:
+    #                         subject['links']['targets_count'] =len(subject_data)
+    #                         object['links']['targets_count'] = len(object_data)
+    #                         body['shared_targets'] = list(shared_keys)
+    #                     elif self.type == RelationType.SHARED_DISEASE:
+    #                         subject['links']['diseases_count'] = len(subject_data)
+    #                         object['links']['diseases_count'] = len(object_data)
+    #                         body['shared_diseases'] = list(shared_keys)
+    #                     r = Relation(subject, object, dist, self.type, **body)
+    #                     self.queue_out.put(r, self.r_server)#TODO: create an object here
+    #             except Exception, e:
+    #                 error = True
+    #                 logger.exception('Error processing key %s' % key)
+    #
+    #             self.queue_in.done(key, error=error, r_server=self.r_server)
 
-                self.queue_in.done(key, error=error, r_server=self.r_server)
-
-        logger.info('%s done processing'%self.name)
+        # logger.info('%s done processing'%self.name)
 
     def _get_ordered_keys(self, subject_data, object_data, keys):
         ordered_keys = sorted([(max(subject_data[key], object_data[key]), key) for key in keys], reverse=True)
@@ -260,8 +260,12 @@ class MatrixIteratorWorker(RedisQueueWorkerProcess):
                 subj_id = self.keys[i]
                 obj_id = self.keys[j]
                 if set(self.matrix_data[subj_id].keys()) & set(self.matrix_data[obj_id].keys()):
-                    self.queue_out.put((subj_id, self.matrix_data[subj_id], self.labels[subj_id], obj_id, self.matrix_data[obj_id], self.labels[obj_id]),
-                                       r_server= self.r_server)
+                    self.put_into_queue_out((subj_id,
+                                             self.matrix_data[subj_id],
+                                             self.labels[subj_id], obj_id,
+                                             self.matrix_data[obj_id],
+                                             self.labels[obj_id]),
+                                            )
 
 
 class LocalTfidfTransformer(TfidfTransformer):
