@@ -474,22 +474,22 @@ class ScoringProcess():
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-        number_of_storers = number_of_workers/2 + 1
-        # number_of_storers = 1
+        number_of_storers = number_of_workers
+        queue_per_worker = 250
         if targets and len(targets) <number_of_workers:
             number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
-                              max_size=number_of_workers*2,
+                              max_size=number_of_workers*5,
                               job_timeout=3600,
                               r_server=self.r_server,
                               total=len(targets))
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
-                                           max_size=10001,
+                                           max_size=queue_per_worker * number_of_workers,
                                            job_timeout=1200,
                                            batch_size=10,
                                            r_server=self.r_server)
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
-                                  max_size=10000,
+                                  max_size=queue_per_worker * number_of_storers,
                                   job_timeout=1200,
                                   batch_size=10,
                                   r_server=self.r_server)
