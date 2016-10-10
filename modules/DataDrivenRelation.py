@@ -544,7 +544,7 @@ class RelationHandlerEuristicOverlapEstimationPairProducer(RedisQueueWorkerProce
                     if i > j:
                         if OverlapDistance.estimate_below_threshold(self.sums_vector[i], self.sums_vector[j],
                                                                     threshold=self.threshold):
-                            self.queue_out.put((i, self.data_vector[i], j, self.data_vector[j]), self.r_server)
+                            self.put_into_queue_out((i, self.data_vector[i], j, self.data_vector[j]))
                 compared.add(j)
 
 class RelationHandlerProduceAll(RelationHandler):
