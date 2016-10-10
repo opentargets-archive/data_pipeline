@@ -636,25 +636,30 @@ class DataDrivenRelationProcess(object):
 
         '''create the queues'''
         d2d_pair_producing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_pair_producting',
-                                          max_size=number_of_workers* 5,
-                                          job_timeout=60 * 60 * 24,
-                                          ttl=60 * 60 * 24 * 14)
+                                        max_size=number_of_workers* 5,
+                                        job_timeout=60 * 60 * 24,
+                                        batch_size=1,
+                                        ttl=60 * 60 * 24 * 14)
         t2t_pair_producing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_pair_producting',
-                                          max_size=number_of_workers * 5,
-                                          job_timeout=60 * 60 * 24,
-                                          ttl=60 * 60 * 24 * 14)
+                                        max_size=number_of_workers * 5,
+                                        job_timeout=60 * 60 * 24,
+                                        batch_size=1,
+                                        ttl=60 * 60 * 24 * 14)
 
         d2d_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_processing',
                                           max_size=number_of_workers * queue_per_worker,
                                           job_timeout=300,
+                                          batch_size=100,
                                           ttl=60 * 60 * 24 * 14)
         t2t_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_processing',
                                           max_size=number_of_workers * queue_per_worker,
                                           job_timeout=300,
+                                          batch_size=100,
                                           ttl=60 * 60 * 24 * 14)
 
         queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
                                    max_size=int(queue_per_worker * number_of_storers*10),
+                                   batch_size=100,
                                    job_timeout=120)
         '''start shared workers'''
         q_reporter = RedisQueueStatusReporter([d2d_pair_producing,
