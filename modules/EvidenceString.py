@@ -17,7 +17,7 @@ from modules import GeneData
 from modules.ECO import ECO
 from modules.EFO import EFO, get_ontology_code_from_url
 from modules.GeneData import Gene
-from modules.Literature import Literature
+from modules.Literature import Publication, PublicationFetcher
 from settings import Config
 
 logger = logging.getLogger(__name__)
@@ -181,18 +181,19 @@ class ExtendedInfoECO(ExtendedInfo):
 class ExtendedInfoLiterature(ExtendedInfo):
     root = "literature"
 
-    def __init__(self, literature):
-        if isinstance(literature, Literature):
-            self.extract_info(literature)
+    def __init__(self, literature,analyzed_literature):
+        if isinstance(literature, Publication):
+            self.extract_info(literature,analyzed_literature)
         else:
-            raise AttributeError("you need to pass a Literature not a: " + str(type(literature)))
+            raise AttributeError("you need to pass a Publication not a: " + str(type(literature)))
 
-    def extract_info(self, literature):
+    def extract_info(self, literature, analyzed_literature):
 
         self.data = dict( abstract = literature.abstract,
                           journal=literature.journal,
                           year=literature.year,
-                          abstract_lemmas=literature.abstract_lemmas)
+                          title=literature.title,
+                          abstract_lemmas=analyzed_literature.lemmas)
 
 class ProcessedEvidenceStorer():
     def __init__(self,  es_loader, chunk_size=1e4, quiet = False):
@@ -216,10 +217,6 @@ class ProcessedEvidenceStorer():
                            routing = ev.evidence['target']['id'])
 
 
-
-
-
-
     def close(self):
         pass
 
@@ -232,11 +229,10 @@ class ProcessedEvidenceStorer():
 
 
 class EvidenceManager():
-    def __init__(self, lookup_data,):
+    def __init__(self, lookup_data,loader):
         self.available_genes = lookup_data.available_genes
         self.available_efos =  lookup_data.available_efos
         self.available_ecos =  lookup_data.available_ecos
-        self.available_publications = lookup_data.available_publications
         self.uni2ens =  lookup_data.uni2ens
         self.non_reference_genes =  lookup_data.non_reference_genes
         self._get_eco_scoring_values()
@@ -247,6 +243,7 @@ class EvidenceManager():
         # self.efo_retriever = EFOLookUpTable(self.es)
         # self.eco_retriever = ECOLookUpTable(self.es)
         self._get_score_modifiers()
+        self.pub_fetcher = PublicationFetcher(loader.es, loader=loader)
         # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
 
 
@@ -525,14 +522,12 @@ class EvidenceManager():
         ''' Add literature data '''
         pmid_url = extended_evidence['literature']['references'][0]['lit_id']
         pmid = pmid_url.split('/')[-1]
-        literature = self._get_literature_obj(pmid)
-        #TODO: check introduced for testing!!!
-        if literature.abstract:
-
-            literature_info = ExtendedInfoLiterature(literature)
-            extended_evidence['literature']['year'] = literature_info.data['year']
-            extended_evidence['literature']['abstract'] = literature_info.data['abstract']
-            extended_evidence['literature']['journal'] = literature_info.data['journal']
+        pubs = self.pub_fetcher.get_publication_with_analyzed_data([pmid])
+        literature_info = ExtendedInfoLiterature(pubs[pmid][0],pubs[pmid][1])
+        extended_evidence['literature']['year'] = literature_info.data['year']
+        extended_evidence['literature']['abstract'] = literature_info.data['abstract']
+        extended_evidence['literature']['journal_data'] = literature_info.data['journal']
+        extended_evidence['literature']['title'] = literature_info.data['title']
 
 
 
@@ -551,8 +546,8 @@ class EvidenceManager():
             GO_terms['molecular_function'] or \
             GO_terms['cellular_component'] :
             extended_evidence['private']['facets']['go'] = GO_terms
-        if literature.abstract:
-            extended_evidence['private']['facets']['abstract_lemmas'] = literature_info.data['abstract_lemmas']
+
+        extended_evidence['private']['facets']['abstract_lemmas'] = literature_info.data['abstract_lemmas']
 
         return Evidence(extended_evidence)
 
@@ -573,17 +568,6 @@ class EvidenceManager():
         eco = ECO(ecoid)
         eco.load_json(self.available_ecos[ecoid])
         return eco
-
-    def _get_literature_obj(self, pmid):
-
-        literature = Literature(pmid)
-
-        available_pub = self.available_publications[pmid]
-        #TODO : check For testing
-        if(available_pub):
-            literature.load_json(available_pub)
-        return literature
-
 
     def _get_non_reference_gene_mappings(self):
         self.non_reference_genes = {}
@@ -859,12 +843,13 @@ class EvidenceProcesser(multiprocessing.Process):
                  output_computed_count,
                  processing_errors_count,
                  input_processed_count,
-                 lock):
+                 lock,
+                 loader):
         super(EvidenceProcesser, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
         self.start_time = time.time()
-        self.evidence_manager = EvidenceManager(lookup_data)
+        self.evidence_manager = EvidenceManager(lookup_data, loader)
         self.input_loading_finished = input_loading_finished
         self.output_computation_finished = output_computation_finished
         self.input_generated_count = input_generated_count
@@ -1054,7 +1039,8 @@ class EvidenceStringProcess():
                                      output_computed_count,
                                      processing_errors_count,
                                      input_processed_count,
-                                     data_processing_lock
+                                     data_processing_lock,
+                                     loader
                                      ) for i in range(workers_number)]
                                   # ) for i in range(2)]
         for w in scorers:

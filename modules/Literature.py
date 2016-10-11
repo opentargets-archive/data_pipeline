@@ -114,7 +114,7 @@ class PublicationFetcher(object):
                                       pub_type=result['pubTypeList']['pubType'],
                                       )
                     if 'meshHeadingList' in result:
-                        pub. mesh_headings = result['meshHeadingList']['meshHeading']
+                        pub.mesh_headings = result['meshHeadingList']['meshHeading']
                     if 'chemicalList' in result:
                         pub.chemicals = result['chemicalList']['chemical']
                     if 'dateOfRevision' in result:
@@ -150,6 +150,18 @@ class PublicationFetcher(object):
             result = [i[u'id'] for i in json_response[u'referenceList'][u'reference'] if u'id' in i]
             pub.references=result
         return pub
+
+    def get_publication_with_analyzed_data(self, pub_ids):
+        logging.info("getting publication/analyzed data for id {}".format(pub_ids))
+        pubs = {}
+        for parent_publication,analyzed_publication in self.es_query.get_publications_with_analyzed_data(ids=pub_ids):
+            pub = Publication()
+            pub.load_json(parent_publication)
+            analyzed_pub= PublicationAnalysisSpacy(pub.pub_id)
+            analyzed_pub.load_json(analyzed_publication)
+            pubs[pub.pub_id] = [pub,analyzed_pub]
+        return pubs
+
 
 
 class Publication(JSONSerializable):
@@ -254,12 +266,13 @@ class PublicationAnalyserSpacy(object):
 
         if pub is None:
             pub = self.fetcher.get_publication(pub_ids=pub_id)
-
-        text_to_parse = unicode(pub.title + ' ' + pub.abstract)
-        lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
-        lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
-        noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
-        analysed_pub = PublicationAnalysisSpacy(pub_id = pub_id,
+        analysed_pub = None
+        if pub.title and pub.abstract:
+            text_to_parse = unicode(pub.title + ' ' + pub.abstract)
+            lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
+            lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
+            noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
+            analysed_pub = PublicationAnalysisSpacy(pub_id = pub_id,
                                         lemmas=lemmas,
                                         noun_chunks=noun_chunks,
                                         analysed_sentences_count=analysed_sentences_count)
@@ -278,7 +291,7 @@ class PublicationAnalyserSpacy(object):
         #    print('ENTITIES:')
         for e in parsedEx.ents:
             e_str = u' '.join(t.orth_ for t in e).encode('utf-8').lower()
-            if ((not e.label_) or (e.label_ == u'ENT')) and not (e_str in STOPLIST) and not (e_str in SYMBOLS):
+            if ((not e.label_) or (e.label_ == u'ENT')) and not (e_str in self.STOPLIST) and not (e_str in SYMBOLS):
                 if e_str not in ec:
                     try:
                         ec[e_str] += tl.count(e_str)
@@ -307,7 +320,7 @@ class PublicationAnalyserSpacy(object):
         tokens = lemmas
 
         # stoplist the tokens
-        tokens = [tok for tok in tokens if tok.encode('utf-8') not in STOPLIST]
+        tokens = [tok for tok in tokens if tok.encode('utf-8') not in self.STOPLIST]
 
         # stoplist symbols
         tokens = [tok for tok in tokens if tok.encode('utf-8') not in SYMBOLS]
@@ -493,84 +506,6 @@ def cleanText(text):
     text = text.lower()
 
     return text
-
-
-class Literature(JSONSerializable):
-    def __init__(self,
-                 pmid,
-                 abstract='',
-                 journal='',
-                 year='',
-                 abstract_lemmas=''):
-        self.pmid = pmid
-        self.abstract = abstract
-        self.journal = journal
-        self.year = year
-        self.abstract_lemmas = abstract_lemmas
-
-
-class LiteratureLookUpTable(object):
-    """
-    A redis-based pickable literature look up table
-    """
-
-    def __init__(self,
-                 es,
-                 namespace = None,
-                 r_server = None,
-                 ttl = 60*60*24+7):
-        self._table = RedisLookupTablePickle(namespace = namespace,
-                                            r_server = r_server,
-                                            ttl = ttl)
-        self._es = es
-        self._es_query = ESQuery(es)
-        self.r_server = r_server
-        if r_server is not None:
-            self._load_literature_data(r_server)
-
-    def _load_literature_data(self, r_server = None):
-        for parent_publication, analyzed_publication in tqdm(self._es_query.get_all_publications(),
-                        desc='loading publications',
-                        unit=' publication',
-                        unit_scale=True,
-                        total=self._es_query.count_all_publications(),
-                        leave=False,
-                        ):
-            literature = parent_publication
-            literature['abstract_lemmas'] = analyzed_publication['lemmas']
-            self.set_literature(literature,self._get_r_server(
-                    r_server))# TODO can be improved by sending elements in batches
-
-    def get_literature(self, pmid, r_server = None):
-        return self._table.get(pmid, r_server=r_server)
-
-    def set_literature(self, literature, r_server = None):
-        self._table.set((literature['pub_id']), literature, r_server=self._get_r_server(
-            r_server))
-
-    def get_available_literature_ids(self, r_server = None):
-        return self._table.keys()
-
-    def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
-
-    def __getitem__(self, key, r_server=None):
-        return self.get_literature(key, r_server)
-
-    def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
-
-    def _get_r_server(self, r_server=None):
-        if not r_server:
-            r_server = self.r_server
-        if r_server is None:
-            raise AttributeError('A redis server is required either at class instantation or at the method level')
-        return r_server
-
-    def keys(self):
-        return self._table.keys()
-
-
 
 class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
     def __init__(self,

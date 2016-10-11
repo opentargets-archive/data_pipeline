@@ -5,14 +5,12 @@ from common.ElasticsearchQuery import ESQuery
 from modules.ECO import ECOLookUpTable
 from modules.EFO import EFOLookUpTable
 from modules.GeneData import GeneLookUpTable
-from modules.Literature import LiteratureLookUpTable
 
 class LookUpData():
     def __init__(self):
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
-        self.available_publications = None
         self.uni2ens = None
         self.non_reference_genes = None
         self.available_gene_objects = None
@@ -23,7 +21,6 @@ class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
     ECO = 'eco'
-    PUBLICATION = 'publication'
 
 class LookUpDataRetriever(object):
     def __init__(self,
@@ -51,9 +48,6 @@ class LookUpDataRetriever(object):
                 self._get_available_efos()
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
-            elif dt == LookUpDataType.PUBLICATION:
-                self._get_available_publications()
-
             self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
 
 
@@ -87,7 +81,3 @@ class LookUpDataRetriever(object):
                 self.lookup.non_reference_genes[symbol]['reference']=ensg
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
-
-    def _get_available_publications(self):
-        self.logger.info('getting literature/publications')
-        self.lookup.available_publications = LiteratureLookUpTable(self.es, 'LITERATURE_LOOKUP', self.r_server)
