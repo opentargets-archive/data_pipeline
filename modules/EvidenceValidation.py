@@ -1583,114 +1583,6 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         return
 
 
-class ElasticStorage():
-
-
-
-
-    @staticmethod
-    def delete_prev_data_in_es(es, index, data_source_name):
-        logger = logging.getLogger(__name__)
-        # Create a query for results you want to delete
-
-        count = 0
-        q = '{ "query": { "filtered": { "filter": { "type" : { "value" : "%s" } } } } }' % (data_source_name)
-
-        res = es.search(
-                index=index,
-                body=q,
-                size=0,
-                search_type='count')
-
-        count = res["hits"]["total"]
-
-        logger.debug(
-            "EvidenceStringELasticStorage %s number of docs: %i" % (index, count))
-
-
-
-        if count:
-            logger.debug("Delete previous submitted data: %i evidence strings will be removed"%count)
-
-            search = es.search(
-                    index=index,
-                    doc_type=data_source_name,
-                    body=q,
-                    size=int(EVIDENCESTRING_VALIDATION_CHUNK_SIZE),
-                    search_type="scan",
-                    scroll='5m')
-
-            nb_scroll = 0
-            total_hits = count
-
-            while total_hits > 0:
-                # try:
-                # Get the next page of results.
-                if nb_scroll % 10 == 0:
-                    logger.debug("Get Scroll %i and delete data for datasource %s"%(nb_scroll, data_source_name))
-                nb_scroll+=1
-                scroll = es.scroll(scroll_id=search['_scroll_id'], scroll='5m')
-                # Since scroll throws an error catch it and break the loop.
-                # We have results initialize the bulk variable.
-                bulk = ""
-                for result in scroll['hits']['hits']:
-                    bulk = bulk + '{ "delete" : { "_index" : "' + str(result['_index']) + '", "_type" : "' + str(
-                            result['_type']) + '", "_id" : "' + str(result['_id']) + '" } }\n'
-                # Finally do the deleting.
-                es.bulk(body=bulk)
-                total_hits -= len(scroll['hits']['hits'])
-                # except Exception, error:
-                #     if isinstance(error, elasticsearch.exceptions.NotFoundError):
-                #         self.logger.error("ElasticSearch Error updating data in ElasticSearch %s" % (str(error)))
-                #     else:
-                #         self.logger.error("ElasticSearch Error %s" % (str(error)))
-                #     break
-
-                # es.delete(index=Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME, doc_type=data_source_name)
-
-    @staticmethod
-    def store_to_es(es,
-                    index,
-                    data_source_name,
-                    data,
-                    quiet=False):
-        logger = logging.getLogger(__name__)
-
-        start_time = time.time()
-        rows_to_insert = 0
-
-        actions = []
-
-        for key, value in data.iteritems():
-            rows_to_insert += 1
-            action = {
-                "_index": "%s" % index,
-                "_type": "%s" % data_source_name,
-                "_id": key,
-                "_source":
-                    json.dumps(dict(uniq_assoc_fields_hashdig=key,
-                                    json_doc_hashdig=value.json_doc_hashdig,
-                                    evidence_string=value.evidence_string,
-                                    target_id=value.target_id,
-                                    disease_id=value.disease_id,
-                                    data_source_name=value.data_source_name,
-                                    json_schema_version=value.json_schema_version,
-                                    json_doc_version=value.json_doc_version,
-                                    release_date=value.release_date
-                                    ))
-                # "timestamp": datetime.now()
-            }
-            actions.append(action)
-
-        if len(actions) > 0:
-            helpers.bulk(es, actions)
-        # if not quiet:
-        logger.debug('EvidenceStringStorage: inserted %i rows of %s inserted in evidence_string took %ss' % (
-        rows_to_insert, data_source_name, str(time.time() - start_time)))
-
-        return rows_to_insert
-
-
 class EvidenceChunkElasticStorage():
     def __init__(self, loader,):
         self.loader = loader
@@ -1795,23 +1687,9 @@ class SubmissionAuditElasticStorage():
 
         return
 
-    def storage_delete(self, data_source_name):
-        ElasticStorage.delete_prev_data_in_es(self.es, data_source_name)
-        self.cache = {}
-        self.counter = 0
-
     def storage_flush(self, data_source_name):
 
-        #self.logger.info("Flush storage for %s" % data_source_name)
-        if self.cache:
-            ElasticStorage.store_to_es(self.loader.es,
-                                       self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
-                                       data_source_name,
-                                       self.cache,
-                                       quiet=False
-                                       )
-            self.counter += len(self.cache)
-            self.cache = {}
+        self.loader.flush()
 
 class EvidenceValidationFileChecker():
     def __init__(self,

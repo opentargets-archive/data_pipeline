@@ -685,3 +685,57 @@ class ESQuery(object):
             count [ev_hit['_source']['sourceID']]+=1
 
         return count
+
+    def delete_data(self, index, query, doc_type = '', chunk_size=1000):
+        '''
+        Delete all the documents in an index matching a given query
+        :param index: index to use
+        :param query: query matching the elements to remove
+        :param doc_type: document types, default is to look for all the doc types
+        :param chunk_size: size of the bulk action sent to delete
+        :return:
+        '''
+
+        '''count available data'''
+        res = self.handler.search(index=Loader.get_versioned_index(index),
+                                  body={
+                                      "query": query,
+                                      '_source': False,
+                                      'size': 0,
+                                  },
+                                  doc_type = doc_type,
+                                  )
+        total = res['hits']['total']
+        '''if data is matching query, delete it with scan and bulk'''
+        if total:
+            batch = []
+            for hit in helpers.scan(client=self.handler,
+                                    query={"query": query,
+                                       '_source': False,
+                                       'size': chunk_size,
+                                    },
+                                    scroll='1h',
+                                    index=Loader.get_versioned_index(index),
+                                    doc_type=doc_type,
+                                    timeout='1h',
+                                       ):
+                batch.append({
+                                '_op_type': 'delete',
+                                '_index': hit['_index'],
+                                '_type': hit['_type'],
+                                '_id': hit['_id'],
+                            })
+                if len(batch)>= chunk_size:
+                    helpers.bulk(self.handler,
+                                 batch,
+                                 stats_only=True)
+                    batch = []
+
+        if len(batch) >= chunk_size:
+            helpers.bulk(self.handler,
+                         batch,
+                         stats_only=True)
+        '''flush changes'''
+        self.handler.indices.flush(Loader.get_versioned_index(index),
+                         wait_if_ongoing=True)
+
