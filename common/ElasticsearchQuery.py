@@ -1,20 +1,12 @@
-from collections import defaultdict, Counter
-from datetime import datetime, time
-import logging
-from pprint import pprint
+from collections import Counter
 
+import collections
 import jsonpickle
 from elasticsearch import helpers
-from elasticsearch.exceptions import NotFoundError
-from elasticsearch.helpers import streaming_bulk, parallel_bulk
-from sqlalchemy import and_
-from common import Actions
+
 from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
-from common.PGAdapter import ElasticsearchLoad
-from common.processify import processify
 from settings import Config
-from elasticsearch_config import ElasticSearchConfiguration
 
 
 class AssociationSummary(object):
@@ -42,8 +34,9 @@ class AssociationSummary(object):
 
 class ESQuery(object):
 
-    def __init__(self, es):
+    def __init__(self, es, dry_run = False):
         self.handler = es
+        self.dry_run = dry_run
 
     @staticmethod
     def _get_source_from_fields(fields = None):
@@ -686,14 +679,15 @@ class ESQuery(object):
 
         return count
 
-    def delete_data(self, index, query, doc_type = '', chunk_size=1000):
+    def delete_data(self, index, query, doc_type = '', chunk_size=1000, altered_keys=None):
         '''
         Delete all the documents in an index matching a given query
         :param index: index to use
         :param query: query matching the elements to remove
         :param doc_type: document types, default is to look for all the doc types
         :param chunk_size: size of the bulk action sent to delete
-        :return:
+        :param altered_keys: list of fields to fetch data and return as being altered by the delete query
+        :return: dict of keys altered by the query
         '''
 
         '''count available data'''
@@ -707,11 +701,14 @@ class ESQuery(object):
                                   )
         total = res['hits']['total']
         '''if data is matching query, delete it with scan and bulk'''
+        altered = dict()
+        for key in altered_keys:
+            altered[key]=set()
         if total:
             batch = []
             for hit in helpers.scan(client=self.handler,
                                     query={"query": query,
-                                       '_source': False,
+                                       '_source': self._get_source_from_fields(altered_keys),
                                        'size': chunk_size,
                                     },
                                     scroll='1h',
@@ -725,17 +722,61 @@ class ESQuery(object):
                                 '_type': hit['_type'],
                                 '_id': hit['_id'],
                             })
+                flat_source = self.flatten(hit['_source'])
+                for key in altered_keys:
+                    if key in flat_source:
+                        altered[key].add(flat_source[key])
                 if len(batch)>= chunk_size:
-                    helpers.bulk(self.handler,
-                                 batch,
-                                 stats_only=True)
+                    self._flush_bulk(batch)
                     batch = []
 
         if len(batch) >= chunk_size:
-            helpers.bulk(self.handler,
-                         batch,
-                         stats_only=True)
+            self._flush_bulk(batch)
         '''flush changes'''
         self.handler.indices.flush(Loader.get_versioned_index(index),
                          wait_if_ongoing=True)
 
+        return altered
+
+    def delete_evidence_for_datasources(self, datasources):
+        '''
+        delete all the evidence objects with a given source id
+        :param sourceID: a list of datasources ids to delete
+        :return:
+        '''
+
+        if not isinstance(datasources, (list, tuple)):
+            datasources = [datasources]
+        query = {
+            "filtered": {
+                "filter": {
+                    "terms": {"sourceID": datasources},
+                    }
+                }
+            }
+        self.delete_data(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
+                         query=query)
+
+    def _flush_bulk(self, batch):
+        if not self.dry_run:
+            return helpers.bulk(self.handler,
+                                batch,
+                                stats_only=True)
+
+    @staticmethod
+    def flatten(d, parent_key='', separator='.'):
+        '''
+        takes a nested dictionary as input and generate a flat one with keys separated by the separator
+        :param d: dictionary
+        :param parent_key: a prefix for all flattened keys
+        :param separator: separator between nested keys
+        :return: flattened dictionary
+        '''
+        flat_fields = []
+        for k, v in d.items():
+            flat_key = parent_key + separator + k if parent_key else k
+            if isinstance(v, collections.MutableMapping):
+                flat_fields.extend(ESQuery.flatten(v, flat_key, separator=separator).items())
+            else:
+                flat_fields.append((flat_key, v))
+        return dict(flat_fields)
