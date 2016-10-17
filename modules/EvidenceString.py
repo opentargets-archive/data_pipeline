@@ -215,24 +215,13 @@ class ProcessedEvidenceStorer():
 
         # self.cache[id] = ev
         self.counter +=1
-        #TODO - for testing
-        # self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
-        #                    ev.get_doc_name(),
-        #                    id,
-        #                    ev.to_json(),
-        #                    create_index = False,
-        #                    routing = ev.evidence['target']['id'])
 
-
-        self.es_loader.put(
-            Config.ELASTICSEARCH_NEW_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
-            ev.get_doc_name(),
-            id,
-            ev.to_json(),
-            create_index=False,
-            routing=ev.evidence['target']['id'])
-        logging.info("Evidence updated for id - {}".format(id))
-
+        self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+                           ev.get_doc_name(),
+                           id,
+                           ev.to_json(),
+                           create_index = False,
+                           routing = ev.evidence['target']['id'])
 
     def close(self):
         pass
@@ -540,20 +529,9 @@ class EvidenceManager():
         ''' Add literature data '''
         if inject_literature:
 
-            logger.info("In Process -- start" )
-            logger.info(process_name)
             pmid_url = extended_evidence['literature']['references'][0]['lit_id']
             pmid = pmid_url.split('/')[-1]
-
-
-
             pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
-            logger.info("In Process -- end")
-            logger.info(process_name)
-            logging.info("PMID")
-            logging.info(pmid)
-            parent_pub = pubs[pmid][0]
-            analysed_pub = pubs[pmid][1]
             literature_info = ExtendedInfoLiterature(pubs[pmid][0],pubs[pmid][1])
             extended_evidence['literature']['year'] = literature_info.data['year']
             extended_evidence['literature']['abstract'] = literature_info.data['abstract']
