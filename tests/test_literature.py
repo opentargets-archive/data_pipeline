@@ -1,6 +1,6 @@
 import unittest
 
-from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, Literature, LiteratureProcess
+from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, LiteratureProcess
 from common.ElasticsearchLoader import Loader
 from modules.EvidenceString import EvidenceStringProcess
 from elasticsearch import Elasticsearch
@@ -9,7 +9,7 @@ from settings import Config
 import logging
 
 class LiteratureTestCase(unittest.TestCase):
-#     
+#
 #         _test_pub_ids =['24523595',
 #                     '26784250',
 #                     '27409410',
@@ -23,14 +23,14 @@ class LiteratureTestCase(unittest.TestCase):
 #                     '26371324',
 #                     '24817865',
 #                   PublicationAnalyserSpacy]
-    
-    def test_analyse_publication(self):
+
+    def analyse_publication(self):
         logging.basicConfig(filename='output.log',
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                             level=logging.INFO)
         r_server = Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
-        #TODO : ES mocking for unit tests?
-        es = Elasticsearch(hosts = [{'host': 'localhost', 'port': 9200}],
+
+        es = Elasticsearch(hosts = [{'host': 'targethub-es.gdosand.aws.biogen.com', 'port': 80}],
                        maxsize=50,
                        timeout=1800,
                        sniff_on_connection_fail=True,
@@ -60,11 +60,11 @@ class LiteratureTestCase(unittest.TestCase):
                            max_retries=10,
                            )
         loader = Loader(es=es,dry_run=True)
-        EvidenceStringProcess(es, r_server).process_all(datasources=['europepmc'])
+        EvidenceStringProcess(es, r_server).process_all(datasources=['europepmc'],inject_literature=True)
 
 
 
-       
+
 
 if __name__ == '__main__':
     unittest.main()

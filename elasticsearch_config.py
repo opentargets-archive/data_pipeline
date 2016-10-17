@@ -66,18 +66,62 @@ def _get_evidence_string_generic_mapping():
                                     },
                                 }
                             },
-                            "abstract_lemmas": {
+                            "literature": {
                                 "properties": {
-                                    "count": {
-                                        "type": "long"
+                                    "abstract_lemmas": {
+                                        "properties": {
+                                            "count": {
+                                                "type": "long"
+                                            },
+                                            "value": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
                                     },
-                                    "value": {
+                                    "noun_chunks": {
+                                        "properties": {
+                                            "count": {
+                                                "type": "long"
+                                            },
+                                            "value": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
+                                    },
+                                    "chemicals": {
+                                        "properties": {
+                                            "registryNumber": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            },
+                                            "name": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
+                                    },
+                                    "doi": {
                                         "type": "string",
                                         "index": "not_analyzed"
+                                    },
+                                    "pub_type": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    },
+                                    "mesh_headings": {
+                                        "properties": {
+                                            "descriptorName": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
+
                                     }
-                                }
-                            }
-                        }
+                    }
+                }
+            }
                     }
                 }
             },

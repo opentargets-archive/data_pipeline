@@ -193,7 +193,13 @@ class ExtendedInfoLiterature(ExtendedInfo):
                           journal=literature.journal,
                           year=literature.year,
                           title=literature.title,
-                          abstract_lemmas=analyzed_literature.lemmas)
+                          doi=literature.doi,
+                          pub_type=literature.pub_type,
+                          mesh_headings=literature.mesh_headings,
+                          chemicals=literature.chemicals,
+                          abstract_lemmas=analyzed_literature.lemmas,
+                          noun_chunks=analyzed_literature.noun_chunks)
+
 
 class ProcessedEvidenceStorer():
     def __init__(self,  es_loader, chunk_size=1e4, quiet = False):
@@ -209,12 +215,23 @@ class ProcessedEvidenceStorer():
 
         # self.cache[id] = ev
         self.counter +=1
-        self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
-                           ev.get_doc_name(),
-                           id,
-                           ev.to_json(),
-                           create_index = False,
-                           routing = ev.evidence['target']['id'])
+        #TODO - for testing
+        # self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+        #                    ev.get_doc_name(),
+        #                    id,
+        #                    ev.to_json(),
+        #                    create_index = False,
+        #                    routing = ev.evidence['target']['id'])
+
+
+        self.es_loader.put(
+            Config.ELASTICSEARCH_NEW_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+            ev.get_doc_name(),
+            id,
+            ev.to_json(),
+            create_index=False,
+            routing=ev.evidence['target']['id'])
+        logging.info("Evidence updated for id - {}".format(id))
 
 
     def close(self):
@@ -229,7 +246,7 @@ class ProcessedEvidenceStorer():
 
 
 class EvidenceManager():
-    def __init__(self, lookup_data,loader):
+    def __init__(self, lookup_data):
         self.available_genes = lookup_data.available_genes
         self.available_efos =  lookup_data.available_efos
         self.available_ecos =  lookup_data.available_ecos
@@ -243,7 +260,8 @@ class EvidenceManager():
         # self.efo_retriever = EFOLookUpTable(self.es)
         # self.eco_retriever = ECOLookUpTable(self.es)
         self._get_score_modifiers()
-        self.pub_fetcher = PublicationFetcher(loader.es, loader=loader)
+
+
         # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
 
 
@@ -432,7 +450,7 @@ class EvidenceManager():
 
         return True
 
-    def get_extended_evidence(self, evidence):
+    def get_extended_evidence(self, evidence, process_name,pub_fetcher,inject_literature):
 
         extended_evidence = copy.copy(evidence.evidence)
         extended_evidence['private'] = dict()
@@ -520,14 +538,27 @@ class EvidenceManager():
             extended_evidence['evidence'][ExtendedInfoECO.root] = data
 
         ''' Add literature data '''
-        pmid_url = extended_evidence['literature']['references'][0]['lit_id']
-        pmid = pmid_url.split('/')[-1]
-        pubs = self.pub_fetcher.get_publication_with_analyzed_data([pmid])
-        literature_info = ExtendedInfoLiterature(pubs[pmid][0],pubs[pmid][1])
-        extended_evidence['literature']['year'] = literature_info.data['year']
-        extended_evidence['literature']['abstract'] = literature_info.data['abstract']
-        extended_evidence['literature']['journal_data'] = literature_info.data['journal']
-        extended_evidence['literature']['title'] = literature_info.data['title']
+        if inject_literature:
+
+            logger.info("In Process -- start" )
+            logger.info(process_name)
+            pmid_url = extended_evidence['literature']['references'][0]['lit_id']
+            pmid = pmid_url.split('/')[-1]
+
+
+
+            pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
+            logger.info("In Process -- end")
+            logger.info(process_name)
+            logging.info("PMID")
+            logging.info(pmid)
+            parent_pub = pubs[pmid][0]
+            analysed_pub = pubs[pmid][1]
+            literature_info = ExtendedInfoLiterature(pubs[pmid][0],pubs[pmid][1])
+            extended_evidence['literature']['year'] = literature_info.data['year']
+            extended_evidence['literature']['abstract'] = literature_info.data['abstract']
+            extended_evidence['literature']['journal_data'] = literature_info.data['journal']
+            extended_evidence['literature']['title'] = literature_info.data['title']
 
 
 
@@ -547,7 +578,16 @@ class EvidenceManager():
             GO_terms['cellular_component'] :
             extended_evidence['private']['facets']['go'] = GO_terms
 
-        extended_evidence['private']['facets']['abstract_lemmas'] = literature_info.data['abstract_lemmas']
+        if inject_literature:
+
+            extended_evidence['private']['facets']['literature'] = {}
+            extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data['abstract_lemmas']
+            extended_evidence['private']['facets']['literature']['doi'] = literature_info.data['doi']
+            extended_evidence['private']['facets']['literature']['pub_type'] = literature_info.data['pub_type']
+            extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data['mesh_headings']
+            extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data['chemicals']
+            extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data['noun_chunks']
+
 
         return Evidence(extended_evidence)
 
@@ -844,12 +884,12 @@ class EvidenceProcesser(multiprocessing.Process):
                  processing_errors_count,
                  input_processed_count,
                  lock,
-                 loader):
+                 inject_literature):
         super(EvidenceProcesser, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
         self.start_time = time.time()
-        self.evidence_manager = EvidenceManager(lookup_data, loader)
+        self.evidence_manager = EvidenceManager(lookup_data)
         self.input_loading_finished = input_loading_finished
         self.output_computation_finished = output_computation_finished
         self.input_generated_count = input_generated_count
@@ -858,11 +898,18 @@ class EvidenceProcesser(multiprocessing.Process):
         self.input_processed_count = input_processed_count
         self.start_time = time.time()#reset timer start
         self.lock = lock
+        self.inject_literature = inject_literature
+        es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        self.pub_fetcher = PublicationFetcher(es)
+
+
 
 
 
     def run(self):
         logger.info("%s started"%self.name)
+        #TODO : for testing
+        process_name = self.name
         self.data_processing_started = False
         while not ((self.input_generated_count.value == self.input_processed_count.value) and self.input_loading_finished.is_set()):
             data = self.input_q.get()
@@ -877,7 +924,8 @@ class EvidenceProcesser(multiprocessing.Process):
                         '''add scoring to evidence string'''
                         fixed_ev.score_evidence(self.evidence_manager.score_modifiers)
                         '''extend data in evidencestring'''
-                        ev_string_to_load = self.evidence_manager.get_extended_evidence(ev)
+
+                        ev_string_to_load = self.evidence_manager.get_extended_evidence(ev,process_name,self.pub_fetcher,self.inject_literature)
                         # logger.info('%s processed'%idev)
                     else:
                         # traceback.print_exc(limit=1, file=sys.stdout)
@@ -889,6 +937,11 @@ class EvidenceProcesser(multiprocessing.Process):
                         self.output_computed_count.value +=1
 
                 except Exception, error:
+                    logger.info("Error!!! "   )
+                    if error:
+                        logger.info(str(error))
+                    else:
+                        logger.info(Exception.message)
                     with self.lock:
                         self.processing_errors_count.value +=1
                     # UploadError(ev, error, idev).save()
@@ -973,17 +1026,18 @@ class EvidenceStringProcess():
         self.es_query = ESQuery(es)
         self.r_server = r_server
 
-    def process_all(self, datasources = [], dry_run = False):
+    def process_all(self, datasources = [], dry_run = False , inject_literature = False):
         self._process_evidence_string_data(datasources= datasources,
-                                           dry_run = dry_run )
+                                           dry_run = dry_run ,
+                                           inject_literature= inject_literature)
+
 
 
 
     def _process_evidence_string_data(self,
                                       datasources = [],
-                                      dry_run = False):
-
-
+                                      dry_run = False,
+                                      inject_literature = False):
         base_id = 0
         err = 0
         fix = 0
@@ -1006,8 +1060,6 @@ class EvidenceStringProcess():
                                 recreate=overwrite_indices)
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
-
-
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
         output_q = multiprocessing.Queue(maxsize=get_evidence_page_size)
@@ -1040,7 +1092,7 @@ class EvidenceStringProcess():
                                      processing_errors_count,
                                      input_processed_count,
                                      data_processing_lock,
-                                     loader
+                                     inject_literature
                                      ) for i in range(workers_number)]
                                   # ) for i in range(2)]
         for w in scorers:
@@ -1086,7 +1138,7 @@ class EvidenceStringProcess():
                 w.terminate()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
 
-        loader.closer()
+        loader.close()
         logger.info('flushing data to index')
         self.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
                               wait_if_ongoing=True)
