@@ -99,7 +99,7 @@ class PublicationFetcher(object):
                         r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
                         r.raise_for_status()
                         result = r.json()['resultList']['result'][0]
-                        logging.info("Publication data --- {}" .format(result))
+                        logging.debug("Publication data --- {}" .format(result))
                         pub = Publication(pub_id=pub_id,
                                       title=result['title'],
                                       abstract=result['abstractText'],
@@ -109,7 +109,7 @@ class PublicationFetcher(object):
                                       journal=result['journalInfo'],
                                       full_text=u"",
                                       full_text_url=result['fullTextUrlList']['fullTextUrl'],
-                                      epmc_keywords=result['keywordList']['keyword'],
+                                      #epmc_keywords=result['keywordList']['keyword'],
                                       doi=result['doi'],
                                       cited_by=result['citedByCount'],
                                       has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
@@ -441,12 +441,11 @@ class LiteratureProcess(object):
                                   job_timeout=120)
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-        logging.info("No of workers {} ".format(no_of_workers))
 
         # Start literature-analyser-worker processes
         analyzers = [LiteratureAnalyzerProcess(literature_q,
                                                self.r_server.db,
-                                               self.dry_run,
+                                               dry_run,
                                                ) for i in range(no_of_workers)]
 
         for a in analyzers:
@@ -606,7 +605,6 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
         try:
 
             for pub_id, pub in publications.items():
-                logging.info(pub_id)
                 spacy_analysed_pub = self.pub_analyser.analyse_publication(pub_id=pub_id,
                                                                        pub=pub)
 
