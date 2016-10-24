@@ -623,7 +623,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                  queue_out=None,
                  es=None,
                  efo_current=None,
-                 efo_uncat=None,
                  efo_obsolete=None,
                  hpo_current=None,
                  hpo_obsolete=None,
@@ -638,7 +637,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.es = es
         self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es, chunk_size=100))
         self.efo_current = efo_current
-        self.efo_uncat = efo_uncat
         self.efo_obsolete = efo_obsolete
         self.hpo_current = hpo_current
         self.hpo_obsolete = hpo_obsolete
@@ -833,7 +831,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                     index += 1
 
                                     ' Check disease term or phenotype term '
-                                    if (disease_id not in self.efo_current and disease_id not in self.hpo_current and disease_id not in self.mp_current) or disease_id in self.efo_uncat:
+                                    if (disease_id not in self.efo_current and disease_id not in self.hpo_current and disease_id not in self.mp_current):
                                         audit.append((lc, DISEASE_ID_INVALID, disease_id))
                                         disease_failed = True
                                         if disease_id not in invalid_diseases:
@@ -1844,11 +1842,9 @@ class EvidenceValidationFileChecker():
         # LOGGER.addHandler(memoryhandler)
 
         self.uniprot_current = {}
-        self.efo_current = {}
-        self.efo_obsolete = {}
-        self.efo_uncat = []
         self.hpo_ontology = None
         self.mp_ontology = None
+        self.efo_ontology = None
         self.ensembl_current = {}
         self.hgnc_current = {}
         self.eco_current = {}
@@ -2111,44 +2107,12 @@ class EvidenceValidationFileChecker():
         self.mp_ontology.load_mp_classes()
 
     def load_efo(self):
-        # Change this in favor of paths
-        self.logger.info("Loading EFO current terms")
-        efo_pattern = "http://www.ebi.ac.uk/efo/EFO_%"
-        orphanet_pattern = "http://www.orpha.net/ORDO/Orphanet_%"
-        hpo_pattern = "http://purl.obolibrary.org/obo/HP_%"
-        mp_pattern = "http://purl.obolibrary.org/obo/MP_%"
-        do_pattern = "http://purl.obolibrary.org/obo/DOID_%"
-        go_pattern = "http://purl.obolibrary.org/obo/GO_%"
-        omim_pattern = "http://purl.bioontology.org/omim/OMIM_%"
-
         '''
-        Temp: store the uncharactered diseases to filter them
-        https://alpha.targetvalidation.org/disease/genetic_disorder_uncategorized
+        Load EFO terms
+        :return:
         '''
-        for row in self.session.query(EFOPath):
-            if any(map(lambda x: x["uri"] == 'http://www.targetvalidation.org/genetic_disorder_uncategorized',
-                       row.tree_path)):
-                self.efo_uncat.append(row.uri);
-
-        for row in self.session.query(EFONames).filter(
-                or_(
-                        EFONames.uri.like(efo_pattern),
-                        EFONames.uri.like(mp_pattern),
-                        EFONames.uri.like(orphanet_pattern),
-                        EFONames.uri.like(hpo_pattern),
-                        EFONames.uri.like(do_pattern),
-                        EFONames.uri.like(go_pattern),
-                        EFONames.uri.like(omim_pattern)
-                )
-        ):
-            #self.logger.info(row.uri)
-            # if row.uri not in uncat:
-            self.efo_current[row.uri] = row.label
-        # self.logger.info(len(self.efo_current))
-        # self.logger.info("Loading EFO obsolete terms")
-        for row in self.session.query(EFOObsoleteClass):
-            #print "obsolete %s"%(row.uri)
-            self.efo_obsolete[row.uri] = row.reason
+        self.efo_ontology = OntologyClassReader()
+        self.efo_ontology.load_efo_classes()
 
     def get_reference_gene_from_Ensembl(self, ensembl_gene_id):
         '''
@@ -2249,9 +2213,8 @@ class EvidenceValidationFileChecker():
                                        self.r_server.db,
                                        audit_q,
                                        self.es,
-                                       self.efo_current,
-                                       self.efo_uncat,
-                                       self.efo_obsolete,
+                                       self.efo_ontology.current_classes,
+                                       self.efo_ontology.obsolete_classes,
                                        self.hpo_ontology.current_classes,
                                        self.hpo_ontology.obsolete_classes,
                                        self.mp_ontology.current_classes,
@@ -2271,8 +2234,8 @@ class EvidenceValidationFileChecker():
                 self.ensembl_current,
                 self.uniprot_current,
                 self.symbols,
-                self.efo_current,
-                self.efo_obsolete,
+                self.efo_ontology.current_classes,
+                self.efo_ontology.obsolete_classes,
                 self.hpo_ontology.current_classes,
                 self.hpo_ontology.obsolete_classes,
                 self.mp_ontology.current_classes,
