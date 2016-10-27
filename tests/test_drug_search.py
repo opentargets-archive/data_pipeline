@@ -12,7 +12,7 @@ import shutil
 class DrugSearchTestCase(unittest.TestCase):
 
 
-    def test_analyse_publication(self):
+    def test_drug_search(self):
 
         logging.basicConfig(filename='output.log',
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -27,14 +27,6 @@ class DrugSearchTestCase(unittest.TestCase):
 
             SearchObjectProcess( loader, connectors.r_server).process_all()
 
-
-    # def test_ftp_download(self):
-    #     url = 'https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer'
-    #
-    #     with closing(urllib2.urlopen(url)) as r:
-    #         with open('fileabc', 'wb') as f:
-    #             shutil.copyfileobj(r, f)
-    #
 
 
 
