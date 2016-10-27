@@ -108,6 +108,7 @@ class Config():
         '6239':'worm',
         '4932':'yeast'
     }
+    CHEMBL_API = 'https://www.ebi.ac.uk/chembl/api/data'
     HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'

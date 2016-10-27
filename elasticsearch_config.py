@@ -389,7 +389,7 @@ class ElasticSearchConfiguration():
                         "properties": {
                             "suggestions": {
                                 "type": "completion",
-                                "index_analyzer": "whitespace_analyzer",
+                                "analyzer": "whitespace_analyzer",
                                 "search_analyzer": "edgeNGram_analyzer",
                                 "payloads": True
                             },
@@ -513,7 +513,7 @@ class ElasticSearchConfiguration():
                         "properties": {
                             "suggestions": {
                                 "type": "completion",
-                                "index_analyzer": "whitespace_analyzer",
+                                "analyzer": "whitespace_analyzer",
                                 "search_analyzer": "whitespace_analyzer",
                                 "payloads": True
                             },
@@ -864,7 +864,7 @@ class ElasticSearchConfiguration():
                         "properties": {
                             "suggestions": {
                                 "type": "completion",
-                                "index_analyzer": "whitespace_analyzer",
+                                "analyzer": "whitespace_analyzer",
                                 "search_analyzer": "whitespace_analyzer",
                                 "payloads": True
                             }
@@ -922,7 +922,6 @@ class ElasticSearchConfiguration():
 
 
     INDEX_MAPPPINGS = {Config.ELASTICSEARCH_DATA_INDEX_NAME: evidence_data_mapping,
-                       Config.ELASTICSEARCH_NEW_DATA_INDEX_NAME: evidence_data_mapping,
                        Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME: score_data_mapping,
                        Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME: efo_data_mapping,
                        Config.ELASTICSEARCH_ECO_INDEX_NAME: eco_data_mapping,

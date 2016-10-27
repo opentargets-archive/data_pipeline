@@ -126,6 +126,7 @@ class Gene(JSONSerializable):
         self.is_ensembl_reference = []
         self.ortholog = {}
         self._private ={}
+        self.chembl_drugs = {}
 
 
     def _set_id(self):
@@ -631,7 +632,7 @@ class GeneManager():
                            unit_scale=True,
                            unit='genes',
                            leave=False,
-                           total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
+                           total= self.esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
             c += 1
             if c % 1000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
@@ -688,13 +689,8 @@ class GeneManager():
     def _get_chembl_data(self):
         logging.info("Chembl Drug parsing - requesting from URL %s" % Config.CHEMBL_API)
 
-
-        for gene in tqdm(self.genes,
-                         desc='looping through all genes',
-                         unit_scale=True,
-                         unit='genes',
-                         leave=False):
-            req = requests.get(Config.CHEMBL_API+ '/target.json',params={'target_components__accession':gene['uniprotid']})
+        for geneid, gene in self.genes.iterate():
+            req = requests.get(Config.CHEMBL_API+ '/target.json',params={'target_components__accession':gene.uniprot_id})
             logging.info("Chembl Drug parsing - response code %s" % req.status_code)
             req.raise_for_status()
             target_chembl_ids = [x['target_chembl_id'] for x in req.json()['targets']]
@@ -707,14 +703,10 @@ class GeneManager():
             target_drugnames = {}
             for chemblid in molecules:
                 r = requests.get(Config.CHEMBL_API + '/molecule/' + chemblid + '.json')
-                target_drugnames[chemblid] = set([x['synonyms'] for x in r.json()['molecule_synonyms']])
+                target_drugnames[chemblid] = list(set([x['synonyms'] for x in r.json()['molecule_synonyms']]))
 
-            print(target_drugnames)
-
-            #extend gene with related drug names
-            gene['drug'] = {}
-            gene['drug']['molecule_synonyms'] = target_drugnames
-
+            ''' extend gene with related drug names '''
+            gene.chembl_drugs = target_drugnames
         #TODO : update stats
         logging.info("STATS AFTER  CHEMBL Drug PARSING:\n" + self.genes.get_stats())
 

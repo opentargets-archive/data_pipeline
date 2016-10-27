@@ -1,0 +1,18 @@
+{"response":{"numFound":41047,"docs" : [
+  {"gene_family":["ATPase H+/K+ transporting"],"date_approved_reserved":"1990-09-10",
+    "alias_name":["gastric H,K-ATPase alpha subunit","H(+)-K(+)-ATPase alpha subunit","proton pump"],
+    "vega_id":"OTTHUMG00000048106","locus_group":"protein-coding gene","status":"Approved","alias_symbol":["ATP6A"],
+    "_version_":1549134097566138373,"uuid":"e92c1440-a214-44ab-be75-b375179e0bb6","prev_name":["ATPase, H+/K+ exchanging, alpha polypeptide"],
+    "refseq_accession":["NM_000704"],"locus_type":"gene with protein product","iuphar":"objectId:849","gene_family_id":[1211],"cosmic":"ATP4A",
+    "hgnc_id":"HGNC:819","rgd_id":["RGD:2177"],"ensembl_gene_id":"ENSG00000105675","entrez_id":"495","omim_id":[137216],"symbol":"ATP4A",
+    "date_name_changed":"2016-02-10","location":"19q13.12","name":"ATPase H+/K+ transporting alpha subunit","date_modified":"2016-10-05",
+    "mgd_id":["MGI:88113"],"ucsc_id":"uc002oal.2","enzyme_id":["3.6.3.10"],"uniprot_ids":["P20648"],"ccds_id":["CCDS12467"],"pubmed_id":[1330887],
+    "location_sortable":"19q13.12"},
+  {"gene_family":["Tumor necrosis factor superfamily"],"date_approved_reserved":"1986-01-01","alias_name":["TNF superfamily, member 2"],
+    "vega_id":"OTTHUMG00000031194","locus_group":"protein-coding gene","status":"Approved","alias_symbol":["TNFSF2","DIF","TNF-alpha"],
+    "_version_":1549134102210281472,"uuid":"c9efaa83-e502-4ff5-b8f8-89ef5282216c","prev_name":["tumor necrosis factor (TNF superfamily, member 2)"],
+    "refseq_accession":["NM_000594"],"locus_type":"gene with protein product","iuphar":"objectId:2635","gene_family_id":[781],"cosmic":"TNF",
+    "hgnc_id":"HGNC:11892","rgd_id":["RGD:3876"],"ensembl_gene_id":"ENSG00000232810","entrez_id":"7124","omim_id":[191160],"symbol":"TNF",
+    "date_name_changed":"2010-05-04","location":"6p21.33","name":"tumor necrosis factor","date_modified":"2016-10-05","mgd_id":["MGI:104798"],
+    "ucsc_id":"uc011fee.4","prev_symbol":["TNFA"],"uniprot_ids":["P01375"],"orphanet":139204,"ccds_id":["CCDS4702"],"ena":["X02910"],
+    "pubmed_id":[2413547,6392892],"location_sortable":"06p21.33"}]}}

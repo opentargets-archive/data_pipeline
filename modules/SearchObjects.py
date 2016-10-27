@@ -183,6 +183,9 @@ class SearchObjectTarget(SearchObject, object):
                          'name':   o["ortholog_species_name"]}
                         for o in ortholist
                 ]
+        if json_input['chembl_drugs']:
+            self.chembl_drugs = json_input['chembl_drugs']
+
 
 
 class SearchObjectDisease(SearchObject, object):
@@ -295,11 +298,8 @@ class SearchObjectAnalyserWorker(Process):
 
 class SearchObjectProcess(object):
     def __init__(self,
-                 adapter,
                  loader,
                  r_server):
-        self.adapter = adapter
-        self.session = adapter.session
         self.loader = loader
         self.esquery = ESQuery(loader.es)
         self.r_server = r_server
