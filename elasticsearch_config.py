@@ -880,18 +880,7 @@ class ElasticSearchConfiguration():
                                 "index": "not_analyzed"
                             }
                         }
-                    },
-
-                    {
-                        "do_not_analyze_drugs": {
-                            "match_mapping_type": "string",
-                            "path_match": "chembl_drugs*",
-                            "mapping": {
-                                "index": "not_analyzed"
-                            }
-                        }
                     }
-
                 ]
             },
         },
