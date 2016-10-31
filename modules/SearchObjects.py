@@ -183,8 +183,8 @@ class SearchObjectTarget(SearchObject, object):
                          'name':   o["ortholog_species_name"]}
                         for o in ortholist
                 ]
-        if json_input['chembl_drugs']:
-            self.chembl_drugs = json_input['chembl_drugs']
+        if json_input['drugs']:
+            self.drugs = json_input['drugs']
 
 
 

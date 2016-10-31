@@ -126,7 +126,7 @@ class Gene(JSONSerializable):
         self.is_ensembl_reference = []
         self.ortholog = {}
         self._private ={}
-        self.chembl_drugs = {}
+        self.drugs = {}
 
 
     def _set_id(self):
@@ -714,9 +714,7 @@ class GeneManager():
                     target_drugnames[chembl_id].append(synonym_data)
 
             ''' extend gene with related drug names '''
-            gene.chembl_drugs = target_drugnames
-        #TODO : update stats
-        logging.info("STATS AFTER  CHEMBL Drug PARSING:\n" + self.genes.get_stats())
+            gene.drugs['chembl_drugs'] = target_drugnames
 
 
 class GeneRetriever():
