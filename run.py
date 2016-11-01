@@ -373,7 +373,7 @@ if __name__ == '__main__':
         if args.sea or run_full_pipeline:
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
-                SearchObjectProcess(connectors.adapter, loader, connectors.r_server).process_all()
+                SearchObjectProcess(loader, connectors.r_server).process_all()
         if args.qc or run_full_pipeline:
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:
