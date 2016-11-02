@@ -1,6 +1,6 @@
 import unittest
 
-from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, LiteratureProcess
+from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, LiteratureProcess, PubmedLiteratureParser
 from common.ElasticsearchLoader import Loader
 from modules.EvidenceString import EvidenceStringProcess
 from elasticsearch import Elasticsearch
@@ -61,6 +61,20 @@ class LiteratureTestCase(unittest.TestCase):
                            )
         loader = Loader(es=es,dry_run=True)
         EvidenceStringProcess(es, r_server).process_all(datasources=['europepmc'],inject_literature=True)
+
+
+    def test_medline_parser(self):
+
+        es = Elasticsearch(hosts=[{'host': 'targethub-es.gdosand.aws.biogen.com', 'port': 9200}],
+                           maxsize=50,
+                           timeout=1800,
+                           sniff_on_connection_fail=True,
+                           retry_on_timeout=True,
+                           max_retries=10,
+                           )
+        PubmedLiteratureParser().parse_medline_xml()
+        #PubmedLiteratureParser().iter_parse_medline_xml()
+
 
 
 

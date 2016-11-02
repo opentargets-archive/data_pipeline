@@ -23,7 +23,14 @@ import multiprocessing
 from settings import Config
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
 
+import pubmed_parser as pp
+import json
+import simplejson
+from itertools import chain
+
 import time
+from lxml import etree
+
 
 MAX_PUBLICATION_CHUNKS =1000
 
@@ -624,4 +631,139 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
                 logging.info(str(error))
             else:
                 logging.info(Exception.message)
+
+
+class PubmedLiteratureParser(object):
+
+    def parse_medline_xml(self):
+        path_xml = pp.list_xml_path('/Users/pwankar/git/data_pipeline/tests/resources')  # list all xml paths under directory
+        pubmed_dict = pp.parse_medline_xml(path_xml[0])  # dictionary output
+        with open('outfile.txt', 'w') as handle:
+            json.dump(pubmed_dict, handle)
+
+    def iter_parse_medline_xml(self):
+        path_xml = pp.list_xml_path(
+            '/Users/pwankar/git/data_pipeline/tests/resources')  # list all xml paths under directory
+        context = etree.iterparse(path_xml[0], events=('end',))#, tag='MedlineCitation')
+        publication_list = []
+        with open('outfile1.txt', 'w') as handle:
+            for event, elem in context:
+                if elem.tag == 'PMID':
+                    pmid = ''
+                    mesh_terms = ''
+                    article_list = []
+                    keywords = ''
+                    publication = {}
+                    pmid = elem.text
+                    publication['pmid'] = pmid
+                if elem.tag == 'MeshHeadingList':
+                    mesh_terms = self.parse_mesh_terms(elem)
+                    publication['mesh_terms'] = mesh_terms
+                if elem.tag == 'KeywordList':
+                    keywords = self.parse_keywords(elem)
+                    publication['keywords'] = keywords
+                if elem.tag == 'ChemicalList':
+                    chemicals = self.parse_chemicals(elem)
+                    publication['chemicals'] = chemicals
+                if elem.tag == 'Article' :
+                    article =  self.parse_article_info(elem)
+                    publication['article'] = article
+                    elem.clear()  # discard the element
+                    while elem.getprevious() is not None:
+                        del elem.getparent()[0]
+                    simplejson.dump(publication, handle)
+
+
+
+        #del context
+
+
+
+
+    def stringify_children(self,node):
+
+        parts = ([node.text] +
+                 list(chain(*([c.text, c.tail] for c in node.getchildren()))) +
+                 [node.tail])
+        return ''.join(filter(None, parts))
+
+    def parse_mesh_terms(self,element):
+        mesh_terms = []
+        for descriptor in element.findall('DescriptorName'):
+            mesh_terms.append(descriptor.text)
+
+        return mesh_terms
+
+    def parse_keywords(self,element):
+
+        keywords = list()
+
+        for k in element.findall('Keyword'):
+            keywords.append(k.text)
+        keywords = '; '.join(keywords)
+        return keywords
+
+    def parse_chemicals(self,element):
+        chemicals = []
+        for chemical in element.findall('Chemical'):
+            chemical_data = {}
+            chemical_data['name'] = chemical.find('NameOfSubstance').text
+            chemical_data['registryNumber'] = chemical.find('RegistryNumber').text
+            chemicals.append(chemical_data)
+        return chemicals
+
+
+
+    def parse_article_info(self,element):
+        article = {}
+
+
+        if element.find('ArticleTitle') is not None:
+            title = self.stringify_children(element.find('ArticleTitle'))
+        else:
+            title = ''
+
+        if element.find('Abstract') is not None:
+            abstract = self.stringify_children(element.find('Abstract'))
+        else:
+            abstract = ''
+
+        if element.find('AuthorList') is not None:
+            authors = element.find('AuthorList').getchildren()
+            authors_info = list()
+            affiliations_info = list()
+            for author in authors:
+                if author.find('Initials') is not None:
+                    firstname = author.find('Initials').text
+                else:
+                    firstname = ''
+                if author.find('LastName') is not None:
+                    lastname = author.find('LastName').text
+                else:
+                    lastname = ''
+                if author.find('AffiliationInfo/Affiliation') is not None:
+                    affiliation = author.find('AffiliationInfo/Affiliation').text
+                else:
+                    affiliation = ''
+                authors_info.append(firstname + ' ' + lastname)
+                affiliations_info.append(affiliation)
+            affiliations_info = ' '.join([a for a in affiliations_info if a is not ''])
+            authors_info = '; '.join(authors_info)
+        else:
+            affiliations_info = ''
+            authors_info = ''
+
+        journal = element.find('Journal')
+        journal_name = ' '.join(journal.xpath('Title/text()'))
+        #pubdate = date_extractor(journal, year_info_only)
+
+        article['title']= title
+        article['abstract'] = abstract
+        article['journal'] = journal_name
+        article['authors'] = authors_info
+
+
+        return article
+
+
 
