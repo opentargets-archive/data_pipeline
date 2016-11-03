@@ -6,7 +6,6 @@ from modules.ECO import ECOLookUpTable
 from modules.EFO import EFOLookUpTable
 from modules.GeneData import GeneLookUpTable
 
-
 class LookUpData():
     def __init__(self):
         self.available_genes = None
@@ -18,12 +17,18 @@ class LookUpData():
         self.available_efo_objects = None
         self.available_eco_objects = None
 
+class LookUpDataType(object):
+    TARGET = 'target'
+    DISEASE = 'disease'
+    ECO = 'eco'
 
-class LookUpDataRetriever():
+class LookUpDataRetriever(object):
     def __init__(self,
                  es = None,
                  r_server = None,
-                 targets = []):
+                 targets = [],
+                 data_types=(LookUpDataType.TARGET,LookUpDataType.DISEASE,LookUpDataType.ECO),
+                 ):
 
         self.es = es
         self.r_server = r_server
@@ -32,19 +37,19 @@ class LookUpDataRetriever():
         self.lookup = LookUpData()
         self.logger = logging.getLogger(__name__)
         start_time = time.time()
-        load_bar = tqdm(desc='loading lookup data',
-             total=3,
-             unit=' steps',
-             leave=False,)
-        self._get_gene_info(targets)
-        self.logger.info("finished self._get_gene_info(), took %ss" % str(time.time() - start_time))
-        load_bar.update()
-        self._get_available_efos()
-        self.logger.info("finished self._get_available_efos(), took %ss"%str(time.time()-start_time))
-        load_bar.update()
-        self._get_available_ecos()
-        self.logger.info("finished self._get_available_ecos(), took %ss"%str(time.time()-start_time))
-        load_bar.update()
+        for dt in tqdm(data_types,
+                         desc='loading lookup data',
+                         unit=' steps',
+                         leave=False,
+                         ):
+            if dt == LookUpDataType.TARGET:
+                self._get_gene_info(targets)
+            elif dt == LookUpDataType.DISEASE:
+                self._get_available_efos()
+            elif dt == LookUpDataType.ECO:
+                self._get_available_ecos()
+            self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
+
 
 
     def _get_available_efos(self):

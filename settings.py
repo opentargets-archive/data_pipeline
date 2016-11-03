@@ -6,20 +6,38 @@ __author__ = 'andreap'
 import os
 import ConfigParser
 
+
 iniparser = ConfigParser.ConfigParser()
-iniparser.read('db.ini')
+iniparser.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'db.ini'))
 
 class Config():
 
-    ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
-    ONTOLOGY_CONFIG.read('ontology_config.ini')
+    HAS_PROXY = iniparser.has_section('proxy')
+    if HAS_PROXY:
+        PROXY = iniparser.get('proxy', 'protocol') + "://" + iniparser.get('proxy', 'username') + ":" + iniparser.get(
+            'proxy', 'password') + "@" + iniparser.get('proxy', 'host') + ":" + iniparser.get('proxy', 'port')
+        PROXY_PROTOCOL = iniparser.get('proxy', 'protocol')
+        PROXY_USERNAME = iniparser.get('proxy', 'username')
+        PROXY_PASSWORD = iniparser.get('proxy', 'password')
+        PROXY_HOST = iniparser.get('proxy', 'host')
+        PROXY_PORT = int(iniparser.get('proxy', 'port'))
 
+    ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
+    ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
     RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
-    ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
-    ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
-    ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+    try:
+        ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
+        ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+        ELASTICSEARCH_URL = 'http://'+ELASTICSEARCH_HOST
+        if ELASTICSEARCH_PORT:
+            ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
+    except ConfigParser.NoOptionError:
+        ELASTICSEARCH_HOST = None
+        ELASTICSEARCH_PORT = None
+        ELASTICSEARCH_URL = None
+
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -53,13 +71,25 @@ class Config():
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
-    SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
-    POSTGRES_DATABASE = {'drivername': 'postgres',
+    try:
+        SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
+    except ConfigParser.NoOptionError:
+        print 'no virtuoso instance'
+        SPARQL_ENDPOINT_URL = ''
+
+    try:
+        POSTGRES_DATABASE = {'drivername': 'postgres',
             'host': iniparser.get(ENV, 'host'),
             'port': iniparser.get(ENV, 'port'),
             'username': iniparser.get(ENV, 'username'),
             'password': iniparser.get(ENV, 'password'),
             'database': iniparser.get(ENV, 'database')}
+    except ConfigParser.NoOptionError:
+        # the official logger is not loaded yet. not moving things around as we
+        # will likely put all of this in a config file.
+        print 'no postgres instance'
+        POSTGRES_DATABASE = {}
+
     # HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_COMPLETE_SET = 'https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer'
     # HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
@@ -78,6 +108,11 @@ class Config():
         '6239':'worm',
         '4932':'yeast'
     }
+
+    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
+    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
+    CHEMBL_DRUG_SYNONYMS = '''https://www.ebi.ac.uk/chembl/api/data/molecule/{}.json'''
+
     HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
@@ -150,6 +185,11 @@ class Config():
     # put the path to the file where you want to write the SLIM file (turtle format)
     ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
 
+    CHEMBL_URIS = dict(
+        protein_class='https://www.ebi.ac.uk/chembl/api/data/protein_class',
+        target_component='https://www.ebi.ac.uk/chembl/api/data/target_component',
+    )
+
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
         )
@@ -220,6 +260,3 @@ class Config():
     DUMP_REMOTE_API = 'https://beta.targetvalidation.org'
     DUMP_REMOTE_API_SECRET = '1RT6L519zkcTH9i3F99OjeYn13k79Wep'
     DUMP_REMOTE_API_APPNAME = 'load-test'
-
-
-

@@ -1,3 +1,30 @@
+"""
+Copyright 2014-2016 EMBL - European Bioinformatics Institute, Wellcome
+Trust Sanger Institute, GlaxoSmithKline and Biogen
+
+This software was developed as part of Open Targets. For more information please see:
+
+	http://targetvalidation.org
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+.. module:: EvidenceValidation
+    :platform: Unix, Linux
+    :synopsis: A data pipeline module to validate evidence strings.
+.. moduleauthor:: Gautier Koscielny <gautierk@opentargets.org>
+.. moduleauthor:: Andrea Pierleoni <andreap@opentargets.org>
+"""
+
 import os
 import sys
 import copy
@@ -22,6 +49,7 @@ from common.PGAdapter import *
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 import opentargets.model.core as opentargets
 from  common.EvidenceJsonUtils import DatatStructureFlattener
+from modules.Ontology import OntologyClassReader
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
 import hashlib
@@ -29,7 +57,6 @@ from xml.etree import cElementTree as ElementTree
 from sqlalchemy.dialects.postgresql import JSON
 import multiprocessing
 from elasticsearch import Elasticsearch, helpers
-from SPARQLWrapper import SPARQLWrapper, JSON
 
 # This bit is necessary for text mining data
 reload(sys)
@@ -596,7 +623,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                  queue_out=None,
                  es=None,
                  efo_current=None,
-                 efo_uncat=None,
                  efo_obsolete=None,
                  hpo_current=None,
                  hpo_obsolete=None,
@@ -611,7 +637,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.es = es
         self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es, chunk_size=100))
         self.efo_current = efo_current
-        self.efo_uncat = efo_uncat
         self.efo_obsolete = efo_obsolete
         self.hpo_current = hpo_current
         self.hpo_obsolete = hpo_obsolete
@@ -806,7 +831,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                     index += 1
 
                                     ' Check disease term or phenotype term '
-                                    if (disease_id not in self.efo_current and disease_id not in self.hpo_current and disease_id not in self.mp_current) or disease_id in self.efo_uncat:
+                                    if (disease_id not in self.efo_current and disease_id not in self.hpo_current and disease_id not in self.mp_current):
                                         audit.append((lc, DISEASE_ID_INVALID, disease_id))
                                         disease_failed = True
                                         if disease_id not in invalid_diseases:
@@ -1790,7 +1815,6 @@ class EvidenceValidationFileChecker():
     def __init__(self,
                  adapter,
                  es,
-                 sparql,
                  r_server,
                  chunk_size=1e4,
                  ):
@@ -1798,7 +1822,6 @@ class EvidenceValidationFileChecker():
         self.session = adapter.session
         self.es = es
         self.esquery = ESQuery(self.es)
-        self.sparql = sparql
         self.r_server = r_server
         self.chunk_size = chunk_size
         self.cache = {}
@@ -1819,13 +1842,9 @@ class EvidenceValidationFileChecker():
         # LOGGER.addHandler(memoryhandler)
 
         self.uniprot_current = {}
-        self.efo_current = {}
-        self.efo_obsolete = {}
-        self.efo_uncat = []
-        self.hpo_current = {}
-        self.hpo_obsolete = {}
-        self.mp_current = {}
-        self.mp_obsolete = {}
+        self.hpo_ontology = None
+        self.mp_ontology = None
+        self.efo_ontology = None
         self.ensembl_current = {}
         self.hgnc_current = {}
         self.eco_current = {}
@@ -2071,120 +2090,29 @@ class EvidenceValidationFileChecker():
         for row in self.session.query(ECONames):
             self.eco_current[row.uri] = row.label
 
-    def load_ontology(self, name, base_class, current, obsolete):
-        '''
-        Load ontology to accept phenotype terms that are not
-        :return:
-        '''
-        sparql_query = '''
-        SELECT DISTINCT ?ont_node ?label
-        FROM <http://purl.obolibrary.org/obo/%s.owl>
-        {
-        ?ont_node rdfs:subClassOf* <%s> .
-        ?ont_node rdfs:label ?label
-        }
-        '''
-        self.sparql.setQuery(sparql_query%(name, base_class))
-        self.sparql.setReturnFormat(JSON)
-        results = self.sparql.query().convert()
-
-        for result in results["results"]["bindings"]:
-            uri = result['ont_node']['value']
-            label = result['label']['value']
-            current[uri] = label
-            #print(json.dumps(result, indent=4))
-            #print("%s %s"%(uri, label))
-
-        sparql_query = '''
-        PREFIX oboInOwl: <http://www.geneontology.org/formats/oboInOwl#>
-        PREFIX obo: <http://purl.obolibrary.org/obo/>
-        SELECT DISTINCT ?hp_node ?label ?id ?hp_new
-         FROM <http://purl.obolibrary.org/obo/%s.owl>
-         FROM <http://purl.obolibrary.org/obo/>
-         {
-            ?hp_node owl:deprecated true .
-            ?hp_node oboInOwl:id ?id .
-            ?hp_node obo:IAO_0100001 ?hp_new .
-            ?hp_node rdfs:label ?label
-
-         }
-        '''
-        self.sparql.setQuery(sparql_query%name)
-        self.sparql.setReturnFormat(JSON)
-        results = self.sparql.query().convert()
-
-        obsolete_classes = {}
-
-        for result in results["results"]["bindings"]:
-            uri = result['hp_node']['value']
-            label = result['label']['value']
-            id = result['label']['value']
-            hp_new = result['hp_new']['value']
-            new_label = ''
-            if (not re.match('http:\/\/purl.obolibrary\.org', hp_new)):
-                hp_new = "http://purl.obolibrary.org/obo/%s"%hp_new.replace(':','_')
-            obsolete_classes[uri] = hp_new
-        for uri in obsolete_classes:
-            next_uri = obsolete_classes[uri]
-            while next_uri in obsolete_classes:
-                next_uri = obsolete_classes[next_uri]
-            new_label = current[next_uri]
-            obsolete[uri] = "Use %s label:%s"%(next_uri, new_label)
-            self.logger.warn("%s %s"%(uri, obsolete[uri]))
-
     def load_hpo(self):
         '''
         Load HPO to accept phenotype terms that are not in EFO
         :return:
         '''
-        self.load_ontology('hp', 'http://purl.obolibrary.org/obo/HP_0000118', self.hpo_current, self.hpo_obsolete)
+        self.hpo_ontology = OntologyClassReader()
+        self.hpo_ontology.load_hpo_classes()
 
     def load_mp(self):
         '''
         Load MP to accept phenotype terms that are not in EFO
         :return:
         '''
-        self.load_ontology('mp', 'http://purl.obolibrary.org/obo/MP_0000001', self.mp_current, self.mp_obsolete)
+        self.mp_ontology = OntologyClassReader()
+        self.mp_ontology.load_mp_classes()
 
     def load_efo(self):
-        # Change this in favor of paths
-        self.logger.info("Loading EFO current terms")
-        efo_pattern = "http://www.ebi.ac.uk/efo/EFO_%"
-        orphanet_pattern = "http://www.orpha.net/ORDO/Orphanet_%"
-        hpo_pattern = "http://purl.obolibrary.org/obo/HP_%"
-        mp_pattern = "http://purl.obolibrary.org/obo/MP_%"
-        do_pattern = "http://purl.obolibrary.org/obo/DOID_%"
-        go_pattern = "http://purl.obolibrary.org/obo/GO_%"
-        omim_pattern = "http://purl.bioontology.org/omim/OMIM_%"
-
         '''
-        Temp: store the uncharactered diseases to filter them
-        https://alpha.targetvalidation.org/disease/genetic_disorder_uncategorized
+        Load EFO terms
+        :return:
         '''
-        for row in self.session.query(EFOPath):
-            if any(map(lambda x: x["uri"] == 'http://www.targetvalidation.org/genetic_disorder_uncategorized',
-                       row.tree_path)):
-                self.efo_uncat.append(row.uri);
-
-        for row in self.session.query(EFONames).filter(
-                or_(
-                        EFONames.uri.like(efo_pattern),
-                        EFONames.uri.like(mp_pattern),
-                        EFONames.uri.like(orphanet_pattern),
-                        EFONames.uri.like(hpo_pattern),
-                        EFONames.uri.like(do_pattern),
-                        EFONames.uri.like(go_pattern),
-                        EFONames.uri.like(omim_pattern)
-                )
-        ):
-            #self.logger.info(row.uri)
-            # if row.uri not in uncat:
-            self.efo_current[row.uri] = row.label
-        # self.logger.info(len(self.efo_current))
-        # self.logger.info("Loading EFO obsolete terms")
-        for row in self.session.query(EFOObsoleteClass):
-            #print "obsolete %s"%(row.uri)
-            self.efo_obsolete[row.uri] = row.reason
+        self.efo_ontology = OntologyClassReader()
+        self.efo_ontology.load_efo_classes()
 
     def get_reference_gene_from_Ensembl(self, ensembl_gene_id):
         '''
@@ -2285,13 +2213,12 @@ class EvidenceValidationFileChecker():
                                        self.r_server.db,
                                        audit_q,
                                        self.es,
-                                       self.efo_current,
-                                       self.efo_uncat,
-                                       self.efo_obsolete,
-                                       self.hpo_current,
-                                       self.hpo_obsolete,
-                                       self.mp_current,
-                                       self.mp_obsolete,
+                                       self.efo_ontology.current_classes,
+                                       self.efo_ontology.obsolete_classes,
+                                       self.hpo_ontology.current_classes,
+                                       self.hpo_ontology.obsolete_classes,
+                                       self.mp_ontology.current_classes,
+                                       self.mp_ontology.obsolete_classes,
                                        self.uniprot_current,
                                        self.ensembl_current,
                                        ) for i in range(workers_number)]
@@ -2307,12 +2234,12 @@ class EvidenceValidationFileChecker():
                 self.ensembl_current,
                 self.uniprot_current,
                 self.symbols,
-                self.efo_current,
-                self.efo_obsolete,
-                self.hpo_current,
-                self.hpo_obsolete,
-                self.mp_current,
-                self.mp_obsolete,
+                self.efo_ontology.current_classes,
+                self.efo_ontology.obsolete_classes,
+                self.hpo_ontology.current_classes,
+                self.hpo_ontology.obsolete_classes,
+                self.mp_ontology.current_classes,
+                self.mp_ontology.obsolete_classes
             )
 
         auditor.start()

@@ -140,6 +140,37 @@ class ESQuery(object):
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_ECO_INDEX_NAME)
 
+    def get_publications_with_analyzed_data(self,ids, fields=None):
+        source = self._get_source_from_fields(fields)
+        # inner hits to get child documents containing abstract_lemmas , along with parent publications
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                                     "has_child": {
+                                        "type": "publication-analysis-spacy",
+                                            "query": {
+                                                        "ids": {"values": ids}
+
+                                                    },"inner_hits": {}
+                                        }
+                                     },
+
+                               '_source': source,
+                               'size': 1000
+                           },
+                           scroll='2h',
+                           doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                           timeout="10m",
+                           )
+        for hit in res:
+            parent_publication = hit['_source']
+            analyzed_publication = hit['inner_hits']['publication-analysis-spacy']['hits']['hits'][0]['_source']
+            yield parent_publication, analyzed_publication
+
+    def count_all_publications(self):
+
+        return self.count_elements_in_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
+
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
         aggs ={}
@@ -559,23 +590,25 @@ class ESQuery(object):
                 yield hit['_source']
 
 
-    def get_all_pub_ids_from_evidence(self,):
+    def get_all_pub_ids_from_evidence(self,datasources= None):
         #TODO: get all the validated evidencestrings and fetch medline abstracts there
-        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='literature.references.lit_id'
+        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='evidence_string.literature.references.lit_id'
+        return self.get_validated_evidence_strings(fields='evidence_string.literature.references.lit_id',
+                                                   datasources=datasources)
 
-        return ['http://europepmc.org/abstract/MED/24523595',
-               'http://europepmc.org/abstract/MED/26784250',
-               'http://europepmc.org/abstract/MED/27409410',
-               'http://europepmc.org/abstract/MED/26290144',
-               'http://europepmc.org/abstract/MED/25787843',
-               'http://europepmc.org/abstract/MED/26836588',
-               'http://europepmc.org/abstract/MED/26781615',
-               'http://europepmc.org/abstract/MED/26646452',
-               'http://europepmc.org/abstract/MED/26774881',
-               'http://europepmc.org/abstract/MED/26629442',
-               'http://europepmc.org/abstract/MED/26371324',
-               'http://europepmc.org/abstract/MED/24817865',
-               ]
+        # return ['http://europepmc.org/abstract/MED/24523595',
+        #        'http://europepmc.org/abstract/MED/26784250',
+        #        'http://europepmc.org/abstract/MED/27409410',
+        #        'http://europepmc.org/abstract/MED/26290144',
+        #        'http://europepmc.org/abstract/MED/25787843',
+        #        'http://europepmc.org/abstract/MED/26836588',
+        #        'http://europepmc.org/abstract/MED/26781615',
+        #        'http://europepmc.org/abstract/MED/26646452',
+        #        'http://europepmc.org/abstract/MED/26774881',
+        #        'http://europepmc.org/abstract/MED/26629442',
+        #        'http://europepmc.org/abstract/MED/26371324',
+        #        'http://europepmc.org/abstract/MED/24817865',
+        #        ]
 
     def get_all_associations_ids(self,):
         res = helpers.scan(client=self.handler,
