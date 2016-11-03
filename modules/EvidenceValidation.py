@@ -1,35 +1,11 @@
-"""
-Copyright 2014-2016 EMBL - European Bioinformatics Institute, Wellcome
-Trust Sanger Institute, GlaxoSmithKline and Biogen
-
-This software was developed as part of Open Targets. For more information please see:
-
-	http://targetvalidation.org
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-.. module:: EvidenceValidation
-    :platform: Unix, Linux
-    :synopsis: A data pipeline module to validate evidence strings.
-.. moduleauthor:: Gautier Koscielny <gautierk@opentargets.org>
-.. moduleauthor:: Andrea Pierleoni <andreap@opentargets.org>
-"""
-
+from __future__ import division
 import os
 import sys
 import copy
+
 import pysftp
 import requests
+from elasticsearch.exceptions import HTTP_EXCEPTIONS, NotFoundError
 from paramiko import AuthenticationException
 from requests.packages.urllib3.exceptions import HTTPError
 from tqdm import tqdm
@@ -43,20 +19,16 @@ import logging
 from StringIO import StringIO
 import json
 from datetime import datetime, date
-from sqlalchemy import and_, or_, table, column, select, update, insert, desc
 from common import Actions
-from common.PGAdapter import *
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueueWorkerThread
 import opentargets.model.core as opentargets
 from  common.EvidenceJsonUtils import DatatStructureFlattener
 from modules.Ontology import OntologyClassReader
 from settings import Config
-from elasticsearch_config import ElasticSearchConfiguration
 import hashlib
-from xml.etree import cElementTree as ElementTree
-from sqlalchemy.dialects.postgresql import JSON
 import multiprocessing
-from elasticsearch import Elasticsearch, helpers
+from elasticsearch import helpers
 
 # This bit is necessary for text mining data
 reload(sys)
@@ -71,7 +43,7 @@ logging.getLogger("paramiko").setLevel(logging.WARNING)
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
 MAX_NB_EVIDENCE_CHUNKS = 1000
-EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 100
+EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 1
 
 EVIDENCE_STRING_INVALID = 10
 EVIDENCE_STRING_INVALID_TYPE = 11
@@ -240,11 +212,12 @@ class DirectoryCrawlerProcess():
                  output_q,
                  es,
                  r_server,
-                 local_files = []):
+                 local_files = [],
+                 dry_run = False):
         self.output_q = output_q
         self.es = es
-        self.evidence_chunk = EvidenceChunkElasticStorage(loader = Loader(self.es, chunk_size=100))
-        self.submission_audit = SubmissionAuditElasticStorage(loader = Loader(self.es, chunk_size=100))
+        self.loader = Loader(self.es,  dry_run = dry_run)
+        self.submission_audit = SubmissionAuditElasticStorage(self.loader)
         self.start_time = time.time()
         self.r_server = r_server
         self._remote_filenames =dict()
@@ -293,7 +266,7 @@ class DirectoryCrawlerProcess():
         self.logger.info("%s started" % self.__class__.__name__)
 
 
-        self.submission_audit.storage_create_index(recreate=False)
+        SubmissionAuditElasticStorage.storage_create_index(self.loader,recreate=False)
 
         '''scroll through remote  user directories and find the latest files'''
 
@@ -309,6 +282,8 @@ class DirectoryCrawlerProcess():
                         else:
                             datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
                         release_date = date(int(year), int(month), int(day))
+                        EvidenceChunkElasticStorage.storage_delete(self.loader, datasource )
+                        EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
                         try:
                             ''' get md5 '''
                             md5_hash = self.md5_hash_local_file(f)
@@ -348,7 +323,8 @@ class DirectoryCrawlerProcess():
 
                             logfile = os.path.join('/tmp', file_version+ ".log")
                             self.logger.info("%s checking file: %s" % (self.__class__.__name__, file_version))
-                            self.evidence_chunk.storage_create_index(datasource,recreate=False)
+                            EvidenceChunkElasticStorage.storage_delete(self.loader, datasource,)
+                            EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource,recreate=False)
 
 
                             try:
@@ -462,7 +438,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                  es = None):
         super(FileReaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.es = es
-        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es, chunk_size=100))
+        self.loader = Loader(self.es)
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
 
@@ -479,8 +455,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
     def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None, file_type = FileTypes.SFTP):
 
-        # self.logger.info('%s Delete previous data for %s' % (self.name, data_source_name))
-        # self.evidence_chunk_storage.storage_delete(data_source_name)
+
 
         self.logger.info('%s Starting parsing %s' % (self.name, file_path))
 
@@ -525,11 +500,9 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                             line_buffer.append(line)
                             line_number += 1
                             if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
-                                self.logger.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-                                self.queue_out.put(
+                                self.put_into_queue_out(
                                     (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
-                                     offset, list(line_buffer), False),
-                                    self.r_server)
+                                     offset, list(line_buffer), False))
                                 offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
                                 chunk += 1
                                 line_buffer = []
@@ -562,11 +535,9 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                         line_buffer.append(line)
                         line_number += 1
                         if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
-                            self.logger.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-                            self.queue_out.put(
+                            self.put_into_queue_out(
                                 (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
-                                 offset, list(line_buffer), False),
-                                self.r_server)
+                                 offset, list(line_buffer), False))
                             offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
                             chunk += 1
                             line_buffer = []
@@ -576,7 +547,6 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             raise AttributeError('File type %s is not supported'%file_type)
 
         if line_buffer:
-            self.logger.debug('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
             self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
                                list(line_buffer), False),
                                self.r_server)
@@ -622,30 +592,15 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                  redis_path,
                  queue_out=None,
                  es=None,
-                 efo_current=None,
-                 efo_uncat=None,
-                 efo_obsolete=None,
-                 hpo_current=None,
-                 hpo_obsolete=None,
-                 mp_current=None,
-                 mp_obsolete=None,
-                 uniprot_current=None,
-                 ensembl_current=None,
+                 lookup_data= None,
+                 dry_run=False,
                  ):
         super(ValidatorProcess, self).__init__(queue_in, redis_path, queue_out)
         self.queue_in = queue_in
         self.queue_out = queue_out
         self.es = es
-        self.evidence_chunk_storage = EvidenceChunkElasticStorage(Loader(self.es, chunk_size=100))
-        self.efo_current = efo_current
-        self.efo_uncat = efo_uncat
-        self.efo_obsolete = efo_obsolete
-        self.hpo_current = hpo_current
-        self.hpo_obsolete = hpo_obsolete
-        self.mp_current = mp_current
-        self.mp_obsolete = mp_obsolete
-        self.uniprot_current = uniprot_current
-        self.ensembl_current = ensembl_current
+        self.loader= Loader(self.es, dry_run=dry_run)
+        self.lookup_data = lookup_data
         self.start_time = time.time()
         self.audit = list()
         self.logger = logging.getLogger(__name__)
@@ -655,7 +610,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         return self.validate_evidence(file_path, file_version, provider_id, data_source_name, md5_hash, chunk,
                                    offset, line_buffer, end_of_transmission, logfile=logfile)
 
-
+    # @profile
     def validate_evidence(self, file_path, file_version, provider_id, data_source_name, md5_hash, chunk, offset,
                           line_buffer, end_of_transmission, logfile=None):
         '''
@@ -703,7 +658,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
 
         else:
-            self.logger.debug('%s Validating %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
 
             diseases = {}
             top_diseases = []
@@ -779,35 +733,35 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
                         if obj is not None:
                             if obj.target.id:
-                                for id in obj.target.id:
-                                    if id in targets:
-                                        targets[id] += 1
+                                for tid in obj.target.id:
+                                    if tid in targets:
+                                        targets[tid] += 1
                                     else:
-                                        targets[id] = 1
-                                    if not id in top_targets:
+                                        targets[tid] = 1
+                                    if not tid in top_targets:
                                         if len(top_targets) < Config.EVIDENCEVALIDATION_NB_TOP_TARGETS:
-                                            top_targets.append(id)
+                                            top_targets.append(tid)
                                         else:
                                             # map,reduce
                                             for n in range(0, len(top_targets)):
-                                                if targets[top_targets[n]] < targets[id]:
-                                                    top_targets[n] = id;
+                                                if targets[top_targets[n]] < targets[tid]:
+                                                    top_targets[n] = tid;
                                                     break;
 
                             if obj.disease.id:
-                                for id in obj.disease.id:
-                                    if id in diseases:
-                                        diseases[id] += 1
+                                for tid in obj.disease.id:
+                                    if tid in diseases:
+                                        diseases[tid] += 1
                                     else:
-                                        diseases[id] = 1
-                                    if not id in top_diseases:
+                                        diseases[tid] = 1
+                                    if not tid in top_diseases:
                                         if len(top_diseases) < Config.EVIDENCEVALIDATION_NB_TOP_DISEASES:
-                                            top_diseases.append(id)
+                                            top_diseases.append(tid)
                                         else:
                                             # map,reduce
                                             for n in range(0, len(top_diseases)):
-                                                if diseases[top_diseases[n]] < diseases[id]:
-                                                    top_diseases[n] = id;
+                                                if diseases[top_diseases[n]] < diseases[tid]:
+                                                    top_diseases[n] = tid;
                                                     break;
 
                             # flatten
@@ -831,9 +785,12 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                        obj.disease.id[index] = eva_curated[disease_id];
                                        disease_id = obj.disease.id[index];
                                     index += 1
-
+                                    short_disease_id = disease_id.split('/')[-1]
                                     ' Check disease term or phenotype term '
-                                    if (disease_id not in self.efo_current and disease_id not in self.hpo_current and disease_id not in self.mp_current) or disease_id in self.efo_uncat:
+                                    if (short_disease_id not in self.lookup_data.available_efos) and \
+                                            (disease_id not in self.lookup_data.hpo_ontology.current_classes) and \
+                                            (disease_id not in self.lookup_data.mp_ontology.current_classes):# or \
+                                            # (disease_id in self.efo_uncat):
                                         audit.append((lc, DISEASE_ID_INVALID, disease_id))
                                         disease_failed = True
                                         if disease_id not in invalid_diseases:
@@ -841,16 +798,17 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                         else:
                                             invalid_diseases[disease_id] += 1
                                         nb_efo_invalid += 1
-                                    if disease_id in self.efo_obsolete:
-                                        audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
-                                        # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
-                                        disease_failed = True
-                                        if disease_id not in obsolete_diseases:
-                                            obsolete_diseases[disease_id] = 1
-                                        else:
-                                            obsolete_diseases[disease_id] += 1
-                                        nb_efo_obsolete += 1
-                                    elif disease_id in self.hpo_obsolete or disease_id in self.mp_obsolete:
+                                    # if disease_id in self.efo_obsolete:
+                                    #     audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
+                                    #     # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                    #     disease_failed = True
+                                    #     if disease_id not in obsolete_diseases:
+                                    #         obsolete_diseases[disease_id] = 1
+                                    #     else:
+                                    #         obsolete_diseases[disease_id] += 1
+                                    #     nb_efo_obsolete += 1
+                                    elif (disease_id in self.lookup_data.hpo_ontology.obsolete_classes) or \
+                                            (disease_id in self.lookup_data.mp_ontology.obsolete_classes):
                                         audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
                                         # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
                                         disease_failed = True
@@ -868,15 +826,16 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                             ' Check Ensembl ID, UniProt ID and UniProt ID mapping to a Gene ID'
                             target_count = 0
                             if obj.target.id:
-                                for id in obj.target.id:
+                                for tid in obj.target.id:
                                     target_count += 1
                                     # http://identifiers.org/ensembl/ENSG00000178573
-                                    ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', id)
-                                    uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', id)
+                                    ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', tid)
+                                    uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', tid)
                                     if ensemblMatch:
-                                        ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
-                                        target_id = id
-                                        if not ensembl_id in self.ensembl_current:
+                                        # ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
+                                        ensembl_id = tid.split('/')[-1]
+                                        target_id = tid
+                                        if not ensembl_id in self.lookup_data.available_genes:
                                             gene_failed = True
                                             audit.append((lc, ENSEMBL_GENE_ID_UNKNOWN, ensembl_id))
                                             # self.logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
@@ -885,7 +844,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                             else:
                                                 invalid_ensembl_ids[ensembl_id] += 1
                                             nb_ensembl_invalid += 1
-                                        elif self.ensembl_current[ensembl_id]['is_reference'] is False:
+                                        elif ensembl_id in self.lookup_data.non_reference_genes:
                                             gene_mapping_failed = True
                                             audit.append((lc, ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE, ensembl_id))
                                             # self.logger.warning("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
@@ -896,8 +855,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                             nb_ensembl_nonref += 1
 
                                     elif uniprotMatch:
-                                        uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                                        if uniprot_id not in self.uniprot_current:
+                                        # uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
+                                        uniprot_id =  tid.split('/')[-1]
+                                        if uniprot_id not in self.lookup_data.uni2ens:
                                             gene_failed = True
                                             audit.append((lc, UNIPROT_PROTEIN_ID_UNKNOWN, uniprot_id))
                                             # self.logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier".format(lc+1, uniprot_id))
@@ -906,7 +866,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                             else:
                                                 invalid_uniprot_ids[uniprot_id] += 1
                                             nb_uniprot_invalid += 1
-                                        elif "gene_ids" not in self.uniprot_current[uniprot_id]:
+                                        elif not self.lookup_data.uni2ens[uniprot_id]:#TODO:this will not happen wit the current gene processing pipeline
                                             # check symbol mapping (get symbol first)
                                             # gene_mapping_failed = True
                                             gene_failed = True
@@ -918,10 +878,10 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                                 missing_uniprot_id_xrefs[uniprot_id] += 1
                                             nb_missing_uniprot_id_xrefs += 1
                                             # This identifier is not in the current EnsEMBL database
-                                        elif not reduce((lambda x, y: x or y),
-                                                        map(lambda x: self.ensembl_current[x]['is_reference'] is True,
-                                                            self.uniprot_current[uniprot_id]["gene_ids"])):
-                                            gene_mapping_failed = True
+                                        elif (uniprot_id in self.lookup_data.uni2ens) and  \
+                                                        self.lookup_data.uni2ens[uniprot_id] in self.lookup_data.available_genes  and \
+                                                        'is_reference' in  self.lookup_data.available_genes[self.lookup_data.uni2ens[uniprot_id]]  and \
+                                                        (not self.lookup_data.available_genes[self.lookup_data.uni2ens[uniprot_id]]['is_reference'] is True) :
                                             audit.append((lc, UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF, uniprot_id))
                                             # self.logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
                                             if not uniprot_id in invalid_uniprot_id_mappings:
@@ -930,15 +890,16 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                                 invalid_uniprot_id_mappings[uniprot_id] += 1
                                             nb_uniprot_invalid_mapping += 1
                                         else:
-                                            reference_target_list = filter(
-                                                lambda x: self.ensembl_current[x]['is_reference'] is True,
-                                                self.uniprot_current[uniprot_id]["gene_ids"])
+                                            try:
+                                                reference_target_list =self.lookup_data.available_genes[self.lookup_data.uni2ens[uniprot_id]]['is_reference'] is True
+                                            except KeyError:
+                                                reference_target_list = []
                                             if reference_target_list:
                                                 target_id = 'http://identifiers.org/ensembl/%s' % reference_target_list[
                                                     0]
                                             else:
                                                 # get the first one, needs a better way
-                                                target_id = self.uniprot_current[uniprot_id]["gene_ids"][0]
+                                                target_id = self.lookup_data.uni2ens[uniprot_id]
                                             # self.logger.info("Found target id being: %s for %s" %(target_id, uniprot_id))
                                             if target_id is None:
                                                 self.logger.info("Found no target id for %s" % (uniprot_id))
@@ -951,24 +912,26 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
                             ''' store the evidence '''
                             if validation_result == 0 and not disease_failed and not gene_failed:
-                                nb_valid += 1;
+                                nb_valid += 1
                                 # self.logger.info("Add evidence for %s %s " %(target_id, disease_id))
                                 # flatten data structure
                                 # self.logger.info('%s Adding to chunk %s %s'% (self.name, target_id, disease_id))
                                 json_doc_hashdig = DatatStructureFlattener(python_raw).get_hexdigest()
-                                self.evidence_chunk_storage.storage_add(uniq_elements_flat_hexdig,
-                                                                        dict(
-                                                                            uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
-                                                                            json_doc_hashdig=json_doc_hashdig,
-                                                                            evidence_string=json.loads(obj.to_JSON()),
-                                                                            target_id=target_id,
-                                                                            disease_id=efo_id,
-                                                                            data_source_name=data_source_name,
-                                                                            json_schema_version="1.2.2",
-                                                                            json_doc_version=1,
-                                                                            release_date=VALIDATION_DATE),
-                                                                        # release_date = datetime.utcnow()),
-                                                                        data_source_name)
+                                self.loader.put(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + data_source_name,
+                                                data_source_name,
+                                                uniq_elements_flat_hexdig,
+                                                dict(
+                                                    uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
+                                                    json_doc_hashdig=json_doc_hashdig,
+                                                    evidence_string=line,
+                                                    # evidence_string=json.loads(obj.to_JSON(indent=None)),
+                                                    target_id=target_id,
+                                                    disease_id=efo_id,
+                                                    data_source_name=data_source_name,
+                                                    json_schema_version="1.2.3",
+                                                    json_doc_version=1,
+                                                    release_date=VALIDATION_DATE),
+                                                create_index=False)
 
                             else:
                                 if disease_failed:
@@ -1008,13 +971,11 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 cc += len(line)
                 # for line :)
 
-            self.logger.debug('%s nb line parsed %i (size %i)' % (self.name, lc, cc))
 
             ''' write results in ES '''
 
-            self.evidence_chunk_storage.storage_flush()
+            self.loader.flush()
 
-            self.logger.debug('%s bulk insert complete' % (self.name))
 
             'Inform the audit trailer to generate a report and send an e-mail to the data provider'
             return (file_path,
@@ -1056,28 +1017,14 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                  queue_in,
                  redis_path,
                  es=None,
-                 ensembl_current=None,
-                 uniprot_current=None,
-                 symbols=None,
-                 efo_current=None,
-                 efo_obsolete=None,
-                 mp_current=None,
-                 mp_obsolete=None,
-                 hpo_current=None,
-                 hpo_obsolete=None,):
+                 lookup_data = None,
+                 dry_run=False,
+                 ):
         super(AuditTrailProcess, self).__init__(queue_in, redis_path )
         self.queue_in = queue_in
         self.es = es
-        self.submission_audit = SubmissionAuditElasticStorage(loader=Loader(es))
-        self.ensembl_current = ensembl_current
-        self.uniprot_current = uniprot_current
-        self.symbols = symbols
-        self.efo_current = efo_current
-        self.efo_obsolete = efo_obsolete
-        self.hpo_current = hpo_current
-        self.hpo_obsolete = hpo_obsolete
-        self.mp_current = mp_current
-        self.mp_obsolete = mp_obsolete
+        self.submission_audit = SubmissionAuditElasticStorage(loader=Loader(es, dry_run=dry_run))
+        self.lookup_data = lookup_data
         self.start_time = time.time()
         self.registry = dict()
         self.logger = logging.getLogger(__name__)
@@ -1115,24 +1062,25 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         # text.append( signature
         text = '\n'.join(text)
         self.logger.info(text)
-        r = requests.post(
-            Config.MAILGUN_MESSAGES,
-            auth=("api", Config.MAILGUN_API_KEY),
-            files=[("attachment", open(logfile,'rb'))],
-            data={"from": sender,
-                  "to": "andreap@ebi.ac.uk",#recipient,
-                  "bcc": Config.EVIDENCEVALIDATION_BCC_ACCOUNT,
-                  "subject": "Open Targets: {0} validation {1} for {2}".format(data_source_name, status, filename),
-                  "text": text,
-                  # "html": "<html>HTML version of the body</html>"
-                  },
-            )
-        try:
-            r.raise_for_status()
-            self.logger.info('Email sent to %s. Response: \n%s' % (recipient, r.text))
-        except HTTPError, e:
-            self.logger.error("Email not sent")
-            self.logger.error(e)
+        if Config.EVIDENCEVALIDATION_SEND_EMAIL:
+            r = requests.post(
+                Config.MAILGUN_MESSAGES,
+                auth=("api", Config.MAILGUN_API_KEY),
+                files=[("attachment", open(logfile,'rb'))],
+                data={"from": sender,
+                      "to": "andreap@ebi.ac.uk",#recipient,
+                      "bcc": Config.EVIDENCEVALIDATION_BCC_ACCOUNT,
+                      "subject": "Open Targets: {0} validation {1} for {2}".format(data_source_name, status, filename),
+                      "text": text,
+                      # "html": "<html>HTML version of the body</html>"
+                      },
+                )
+            try:
+                r.raise_for_status()
+                self.logger.info('Email sent to %s. Response: \n%s' % (recipient, r.text))
+            except HTTPError, e:
+                self.logger.error("Email not sent")
+                self.logger.error(e)
 
 
         return
@@ -1140,7 +1088,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
     def merge_dict_sum(self, x, y):
         # merge keys
         # x.update(y) won't work
-        for key, value in y.iteritems():
+        for key, value in y.items():
             if key in x:
                 x[key] += value
             else:
@@ -1156,10 +1104,10 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         :param ensembl_gene_id: ensembl gene identifier to check
         :return: a string indicating if the gene is mapped to a reference assembly or an alternative assembly only
         '''
-        symbol = self.ensembl_current[ensembl_gene_id]['display_name']
-        if symbol in self.symbols and 'ensembl_primary_id' in self.symbols[symbol]:
-            return self.symbols[symbol]['ensembl_primary_id'] + " " + symbol + " (reference assembly)"
-        return symbol + " (non reference assembly)"
+        if ensembl_gene_id in self.lookup_data.available_genes:
+            symbol = self.lookup_data.available_genes[ensembl_gene_id]['approved_symbol']
+            return ensembl_gene_id + " " + symbol + " (reference assembly)"
+        return ensembl_gene_id + " (non reference assembly)"
 
     def get_reference_gene_from_list(self, genes):
         '''
@@ -1169,9 +1117,9 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         identifiers passed in the input otherwise
         '''
         for ensembl_gene_id in genes:
-            if self.ensembl_current[ensembl_gene_id]['is_reference'] is True:
-                return ensembl_gene_id + " " + self.ensembl_current[ensembl_gene_id][
-                    'display_name'] + " (reference assembly)"
+            gene = self.lookup_data.available_genes[ensembl_gene_id]
+            if gene and 'is_ensembl_reference' in gene and gene['is_ensembl_reference'] is True:
+                return ensembl_gene_id + " " + gene['approved_symbol'] + " (reference assembly)"
         return ", ".join(genes) + " (non reference assembly)"
 
     def write_logs(self, lfh, audit):
@@ -1208,8 +1156,6 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
     def audit_submission(self, file_on_disk, filename, provider_id, data_source_name, md5_hash, chunk, stats, audit,
                          offset, buffer_size, end_of_transmission, logfile=None):
 
-        self.logger.debug("%s %s chunk=%i nb_lines=%i nb_valid=%i nb_errors=%i"
-                    % (self.name, md5_hash, chunk, stats["nb_lines"], stats["nb_valid"], stats["nb_errors"]))
 
         ''' check invalid disease and report it in the logs '''
         #for item in audit:
@@ -1280,12 +1226,12 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             nb_valid = reduce((lambda x, y: x + y),
                               map(lambda x: x['stats']['nb_valid'], self.registry[md5_hash]['chunks']))
 
-            for x in self.registry[md5_hash]['chunks']:
-                self.logger.debug("%s %i"%(data_source_name, x['chunk']))
-                if x['stats']['invalid_diseases'] is not None:
-                    self.logger.debug("len invalid_diseases: %i"%len(x['stats']['invalid_diseases']))
-                else:
-                    self.logger.debug('None invalid_diseases')
+            # for x in self.registry[md5_hash]['chunks']:
+            #     self.logger.debug("%s %i"%(data_source_name, x['chunk']))
+                # if x['stats']['invalid_diseases'] is not None:
+                #     self.logger.debug("len invalid_diseases: %i"%len(x['stats']['invalid_diseases']))
+                # else:
+                #     self.logger.debug('None invalid_diseases')
             invalid_diseases = reduce((lambda x, y: self.merge_dict_sum(x, y)), map(lambda x: x['stats']['invalid_diseases'].copy(),
                                                                       self.registry[md5_hash]['chunks']))
             self.logger.debug("len TOTAL invalid_diseases: %i"%len(invalid_diseases))
@@ -1319,13 +1265,10 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             '''
             Write audit logs
             '''
-            self.logger.debug("Open log file")
             lfh = open(logfile, 'wb')
             for chunk in sortedChunks:
-                self.logger.debug("%i"%chunk['chunk'])
                 self.write_logs(lfh, chunk['audit'])
             lfh.close()
-            self.logger.debug("Close log file")
 
             '''
             Count nb of documents
@@ -1372,7 +1315,6 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                         if ensemblMatch:
                             ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
                             id_text = self.get_reference_gene_from_Ensembl(ensembl_id)
-                            symbol = self.ensembl_current[ensembl_id]['display_name']
                         # elif uniprotMatch:
                         #    uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
                         #    id_text = self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"]);
@@ -1396,10 +1338,10 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                         # self.logger.info(json.dumps(result))
                         disease = top_diseases['key']
                         doc_count = top_diseases['doc_count']
-                        if top_diseases['key'] in self.efo_current:
+                        if top_diseases['key'] in self.lookup_data.available_efos:
                             text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(disease, doc_count,
                                                                            doc_count * 100.0 / nb_documents,
-                                                                           self.efo_current[disease]))
+                                                                           self.lookup_data.available_efos[disease]))
                         else:
                             text.append("\t-{0}:\t{1} ({2:.2f}%)".format(disease, doc_count, doc_count * 100.0 / nb_documents))
                     text.append("")
@@ -1425,12 +1367,12 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                     len(obsolete_diseases), nb_efo_obsolete, nb_efo_obsolete * 100 / nb_documents, '%'))
                 for disease_id in obsolete_diseases:
                     new_term = None
-                    if disease_id in self.efo_obsolete:
-                        new_term = self.efo_obsolete[disease_id]
-                    elif disease_id in self.hpo_obsolete:
-                        new_term = self.hpo_obsolete[disease_id]
-                    else:
-                        new_term = self.mp_obsolete[disease_id]
+                    if disease_id in self.lookup_data.efo_ontology.obsolete_classes:
+                        new_term = self.lookup_data.efo_ontology.obsolete_classes[disease_id]
+                    elif disease_id in self.lookup_data.hpo_ontology.obsolete_classes[disease_id]:
+                        new_term = self.lookup_data.hpo_ontology.obsolete_classes[disease_id][disease_id]
+                    elif disease_id in self.lookup_data.mp_ontology.obsolete_classes[disease_id]:
+                        new_term = self.lookup_data.mp_ontology.obsolete_classes[disease_id][disease_id]
                     if obsolete_diseases[disease_id] == 1:
                         text.append("\t%s\t(reported once)\t%s" % (
                             disease_id, new_term))
@@ -1511,11 +1453,11 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                 for uniprot_id in invalid_uniprot_id_mappings:
                     if invalid_uniprot_id_mappings[uniprot_id] == 1:
                         text.append("\t%s\t(reported once) maps to %s" % (
-                            uniprot_id, self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"])))
+                            uniprot_id, self.get_reference_gene_from_list([self.lookup_data.uni2ens[uniprot_id]])))
                     else:
                         text.append("\t%s\t(reported %i times) maps to %s" % (
                             uniprot_id, invalid_uniprot_id_mappings[uniprot_id],
-                            self.get_reference_gene_from_list(self.uniprot_current[uniprot_id]["gene_ids"])))
+                            self.get_reference_gene_from_list([self.lookup_data.uni2ens[uniprot_id]])))
                 text.append("")
 
             text = '\n'.join(text)
@@ -1550,29 +1492,27 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             '''
             Send e-mail
             '''
-            if  Config.EVIDENCEVALIDATION_SEND_EMAIL:
-
-                self.send_email(
-                        provider_id,
-                        data_source_name,
-                        filename,
-                        successfully_validated,
-                        self.registry[md5_hash]['nb_lines'],
-                        {'valid records': nb_valid,
-                         'JSON errors': nb_errors,
-                         'records with duplicates': nb_duplicates,
-                         'records with invalid EFO terms': nb_efo_invalid,
-                         'records with obsolete EFO terms': nb_efo_obsolete,
-                         'records with invalid Ensembl ids': nb_ensembl_invalid,
-                         'records with Human Alternative sequence Gene Ensembl ids (warning)': nb_ensembl_nonref,
-                         'records with invalid UniProt ids': nb_uniprot_invalid,
-                         'records with UniProt entries without x-refs to Ensembl (warning)': nb_missing_uniprot_id_xrefs,
-                         'records with UniProt ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping
-                         },
-                        now_nice,
-                        text,
-                        logfile
-                )
+            self.send_email(
+                    provider_id,
+                    data_source_name,
+                    filename,
+                    successfully_validated,
+                    self.registry[md5_hash]['nb_lines'],
+                    {'valid records': nb_valid,
+                     'JSON errors': nb_errors,
+                     'records with duplicates': nb_duplicates,
+                     'records with invalid EFO terms': nb_efo_invalid,
+                     'records with obsolete EFO terms': nb_efo_obsolete,
+                     'records with invalid Ensembl ids': nb_ensembl_invalid,
+                     'records with Human Alternative sequence Gene Ensembl ids (warning)': nb_ensembl_nonref,
+                     'records with invalid UniProt ids': nb_uniprot_invalid,
+                     'records with UniProt entries without x-refs to Ensembl (warning)': nb_missing_uniprot_id_xrefs,
+                     'records with UniProt ids not mapped to a reference assembly Ensembl gene (warning)': nb_uniprot_invalid_mapping
+                     },
+                    now_nice,
+                    text,
+                    logfile
+            )
 
             '''
             Release space
@@ -1588,32 +1528,25 @@ class EvidenceChunkElasticStorage():
         self.loader = loader
         self.logger = logging.getLogger(__name__)
 
-    def storage_create_index(self,data_source_name, recreate=False):
-        self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name, recreate = recreate)
+    @staticmethod
+    def storage_create_index(loader, data_source_name, recreate=False):
+        loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name, recreate = recreate)
 
-    def storage_add(self, id, evidence_string, data_source_name):
-
-        self.loader.put(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name,
-                        data_source_name,
-                        id,
-                        evidence_string,
-                        create_index=False)
-
-    def storage_delete(self, data_source_name):
+    @staticmethod
+    def storage_delete(loader, data_source_name):
         versioned_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)
-        if self.loader.es.indices.exists(versioned_name):
-            self.loader.es.indices.delete(versioned_name)
+        if loader.es.indices.exists(versioned_name):
+            loader.es.indices.delete(versioned_name)
 
-    def storage_flush(self):
-        self.loader.flush()
 
 class SubmissionAuditElasticStorage():
     def __init__(self, loader, chunk_size=1e3):
         self.loader = loader
         self.logger = logging.getLogger(__name__)
 
-    def storage_create_index(self, recreate=False):
-        self.loader.create_new_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME, recreate)
+    @staticmethod
+    def storage_create_index(loader, recreate=False):
+        loader.create_new_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME, recreate)
 
     def exists(self, filename=None):
         search = self.loader.es.search(
@@ -1625,35 +1558,38 @@ class SubmissionAuditElasticStorage():
         return search and search["hits"]["total"] == 1
 
     def get_submission_md5(self, md5=None):
-        search = self.loader.es.search(
-                index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
-                doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
-                body=SUBMISSION_FILTER_MD5_QUERY%md5,
-        )
+        try:
+            search = self.loader.es.search(
+                    index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
+                    doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
+                    body=SUBMISSION_FILTER_MD5_QUERY%md5,
+            )
 
-        if search and search["hits"]["total"] == 1:
-            return search["hits"]["hits"][0]
-        else:
-            return None
+            if search and search["hits"]["total"] == 1:
+                return search["hits"]["hits"][0]
+        except NotFoundError:
+            pass
+        return None
 
     def get_submission(self, filename=None):
-        search = self.loader.es.search(
-                index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
-                doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
-                body=SUBMISSION_FILTER_FILENAME_QUERY%filename,
-        )
+        try:
+            search = self.loader.es.search(
+                    index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
+                    doc_type=Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME,
+                    body=SUBMISSION_FILTER_FILENAME_QUERY%filename,
+            )
 
-        if search and search["hits"]["total"] == 1:
-            return search["hits"]["hits"][0]
-        else:
-            return None
+            if search and search["hits"]["total"] == 1:
+                return search["hits"]["hits"][0]
+        except NotFoundError:
+            pass
+        return None
 
     def storage_insert_or_update(self, submission=None, update=False):
         start_time = time.time()
 
         actions = []
         if update:
-            self.logger.debug(json.dumps(submission, indent=4))
             action = {
                 '_op_type': 'update',
                 '_index': '%s' % self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
@@ -1673,17 +1609,16 @@ class SubmissionAuditElasticStorage():
             }
             actions.append(action)
 
-        self.logger.debug(json.dumps(actions[0], indent=4))
 
-        success = helpers.bulk(self.loader.es, actions, stats_only=False)
-        self.logger.debug(json.dumps(success, indent=4))
-        if success[0] !=1:
-            # print("ERRORS REPORTED " + json.dumps(nb_errors))
-            self.logger.debug("SubmissionAuditElasticStorage: command failed:%s"%success[0])
-        else:
-            self.logger.debug('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
+        if not self.loader.dry_run:
+            success = helpers.bulk(self.loader.es, actions, stats_only=False)
+            if success[0] !=1:
+                # print("ERRORS REPORTED " + json.dumps(nb_errors))
+                self.logger.debug("SubmissionAuditElasticStorage: command failed:%s"%success[0])
+            else:
+                self.logger.debug('SubmissionAuditElasticStorage: insertion took %ss' % (str(time.time() - start_time)))
 
-        self.loader.es.indices.flush(index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME))
+            self.loader.es.indices.flush(index=self.loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME))
 
         return
 
@@ -1693,43 +1628,18 @@ class SubmissionAuditElasticStorage():
 
 class EvidenceValidationFileChecker():
     def __init__(self,
-                 adapter,
                  es,
                  r_server,
                  chunk_size=1e4,
+                 dry_run = False,
                  ):
-        self.adapter = adapter
-        self.session = adapter.session
         self.es = es
-        self.esquery = ESQuery(self.es)
+        self.esquery = ESQuery(self.es, dry_run = dry_run)
+        self.dry_run = dry_run
         self.r_server = r_server
         self.chunk_size = chunk_size
         self.cache = {}
         self.counter = 0
-        # formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        # self.buffer = StringIO()
-        # streamhandler = logging.StreamHandler(self.buffer)
-        # streamhandler.setFormatter(formatter)
-        # memoryhandler = logging.handlers.MemoryHandler(1024*10, logging.DEBUG, streamhandler)
-        # LOGGER = logging.getLogger('opentargets.model.core')
-        # LOGGER.setLevel(logging.ERROR)
-        # LOGGER.addHandler(memoryhandler)
-        # LOGGER = logging.getLogger('opentargets.model.evidence.core')
-        # LOGGER.setLevel(logging.ERROR)
-        # LOGGER.addHandler(memoryhandler)
-        # LOGGER = logging.getLogger('opentargets.model.evidence.association_score')
-        # LOGGER.setLevel(logging.ERROR)
-        # LOGGER.addHandler(memoryhandler)
-
-        self.uniprot_current = {}
-        self.efo_current = {}
-        self.efo_obsolete = {}
-        self.efo_uncat = []
-        self.hpo_ontology = None
-        self.mp_ontology = None
-        self.ensembl_current = {}
-        self.hgnc_current = {}
-        self.eco_current = {}
         self.symbols = {}
         self.logger = logging.getLogger(__name__)
 
@@ -1780,280 +1690,8 @@ class EvidenceValidationFileChecker():
 
         return self.buffer.getvalue()
 
-    def load_HGNC(self):
-        '''
-        Load HGNC information from the last version in database
-        :return: None
-        '''
-        self.logger.debug("Loading HGNC entries and mapping from Ensembl Gene Id to UniProt")
-        c = 0
-        for row in self.session.query(HgncInfoLookup).order_by(desc(HgncInfoLookup.last_updated)).limit(1):
-            # data = json.loads(row.data);
-            for doc in row.data["response"]["docs"]:
-                gene_symbol = None;
-                ensembl_gene_id = None;
-                if "symbol" in doc:
-                    gene_symbol = doc["symbol"];
-                    if gene_symbol not in self.symbols:
-                        self.logger.debug("Adding missing symbol from Ensembl %s" % gene_symbol)
-                        self.symbols[gene_symbol] = {};
 
-                    self.symbols[gene_symbol]["hgnc_id"] = doc["hgnc_id"]
-                    self.hgnc_current = doc
-
-                if "ensembl_gene_id" in doc:
-                    ensembl_gene_id = doc["ensembl_gene_id"];
-
-                if "uniprot_ids" in doc:
-                    if "uniprot_ids" not in self.symbols[gene_symbol]:
-                        self.symbols[gene_symbol]["uniprot_ids"] = [];
-                    for uniprot_id in doc["uniprot_ids"]:
-                        if uniprot_id in self.uniprot_current and ensembl_gene_id is not None and ensembl_gene_id in self.ensembl_current:
-                            # print uniprot_id, " ", ensembl_gene_id, "\n"
-                            if "gene_ids" not in self.uniprot_current[uniprot_id]:
-                                self.uniprot_current[uniprot_id]["gene_ids"] = [ensembl_gene_id];
-                            elif ensembl_gene_id not in self.uniprot_current[uniprot_id]["gene_ids"]:
-                                self.uniprot_current[uniprot_id]["gene_ids"].append(ensembl_gene_id);
-
-                        if uniprot_id not in self.symbols[gene_symbol]["uniprot_ids"]:
-                            self.symbols[gene_symbol]["uniprot_ids"].append(uniprot_id)
-
-        self.logger.debug("%i entries parsed for HGNC" % len(row.data["response"]["docs"]))
-
-    def load_Uniprot(self):
-        self.logger.debug("Loading Uniprot identifiers and mappings to Gene Symbol and Ensembl Gene Id")
-        c = 0
-        for row in self.session.query(UniprotInfo).yield_per(1000):
-            # get the symbol too
-            uniprot_accession = row.uniprot_accession
-            self.uniprot_current[uniprot_accession] = {};
-            root = ElementTree.fromstring(row.uniprot_entry)
-            protein_name = None
-            for name in root.findall("./ns0:name", {'ns0': 'http://uniprot.org/uniprot'}):
-                protein_name = name.text
-                break;
-            gene_symbol = None
-            for gene_name_el in root.findall(".//ns0:gene/ns0:name[@type='primary']",
-                                             {'ns0': 'http://uniprot.org/uniprot'}):
-                gene_symbol = gene_name_el.text
-                break;
-
-            if gene_symbol is not None:
-                # some protein have to be remapped to another symbol
-                # PLSCR3 => TMEM256-PLSCR3
-                # LPPR4 => PLPPR4
-                # Q9Y328 => NSG2 => Nsg2 => HMP19 (in Human)
-                #
-                if gene_symbol == 'PLSCR3':
-                    gene_symbol = 'TMEM256-PLSCR3';
-                    self.logger.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
-                elif gene_symbol == 'LPPR4':
-                    gene_symbol = 'PLPPR4';
-                    self.logger.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
-                elif gene_symbol == 'NSG2':
-                    gene_symbol = 'HMP19';
-                    self.logger.debug("Mapping protein entry to correct symbol %s" % gene_symbol)
-
-                self.uniprot_current[uniprot_accession]["gene_symbol"] = gene_symbol;
-
-                if gene_symbol not in self.symbols:
-                    self.symbols[gene_symbol] = {};
-                if "uniprot_ids" not in self.symbols[gene_symbol]:
-                    self.symbols[gene_symbol]["uniprot_ids"] = [uniprot_accession]
-                elif uniprot_accession not in self.symbols[gene_symbol]["uniprot_ids"]:
-                    self.symbols[gene_symbol]["uniprot_ids"].append(uniprot_accession)
-
-            gene_id = None
-            for crossref in root.findall(".//ns0:dbReference[@type='Ensembl']/ns0:property[@type='gene ID']",
-                                         {'ns0': 'http://uniprot.org/uniprot'}):
-                ensembl_gene_id = crossref.get("value")
-                if ensembl_gene_id in self.ensembl_current:
-                    # print uniprot_accession, " ", ensembl_gene_id, "\n"
-                    if "gene_ids" not in self.uniprot_current[uniprot_accession]:
-                        self.uniprot_current[uniprot_accession]["gene_ids"] = [ensembl_gene_id];
-                    elif ensembl_gene_id not in self.uniprot_current[uniprot_accession]["gene_ids"]:
-                        self.uniprot_current[uniprot_accession]["gene_ids"].append(ensembl_gene_id)
-
-            # create a mapping from the symbol instead to link to Ensembl
-            if "gene_ids" not in self.uniprot_current[uniprot_accession]:
-                if gene_symbol and gene_symbol in self.symbols:
-                    if ("ensembl_primary_id" in self.symbols[gene_symbol] and
-                            ("gene_ids" not in self.uniprot_current[uniprot_accession] or
-                                     self.symbols[gene_symbol]["ensembl_primary_id"] not in
-                                     self.uniprot_current[uniprot_accession]["gene_ids"]
-                             )
-                        ):
-                        self.uniprot_current[uniprot_accession]["gene_ids"] = [
-                            self.symbols[gene_symbol]["ensembl_primary_id"]];
-                    elif ("ensembl_secondary_id" in self.symbols[gene_symbol] and
-                              ("gene_ids" not in self.uniprot_current[uniprot_accession] or
-                                       self.symbols[gene_symbol]["ensembl_secondary_id"] not in
-                                       self.uniprot_current[uniprot_accession]["gene_ids"]
-                               )
-                          ):
-                        self.uniprot_current[uniprot_accession]["gene_ids"] = [
-                            self.symbols[gene_symbol]["ensembl_secondary_id"]];
-
-            # seqrec = UniprotIterator(StringIO(row.uniprot_entry), 'uniprot-xml').next()
-            c += 1
-            if c % 5000 == 0:
-                self.logger.debug("%i entries retrieved for uniprot" % c)
-                # for accession in seqrec.annotations['accessions']:
-                #    self.uniprot_current.append(accession)
-        self.logger.debug("%i entries retrieved for uniprot" % c)
-
-    def load_Ensembl(self):
-
-        self.logger.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
-            Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-
-        for row in self.esquery.get_all_ensembl_genes():
-            self.ensembl_current[row["id"]] = row
-            # put the ensembl_id in symbols too
-            display_name = row["display_name"]
-            if display_name not in self.symbols:
-                self.symbols[display_name] = {}
-                self.symbols[display_name]["assembly_name"] = row["assembly_name"]
-                self.symbols[display_name]["ensembl_release"] = row["ensembl_release"]
-            if row["is_reference"]:
-                self.symbols[display_name]["ensembl_primary_id"] = row["id"]
-            else:
-                if "ensembl_secondary_id" not in self.symbols[display_name] or row["id"] < \
-                        self.symbols[display_name]["ensembl_secondary_id"]:
-                    self.symbols[display_name]["ensembl_secondary_id"] = row["id"];
-                if "ensembl_secondary_ids" not in self.symbols[display_name]:
-                    self.symbols[display_name]["ensembl_secondary_ids"] = []
-                self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
-
-        self.logger.debug("Loading ES Ensembl finished")
-
-
-    def store_gene_mapping(self):
-        '''
-            Stores the relation between UniProt, Ensembl, HGNC and the gene symbols
-            in one table called gene_mapping_lookup.
-            It's a snapshot of the UniProt, Ensembl and HGNC information at a given time
-        '''
-        self.logger.debug("Stitching everything together")
-        data = {'symbols': self.symbols, 'uniprot': self.uniprot_current, 'ensembl': self.ensembl_current}
-
-        now = datetime.utcnow()
-        today = datetime.strptime("{:%Y-%m-%d}".format(datetime.now()), '%Y-%m-%d')
-        # Truncate table
-        self.session.query(GeneMappingLookup).delete()
-        hr = GeneMappingLookup(
-                last_updated=today,
-                data=data
-        )
-        self.session.add(hr)
-        self.session.commit()
-        self.logger.debug(
-            "inserted gene mapping information in JSONB format in the gene_mapping_lookup table at {:%d, %b %Y}".format(
-                today))
-
-    def load_gene_mapping(self):
-        '''
-            Loads the relation between UniProt, Ensembl, HGNC and the gene symbols
-            from one table called gene_mapping_lookup.
-        '''
-
-        self.logger.debug("Loading mapping between Ensembl, UniProt, HGNC and gene symbols")
-        for row in self.session.query(GeneMappingLookup).order_by(desc(GeneMappingLookup.last_updated)).limit(1):
-            data = row.data
-            self.symbols = data['symbols']
-            self.uniprot_current = data['uniprot']
-            #self.logger.info("Uniprot dictionary contains {0} entries".format(len(self.uniprot_current.keys())))
-            #self.logger.info(json.dumps(self.uniprot_current.keys()))
-            self.ensembl_current = data['ensembl']
-
-    def load_eco(self):
-
-        self.logger.debug("Loading ECO current valid terms")
-        for row in self.session.query(ECONames):
-            self.eco_current[row.uri] = row.label
-
-    def load_hpo(self):
-        '''
-        Load HPO to accept phenotype terms that are not in EFO
-        :return:
-        '''
-        self.hpo_ontology = OntologyClassReader()
-        self.hpo_ontology.load_hpo_classes()
-
-    def load_mp(self):
-        '''
-        Load MP to accept phenotype terms that are not in EFO
-        :return:
-        '''
-        self.mp_ontology = OntologyClassReader()
-        self.mp_ontology.load_mp_classes()
-
-    def load_efo(self):
-        # Change this in favor of paths
-        self.logger.info("Loading EFO current terms")
-        efo_pattern = "http://www.ebi.ac.uk/efo/EFO_%"
-        orphanet_pattern = "http://www.orpha.net/ORDO/Orphanet_%"
-        hpo_pattern = "http://purl.obolibrary.org/obo/HP_%"
-        mp_pattern = "http://purl.obolibrary.org/obo/MP_%"
-        do_pattern = "http://purl.obolibrary.org/obo/DOID_%"
-        go_pattern = "http://purl.obolibrary.org/obo/GO_%"
-        omim_pattern = "http://purl.bioontology.org/omim/OMIM_%"
-
-        '''
-        Temp: store the uncharactered diseases to filter them
-        https://alpha.targetvalidation.org/disease/genetic_disorder_uncategorized
-        '''
-        for row in self.session.query(EFOPath):
-            if any(map(lambda x: x["uri"] == 'http://www.targetvalidation.org/genetic_disorder_uncategorized',
-                       row.tree_path)):
-                self.efo_uncat.append(row.uri);
-
-        for row in self.session.query(EFONames).filter(
-                or_(
-                        EFONames.uri.like(efo_pattern),
-                        EFONames.uri.like(mp_pattern),
-                        EFONames.uri.like(orphanet_pattern),
-                        EFONames.uri.like(hpo_pattern),
-                        EFONames.uri.like(do_pattern),
-                        EFONames.uri.like(go_pattern),
-                        EFONames.uri.like(omim_pattern)
-                )
-        ):
-            #self.logger.info(row.uri)
-            # if row.uri not in uncat:
-            self.efo_current[row.uri] = row.label
-        # self.logger.info(len(self.efo_current))
-        # self.logger.info("Loading EFO obsolete terms")
-        for row in self.session.query(EFOObsoleteClass):
-            #print "obsolete %s"%(row.uri)
-            self.efo_obsolete[row.uri] = row.reason
-
-    def get_reference_gene_from_Ensembl(self, ensembl_gene_id):
-        '''
-        Given an ensembl gene id return the corresponding reference assembly gene id if it exists.
-        It get the gene external name and get the corresponding primary assembly gene id.
-        :param self:
-        :param ensembl_gene_id: ensembl gene identifier to check
-        :return: a string indicating if the gene is mapped to a reference assembly or an alternative assembly only
-        '''
-        symbol = self.ensembl_current[ensembl_gene_id]['display_name']
-        if symbol in self.symbols and 'ensembl_primary_id' in self.symbols[symbol]:
-            return self.symbols[symbol]['ensembl_primary_id'] + " " + symbol + " (reference assembly)"
-        return symbol + " (non reference assembly)"
-
-    def map_genes(self):
-        '''
-            This is the preamble step of the pipeline
-            It's loading all the Ensembl, UniProt, HGNC and symbol information
-            and will store it in the back-end to be shared and used by the validation
-            workers
-        '''
-        self.load_Ensembl()
-        self.load_Uniprot()
-        self.load_HGNC()
-        self.store_gene_mapping()
-
-    def check_all(self, local_files = []):
+    def check_all(self, local_files = [], dry_run = False):
         '''
         Check every given evidence string
         :return:
@@ -2061,32 +1699,22 @@ class EvidenceValidationFileChecker():
 
         #self.load_mp()
         #return;
+        dry_run = dry_run or self.dry_run
 
-
-        progress = tqdm(desc='loading lookup data',
-                        unit=' step',
-                        total=5,
-                        dynamic_ncols=True,
-                        leave=False,
-                        )
-
-        self.load_gene_mapping()
-        progress.update()
-        self.load_efo()
-        progress.update()
-        self.load_hpo()
-        progress.update()
-        self.load_mp()
-        progress.update()
-        self.load_eco()
-        progress.update()
-        self.adapter.close()
-        progress.close()
+        lookup_data = LookUpDataRetriever(self.es,
+                                          self.r_server,
+                                          data_types=(LookUpDataType.TARGET,
+                                                      LookUpDataType.DISEASE,
+                                                      LookUpDataType.ECO,
+                                                      LookUpDataType.HPO,
+                                                      LookUpDataType.MP,
+                                                     ),
+                                          ).lookup
 
         'Create queues'
         file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
                             max_size=NB_JSON_FILES,
-                            job_timeout=120)
+                            job_timeout=12000)
         evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_evidence_q',
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
                             job_timeout=120)
@@ -2098,7 +1726,7 @@ class EvidenceValidationFileChecker():
                                                evidence_q,
                                                audit_q
                                                ],
-                                              interval=10)
+                                              interval=30)
         q_reporter.start()
 
 
@@ -2127,34 +1755,20 @@ class EvidenceValidationFileChecker():
                                        self.r_server.db,
                                        audit_q,
                                        self.es,
-                                       self.efo_current,
-                                       self.efo_uncat,
-                                       self.efo_obsolete,
-                                       self.hpo_ontology.current_classes,
-                                       self.hpo_ontology.obsolete_classes,
-                                       self.mp_ontology.current_classes,
-                                       self.mp_ontology.obsolete_classes,
-                                       self.uniprot_current,
-                                       self.ensembl_current,
+                                       lookup_data = lookup_data,
+                                       dry_run=dry_run,
                                        ) for i in range(workers_number)]
-        # ) for i in range(2)]
+                                        # ) for i in range(1)]
         for w in validators:
             w.start()
 
         'Audit the whole process and send e-mails'
         auditor = AuditTrailProcess(
-                audit_q,
-                self.r_server.db,
-                self.es,
-                self.ensembl_current,
-                self.uniprot_current,
-                self.symbols,
-                self.efo_current,
-                self.efo_obsolete,
-                self.hpo_ontology.current_classes,
-                self.hpo_ontology.obsolete_classes,
-                self.mp_ontology.current_classes,
-                self.mp_ontology.obsolete_classes
+            audit_q,
+            self.r_server.db,
+            self.es,
+            lookup_data=lookup_data,
+            dry_run=dry_run,
             )
 
         auditor.start()
@@ -2165,7 +1779,9 @@ class EvidenceValidationFileChecker():
                 file_q,
                 self.es,
                 self.r_server,
-                local_files)
+                local_files,
+                dry_run=dry_run,
+        )
 
         directory_crawler.run()
 
@@ -2178,10 +1794,12 @@ class EvidenceValidationFileChecker():
 
         auditor.join()
 
-        self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
-                              wait_if_ongoing=True)
-        self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'),
-                              wait_if_ongoing=True)
+        if not dry_run:
+
+            self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
+                                  wait_if_ongoing=True)
+            self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'),
+                                  wait_if_ongoing=True)
         return
 
     def reset(self):

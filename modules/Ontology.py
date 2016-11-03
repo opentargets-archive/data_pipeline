@@ -26,6 +26,9 @@ limitations under the License.
 
 import re
 import sys
+
+from rdflib import BNode
+
 reload(sys);
 sys.setdefaultencoding("utf8");
 import os
@@ -36,14 +39,11 @@ import opentargets.model.core as opentargets
 import logging
 import json
 import rdflib
-from rdflib import URIRef
-from rdflib import Namespace
-from rdflib.namespace import OWL, RDF, RDFS
+from rdflib.namespace import RDFS
 from common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
-from settings import Config
 from tqdm import tqdm
-from datetime import datetime, date
+from datetime import date
 from settings import Config
 
 __author__ = "Gautier Koscielny"
@@ -244,8 +244,8 @@ class OntologyClassReader():
             label = str(row[1])
             self.current_classes[uri] = label
             count +=1
-            logger.info("RDFLIB '%s' '%s'" % (uri, label))
-        logger.debug("%i"%count)
+            # logger.debug("RDFLIB '%s' '%s'" % (uri, label))
+        logger.debug("parsed %i classes"%count)
 
         sparql_query = '''
         SELECT DISTINCT ?ont_node ?label ?id ?ont_new
@@ -268,7 +268,7 @@ class OntologyClassReader():
             # point to the new URI
             obsoletes[uri] = { 'label': label, 'new_uri' : new_uri }
             count +=1
-            logger.info("Obsolete %s '%s' %s" % (uri, label, new_uri))
+            logger.debug("WARNING: Obsolete %s '%s' %s" % (uri, label, new_uri))
         """
         Still need to loop over to find the next new class to replace the
         old URI with the latest URI (some intermediate classes can be obsolete too)
@@ -279,7 +279,7 @@ class OntologyClassReader():
             while next_uri in obsoletes.keys():
                 next_uri = obsoletes[next_uri]['new_uri']
             new_label = self.current_classes[next_uri]
-            logger.warn("%s => %s" % (old_uri, obsoletes[old_uri]))
+            logger.debug("WARNING %s => %s" % (old_uri, obsoletes[old_uri]))
             self.obsolete_classes[old_uri] = "Use %s label:%s" % (next_uri, new_label)
 
         return
@@ -301,6 +301,7 @@ class OntologyClassReader():
         self.load_ontology_classes(base_class=base_class)
 
         #self.get_ontology_top_levels(base_class, top_level_map=self.phenotype_top_levels)
+
 
 class DiseasePhenotypes():
 
