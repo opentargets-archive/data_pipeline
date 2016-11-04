@@ -1021,6 +1021,8 @@ class EvidenceStringProcess():
                                 recreate=overwrite_indices)
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
+        if datasources:
+            self.es_query.delete_evidence_for_datasources(datasources)
 
 
         '''create queues'''
@@ -1100,7 +1102,7 @@ class EvidenceStringProcess():
                 w.terminate()
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
 
-        loader.closer()
+        loader.close()
         logger.info('flushing data to index')
         self.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
                               wait_if_ongoing=True)
