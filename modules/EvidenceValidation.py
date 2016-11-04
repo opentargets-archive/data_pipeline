@@ -281,7 +281,6 @@ class DirectoryCrawlerProcess():
                             user = user.split('_')[0]
                         else:
                             datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
-                        release_date = date(int(year), int(month), int(day))
                         EvidenceChunkElasticStorage.storage_delete(self.loader, datasource )
                         EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
                         try:

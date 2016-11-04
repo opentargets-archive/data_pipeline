@@ -19,7 +19,7 @@ from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
-from modules.Literature import LiteratureActions, Literature
+from modules.Literature import LiteratureActions, LiteratureProcess
 from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
 from modules.Association import AssociationActions, ScoringProcess
@@ -248,6 +248,10 @@ if __name__ == '__main__':
     parser.add_argument("--do-nothing", dest='do_nothing',
                         help="to be used just for test",
                         action='store_true', default=False)
+    parser.add_argument("--inject-literature", dest='inject_literature',
+                        help="inject literature data in the evidence-string, default set to False",
+                        action='store_true', default=False)
+
     args = parser.parse_args()
 
     targets = args.targets
@@ -331,9 +335,9 @@ if __name__ == '__main__':
         if args.lit or run_full_pipeline:
             do_all = (LiteratureActions.ALL in args.lit) or run_full_pipeline
             if (LiteratureActions.FETCH in args.lit) or do_all:
-                Literature(connectors.es, loader).fetch()
+                LiteratureProcess(connectors.es, loader).fetch()
             if (LiteratureActions.PROCESS in args.lit) or do_all:
-                Literature(connectors.es, loader, connectors.r_server).process()
+                LiteratureProcess(connectors.es, loader, connectors.r_server).process(dry_run=args.dry_run)
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
@@ -354,7 +358,7 @@ if __name__ == '__main__':
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
                 targets = EvidenceStringProcess(connectors.es, connectors.r_server).process_all(datasources = args.datasource,
-                                                                          dry_run=args.dry_run)
+                                                                          dry_run=args.dry_run,inject_literature=args.inject_literature)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:
@@ -367,7 +371,7 @@ if __name__ == '__main__':
         if args.sea or run_full_pipeline:
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
-                SearchObjectProcess(connectors.adapter, loader, connectors.r_server).process_all()
+                SearchObjectProcess(loader, connectors.r_server).process_all()
         if args.qc or run_full_pipeline:
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:

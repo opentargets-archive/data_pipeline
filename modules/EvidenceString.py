@@ -17,7 +17,7 @@ from modules import GeneData
 from modules.ECO import ECO
 from modules.EFO import EFO, get_ontology_code_from_url
 from modules.GeneData import Gene
-from modules.Literature import Literature
+from modules.Literature import Publication, PublicationFetcher
 from settings import Config
 
 logger = logging.getLogger(__name__)
@@ -181,18 +181,25 @@ class ExtendedInfoECO(ExtendedInfo):
 class ExtendedInfoLiterature(ExtendedInfo):
     root = "literature"
 
-    def __init__(self, literature):
-        if isinstance(literature, Literature):
-            self.extract_info(literature)
+    def __init__(self, literature,analyzed_literature):
+        if isinstance(literature, Publication):
+            self.extract_info(literature,analyzed_literature)
         else:
-            raise AttributeError("you need to pass a Literature not a: " + str(type(literature)))
+            raise AttributeError("you need to pass a Publication not a: " + str(type(literature)))
 
-    def extract_info(self, literature):
+    def extract_info(self, literature, analyzed_literature):
 
         self.data = dict( abstract = literature.abstract,
                           journal=literature.journal,
                           year=literature.year,
-                          abstract_lemmas=literature.abstract_lemmas)
+                          title=literature.title,
+                          doi=literature.doi,
+                          pub_type=literature.pub_type,
+                          mesh_headings=literature.mesh_headings,
+                          chemicals=literature.chemicals,
+                          abstract_lemmas=analyzed_literature.lemmas,
+                          noun_chunks=analyzed_literature.noun_chunks)
+
 
 class ProcessedEvidenceStorer():
     def __init__(self,  es_loader, chunk_size=1e4, quiet = False):
@@ -215,11 +222,6 @@ class ProcessedEvidenceStorer():
                            create_index = False,
                            routing = ev.evidence['target']['id'])
 
-
-
-
-
-
     def close(self):
         pass
 
@@ -232,11 +234,10 @@ class ProcessedEvidenceStorer():
 
 
 class EvidenceManager():
-    def __init__(self, lookup_data,):
+    def __init__(self, lookup_data):
         self.available_genes = lookup_data.available_genes
         self.available_efos =  lookup_data.available_efos
         self.available_ecos =  lookup_data.available_ecos
-        self.available_publications = lookup_data.available_publications
         self.uni2ens =  lookup_data.uni2ens
         self.non_reference_genes =  lookup_data.non_reference_genes
         self._get_eco_scoring_values()
@@ -247,6 +248,8 @@ class EvidenceManager():
         # self.efo_retriever = EFOLookUpTable(self.es)
         # self.eco_retriever = ECOLookUpTable(self.es)
         self._get_score_modifiers()
+
+
         # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
 
 
@@ -435,7 +438,7 @@ class EvidenceManager():
 
         return True
 
-    def get_extended_evidence(self, evidence):
+    def get_extended_evidence(self, evidence, process_name,pub_fetcher,inject_literature):
 
         extended_evidence = copy.copy(evidence.evidence)
         extended_evidence['private'] = dict()
@@ -523,16 +526,16 @@ class EvidenceManager():
             extended_evidence['evidence'][ExtendedInfoECO.root] = data
 
         ''' Add literature data '''
-        pmid_url = extended_evidence['literature']['references'][0]['lit_id']
-        pmid = pmid_url.split('/')[-1]
-        literature = self._get_literature_obj(pmid)
-        #TODO: check introduced for testing!!!
-        if literature.abstract:
+        if inject_literature:
 
-            literature_info = ExtendedInfoLiterature(literature)
+            pmid_url = extended_evidence['literature']['references'][0]['lit_id']
+            pmid = pmid_url.split('/')[-1]
+            pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
+            literature_info = ExtendedInfoLiterature(pubs[pmid][0],pubs[pmid][1])
             extended_evidence['literature']['year'] = literature_info.data['year']
             extended_evidence['literature']['abstract'] = literature_info.data['abstract']
-            extended_evidence['literature']['journal'] = literature_info.data['journal']
+            extended_evidence['literature']['journal_data'] = literature_info.data['journal']
+            extended_evidence['literature']['title'] = literature_info.data['title']
 
 
 
@@ -551,8 +554,17 @@ class EvidenceManager():
             GO_terms['molecular_function'] or \
             GO_terms['cellular_component'] :
             extended_evidence['private']['facets']['go'] = GO_terms
-        if literature.abstract:
-            extended_evidence['private']['facets']['abstract_lemmas'] = literature_info.data['abstract_lemmas']
+
+        if inject_literature:
+
+            extended_evidence['private']['facets']['literature'] = {}
+            extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data['abstract_lemmas']
+            extended_evidence['private']['facets']['literature']['doi'] = literature_info.data['doi']
+            extended_evidence['private']['facets']['literature']['pub_type'] = literature_info.data['pub_type']
+            extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data['mesh_headings']
+            extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data['chemicals']
+            extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data['noun_chunks']
+
 
         return Evidence(extended_evidence)
 
@@ -573,17 +585,6 @@ class EvidenceManager():
         eco = ECO(ecoid)
         eco.load_json(self.available_ecos[ecoid])
         return eco
-
-    def _get_literature_obj(self, pmid):
-
-        literature = Literature(pmid)
-
-        available_pub = self.available_publications[pmid]
-        #TODO : check For testing
-        if(available_pub):
-            literature.load_json(available_pub)
-        return literature
-
 
     def _get_non_reference_gene_mappings(self):
         self.non_reference_genes = {}
@@ -859,7 +860,8 @@ class EvidenceProcesser(multiprocessing.Process):
                  output_computed_count,
                  processing_errors_count,
                  input_processed_count,
-                 lock):
+                 lock,
+                 inject_literature):
         super(EvidenceProcesser, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
@@ -873,11 +875,18 @@ class EvidenceProcesser(multiprocessing.Process):
         self.input_processed_count = input_processed_count
         self.start_time = time.time()#reset timer start
         self.lock = lock
+        self.inject_literature = inject_literature
+        es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        self.pub_fetcher = PublicationFetcher(es)
+
+
 
 
 
     def run(self):
         logger.info("%s started"%self.name)
+        #TODO : for testing
+        process_name = self.name
         self.data_processing_started = False
         while not ((self.input_generated_count.value == self.input_processed_count.value) and self.input_loading_finished.is_set()):
             data = self.input_q.get()
@@ -892,7 +901,8 @@ class EvidenceProcesser(multiprocessing.Process):
                         '''add scoring to evidence string'''
                         fixed_ev.score_evidence(self.evidence_manager.score_modifiers)
                         '''extend data in evidencestring'''
-                        ev_string_to_load = self.evidence_manager.get_extended_evidence(ev)
+
+                        ev_string_to_load = self.evidence_manager.get_extended_evidence(ev,process_name,self.pub_fetcher,self.inject_literature)
                         # logger.info('%s processed'%idev)
                     else:
                         # traceback.print_exc(limit=1, file=sys.stdout)
@@ -904,6 +914,10 @@ class EvidenceProcesser(multiprocessing.Process):
                         self.output_computed_count.value +=1
 
                 except Exception, error:
+                    if error:
+                        logger.info(str(error))
+                    else:
+                        logger.info(Exception.message)
                     with self.lock:
                         self.processing_errors_count.value +=1
                     # UploadError(ev, error, idev).save()
@@ -988,17 +1002,18 @@ class EvidenceStringProcess():
         self.es_query = ESQuery(es)
         self.r_server = r_server
 
-    def process_all(self, datasources = [], dry_run = False):
+    def process_all(self, datasources = [], dry_run = False , inject_literature = False):
         self._process_evidence_string_data(datasources= datasources,
-                                           dry_run = dry_run )
+                                           dry_run = dry_run ,
+                                           inject_literature= inject_literature)
+
 
 
 
     def _process_evidence_string_data(self,
                                       datasources = [],
-                                      dry_run = False):
-
-
+                                      dry_run = False,
+                                      inject_literature = False):
         base_id = 0
         err = 0
         fix = 0
@@ -1056,7 +1071,8 @@ class EvidenceStringProcess():
                                      output_computed_count,
                                      processing_errors_count,
                                      input_processed_count,
-                                     data_processing_lock
+                                     data_processing_lock,
+                                     inject_literature
                                      ) for i in range(workers_number)]
                                   # ) for i in range(2)]
         for w in scorers:

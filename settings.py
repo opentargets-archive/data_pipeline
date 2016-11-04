@@ -12,6 +12,16 @@ iniparser.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'db.ini'
 
 class Config():
 
+    HAS_PROXY = iniparser.has_section('proxy')
+    if HAS_PROXY:
+        PROXY = iniparser.get('proxy', 'protocol') + "://" + iniparser.get('proxy', 'username') + ":" + iniparser.get(
+            'proxy', 'password') + "@" + iniparser.get('proxy', 'host') + ":" + iniparser.get('proxy', 'port')
+        PROXY_PROTOCOL = iniparser.get('proxy', 'protocol')
+        PROXY_USERNAME = iniparser.get('proxy', 'username')
+        PROXY_PASSWORD = iniparser.get('proxy', 'password')
+        PROXY_HOST = iniparser.get('proxy', 'host')
+        PROXY_PORT = int(iniparser.get('proxy', 'port'))
+
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
@@ -98,6 +108,11 @@ class Config():
         '6239':'worm',
         '4932':'yeast'
     }
+
+    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
+    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
+    CHEMBL_DRUG_SYNONYMS = '''https://www.ebi.ac.uk/chembl/api/data/molecule/{}.json'''
+
     HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
@@ -169,6 +184,11 @@ class Config():
 
     # put the path to the file where you want to write the SLIM file (turtle format)
     ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
+
+    CHEMBL_URIS = dict(
+        protein_class='https://www.ebi.ac.uk/chembl/api/data/protein_class',
+        target_component='https://www.ebi.ac.uk/chembl/api/data/target_component',
+    )
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5

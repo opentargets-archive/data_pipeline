@@ -37,8 +37,13 @@ __maintainer__ = "Gautier Koscielny"
 __email__ = "gautierk@opentargets.org"
 __status__ = "Production"
 
-fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
-logger = logging.getLogger()
+from logging.config import fileConfig
+
+try:
+    fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
+except:
+    pass
+logger = logging.getLogger(__name__)
 
 def setup_module(module):
     logger.info("Setting up the ontology tests")
@@ -85,6 +90,15 @@ def test_load_hpo_classes():
         logger.info("%s => %s "%(k, v))
         assert obj.obsolete_classes[k] == v
 
+    # check the top_level classes
+    logger.info(len(obj.top_level_classes))
+    assert len(obj.top_level_classes) > 0
+    assert 'http://purl.obolibrary.org/obo/HP_0001871' in obj.top_level_classes
+    assert 'http://purl.obolibrary.org/obo/HP_0003549' in obj.top_level_classes
+    assert 'http://purl.obolibrary.org/obo/HP_0000152' in obj.top_level_classes
+    assert 'http://purl.obolibrary.org/obo/HP_0040064' in obj.top_level_classes
+
+
 @with_setup(my_setup_function, my_teardown_function)
 def test_load_mp_classes():
 
@@ -104,6 +118,27 @@ def test_load_mp_classes():
     for k,v in obj.obsolete_classes.iteritems():
         logger.info("%s => %s "%(k, v))
         assert obj.obsolete_classes[k] == v
+
+@with_setup(my_setup_function, my_teardown_function)
+def test_load_efo_classes():
+
+    obj = OntologyClassReader()
+    assert not obj == None
+    obj.load_efo_classes()
+
+    logger.info(len(obj.current_classes))
+
+    assert obj.current_classes["http://www.ebi.ac.uk/efo/EFO_0000408"] == "disease"
+    assert obj.current_classes["http://www.ebi.ac.uk/efo/EFO_0000651"] == "phenotype"
+    assert obj.current_classes["http://www.ebi.ac.uk/efo/EFO_0001444"] == "measurement"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/GO_0008150"] == "biological process"
+
+    # Display obsolete terms
+    logger.info(len(obj.obsolete_classes))
+    for k,v in obj.obsolete_classes.iteritems():
+        logger.info("%s => %s "%(k, v))
+        assert obj.obsolete_classes[k] == v
+
 
 @with_setup(my_setup_function, my_teardown_function)
 def test_get_disease_phenotypes():

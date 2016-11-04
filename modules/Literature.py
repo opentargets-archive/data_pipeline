@@ -16,13 +16,21 @@ from tqdm import tqdm
 
 from common import Actions
 from common.DataStructure import JSONSerializable
+from elasticsearch import Elasticsearch
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 import multiprocessing
 from settings import Config
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
 
+import pubmed_parser as pp
+import json
+import simplejson
+from itertools import chain
+
 import time
+from lxml import etree
+
 
 MAX_PUBLICATION_CHUNKS =1000
 
@@ -84,19 +92,22 @@ class PublicationFetcher(object):
         '''get from elasticsearch cache'''
         logging.info( "getting pub id {}".format( pub_ids))
         pubs ={}
-        for pub_source in self.es_query.get_publications_by_id(pub_ids):
-            logging.info( 'got pub %s from cache'%pub_source['pub_id'])
-            pub = Publication()
-            pub.load_json(pub_source)
-            pubs[pub.pub_id] = pub
-        if len(pubs)<pub_ids:
-            for pub_id in pub_ids:
-                if pub_id not in pubs:
-                    logging.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
-                    r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
-                    r.raise_for_status()
-                    result = r.json()['resultList']['result'][0]
-                    pub = Publication(pub_id=pub_id,
+        try:
+
+            for pub_source in self.es_query.get_publications_by_id(pub_ids):
+                logging.info( 'got pub %s from cache'%pub_source['pub_id'])
+                pub = Publication()
+                pub.load_json(pub_source)
+                pubs[pub.pub_id] = pub
+            if len(pubs)<pub_ids:
+                for pub_id in pub_ids:
+                    if pub_id not in pubs:
+                        logging.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
+                        r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
+                        r.raise_for_status()
+                        result = r.json()['resultList']['result'][0]
+                        logging.debug("Publication data --- {}" .format(result))
+                        pub = Publication(pub_id=pub_id,
                                       title=result['title'],
                                       abstract=result['abstractText'],
                                       authors=result['authorList'],
@@ -105,7 +116,7 @@ class PublicationFetcher(object):
                                       journal=result['journalInfo'],
                                       full_text=u"",
                                       full_text_url=result['fullTextUrlList']['fullTextUrl'],
-                                      epmc_keywords=result['keywordList']['keyword'],
+                                      #epmc_keywords=result['keywordList']['keyword'],
                                       doi=result['doi'],
                                       cited_by=result['citedByCount'],
                                       has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
@@ -113,24 +124,32 @@ class PublicationFetcher(object):
                                       is_open_access=result['isOpenAccess'] == u'Y',
                                       pub_type=result['pubTypeList']['pubType'],
                                       )
-                    if 'meshHeadingList' in result:
-                        pub. mesh_headings = result['meshHeadingList']['meshHeading']
-                    if 'chemicalList' in result:
-                        pub.chemicals = result['chemicalList']['chemical']
-                    if 'dateOfRevision' in result:
-                        pub.date_of_revision = result["dateOfRevision"]
-                    if pub.has_text_mined_entities:
-                        self.get_epmc_text_mined_entities(pub)
-                    if pub.has_references:
-                        self.get_epmc_ref_list(pub)
+                        if 'meshHeadingList' in result:
+                            pub.mesh_headings = result['meshHeadingList']['meshHeading']
+                        if 'chemicalList' in result:
+                            pub.chemicals = result['chemicalList']['chemical']
+                        if 'dateOfRevision' in result:
+                            pub.date_of_revision = result["dateOfRevision"]
 
-                    self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                        if pub.has_text_mined_entities:
+                            self.get_epmc_text_mined_entities(pub)
+                        if pub.has_references:
+                            self.get_epmc_ref_list(pub)
+
+                        self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                                     Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                                     pub_id,
                                     pub.to_json(),
                                     )
-                    pubs[pub.pub_id] = pub
-            self.loader.flush()
+                        pubs[pub.pub_id] = pub
+                self.loader.flush()
+        except Exception, error:
+            logging.info("Error in retrieving publication data for pmid {} ".format(pub_ids))
+            if error:
+                logging.info(str(error))
+            else:
+                logging.info(Exception.message)
+
         return pubs
 
     def get_epmc_text_mined_entities(self, pub):
@@ -150,6 +169,18 @@ class PublicationFetcher(object):
             result = [i[u'id'] for i in json_response[u'referenceList'][u'reference'] if u'id' in i]
             pub.references=result
         return pub
+
+    def get_publication_with_analyzed_data(self, pub_ids):
+        logging.debug("getting publication/analyzed data for id {}".format(pub_ids))
+        pubs = {}
+        for parent_publication,analyzed_publication in self.es_query.get_publications_with_analyzed_data(ids=pub_ids):
+            pub = Publication()
+            pub.load_json(parent_publication)
+            analyzed_pub= PublicationAnalysisSpacy(pub.pub_id)
+            analyzed_pub.load_json(analyzed_publication)
+            pubs[pub.pub_id] = [pub,analyzed_pub]
+        return pubs
+
 
 
 class Publication(JSONSerializable):
@@ -254,12 +285,13 @@ class PublicationAnalyserSpacy(object):
 
         if pub is None:
             pub = self.fetcher.get_publication(pub_ids=pub_id)
-
-        text_to_parse = unicode(pub.title + ' ' + pub.abstract)
-        lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
-        lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
-        noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
-        analysed_pub = PublicationAnalysisSpacy(pub_id = pub_id,
+        analysed_pub = None
+        if pub.title and pub.abstract:
+            text_to_parse = unicode(pub.title + ' ' + pub.abstract)
+            lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
+            lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
+            noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
+            analysed_pub = PublicationAnalysisSpacy(pub_id = pub_id,
                                         lemmas=lemmas,
                                         noun_chunks=noun_chunks,
                                         analysed_sentences_count=analysed_sentences_count)
@@ -278,7 +310,7 @@ class PublicationAnalyserSpacy(object):
         #    print('ENTITIES:')
         for e in parsedEx.ents:
             e_str = u' '.join(t.orth_ for t in e).encode('utf-8').lower()
-            if ((not e.label_) or (e.label_ == u'ENT')) and not (e_str in STOPLIST) and not (e_str in SYMBOLS):
+            if ((not e.label_) or (e.label_ == u'ENT')) and not (e_str in self.STOPLIST) and not (e_str in SYMBOLS):
                 if e_str not in ec:
                     try:
                         ec[e_str] += tl.count(e_str)
@@ -307,7 +339,7 @@ class PublicationAnalyserSpacy(object):
         tokens = lemmas
 
         # stoplist the tokens
-        tokens = [tok for tok in tokens if tok.encode('utf-8') not in STOPLIST]
+        tokens = [tok for tok in tokens if tok.encode('utf-8') not in self.STOPLIST]
 
         # stoplist symbols
         tokens = [tok for tok in tokens if tok.encode('utf-8') not in SYMBOLS]
@@ -402,13 +434,11 @@ class LiteratureProcess(object):
 
     def process(self,
                 datasources=[],
-                ):
+                dry_run=False):
         #TODO: process everything with an analyser in parallel
 
 
         # for t in [text, text2, text3, text4, text5, text6]:
-        pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
-        pub_analyser = PublicationAnalyserSpacy(pub_fetcher, self.es, self.loader)
 
         #todo, add method to process all cached publications??
 
@@ -418,20 +448,18 @@ class LiteratureProcess(object):
                                   job_timeout=120)
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-        logging.info("No of workers {} ".format(no_of_workers))
 
         # Start literature-analyser-worker processes
         analyzers = [LiteratureAnalyzerProcess(literature_q,
                                                self.r_server.db,
-                                               pub_analyser,
-                                               self.loader,
-                                               self.es,
+                                               dry_run,
                                                ) for i in range(no_of_workers)]
 
         for a in analyzers:
             a.start()
 
         #TODO : Use separate queue for retrieving evidences?
+        pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
 
         for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(datasources= datasources),
                     desc='Reading available evidence_strings to analyse publications',
@@ -494,21 +522,6 @@ def cleanText(text):
 
     return text
 
-
-class Literature(JSONSerializable):
-    def __init__(self,
-                 pmid,
-                 abstract='',
-                 journal='',
-                 year='',
-                 abstract_lemmas=''):
-        self.pmid = pmid
-        self.abstract = abstract
-        self.journal = journal
-        self.year = year
-        self.abstract_lemmas = abstract_lemmas
-
-
 class LiteratureLookUpTable(object):
     """
     A redis-based pickable literature look up table
@@ -538,6 +551,7 @@ class LiteratureLookUpTable(object):
                         ):
             literature = parent_publication
             literature['abstract_lemmas'] = analyzed_publication['lemmas']
+            literature['noun_chunks'] = analyzed_publication['noun_chunks']
             self.set_literature(literature,self._get_r_server(
                     r_server))# TODO can be improved by sending elements in batches
 
@@ -564,7 +578,7 @@ class LiteratureLookUpTable(object):
         if not r_server:
             r_server = self.r_server
         if r_server is None:
-            raise AttributeError('A redis server is required either at class instantation or at the method level')
+            raise AttributeError('A redis server is required either at class instantiation or at the method level')
         return r_server
 
     def keys(self):
@@ -572,38 +586,184 @@ class LiteratureLookUpTable(object):
 
 
 
+
 class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
     def __init__(self,
                  queue_in,
                  redis_path,
-                 pub_analyser,
-                 loader,
-                 es=None,
-
+                 chunk_size = 1e4,
+                 dry_run=False
                  ):
         super(LiteratureAnalyzerProcess, self).__init__(queue_in, redis_path)
         self.queue_in = queue_in
         self.redis_path = redis_path
-        self.es = es
-        self.pub_analyser = pub_analyser
-        self.loader = loader
+        self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
         self.start_time = time.time()
         self.audit = list()
         self.logger = logging.getLogger(__name__)
+        pub_fetcher = PublicationFetcher(self.es)
+        self.chunk_size = chunk_size
+        self.dry_run = dry_run
+        self.pub_analyser = PublicationAnalyserSpacy(pub_fetcher, self.es)
 
     def process(self, data):
         publications = data
-        logging.info("In LiteratureAnalyzerProcess- {} ".format(self.name))
-        for pub_id, pub in publications.items():
+        logging.debug("In LiteratureAnalyzerProcess- {} ".format(self.name))
+        try:
 
-            spacy_analysed_pub = self.pub_analyser.analyse_publication(pub_id=pub_id,
+            for pub_id, pub in publications.items():
+                spacy_analysed_pub = self.pub_analyser.analyse_publication(pub_id=pub_id,
                                                                        pub=pub)
 
-            self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+            with Loader(self.es, chunk_size=self.chunk_size, dry_run=self.dry_run) as es_loader:
+                es_loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                             doc_type=spacy_analysed_pub.get_type(),
                             ID=pub_id,
                             body=spacy_analysed_pub.to_json(),
                             parent=pub_id,
                             )
-            logging.info("Literature data updated for pmid {}".format(pub_id))
+                logging.debug("Literature data updated for pmid {}".format(pub_id))
+
+
+        except Exception, error:
+            logging.info("Error in loading analysed publication for pmid {}".format(pub_id))
+            if error:
+                logging.info(str(error))
+            else:
+                logging.info(Exception.message)
+
+
+class PubmedLiteratureParser(object):
+
+    def parse_medline_xml(self):
+        path_xml = pp.list_xml_path('/Users/pwankar/git/data_pipeline/tests/resources')  # list all xml paths under directory
+        pubmed_dict = pp.parse_medline_xml(path_xml[0])  # dictionary output
+        with open('outfile.txt', 'w') as handle:
+            json.dump(pubmed_dict, handle)
+
+    def iter_parse_medline_xml(self):
+        path_xml = pp.list_xml_path(
+            '/Users/pwankar/git/data_pipeline/tests/resources')  # list all xml paths under directory
+        context = etree.iterparse(path_xml[0], events=('end',))#, tag='MedlineCitation')
+        publication_list = []
+        with open('outfile1.txt', 'w') as handle:
+            for event, elem in context:
+                if elem.tag == 'PMID':
+                    pmid = ''
+                    mesh_terms = ''
+                    article_list = []
+                    keywords = ''
+                    publication = {}
+                    pmid = elem.text
+                    publication['pmid'] = pmid
+                if elem.tag == 'MeshHeadingList':
+                    mesh_terms = self.parse_mesh_terms(elem)
+                    publication['mesh_terms'] = mesh_terms
+                if elem.tag == 'KeywordList':
+                    keywords = self.parse_keywords(elem)
+                    publication['keywords'] = keywords
+                if elem.tag == 'ChemicalList':
+                    chemicals = self.parse_chemicals(elem)
+                    publication['chemicals'] = chemicals
+                if elem.tag == 'Article' :
+                    article =  self.parse_article_info(elem)
+                    publication['article'] = article
+                    elem.clear()  # discard the element
+                    while elem.getprevious() is not None:
+                        del elem.getparent()[0]
+                    simplejson.dump(publication, handle)
+
+
+
+        #del context
+
+
+
+
+    def stringify_children(self,node):
+
+        parts = ([node.text] +
+                 list(chain(*([c.text, c.tail] for c in node.getchildren()))) +
+                 [node.tail])
+        return ''.join(filter(None, parts))
+
+    def parse_mesh_terms(self,element):
+        mesh_terms = []
+        for descriptor in element.findall('DescriptorName'):
+            mesh_terms.append(descriptor.text)
+
+        return mesh_terms
+
+    def parse_keywords(self,element):
+
+        keywords = list()
+
+        for k in element.findall('Keyword'):
+            keywords.append(k.text)
+        keywords = '; '.join(keywords)
+        return keywords
+
+    def parse_chemicals(self,element):
+        chemicals = []
+        for chemical in element.findall('Chemical'):
+            chemical_data = {}
+            chemical_data['name'] = chemical.find('NameOfSubstance').text
+            chemical_data['registryNumber'] = chemical.find('RegistryNumber').text
+            chemicals.append(chemical_data)
+        return chemicals
+
+
+
+    def parse_article_info(self,element):
+        article = {}
+
+
+        if element.find('ArticleTitle') is not None:
+            title = self.stringify_children(element.find('ArticleTitle'))
+        else:
+            title = ''
+
+        if element.find('Abstract') is not None:
+            abstract = self.stringify_children(element.find('Abstract'))
+        else:
+            abstract = ''
+
+        if element.find('AuthorList') is not None:
+            authors = element.find('AuthorList').getchildren()
+            authors_info = list()
+            affiliations_info = list()
+            for author in authors:
+                if author.find('Initials') is not None:
+                    firstname = author.find('Initials').text
+                else:
+                    firstname = ''
+                if author.find('LastName') is not None:
+                    lastname = author.find('LastName').text
+                else:
+                    lastname = ''
+                if author.find('AffiliationInfo/Affiliation') is not None:
+                    affiliation = author.find('AffiliationInfo/Affiliation').text
+                else:
+                    affiliation = ''
+                authors_info.append(firstname + ' ' + lastname)
+                affiliations_info.append(affiliation)
+            affiliations_info = ' '.join([a for a in affiliations_info if a is not ''])
+            authors_info = '; '.join(authors_info)
+        else:
+            affiliations_info = ''
+            authors_info = ''
+
+        journal = element.find('Journal')
+        journal_name = ' '.join(journal.xpath('Title/text()'))
+        #pubdate = date_extractor(journal, year_info_only)
+
+        article['title']= title
+        article['abstract'] = abstract
+        article['journal'] = journal_name
+        article['authors'] = authors_info
+
+
+        return article
+
+
 

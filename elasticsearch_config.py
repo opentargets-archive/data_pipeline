@@ -66,18 +66,62 @@ def _get_evidence_string_generic_mapping():
                                     },
                                 }
                             },
-                            "abstract_lemmas": {
+                            "literature": {
                                 "properties": {
-                                    "count": {
-                                        "type": "long"
+                                    "abstract_lemmas": {
+                                        "properties": {
+                                            "count": {
+                                                "type": "long"
+                                            },
+                                            "value": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
                                     },
-                                    "values": {
+                                    "noun_chunks": {
+                                        "properties": {
+                                            "count": {
+                                                "type": "long"
+                                            },
+                                            "value": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
+                                    },
+                                    "chemicals": {
+                                        "properties": {
+                                            "registryNumber": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            },
+                                            "name": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
+                                    },
+                                    "doi": {
                                         "type": "string",
                                         "index": "not_analyzed"
+                                    },
+                                    "pub_type": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    },
+                                    "mesh_headings": {
+                                        "properties": {
+                                            "descriptorName": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
+
                                     }
-                                }
-                            }
-                        }
+                    }
+                }
+            }
                     }
                 }
             },
@@ -345,7 +389,7 @@ class ElasticSearchConfiguration():
                         "properties": {
                             "suggestions": {
                                 "type": "completion",
-                                "index_analyzer": "whitespace_analyzer",
+                                "analyzer": "whitespace_analyzer",
                                 "search_analyzer": "edgeNGram_analyzer",
                                 "payloads": True
                             },
@@ -469,7 +513,7 @@ class ElasticSearchConfiguration():
                         "properties": {
                             "suggestions": {
                                 "type": "completion",
-                                "index_analyzer": "whitespace_analyzer",
+                                "analyzer": "whitespace_analyzer",
                                 "search_analyzer": "whitespace_analyzer",
                                 "payloads": True
                             },
@@ -657,7 +701,7 @@ class ElasticSearchConfiguration():
                                           "number_of_replicas": evidence_replicas_number,
                                           # "index.store.type": "memory",
                                           "refresh_interval": "60s",
-                                          "max_result_window": str(10e6),
+                                          "max_result_window": str(int(10e6)),
                                           },
                              "mappings": {"_default_": _get_evidence_string_generic_mapping()},
                              }
@@ -701,7 +745,7 @@ class ElasticSearchConfiguration():
                                        "number_of_replicas": evidence_replicas_number,
                                        # "index.store.type": "memory",
                                        "refresh_interval": "60s",
-                                       "max_result_window": str(5e6),
+                                       "max_result_window": str(int(5e6)),
                                        },
                           "mappings": {
                               Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {
@@ -820,7 +864,7 @@ class ElasticSearchConfiguration():
                         "properties": {
                             "suggestions": {
                                 "type": "completion",
-                                "index_analyzer": "whitespace_analyzer",
+                                "analyzer": "whitespace_analyzer",
                                 "search_analyzer": "whitespace_analyzer",
                                 "payloads": True
                             }

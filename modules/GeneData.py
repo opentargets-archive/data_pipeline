@@ -126,6 +126,7 @@ class Gene(JSONSerializable):
         self.is_ensembl_reference = []
         self.ortholog = {}
         self._private ={}
+        self.drugs = {}
 
 
     def _set_id(self):
@@ -542,7 +543,7 @@ class GeneManager():
 
     def merge_all(self, dry_run = False):
         bar = tqdm(desc='Merging data from available databases',
-                   total = 5,
+                   total = 6,
                    unit= 'steps')
         self._get_hgnc_data_from_json()
         bar.update()
@@ -551,6 +552,8 @@ class GeneManager():
         self._get_ensembl_data()
         bar.update()
         self._get_uniprot_data()
+        bar.update()
+        self._get_chembl_data()
         bar.update()
         self._store_data(dry_run=dry_run)
         bar.update()
@@ -629,7 +632,7 @@ class GeneManager():
                            unit_scale=True,
                            unit='genes',
                            leave=False,
-                           total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
+                           total= self.esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
             c += 1
             if c % 1000 == 0:
                 logging.info("%i entries retrieved for uniprot" % c)
@@ -683,8 +686,35 @@ class GeneManager():
 
         logging.info('all gene objects pushed to elasticsearch')
 
+    def _get_chembl_data(self):
+        logging.info("Chembl Drug parsing ")
 
+        for gene_id, gene in self.genes.iterate():
+            req = requests.get(Config.CHEMBL_TARGET_BY_UNIPROT_ID,params={'target_components__accession': gene.uniprot_id})
+            req.raise_for_status()
+            target_chembl_ids = [x['target_chembl_id'] for x in req.json()['targets']]
 
+            molecules = []
+            for target_id in target_chembl_ids:
+                r = requests.get(Config.CHEMBL_MECHANISM, params={'target_chembl_id': target_id})
+                r.raise_for_status()
+                molecules.extend([x['molecule_chembl_id'] for x in r.json()['mechanisms']])
+
+            target_drugnames = {}
+            for chembl_id in molecules:
+                r = requests.get(Config.CHEMBL_DRUG_SYNONYMS.format(chembl_id))
+                r.raise_for_status()
+                target_drugnames[chembl_id]=[]
+                #target_drugnames[chembl_id] = list(set([x['synonyms'] for x in r.json()['molecule_synonyms']]))
+                #TODO : remove dups
+                for x in r.json()['molecule_synonyms']:
+                    synonym_data = {}
+                    synonym_data['synonym']=x['synonyms']
+                    synonym_data['synonym_type'] = x['syn_type']
+                    target_drugnames[chembl_id].append(synonym_data)
+
+            ''' extend gene with related drug names '''
+            gene.drugs['chembl_drugs'] = target_drugnames
 
 
 class GeneRetriever():
