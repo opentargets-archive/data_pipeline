@@ -154,19 +154,19 @@ order by ?count
 subclass generators: yield a series of values
 '''
 def _get_subclass_of(arg, graph):
-    logger.debug("[_get_subclass_of] %i"%len(arg))
+    #logger.debug("[_get_subclass_of] %i"%len(arg))
     node = arg[0]
     depth = arg[1]
     path = arg[2]
     level = arg[3]
-    logger.debug("Superclass: %s; label: %s; depth: %i"%(str(node.identifier), node.value(RDFS.label), depth))
+    #logger.debug("Superclass: %s; label: %s; depth: %i"%(str(node.identifier), node.value(RDFS.label), depth))
 
     if level > 0 and depth == level:
         return
     for c in graph.subjects(predicate=RDFS.subClassOf, object=node.identifier):
         cr = rdflib.resource.Resource(graph, c)
         label = cr.value(RDFS.label)
-        logger.debug("\tSubClass: %s; label: %s"%(str(cr.identifier), label))
+        #logger.debug("\tSubClass: %s; label: %s"%(str(cr.identifier), label))
 
         #synonyms = []
         # get synonyms by filtering on triples
@@ -325,16 +325,10 @@ class OntologyClassReader():
 
         return
 
-    def get_ancestors(self, id):
-        """Return a list of ancestors"""
-        return
-
-    def get_classes_paths(self, uri, level=0):
+    def get_classes_paths(self, root_uri, level=0):
 
         root_node = rdflib.resource.Resource(self.rdf_graph,
-                                                   rdflib.term.URIRef(uri))
-
-        logger.debug("* get_paths start")
+                                             rdflib.term.URIRef(root_uri))
 
         # create an entry for the root:
         root_node_uri = str(root_node.identifier)
@@ -343,7 +337,6 @@ class OntologyClassReader():
         self.classes_paths[root_node_uri]['labels'].append([root_node.value(RDFS.label)])
         (prefix, namespace, id) = self.rdf_graph.namespace_manager.compute_qname(root_node.identifier)
         self.classes_paths[root_node_uri]['ids'].append([id])
-
 
         for entity in self.rdf_graph.transitiveClosure(_get_subclass_of, (root_node, 0, (), level)):
 
@@ -375,16 +368,16 @@ class OntologyClassReader():
             self.classes_paths[node_uri]['labels'].append(labels_struct)
             self.classes_paths[node_uri]['ids'].append(ids_struct)
 
-            logger.debug("** %s **"%node_uri)
-            logger.debug( json.dumps(self.classes_paths[node_uri], indent=2) )
+            #logger.debug("** %s **"%node_uri)
+            #logger.debug( json.dumps(self.classes_paths[node_uri], indent=2) )
 
-        logger.debug("* get_paths end")
         return
 
     def load_hpo_classes(self):
         """Loads the HPO graph and extracts the current and obsolete classes.
            Status: production
         """
+        logging.debug("load_hpo_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
         base_class = 'http://purl.obolibrary.org/obo/HP_0000118'
         self.load_ontology_classes(base_class=base_class)
@@ -393,6 +386,7 @@ class OntologyClassReader():
         """Loads the HPO graph and extracts the current and obsolete classes.
            Status: production
         """
+        logging.debug("load_mp_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
         base_class = 'http://purl.obolibrary.org/obo/MP_0000001'
         self.load_ontology_classes(base_class= base_class)
@@ -404,20 +398,26 @@ class OntologyClassReader():
         """Loads the EFO graph and extracts the current and obsolete classes.
            Status: production
         """
+        logging.debug("load_efo_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
         # load disease, phenotype, measurement, biological process
-        for base_class in [ 'http://www.ebi.ac.uk/efo/EFO_0000408', 'http://www.ebi.ac.uk/efo/EFO_0000651', 'http://www.ebi.ac.uk/efo/EFO_0001444', 'http://purl.obolibrary.org/obo/GO_0008150' ]:
+        for base_class in [ 'http://www.ebi.ac.uk/efo/EFO_0000408',
+                            'http://www.ebi.ac.uk/efo/EFO_0000651',
+                            'http://www.ebi.ac.uk/efo/EFO_0001444',
+                            'http://purl.obolibrary.org/obo/GO_0008150' ]:
             self.load_ontology_classes(base_class=base_class)
 
     def load_evidence_classes(self):
-
+        '''
+        Loads evidence from ECO, SO and the Open Targets evidence classes
+        :return:
+        '''
         self.load_ontology_graph('/Users/koscieln/Downloads/eco.owl')
         self.load_ontology_graph('/Users/koscieln/Downloads/so-xp.owl')
 
         evidence_uri = URIRef('http://purl.obolibrary.org/obo/ECO_0000000')
 
         for triple in self.rdf_graph.triples((evidence_uri, None, None)):
-        #for triple in self.rdf_graph.triples((subject, RDFS.subClassOf, None)):
              logger.debug(triple)
 
         '''
@@ -427,14 +427,12 @@ class OntologyClassReader():
             C) Traverse the graph breadth first
         '''
 
-        ot1 = Namespace(unicode("http://www.targetvalidation.org/disease"))
-        ot2 = Namespace(unicode("http://identifiers.org/eco"))
+        cttv = Namespace(unicode("http://www.targetvalidation.org/disease"))
+        ot = Namespace(unicode("http://identifiers.org/eco"))
 
-        namespace_manager = NamespaceManager(self.rdf_graph)
-        #self.rdf_graph.namespace_manager.bind('ot1', URIRef(ot1, override=False)
-        #self.rdf_graph.namespace_manager.bind('ot2', ot2, override=False)
-        self.rdf_graph.namespace_manager.bind('cttv', Namespace(unicode("http://www.targetvalidation.org/disease")))
-        self.rdf_graph.namespace_manager.bind('ot', Namespace("http://identifiers.org/eco"))
+        #namespace_manager = NamespaceManager(self.rdf_graph)
+        self.rdf_graph.namespace_manager.bind('cttv', cttv)
+        self.rdf_graph.namespace_manager.bind('ot',ot)
 
         open_targets_terms = {
             'http://www.targetvalidation.org/disease/cttv_evidence':'CTTV evidence',
@@ -472,7 +470,7 @@ class OntologyClassReader():
 
         for base_class in ['http://purl.obolibrary.org/obo/ECO_0000000']: #, 'http://purl.obolibrary.org/obo/SO_0000400', 'http://purl.obolibrary.org/obo/SO_0001260', 'http://purl.obolibrary.org/obo/SO_0000110', 'http://purl.obolibrary.org/obo/SO_0001060' ]:
             self.load_ontology_classes(base_class=base_class)
-            self.get_classes_paths(uri=base_class, level=0)
+            self.get_classes_paths(root_uri=base_class, level=0)
 
 class DiseasePhenotypes():
 
@@ -480,161 +478,25 @@ class DiseasePhenotypes():
         self.rdf_graph = None
         pass
 
-    def get_subclasses(self, node, node_lable):
-        subclasses = list(node.transitive_subjects(RDFS.subClassOf))
-        for c in subclasses:
-            if node.qname() != c.qname():
-                print c
-                label = c.value(RDFS.label)
-                synonyms = []
-                # get synonyms by filtering on triples
-                for subject, predicate, obj in self.rdf_graph.triples(
-                        (rdflib.term.URIRef("http://purl.obolibrary.org/obo/SO_0001060"),
-                         rdflib.term.URIRef('http://www.geneontology.org/formats/oboInOwl#hasExactSynonym'),
-                         None)):
-                    print subject, predicate, obj
-                    synonyms.append(obj)
-
-                print "%s -> %s (%s) synonyms:%s" %(node.qname(), c.qname(), label, ",".join(synonyms))
-                self.get_subclasses(c, label)
-
-
-
     # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/
     # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw
     def parse_owl_url(self):
-        self.get_eco_paths()
-
-    def get_eco_paths(self):
-
-        eco_paths = {}
-
-
-        '''
-        CTTV evidence => evidence
-        "[{"uri": "http://www.targetvalidation.org/disease/cttv_evidence", "label": "CTTV evidence"}, {"uri": "http://purl.obolibrary.org/obo/ECO_0000360", "label": "biological target-disease association via drug"}, {"uri": "http://identifiers.org/eco/drug_disease" (...)"
-        "[{"uri": "http://www.targetvalidation.org/disease/cttv_evidence", "label": "CTTV evidence"}, {"uri": "http://purl.obolibrary.org/obo/ECO_0000360", "label": "biological target-disease association via drug"}, {"uri": "http://identifiers.org/eco/target_drug", (...)"
-            animal model system study evidence
-            author statement
-            "http://www.targetvalidation.org/evidence/literature_mining"
-            similarity
-
-        :return:
-        '''
-
-        # https://raw.githubusercontent.com/evidenceontology/evidenceontology/master/eco.owl
-        query='''
-        PREFIX obo: <http://purl.obolibrary.org/obo/>
-        SELECT ?node_uri ?parent_uri sample(?parent_label) AS ?parent_label ?dist ?path
-        WHERE
-        {
-            {
-            SELECT *
-            WHERE
-            {
-            ?node_uri rdfs:subClassOf ?y .
-            ?node_uri rdfs:label ?parent_label
-            }
-        }
-        OPTION ( TRANSITIVE, T_NO_CYCLES, T_DISTINCT, t_min(1), t_in (?y), t_out (?node_uri), t_step (?y) as ?parent_uri, t_step ('step_no') as ?dist, t_step ('path_id') as ?path ) .
-        FILTER ( ?y = <http://www.targetvalidation.org/evidence/cttv_evidence> )
-        }
-        ORDER BY ?path ?dist
-        '''
-
-        self.rdf_graph = rdflib.Graph()
-        print ("parse ECO")
-        self.rdf_graph.parse('/Users/koscieln/Downloads/eco.owl', format='xml')
-        self.rdf_graph.parse('/Users/koscieln/Downloads/so-xp.owl', format='xml')
-
-        # assertion method
-        subject = root = rdflib.term.URIRef("http://purl.obolibrary.org/obo/ECO_0000217")
-        root_a = rdflib.resource.Resource(self.rdf_graph, subject)
-        root_b = rdflib.resource.Resource(self.rdf_graph, rdflib.term.URIRef("http://purl.obolibrary.org/obo/ECO_0000000"))
-
-        #sequence variant
-        so_root_d = rdflib.resource.Resource(self.rdf_graph, rdflib.term.URIRef("http://purl.obolibrary.org/obo/SO_0001060"))
-
-
-        print ("prepare query")
-        print ("prepare query")
-        for triple in self.rdf_graph.triples((subject, None, None)):
-        #for triple in self.rdf_graph.triples((subject, RDFS.subClassOf, None)):
-            print triple
-
-        print ("Subclasses")
-        subclasses = list(root_a.transitive_subjects(RDFS.subClassOf))
-        for c in subclasses:
-            print c
-            print c.qname()
-
-        label_a = root_a.value(RDFS.label)
-        self.get_subclasses(root_a, label_a)
-
-        print "-User-defined transitive closures"
-        for tuple in self.rdf_graph.transitiveClosure(_get_subclass_of, (root_a, 0, (), 0)):
-            print tuple
-        print "-end of function"
-
-        classes_path = dict()
-
-        genomic_context = rdflib.resource.Resource(self.rdf_graph, rdflib.term.URIRef("http://purl.obolibrary.org/obo/ECO_0000177"))
-        print "* User-defined transitive closures 2"
-        for entity in self.rdf_graph.transitiveClosure(_get_subclass_of, (genomic_context, 0, (), 0)):
-            node = entity[0]
-            depth = entity[1]
-            path = entity[2]
-            if node not in classes_path:
-                classes_path[node] = []
-            js_struct = []
-            for n in path:
-                js_struct.append({'uri': str(n), 'label': n.value(RDFS.label)})
-            js_struct.append({'uri': str(node), 'label': node.value(RDFS.label)})
-            classes_path[node].append(js_struct)
-            print json.dumps(js_struct, indent=2)
-
-        print "* end of function 2"
-
-
-        for triple in self.rdf_graph.triples((rdflib.term.URIRef("http://purl.obolibrary.org/obo/SO_0001060"), None, None)):
-            print triple
-
-        for triple in self.rdf_graph.triples(
-                    (rdflib.term.URIRef("http://purl.obolibrary.org/obo/SO_0001060"),
-                     rdflib.term.URIRef('http://www.geneontology.org/formats/oboInOwl#hasExactSynonym'),
-                     None)):
-            print triple
-        #so_root_d_label = so_root_d.value(RDFS.label)
-        #self.get_subclasses(so_root_d, so_root_d_label)
-
-        #label_b = root_b.value(RDFS.label)
-        #self.get_subclasses(root_b, label_b)
-
-        #print ("")
-        #for i in self.rdf_graph.subjects(RDFS.subClassOf, subject):
-        #    yield i
-        #for i in graph.subjects()
-        #qres = self.rdf_graph.query(query)
-
-        #for row in qres:
-        #    print ("node_uri:%s parent_uri:%s parent_label:%s dist:%s path:%s" % row)
+        self.get_disease_phenotypes()
 
     def get_disease_phenotypes(self):
         # we care about namespaces
         #oban = Namespace('http://purl.org/oban/')
         self.rdf_graph = rdflib.Graph()
         # load HPO:
-        print ("parse HPO")
+        logger.debug("parse HPO")
         self.rdf_graph.parse(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'), format='xml')
-        print ("parse MP")
+        logger.debug("parse MP")
         self.rdf_graph.parse(Config.ONTOLOGY_CONFIG.get('uris', 'mp'), format='xml')
         #print ("parse EFO")
         #self.rdf_graph.parse('/Users/koscieln/Downloads/hp.owl', format='xml')
         for key, uri in Config.ONTOLOGY_CONFIG.items('disease_phenotypes_uris'):
-            print ("merge phenotypes from %s" % uri)
+            logger.debug("merge phenotypes from %s" % uri)
             self.rdf_graph.parse(uri, format='xml')
-
-        #graph.parse('https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw', format='xml')
 
         #for subject, predicate, obj in self.rdf_graph:
         #    print subject, predicate, obj
@@ -655,18 +517,20 @@ class DiseasePhenotypes():
         )
 
         for row in qres:
-            print ("%s hasPhenotype %s (%s)" % row)
+            logger.debug("%s hasPhenotype %s (%s)" % row)
 
-        # EXTRACT THE GOOD BITS
+        # EXTRACT THE GOOD BITS for EFO
+        # TODO
 
 
 class PhenotypeSlim():
 
-    def __init__(self, sparql):
+    def __init__(self):
 
-        self.sparql = sparql
         self.rdf_graph = rdflib.Graph()
         self.phenotypes = None
+        #self.efo = OntologyClassReader()
+        #self.efo.load_efo_classes()
 
         self.phenotype_map = {}
         self.phenotype_excluded = set()
@@ -730,7 +594,10 @@ class PhenotypeSlim():
         '''
         self.phenotypes = OntologyClassReader()
         self.phenotypes.load_hpo_classes()
-        self.phenotypes.load_mp_classes()
+        #self.phenotypes.load_mp_classes()
+        self.phenotypes.get_classes_paths(root_uri="http://purl.obolibrary.org/obo/HP_0000118")
+
+        logger.debug(json.dumps(self.phenotypes.classes_paths["http://purl.obolibrary.org/obo/HP_0000319"], indent=2))
 
     def exclude_phenotypes(self, l):
         '''
@@ -753,14 +620,6 @@ class PhenotypeSlim():
                     ancestor = result['ancestor']['value']
                     al.append(ancestor)
                     self.exclude_phenotypes(al)
-
-
-    def get_ontology_path2(self, base_class, id):
-
-        resource_id = rdflib.resource.Resource(self.phenotypes.rdf_graph, rdflib.term.URIRef(id))
-        print "* get_ontology_path2"
-        for entity in self.rdf_graph.transitiveClosure(write_superclasses, (resource_id, self.rdf_graph)):
-            print entity
 
     def generate_ttl_query(self, filename):
 
@@ -865,7 +724,8 @@ class PhenotypeSlim():
                 except AuthenticationException:
                     self.logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
 
-        self.generate_ttl_query(Config.ONTOLOGY_SLIM_FILE)
+        self.generate_phenotype_map()
+        #self.generate_ttl_query(Config.ONTOLOGY_SLIM_FILE)
 
     def parse_gzipfile(self, filename, mode, fileobj, mtime):
 
@@ -941,8 +801,13 @@ class PhenotypeSlim():
         return
 
 def main():
-    obj = DiseasePhenotypes()
-    obj.parse_owl_url()
+    #obj = DiseasePhenotypes()
+    #obj.parse_owl_url()
+
+    obj = PhenotypeSlim()
+    obj.load_all_phenotypes()
+    #obj.create_phenotype_slim(local_files=[])
+
 
 if __name__ == "__main__":
     main()
