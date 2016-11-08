@@ -1,12 +1,13 @@
 import unittest
 
-from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, LiteratureProcess, PubmedLiteratureParser
+from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, LiteratureProcess, PubmedLiteratureProcess
 from common.ElasticsearchLoader import Loader
 from modules.EvidenceString import EvidenceStringProcess
 from elasticsearch import Elasticsearch
 from redislite import Redis
 from settings import Config
 import logging
+from run import PipelineConnectors
 
 class LiteratureTestCase(unittest.TestCase):
 #
@@ -43,7 +44,7 @@ class LiteratureTestCase(unittest.TestCase):
 
 
 
-    def test_evidence_publication_loading(self):
+    def evidence_publication_loading(self):
 
         logging.basicConfig(filename='output.log',
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -64,20 +65,16 @@ class LiteratureTestCase(unittest.TestCase):
 
 
     def test_medline_parser(self):
-
-        es = Elasticsearch(hosts=[{'host': 'targethub-es.gdosand.aws.biogen.com', 'port': 9200}],
-                           maxsize=50,
-                           timeout=1800,
-                           sniff_on_connection_fail=True,
-                           retry_on_timeout=True,
-                           max_retries=10,
-                           )
-        PubmedLiteratureParser().parse_medline_xml()
+        logging.basicConfig(filename='output.log',
+                            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                            level=logging.INFO)
+        #PubmedLiteratureParser().parse_medline_xml()
         #PubmedLiteratureParser().iter_parse_medline_xml()
 
-
-
-
+        p = PipelineConnectors()
+        p.init_services_connections()
+        with Loader(p.es ,chunk_size=1000) as loader:
+            PubmedLiteratureProcess(p.es,loader,p.r_server).process_publication()
 
 
 if __name__ == '__main__':

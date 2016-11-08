@@ -19,7 +19,7 @@ from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
-from modules.Literature import LiteratureActions, LiteratureProcess
+from modules.Literature import LiteratureActions, PubmedLiteratureProcess
 from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
 from modules.Association import AssociationActions, ScoringProcess
@@ -335,9 +335,9 @@ if __name__ == '__main__':
         if args.lit or run_full_pipeline:
             do_all = (LiteratureActions.ALL in args.lit) or run_full_pipeline
             if (LiteratureActions.FETCH in args.lit) or do_all:
-                LiteratureProcess(connectors.es, loader).fetch()
+                PubmedLiteratureProcess(connectors.es, loader,connectors.r_server).fetch(dry_run=args.dry_run)
             if (LiteratureActions.PROCESS in args.lit) or do_all:
-                LiteratureProcess(connectors.es, loader, connectors.r_server).process(dry_run=args.dry_run)
+                PubmedLiteratureProcess(connectors.es, loader, connectors.r_server).process(dry_run=args.dry_run)
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:

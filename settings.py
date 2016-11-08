@@ -260,3 +260,6 @@ class Config():
     DUMP_REMOTE_API = 'https://beta.targetvalidation.org'
     DUMP_REMOTE_API_SECRET = '1RT6L519zkcTH9i3F99OjeYn13k79Wep'
     DUMP_REMOTE_API_APPNAME = 'load-test'
+
+    #Pubmed FTP
+    PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'

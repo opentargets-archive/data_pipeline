@@ -1,8 +1,7 @@
 #!/usr/local/bin/python
 # coding: latin-1
+import gzip
 import logging
-from pprint import pprint
-
 import requests
 from sklearn.base import TransformerMixin
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
@@ -23,14 +22,13 @@ import multiprocessing
 from settings import Config
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
 
-import pubmed_parser as pp
-import json
 import simplejson
 from itertools import chain
 
 import time
 from lxml import etree
-
+from ftplib import FTP
+import os
 
 MAX_PUBLICATION_CHUNKS =1000
 
@@ -99,50 +97,50 @@ class PublicationFetcher(object):
                 pub = Publication()
                 pub.load_json(pub_source)
                 pubs[pub.pub_id] = pub
-            if len(pubs)<pub_ids:
-                for pub_id in pub_ids:
-                    if pub_id not in pubs:
-                        logging.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
-                        r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
-                        r.raise_for_status()
-                        result = r.json()['resultList']['result'][0]
-                        logging.debug("Publication data --- {}" .format(result))
-                        pub = Publication(pub_id=pub_id,
-                                      title=result['title'],
-                                      abstract=result['abstractText'],
-                                      authors=result['authorList'],
-                                      year=int(result['pubYear']),
-                                      date=result["firstPublicationDate"],
-                                      journal=result['journalInfo'],
-                                      full_text=u"",
-                                      full_text_url=result['fullTextUrlList']['fullTextUrl'],
-                                      #epmc_keywords=result['keywordList']['keyword'],
-                                      doi=result['doi'],
-                                      cited_by=result['citedByCount'],
-                                      has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
-                                      has_references=result['hasReferences'] == u'Y',
-                                      is_open_access=result['isOpenAccess'] == u'Y',
-                                      pub_type=result['pubTypeList']['pubType'],
-                                      )
-                        if 'meshHeadingList' in result:
-                            pub.mesh_headings = result['meshHeadingList']['meshHeading']
-                        if 'chemicalList' in result:
-                            pub.chemicals = result['chemicalList']['chemical']
-                        if 'dateOfRevision' in result:
-                            pub.date_of_revision = result["dateOfRevision"]
-
-                        if pub.has_text_mined_entities:
-                            self.get_epmc_text_mined_entities(pub)
-                        if pub.has_references:
-                            self.get_epmc_ref_list(pub)
-
-                        self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-                                    Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                                    pub_id,
-                                    pub.to_json(),
-                                    )
-                        pubs[pub.pub_id] = pub
-                self.loader.flush()
+            # if len(pubs)<pub_ids:
+            #     for pub_id in pub_ids:
+            #         if pub_id not in pubs:
+            #             logging.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
+            #             r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
+            #             r.raise_for_status()
+            #             result = r.json()['resultList']['result'][0]
+            #             logging.debug("Publication data --- {}" .format(result))
+            #             pub = Publication(pub_id=pub_id,
+            #                           title=result['title'],
+            #                           abstract=result['abstractText'],
+            #                           authors=result['authorList'],
+            #                           year=int(result['pubYear']),
+            #                           date=result["firstPublicationDate"],
+            #                           journal=result['journalInfo'],
+            #                           full_text=u"",
+            #                           full_text_url=result['fullTextUrlList']['fullTextUrl'],
+            #                           #epmc_keywords=result['keywordList']['keyword'],
+            #                           doi=result['doi'],
+            #                           cited_by=result['citedByCount'],
+            #                           has_text_mined_terms=result['hasTextMinedTerms'] == u'Y',
+            #                           has_references=result['hasReferences'] == u'Y',
+            #                           is_open_access=result['isOpenAccess'] == u'Y',
+            #                           pub_type=result['pubTypeList']['pubType'],
+            #                           )
+            #             if 'meshHeadingList' in result:
+            #                 pub.mesh_headings = result['meshHeadingList']['meshHeading']
+            #             if 'chemicalList' in result:
+            #                 pub.chemicals = result['chemicalList']['chemical']
+            #             if 'dateOfRevision' in result:
+            #                 pub.date_of_revision = result["dateOfRevision"]
+            #
+            #             if pub.has_text_mined_entities:
+            #                 self.get_epmc_text_mined_entities(pub)
+            #             if pub.has_references:
+            #                 self.get_epmc_ref_list(pub)
+            #
+            #             self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+            #                         Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+            #                         pub_id,
+            #                         pub.to_json(),
+            #                         )
+            #             pubs[pub.pub_id] = pub
+            #     self.loader.flush()
         except Exception, error:
             logging.info("Error in retrieving publication data for pmid {} ".format(pub_ids))
             if error:
@@ -180,7 +178,6 @@ class PublicationFetcher(object):
             analyzed_pub.load_json(analyzed_publication)
             pubs[pub.pub_id] = [pub,analyzed_pub]
         return pubs
-
 
 
 class Publication(JSONSerializable):
@@ -230,6 +227,35 @@ class Publication(JSONSerializable):
         self.references = references
         self.mesh_headings = mesh_headings
         self.chemicals = chemicals
+
+    def __str__(self):
+        return "id:%s | title:%s | abstract:%s | authors:%s | year:%s | date:%s | journal:%s" \
+               "| full_text:%s | epmc_text_mined_entities:%s | epmc_keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
+               "| has_text_mined_entities:%s | is_open_access:%s | pub_type:%s | date_of_revision:%s | has_references:%s | references:%s" \
+               "| mesh_headings:%s | chemicals:%s"%(self.pub_id,
+                                                   self.title,
+                                                   self.abstract,
+                                                   self.authors,
+                                                   self.year,
+                                                    self.date,
+                                                    self.journal,
+                                                    self.full_text,
+                                                    self.epmc_text_mined_entities,
+                                                    self.epmc_keywords,
+                                                    self.full_text_url,
+                                                    self.doi,
+                                                    self.cited_by,
+                                                    self.has_text_mined_entities,
+                                                    self.is_open_access,
+                                                    self.pub_type,
+                                                    self.date_of_revision,
+                                                    self.has_references,
+                                                    self.references,
+                                                    self.mesh_headings,
+                                                    self.chemicals
+                                                    )
+
+
 
 class PublicationAnalysis(JSONSerializable):
     """
@@ -633,52 +659,251 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
                 logging.info(Exception.message)
 
 
-class PubmedLiteratureParser(object):
+class PubmedLiteratureProcess(object):
 
-    def parse_medline_xml(self):
-        path_xml = pp.list_xml_path('/Users/pwankar/git/data_pipeline/tests/resources')  # list all xml paths under directory
-        pubmed_dict = pp.parse_medline_xml(path_xml[0])  # dictionary output
-        with open('outfile.txt', 'w') as handle:
-            json.dump(pubmed_dict, handle)
 
-    def iter_parse_medline_xml(self):
-        path_xml = pp.list_xml_path(
-            '/Users/pwankar/git/data_pipeline/tests/resources')  # list all xml paths under directory
-        context = etree.iterparse(path_xml[0], events=('end',))#, tag='MedlineCitation')
-        publication_list = []
-        with open('outfile1.txt', 'w') as handle:
+    def __init__(self,
+                 es,
+                 loader,
+                 r_server=None,
+                 ):
+        self.es =es
+        self.loader = loader
+        self.r_server = r_server
+        self.logger = logging.getLogger(__name__)
+
+
+    def fetch(self,dry_run=False):
+
+        if not self.loader.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
+            self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
+        self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
+        # Literature Parser Queue
+        literature_parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_parser_q',
+                                  max_size=MAX_PUBLICATION_CHUNKS,
+                                  job_timeout=120)
+
+
+        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+
+        'Start xml file workers'
+        parsers = [PubmedXMLParserProcess(literature_parser_q,
+                                     self.r_server.db,
+                                     self.es,
+                                     dry_run
+                                     )
+                   for i in range(no_of_workers)]
+
+        for w in parsers:
+            w.start()
+
+
+        max_attempts = 5
+        ftp = self.ftp_connect()
+        files = ftp.nlst()
+        temp_location = '../temp_xml/'
+
+
+
+        for j in range(len(files)):
+            try:
+
+                if not os.path.isfile(temp_location + files[j]):
+                    handle = open(os.path.join(temp_location, files[j]), 'wb')
+                    ftp.retrbinary('RETR ' + files[j], handle.write)
+                    handle.close()
+
+                literature_parser_q.put(temp_location + files[j])
+            # TODO: for testing
+                if j == 10:
+                    break
+
+
+
+            except Exception:
+                if max_attempts != 0:
+                    logging.error("Error while downloading files from FTP server")
+                    ftp=self.ftp_connect()
+                    max_attempts -= 1
+                else:
+                    break
+        literature_parser_q.set_submission_finished(r_server=self.r_server)
+
+        for p in parsers:
+                p.join()
+
+        logging.info('flushing data to index')
+
+        self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+            wait_if_ongoing=True)
+        logging.info("DONE")
+
+
+    def process(self,datasources=[],dry_run=False):
+        # Literature Queue
+        literature_analyzer_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_analyzer_q',
+                                  max_size=MAX_PUBLICATION_CHUNKS,
+                                  job_timeout=120)
+
+        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+
+        # Start literature-analyser-worker processes
+        analyzers = [LiteratureAnalyzerProcess(literature_analyzer_q,
+                                               self.r_server.db,
+                                               dry_run,
+                                               ) for i in range(no_of_workers)]
+
+        for a in analyzers:
+            a.start()
+
+        pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
+
+        for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(datasources=datasources),
+                       desc='Reading available evidence_strings to analyse publications',
+                       total=self.es_query.count_validated_evidence_strings(datasources=datasources),
+                       unit=' evidence',
+                       unit_scale=True):
+            pub_id = self.get_pub_id_from_url(ev['evidence_string']['literature']['references'][0]['lit_id'])
+            pubs = pub_fetcher.get_publication(pub_id)
+
+            literature_analyzer_q.put(pubs)
+        literature_analyzer_q.set_submission_finished(r_server=self.r_server)
+
+        # TODO - auditing?
+        # wait for all spacy workers to finish
+        for a in analyzers:
+            a.join()
+
+        logging.info('flushing data to index')
+
+        self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                                     wait_if_ongoing=True)
+        logging.info("DONE")
+
+
+    def ftp_connect(self):
+        ftp = FTP(Config.PUBMED_FTP_SERVER, timeout=30*60)
+        ftp.login()
+        ftp.cwd('pubmed/baseline')
+
+        return ftp
+
+
+class PubmedXMLParserProcess(RedisQueueWorkerProcess):
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 es,
+                 dry_run=False):
+        super(PubmedXMLParserProcess, self).__init__(queue_in, redis_path)
+        self.es = Elasticsearch(hosts=Config.ELASTICSEARCH_URL,
+                                maxsize=50,
+                                timeout=1800,
+                                sniff_on_connection_fail=True,
+                                retry_on_timeout=True,
+                                max_retries=10,
+                                )
+        self.publication_chunk_storage = PublicationChunkElasticStorage(Loader(self.es, chunk_size=1000))
+        self.start_time = time.time()  # reset timer start
+        self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
+
+
+    def process(self, data):
+        file_path = data
+        self.logger.info("Process Name {}".format(self.name))
+        self.logger.info('Parsing file %s' % file_path)
+        ''' parse the file and put publication in the queue '''
+        try:
+
+            self.iter_parse_medline_xml(file_path)
+            #self.publication_chunk_storage.storage_flush()
+        except Exception, error:
+            logging.error("Error processing xml file {}".format(file_path))
+            if error:
+                logging.error(str(error))
+            else:
+                logging.error(Exception.message)
+
+        self.logger.info("%s finished" % self.name)
+
+    def iter_parse_medline_xml(self, file ):
+
+            context = etree.iterparse(gzip.open(file, 'rb'), events=('end',))
+
             for event, elem in context:
-                if elem.tag == 'PMID':
-                    pmid = ''
-                    mesh_terms = ''
-                    article_list = []
-                    keywords = ''
-                    publication = {}
-                    pmid = elem.text
-                    publication['pmid'] = pmid
+                if elem.tag == 'PMID' and elem.getparent().tag == 'MedlineCitation':
+                        pmid = ''
+                        mesh_terms = ''
+                        article_list = []
+                        keywords = ''
+                        publication = {}
+                        pmid = elem.text
+                        publication['pmid'] = pmid
                 if elem.tag == 'MeshHeadingList':
-                    mesh_terms = self.parse_mesh_terms(elem)
-                    publication['mesh_terms'] = mesh_terms
+                        mesh_terms = self.parse_mesh_terms(elem)
+                        publication['mesh_terms'] = mesh_terms
                 if elem.tag == 'KeywordList':
-                    keywords = self.parse_keywords(elem)
-                    publication['keywords'] = keywords
+                        keywords = self.parse_keywords(elem)
+                        publication['keywords'] = keywords
                 if elem.tag == 'ChemicalList':
-                    chemicals = self.parse_chemicals(elem)
-                    publication['chemicals'] = chemicals
-                if elem.tag == 'Article' :
-                    article =  self.parse_article_info(elem)
-                    publication['article'] = article
-                    elem.clear()  # discard the element
-                    while elem.getprevious() is not None:
-                        del elem.getparent()[0]
-                    simplejson.dump(publication, handle)
+                        chemicals = self.parse_chemicals(elem)
+                        publication['chemicals'] = chemicals
+                if elem.tag == 'Article':
+                        article = self.parse_article_info(elem)
+                        publication['article'] = article
+                        # elem.clear()  # discard the element
+                        # while elem.getprevious() is not None:
+                        #     del elem.getparent()[0]
+                        # simplejson.dump(publication, handle)
 
+                if elem.tag == 'MedlineCitation':
+                        elem.clear()  # discard the element
+                        while elem.getprevious() is not None:
+                            del elem.getparent()[0]
+                        self.store_publication(publication)
 
+            del context
 
-        #del context
+    def store_publication(self, publication):
+        try:
 
+            pub = Publication(pub_id=publication['pmid'],
+                          title=publication['article']['title'],
+                          abstract=publication['article']['abstract'],
+                          authors=publication['article']['authors'],
+                          year=publication['article']['pub_year'],
+                          #date=publication["firstPublicationDate"],
+                          journal=publication['article']['journal'],
+                          # full_text=u"",
+                          # full_text_url=publication['fullTextUrlList']['fullTextUrl'],
+                          epmc_keywords=publication.get('keywords',[]),
+                          doi=publication['article']['doi'],
+                          # cited_by=publication['citedByCount'],
+                          # has_text_mined_terms=publication['hasTextMinedTerms'] == u'Y',
+                          # has_references=publication['hasReferences'] == u'Y',
+                          # is_open_access=publication['isOpenAccess'] == u'Y',
+                          pub_type=publication['article']['pub_types'],
+                          )
+            if 'mesh_terms' in publication:
+                pub.mesh_headings = publication['mesh_terms']
+            if 'chemicalList' in publication:
+                pub.chemicals = publication['chemicals']
+        # if 'dateOfRevision' in publication:
+        #     pub.date_of_revision = publication["dateOfRevision"]
+        #
+        # if pub.has_text_mined_entities:
+        #     self.get_epmc_text_mined_entities(pub)
+        # if pub.has_references:
+        #     self.get_epmc_ref_list(pub)
 
-
+            self.publication_chunk_storage.storage_add(publication['pmid'],pub)
+        except Exception, error:
+            logging.info("Error loading publication data to index ")
+            if error:
+                logging.info(str(error))
+            else:
+                logging.info(Exception.message)
 
     def stringify_children(self,node):
 
@@ -689,15 +914,13 @@ class PubmedLiteratureParser(object):
 
     def parse_mesh_terms(self,element):
         mesh_terms = []
-        for descriptor in element.findall('DescriptorName'):
-            mesh_terms.append(descriptor.text)
+        for mesh_heading in element.findall('MeshHeading'):
+            mesh_terms.append(mesh_heading.find('DescriptorName').text)
 
         return mesh_terms
 
     def parse_keywords(self,element):
-
         keywords = list()
-
         for k in element.findall('Keyword'):
             keywords.append(k.text)
         keywords = '; '.join(keywords)
@@ -716,7 +939,6 @@ class PubmedLiteratureParser(object):
 
     def parse_article_info(self,element):
         article = {}
-
 
         if element.find('ArticleTitle') is not None:
             title = self.stringify_children(element.find('ArticleTitle'))
@@ -755,15 +977,49 @@ class PubmedLiteratureParser(object):
 
         journal = element.find('Journal')
         journal_name = ' '.join(journal.xpath('Title/text()'))
-        #pubdate = date_extractor(journal, year_info_only)
 
-        article['title']= title
+        issue = journal.xpath('JournalIssue')[0]
+        issue_date = issue.find('PubDate')
+        if issue_date.find('Year') is not None:
+            article['pub_year'] = element.find('PublicationTypeList').text
+        else:
+            article['pub_year'] = ''
+
+        article['title'] = title
         article['abstract'] = abstract
         article['journal'] = journal_name
         article['authors'] = authors_info
 
+        pub_types = []
+        pub_type_list = element.find('PublicationTypeList')
+        for pub_type in pub_type_list.findall('PublicationType'):
+            pub_types.append(pub_type.text)
+        article['pub_types'] = pub_types
+
+        doi_list = []
+        doi_elem = element.find('ELocationID')
+        if doi_elem is not None:
+            if doi_elem.get('EIdType') == 'doi':
+                doi_list.append(doi_elem.text)
+        article['doi'] = doi_list
 
         return article
 
+class PublicationChunkElasticStorage():
+    def __init__(self, loader,):
+        self.loader = loader
+        self.logger = logging.getLogger(__name__)
 
+    def storage_create_index(self, recreate=False):
+        self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate = recreate)
 
+    def storage_add(self, pub_id, publication_data):
+
+        self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                        Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                        pub_id,
+                        publication_data,
+                        create_index=False)
+
+    def storage_flush(self):
+        self.loader.flush()
