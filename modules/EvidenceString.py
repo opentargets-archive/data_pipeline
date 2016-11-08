@@ -215,7 +215,6 @@ class ProcessedEvidenceStorer():
 
         # self.cache[id] = ev
         self.counter +=1
-
         self.es_loader.put(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-'+Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
                            ev.get_doc_name(),
                            id,
@@ -915,7 +914,6 @@ class EvidenceProcesser(multiprocessing.Process):
                         self.output_computed_count.value +=1
 
                 except Exception, error:
-                    logger.info("Error!!! "   )
                     if error:
                         logger.info(str(error))
                     else:
@@ -1038,6 +1036,10 @@ class EvidenceStringProcess():
                                 recreate=overwrite_indices)
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
+        if datasources:
+            self.es_query.delete_evidence_for_datasources(datasources)
+
+
         '''create queues'''
         input_q = multiprocessing.Queue(maxsize=get_evidence_page_size+1)
         output_q = multiprocessing.Queue(maxsize=get_evidence_page_size)
