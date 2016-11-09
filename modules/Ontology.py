@@ -594,10 +594,9 @@ class PhenotypeSlim():
         '''
         self.phenotypes = OntologyClassReader()
         self.phenotypes.load_hpo_classes()
-        #self.phenotypes.load_mp_classes()
-        self.phenotypes.get_classes_paths(root_uri="http://purl.obolibrary.org/obo/HP_0000118")
-
-        logger.debug(json.dumps(self.phenotypes.classes_paths["http://purl.obolibrary.org/obo/HP_0000319"], indent=2))
+        self.phenotypes.get_classes_paths(root_uri='http://purl.obolibrary.org/obo/HP_0000118')
+        self.phenotypes.load_mp_classes()
+        self.phenotypes.get_classes_paths(root_uri='http://purl.obolibrary.org/obo/MP_0000001')
 
     def exclude_phenotypes(self, l):
         '''
@@ -620,30 +619,6 @@ class PhenotypeSlim():
                     ancestor = result['ancestor']['value']
                     al.append(ancestor)
                     self.exclude_phenotypes(al)
-
-    def generate_ttl_query(self, filename):
-
-        with open(filename, 'w') as hfile:
-            # create restricted list
-            print ",".join(self.phenotype_top_levels.keys())
-            for p in self.phenotype_top_levels:
-                if p in self.phenotype_map:
-                    self.exclude_phenotypes(self.phenotype_map[p]['superclasses'])
-            # return
-
-            hfile.write("@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n")
-
-            for k, v in self.phenotype_map.iteritems():
-                count = 0
-                if k not in self.phenotype_excluded:
-                    hfile.write("<%s> rdfs:label \"%s\" .\n" % (k, v['label']))
-                    if k in self.phenotype_top_levels:
-                        hfile.write("<%s> rdfs:subClassOf <http://www.ebi.ac.uk/efo/EFO_0000651> .\n" % k)
-                    else:
-                        for p in v['superclasses']:
-                            hfile.write("<%s> rdfs:subClassOf <%s> .\n" % (k, p))
-
-        hfile.close()
 
     def _store_remote_filename(self, filename):
         print "%s" % filename
@@ -724,8 +699,9 @@ class PhenotypeSlim():
                 except AuthenticationException:
                     self.logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
 
-        self.generate_phenotype_map()
-        #self.generate_ttl_query(Config.ONTOLOGY_SLIM_FILE)
+        for uri, p in self.phenotype_map.iteritems():
+            logger.debug(uri)
+            logger.debug(json.dumps(p, indent=2))
 
     def parse_gzipfile(self, filename, mode, fileobj, mtime):
 
@@ -767,16 +743,9 @@ class PhenotypeSlim():
 
                 if obj.disease.id:
                     for id in obj.disease.id:
-                        if re.match('http://purl.obolibrary.org/obo/HP_\d+', id):
+                        if re.match('http://purl.obolibrary.org/obo/HP_\d+', id) or re.match('http://purl.obolibrary.org/obo/MP_\d+', id):
                             ''' get all terms '''
-                            self.get_ontology_path2('http://purl.obolibrary.org/obo/HP_0000118', id)
-
-                        elif re.match('http://purl.obolibrary.org/obo/MP_\d+', id):
-                            ''' get all terms '''
-                            self.get_ontology_path2('http://purl.obolibrary.org/obo/MP_0000001', id)
-                        elif re.match('http://www.orpha.net/ORDO/Orphanet_\d+', id):
-                            ''' just map to the genetic disorders '''
-                            self.get_ontology_path('http://www.ebi.ac.uk/efo/EFO_0000508', id)
+                            self.phenotype_map[id] = self.phenotypes.classes_paths[id]
 
         fh.close()
 
@@ -805,8 +774,8 @@ def main():
     #obj.parse_owl_url()
 
     obj = PhenotypeSlim()
-    obj.load_all_phenotypes()
-    #obj.create_phenotype_slim(local_files=[])
+    #obj.load_all_phenotypes()
+    obj.create_phenotype_slim(local_files=['/Users/koscieln/Documents/work/gitlab/data_pipeline/samples/cttv008-22-07-2016.json.gz'])
 
 
 if __name__ == "__main__":
