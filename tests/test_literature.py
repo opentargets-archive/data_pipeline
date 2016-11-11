@@ -74,7 +74,7 @@ class LiteratureTestCase(unittest.TestCase):
         p = PipelineConnectors()
         p.init_services_connections()
         with Loader(p.es ,chunk_size=1000) as loader:
-            PubmedLiteratureProcess(p.es,loader,p.r_server).process_publication()
+            PubmedLiteratureProcess(p.es,loader,p.r_server).fetch()
 
 
 if __name__ == '__main__':
