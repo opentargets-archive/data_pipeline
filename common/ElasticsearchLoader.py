@@ -4,13 +4,6 @@ from collections import defaultdict
 from datetime import datetime
 import time
 import logging
-from difflib import Differ
-from pprint import pprint
-from unittest import TestCase
-
-import collections
-
-import sys
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import parallel_bulk, bulk
 from sqlalchemy import and_
@@ -18,7 +11,6 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.EvidenceJsonUtils import assertJSONEqual
 from common.PGAdapter import ElasticsearchLoad
-from common.processify import processify
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
 __author__ = 'andreap'
@@ -155,7 +147,6 @@ class JSONObjectStorage():
     @staticmethod
     def paginated_query(q, page_size = 1000):
         offset = 0
-        # @processify
         def get_results():
             return q.limit(page_size).offset(offset)
         while True:
