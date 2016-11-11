@@ -5,6 +5,9 @@ from common.ElasticsearchQuery import ESQuery
 from modules.ECO import ECOLookUpTable
 from modules.EFO import EFOLookUpTable
 from modules.GeneData import GeneLookUpTable
+from modules.Literature import LiteratureLookUpTable
+from modules.Ontology import OntologyClassReader
+
 
 class LookUpData():
     def __init__(self):
@@ -21,6 +24,9 @@ class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
     ECO = 'eco'
+    PUBLICATION = 'publication'
+    MP = 'mp'
+    HPO = 'hpo'
 
 class LookUpDataRetriever(object):
     def __init__(self,
@@ -36,18 +42,24 @@ class LookUpDataRetriever(object):
             self.esquery = ESQuery(es)
         self.lookup = LookUpData()
         self.logger = logging.getLogger(__name__)
-        start_time = time.time()
+        #TODO: run the steps in parallel to speedup loading times
         for dt in tqdm(data_types,
                          desc='loading lookup data',
                          unit=' steps',
                          leave=False,
                          ):
+            start_time = time.time()
             if dt == LookUpDataType.TARGET:
                 self._get_gene_info(targets)
             elif dt == LookUpDataType.DISEASE:
                 self._get_available_efos()
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
+            elif dt == LookUpDataType.MP:
+                self._get_mp()
+            elif dt == LookUpDataType.HPO:
+                self._get_hpo()
+
             self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
 
 
@@ -81,3 +93,19 @@ class LookUpDataRetriever(object):
                 self.lookup.non_reference_genes[symbol]['reference']=ensg
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
+
+    def _get_hpo(self):
+        '''
+        Load HPO to accept phenotype terms that are not in EFO
+        :return:
+        '''
+        self.lookup.hpo_ontology = OntologyClassReader()
+        self.lookup.hpo_ontology.load_hpo_classes()
+
+    def _get_mp(self):
+        '''
+        Load MP to accept phenotype terms that are not in EFO
+        :return:
+        '''
+        self.lookup.mp_ontology = OntologyClassReader()
+        self.lookup.mp_ontology.load_mp_classes()
