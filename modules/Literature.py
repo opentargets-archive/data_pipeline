@@ -23,7 +23,7 @@ import multiprocessing
 from settings import Config
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
 
-import pubmed_parser as pp
+# import pubmed_parser as pp
 import json
 import simplejson
 from itertools import chain
