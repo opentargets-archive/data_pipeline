@@ -428,7 +428,8 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
                                element_id,
                                score.to_json(),
                                create_index=False,
-                               routing=score.target['id'])
+                               # routing=score.target['id'],
+                            )
         else:
             logger.warning('Skipped association with score 0: %s'%element_id)
 
