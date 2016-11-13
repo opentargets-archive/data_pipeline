@@ -316,6 +316,12 @@ class DiseaseGraph:
         self.print_rdf_tree_from_root(g)
         self.make_node_graph(g)
 
+    def print_rdf_tree_from_root(self, g):
+        print("STUB for method: print_rdf_tree_from_root()")
+
+    def make_node_graph(self, g):
+        print("STUB for method: make_node_graph()")
+
 
 class DiseaseNode:
     """
