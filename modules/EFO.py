@@ -321,7 +321,7 @@ class DiseaseNode:
     """
     A class representing all triples associated with a particular disease subject
     e.g. asthma: http://www.ebi.ac.uk/efo/EFO_0000270
-    and all its parents and children
+    and its parents and children
     """
 
     def __init__(self, name="name", parents = [], children = []):
