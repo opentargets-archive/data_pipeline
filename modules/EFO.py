@@ -300,3 +300,31 @@ class EFOLookUpTable(object):
 
     def keys(self):
         return self._table.keys()
+
+
+class DiseaseGraph:
+    """
+    A DAG of disease nodes whose elements are instances of class DiseaseNode
+    Input: g - an RDFLib-generated ConjugativeGraph, i.e. list of RDF triples
+    """
+
+    def __init__(self, g):
+        self.g = g
+        self.root = None
+        self.node_map = {}
+        self.node_cnt = 0
+        self.print_rdf_tree_from_root(g)
+        self.make_node_graph(g)
+
+
+class DiseaseNode:
+    """
+    A class representing all triples associated with a particular disease subject
+    e.g. asthma: http://www.ebi.ac.uk/efo/EFO_0000270
+    and all its parents and children
+    """
+
+    def __init__(self, name="name", parents = [], children = []):
+        self.name = name,
+        self.parents = parents
+        self.children = children
