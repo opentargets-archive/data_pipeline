@@ -6,6 +6,7 @@ import json
 import logging
 import uuid
 import datetime
+from threading import Thread
 
 import numpy as np
 np.seterr(divide='warn', invalid='warn')
@@ -484,12 +485,16 @@ class RedisQueueStatusReporter(Process):
 
     def _average_long_interval(self,data,):
         np_data = np.array(data).astype(float)
-        if len(data) > self.history_resolution:
-            normalisation = int(round(len(data)/self.history_resolution))
-            np.mean(np_data[:-(len(data) % normalisation)].reshape(-1, normalisation), axis=1)
-        np_data /= np.max(np.abs(np_data), axis=0) # normalize by max value
-        if np_data.max() >0:
-            np_data *= (self._history_plot_interval / np_data.max()) #map to interval
+        if data:
+            try:
+                if len(data) > self.history_resolution:
+                    normalisation = int(round(len(data)/self.history_resolution))
+                    np.mean(np_data[:-(len(data) % normalisation)].reshape(-1, normalisation), axis=1)
+                np_data /= np.max(np.abs(np_data), axis=0) # normalize by max value
+                if np_data.max() >0:
+                    np_data *= (self._history_plot_interval / np_data.max()) #map to interval
+            except:
+                pass
         return np_data
 
     def _compose_history_line(self, queue_id, key, status = None):
@@ -504,123 +509,136 @@ class RedisQueueStatusReporter(Process):
 
     def sparkplot(self, data):
         output = []
-        max_data = data.max()
-        rounded_data = np.round(data).astype(int)
-        for i, value in enumerate(data):
-            if value==max_data:
-                data_char = Fore.YELLOW+self._history_plot_max+Fore.RESET
-            elif 0.< value <  self._history_plot_interval:
-                data_char = self._history_plot[rounded_data[i]]
-            else:
-                data_char = self._history_plot[0]
-            output.append(data_char)
+        if data.size:
+            max_data = data.max()
+            rounded_data = np.round(data).astype(int)
+            for i, value in enumerate(data):
+                if value == max_data:
+                    data_char = Fore.YELLOW+self._history_plot_max+Fore.RESET
+                elif 0. < value < self._history_plot_interval:
+                    data_char = self._history_plot[rounded_data[i]]
+                else:
+                    data_char = self._history_plot[0]
+                output.append(data_char)
         return u''.join(output)
 
 
-class RedisQueueWorkerProcess(Process):
+def get_redis_worker(base = Process):
     '''
-    Base class for workers attached to the RedisQueue class that runs in a separate process
-    it requires a queue in object to get data from, and a redis connection path.
-    if a queue out is specified it will push the output to that queue.
-    the implemented classes needs to add an implementation of the 'process' method, that either store the output or
-    returns it to be stored in a queue out
+    Factory for returning workers
+    :param base: either a multiprocessing.Process or threading.Thread base class. might work with other base classes with duck typing
+    :return: worker class subclassing the base class
     '''
-    def __init__(self,
-                 queue_in,
-                 redis_path,
-                 queue_out=None,
-                 auto_signal_submission_finished=True,
-                 **kwargs
-                 ):
+
+    class RedisQueueWorkerBase(base):
+        '''
+        Base class for workers attached to the RedisQueue class that runs in a separate process
+        it requires a queue in object to get data from, and a redis connection path.
+        if a queue out is specified it will push the output to that queue.
+        the implemented classes needs to add an implementation of the 'process' method, that either store the output or
+        returns it to be stored in a queue out
+        '''
+        def __init__(self,
+                     queue_in,
+                     redis_path,
+                     queue_out=None,
+                     auto_signal_submission_finished=True,
+                     **kwargs
+                     ):
 
 
-        super(RedisQueueWorkerProcess, self).__init__()
-        self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
-        self.queue_out = queue_out
-        self.r_server = Redis(redis_path, serverconfig={'save': []})
-        self.auto_signal = auto_signal_submission_finished
-        self.queue_in_as_batch = queue_in.batch_size >1
-        if self.queue_out:
-            self.queue_out_batch_size = queue_out.batch_size
-        self.logger = logging.getLogger(__name__)
-        self.logger.info('%s started' % self.name)
-        self.job_result_cache = []
+            super(RedisQueueWorkerBase, self).__init__()
+            self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
+            self.queue_out = queue_out
+            self.r_server = Redis(redis_path, serverconfig={'save': []})
+            self.auto_signal = auto_signal_submission_finished
+            self.queue_in_as_batch = queue_in.batch_size >1
+            if self.queue_out:
+                self.queue_out_batch_size = queue_out.batch_size
+            self.logger = logging.getLogger(__name__)
+            self.logger.info('%s started' % self.name)
+            self.job_result_cache = []
 
 
-    def run(self):
-        while not self.queue_in.is_done(r_server=self.r_server):
-            job = self.queue_in.get(r_server=self.r_server, timeout=1)
+        def run(self):
+            while not self.queue_in.is_done(r_server=self.r_server):
+                job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
-            if job is not None:
-                key, data = job
-                error = False
-                try:
-                    if self.queue_in_as_batch:
-                        job_results = [self.process(d) for d in data]
+                if job is not None:
+                    key, data = job
+                    error = False
+                    try:
+                        if self.queue_in_as_batch:
+                            job_results = [self.process(d) for d in data]
+                        else:
+                            job_results = self.process(data)
+                        if self.queue_out is not None and job_results is not None:
+                            self.put_into_queue_out(job_results, aggregated_input = self.queue_in_as_batch)
+                    except Exception, e:
+                        error = True
+                        self.logger.exception('Error processing key %s' % key)
+
+                    self.queue_in.done(key, error=error, r_server=self.r_server)
+                else:
+                    # self.logger.info('nothing to do in '+self.name)
+                    time.sleep(.01)
+
+            if self.job_result_cache:
+                self._clear_job_results_cache()
+
+            self.logger.info('%s done processing' % self.name)
+            if (self.queue_out is not None) and self.auto_signal:
+                self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
+
+            self.close()
+
+        def _split_iterable(self, input, size):
+                for i in range(0, len(input), size):
+                    yield input[i:i + size]
+
+        def put_into_queue_out(self, result, aggregated_input = False ):
+            if result is not None:
+                if self.queue_out_batch_size > 1:
+                    if aggregated_input:
+                        not_none_results = [r for r in result if r is not None]
+                        for batch in self._split_iterable(not_none_results, self.queue_out_batch_size):
+                            self.queue_out.put(batch, self.r_server)
                     else:
-                        job_results = self.process(data)
-                    if self.queue_out is not None and job_results is not None:
-                        self.put_into_queue_out(job_results, aggregated_input = self.queue_in_as_batch)
-                except Exception, e:
-                    error = True
-                    self.logger.exception('Error processing key %s' % key)
-
-                self.queue_in.done(key, error=error, r_server=self.r_server)
-            else:
-                # self.logger.info('nothing to do in '+self.name)
-                time.sleep(.01)
-
-        if self.job_result_cache:
-            self._clear_job_results_cache()
-
-        self.logger.info('%s done processing' % self.name)
-        if (self.queue_out is not None) and self.auto_signal:
-            self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
-
-        self.close()
-
-    def _split_iterable(self, input, size):
-            for i in range(0, len(input), size):
-                yield input[i:i + size]
-
-    def put_into_queue_out(self, result, aggregated_input = False ):
-        if result is not None:
-            if self.queue_out_batch_size > 1:
-                if aggregated_input:
-                    not_none_results = [r for r in result if r is not None]
-                    for batch in self._split_iterable(not_none_results, self.queue_out_batch_size):
-                        self.queue_out.put(batch, self.r_server)
+                        self.job_result_cache.append(result)
+                        if len(self.job_result_cache) >= self.queue_out_batch_size:
+                            self._clear_job_results_cache()
                 else:
-                    self.job_result_cache.append(result)
-                    if len(self.job_result_cache) >= self.queue_out_batch_size:
-                        self._clear_job_results_cache()
-            else:
-                if aggregated_input:
-                    for r in result:
-                        self.queue_out.put(r, self.r_server)
-                else:
-                    self.queue_out.put(result, self.r_server)
+                    if aggregated_input:
+                        for r in result:
+                            self.queue_out.put(r, self.r_server)
+                    else:
+                        self.queue_out.put(result, self.r_server)
 
-    def _clear_job_results_cache(self):
-        self.queue_out.put(self.job_result_cache, self.r_server)
-        self.job_result_cache = []
+        def _clear_job_results_cache(self):
+            self.queue_out.put(self.job_result_cache, self.r_server)
+            self.job_result_cache = []
 
-    def close(self):
-        '''
-        implement in subclass to clean up loaders and other trailing elements when the processer is done
-        :return:
-        '''
-        pass
+        def close(self):
+            '''
+            implement in subclass to clean up loaders and other trailing elements when the processer is done
+            :return:
+            '''
+            pass
 
-    #TODO: enforce timeout
-    def process(self, data):
-        raise NotImplementedError('please add an implementation to process the data')
+        #TODO: enforce timeout
+        def process(self, data):
+            raise NotImplementedError('please add an implementation to process the data')
 
-    def __enter__(self):
-        pass
+        def __enter__(self):
+            pass
 
-    def __exit__(self, *args):
-        self.close()
+        def __exit__(self, *args):
+            self.close()
+
+    return RedisQueueWorkerBase
+
+RedisQueueWorkerProcess = get_redis_worker()
+RedisQueueWorkerThread = get_redis_worker(base=Thread)
 
 
 
