@@ -80,7 +80,7 @@ class EcoProcess():
 
         self.evidence_ontology = OntologyClassReader()
         self.evidence_ontology.load_evidence_classes()
-        for uri,label in self.evidence_ontology.current_classes.iteritems():
+        for uri,label in self.evidence_ontology.current_classes.items():
             #logger.debug("URI: %s, label:%s"%(uri, label))
             eco = ECO(uri,
                       label,
