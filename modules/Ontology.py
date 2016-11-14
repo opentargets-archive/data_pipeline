@@ -385,8 +385,8 @@ class OntologyClassReader():
         Loads evidence from ECO, SO and the Open Targets evidence classes
         :return:
         '''
-        self.load_ontology_graph('/Users/koscieln/Downloads/eco.owl')
-        self.load_ontology_graph('/Users/koscieln/Downloads/so-xp.owl')
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'so'))
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'eco'))
 
         evidence_uri = URIRef('http://purl.obolibrary.org/obo/ECO_0000000')
 
@@ -438,10 +438,7 @@ class OntologyClassReader():
         # ClinVAR SNP-gene pipeline http://identifiers.org/eco/clinvar_gene_assignments SubclassOf ECO:0000246
         # CTTV-custom annotation pipeline http://identifiers.org/eco/cttv_mapping_pipeline SubclassOf ECO:0000246
 
-        #self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'so'))
-        #self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'eco'))
-
-        for base_class in ['http://purl.obolibrary.org/obo/ECO_0000000']: #, 'http://purl.obolibrary.org/obo/SO_0000400', 'http://purl.obolibrary.org/obo/SO_0001260', 'http://purl.obolibrary.org/obo/SO_0000110', 'http://purl.obolibrary.org/obo/SO_0001060' ]:
+        for base_class in ['http://purl.obolibrary.org/obo/ECO_0000000', 'http://purl.obolibrary.org/obo/SO_0000400', 'http://purl.obolibrary.org/obo/SO_0001260', 'http://purl.obolibrary.org/obo/SO_0000110', 'http://purl.obolibrary.org/obo/SO_0001060' ]:
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
 
