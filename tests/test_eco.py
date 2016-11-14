@@ -65,7 +65,6 @@ def test_eco_load():
     eco_process = EcoProcess()
     assert not eco_process == None
     eco_process._process_ontology_data()
-    return
     obj = eco_process.evidence_ontology
     assert not obj == None
     logger.info(len(obj.current_classes))
@@ -75,8 +74,6 @@ def test_eco_load():
     assert obj.current_classes["http://purl.obolibrary.org/obo/ECO_0000084"] == "gene neighbors evidence"
     assert obj.current_classes["http://purl.obolibrary.org/obo/SO_0002053"] == "gain_of_function_variant"
     assert obj.current_classes["http://purl.obolibrary.org/obo/ECO_0000177"] == "genomic context evidence"
-
-    # Liv Bastiaens , Love Me, Michael Kiwanuka
 
     logger.error("Show classes paths")
     for node, value in obj.classes_paths.iteritems():
