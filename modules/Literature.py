@@ -1,34 +1,33 @@
 #!/usr/local/bin/python
 # coding: latin-1
 import logging
-from pprint import pprint
-
-import requests
-from sklearn.base import TransformerMixin
-from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
-from nltk.corpus import stopwords
-import string
+import multiprocessing
 import re
-from spacy.en import English
+import string
+import time
 from collections import Counter
 
+import requests
+from nltk.corpus import stopwords
+from sklearn.base import TransformerMixin
+from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
+from spacy.en import English
 from tqdm import tqdm
 
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
-import multiprocessing
+from common.Redis import RedisQueue, RedisQueueWorkerProcess
 from settings import Config
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 
-import time
+MAX_PUBLICATION_CHUNKS = 1000
 
-MAX_PUBLICATION_CHUNKS =1000
 
 class LiteratureActions(Actions):
-    FETCH='fetch'
-    PROCESS= 'process'
+    FETCH = 'fetch'
+    PROCESS = 'process'
+
 
 # List of symbols we don't care about
 SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "“", "”", "'ve"]
@@ -60,40 +59,39 @@ class PublicationFetcher(object):
     """
     Retireve data about a publication
     """
-    _QUERY_BY_EXT_ID= '''http://www.ebi.ac.uk/europepmc/webservices/rest/search?pagesize=10&query=EXT_ID:{}&format=json&resulttype=core&page=1&pageSize=1000'''
-    _QUERY_TEXT_MINED='''http://www.ebi.ac.uk/europepmc/webservices/rest/MED/{}/textMinedTerms//1/1000/json'''
-    _QUERY_REFERENCE='''http://www.ebi.ac.uk/europepmc/webservices/rest/MED/{}/references//json'''
+    _QUERY_BY_EXT_ID = '''http://www.ebi.ac.uk/europepmc/webservices/rest/search?pagesize=10&query=EXT_ID:{}&format=json&resulttype=core&page=1&pageSize=1000'''
+    _QUERY_TEXT_MINED = '''http://www.ebi.ac.uk/europepmc/webservices/rest/MED/{}/textMinedTerms//1/1000/json'''
+    _QUERY_REFERENCE = '''http://www.ebi.ac.uk/europepmc/webservices/rest/MED/{}/references//json'''
 
-    #"EXT_ID:17440703 OR EXT_ID:17660818 OR EXT_ID:18092167 OR EXT_ID:18805785 OR EXT_ID:19442247 OR EXT_ID:19808788 OR EXT_ID:19849817 OR EXT_ID:20192983 OR EXT_ID:20871604 OR EXT_ID:21270825"
+    # "EXT_ID:17440703 OR EXT_ID:17660818 OR EXT_ID:18092167 OR EXT_ID:18805785 OR EXT_ID:19442247 OR EXT_ID:19808788 OR EXT_ID:19849817 OR EXT_ID:20192983 OR EXT_ID:20871604 OR EXT_ID:21270825"
 
-    def __init__(self, es, loader = None):
+    def __init__(self, es, loader=None):
         if loader is None:
             self.loader = Loader(es)
         else:
-            self.loader=loader
+            self.loader = loader
         self.es = es
-        self.es_query=ESQuery(es)
+        self.es_query = ESQuery(es)
         self.logger = logging.getLogger(__name__)
-
 
     def get_publication(self, pub_ids):
 
         if isinstance(pub_ids, (str, unicode)):
-            pub_ids=[pub_ids]
+            pub_ids = [pub_ids]
 
         '''get from elasticsearch cache'''
-        logging.info( "getting pub id {}".format( pub_ids))
-        pubs ={}
+        logging.info("getting pub id {}".format(pub_ids))
+        pubs = {}
         for pub_source in self.es_query.get_publications_by_id(pub_ids):
-            logging.info( 'got pub %s from cache'%pub_source['pub_id'])
+            logging.info('got pub %s from cache' % pub_source['pub_id'])
             pub = Publication()
             pub.load_json(pub_source)
             pubs[pub.pub_id] = pub
-        if len(pubs)<pub_ids:
+        if len(pubs) < pub_ids:
             for pub_id in pub_ids:
                 if pub_id not in pubs:
-                    logging.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
-                    r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
+                    logging.info('getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
+                    r = requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
                     r.raise_for_status()
                     result = r.json()['resultList']['result'][0]
                     pub = Publication(pub_id=pub_id,
@@ -114,7 +112,7 @@ class PublicationFetcher(object):
                                       pub_type=result['pubTypeList']['pubType'],
                                       )
                     if 'meshHeadingList' in result:
-                        pub. mesh_headings = result['meshHeadingList']['meshHeading']
+                        pub.mesh_headings = result['meshHeadingList']['meshHeading']
                     if 'chemicalList' in result:
                         pub.chemicals = result['chemicalList']['chemical']
                     if 'dateOfRevision' in result:
@@ -148,23 +146,22 @@ class PublicationFetcher(object):
         json_response = r.json()
         if u'referenceList' in json_response:
             result = [i[u'id'] for i in json_response[u'referenceList'][u'reference'] if u'id' in i]
-            pub.references=result
+            pub.references = result
         return pub
 
 
 class Publication(JSONSerializable):
-
     def __init__(self,
-                 pub_id = u"",
-                 title = u"",
-                 abstract = u"",
-                 authors = [],
-                 year = None,
-                 date = None,
-                 journal = u"",
-                 full_text = u"",
-                 epmc_text_mined_entities = {},
-                 epmc_keywords = [],
+                 pub_id=u"",
+                 title=u"",
+                 abstract=u"",
+                 authors=[],
+                 year=None,
+                 date=None,
+                 journal=u"",
+                 full_text=u"",
+                 epmc_text_mined_entities={},
+                 epmc_keywords=[],
                  full_text_url=[],
                  doi=u'',
                  cited_by=None,
@@ -200,6 +197,7 @@ class Publication(JSONSerializable):
         self.mesh_headings = mesh_headings
         self.chemicals = chemicals
 
+
 class PublicationAnalysis(JSONSerializable):
     """
     Base class for all publication analysis
@@ -230,42 +228,38 @@ class PublicationAnalysisSpacy(PublicationAnalysis):
         self.noun_chunks = noun_chunks
         self.analysed_sentences_count = analysed_sentences_count
 
-
     def get_type(self):
         '''Define the type for elasticsearch here'''
         return Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME
 
 
-
 class PublicationAnalyserSpacy(object):
-    def __init__(self, fetcher, es, loader = None):
+    def __init__(self, fetcher, es, loader=None):
         if loader is None:
             self.loader = Loader(es)
         self.fetcher = fetcher
         self.logger = logging.getLogger(__name__)
         self.parser = English()
         # A custom stoplist
-        STOPLIST = set(stopwords.words('english') + ["n't", "'s", "'m", "ca","p","t"] + list(ENGLISH_STOP_WORDS))
-        ALLOWED_STOPLIST=set(('non'))
+        STOPLIST = set(stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS))
+        ALLOWED_STOPLIST = set(('non'))
         self.STOPLIST = STOPLIST - ALLOWED_STOPLIST
 
-
-    def analyse_publication(self, pub_id, pub = None):
+    def analyse_publication(self, pub_id, pub=None):
 
         if pub is None:
             pub = self.fetcher.get_publication(pub_ids=pub_id)
 
         text_to_parse = unicode(pub.title + ' ' + pub.abstract)
         lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
-        lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
-        noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
-        analysed_pub = PublicationAnalysisSpacy(pub_id = pub_id,
-                                        lemmas=lemmas,
-                                        noun_chunks=noun_chunks,
-                                        analysed_sentences_count=analysed_sentences_count)
+        lemmas = tuple({'value': k, "count": v} for k, v in lemmas.items())
+        noun_chunks = tuple({'value': k, "count": v} for k, v in noun_chunks.items())
+        analysed_pub = PublicationAnalysisSpacy(pub_id=pub_id,
+                                                lemmas=lemmas,
+                                                noun_chunks=noun_chunks,
+                                                analysed_sentences_count=analysed_sentences_count)
 
         return analysed_pub
-
 
     def _spacy_analyser(self, abstract):
         # #TODO: see PriYanka notebook tests, and/or code below
@@ -283,7 +277,7 @@ class PublicationAnalyserSpacy(object):
                     try:
                         ec[e_str] += tl.count(e_str)
                     except:
-                     logging.info(e_str)
+                        logging.info(e_str)
                         #            print( e_str, e_str in STOPLIST)
                         #        print (e.label, repr(e.label_),  ' '.join(t.orth_ for t in e))
         # print('FILTERED NOUN CHUNKS:')
@@ -291,7 +285,6 @@ class PublicationAnalyserSpacy(object):
         #     print k, round(float(v) / sents_count, 3)
 
         return lemmas, ec, sents_count
-
 
     # A custom function to tokenize the text using spaCy
     # and convert to lemmas
@@ -345,7 +338,6 @@ class PublicationAnalyserSpacy(object):
     def transform_doc(self, doc):
 
         for ent in doc.ents:
-
             ent.merge(ent.root.tag_, ent.text, LABELS[ent.label_])
 
         for np in list(doc.noun_chunks):
@@ -366,51 +358,47 @@ class PublicationAnalyserSpacy(object):
 
 
 class Literature(object):
-
-
     def __init__(self,
                  es,
                  loader,
                  r_server=None,
                  ):
         self.es = es
-        self.es_query=ESQuery(es)
+        self.es_query = ESQuery(es)
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
         if not self.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
-
     def fetch(self,
               datasources=[],
               ):
 
-        #TODO: load everything with a fetcher in parallel
+        # TODO: load everything with a fetcher in parallel
         pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
-        fetched_pub_ids=set()
+        fetched_pub_ids = set()
         for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
-                    desc='Reading available evidence_strings to fetch publications ids',
-                    total = self.es_query.count_validated_evidence_strings(datasources= datasources),
-                    unit=' evidence',
-                    unit_scale=True):
-            pub_id= self.get_pub_id_from_url(ev)
+                       desc='Reading available evidence_strings to fetch publications ids',
+                       total=self.es_query.count_validated_evidence_strings(datasources=datasources),
+                       unit=' evidence',
+                       unit_scale=True):
+            pub_id = self.get_pub_id_from_url(ev)
             if pub_id not in fetched_pub_ids:
                 pubs = pub_fetcher.get_publication(pub_id)
                 fetched_pub_ids.add(pub_id)
 
-
     def process(self,
                 datasources=[],
                 ):
-        #TODO: process everything with an analyser in parallel
+        # TODO: process everything with an analyser in parallel
 
 
         # for t in [text, text2, text3, text4, text5, text6]:
         pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
         pub_analyser = PublicationAnalyserSpacy(pub_fetcher, self.es, self.loader)
 
-        #todo, add method to process all cached publications??
+        # todo, add method to process all cached publications??
 
         # Literature Queue
         literature_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_analyzer_q',
@@ -431,26 +419,26 @@ class Literature(object):
         for a in analyzers:
             a.start()
 
-        #TODO : Use separate queue for retrieving evidences?
+        # TODO : Use separate queue for retrieving evidences?
 
         for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
-                    desc='Reading available evidence_strings to analyse publications',
-                    total = self.es_query.count_validated_evidence_strings(datasources= datasources),
-                    unit=' evidence',
-                    unit_scale=True):
-            pub_id= self.get_pub_id_from_url(ev)
+                       desc='Reading available evidence_strings to analyse publications',
+                       total=self.es_query.count_validated_evidence_strings(datasources=datasources),
+                       unit=' evidence',
+                       unit_scale=True):
+            pub_id = self.get_pub_id_from_url(ev)
             pubs = pub_fetcher.get_publication(pub_id)
 
             literature_q.put(pubs)
             # TODO - auditing?
-        #wait for all spacy workers to finish
+        # wait for all spacy workers to finish
         for a in analyzers:
-                a.join()
+            a.join()
 
         logging.info('flushing data to index')
 
         self.es_loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-            wait_if_ongoing=True)
+                                        wait_if_ongoing=True)
         logging.info("DONE")
 
     @staticmethod
@@ -516,7 +504,6 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
         publications = data
         logging.info("In LiteratureAnalyzerProcess- {} ".format(self.name))
         for pub_id, pub in publications.items():
-
             spacy_analysed_pub = self.pub_analyser.analyse_publication(pub_id=pub_id,
                                                                        pub=pub)
 
