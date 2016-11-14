@@ -132,12 +132,12 @@ class Config():
     # Current genome Assembly
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     # Change this if you don't want to send e-mails
-    EVIDENCEVALIDATION_SEND_EMAIL = True
+    EVIDENCEVALIDATION_SEND_EMAIL = False
     EVIDENCEVALIDATION_SENDER_ACCOUNT = 'no_reply@targetvalidation.org'
     MAILGUN_DOMAIN = "https://api.mailgun.net/v3/mg.targetvalidation.org"
     MAILGUN_MESSAGES = MAILGUN_DOMAIN+'/messages'
     MAILGUN_API_KEY = "key-b7986f9a29fe234733b0af3b1206b146"
-    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
+    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'andreap@targetvalidation.org', ]
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', ]
@@ -150,7 +150,7 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
     # ftp user and passwords
-    EVIDENCEVALIDATION_FTP_HOST= dict( host = '192.168.1.150',
+    EVIDENCEVALIDATION_FTP_HOST= dict( host = 'ftp.targetvalidation.org',
                                        port = 22)
     EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}\.json\.gz$"
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
@@ -163,7 +163,7 @@ class Config():
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv008"] = '409a0d21'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv007"] = 'a6052a3b'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv025"] = 'd2b315fa'
-    # # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
+    # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
 
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
