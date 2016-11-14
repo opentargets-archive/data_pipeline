@@ -445,6 +445,26 @@ class OntologyClassReader():
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
 
+class DiseaseUtils():
+
+    def __init__(self):
+
+        self.diseases = OntologyClassReader()
+        self.diseases.load_efo_classes()
+        self.diseases.get_classes_paths(root_uri="http://www.ebi.ac.uk/efo/EFO_0000408")
+
+    def get_disease_tas(self, filename=None):
+
+        # get all tas per
+        fh = open(filename, 'w')
+        for uri, label in self.diseases.current_classes.items():
+            if uri in self.diseases.classes_paths and uri != "http://www.ebi.ac.uk/efo/EFO_0000408":
+                tas = map(lambda x: x[1]['label'], self.diseases.classes_paths[uri]['all'])
+                fh.write("%s\t%s\t%s\n"%(uri, label, ",".join(set(tas))))
+        fh.close()
+
+
+
 class DiseasePhenotypes():
 
     def __init__(self):
