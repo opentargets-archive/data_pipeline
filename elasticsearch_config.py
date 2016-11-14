@@ -508,6 +508,14 @@ class ElasticSearchConfiguration():
                     #                     "index" : "not_analyzed"
                     #                     },
                     #                 },
+                    "protein_class": {
+                        "properties": {
+                            "label": {
+                                "type": "string",
+                                "index" : "not_analyzed"
+                            }
+                        }
+                    },
                     "_private": {
                         # "type" : "object",
                         "properties": {
@@ -750,7 +758,7 @@ class ElasticSearchConfiguration():
                           "mappings": {
                               Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {
                                   "_all": {"enabled": True},
-                                  "_routing": {"required": True,},
+                                  # "_routing": {"required": True,},
                                   "properties": {
                                       "target": {
                                           "properties": {

@@ -350,10 +350,8 @@ if __name__ == '__main__':
                 DiseasePhenotypes().parse_owl_url()
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
-            if (ValidationActions.GENEMAPPING in args.val) or do_all:
-                EvidenceValidationFileChecker(connectors.adapter, connectors.es, connectors.r_server).map_genes()
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(connectors.adapter, connectors.es, connectors.r_server).check_all(args.local_file)
+                EvidenceValidationFileChecker(connectors.es, connectors.r_server, dry_run=args.dry_run).check_all(args.local_file)
         if args.valreset:
             EvidenceValidationFileChecker(connectors.adapter, connectors.es, connectors.r_server).reset()
         if args.evs or run_full_pipeline:
