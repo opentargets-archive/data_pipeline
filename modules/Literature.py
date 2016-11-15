@@ -26,8 +26,9 @@ from itertools import chain
 
 import time
 from lxml import etree,objectify
-from ftplib import FTP
+from ftplib import FTP,all_errors
 import os
+import errno
 
 MAX_PUBLICATION_CHUNKS =1000
 
@@ -141,7 +142,7 @@ class PublicationFetcher(object):
             #             pubs[pub.pub_id] = pub
             #     self.loader.flush()
         except Exception, error:
-            logging.info("Error in retrieving publication data for pmid {} ".format(pub_ids))
+            logging.error("Error in retrieving publication data for pmid {} ".format(pub_ids))
             if error:
                 logging.info(str(error))
             else:
@@ -654,7 +655,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
 
 
         except Exception, error:
-            logging.info("Error in loading analysed publication for pmid {}".format(pub_id))
+            logging.error("Error in loading analysed publication for pmid {}".format(pub_id))
             if error:
                 logging.info(str(error))
             else:
@@ -667,16 +668,17 @@ class PubmedLiteratureProcess(object):
     def __init__(self,
                  es,
                  loader,
+                 dry_run=False,
                  r_server=None,
                  ):
         self.es =es
         self.loader = loader
+        self.dry_run = dry_run
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
 
-
-    def fetch(self,dry_run=False):
-
+    def fetch(self, local_file_locn = []):
+        ts = time.time()
         if not self.loader.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
         self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
@@ -711,7 +713,7 @@ class PubmedLiteratureProcess(object):
         readers = [PubmedXMLReaderProcess(literature_reader_q,
                                           self.r_server.db,
                                           literature_parser_q,
-                                          dry_run
+                                          self.dry_run
                                           )
                    for i in range(no_of_workers)]
 
@@ -724,7 +726,7 @@ class PubmedLiteratureProcess(object):
         parsers = [PubmedXMLParserProcess(literature_parser_q,
                                      self.r_server.db,
                                      literature_loader_q,
-                                     dry_run
+                                     self.dry_run
                                      )
                    for i in range(no_of_workers)]
 
@@ -735,42 +737,47 @@ class PubmedLiteratureProcess(object):
         '''Fixed number of workers to reduce the overhead of creating ES connections for each worker process'''
         loaders = [LiteratureLoaderProcess(literature_loader_q,
                                           self.r_server.db,
-                                          dry_run
+                                          self.dry_run
                                           )
                    for i in range(no_of_workers)]
 
         for w in loaders:
             w.start()
 
+        if local_file_locn:
+            xml_location = local_file_locn[0] + '/'
+        else:
+            xml_location = Config.PUBMED_XML_LOCN
+            try:
+                os.makedirs(xml_location)
+            except OSError as exception:
+                if exception.errno != errno.EEXIST:
+                    raise
+                else:
+                    logging.error("\n Directory %s already exists.".format(xml_location))
 
-
-
-
-        max_attempts = 5
         ftp = self.ftp_connect()
         files = ftp.nlst()
-        temp_location = '../temp_xml/'
+        max_attempts = 5
 
+        # TODO : for testing
+        # for j in range(len(files)):
+        for j in range(800, 812):
 
-        #TODO : for testing
-        #for j in range(len(files)):
-        for j in range(800,803):
             try:
 
-                if not os.path.isfile(temp_location + files[j]):
-                    handle = open(os.path.join(temp_location, files[j]), 'wb')
-                    ftp.retrbinary('RETR ' + files[j], handle.write)
-                    handle.close()
-                literature_reader_q.put(temp_location + files[j])
+                if not os.path.isfile(xml_location + files[j]):
+                    self.download_file(ftp, xml_location, files[j])
+                literature_reader_q.put(xml_location + files[j])
 
-
-            except Exception:
+            except all_errors as e:
+                logging.error("Error downloading medline file {} from FTP server".format(files[j]), str(e))
                 if max_attempts != 0:
-                    logging.error("Error while downloading files from FTP server")
-                    ftp=self.ftp_connect()
+                    ftp = self.ftp_connect()
                     max_attempts -= 1
                 else:
                     break
+
         literature_reader_q.set_submission_finished(r_server=self.r_server)
 
         for r in readers:
@@ -782,17 +789,16 @@ class PubmedLiteratureProcess(object):
         for l in loaders:
                 l.join()
 
-
-
-
         logging.info('flushing data to index')
 
         self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
             wait_if_ongoing=True)
+        te = time.time()
+        logging.info("Total time taken {}".format(te-ts))
         logging.info("DONE")
 
 
-    def process(self,datasources=[],dry_run=False):
+    def process(self, datasources=[]):
         # Literature Queue
         literature_analyzer_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_analyzer_q',
                                   max_size=MAX_PUBLICATION_CHUNKS,
@@ -803,7 +809,7 @@ class PubmedLiteratureProcess(object):
         # Start literature-analyser-worker processes
         analyzers = [LiteratureAnalyzerProcess(literature_analyzer_q,
                                                self.r_server.db,
-                                               dry_run,
+                                               self.dry_run,
                                                ) for i in range(no_of_workers)]
 
         for a in analyzers:
@@ -841,6 +847,12 @@ class PubmedLiteratureProcess(object):
 
         return ftp
 
+    def download_file(self,ftp,xml_location,file):
+        handle = open(os.path.join(xml_location, file), 'wb')
+        ftp.retrbinary('RETR ' + file, handle.write)
+        handle.close()
+
+
 class PubmedXMLReaderProcess(RedisQueueWorkerProcess):
 
     def __init__(self,
@@ -856,8 +868,8 @@ class PubmedXMLReaderProcess(RedisQueueWorkerProcess):
 
     def process(self, data):
         file_path = data
-        self.logger.info("Process Name {}".format(self.name))
-        self.logger.info('Reading file %s' % file_path)
+        self.logger.debug("Process Name {}".format(self.name))
+        self.logger.debug('Reading file %s' % file_path)
         ''' read xml file and put each medline record in the parser queue '''
         try:
             self.read_medline_xml(file_path)
@@ -870,7 +882,7 @@ class PubmedXMLReaderProcess(RedisQueueWorkerProcess):
             else:
                 logging.error(Exception.message)
 
-        self.logger.info("%s finished" % self.name)
+        self.logger.debug("%s finished" % self.name)
 
     def read_medline_xml(self, file):
 
@@ -881,11 +893,11 @@ class PubmedXMLReaderProcess(RedisQueueWorkerProcess):
             f.next()
             for line in f:
 
-                if(line.__contains__("<MedlineCitation Owner")):
-                     record =  ""
+                if line.__contains__("<MedlineCitation Owner"):
+                     record = ""
                      record +=line
 
-                elif (line.__contains__("</MedlineCitation>")):
+                elif line.__contains__("</MedlineCitation>"):
                      record += line
                      self.queue_out.put((record, file),self.r_server)
 
@@ -913,79 +925,72 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         self.logger = logging.getLogger(__name__)
 
 
-    def process(self, data):
+    def process(self,data):
         medline_record,filename = data
-        self.logger.info("Process Name {}".format(self.name))
+        self.logger.debug("Process Name {}".format(self.name))
+
         ''' parse the file and put publication in the queue '''
-        try:
+        self.parse_medline_xml_record(medline_record,filename)
 
-            self.parse_medline_xml_record(medline_record,filename)
-
-        except Exception, error:
-            logging.error("Error processing xml file {}".format(medline_record))
-            if error:
-                logging.error(str(error))
-            else:
-                logging.error(Exception.message)
-
-        self.logger.info("%s finished" % self.name)
+        self.logger.debug("%s finished" % self.name)
 
     def parse_medline_xml_record(self, record, filename):
 
         publication = dict()
-        medline = objectify.fromstring(record)
-        publication['pmid'] = medline.PMID.text
-        for e in medline.Article.iterchildren():
-            if e.tag == 'ArticleTitle':
-                publication['title'] = e.text
-            if e.tag == 'Abstract':
-                publication['abstract'] = e.AbstractText.text
+        try:
+            medline = objectify.fromstring(record)
+            publication['pmid'] = medline.PMID.text
+            for e in medline.Article.iterchildren():
+                if e.tag == 'ArticleTitle':
+                    publication['title'] = e.text
+                if e.tag == 'Abstract':
+                    publication['abstract'] = e.AbstractText.text
 
-        publication['filename'] = filename
-        self.queue_out.put(publication,self.r_server)
+            publication['filename'] = filename
+            self.queue_out.put(publication,self.r_server)
+        except etree.XMLSyntaxError as e:
+            logging.error("Error parsing XML file {} - medline record {}".format(filename,record),str(e))
 
-
-    def iter_parse_medline_xml(self, record):
-
-           # context = etree.iterparse(gzip.open(file, 'rb'), events=('end',))
-            context = etree.parse(record)
-
-            for event, elem in context:
-                if elem.tag == 'PMID' and elem.getparent().tag == 'MedlineCitation':
-                        pmid = ''
-                        mesh_terms = ''
-                        article_list = []
-                        keywords = ''
-                        publication = {}
-                        pmid = elem.text
-                        publication['pmid'] = pmid
-                if elem.tag == 'MeshHeadingList':
-                        mesh_terms = self.parse_mesh_terms(elem)
-                        publication['mesh_terms'] = mesh_terms
-                if elem.tag == 'KeywordList':
-                        keywords = self.parse_keywords(elem)
-                        publication['keywords'] = keywords
-                if elem.tag == 'ChemicalList':
-                        chemicals = self.parse_chemicals(elem)
-                        publication['chemicals'] = chemicals
-                if elem.tag == 'Article':
-                        article = self.parse_article_info(elem)
-                        publication['article'] = article
-                        # elem.clear()  # discard the element
-                        # while elem.getprevious() is not None:
-                        #     del elem.getparent()[0]
-                        # simplejson.dump(publication, handle)
-
-                if elem.tag == 'MedlineCitation':
-                        elem.clear()  # discard the element
-                        while elem.getprevious() is not None:
-                            del elem.getparent()[0]
-
-                        self.queue_out.put((publication,file),self.r_server)
-                        #self.store_publication(publication,file)
-
-
-            del context
+    # Event parser not needed anymore
+    # def iter_parse_medline_xml(self, record):
+    #
+    #
+    #         context = etree.iterparse(gzip.open(file, 'rb'), events=('end',))
+    #         for event, elem in context:
+    #             if elem.tag == 'PMID' and elem.getparent().tag == 'MedlineCitation':
+    #                     pmid = ''
+    #                     mesh_terms = ''
+    #                     article_list = []
+    #                     keywords = ''
+    #                     publication = {}
+    #                     pmid = elem.text
+    #                     publication['pmid'] = pmid
+    #             if elem.tag == 'MeshHeadingList':
+    #                     mesh_terms = self.parse_mesh_terms(elem)
+    #                     publication['mesh_terms'] = mesh_terms
+    #             if elem.tag == 'KeywordList':
+    #                     keywords = self.parse_keywords(elem)
+    #                     publication['keywords'] = keywords
+    #             if elem.tag == 'ChemicalList':
+    #                     chemicals = self.parse_chemicals(elem)
+    #                     publication['chemicals'] = chemicals
+    #             if elem.tag == 'Article':
+    #                     article = self.parse_article_info(elem)
+    #                     publication['article'] = article
+    #                     # elem.clear()  # discard the element
+    #                     # while elem.getprevious() is not None:
+    #                     #     del elem.getparent()[0]
+    #                     # simplejson.dump(publication, handle)
+    #
+    #             if elem.tag == 'MedlineCitation':
+    #                     elem.clear()  # discard the element
+    #                     while elem.getprevious() is not None:
+    #                         del elem.getparent()[0]
+    #
+    #                     self.queue_out.put((publication,file),self.r_server)
+    #
+    #
+    #         del context
 
 
     def stringify_children(self,node):
@@ -1103,6 +1108,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                 max_retries=10,
                                 )
         self.publication_chunk_storage = PublicationChunkElasticStorage(Loader(self.es, chunk_size=1000))
+        self.es_query = ESQuery(self.es)
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
@@ -1110,20 +1116,13 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
 
     def process(self, data):
         publication = data
-        self.logger.info("Process Name {}".format(self.name))
+
+        self.logger.debug("Process Name {}".format(self.name))
+
         ''' load the publication chunks to ES '''
-        try:
-            logging.info("Filename {} Publication {}".format(publication['filename'],publication) )
-            self.store_publication(publication)
+        self.store_publication(publication)
 
-        except Exception, error:
-            logging.error("Error loading xml file {} Publication {}".format(publication['filename'], publication))
-            if error:
-                logging.error(str(error))
-            else:
-                logging.error(Exception.message)
-
-        self.logger.info("%s finished" % self.name)
+        self.logger.debug("%s finished" % self.name)
 
     def store_publication(self, publication):
         try:
@@ -1158,14 +1157,13 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
         #     self.get_epmc_text_mined_entities(pub)
         # if pub.has_references:
         #     self.get_epmc_ref_list(pub)
+            logging.debug("PMID for loading : {}".format(pub.pub_id))
 
             self.publication_chunk_storage.storage_add(publication['pmid'],pub)
-        except Exception, error:
-            logging.info("Error loading publication data to index ")
-            if error:
-                logging.info(str(error))
-            else:
-                logging.info(Exception.message)
+
+        except KeyError as e:
+            logging.error("Error creating publication object for pmid {} , filename {}".format(publication['pmid'],
+                                                                                               publication['filename']),str(e))
 
 
 class PublicationChunkElasticStorage():
@@ -1183,6 +1181,7 @@ class PublicationChunkElasticStorage():
                         pub_id,
                         publication_data,
                         create_index=False)
+
 
     def storage_flush(self):
         self.loader.flush()
