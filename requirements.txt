@@ -37,3 +37,4 @@ biopython==1.65
 rdflib
 colorama
 coverage
+psutil
