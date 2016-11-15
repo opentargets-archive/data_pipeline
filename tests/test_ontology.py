@@ -21,7 +21,7 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from modules.Ontology import OntologyClassReader, DiseasePhenotypes, PhenotypeSlim
+from modules.Ontology import OntologyClassReader, DiseasePhenotypes, PhenotypeSlim, DiseaseUtils
 from SPARQLWrapper import SPARQLWrapper, JSON
 from settings import Config
 import logging
@@ -145,6 +145,13 @@ def test_get_disease_phenotypes():
     obj = DiseasePhenotypes()
     assert not obj == None
     obj.get_disease_phenotypes()
+
+@with_setup(my_setup_function, my_teardown_function)
+def test_get_disease_tas():
+    obj = DiseaseUtils()
+    assert not obj == None
+    obj.get_disease_tas(filename="/Users/koscieln/.ontologycache/efo/disease_tas.txt")
+
 
 @with_setup(my_setup_function, my_teardown_function)
 def test_parse_local_files():

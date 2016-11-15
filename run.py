@@ -345,7 +345,7 @@ if __name__ == '__main__':
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
-                PhenotypeSlim(connectors.sparql).create_phenotype_slim(args.local_file)
+                PhenotypeSlim().create_phenotype_slim(args.local_file)
             if (OntologyActions.DISEASEPHENOTYPES in args.onto) or do_all:
                 DiseasePhenotypes().parse_owl_url()
         if args.val or run_full_pipeline:

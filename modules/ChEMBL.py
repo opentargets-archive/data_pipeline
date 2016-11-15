@@ -37,7 +37,7 @@ from settings import Config
 
 __copyright__ = "Copyright 2014-2016, GlaxoSmithKline"
 
-__credits__ = ["Gautier Koscielny", "Rita Santos"]
+__credits__ = ["Gautier Koscielny"]
 __license__ = "Apache 2.0"
 __version__ = "1.2.2"
 __maintainer__ = "Gautier Koscielny"

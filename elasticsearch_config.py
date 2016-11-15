@@ -508,6 +508,14 @@ class ElasticSearchConfiguration():
                     #                     "index" : "not_analyzed"
                     #                     },
                     #                 },
+                    "protein_class": {
+                        "properties": {
+                            "label": {
+                                "type": "string",
+                                "index" : "not_analyzed"
+                            }
+                        }
+                    },
                     "_private": {
                         # "type" : "object",
                         "properties": {

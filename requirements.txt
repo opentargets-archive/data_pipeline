@@ -36,3 +36,4 @@ nose==1.3.7
 biopython==1.65
 rdflib
 colorama
+coverage
