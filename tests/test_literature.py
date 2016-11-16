@@ -8,6 +8,8 @@ from redislite import Redis
 from settings import Config
 import logging
 from run import PipelineConnectors
+from common.ElasticsearchQuery import ESQuery
+import gzip
 
 class LiteratureTestCase(unittest.TestCase):
 #
@@ -74,7 +76,7 @@ class LiteratureTestCase(unittest.TestCase):
         p = PipelineConnectors()
         p.init_services_connections()
         with Loader(p.es ,chunk_size=1000) as loader:
-            PubmedLiteratureProcess(p.es,loader,p.r_server).fetch()
+            PubmedLiteratureProcess(p.es,loader,False,p.r_server).fetch()
 
 
 if __name__ == '__main__':

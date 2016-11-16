@@ -699,6 +699,13 @@ class PubmedLiteratureProcess(object):
                                          job_timeout=120)
 
 
+        q_reporter = RedisQueueStatusReporter([
+                                               literature_reader_q,
+                                               literature_parser_q,
+                                               literature_loader_q
+                                               ],
+                                              interval=10)
+        q_reporter.start()
         q_reporter = RedisQueueStatusReporter([literature_reader_q,
                                                literature_parser_q,
                                                literature_loader_q,
@@ -925,7 +932,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
 
     def process(self,data):
-        record,filename = data
+        record, filename = data
         publication = dict()
         try:
             medline = objectify.fromstring(record)
@@ -935,6 +942,48 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                     publication['title'] = e.text
                 if e.tag == 'Abstract':
                     publication['abstract'] = e.AbstractText.text
+
+            publication['filename'] = filename
+            self.queue_out.put(publication, self.r_server)
+        except etree.XMLSyntaxError as e:
+            logging.error("Error parsing XML file {} - medline record {}".format(filename, record), str(e))
+
+        publication = dict()
+        try:
+            medline = objectify.fromstring(record)
+            publication['pmid'] = medline.PMID.text
+            for child in medline.getchildren():
+                if child.tag == 'DateCreated':
+                    firstPublicationDate = []
+                    firstPublicationDate.append(child.Year.text)
+                    firstPublicationDate.append(child.Month.text)
+                    firstPublicationDate.append(child.Day.text)
+
+                    publication['firstPublicationDate'] = '-'.join(firstPublicationDate)
+
+                if child.tag == 'Article':
+                    publication = self.parse_article_info(child,publication)
+
+                if child.tag == 'ChemicalList':
+                    publication['chemicals'] = []
+                    for chemical in child.getchildren():
+                        chemical_dict = dict()
+                        chemical_dict['name'] = chemical.NameOfSubstance.text
+                        chemical_dict['registryNumber'] = chemical.RegistryNumber.text
+                        publication['chemicals'].append(chemical_dict)
+
+
+
+                if child.tag == 'KeywordList':
+                    publication['keywords'] = []
+                    for keyword in child.getchildren():
+                        publication['keywords'].append(keyword.text)
+
+
+                if child.tag == 'MeshHeadingList':
+                    publication['mesh_terms'] = list()
+                    for meshheading in child.getchildren():
+                        publication['mesh_terms'].append(meshheading.DescriptorName.text)
 
             publication['filename'] = filename
             self.queue_out.put(publication,self.r_server)
@@ -990,98 +1039,51 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                  [node.tail])
         return ''.join(filter(None, parts))
 
-    def parse_mesh_terms(self,element):
-        mesh_terms = []
-        for mesh_heading in element.findall('MeshHeading'):
-            mesh_terms.append(mesh_heading.find('DescriptorName').text)
 
-        return mesh_terms
+    def parse_article_info(self, article, publication):
 
-    def parse_keywords(self,element):
-        keywords = list()
-        for k in element.findall('Keyword'):
-            keywords.append(k.text)
-        keywords = '; '.join(keywords)
-        return keywords
+        for e in article.iterchildren():
+            if e.tag == 'ArticleTitle':
+                publication['title'] = e.text
 
-    def parse_chemicals(self,element):
-        chemicals = []
-        for chemical in element.findall('Chemical'):
-            chemical_data = {}
-            chemical_data['name'] = chemical.find('NameOfSubstance').text
-            chemical_data['registryNumber'] = chemical.find('RegistryNumber').text
-            chemicals.append(chemical_data)
-        return chemicals
+            if e.tag == 'Abstract':
+                abstracts = []
+                for abstractText in e:
+                    abstracts.append(abstractText.AbstractText.text)
+                publication['abstract'] = abstracts
 
+            if e.tag == 'Journal':
+                publication['journal'] = {}
+                for child in e.getchildren():
+                    if child.tag == 'Title':
+                        publication['journal']['title'] = child.text
+                    if child.tag == 'ISOAbbreviation':
+                        publication['journal']['medlineAbbreviation'] = child.text
 
+                publication['pub_year'] = ''
+                for pubdate in e.JournalIssue.PubDate.getchildren():
+                    if pubdate.tag == 'Year':
+                        publication['pub_year'] = pubdate.text
 
-    def parse_article_info(self,element):
-        article = {}
+            if e.tag == 'PublicationTypeList':
+                pub_types = []
+                for pub_type in e.PublicationType:
+                    pub_types.append(pub_type.text)
+                publication['pub_types'] = pub_types
 
-        if element.find('ArticleTitle') is not None:
-            title = self.stringify_children(element.find('ArticleTitle'))
-        else:
-            title = ''
+            if e.tag == 'ELocationID' and e.attrib['EIdType'] == 'doi':
+                publication['doi'] = e.text
 
-        if element.find('Abstract') is not None:
-            abstract = self.stringify_children(element.find('Abstract'))
-        else:
-            abstract = ''
+            if e.tag == 'AuthorList':
+                publication['authors'] = list()
+                for author in e.Author:
+                    author_dict = dict()
+                    for e in author.getchildren():
+                        author_dict[e.tag] = e.text
 
-        if element.find('AuthorList') is not None:
-            authors = element.find('AuthorList').getchildren()
-            authors_info = list()
-            affiliations_info = list()
-            for author in authors:
-                if author.find('Initials') is not None:
-                    firstname = author.find('Initials').text
-                else:
-                    firstname = ''
-                if author.find('LastName') is not None:
-                    lastname = author.find('LastName').text
-                else:
-                    lastname = ''
-                if author.find('AffiliationInfo/Affiliation') is not None:
-                    affiliation = author.find('AffiliationInfo/Affiliation').text
-                else:
-                    affiliation = ''
-                authors_info.append(firstname + ' ' + lastname)
-                affiliations_info.append(affiliation)
-            affiliations_info = ' '.join([a for a in affiliations_info if a is not ''])
-            authors_info = '; '.join(authors_info)
-        else:
-            affiliations_info = ''
-            authors_info = ''
+                    publication['authors'].append(author_dict)
 
-        journal = element.find('Journal')
-        journal_name = ' '.join(journal.xpath('Title/text()'))
-
-        issue = journal.xpath('JournalIssue')[0]
-        issue_date = issue.find('PubDate')
-        if issue_date.find('Year') is not None:
-            article['pub_year'] = element.find('PublicationTypeList').text
-        else:
-            article['pub_year'] = ''
-
-        article['title'] = title
-        article['abstract'] = abstract
-        article['journal'] = journal_name
-        article['authors'] = authors_info
-
-        pub_types = []
-        pub_type_list = element.find('PublicationTypeList')
-        for pub_type in pub_type_list.findall('PublicationType'):
-            pub_types.append(pub_type.text)
-        article['pub_types'] = pub_types
-
-        doi_list = []
-        doi_elem = element.find('ELocationID')
-        if doi_elem is not None:
-            if doi_elem.get('EIdType') == 'doi':
-                doi_list.append(doi_elem.text)
-        article['doi'] = doi_list
-
-        return article
+        return publication
 
 class LiteratureLoaderProcess(RedisQueueWorkerProcess):
 
@@ -1111,25 +1113,25 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
             pub = Publication(pub_id=publication['pmid'],
                           title=publication['title'],
                           abstract=publication.get('abstract',''),
-                          # authors=publication['authors'],
-                          # year=publication['pub_year'],
-                          #date=publication["firstPublicationDate"],
-                          # journal=publication['journal'],
-                          # full_text=u"",
-                          # full_text_url=publication['fullTextUrlList']['fullTextUrl'],
-                          # epmc_keywords=publication.get('keywords',[]),
-                          # doi=publication['doi'],
-                          # cited_by=publication['citedByCount'],
-                          # has_text_mined_terms=publication['hasTextMinedTerms'] == u'Y',
-                          # has_references=publication['hasReferences'] == u'Y',
-                          # is_open_access=publication['isOpenAccess'] == u'Y',
-                          # pub_type=publication['pub_types'],
+                          authors=publication.get('authors'),
+                          year=publication.get('pub_year'),
+                          date=publication.get("firstPublicationDate"),
+                          journal=publication.get('journal',''),
+                          full_text=u"",
+                          #full_text_url=publication['fullTextUrlList']['fullTextUrl'],
+                          epmc_keywords=publication.get('keywords'),
+                          doi=publication.get('doi',''),
+                          #cited_by=publication['citedByCount'],
+                          #has_text_mined_terms=publication['hasTextMinedTerms'] == u'Y',
+                          #has_references=publication['hasReferences'] == u'Y',
+                          #is_open_access=publication['isOpenAccess'] == u'Y',
+                          pub_type=publication['pub_types'],
                           filename=publication['filename']
 
                           )
             if 'mesh_terms' in publication:
                 pub.mesh_headings = publication['mesh_terms']
-            if 'chemicalList' in publication:
+            if 'chemicals' in publication:
                 pub.chemicals = publication['chemicals']
         # if 'dateOfRevision' in publication:
         #     pub.date_of_revision = publication["dateOfRevision"]
@@ -1138,19 +1140,21 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
         #     self.get_epmc_text_mined_entities(pub)
         # if pub.has_references:
         #     self.get_epmc_ref_list(pub)
+            logging.debug("PMID for loading : {}".format(pub.pub_id))
+
+            self.publication_chunk_storage.storage_add(publication['pmid'],pub)
+
+
 
             self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                             Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                             publication['pmid'],
                             pub,
                             create_index=False)
-
         except KeyError as e:
             logging.error("Error creating publication object for pmid {} , filename {}".format(publication['pmid'],
                                                                                                publication['filename']),str(e))
-
     def close(self):
         self.loader.close()
-
 
 
