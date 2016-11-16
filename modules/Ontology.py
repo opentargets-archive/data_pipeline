@@ -346,6 +346,38 @@ class OntologyClassReader():
 
         return
 
+    def parse_properties(self, rdf_node):
+        logger.debug("parse_properties for rdf_node: {}".format(rdf_node))
+        raw_properties = predicate_objects = list(self.rdf_graph.predicate_objects(subject=rdf_node))
+        rdf_properties = {}
+        logger.debug("raw_properties for rdf_node: {}".format(rdf_node))
+        for index, property in enumerate(raw_properties):
+            logger.debug("{}. {}".format(index, property))
+            property_name = str(property[0])
+            property_value = str(property[1])
+            # rdf_properties[property_name].append(property_value)
+            if property_name in rdf_properties:
+                rdf_properties[property_name].append(property_value)
+            else:
+                rdf_properties[property_name] = [property_value]
+        '''
+        logger.debug("rdf_properties: {}".format(rdf_properties))
+        for index, key in enumerate(rdf_properties):
+            rdf_values = list(map(str, rdf_properties[key]))
+            logger.debug("{}. k: {}, v: {}, {}".format(index, key, len(rdf_values), rdf_values))
+        if 'http://www.ebi.ac.uk/efo/alternative_term' in rdf_properties:
+            alternative_terms = rdf_properties['http://www.ebi.ac.uk/efo/alternative_term']
+            logger.debug("alternative_terms: {}, {}".format(len(alternative_terms), alternative_terms))
+        else:
+            logger.debug("no alternative terms")
+        if 'http://www.w3.org/2000/01/rdf-schema#label' in rdf_properties:
+            label = rdf_properties['http://www.w3.org/2000/01/rdf-schema#label']
+            logger.debug("label: {}, {}".format(len(label), label))
+        else:
+            logger.debug("no label")
+        '''
+        return rdf_properties
+
     def load_hpo_classes(self):
         """Loads the HPO graph and extracts the current and obsolete classes.
            Status: production
@@ -379,6 +411,20 @@ class OntologyClassReader():
                             'http://www.ebi.ac.uk/efo/EFO_0001444',
                             'http://purl.obolibrary.org/obo/GO_0008150' ]:
             self.load_ontology_classes(base_class=base_class)
+
+    def load_efo_classes_with_paths(self):
+        """Loads the EFO graph and extracts the current and obsolete classes.
+           Status: production
+        """
+        logging.debug("load_efo_classes...")
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
+        # load disease, phenotype, measurement, biological process
+        for base_class in [ 'http://www.ebi.ac.uk/efo/EFO_0000408',
+                            'http://www.ebi.ac.uk/efo/EFO_0000651',
+                            'http://www.ebi.ac.uk/efo/EFO_0001444',
+                            'http://purl.obolibrary.org/obo/GO_0008150' ]:
+            self.load_ontology_classes(base_class=base_class)
+            self.get_classes_paths(root_uri=base_class, level=0)
 
     def load_evidence_classes(self):
         '''

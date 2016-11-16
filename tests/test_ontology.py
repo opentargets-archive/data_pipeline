@@ -22,6 +22,7 @@ limitations under the License.
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
 from modules.Ontology import OntologyClassReader, DiseasePhenotypes, PhenotypeSlim, DiseaseUtils
+from rdflib import URIRef
 from SPARQLWrapper import SPARQLWrapper, JSON
 from settings import Config
 import logging
@@ -139,6 +140,41 @@ def test_load_efo_classes():
         logger.info("%s => %s "%(k, v))
         assert obj.obsolete_classes[k] == v
 
+@with_setup(my_setup_function, my_teardown_function)
+def test_load_efo_classes_with_paths():
+
+    obj = OntologyClassReader()
+    assert not obj == None
+    obj.load_efo_classes_with_paths()
+
+    logger.info(len(obj.current_classes))
+
+    assert obj.current_classes["http://www.ebi.ac.uk/efo/EFO_0000408"] == "disease"
+    assert obj.current_classes["http://www.ebi.ac.uk/efo/EFO_0000651"] == "phenotype"
+    assert obj.current_classes["http://www.ebi.ac.uk/efo/EFO_0001444"] == "measurement"
+    assert obj.current_classes["http://purl.obolibrary.org/obo/GO_0008150"] == "biological process"
+
+    for uri, label in obj.current_classes.items():
+        properties = obj.parse_properties(URIRef(uri))
+        definition = ''
+        if 'http://www.ebi.ac.uk/efo/definition' in properties:
+            definition = ". ".join(properties['http://www.ebi.ac.uk/efo/definition'])
+        synonyms = []
+        if 'http://www.ebi.ac.uk/efo/alternative_term' in properties:
+            synonyms = properties['http://www.ebi.ac.uk/efo/alternative_term']
+        logger.debug("URI: %s, label:%s, definition:%s, synonyms:%s"%(uri, label, definition, "; ".join(synonyms)))
+
+    vs = "hello"
+    print("%i" % vs)
+
+@with_setup(my_setup_function, my_teardown_function)
+def test_parse_properties():
+    obj = OntologyClassReader()
+    assert not obj == None
+    obj.load_hpo_classes()
+    obj.parse_properties(URIRef('http://purl.obolibrary.org/obo/HP_0040064'))
+    vs = "hello"
+    print ("%i"%vs)
 
 @with_setup(my_setup_function, my_teardown_function)
 def test_get_disease_phenotypes():
@@ -161,3 +197,4 @@ def test_parse_local_files():
     assert not obj == None
     local_files = [ os.path.join(os.path.abspath(os.path.dirname(__file__)), '../samples/cttv008-22-07-2016.json.gz') ]
     obj.create_phenotype_slim(local_files=local_files)
+
