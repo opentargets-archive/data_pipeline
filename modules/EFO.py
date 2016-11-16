@@ -12,6 +12,7 @@ from common.ElasticsearchLoader import JSONObjectStorage
 from common.ElasticsearchQuery import ESQuery
 from common.PGAdapter import  EFONames, EFOPath, EFOFirstChild
 from common.Redis import RedisLookupTablePickle
+from modules.Ontology import OntologyClassReader
 from settings import Config
 
 __author__ = 'andreap'
@@ -90,11 +91,36 @@ class EfoProcess():
                  adapter,):
         self.adapter=adapter
         self.session=adapter.session
+        self.disease_ontology = None
         self.efos = OrderedDict()
 
     def process_all(self):
-        self._process_efo_data()
+        self._process_ontology_data()
         self._store_efo()
+
+    def _process_ontology_data(self):
+
+        self.disease_ontology = OntologyClassReader()
+        self.disease_ontology.load_efo_classes_with_paths()
+        for uri,label in self.disease_ontology.current_classes.items():
+            properties = self.disease_ontology.parse_properties(URIRef(uri))
+            definition = ''
+            if 'http://www.ebi.ac.uk/efo/definition' in properties:
+                definition = ". ".join(properties['http://www.ebi.ac.uk/efo/definition'])
+            synonyms = []
+            if 'http://www.ebi.ac.uk/efo/alternative_term' in properties:
+                synonyms = properties['http://www.ebi.ac.uk/efo/alternative_term']
+
+            efo = EFO(code=uri,
+                      label=label,
+                      synonyms=synonyms,
+                      path=self.disease_ontology.classes_paths[uri]['all'],
+                      path_codes=self.disease_ontology.classes_paths[uri]['ids'],
+                      path_labels=self.disease_ontology.classes_paths[uri]['labels'],
+                      definition=definition
+                      )
+            id = self.disease_ontology.classes_paths[uri]['ids'][0][-1]
+            self.efos[id] = efo
 
     def _process_efo_data(self):
 
