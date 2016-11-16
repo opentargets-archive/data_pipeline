@@ -649,15 +649,11 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
                             body=spacy_analysed_pub.to_json(),
                             parent=pub_id,
                             )
-                logging.debug("Literature data updated for pmid {}".format(pub_id))
+                # logging.debug("Literature data updated for pmid {}".format(pub_id))
 
 
-        except Exception, error:
-            logging.error("Error in loading analysed publication for pmid {}".format(pub_id))
-            if error:
-                logging.info(str(error))
-            else:
-                logging.info(Exception.message)
+        except Exception as error:
+            logging.error("Error in loading analysed publication for pmid {}: {}".format(pub_id, error.message))
 
 
 class PubmedLiteratureProcess(object):
@@ -675,16 +671,18 @@ class PubmedLiteratureProcess(object):
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
 
-    def fetch(self, local_file_locn = []):
+    def fetch(self,
+              local_file_locn = [],
+              force = False):
         ts = time.time()
-        if not self.loader.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
-            self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
+        if not self.loader.es.indices.exists(Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)):
+            self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
         self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
         # Literature Reader Queue
         literature_reader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_reader_q',
                                          max_size=MAX_PUBLICATION_CHUNKS,
-                                         job_timeout=120)
+                                         job_timeout=1200)
 
         # Literature Parser Queue
         literature_parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_parser_q',
@@ -749,14 +747,14 @@ class PubmedLiteratureProcess(object):
 
         ftp = self.ftp_connect()
         files = ftp.nlst()
-        max_attempts = 5
 
         # TODO : for testing
         # for j in range(len(files)):
-        for j in range(800, 812):
+        for file_ in tqdm(ftp.nlst()[800:810],
+                      desc='getting remote files'):
 
             try:
-                file_path = os.path.join(Config.PUBMED_XML_LOCN, files[j])
+                file_path = os.path.join(Config.PUBMED_XML_LOCN, file_)
 
                 if not os.path.isfile(file_path):
                     self.download_file(ftp, file_path)
@@ -764,11 +762,7 @@ class PubmedLiteratureProcess(object):
 
             except all_errors as e:
                 logging.error("Error downloading medline file {} from FTP server".format(files[j]), str(e))
-                if max_attempts != 0:
-                    ftp = self.ftp_connect()
-                    max_attempts -= 1
-                else:
-                    break
+
 
         literature_reader_q.set_submission_finished(r_server=self.r_server)
 
@@ -861,24 +855,19 @@ class PubmedXMLReaderProcess(RedisQueueWorkerProcess):
     def process(self, data):
         file_path = data
         self.logger.debug("Process Name {}".format(self.name))
-        self.logger.debug('Reading file %s' % file_path)
-        ''' read xml file and put each medline record in the parser queue '''
-        self.read_medline_xml(file_path)
-        self.logger.debug("%s finished" % self.name)
-
-    def read_medline_xml(self, file_name):
-
-        with gzip.open(file_name, 'r') as f:
+        with gzip.open(file_path, 'r') as f:
             record = []
             skip = True
             for line in f:
                 if line.startswith("<MedlineCitation Owner"):
-                     skip = False
+                    skip = False
                 if not skip:
-                     record.append(line)
+                    record.append(line)
                 if line.startswith("</MedlineCitation>"):
-                    self.queue_out.put(('\n'.join(record), file_name), self.r_server)
+                    self.put_into_queue_out(('\n'.join(record), os.path.basename(file_path)))
                     skip = True
+                    record = []
+
 
 class PubmedXMLParserProcess(RedisQueueWorkerProcess):
     def __init__(self,
@@ -914,7 +903,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
             publication['filename'] = filename
             self.queue_out.put(publication, self.r_server)
         except etree.XMLSyntaxError as e:
-            logging.error("Error parsing XML file {} - medline record {}".format(filename, record), str(e))
+            logging.error("Error parsing XML file {} - medline record {}".format(filename, record, e.message))
 
         publication = dict()
         try:
@@ -954,9 +943,9 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                         publication['mesh_terms'].append(meshheading.DescriptorName.text)
 
             publication['filename'] = filename
-            self.queue_out.put(publication,self.r_server)
+            return publication
         except etree.XMLSyntaxError as e:
-            logging.error("Error parsing XML file {} - medline record {}".format(filename,record),str(e))
+            logging.error("Error parsing XML file {} - medline record {}".format(filename,record),e.message)
 
     # Event parser not needed anymore
     # def iter_parse_medline_xml(self, record):
@@ -1027,6 +1016,8 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                         publication['journal']['title'] = child.text
                     if child.tag == 'ISOAbbreviation':
                         publication['journal']['medlineAbbreviation'] = child.text
+                    else:
+                        publication['journal']['medlineAbbreviation'] = ''
 
                 publication['pub_year'] = ''
                 for pubdate in e.JournalIssue.PubDate.getchildren():
