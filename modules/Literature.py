@@ -743,17 +743,9 @@ class PubmedLiteratureProcess(object):
         for w in loaders:
             w.start()
 
-        if local_file_locn:
-            xml_location = local_file_locn[0] + '/'
-        else:
-            xml_location = Config.PUBMED_XML_LOCN
-            try:
-                os.makedirs(xml_location)
-            except OSError as exception:
-                if exception.errno != errno.EEXIST:
-                    raise
-                else:
-                    logging.error("\n Directory %s already exists.".format(xml_location))
+
+        if not os.path.exists(Config.PUBMED_XML_LOCN):
+            os.makedirs(Config.PUBMED_XML_LOCN)
 
         ftp = self.ftp_connect()
         files = ftp.nlst()
@@ -764,10 +756,11 @@ class PubmedLiteratureProcess(object):
         for j in range(800, 812):
 
             try:
+                file_path = os.path.join(Config.PUBMED_XML_LOCN, files[j])
 
-                if not os.path.isfile(xml_location + files[j]):
-                    self.download_file(ftp, xml_location, files[j])
-                literature_reader_q.put(xml_location + files[j])
+                if not os.path.isfile(file_path):
+                    self.download_file(ftp, file_path)
+                literature_reader_q.put(file_path)
 
             except all_errors as e:
                 logging.error("Error downloading medline file {} from FTP server".format(files[j]), str(e))
@@ -846,9 +839,9 @@ class PubmedLiteratureProcess(object):
 
         return ftp
 
-    def download_file(self,ftp,xml_location,file):
-        handle = open(os.path.join(xml_location, file), 'wb')
-        ftp.retrbinary('RETR ' + file, handle.write)
+    def download_file(self, ftp, file_path):
+        handle = open(file_path, 'wb')
+        ftp.retrbinary('RETR ' + os.path.basename(file_path), handle.write)
         handle.close()
 
 
@@ -870,39 +863,22 @@ class PubmedXMLReaderProcess(RedisQueueWorkerProcess):
         self.logger.debug("Process Name {}".format(self.name))
         self.logger.debug('Reading file %s' % file_path)
         ''' read xml file and put each medline record in the parser queue '''
-        try:
-            self.read_medline_xml(file_path)
-
-
-        except Exception, error:
-            logging.error("Error reading xml file {}".format(file_path))
-            if error:
-                logging.error(str(error))
-            else:
-                logging.error(Exception.message)
-
+        self.read_medline_xml(file_path)
         self.logger.debug("%s finished" % self.name)
 
-    def read_medline_xml(self, file):
+    def read_medline_xml(self, file_name):
 
-        with gzip.open(file, 'r') as f:
-            f.next()
-            f.next()
-            f.next()
-            f.next()
+        with gzip.open(file_name, 'r') as f:
+            record = []
+            skip = True
             for line in f:
-
-                if line.__contains__("<MedlineCitation Owner"):
-                     record = ""
-                     record +=line
-
-                elif line.__contains__("</MedlineCitation>"):
-                     record += line
-                     self.queue_out.put((record, file),self.r_server)
-
-                else:
-                     record += line
-
+                if line.startswith("<MedlineCitation Owner"):
+                     skip = False
+                if not skip:
+                     record.append(line)
+                if line.startswith("</MedlineCitation>"):
+                    self.queue_out.put(('\n'.join(record), file_name), self.r_server)
+                    skip = True
 
 class PubmedXMLParserProcess(RedisQueueWorkerProcess):
     def __init__(self,
