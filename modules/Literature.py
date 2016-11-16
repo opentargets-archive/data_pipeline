@@ -1,34 +1,32 @@
 #!/usr/local/bin/python
 # coding: latin-1
+import errno
 import gzip
 import logging
+import multiprocessing
+import os
+import re
+import string
+import time
+from collections import Counter
+from ftplib import FTP,all_errors
+from itertools import chain
+
 import requests
+from elasticsearch import Elasticsearch
+from lxml import etree,objectify
+from nltk.corpus import stopwords
 from sklearn.base import TransformerMixin
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
-from nltk.corpus import stopwords
-import string
-import re
 from spacy.en import English
-from collections import Counter
-
 from tqdm import tqdm
 
 from common import Actions
 from common.DataStructure import JSONSerializable
-from elasticsearch import Elasticsearch
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
-import multiprocessing
-from settings import Config
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
-
-from itertools import chain
-
-import time
-from lxml import etree,objectify
-from ftplib import FTP,all_errors
-import os
-import errno
+from settings import Config
 
 MAX_PUBLICATION_CHUNKS =1000
 
@@ -699,13 +697,7 @@ class PubmedLiteratureProcess(object):
                                          job_timeout=120)
 
 
-        q_reporter = RedisQueueStatusReporter([
-                                               literature_reader_q,
-                                               literature_parser_q,
-                                               literature_loader_q
-                                               ],
-                                              interval=10)
-        q_reporter.start()
+
         q_reporter = RedisQueueStatusReporter([literature_reader_q,
                                                literature_parser_q,
                                                literature_loader_q,
@@ -1112,11 +1104,11 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
         try:
             pub = Publication(pub_id=publication['pmid'],
                           title=publication['title'],
-                          abstract=publication.get('abstract',''),
+                          abstract=publication.get('abstract'),
                           authors=publication.get('authors'),
                           year=publication.get('pub_year'),
                           date=publication.get("firstPublicationDate"),
-                          journal=publication.get('journal',''),
+                          journal=publication.get('journal'),
                           full_text=u"",
                           #full_text_url=publication['fullTextUrlList']['fullTextUrl'],
                           epmc_keywords=publication.get('keywords'),
@@ -1125,14 +1117,12 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                           #has_text_mined_terms=publication['hasTextMinedTerms'] == u'Y',
                           #has_references=publication['hasReferences'] == u'Y',
                           #is_open_access=publication['isOpenAccess'] == u'Y',
-                          pub_type=publication['pub_types'],
-                          filename=publication['filename']
-
+                          pub_type=publication.get('pub_types'),
+                          filename=publication.get('filename'),
+                          mesh_headings=publication.get('mesh_terms'),
+                          chemicals=publication.get('chemicals')
                           )
-            if 'mesh_terms' in publication:
-                pub.mesh_headings = publication['mesh_terms']
-            if 'chemicals' in publication:
-                pub.chemicals = publication['chemicals']
+
         # if 'dateOfRevision' in publication:
         #     pub.date_of_revision = publication["dateOfRevision"]
         #
@@ -1140,11 +1130,6 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
         #     self.get_epmc_text_mined_entities(pub)
         # if pub.has_references:
         #     self.get_epmc_ref_list(pub)
-            logging.debug("PMID for loading : {}".format(pub.pub_id))
-
-            self.publication_chunk_storage.storage_add(publication['pmid'],pub)
-
-
 
             self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                             Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
@@ -1152,8 +1137,11 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                             pub,
                             create_index=False)
         except KeyError as e:
-            logging.error("Error creating publication object for pmid {} , filename {}".format(publication['pmid'],
-                                                                                               publication['filename']),str(e))
+            logging.error("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
+                publication['pmid'],
+                publication['filename'],
+                e.message))
+
     def close(self):
         self.loader.close()
 
