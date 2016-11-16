@@ -674,7 +674,7 @@ class PubmedLiteratureProcess(object):
     def fetch(self,
               local_file_locn = [],
               force = False):
-        ts = time.time()
+
         if not self.loader.es.indices.exists(Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
         self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
@@ -741,12 +741,14 @@ class PubmedLiteratureProcess(object):
         for w in loaders:
             w.start()
 
-
-        if not os.path.exists(Config.PUBMED_XML_LOCN):
-            os.makedirs(Config.PUBMED_XML_LOCN)
+        if local_file_locn:
+            xml_location = local_file_locn[0] + '/'
+        else:
+            xml_location = Config.PUBMED_XML_LOCN
+            if not os.path.exists(xml_location):
+                os.makedirs(xml_location)
 
         ftp = self.ftp_connect()
-        files = ftp.nlst()
 
         # TODO : for testing
         # for j in range(len(files)):
@@ -754,14 +756,14 @@ class PubmedLiteratureProcess(object):
                       desc='getting remote files'):
 
             try:
-                file_path = os.path.join(Config.PUBMED_XML_LOCN, file_)
+                file_path = os.path.join(xml_location, file_)
 
                 if not os.path.isfile(file_path):
                     self.download_file(ftp, file_path)
                 literature_reader_q.put(file_path)
 
             except all_errors as e:
-                logging.error("Error downloading medline file {} from FTP server".format(files[j]), str(e))
+                logging.error("Error downloading medline file {} from FTP server".format(file_), e.message)
 
 
         literature_reader_q.set_submission_finished(r_server=self.r_server)
@@ -779,8 +781,7 @@ class PubmedLiteratureProcess(object):
 
         self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
             wait_if_ongoing=True)
-        te = time.time()
-        logging.info("Total time taken {}".format(te-ts))
+
         logging.info("DONE")
 
 
@@ -894,21 +895,6 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         try:
             medline = objectify.fromstring(record)
             publication['pmid'] = medline.PMID.text
-            for e in medline.Article.iterchildren():
-                if e.tag == 'ArticleTitle':
-                    publication['title'] = e.text
-                if e.tag == 'Abstract':
-                    publication['abstract'] = e.AbstractText.text
-
-            publication['filename'] = filename
-            self.queue_out.put(publication, self.r_server)
-        except etree.XMLSyntaxError as e:
-            logging.error("Error parsing XML file {} - medline record {}".format(filename, record, e.message))
-
-        publication = dict()
-        try:
-            medline = objectify.fromstring(record)
-            publication['pmid'] = medline.PMID.text
             for child in medline.getchildren():
                 if child.tag == 'DateCreated':
                     firstPublicationDate = []
@@ -929,13 +915,10 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                         chemical_dict['registryNumber'] = chemical.RegistryNumber.text
                         publication['chemicals'].append(chemical_dict)
 
-
-
                 if child.tag == 'KeywordList':
                     publication['keywords'] = []
                     for keyword in child.getchildren():
                         publication['keywords'].append(keyword.text)
-
 
                 if child.tag == 'MeshHeadingList':
                     publication['mesh_terms'] = list()
