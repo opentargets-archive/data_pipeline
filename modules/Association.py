@@ -9,7 +9,7 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
-from common.LookupHelpers import LookUpDataRetriever
+from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter
 from modules.EFO import EFO
 from modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
@@ -35,15 +35,7 @@ class ScoringMethods():
     SUM = 'sum'
     MAX = 'max'
 
-def millify(n):
-    try:
-        n = float(n)
-        millnames=['','K','M','G','P']
-        millidx=max(0,min(len(millnames)-1,
-                          int(math.floor(math.log10(abs(n))/3))))
-        return '%.1f%s'%(n/10**(3*millidx),millnames[millidx])
-    except:
-        return n
+
 
 class AssociationScore(JSONSerializable):
 
@@ -192,39 +184,69 @@ class EvidenceScore():
 class HarmonicSumScorer():
 
     def __init__(self, buffer = 100):
-        '''
-        will get every score,
-        keep in memory the top max number
-        calculate the score on those
-        :return:calculated score
-        '''
+        """
+        An HarmonicSumScorer will ingest any number of numeric score, keep in memory the top max number
+        defined by the buffer and calculate an harmonic sum of those
+        Args:
+            buffer: number of element to keep in memory to compute the harmonic sum
+        """
         self.buffer = buffer
         self.data = []
         self.refresh()
 
     def add(self, score):
+        """
+        add a score to the pool of values
+        Args:
+            score (float):  a number to add to the pool ov values. is converted to float
+
+        """
+        score = float(score)
         if len(self.data)>= self.buffer:
             if score >self.min:
-                self.data[self.data.index(self.min)] = float(score)
+                self.data[self.data.index(self.min)] = score
                 self.refresh()
         else:
-            self.data.append(float(score))
+            self.data.append(score)
             self.refresh()
 
 
     def refresh(self):
+        """
+        Store the minimum value of the pool
+
+        """
         if self.data:
             self.min = min(self.data)
         else:
             self.min = 0.
 
     def score(self, *args,**kwargs):
+        """
+        Returns an harmonic sum for the pool of values
+        Args:
+            *args: forwarded to HarmonicSumScorer.harmonic_sum
+        Keyword Args
+            **kwargs: forwarded to HarmonicSumScorer.harmonic_sum
+        Returns:
+            harmonic_sum (float): the harmonic sum of the pool of values
+        """
         return self.harmonic_sum(self.data, *args, **kwargs)
 
     @staticmethod
     def harmonic_sum(data,
                      scale_factor = 1,
                      cap = None):
+        """
+        Returns an harmonic sum for the data passed
+        Args:
+            data (list): list of floats to compute the harmonic sum from
+            scale_factor (float): a scaling factor to multiply to each datapoint. Defaults to 1
+            cap (float): if not None, never return an harmonic sum higher than the cap value.
+
+        Returns:
+            harmonic_sum (float): the harmonic sum of the data passed
+        """
         data.sort(reverse=True)
         harmonic_sum = sum(s / ((i+1) ** scale_factor) for i, s in enumerate(data))
         if cap is not None and \
@@ -370,7 +392,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                 if e.is_direct:
                     is_direct = True
                     break
-            self.target_disease_pair_q.put((key[0],key[1], evidence, is_direct))
+            self.put_into_queue_out((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
 
 
@@ -426,6 +448,8 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 
 
     def process(self, data):
+        if data is None:
+            pass
         target, disease, score = data
         element_id = '%s-%s' % (target, disease)
         if score: #bypass associations with overall score=0
@@ -434,9 +458,10 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
                                element_id,
                                score.to_json(),
                                create_index=False,
-                               routing=score.target['id'])
+                               # routing=score.target['id'],
+                            )
         else:
-            logger.warning('Skipped association %s'%element_id)
+            logger.warning('Skipped association with score 0: %s'%element_id)
 
     def close(self):
         self.loader.close()
@@ -461,43 +486,50 @@ class ScoringProcess():
     def score_target_disease_pairs(self,
                                    targets = [],
                                    dry_run = False):
-        # # with ScoreStorer(self.adapter) as storer:
 
-        # estimated_total = target_total*disease_total
-        # logger.info("%s targets available | %s diseases available | %s estimated combinations to precalculate"%(millify(target_total),
-        #                                                                                                         millify(disease_total),
-        #                                                                                                         millify(estimated_total)))
         overwrite_indices = not dry_run
-        if not dry_run:
+        if overwrite_indices:
             overwrite_indices = not bool(targets)
         if not targets:
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
-        lookup_data = LookUpDataRetriever(self.es, self.r_server, targets=targets).lookup
+        lookup_data = LookUpDataRetriever(self.es,
+                                          self.r_server,
+                                          targets=targets,
+                                          data_types=(
+                                                      LookUpDataType.DISEASE,
+                                                      LookUpDataType.TARGET,
+                                                      LookUpDataType.ECO,
+                                                      )
+                                          ).lookup
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        number_of_storers = number_of_workers
+        queue_per_worker = 250
         if targets and len(targets) <number_of_workers:
             number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
-                              max_size=number_of_workers*10,
+                              max_size=number_of_workers*5,
                               job_timeout=3600,
                               r_server=self.r_server,
                               total=len(targets))
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
-                                           max_size=10001,
+                                           max_size=queue_per_worker * number_of_workers,
                                            job_timeout=1200,
+                                           batch_size=100,
                                            r_server=self.r_server)
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
-                                  max_size=10000,
+                                  max_size=queue_per_worker * number_of_storers,
                                   job_timeout=1200,
+                                  batch_size=100,
                                   r_server=self.r_server)
 
         q_reporter = RedisQueueStatusReporter([target_q,
                                                target_disease_pair_q,
                                                score_data_q
                                                ],
-                                              interval=10,
+                                              interval=30,
                                               )
         q_reporter.start()
 
@@ -507,7 +539,7 @@ class ScoringProcess():
                                      self.r_server.db,
                                      chunk_size=1000,
                                      dry_run = dry_run,
-                                     ) for i in range(number_of_workers)]
+                                     ) for i in range(number_of_storers)]
 
         for w in storers:
             w.start()
@@ -516,7 +548,7 @@ class ScoringProcess():
                                  self.r_server.db,
                                  score_data_q,
                                  lookup_data,
-                                 ) for i in range(number_of_workers)]
+                                 ) for i in range(number_of_workers*2)]
         for w in scorers:
             w.start()
 
@@ -530,8 +562,8 @@ class ScoringProcess():
             w.start()
 
 
-        if not dry_run:
-            self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
+        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
+        self.es_loader.prepare_for_bulk_indexing(self.es_loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
 
 
 

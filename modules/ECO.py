@@ -1,4 +1,6 @@
 import warnings
+import logging
+import json
 from collections import OrderedDict
 
 from tqdm import tqdm
@@ -9,9 +11,25 @@ from common.ElasticsearchLoader import JSONObjectStorage
 from common.ElasticsearchQuery import ESQuery
 from common.PGAdapter import  ECOPath
 from common.Redis import RedisLookupTablePickle
+from modules.Ontology import OntologyClassReader
 from settings import Config
 
-__author__ = 'andreap'
+__author__ = "Andrea Pierleoni, Gautier Koscielny"
+__copyright__ = "Copyright 2014-2016, Open Targets"
+__credits__ = []
+__license__ = "Apache 2.0"
+__version__ = ""
+__maintainer__ = "Gautier Koscielny"
+__email__ = "gautierk@opentargets.org"
+__status__ = "Production"
+
+from logging.config import fileConfig
+
+try:
+    fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
+except:
+    pass
+logger = logging.getLogger(__name__)
 
 class EcoActions(Actions):
     PROCESS='process'
@@ -47,17 +65,34 @@ class ECO(JSONSerializable):
 
 class EcoProcess():
 
-    def __init__(self,
-                 adapter):
-        self.adapter=adapter
-        self.session=adapter.session
+    def __init__(self):
+        self.adapter=None
+        self.session=None
         self.ecos = OrderedDict()
+        self.evidence_ontology = None
 
     def process_all(self):
-        self._process_eco_data()
+        self._process_ontology_data()
+        #self._process_eco_data()
         self._store_eco()
 
+    def _process_ontology_data(self):
+
+        self.evidence_ontology = OntologyClassReader()
+        self.evidence_ontology.load_evidence_classes()
+        for uri,label in self.evidence_ontology.current_classes.items():
+            #logger.debug("URI: %s, label:%s"%(uri, label))
+            eco = ECO(uri,
+                      label,
+                      self.evidence_ontology.classes_paths[uri]['all'],
+                      self.evidence_ontology.classes_paths[uri]['ids'],
+                      self.evidence_ontology.classes_paths[uri]['labels']
+                      )
+            id = self.evidence_ontology.classes_paths[uri]['ids'][0][-1]
+            self.ecos[id] = eco
+
     def _process_eco_data(self):
+
         for row in self.session.query(ECOPath).yield_per(1000):
             # if row.uri_id_org:
                 # idorg2ecos[row.uri_id_org] = row.uri
@@ -198,3 +233,12 @@ class ECOLookUpTable(object):
 
     def keys(self):
         return self._table.keys()
+
+def main():
+    eco_process = EcoProcess()
+    eco_process._process_ontology_data()
+    return
+
+
+if __name__ == "__main__":
+    main()

@@ -6,20 +6,38 @@ __author__ = 'andreap'
 import os
 import ConfigParser
 
+
 iniparser = ConfigParser.ConfigParser()
-iniparser.read('db.ini')
+iniparser.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'db.ini'))
 
 class Config():
 
-    ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
-    ONTOLOGY_CONFIG.read('ontology_config.ini')
+    HAS_PROXY = iniparser.has_section('proxy')
+    if HAS_PROXY:
+        PROXY = iniparser.get('proxy', 'protocol') + "://" + iniparser.get('proxy', 'username') + ":" + iniparser.get(
+            'proxy', 'password') + "@" + iniparser.get('proxy', 'host') + ":" + iniparser.get('proxy', 'port')
+        PROXY_PROTOCOL = iniparser.get('proxy', 'protocol')
+        PROXY_USERNAME = iniparser.get('proxy', 'username')
+        PROXY_PASSWORD = iniparser.get('proxy', 'password')
+        PROXY_HOST = iniparser.get('proxy', 'host')
+        PROXY_PORT = int(iniparser.get('proxy', 'port'))
 
+    ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
+    ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
     RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
-    ELASTICSEARCH_URL = 'http://'+iniparser.get(ENV, 'elurl')+':'+iniparser.get(ENV, 'elport')+'/'
-    ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
-    ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+    try:
+        ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
+        ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+        ELASTICSEARCH_URL = 'http://'+ELASTICSEARCH_HOST
+        if ELASTICSEARCH_PORT:
+            ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
+    except ConfigParser.NoOptionError:
+        ELASTICSEARCH_HOST = None
+        ELASTICSEARCH_PORT = None
+        ELASTICSEARCH_URL = None
+
     # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -90,6 +108,11 @@ class Config():
         '6239':'worm',
         '4932':'yeast'
     }
+
+    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
+    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
+    CHEMBL_DRUG_SYNONYMS = '''https://www.ebi.ac.uk/chembl/api/data/molecule/{}.json'''
+
     HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
@@ -109,12 +132,12 @@ class Config():
     # Current genome Assembly
     EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
     # Change this if you don't want to send e-mails
-    EVIDENCEVALIDATION_SEND_EMAIL = True
+    EVIDENCEVALIDATION_SEND_EMAIL = False
     EVIDENCEVALIDATION_SENDER_ACCOUNT = 'no_reply@targetvalidation.org'
     MAILGUN_DOMAIN = "https://api.mailgun.net/v3/mg.targetvalidation.org"
     MAILGUN_MESSAGES = MAILGUN_DOMAIN+'/messages'
     MAILGUN_API_KEY = "key-b7986f9a29fe234733b0af3b1206b146"
-    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'eliseop@targetvalidation.org' ]
+    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'andreap@targetvalidation.org', ]
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', ]
@@ -127,7 +150,7 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
     # ftp user and passwords
-    EVIDENCEVALIDATION_FTP_HOST= dict( host = '192.168.1.150',
+    EVIDENCEVALIDATION_FTP_HOST= dict( host = 'ftp.targetvalidation.org',
                                        port = 22)
     EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}\.json\.gz$"
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
@@ -140,7 +163,7 @@ class Config():
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv008"] = '409a0d21'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv007"] = 'a6052a3b'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv025"] = 'd2b315fa'
-    # # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
+    # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
 
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
@@ -161,6 +184,11 @@ class Config():
 
     # put the path to the file where you want to write the SLIM file (turtle format)
     ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
+
+    CHEMBL_URIS = dict(
+        protein_class='https://www.ebi.ac.uk/chembl/api/data/protein_class',
+        target_component='https://www.ebi.ac.uk/chembl/api/data/target_component',
+    )
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5

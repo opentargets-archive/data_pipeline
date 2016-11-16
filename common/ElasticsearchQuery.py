@@ -1,20 +1,12 @@
-from collections import defaultdict, Counter
-from datetime import datetime, time
-import logging
-from pprint import pprint
+from collections import Counter
 
+import collections
 import jsonpickle
 from elasticsearch import helpers
-from elasticsearch.exceptions import NotFoundError
-from elasticsearch.helpers import streaming_bulk, parallel_bulk
-from sqlalchemy import and_
-from common import Actions
+
 from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
-from common.PGAdapter import ElasticsearchLoad
-from common.processify import processify
 from settings import Config
-from elasticsearch_config import ElasticSearchConfiguration
 
 
 class AssociationSummary(object):
@@ -42,8 +34,9 @@ class AssociationSummary(object):
 
 class ESQuery(object):
 
-    def __init__(self, es):
+    def __init__(self, es, dry_run = False):
         self.handler = es
+        self.dry_run = dry_run
 
     @staticmethod
     def _get_source_from_fields(fields = None):
@@ -139,6 +132,37 @@ class ESQuery(object):
     def count_all_eco(self):
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_ECO_INDEX_NAME)
+
+    def get_publications_with_analyzed_data(self,ids, fields=None):
+        source = self._get_source_from_fields(fields)
+        # inner hits to get child documents containing abstract_lemmas , along with parent publications
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                                     "has_child": {
+                                        "type": "publication-analysis-spacy",
+                                            "query": {
+                                                        "ids": {"values": ids}
+
+                                                    },"inner_hits": {}
+                                        }
+                                     },
+
+                               '_source': source,
+                               'size': 1000
+                           },
+                           scroll='2h',
+                           doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                           timeout="10m",
+                           )
+        for hit in res:
+            parent_publication = hit['_source']
+            analyzed_publication = hit['inner_hits']['publication-analysis-spacy']['hits']['hits'][0]['_source']
+            yield parent_publication, analyzed_publication
+
+    def count_all_publications(self):
+
+        return self.count_elements_in_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
@@ -559,23 +583,25 @@ class ESQuery(object):
                 yield hit['_source']
 
 
-    def get_all_pub_ids_from_evidence(self,):
+    def get_all_pub_ids_from_evidence(self,datasources= None):
         #TODO: get all the validated evidencestrings and fetch medline abstracts there
-        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='literature.references.lit_id'
+        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='evidence_string.literature.references.lit_id'
+        return self.get_validated_evidence_strings(fields='evidence_string.literature.references.lit_id',
+                                                   datasources=datasources)
 
-        return ['http://europepmc.org/abstract/MED/24523595',
-               'http://europepmc.org/abstract/MED/26784250',
-               'http://europepmc.org/abstract/MED/27409410',
-               'http://europepmc.org/abstract/MED/26290144',
-               'http://europepmc.org/abstract/MED/25787843',
-               'http://europepmc.org/abstract/MED/26836588',
-               'http://europepmc.org/abstract/MED/26781615',
-               'http://europepmc.org/abstract/MED/26646452',
-               'http://europepmc.org/abstract/MED/26774881',
-               'http://europepmc.org/abstract/MED/26629442',
-               'http://europepmc.org/abstract/MED/26371324',
-               'http://europepmc.org/abstract/MED/24817865',
-               ]
+        # return ['http://europepmc.org/abstract/MED/24523595',
+        #        'http://europepmc.org/abstract/MED/26784250',
+        #        'http://europepmc.org/abstract/MED/27409410',
+        #        'http://europepmc.org/abstract/MED/26290144',
+        #        'http://europepmc.org/abstract/MED/25787843',
+        #        'http://europepmc.org/abstract/MED/26836588',
+        #        'http://europepmc.org/abstract/MED/26781615',
+        #        'http://europepmc.org/abstract/MED/26646452',
+        #        'http://europepmc.org/abstract/MED/26774881',
+        #        'http://europepmc.org/abstract/MED/26629442',
+        #        'http://europepmc.org/abstract/MED/26371324',
+        #        'http://europepmc.org/abstract/MED/24817865',
+        #        ]
 
     def get_all_associations_ids(self,):
         res = helpers.scan(client=self.handler,
@@ -655,3 +681,105 @@ class ESQuery(object):
             count [ev_hit['_source']['sourceID']]+=1
 
         return count
+
+    def delete_data(self, index, query, doc_type = '', chunk_size=1000, altered_keys=None):
+        '''
+        Delete all the documents in an index matching a given query
+        :param index: index to use
+        :param query: query matching the elements to remove
+        :param doc_type: document types, default is to look for all the doc types
+        :param chunk_size: size of the bulk action sent to delete
+        :param altered_keys: list of fields to fetch data and return as being altered by the delete query
+        :return: dict of keys altered by the query
+        '''
+
+        '''count available data'''
+        res = self.handler.search(index=Loader.get_versioned_index(index),
+                                  body={
+                                      "query": query,
+                                      '_source': False,
+                                      'size': 0,
+                                  },
+                                  doc_type = doc_type,
+                                  )
+        total = res['hits']['total']
+        '''if data is matching query, delete it with scan and bulk'''
+        altered = dict()
+        for key in altered_keys:
+            altered[key]=set()
+        if total:
+            batch = []
+            for hit in helpers.scan(client=self.handler,
+                                    query={"query": query,
+                                       '_source': self._get_source_from_fields(altered_keys),
+                                       'size': chunk_size,
+                                    },
+                                    scroll='1h',
+                                    index=Loader.get_versioned_index(index),
+                                    doc_type=doc_type,
+                                    timeout='1h',
+                                       ):
+                batch.append({
+                                '_op_type': 'delete',
+                                '_index': hit['_index'],
+                                '_type': hit['_type'],
+                                '_id': hit['_id'],
+                            })
+                flat_source = self.flatten(hit['_source'])
+                for key in altered_keys:
+                    if key in flat_source:
+                        altered[key].add(flat_source[key])
+                if len(batch)>= chunk_size:
+                    self._flush_bulk(batch)
+                    batch = []
+
+        if len(batch) >= chunk_size:
+            self._flush_bulk(batch)
+        '''flush changes'''
+        self.handler.indices.flush(Loader.get_versioned_index(index),
+                         wait_if_ongoing=True)
+
+        return altered
+
+    def delete_evidence_for_datasources(self, datasources):
+        '''
+        delete all the evidence objects with a given source id
+        :param sourceID: a list of datasources ids to delete
+        :return:
+        '''
+
+        if not isinstance(datasources, (list, tuple)):
+            datasources = [datasources]
+        query = {
+            "filtered": {
+                "filter": {
+                    "terms": {"sourceID": datasources},
+                    }
+                }
+            }
+        self.delete_data(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
+                         query=query)
+
+    def _flush_bulk(self, batch):
+        if not self.dry_run:
+            return helpers.bulk(self.handler,
+                                batch,
+                                stats_only=True)
+
+    @staticmethod
+    def flatten(d, parent_key='', separator='.'):
+        '''
+        takes a nested dictionary as input and generate a flat one with keys separated by the separator
+        :param d: dictionary
+        :param parent_key: a prefix for all flattened keys
+        :param separator: separator between nested keys
+        :return: flattened dictionary
+        '''
+        flat_fields = []
+        for k, v in d.items():
+            flat_key = parent_key + separator + k if parent_key else k
+            if isinstance(v, collections.MutableMapping):
+                flat_fields.extend(ESQuery.flatten(v, flat_key, separator=separator).items())
+            else:
+                flat_fields.append((flat_key, v))
+        return dict(flat_fields)
