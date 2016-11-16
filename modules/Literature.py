@@ -699,12 +699,12 @@ class PubmedLiteratureProcess(object):
                                          job_timeout=120)
 
 
-        # q_reporter = RedisQueueStatusReporter([
-        #                                        literature_parser_q,
-        #                                        literature_loader_q
-        #                                        ],
-        #                                       interval=10)
-        # q_reporter.start()
+        q_reporter = RedisQueueStatusReporter([literature_reader_q,
+                                               literature_parser_q,
+                                               literature_loader_q,
+                                               ],
+                                              interval=10)
+        q_reporter.start()
 
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
@@ -919,23 +919,13 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                                 retry_on_timeout=True,
                                 max_retries=10,
                                 )
-        self.publication_chunk_storage = PublicationChunkElasticStorage(Loader(self.es, chunk_size=1000))
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 
 
     def process(self,data):
-        medline_record,filename = data
-        self.logger.debug("Process Name {}".format(self.name))
-
-        ''' parse the file and put publication in the queue '''
-        self.parse_medline_xml_record(medline_record,filename)
-
-        self.logger.debug("%s finished" % self.name)
-
-    def parse_medline_xml_record(self, record, filename):
-
+        record,filename = data
         publication = dict()
         try:
             medline = objectify.fromstring(record)
@@ -1107,7 +1097,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                 retry_on_timeout=True,
                                 max_retries=10,
                                 )
-        self.publication_chunk_storage = PublicationChunkElasticStorage(Loader(self.es, chunk_size=1000))
+        self.loader = Loader(self.es, chunk_size=1000)
         self.es_query = ESQuery(self.es)
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
@@ -1117,16 +1107,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
     def process(self, data):
         publication = data
 
-        self.logger.debug("Process Name {}".format(self.name))
-
-        ''' load the publication chunks to ES '''
-        self.store_publication(publication)
-
-        self.logger.debug("%s finished" % self.name)
-
-    def store_publication(self, publication):
         try:
-
             pub = Publication(pub_id=publication['pmid'],
                           title=publication['title'],
                           abstract=publication.get('abstract',''),
@@ -1157,31 +1138,19 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
         #     self.get_epmc_text_mined_entities(pub)
         # if pub.has_references:
         #     self.get_epmc_ref_list(pub)
-            logging.debug("PMID for loading : {}".format(pub.pub_id))
 
-            self.publication_chunk_storage.storage_add(publication['pmid'],pub)
+            self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                            Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                            publication['pmid'],
+                            pub,
+                            create_index=False)
 
         except KeyError as e:
             logging.error("Error creating publication object for pmid {} , filename {}".format(publication['pmid'],
                                                                                                publication['filename']),str(e))
 
-
-class PublicationChunkElasticStorage():
-    def __init__(self, loader,):
-        self.loader = loader
-        self.logger = logging.getLogger(__name__)
-
-    def storage_create_index(self, recreate=False):
-        self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate = recreate)
-
-    def storage_add(self, pub_id, publication_data):
-
-        self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-                        Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                        pub_id,
-                        publication_data,
-                        create_index=False)
+    def close(self):
+        self.loader.close()
 
 
-    def storage_flush(self):
-        self.loader.flush()
+
