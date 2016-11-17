@@ -1,6 +1,6 @@
 import unittest
 
-from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, LiteratureProcess, PubmedLiteratureProcess
+from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, LiteratureProcess, MedlineRetriever
 from common.ElasticsearchLoader import Loader
 from modules.EvidenceString import EvidenceStringProcess
 from elasticsearch import Elasticsearch
@@ -76,7 +76,7 @@ class LiteratureTestCase(unittest.TestCase):
         p = PipelineConnectors()
         p.init_services_connections()
         with Loader(p.es ,chunk_size=1000) as loader:
-            PubmedLiteratureProcess(p.es,loader,False,p.r_server).fetch()
+            MedlineRetriever(p.es, loader, False, p.r_server).fetch()
 
 
 if __name__ == '__main__':

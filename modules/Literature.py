@@ -60,6 +60,19 @@ LABELS = {
 }
 
 
+def ftp_connect():
+    ftp = FTP(Config.PUBMED_FTP_SERVER, timeout=30 * 60)
+    ftp.login()
+    ftp.cwd('pubmed/baseline')
+
+    return ftp
+
+
+def download_file(ftp, file_path):
+    handle = open(file_path, 'wb')
+    ftp.retrbinary('RETR ' + os.path.basename(file_path), handle.write)
+    handle.close()
+
 class PublicationFetcher(object):
     """
     Retireve data about a publication
@@ -70,9 +83,9 @@ class PublicationFetcher(object):
 
     #"EXT_ID:17440703 OR EXT_ID:17660818 OR EXT_ID:18092167 OR EXT_ID:18805785 OR EXT_ID:19442247 OR EXT_ID:19808788 OR EXT_ID:19849817 OR EXT_ID:20192983 OR EXT_ID:20871604 OR EXT_ID:21270825"
 
-    def __init__(self, es, loader = None):
+    def __init__(self, es, loader = None, dry_run = False):
         if loader is None:
-            self.loader = Loader(es)
+            self.loader = Loader(es, dry_run=dry_run)
         else:
             self.loader=loader
         self.es = es
@@ -296,9 +309,9 @@ class PublicationAnalysisSpacy(PublicationAnalysis):
 
 
 class PublicationAnalyserSpacy(object):
-    def __init__(self, fetcher, es, loader = None):
+    def __init__(self, fetcher, es, loader = None, dry_run=False):
         if loader is None:
-            self.loader = Loader(es)
+            self.loader = Loader(es, dry_run=dry_run)
         self.fetcher = fetcher
         self.logger = logging.getLogger(__name__)
         self.parser = English()
@@ -656,7 +669,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
             logging.error("Error in loading analysed publication for pmid {}: {}".format(pub_id, error.message))
 
 
-class PubmedLiteratureProcess(object):
+class MedlineRetriever(object):
 
 
     def __init__(self,
@@ -679,50 +692,55 @@ class PubmedLiteratureProcess(object):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
         self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
-        # Literature Reader Queue
-        literature_reader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_reader_q',
-                                         max_size=MAX_PUBLICATION_CHUNKS,
+        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+
+        # FTP Retriever Queue
+        retriever_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_retriever',
+                                         max_size=no_of_workers/2 +1,
                                          job_timeout=1200)
 
-        # Literature Parser Queue
-        literature_parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_parser_q',
+        # Parser Queue
+        parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_parser',
                                   max_size=MAX_PUBLICATION_CHUNKS,
                                   job_timeout=120)
 
-        # Literature ES-Loader Queue
-        literature_loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_loader_q',
+        # ES-Loader Queue
+        loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
                                          max_size=MAX_PUBLICATION_CHUNKS,
                                          job_timeout=120)
 
 
 
-        q_reporter = RedisQueueStatusReporter([literature_reader_q,
-                                               literature_parser_q,
-                                               literature_loader_q,
+        q_reporter = RedisQueueStatusReporter([retriever_q,
+                                               parser_q,
+                                               loader_q,
                                                ],
                                               interval=10)
         q_reporter.start()
 
 
-        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        if not os.path.exists(Config.PUBMED_XML_LOCN):
+            os.makedirs(Config.PUBMED_XML_LOCN)
+
+
 
         '''Start file-reader workers'''
-        readers = [PubmedXMLReaderProcess(literature_reader_q,
+        retrievers = [PubmedFTPReaderProcess(retriever_q,
                                           self.r_server.db,
-                                          literature_parser_q,
+                                          parser_q,
                                           self.dry_run
                                           )
-                   for i in range(no_of_workers)]
+                   for i in range(no_of_workers/2 +1)]
 
-        for w in readers:
+        for w in retrievers:
             w.start()
 
 
 
         'Start xml file parser workers'
-        parsers = [PubmedXMLParserProcess(literature_parser_q,
+        parsers = [PubmedXMLParserProcess(parser_q,
                                      self.r_server.db,
-                                     literature_loader_q,
+                                     loader_q,
                                      self.dry_run
                                      )
                    for i in range(no_of_workers)]
@@ -732,43 +750,31 @@ class PubmedLiteratureProcess(object):
 
         '''Start es-loader workers'''
         '''Fixed number of workers to reduce the overhead of creating ES connections for each worker process'''
-        loaders = [LiteratureLoaderProcess(literature_loader_q,
+        loaders = [LiteratureLoaderProcess(loader_q,
                                           self.r_server.db,
                                           self.dry_run
                                           )
-                   for i in range(no_of_workers)]
+                   for i in range(no_of_workers/2 +1)]
 
         for w in loaders:
             w.start()
 
-        if local_file_locn:
-            xml_location = local_file_locn[0] + '/'
-        else:
-            xml_location = Config.PUBMED_XML_LOCN
-            if not os.path.exists(xml_location):
-                os.makedirs(xml_location)
 
-        ftp = self.ftp_connect()
+        ftp = ftp_connect()
 
         # TODO : for testing
         # for j in range(len(files)):
         for file_ in tqdm(ftp.nlst()[800:810],
-                      desc='getting remote files'):
+                      desc='enqueuing remote files'):
 
-            try:
-                file_path = os.path.join(xml_location, file_)
-
-                if not os.path.isfile(file_path):
-                    self.download_file(ftp, file_path)
-                literature_reader_q.put(file_path)
-
-            except all_errors as e:
-                logging.error("Error downloading medline file {} from FTP server".format(file_), e.message)
+            file_path = os.path.join(Config.PUBMED_XML_LOCN, file_)
+            retriever_q.put(file_path)
 
 
-        literature_reader_q.set_submission_finished(r_server=self.r_server)
 
-        for r in readers:
+        retriever_q.set_submission_finished(r_server=self.r_server)
+
+        for r in retrievers:
                 r.join()
 
         for p in parsers:
@@ -785,77 +791,34 @@ class PubmedLiteratureProcess(object):
         logging.info("DONE")
 
 
-    def process(self, datasources=[]):
-        # Literature Queue
-        literature_analyzer_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_analyzer_q',
-                                  max_size=MAX_PUBLICATION_CHUNKS,
-                                  job_timeout=120)
-
-        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-
-        # Start literature-analyser-worker processes
-        analyzers = [LiteratureAnalyzerProcess(literature_analyzer_q,
-                                               self.r_server.db,
-                                               self.dry_run,
-                                               ) for i in range(no_of_workers)]
-
-        for a in analyzers:
-            a.start()
-
-        pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
-
-        for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(datasources=datasources),
-                       desc='Reading available evidence_strings to analyse publications',
-                       total=self.es_query.count_validated_evidence_strings(datasources=datasources),
-                       unit=' evidence',
-                       unit_scale=True):
-            pub_id = self.get_pub_id_from_url(ev['evidence_string']['literature']['references'][0]['lit_id'])
-            pubs = pub_fetcher.get_publication(pub_id)
-
-            literature_analyzer_q.put(pubs)
-        literature_analyzer_q.set_submission_finished(r_server=self.r_server)
-
-        # TODO - auditing?
-        # wait for all spacy workers to finish
-        for a in analyzers:
-            a.join()
-
-        logging.info('flushing data to index')
-
-        self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-                                     wait_if_ongoing=True)
-        logging.info("DONE")
 
 
-    def ftp_connect(self):
-        ftp = FTP(Config.PUBMED_FTP_SERVER, timeout=30*60)
-        ftp.login()
-        ftp.cwd('pubmed/baseline')
 
-        return ftp
-
-    def download_file(self, ftp, file_path):
-        handle = open(file_path, 'wb')
-        ftp.retrbinary('RETR ' + os.path.basename(file_path), handle.write)
-        handle.close()
-
-
-class PubmedXMLReaderProcess(RedisQueueWorkerProcess):
+class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
 
     def __init__(self,
                  queue_in,
                  redis_path,
                  queue_out,
-                 dry_run=False):
-        super(PubmedXMLReaderProcess, self).__init__(queue_in, redis_path,queue_out)
+                 dry_run=False,
+                 forget=False):
+        super(PubmedFTPReaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
+        self.ftp = ftp_connect()
+        self.forget = forget
 
 
     def process(self, data):
         file_path = data
         self.logger.debug("Process Name {}".format(self.name))
+        if not os.path.isfile(file_path):
+            try:
+                download_file(self.ftp, file_path)
+            except all_errors as e:
+                self.logger.exception('Error downloading file: %s. SKIPPED!'%os.path.basename(file_path))
+                return
         with gzip.open(file_path, 'r') as f:
             record = []
             skip = True
@@ -868,6 +831,8 @@ class PubmedXMLReaderProcess(RedisQueueWorkerProcess):
                     self.put_into_queue_out(('\n'.join(record), os.path.basename(file_path)))
                     skip = True
                     record = []
+        if self.forget:
+            os.remove(file_path)
 
 
 class PubmedXMLParserProcess(RedisQueueWorkerProcess):
@@ -1041,10 +1006,9 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                 retry_on_timeout=True,
                                 max_retries=10,
                                 )
-        self.loader = Loader(self.es, chunk_size=1000)
+        self.loader = Loader(self.es, chunk_size=1000, dry_run=dry_run)
         self.es_query = ESQuery(self.es)
         self.start_time = time.time()  # reset timer start
-        self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 
 
