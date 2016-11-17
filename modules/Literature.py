@@ -1,12 +1,15 @@
 #!/usr/local/bin/python
 # coding: latin-1
 import gzip
+import io
 import logging
 import multiprocessing
 import os
 import re
 import string
 import time
+import urllib
+from StringIO import StringIO
 from collections import Counter
 from ftplib import FTP,all_errors
 from itertools import chain
@@ -71,23 +74,43 @@ def ftp_connect():
     return host
 
 
-def download_file(ftp, file_path, download_attempt = 5):
+# def download_file(ftp, file_path, download_attempt = 5):
+#
+#     attempt = 0
+#     while attempt <= download_attempt:
+#         logger.debug('Downloading file %s from ftp' % os.path.basename(file_path))
+#         try:
+#             ftp.download_if_newer(os.path.basename(file_path), file_path)
+#             break
+#         except Exception as e:
+#             logger.debug('FAILED Downloading file %s from ftp: %s' % (os.path.basename(file_path), str(e)))
+#             if attempt <= download_attempt:
+#                 pass
+#             else:
+#                 raise e
+#         attempt += 1
+#     if attempt > download_attempt:
+#         logger.error('File %s NOT DOWNLOADED from ftp' % os.path.basename(file_path))
 
-    attempt = 0
-    while attempt <= download_attempt:
-        logger.debug('Downloading file %s from ftp' % os.path.basename(file_path))
-        try:
-            ftp.download_if_newer(os.path.basename(file_path), file_path)
-            break
-        except Exception as e:
-            logger.debug('FAILED Downloading file %s from ftp: %s' % (os.path.basename(file_path), str(e)))
-            if attempt <= download_attempt:
-                pass
-            else:
-                raise e
-        attempt += 1
-    if attempt > download_attempt:
-        logger.error('File %s NOT DOWNLOADED from ftp' % os.path.basename(file_path))
+
+# def download_file(ftp, file_path, download_attempt = 5):
+#
+#     attempt = 0
+#     while attempt <= download_attempt:
+#         try:
+#             remote_file = 'ftp://anonymous:nopass@'+'/'.join([Config.PUBMED_FTP_SERVER, MEDLINE_BASE_PATH, os.path.basename(file_path)])
+#             logger.debug('Downloading remote file %s ' % remote_file)
+#             urllib.urlretrieve(remote_file, file_path)
+#             break
+#         except Exception as e:
+#             logger.debug('FAILED Downloading file %s from ftp: %s' % (os.path.basename(file_path), str(e)))
+#             if attempt <= download_attempt:
+#                 pass
+#             else:
+#                 raise e
+#         attempt += 1
+#     if attempt > download_attempt:
+#         logger.error('File %s NOT DOWNLOADED from ftp' % os.path.basename(file_path))
 
 class PublicationFetcher(object):
     """
@@ -817,13 +840,12 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                  redis_path,
                  queue_out,
                  dry_run=False,
-                 forget=True):
+                 ):
         super(PubmedFTPReaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
         self.ftp = ftp_connect()
-        self.forget = forget
 
 
     def process(self, data):
@@ -832,7 +854,8 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
             return
         if not os.path.isfile(file_path):
             try:
-                download_file(self.ftp, file_path)
+                ftp_file_handler =self.ftp.open(os.path.basename(file_path),'rb')
+                file_handler = StringIO(ftp_file_handler.read())
             except all_errors as e:
                 self.logger.exception('Error downloading file: %s. SKIPPED!' % ('/'.join([
                     Config.PUBMED_FTP_SERVER,
@@ -840,8 +863,13 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                     os.path.basename(file_path)
                 ])))
                 return
+        else:
+            file_handler=io.open(file_path,'rb')
         entries_in_file = 0
-        with gzip.open(file_path, 'r') as f:
+        with gzip.GzipFile(filename=os.path.basename(file_path),
+                           mode='rb',
+                           fileobj=file_handler,
+                           ) as f:
             record = []
             skip = True
             for line in f:
@@ -857,8 +885,6 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
 
         if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE:
             logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
-        if self.forget:
-            os.remove(file_path)
 
     def skip_file_processing(self, file_name):
         #TODO check in es if there the file has already been fully processed
