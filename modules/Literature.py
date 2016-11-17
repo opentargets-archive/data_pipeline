@@ -11,6 +11,7 @@ from collections import Counter
 from ftplib import FTP,all_errors
 from itertools import chain
 
+import ftputil as ftputil
 import requests
 from elasticsearch import Elasticsearch
 from lxml import etree,objectify
@@ -65,11 +66,9 @@ MEDLINE_BASE_PATH = 'pubmed/baseline'
 EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE = 30000
 
 def ftp_connect():
-    ftp = FTP(Config.PUBMED_FTP_SERVER, timeout=30 * 60)
-    ftp.login()
-    ftp.cwd(MEDLINE_BASE_PATH)
-
-    return ftp
+    host = ftputil.FTPHost(Config.PUBMED_FTP_SERVER, 'anonymous', 'support@targetvalidation.org')
+    host.chdir(MEDLINE_BASE_PATH)
+    return host
 
 
 def download_file(ftp, file_path, download_attempt = 5):
@@ -77,13 +76,10 @@ def download_file(ftp, file_path, download_attempt = 5):
     attempt = 0
     while attempt <= download_attempt:
         logger.debug('Downloading file %s from ftp' % os.path.basename(file_path))
-        handle = open(file_path, 'wb')
         try:
-            ftp.retrbinary('RETR ' + os.path.basename(file_path), handle.write)
-            handle.close()
+            ftp.download_if_newer(os.path.basename(file_path), file_path)
             break
         except Exception as e:
-            handle.close()
             logger.debug('FAILED Downloading file %s from ftp: %s' % (os.path.basename(file_path), str(e)))
             if attempt <= download_attempt:
                 pass
@@ -781,20 +777,17 @@ class MedlineRetriever(object):
         for w in loaders:
             w.start()
 
-
-        ftp = ftp_connect()
-
-        # TODO : for testing
-        # for j in range(len(files)):
         shift_downloading = 1
-        for file_ in tqdm(ftp.nlst(),
-                      desc='enqueuing remote files'):
-
-            file_path = os.path.join(Config.PUBMED_XML_LOCN, file_)
-            retriever_q.put(file_path)
-            time.sleep(shift_downloading)
-
-
+        host = ftp_connect()
+        files = host.listdir(host.curdir)
+        for file_ in tqdm(files,
+                  desc='enqueuing remote files'):
+            if host.path.isfile(file_):
+                # Remote name, local name, binary mode
+                file_path = os.path.join(Config.PUBMED_XML_LOCN, file_)
+                retriever_q.put(file_path)
+                time.sleep(shift_downloading)
+        host.close()
         retriever_q.set_submission_finished(r_server=self.r_server)
 
         for r in retrievers:
@@ -870,6 +863,9 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
     def skip_file_processing(self, file_name):
         #TODO check in es if there the file has already been fully processed
         return False
+
+    def close(self):
+        self.ftp.close()
 
 class PubmedXMLParserProcess(RedisQueueWorkerProcess):
     def __init__(self,
