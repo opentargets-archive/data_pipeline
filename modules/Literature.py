@@ -750,7 +750,7 @@ class MedlineRetriever(object):
                                           parser_q,
                                           self.dry_run
                                           )
-                      for i in range(4)]
+                      for i in range(3)]
 
                       # for i in range(no_of_workers/2 +1)]
 
@@ -787,7 +787,7 @@ class MedlineRetriever(object):
         # TODO : for testing
         # for j in range(len(files)):
         shift_downloading = 1
-        for file_ in tqdm(ftp.nlst()[800:810],
+        for file_ in tqdm(ftp.nlst(),
                       desc='enqueuing remote files'):
 
             file_path = os.path.join(Config.PUBMED_XML_LOCN, file_)
