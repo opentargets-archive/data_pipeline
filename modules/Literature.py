@@ -1,6 +1,5 @@
 #!/usr/local/bin/python
 # coding: latin-1
-import errno
 import gzip
 import logging
 import multiprocessing
@@ -27,6 +26,8 @@ from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
 from settings import Config
+
+logger = logging.getLogger(__name__)
 
 MAX_PUBLICATION_CHUNKS =1000
 
@@ -59,18 +60,23 @@ LABELS = {
     u'CARDINAL': u'CARDINAL'
 }
 
+MEDLINE_BASE_PATH = 'pubmed/baseline'
 
 def ftp_connect():
     ftp = FTP(Config.PUBMED_FTP_SERVER, timeout=30 * 60)
     ftp.login()
-    ftp.cwd('pubmed/baseline')
+    ftp.cwd(MEDLINE_BASE_PATH)
 
     return ftp
 
 
 def download_file(ftp, file_path):
     handle = open(file_path, 'wb')
-    ftp.retrbinary('RETR ' + os.path.basename(file_path), handle.write)
+    try:
+        ftp.retrbinary('RETR ' + os.path.basename(file_path), handle.write)
+    except Exception as e:
+        handle.close()
+        raise e
     handle.close()
 
 class PublicationFetcher(object):
@@ -801,7 +807,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                  redis_path,
                  queue_out,
                  dry_run=False,
-                 forget=False):
+                 forget=True):
         super(PubmedFTPReaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
@@ -817,7 +823,11 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
             try:
                 download_file(self.ftp, file_path)
             except all_errors as e:
-                self.logger.exception('Error downloading file: %s. SKIPPED!'%os.path.basename(file_path))
+                self.logger.exception('Error downloading file: %s. SKIPPED!' % ('/'.join([
+                    Config.PUBMED_FTP_SERVER,
+                    MEDLINE_BASE_PATH,
+                    os.path.basename(file_path)
+                ])))
                 return
         with gzip.open(file_path, 'r') as f:
             record = []
