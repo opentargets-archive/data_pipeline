@@ -24,7 +24,8 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle, \
+    RedisQueueWorkerThread
 from settings import Config
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,7 @@ LABELS = {
 }
 
 MEDLINE_BASE_PATH = 'pubmed/baseline'
+EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE = 30000
 
 def ftp_connect():
     ftp = FTP(Config.PUBMED_FTP_SERVER, timeout=30 * 60)
@@ -70,14 +72,26 @@ def ftp_connect():
     return ftp
 
 
-def download_file(ftp, file_path):
-    handle = open(file_path, 'wb')
-    try:
-        ftp.retrbinary('RETR ' + os.path.basename(file_path), handle.write)
-    except Exception as e:
-        handle.close()
-        raise e
-    handle.close()
+def download_file(ftp, file_path, download_attempt = 5):
+
+    attempt = 0
+    while attempt <= download_attempt:
+        logger.debug('Downloading file %s from ftp' % os.path.basename(file_path))
+        handle = open(file_path, 'wb')
+        try:
+            ftp.retrbinary('RETR ' + os.path.basename(file_path), handle.write)
+            handle.close()
+            break
+        except Exception as e:
+            handle.close()
+            logger.debug('FAILED Downloading file %s from ftp: %s' % (os.path.basename(file_path), str(e)))
+            if attempt <= download_attempt:
+                pass
+            else:
+                raise e
+        attempt += 1
+    if attempt > download_attempt:
+        logger.error('File %s NOT DOWNLOADED from ftp' % os.path.basename(file_path))
 
 class PublicationFetcher(object):
     """
@@ -702,7 +716,7 @@ class MedlineRetriever(object):
 
         # FTP Retriever Queue
         retriever_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_retriever',
-                                         max_size=no_of_workers/2 +1,
+                                         max_size=no_of_workers,
                                          job_timeout=1200)
 
         # Parser Queue
@@ -736,7 +750,9 @@ class MedlineRetriever(object):
                                           parser_q,
                                           self.dry_run
                                           )
-                   for i in range(no_of_workers/2 +1)]
+                      for i in range(4)]
+
+                      # for i in range(no_of_workers/2 +1)]
 
         for w in retrievers:
             w.start()
@@ -770,12 +786,13 @@ class MedlineRetriever(object):
 
         # TODO : for testing
         # for j in range(len(files)):
+        shift_downloading = 1
         for file_ in tqdm(ftp.nlst()[800:810],
                       desc='enqueuing remote files'):
 
             file_path = os.path.join(Config.PUBMED_XML_LOCN, file_)
             retriever_q.put(file_path)
-
+            time.sleep(shift_downloading)
 
 
         retriever_q.set_submission_finished(r_server=self.r_server)
@@ -818,7 +835,8 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
 
     def process(self, data):
         file_path = data
-        self.logger.debug("Process Name {}".format(self.name))
+        if self.skip_file_processing(os.path.basename(file_path)):
+            return
         if not os.path.isfile(file_path):
             try:
                 download_file(self.ftp, file_path)
@@ -829,6 +847,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                     os.path.basename(file_path)
                 ])))
                 return
+        entries_in_file = 0
         with gzip.open(file_path, 'r') as f:
             record = []
             skip = True
@@ -841,9 +860,16 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                     self.put_into_queue_out(('\n'.join(record), os.path.basename(file_path)))
                     skip = True
                     record = []
+                    entries_in_file +=1
+
+        if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE:
+            logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
         if self.forget:
             os.remove(file_path)
 
+    def skip_file_processing(self, file_name):
+        #TODO check in es if there the file has already been fully processed
+        return False
 
 class PubmedXMLParserProcess(RedisQueueWorkerProcess):
     def __init__(self,
