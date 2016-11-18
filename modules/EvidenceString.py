@@ -1003,9 +1003,9 @@ class EvidenceStringProcess():
         self.r_server = r_server
 
     def process_all(self, datasources = [], dry_run = False , inject_literature = False):
-        self._process_evidence_string_data(datasources= datasources,
-                                           dry_run = dry_run ,
-                                           inject_literature= inject_literature)
+        return self._process_evidence_string_data(datasources= datasources,
+                                                  dry_run = dry_run ,
+                                                  inject_literature= inject_literature)
 
 
 
