@@ -10,7 +10,6 @@ from elasticsearch import Elasticsearch
 from SPARQLWrapper import SPARQLWrapper, JSON
 from common import Actions
 from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
-from common.PGAdapter import Adapter
 from modules.DataDrivenRelation import DataDrivenRelationActions, DataDrivenRelationProcess
 from modules.Dump import DumpActions, DumpGenerator
 from modules.ECO import EcoActions, EcoProcess, EcoUploader
@@ -25,7 +24,6 @@ from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomePr
 from modules.Association import AssociationActions, ScoringProcess
 from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from modules.Uniprot import UniProtActions,UniprotDownloader
-from modules.HGNC import HGNCActions, HGNCUploader
 from modules.Ensembl import EnsemblGeneInfo, EnsemblActions, EnsemblProcess
 from modules.MouseModels import MouseModelsActions, Phenodigm
 from modules.IntOGen import IntOGenActions, IntOGen
@@ -57,9 +55,6 @@ class PipelineConnectors():
 
         Declares the connector parts
         """
-
-        ''' sqlalchemy adapter '''
-        self.adapter = None
         ''' Elastic Search connection'''
         self.es = None
         ''' sparql endpoint client'''
@@ -72,13 +67,6 @@ class PipelineConnectors():
             os.remove(Config.REDISLITE_DB_PATH)
 
     def init_services_connections(self, redispersist=False):
-
-        try:
-            self.adapter = Adapter()
-        except:
-            logger.error('Cannot connect to Postgres database. skipping creation of adapter')
-            self.adapter= None
-
         '''init es client'''
         connection_attempt = 1
         hosts=[]
@@ -142,40 +130,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='CTTV processing pipeline')
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
                         action="append_const", const = Actions.ALL)
-    parser.add_argument("--hpad", dest='hpa', help="download data from human protein atlas and store it in postgres",
-                        action="append_const", const = HPAActions.DOWNLOAD)
-    parser.add_argument("--hpap", dest='hpa', help="process human protein atlas data stored in postgres and create json object",
-                        action="append_const", const = HPAActions.PROCESS)
-    parser.add_argument("--hpau", dest='hpa', help="upload processed human protein atlas json obects stored in postgres to elasticsearch",
-                        action="append_const", const = HPAActions.UPLOAD)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",
                         action="append_const", const = HPAActions.ALL)
-    parser.add_argument("--read", dest='rea', help="download data from reactome and store it in postgres",
-                        action="append_const", const = ReactomeActions.DOWNLOAD)
-    parser.add_argument("--reap", dest='rea', help="process reactome data stored in postgres and create json object",
-                        action="append_const", const = ReactomeActions.PROCESS)
-    parser.add_argument("--reau", dest='rea', help="upload processed reactome json obects stored in postgres to elasticsearch",
-                        action="append_const", const = ReactomeActions.UPLOAD)
     parser.add_argument("--rea", dest='rea', help="download reactome data, process it and upload it to elasticsearch",
                         action="append_const", const = ReactomeActions.ALL)
     parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in postgresql",
                         action="append_const", const = UniProtActions.CACHE)
     parser.add_argument("--genm", dest='gen', help="merge the available gene information and store the resulting json objects in postgres",
                         action="append_const", const = GeneActions.MERGE)
-    parser.add_argument("--hgncu", dest='hgnc', help="upload the HGNC json file to the lookups schema in postgres",
-                        action="append_const", const = HGNCActions.UPLOAD)
     parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = GeneActions.ALL)
-    parser.add_argument("--efop", dest='efo', help="process the efo information and store the resulting json objects in postgres",
-                        action="append_const", const = EfoActions.PROCESS)
-    parser.add_argument("--efou", dest='efo', help="upload the stored json efo object to elasticsearch",
-                        action="append_const", const = EfoActions.UPLOAD)
     parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EfoActions.ALL)
-    parser.add_argument("--ecop", dest='eco', help="process the eco information and store the resulting json objects in postgres",
-                        action="append_const", const = EcoActions.PROCESS)
-    parser.add_argument("--ecou", dest='eco', help="upload the stored json efo object to elasticsearch",
-                        action="append_const", const = EcoActions.UPLOAD)
     parser.add_argument("--eco", dest='eco', help="process the eco information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EcoActions.ALL)
     parser.add_argument("--evsp", dest='evs', help="process and validate the available evidence strings and store the resulting json object in postgres ",
@@ -277,32 +243,20 @@ if __name__ == '__main__':
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
                 dry_run = args.dry_run) as loader:
         run_full_pipeline = False
-        if args.all  and (Actions.ALL in args.all):
+        if args.all and (Actions.ALL in args.all):
             run_full_pipeline = True
         if args.hpa or run_full_pipeline:
             do_all = (HPAActions.ALL in args.hpa) or run_full_pipeline
-            if (HPAActions.DOWNLOAD in args.hpa) or do_all:
-                HPADataDownloader(connectors.adapter).retrieve_all()
             if (HPAActions.PROCESS in args.hpa) or do_all:
-                HPAProcess(connectors.adapter).process_all()
-            if (HPAActions.UPLOAD in args.hpa) or do_all:
-                HPAUploader(connectors.adapter, loader).upload_all()
+                HPAProcess(loader).process_all()
         if args.rea or run_full_pipeline:
             do_all = (ReactomeActions.ALL in args.rea) or run_full_pipeline
-            if (ReactomeActions.DOWNLOAD in args.rea) or do_all:
-                ReactomeDataDownloader(connectors.adapter).retrieve_all()
             if (ReactomeActions.PROCESS in args.rea) or do_all:
-                ReactomeProcess(connectors.adapter).process_all()
-            if (ReactomeActions.UPLOAD in args.rea) or do_all:
-                ReactomeUploader(connectors.adapter, loader).upload_all()
+                ReactomeProcess(loader).process_all()
         if args.uni or run_full_pipeline:
             do_all = (UniProtActions.ALL in args.uni) or run_full_pipeline
             if (UniProtActions.CACHE in args.uni) or do_all:
                 UniprotDownloader(loader).cache_human_entries()
-        if args.hgnc or run_full_pipeline:
-            do_all = (HGNCActions.ALL in args.hgnc) or run_full_pipeline
-            if (HGNCActions.UPLOAD in args.hgnc) or do_all:
-                HGNCUploader(connectors.adapter).upload()
         if args.ens or run_full_pipeline:
             do_all = (EnsemblActions.ALL in args.ens) or run_full_pipeline
             if (EnsemblActions.PROCESS in args.ens) or do_all:
@@ -315,23 +269,19 @@ if __name__ == '__main__':
         if args.efo or run_full_pipeline:
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:
-                EfoProcess(connectors.adapter).process_all()
-            if (EfoActions.UPLOAD in args.efo) or do_all:
-                EfoUploader(connectors.adapter, loader).upload_all()
+                EfoProcess(loader).process_all()
         if args.eco or run_full_pipeline:
             do_all = (EcoActions.ALL in args.eco) or run_full_pipeline
             if (EcoActions.PROCESS in args.eco) or do_all:
-                EcoProcess(connectors.adapter).process_all()
-            if (EcoActions.UPLOAD in args.eco) or do_all:
-                EcoUploader(connectors.adapter, loader).upload_all()
+                EcoProcess(loader).process_all()
         if args.mus or run_full_pipeline:
             do_all = (MouseModelsActions.ALL in args.mus) or run_full_pipeline
             if (MouseModelsActions.UPDATE_CACHE in args.mus) or do_all:
-                Phenodigm(connectors.adapter, connectors.es, connectors.sparql).update_cache()
+                Phenodigm(connectors.es, connectors.sparql).update_cache()
             if (MouseModelsActions.UPDATE_GENES in args.mus) or do_all:
-                Phenodigm(connectors.adapter, connectors.es, connectors.sparql).update_genes()
+                Phenodigm(connectors.es, connectors.sparql).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
-                Phenodigm(connectors.adapter, connectors.es, connectors.sparql).generate_evidence()
+                Phenodigm(connectors.es, connectors.sparql).generate_evidence()
         if args.lit or run_full_pipeline:
             do_all = (LiteratureActions.ALL in args.lit) or run_full_pipeline
             if (LiteratureActions.FETCH in args.lit) or do_all:
@@ -353,7 +303,7 @@ if __name__ == '__main__':
             if (ValidationActions.CHECKFILES in args.val) or do_all:
                 EvidenceValidationFileChecker(connectors.es, connectors.r_server, dry_run=args.dry_run).check_all(args.local_file)
         if args.valreset:
-            EvidenceValidationFileChecker(connectors.adapter, connectors.es, connectors.r_server).reset()
+            EvidenceValidationFileChecker( connectors.es, connectors.r_server).reset()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
