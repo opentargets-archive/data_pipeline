@@ -1,3 +1,4 @@
+import copy
 import re
 import sys
 reload(sys)

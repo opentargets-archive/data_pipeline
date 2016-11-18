@@ -2,7 +2,6 @@ from datetime import datetime
 import logging
 from sqlalchemy import and_
 from common import Actions
-from common.ElasticsearchLoader import JSONObjectStorage
 import requests
 from common.PGAdapter import *
 from StringIO import StringIO

@@ -8,9 +8,7 @@ from tqdm import tqdm
 
 from common import Actions
 from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import JSONObjectStorage
 from common.ElasticsearchQuery import ESQuery
-from common.PGAdapter import  ECOPath
 from common.Redis import RedisLookupTablePickle
 from modules.Ontology import OntologyClassReader
 from settings import Config

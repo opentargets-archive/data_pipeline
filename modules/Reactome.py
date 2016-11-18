@@ -4,9 +4,7 @@ import requests
 from sqlalchemy.exc import IntegrityError
 from common import Actions
 from common.DataStructure import TreeNode, JSONSerializable
-from common.ElasticsearchLoader import JSONObjectStorage
 from common.ElasticsearchQuery import ESQuery
-from common.PGAdapter import ReactomePathwayData, ReactomePathwayRelation, ReactomeEnsembleMapping
 from settings import Config
 import networkx as nx
 from networkx.readwrite import json_graph

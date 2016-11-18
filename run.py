@@ -1,30 +1,27 @@
 
 import logging
 import os
-import socket
-
 import sys
-
 import time
 from elasticsearch import Elasticsearch
-from SPARQLWrapper import SPARQLWrapper, JSON
+from SPARQLWrapper import SPARQLWrapper
 from common import Actions
-from common.ElasticsearchLoader import Loader, ElasticsearchActions, JSONObjectStorage
+from common.ElasticsearchLoader import Loader
 from modules.DataDrivenRelation import DataDrivenRelationActions, DataDrivenRelationProcess
 from modules.Dump import DumpActions, DumpGenerator
-from modules.ECO import EcoActions, EcoProcess, EcoUploader
-from modules.EFO import EfoActions, EfoProcess, EfoUploader
+from modules.ECO import EcoActions, EcoProcess
+from modules.EFO import EfoActions, EfoProcess
 from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager
-from modules.HPA import HPADataDownloader, HPAActions, HPAProcess, HPAUploader
+from modules.HPA import  HPAActions, HPAProcess
 from modules.Literature import LiteratureActions, LiteratureProcess
 from modules.QC import QCActions, QCRunner
-from modules.Reactome import ReactomeActions, ReactomeDataDownloader, ReactomeProcess, ReactomeUploader
+from modules.Reactome import ReactomeActions,  ReactomeProcess
 from modules.Association import AssociationActions, ScoringProcess
 from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from modules.Uniprot import UniProtActions,UniprotDownloader
-from modules.Ensembl import EnsemblGeneInfo, EnsemblActions, EnsemblProcess
+from modules.Ensembl import  EnsemblActions, EnsemblProcess
 from modules.MouseModels import MouseModelsActions, Phenodigm
 from modules.IntOGen import IntOGenActions, IntOGen
 from modules.Ontology import OntologyActions, PhenotypeSlim, DiseasePhenotypes
