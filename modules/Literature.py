@@ -735,7 +735,7 @@ class MedlineRetriever(object):
 
         # FTP Retriever Queue
         retriever_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_retriever',
-                                         max_size=no_of_workers,
+                                         max_size=no_of_workers*2,
                                          job_timeout=1200)
 
         # Parser Queue
@@ -754,7 +754,7 @@ class MedlineRetriever(object):
                                                parser_q,
                                                loader_q,
                                                ],
-                                              interval=10)
+                                              interval=30)
         q_reporter.start()
 
 
@@ -769,8 +769,7 @@ class MedlineRetriever(object):
                                           parser_q,
                                           self.dry_run
                                           )
-                      # for i in range(3)]
-                      for i in range(no_of_workers/2 +1)]
+                      for i in range(no_of_workers)]
 
         for w in retrievers:
             w.start()
