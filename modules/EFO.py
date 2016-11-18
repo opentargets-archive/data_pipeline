@@ -1,20 +1,12 @@
-import warnings
 from collections import OrderedDict
 import logging
-
-import sys
-
 from tqdm import tqdm
-
 from common import Actions
 from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import JSONObjectStorage
 from common.ElasticsearchQuery import ESQuery
-from common.PGAdapter import  EFONames, EFOPath, EFOFirstChild
 from common.Redis import RedisLookupTablePickle
 from settings import Config
 
-__author__ = 'andreap'
 
 class EfoActions(Actions):
     PROCESS='process'
@@ -87,22 +79,28 @@ class EFO(JSONSerializable):
 class EfoProcess():
 
     def __init__(self,
-                 adapter,):
-        self.adapter=adapter
-        self.session=adapter.session
+                 loader,):
+        self.loader = loader
         self.efos = OrderedDict()
 
     def process_all(self):
         self._process_efo_data()
         self._store_efo()
 
+
+    def _get_efo_names(self):
+        raise NotImplementedError
+
+    def _get_efo_path(self):
+        raise NotImplementedError
+
+    def _get_efo_first_child(self):
+        raise NotImplementedError
+
     def _process_efo_data(self):
 
         # efo_uri = {}
-        for row in self.session.query(EFONames).yield_per(1000):
-            # if row.uri_id_org:
-            #     idorg2efos[row.uri_id_org] = row.uri
-            # efo_uri[get_ontology_code_from_url(row.uri)]=row.uri
+        for row in self._get_efo_names():
             synonyms = []
             if row.synonyms != [None]:
                 synonyms = sorted(list(set(row.synonyms)))
@@ -116,7 +114,7 @@ class EfoProcess():
                                      path = [])
 
 
-        for row in self.session.query(EFOPath).yield_per(1000):
+        for row in self._get_efo_path():
             full_path_codes = []
             full_path_labels = []
             efo_code = get_ontology_code_from_url(row.uri)
@@ -163,7 +161,7 @@ class EfoProcess():
                         break
 
 
-        for row in self.session.query(EFOFirstChild).yield_per(1000):
+        for row in self._get_efo_first_child():
             if get_ontology_code_from_url(row.first_child_uri) == 'genetic_disorder_uncategorized':
                 continue
             efo_code_parent = get_ontology_code_from_url(row.parent_uri)
@@ -179,69 +177,12 @@ class EfoProcess():
 
 
     def _store_efo(self):
-        JSONObjectStorage.store_to_pg(self.session,
-                                              Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                                              Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                                              self.efos)
 
+        for efo in self.efos:
+            self.loader.put(index_name=Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                            doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+                            body = efo)
 
-
-
-class EfoUploader():
-
-    def __init__(self,
-                 adapter,
-                 loader):
-        self.adapter=adapter
-        self.session=adapter.session
-        self.loader=loader
-
-    def upload_all(self):
-        JSONObjectStorage.refresh_index_data_in_es(self.loader,
-                                         self.session,
-                                         Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                                         Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                                         )
-        self.loader.optimize_all()
-
-
-
-class EfoRetriever():
-    """
-    Will retrieve a EFO object form the processed json stored in postgres
-    """
-    def __init__(self,
-                 adapter,
-                 cache_size = 25):
-        warnings.warn('use redis based instead', DeprecationWarning, stacklevel=2)
-        self.adapter=adapter
-        self.session=adapter.session
-        self.cache = OrderedDict()
-        self.cache_size = cache_size
-
-    def get_efo(self, efoid):
-        if efoid in self.cache:
-            efo = self.cache[efoid]
-        else:
-            efo = self._get_from_db(efoid)
-            self._add_to_cache(efoid, efo)
-
-        return efo
-
-    def _get_from_db(self, efoid):
-        json_data = JSONObjectStorage.get_data_from_pg(self.session,
-                                                       Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                                                       Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                                                       efoid)
-        efo = EFO(efoid)
-        if json_data:
-            efo.load_json(json_data)
-        return efo
-
-    def _add_to_cache(self, efoid, efo):
-        self.cache[efoid]=efo
-        while len(self.cache) >self.cache_size:
-            self.cache.popitem(last=False)
 
 
 class EFOLookUpTable(object):
