@@ -769,9 +769,8 @@ class MedlineRetriever(object):
                                           parser_q,
                                           self.dry_run
                                           )
-                      for i in range(3)]
-
-                      # for i in range(no_of_workers/2 +1)]
+                      # for i in range(3)]
+                      for i in range(no_of_workers/2 +1)]
 
         for w in retrievers:
             w.start()
@@ -800,7 +799,7 @@ class MedlineRetriever(object):
         for w in loaders:
             w.start()
 
-        shift_downloading = 1
+        shift_downloading = 2
         host = ftp_connect()
         files = host.listdir(host.curdir)
         for file_ in tqdm(files,
@@ -856,12 +855,13 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
             try:
                 ftp_file_handler =self.ftp.open(os.path.basename(file_path),'rb')
                 file_handler = StringIO(ftp_file_handler.read())
-            except all_errors as e:
-                self.logger.exception('Error downloading file: %s. SKIPPED!' % ('/'.join([
+            except Exception as e:
+                self.logger.exception('Error fetching file: %s. %s . SKIPPED.' % ('/'.join([
                     Config.PUBMED_FTP_SERVER,
                     MEDLINE_BASE_PATH,
                     os.path.basename(file_path)
-                ])))
+                ]),
+                e.message))
                 return
         else:
             file_handler=io.open(file_path,'rb')

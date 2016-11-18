@@ -294,31 +294,19 @@ class ElasticSearchConfiguration():
     available_databases = Config().DATASOURCE_TO_DATATYPE_MAPPING.keys()
     available_databases.append('other')
 
-    if os.environ.get('CTTV_EL_LOADER') == 'prod' or \
-                    os.environ.get('CTTV_EL_LOADER') == 'stag':
-        generic_shard_number = '3'
-        generic_replicas_number = '0'
-        evidence_shard_number = '3'
-        evidence_replicas_number = '1'
-        relation_shard_number = '10'
-        relation_replicas_number = '0'
-        validation_shard_number = '1'
-        validation_replicas_number = '1'
-        submission_audit_shard_number = '1'
-        submission_audit_replicas_number = '1'
-        bulk_load_chunk = 1000
-    else:
-        generic_shard_number = '3'
-        generic_replicas_number = '0'
-        evidence_shard_number = '3'
-        evidence_replicas_number = '0'
-        relation_shard_number = '6'
-        relation_replicas_number = '0'
-        validation_shard_number = '1'
-        validation_replicas_number = '1'
-        submission_audit_shard_number = '1'
-        submission_audit_replicas_number = '1'
-        bulk_load_chunk = 1000
+    generic_shard_number = '3'
+    generic_replicas_number = '1'
+    evidence_shard_number = '3'
+    evidence_replicas_number = '1'
+    relation_shard_number = '10'
+    relation_replicas_number = '1'
+    publication_shard_number = '10'
+    publication_replicas_number = '1'
+    validation_shard_number = '1'
+    validation_replicas_number = '1'
+    submission_audit_shard_number = '1'
+    submission_audit_replicas_number = '1'
+    bulk_load_chunk = 1000
 
     uniprot_data_mapping = eco_data_mapping = {"mappings": {
         Config.ELASTICSEARCH_UNIPROT_DOC_NAME: {
@@ -896,8 +884,8 @@ class ElasticSearchConfiguration():
 
     publication_data_mapping = {
         "settings": {
-            "number_of_shards": generic_shard_number,
-            "number_of_replicas": generic_replicas_number,
+            "number_of_shards": publication_shard_number,
+            "number_of_replicas": publication_replicas_number,
             "refresh_interval": "1s",
         },
         "mappings": {
@@ -911,8 +899,30 @@ class ElasticSearchConfiguration():
                         "date": {
                             "type": "date",
                             "format": "strict_date_optional_time||epoch_millis",
+                        },
+                        "title": {
+                            "type": "string",
+                            "index": "analyzed",
+
+                        },
+                        "abstract": {
+                            "type": "string",
+                            "index": "analyzed",
+                        },
+                    },
+                    "dynamic_templates": [
+                        {
+                            "string_fields": {
+                                "match": "*",
+                                "match_mapping_type": "string",
+                                "mapping": {
+                                    "index": "not_analyzed",
+                                    "omit_norms": True,
+                                    "type": "string"
+                                }
+                            }
                         }
-                    }
+                    ],
                 },
                 Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME: {
                     "_parent": {
@@ -924,9 +934,27 @@ class ElasticSearchConfiguration():
                     "_routing": {
                         "required": True
                     }
+                },
+                "_default_": {
+                    "_all": {
+                        "enabled": True
+                    },
+                    "dynamic_templates": [
+                        {
+                            "string_fields": {
+                                "match": "*",
+                                "match_mapping_type": "string",
+                                "mapping": {
+                                    "index": "not_analyzed",
+                                    "omit_norms": True,
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    ],
                 }
-            }
         }
+    }
 
 
     INDEX_MAPPPINGS = {Config.ELASTICSEARCH_DATA_INDEX_NAME: evidence_data_mapping,
