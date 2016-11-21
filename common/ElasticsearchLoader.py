@@ -192,7 +192,7 @@ class Loader():
 
 
 
-    def put(self, index_name, doc_type, ID, body, create_index = True, routing = None, parent = None, auto_optimise = False):
+    def put(self, index_name, doc_type, ID, body, create_index = True, operation= None,routing = None, parent = None, auto_optimise = False):
 
         if index_name not in self.indexes_created:
             if create_index:
@@ -207,6 +207,8 @@ class Loader():
                                _type=doc_type,
                                _id=ID,
                                _source=body)
+        if operation is not None:
+            submission_dict['_op_type']=operation
         if routing is not None:
             submission_dict['_routing']=routing
         if parent is not None:

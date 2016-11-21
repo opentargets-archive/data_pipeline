@@ -263,4 +263,6 @@ class Config():
 
     #Literature Pipeline -- Pubmed/Medline FTP server
     PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
-    PUBMED_XML_LOCN = '/tmp/medline/'
+    PUBMED_XML_LOCN = '/tmp/medline/baseline'
+    PUBMED_XML_UPDATE_LOCN = '/tmp/medline/update'
+

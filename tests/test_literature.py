@@ -79,5 +79,17 @@ class LiteratureTestCase(unittest.TestCase):
             MedlineRetriever(p.es, loader, False, p.r_server).fetch()
 
 
+    def test_medline_parser_update(self):
+        logging.basicConfig(filename='output.log',
+                            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                            level=logging.INFO)
+
+        p = PipelineConnectors()
+        p.init_services_connections()
+        with Loader(p.es ,chunk_size=1000) as loader:
+            MedlineRetriever(p.es, loader, False, p.r_server).fetch(update=True)
+
+
+
 if __name__ == '__main__':
     unittest.main()
