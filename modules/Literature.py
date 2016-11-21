@@ -814,7 +814,7 @@ class MedlineRetriever(object):
         #filter for update files
         gzip_files = [i for i in files if i.endswith('.xml.gz')]
 
-        for file_ in tqdm(gzip_files[1:3],
+        for file_ in tqdm(gzip_files,
                   desc='enqueuing remote files'):
             if host.path.isfile(file_):
                 # Remote name, local name, binary mode
@@ -971,7 +971,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
             elif medline.tag == 'DeleteCitation':
                 publication['delete_pmids'] = list()
                 for deleted_pmid in medline.getchildren():
-                    publication['delete_pmids'].append(deleted_pmid.PMID.text)
+                    publication['delete_pmids'].append(deleted_pmid.text)
 
             publication['filename'] = filename
             return publication
@@ -1019,7 +1019,8 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                 for author in e.Author:
                     author_dict = dict()
                     for e in author.getchildren():
-                        author_dict[e.tag] = e.text
+                        if e.tag != 'AffiliationInfo':
+                            author_dict[e.tag] = e.text
 
                     publication['authors'].append(author_dict)
 
@@ -1054,6 +1055,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                 self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                                 Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                                 pmid,
+                                body=None,
                                 create_index=False,
                                 operation='delete')
 
