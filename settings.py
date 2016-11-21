@@ -25,7 +25,7 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.12'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     try:
         ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
@@ -116,7 +116,7 @@ class Config():
     HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'http://v15.proteinatlas.org/download/rna.csv.zip'
+    HPA_RNA_URL = 'http://v15.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'

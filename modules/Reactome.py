@@ -65,23 +65,21 @@ class ReactomeDataDownloader():
 
     def get_pathway_data(self):
         self.valid_pathway_ids = []
-        parsed = 0
         for row in self._download_data(Config.REACTOME_PATHWAY_DATA).split('\n'):
             if row:
                 pathway_id, pathway_name, species = row.split('\t')
                 if pathway_id not in self.valid_pathway_ids:
                     if species in self.allowed_species:
-                        parsed += 1
                         self.valid_pathway_ids.append(pathway_id)
                         yield dict(id=pathway_id,
                                    name=pathway_name,
                                    species=species,
                                    )
-                        if len(parsed) % 1000 == 0:
-                            self.logger.info("%i rows parsed for reactome_pathway_data" % len(parsed))
+                        if len(self.valid_pathway_ids) % 1000 == 0:
+                            self.logger.debug("%i rows parsed for reactome_pathway_data" % len(self.valid_pathway_ids))
                 else:
                     self.logger.warn("Pathway id %s is already loaded, skipping duplicate data" % pathway_id)
-        self.logger.info('parsed %i rows for reactome_pathway_data' % len(parsed))
+        self.logger.info('parsed %i rows for reactome_pathway_data' % len(self.valid_pathway_ids))
 
     def get_pathway_relations(self):
         added_relations = []
@@ -96,10 +94,10 @@ class ReactomeDataDownloader():
                                    )
                         added_relations.append(relation)
                         if len(added_relations) % 1000 == 0:
-                            self.logger.info("%i rows parsed from reactome_pathway_relation" % len(added_relations))
+                            self.logger.debug("%i rows parsed from reactome_pathway_relation" % len(added_relations))
                 else:
                     self.logger.warn("Pathway relation %s is already loaded, skipping duplicate data" % str(relation))
-            self.logger.info('parsed %i rows from reactome_pathway_relation' % len(added_relations))
+        self.logger.info('parsed %i rows from reactome_pathway_relation' % len(added_relations))
 
 
 class ReactomeProcess():
@@ -113,6 +111,7 @@ class ReactomeProcess():
 
     def process_all(self):
         self._process_pathway_hierarchy()
+        self.loader.close()
 
     def _process_pathway_hierarchy(self):
         root = 'root'
@@ -137,6 +136,7 @@ class ReactomeProcess():
                         ancestors.add(p)
                 self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
                                 doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                                ID=node,
                                 body=dict(id=node,
                                           label=node_data['name'],
                                           path=paths,
@@ -145,6 +145,7 @@ class ReactomeProcess():
                                           is_root=node == root,
                                           ancestors=list(ancestors)
                                           ))
+
 
 
 class ReactomeRetriever():

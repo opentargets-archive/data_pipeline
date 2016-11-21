@@ -61,7 +61,7 @@ class HPADataDownloader():
                        expression_type=row['Expression type'],
                        )
             if c + 1 % 10000 == 0:
-                logging.info("%i rows parsed from hpa_normal_tissue" % c)
+                logging.debug("%i rows parsed from hpa_normal_tissue" % c)
         logging.info('parsed %i rows from hpa_normal_tissue' % c)
 
     def retrieve_rna_data(self):
@@ -75,7 +75,7 @@ class HPADataDownloader():
                        )
 
             if c + 1 % 10000 == 0:
-                logging.info("%i rows uploaded to hpa_rna" % c)
+                logging.debug("%i rows uploaded to hpa_rna" % c)
         logging.info('inserted %i rows in hpa_rna' % c)
 
     def retrieve_cancer_data(self):
@@ -89,7 +89,7 @@ class HPADataDownloader():
                        expression_type=row['Expression type'],
                        )
             if c + 1 % 10000 == 0:
-                logging.info("%i rows uploaded to hpa_cancer" % c)
+                logging.debug("%i rows uploaded to hpa_cancer" % c)
             logging.info('inserted %i rows in hpa_cancer' % c)
 
     def retrieve_subcellular_location_data(self):
@@ -102,7 +102,7 @@ class HPADataDownloader():
                        reliability=row['Reliability'],
                        )
             if c + 1 % 10000 == 0:
-                logging.info("%i rows uploaded to hpa_subcellular_location" % c)
+                logging.debug("%i rows uploaded to hpa_subcellular_location" % c)
         logging.info('inserted %i rows in hpa_subcellular_location' % c)
 
 
@@ -122,6 +122,8 @@ class HPAProcess():
         self.process_cancer()
         self.process_subcellular_location()
         self.store_data()
+        self.loader.close()
+
 
     def _get_available_genes(self, ):
         return self.available_genes
@@ -141,7 +143,7 @@ class HPAProcess():
 
     def process_rna(self):
         self.rna_data = dict()
-        for row in self.downloader.retrieve_normal_tissue_data():
+        for row in self.downloader.retrieve_rna_data():
             gene = row['gene']
             if gene not in self.available_genes:
                 self.init_gene(gene)
@@ -164,9 +166,10 @@ class HPAProcess():
     def store_data(self):
         if self.data.values()[0]['expression']:  # if there is expression data
 
-            for data in self.data.values():
+            for gene, data in self.data.items():
                 self.loader.put(index_name=Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
                                 doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+                                ID=gene,
                                 body=data['expression'].to_json(),
                                 )
         if self.data.values()[0]['cancer']:  # if there is cancer data
