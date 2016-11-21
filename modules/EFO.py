@@ -181,6 +181,7 @@ class EfoProcess():
         for efo in self.efos:
             self.loader.put(index_name=Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
                             doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+                            ID=efo.get_id(),
                             body = efo)
 
 

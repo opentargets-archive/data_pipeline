@@ -124,6 +124,7 @@ class EcoProcess():
         for eco in self.ecos:
             self.loader.put(index_name=Config.ELASTICSEARCH_ECO_INDEX_NAME,
                             doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
+                            ID=eco.get_id(),
                             body=eco)
 
 
