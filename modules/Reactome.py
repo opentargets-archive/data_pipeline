@@ -25,6 +25,7 @@ class ReactomeDataDownloader():
     allowed_species = ['Homo sapiens']
 
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
 
     def _download_data(self, url):
         r = requests.get(url)
@@ -56,10 +57,10 @@ class ReactomeDataDownloader():
     #                                                          )
     #                     added_relations.append(relation)
     #                     if len(added_relations)% 1000 == 0:
-    #                         logging.info("%i rows parsed for reactome_ensembl_mapping"%len(added_relations))
+    #                         self.logger.info("%i rows parsed for reactome_ensembl_mapping"%len(added_relations))
     #             else:
-    #                 logging.warn("Pathway mapping %s is already loaded, skipping duplicate data"%str(relation))
-    #     logging.info('parsed %i rows for reactome_ensembl_mapping'%len(added_relations))
+    #                 self.logger.warn("Pathway mapping %s is already loaded, skipping duplicate data"%str(relation))
+    #     self.logger.info('parsed %i rows for reactome_ensembl_mapping'%len(added_relations))
 
 
     def get_pathway_data(self):
@@ -77,10 +78,10 @@ class ReactomeDataDownloader():
                                    species=species,
                                    )
                         if len(parsed) % 1000 == 0:
-                            logging.info("%i rows parsed for reactome_pathway_data" % len(parsed))
+                            self.logger.info("%i rows parsed for reactome_pathway_data" % len(parsed))
                 else:
-                    logging.warn("Pathway id %s is already loaded, skipping duplicate data" % pathway_id)
-        logging.info('parsed %i rows for reactome_pathway_data' % len(parsed))
+                    self.logger.warn("Pathway id %s is already loaded, skipping duplicate data" % pathway_id)
+        self.logger.info('parsed %i rows for reactome_pathway_data' % len(parsed))
 
     def get_pathway_relations(self):
         added_relations = []
@@ -95,10 +96,10 @@ class ReactomeDataDownloader():
                                    )
                         added_relations.append(relation)
                         if len(added_relations) % 1000 == 0:
-                            logging.info("%i rows parsed from reactome_pathway_relation" % len(added_relations))
+                            self.logger.info("%i rows parsed from reactome_pathway_relation" % len(added_relations))
                 else:
-                    logging.warn("Pathway relation %s is already loaded, skipping duplicate data" % str(relation))
-            logging.info('parsed %i rows from reactome_pathway_relation' % len(added_relations))
+                    self.logger.warn("Pathway relation %s is already loaded, skipping duplicate data" % str(relation))
+            self.logger.info('parsed %i rows from reactome_pathway_relation' % len(added_relations))
 
 
 class ReactomeProcess():
@@ -108,6 +109,7 @@ class ReactomeProcess():
         self.data = {}
         '''download data'''
         self.downloader = ReactomeDataDownloader()
+        self.logger = logging.getLogger(__name__)
 
     def process_all(self):
         self._process_pathway_hierarchy()
@@ -154,6 +156,7 @@ class ReactomeRetriever():
                  es):
         self.es_query = ESQuery(es)
         self._cache = {}
+        self.logger = logging.getLogger(__name__)
 
     def get_reaction(self, reaction_id):
         if reaction_id not in self._cache:
