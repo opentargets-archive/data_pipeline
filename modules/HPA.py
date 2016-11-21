@@ -1,7 +1,6 @@
 import csv
 import logging
 from StringIO import StringIO
-from datetime import datetime
 from zipfile import ZipFile
 
 import requests
@@ -108,11 +107,12 @@ class HPADataDownloader():
 
 
 class HPAProcess():
-    def __init__(self, adapter):
-        self.adapter = adapter
-        self.session = adapter.session
+    def __init__(self, loader):
+        self.loader = loader
         self.data = {}
+        self.available_genes = set()
         self.set_translations()
+        self.downloader = HPADataDownloader()
         self.logger = logging.getLogger(__name__)
 
     def process_all(self):
@@ -123,28 +123,34 @@ class HPAProcess():
         self.process_subcellular_location()
         self.store_data()
 
-    def _get_available_genes(self, table=HPANormalTissue):
-        # genes =[ row.gene for row in self.session.query(table).distinct(table.gene).group_by(table.gene)]
-        genes = [row.gene for row in self.session.query(table.gene).distinct()]
-        logging.debug('found %i genes in table %s' % (len(genes), table.__tablename__))
-        return genes
+    def _get_available_genes(self, ):
+        return self.available_genes
 
     def process_normal_tissue(self):
-        for gene in self._get_available_genes(HPANormalTissue):
-            if gene not in self.data:
+        self.normal_tissue_data = dict()
+        for row in self.downloader.retrieve_normal_tissue_data():
+            gene = row['gene']
+            if gene not in self.available_genes:
                 self.init_gene(gene)
+                self.normal_tissue_data[gene] = []
+                self.available_genes.add(gene)
+            self.normal_tissue_data[gene].append(row)
+        for gene in self.available_genes:
             self.data[gene]['expression'].tissues = self.get_normal_tissue_data_for_gene(gene)
         return
 
-    def _get_row_as_dict(row):
-        d = row.__dict__
-        d.pop('_sa_instance_state')
-        return d
-
     def process_rna(self):
-        for gene in self._get_available_genes(HPARNA):
-            if gene not in self.data:
+        self.rna_data = dict()
+        for row in self.downloader.retrieve_normal_tissue_data():
+            gene = row['gene']
+            if gene not in self.available_genes:
                 self.init_gene(gene)
+                self.available_genes.add(gene)
+            if gene not in self.rna_data:
+                self.rna_data[gene] = []
+            self.rna_data[gene].append(row)
+        for gene in self.available_genes:
+
             self.data[gene]['expression'].tissues, \
             self.data[gene]['expression'].cell_lines = self.get_rna_data_for_gene(gene)
         return
@@ -156,33 +162,16 @@ class HPAProcess():
         pass
 
     def store_data(self):
-        if self.data.values()[0]['expression']:
-            rows_deleted = self.session.query(
-                ElasticsearchLoad).filter(
-                and_(ElasticsearchLoad.index == Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                     ElasticsearchLoad.type == Config.ELASTICSEARCH_EXPRESSION_DOC_NAME)).delete(
-                synchronize_session='fetch')
-            if rows_deleted:
-                logging.info('deleted %i rows of expression data from elasticsearch_load' % rows_deleted)
-            c = 0
-            for gene, data in self.data.items():
-                c += 1
-                self.session.add(ElasticsearchLoad(id=gene,
-                                                   index=Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                                                   type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                                                   data=data['expression'].to_json(),
-                                                   active=True,
-                                                   date_created=datetime.now(),
-                                                   date_modified=datetime.now(),
-                                                   ))
-                if c % 10000 == 0:
-                    logging.info("%i rows of expression data inserted to elasticsearch_load" % c)
-                    self.session.flush()
-            self.session.commit()
-            logging.info('inserted %i rows of expression data inserted in elasticsearch_load' % c)
-        if self.data.values()[0]['cancer']:
+        if self.data.values()[0]['expression']:  # if there is expression data
+
+            for data in self.data.values():
+                self.loader.put(index_name=Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                                doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+                                body=data['expression'].to_json(),
+                                )
+        if self.data.values()[0]['cancer']:  # if there is cancer data
             pass
-        if self.data.values()[0]['subcellular_location']:
+        if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
             pass
 
     def init_gene(self, gene):
@@ -193,8 +182,8 @@ class HPAProcess():
 
     def get_normal_tissue_data_for_gene(self, gene):
         tissue_data = {}
-        for row in self.session.query(HPANormalTissue).filter_by(gene=gene).all():
-            tissue = row.tissue.replace('1', '').replace('2', '').strip()
+        for row in self.normal_tissue_data[gene]:
+            tissue = row['tissue'].replace('1', '').replace('2', '').strip()
             if tissue not in tissue_data:
                 tissue_data[tissue] = {'protein': {
                     'cell_type': {},
@@ -206,19 +195,19 @@ class HPAProcess():
                     'rna': {
                     },
                     'efo_code': self.tissue_translation[tissue]}
-            if row.cell_type not in tissue_data[tissue]['protein']['cell_type']:
-                tissue_data[tissue]['protein']['cell_type'][row.cell_type] = []
-            tissue_data[tissue]['protein']['cell_type'][row.cell_type].append(
-                dict(level=self.level_translation[row.level],
-                     expression_type=row.expression_type,
-                     reliability=self.reliability_translation[row.reliability],
+            if row['cell_type'] not in tissue_data[tissue]['protein']['cell_type']:
+                tissue_data[tissue]['protein']['cell_type'][row['cell_type']] = []
+            tissue_data[tissue]['protein']['cell_type'][row['cell_type']].append(
+                dict(level=self.level_translation[row['level']],
+                     expression_type=row['expression_type'],
+                     reliability=self.reliability_translation[row['reliability']],
                      ))
-            if self.level_translation[row.level] > tissue_data[tissue]['protein']['level']:
-                tissue_data[tissue]['protein']['level'] = self.level_translation[row.level]  # TODO: improvable by
+            if self.level_translation[row['level']] > tissue_data[tissue]['protein']['level']:
+                tissue_data[tissue]['protein']['level'] = self.level_translation[row['level']]  # TODO: improvable by
                 # giving higher priority to reliable annotations over uncertain
             if not tissue_data[tissue]['protein']['expression_type']:
-                tissue_data[tissue]['protein']['expression_type'] = row.expression_type
-            if self.reliability_translation[row.reliability]:
+                tissue_data[tissue]['protein']['expression_type'] = row['expression_type']
+            if self.reliability_translation[row['reliability']]:
                 tissue_data[tissue]['protein']['reliability'] = True
 
         return tissue_data
@@ -228,16 +217,16 @@ class HPAProcess():
         cell_line_data = {}
         if not tissue_data:
             tissue_data = {}
-        for row in self.session.query(HPARNA).filter_by(gene=gene).all():
-            sample = row.sample
+        for row in self.rna_data[gene]:
+            sample = row['sample']
             is_cell_line = sample not in self.tissue_translation.keys()
             if is_cell_line:
                 if sample not in cell_line_data:
                     cell_line_data[sample] = {'rna': {},
                                               }
-                cell_line_data[sample]['rna']['level'] = self.level_translation[row.abundance]
-                cell_line_data[sample]['rna']['value'] = row.value
-                cell_line_data[sample]['rna']['unit'] = row.unit
+                cell_line_data[sample]['rna']['level'] = self.level_translation[row['abundance']]
+                cell_line_data[sample]['rna']['value'] = row['value']
+                cell_line_data[sample]['rna']['unit'] = row['unit']
             else:
                 if sample not in tissue_data:
                     tissue_data[sample] = {'protein': {
@@ -250,9 +239,9 @@ class HPAProcess():
                         'rna': {
                         },
                         'efo_code': self.tissue_translation[sample]}
-                tissue_data[sample]['rna']['level'] = self.level_translation[row.abundance]
-                tissue_data[sample]['rna']['value'] = row.value
-                tissue_data[sample]['rna']['unit'] = row.unit
+                tissue_data[sample]['rna']['level'] = self.level_translation[row['abundance']]
+                tissue_data[sample]['rna']['value'] = row['value']
+                tissue_data[sample]['rna']['unit'] = row['unit']
         return tissue_data, cell_line_data
 
     def set_translations(self):
@@ -314,17 +303,3 @@ class HPAProcess():
             'vagina': 'UBERON_0000996',
             'adipose tissue': 'adipose tissue',
         }
-
-
-class HPAUploader():
-    def __init__(self, adapter, loader):
-        self.adapter = adapter
-        self.session = adapter.session
-        self.loader = loader
-
-    def upload_all(self):
-        JSONObjectStorage.refresh_index_data_in_es(self.loader,
-                                                   self.session,
-                                                   Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                                                   Config.ELASTICSEARCH_EXPRESSION_DOC_NAME)
-        self.loader.optimize_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)

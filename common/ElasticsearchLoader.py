@@ -6,11 +6,8 @@ import time
 import logging
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import parallel_bulk, bulk
-from sqlalchemy import and_
-from common import Actions
 from common.DataStructure import JSONSerializable
 from common.EvidenceJsonUtils import assertJSONEqual
-from common.PGAdapter import ElasticsearchLoad
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
 __author__ = 'andreap'
