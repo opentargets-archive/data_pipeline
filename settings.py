@@ -244,7 +244,7 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION=85
+    ENSEMBL_RELEASE_VERSION=86
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
