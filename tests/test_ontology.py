@@ -145,7 +145,7 @@ def test_load_efo_classes_with_paths():
 
     obj = OntologyClassReader()
     assert not obj == None
-    obj.load_efo_classes_with_paths()
+    obj.load_open_targets_disease_ontology()
 
     logger.info(len(obj.current_classes))
 

@@ -1,3 +1,4 @@
+import copy
 import re
 import sys
 reload(sys)
@@ -35,6 +36,27 @@ try:
 except:
     pass
 logger = logging.getLogger('Ontology')
+
+EFO_TAS = [
+    'http://www.ebi.ac.uk/efo/EFO_1000018', # bladder disease
+    'http://www.ebi.ac.uk/efo/EFO_0000319', # cardiovascular disease
+    'http://www.ebi.ac.uk/efo/EFO_0000405', # digestive system disease
+    'http://www.ebi.ac.uk/efo/EFO_0001379', # endocrine
+    'http://www.ebi.ac.uk/efo/EFO_0003966', # eye disease
+    'http://www.ebi.ac.uk/efo/EFO_0000508', # genetic disorder
+    'http://www.ebi.ac.uk/efo/EFO_0000524', # head disease
+    'http://www.ebi.ac.uk/efo/EFO_0005803', # henmatological
+    'http://www.ebi.ac.uk/efo/EFO_0000540', # immune system disease
+    'http://www.ebi.ac.uk/efo/EFO_0003086', # kidney disease
+    'http://www.ebi.ac.uk/efo/EFO_0005741', # infection disease
+    'http://www.ebi.ac.uk/efo/EFO_0000589', # metabolic disease
+    'http://www.ebi.ac.uk/efo/EFO_0000616', # neoplasm
+    'http://www.ebi.ac.uk/efo/EFO_0000618', # nervous system
+    'http://www.ebi.ac.uk/efo/EFO_0000512', # reproductive system
+    'http://www.ebi.ac.uk/efo/EFO_0000684', # respiratory system
+    'http://www.ebi.ac.uk/efo/EFO_0002461', # skeletal system
+    'http://www.ebi.ac.uk/efo/EFO_0000701', # skin disease
+]
 
 TOP_LEVELS = '''
 PREFIX obo: <http://purl.obolibrary.org/obo/>
@@ -405,24 +427,58 @@ class OntologyClassReader():
         """
         logging.debug("load_efo_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
-        # load disease, phenotype, measurement, biological process
+        # load disease, phenotype, measurement, biological process and function
         for base_class in [ 'http://www.ebi.ac.uk/efo/EFO_0000408',
                             'http://www.ebi.ac.uk/efo/EFO_0000651',
                             'http://www.ebi.ac.uk/efo/EFO_0001444',
-                            'http://purl.obolibrary.org/obo/GO_0008150' ]:
+                            'http://purl.obolibrary.org/obo/GO_0008150'
+                            'http://www.ebi.ac.uk/efo/EFO_0001441' ]:
             self.load_ontology_classes(base_class=base_class)
 
-    def load_efo_classes_with_paths(self):
+    def load_open_targets_disease_ontology(self):
         """Loads the EFO graph and extracts the current and obsolete classes.
+           Compute the therapeutic
            Status: production
         """
         logging.debug("load_efo_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
-        # load disease, phenotype, measurement, biological process
-        for base_class in [ 'http://www.ebi.ac.uk/efo/EFO_0000408',
+
+        '''
+        Detach the TAs from the disease node
+        and load all the classes
+        '''
+        disease_uri = URIRef('http://www.ebi.ac.uk/efo/EFO_0000408')
+        for base_class in EFO_TAS:
+            uri = URIRef(base_class)
+            self.rdf_graph.remove((uri, None, disease_uri))
+            self.load_ontology_classes(base_class=base_class)
+            self.get_classes_paths(root_uri=base_class, level=0)
+
+        '''
+        Create an other disease node
+        '''
+        cttv = Namespace(unicode("http://www.targetvalidation.org/disease"))
+
+        # namespace_manager = NamespaceManager(self.rdf_graph)
+        self.rdf_graph.namespace_manager.bind('cttv', cttv)
+
+        other_disease_uri = URIRef('http://www.targetvalidation.org/disease/other')
+        self.rdf_graph.add((other_disease_uri, RDF.type, rdflib.term.URIRef(u'http://www.w3.org/2002/07/owl#Class')))
+        self.rdf_graph.add([other_disease_uri, RDFS.label, rdflib.Literal('other disease')])
+
+        '''
+        Get all children of 'disease' and assign them to 'other disease'
+        '''
+        for c in self.rdf_graph.subjects(predicate=RDFS.subClassOf, object=disease_uri):
+            self.rdf_graph.add([c, RDFS.subClassOf, other_disease_uri])
+
+
+        # other disease, phenotype, measurement, biological process
+        for base_class in [ 'http://www.targetvalidation.org/disease',
                             'http://www.ebi.ac.uk/efo/EFO_0000651',
                             'http://www.ebi.ac.uk/efo/EFO_0001444',
-                            'http://purl.obolibrary.org/obo/GO_0008150' ]:
+                            'http://purl.obolibrary.org/obo/GO_0008150',
+                            'http://www.ebi.ac.uk/efo/EFO_0001441' ]:
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
 

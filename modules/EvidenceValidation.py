@@ -488,7 +488,8 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                 total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
                 if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
                     total_chunks +=1
-                self.queue_out.incr_total(total_chunks, self.r_server)
+                self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
+
                 with srv.open(file_path, mode='rb', bufsize=1) as f:
                     with gzip.GzipFile(filename = file_path.split('/')[1],
                                        mode = 'rb',
@@ -523,7 +524,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
             if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
                 total_chunks +=1
-            self.queue_out.incr_total(total_chunks, self.r_server)
+            self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
             with open(file_path, mode='rb',) as f:
                 with gzip.GzipFile(filename = file_path.split('/')[1],
                                    mode = 'rb',
@@ -786,7 +787,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                     index += 1
                                     short_disease_id = disease_id.split('/')[-1]
                                     ' Check disease term or phenotype term '
-                                    if (short_disease_id not in self.lookup_data.available_efos) and \
+                                    #if (short_disease_id not in self.lookup_data.available_efos) and \
+                                    if (disease_id not in self.lookup_data.efo_ontology.current_classes) and \
                                             (disease_id not in self.lookup_data.hpo_ontology.current_classes) and \
                                             (disease_id not in self.lookup_data.mp_ontology.current_classes):# or \
                                             # (disease_id in self.efo_uncat):
@@ -797,15 +799,15 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                         else:
                                             invalid_diseases[disease_id] += 1
                                         nb_efo_invalid += 1
-                                    # if disease_id in self.efo_obsolete:
-                                    #     audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
-                                    #     # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
-                                    #     disease_failed = True
-                                    #     if disease_id not in obsolete_diseases:
-                                    #         obsolete_diseases[disease_id] = 1
-                                    #     else:
-                                    #         obsolete_diseases[disease_id] += 1
-                                    #     nb_efo_obsolete += 1
+                                    if disease_id in self.lookup_data.efo_ontology.obsolete_classes:
+                                         audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
+                                         # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                         disease_failed = True
+                                         if disease_id not in obsolete_diseases:
+                                             obsolete_diseases[disease_id] = 1
+                                         else:
+                                             obsolete_diseases[disease_id] += 1
+                                         nb_efo_obsolete += 1
                                     elif (disease_id in self.lookup_data.hpo_ontology.obsolete_classes) or \
                                             (disease_id in self.lookup_data.mp_ontology.obsolete_classes):
                                         audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
@@ -1703,7 +1705,7 @@ class EvidenceValidationFileChecker():
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=(LookUpDataType.TARGET,
-                                                      LookUpDataType.DISEASE,
+                                                      LookUpDataType.EFO,
                                                       LookUpDataType.ECO,
                                                       LookUpDataType.HPO,
                                                       LookUpDataType.MP,

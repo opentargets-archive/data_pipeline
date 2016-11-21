@@ -101,7 +101,7 @@ class EfoProcess():
     def _process_ontology_data(self):
 
         self.disease_ontology = OntologyClassReader()
-        self.disease_ontology.load_efo_classes_with_paths()
+        self.disease_ontology.load_open_targets_disease_ontology()
         for uri,label in self.disease_ontology.current_classes.items():
             properties = self.disease_ontology.parse_properties(URIRef(uri))
             definition = ''
