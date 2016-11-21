@@ -6,157 +6,12 @@ import time
 import logging
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import parallel_bulk, bulk
-from sqlalchemy import and_
-from common import Actions
 from common.DataStructure import JSONSerializable
 from common.EvidenceJsonUtils import assertJSONEqual
-from common.PGAdapter import ElasticsearchLoad
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
 __author__ = 'andreap'
 
-class ElasticsearchActions(Actions):
-    RELOAD='reload'
-
-class JSONObjectStorage():
-
-    @staticmethod
-    def delete_prev_data_in_pg(session, index_name, doc_name = None):
-        if doc_name is not None:
-            rows_deleted = session.query(
-                ElasticsearchLoad).filter(
-                and_(ElasticsearchLoad.index.startswith(index_name),
-                     ElasticsearchLoad.type == doc_name)).delete(synchronize_session=False)
-        else:
-            rows_deleted = session.query(
-                ElasticsearchLoad).filter(ElasticsearchLoad.index.startswith(index_name)).delete(synchronize_session=False)
-        if rows_deleted:
-            logging.info('deleted %i rows from elasticsearch_load' % rows_deleted)
-
-    @staticmethod
-    def store_to_pg(session,
-                    index_name,
-                    doc_name,
-                    data,
-                    delete_prev=True,
-                    autocommit=True,
-                    quiet = False):
-        if delete_prev:
-            JSONObjectStorage.delete_prev_data_in_pg(session, index_name, doc_name)
-        c = 0
-        for key, value in data.iteritems():
-            c += 1
-
-            session.add(ElasticsearchLoad(id=key,
-                                          index=index_name,
-                                          type=doc_name,
-                                          data=value.to_json(),
-                                          active=True,
-                                          date_created=datetime.now(),
-                                          date_modified=datetime.now(),
-                                          ))
-            if c % 1000 == 0:
-                logging.debug("%i rows of %s inserted to elasticsearch_load" %(c, doc_name))
-                session.flush()
-        session.flush()
-        if autocommit:
-            session.commit()
-        if not quiet:
-            logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(c, doc_name))
-        return c
-
-    @staticmethod
-    def store_to_pg_core(adapter,
-                    index_name,
-                    doc_name,
-                    data,
-                    delete_prev=True,
-                    autocommit=True,
-                    quiet = False):
-        if delete_prev:
-            JSONObjectStorage.delete_prev_data_in_pg(adapter.session, index_name, doc_name)
-        rows_to_insert =[]
-        for key, value in data.iteritems():
-            rows_to_insert.append(dict(id=key,
-                                      index=index_name,
-                                      type=doc_name,
-                                      data=value.to_json(),
-                                      active=True,
-                                      ))
-        adapter.engine.execute(ElasticsearchLoad.__table__.insert(),rows_to_insert)
-
-        # if autocommit:
-        #     adapter.session.commit()
-        if not quiet:
-            logging.info('inserted %i rows of %s inserted in elasticsearch_load' %(len(rows_to_insert), doc_name))
-        return len(rows_to_insert)
-
-
-    @staticmethod
-    def refresh_index_data_in_es(loader, session, index_name, doc_name=None):
-        """given an index and a doc_name,
-        - remove and recreate the index
-        - load all the available data with that doc_name for that index
-        """
-        # loader.create_new_index(index_name)
-        if doc_name:
-            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.index, ElasticsearchLoad.data, ).filter(and_(
-                            ElasticsearchLoad.index.startswith(index_name),
-                            ElasticsearchLoad.type == doc_name,
-                            ElasticsearchLoad.active == True)
-            ).yield_per(loader.chunk_size):
-                loader.put(row.index, doc_name, row.id, row.data)
-        else:
-            for row in session.query(ElasticsearchLoad.id, ElasticsearchLoad.index, ElasticsearchLoad.type, ElasticsearchLoad.data, ).filter(and_(
-                            ElasticsearchLoad.index.startswith(index_name),
-                            ElasticsearchLoad.active == True)
-            ).yield_per(loader.chunk_size):
-                loader.put(row.index, row.type, row.id, row.data)
-        loader.flush()
-        # loader.restore_after_bulk_indexing()
-
-
-    @staticmethod
-    def refresh_all_data_in_es(loader, session):
-        """push all the data stored in elasticsearch_load table to elasticsearch,
-        - remove and recreate each index
-        - load all the available data with any for that index
-        """
-
-
-        for row in session.query(ElasticsearchLoad).yield_per(loader.chunk_size):
-            loader.put(row.index, row.type, row.id, row.data,create_index = True)
-
-
-        loader.flush()
-        # loader.restore_after_bulk_indexing()
-
-    @staticmethod
-    def get_data_from_pg(session, index_name, doc_name, objid):
-        """given an index and a doc_name and an id return the json object tore in postgres
-        """
-        row = session.query(ElasticsearchLoad.data).filter(and_(
-            ElasticsearchLoad.index.startswith(index_name),
-            ElasticsearchLoad.type == doc_name,
-            ElasticsearchLoad.active == True,
-            ElasticsearchLoad.id == objid)
-        ).first()
-        if row:
-            return row.data
-
-    @staticmethod
-    def paginated_query(q, page_size = 1000):
-        offset = 0
-        def get_results():
-            return q.limit(page_size).offset(offset)
-        while True:
-            r = False
-            for elem in get_results():
-               r = True
-               yield elem
-            offset += page_size
-            if not r:
-                break
 
 class Loader():
     """
@@ -357,33 +212,40 @@ class Loader():
     def create_new_index(self, index_name, recreate = False):
         if not self.dry_run:
             index_name = self.get_versioned_index(index_name)
-            if self.es.indices.exists(index_name):
-                if recreate:
-                    res = self.es.indices.delete(index_name)
-                    if not self._check_is_aknowledge(res):
-                        raise ValueError(
-                            'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
-                    try:
-                        self.es.indices.flush(index_name,  wait_if_ongoing =True)
-                    except NotFoundError:
-                        pass
-                    logging.debug("%s index deleted: %s" %(index_name, str(res)))
+            if self._enforce_mapping(index_name):
+                if self.es.indices.exists(index_name):
+                    if recreate:
+                        res = self.es.indices.delete(index_name)
+                        if not self._check_is_aknowledge(res):
+                            raise ValueError(
+                                'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
+                        try:
+                            self.es.indices.flush(index_name,  wait_if_ongoing =True)
+                        except NotFoundError:
+                            pass
+                        logging.debug("%s index deleted: %s" %(index_name, str(res)))
 
-                else:
-                    logging.info("%s index already existing" % index_name)
-                    return
+                    else:
+                        logging.info("%s index already existing" % index_name)
+                        return
 
-            index_created = False
-            for index_root,mapping in ElasticSearchConfiguration.INDEX_MAPPPINGS.items():
-                if index_root in index_name:
-                    self._safe_create_index(index_name, mapping)
-                    index_created=True
-                    break
+                index_created = False
+                for index_root,mapping in ElasticSearchConfiguration.INDEX_MAPPPINGS.items():
+                    if index_root in index_name:
+                        self._safe_create_index(index_name, mapping)
+                        index_created=True
+                        break
 
-            if not index_created:
-                raise ValueError('Cannot create index %s because no mappings are set'%index_name)
-            logging.info("%s index created"%index_name)
+                if not index_created:
+                    raise ValueError('Cannot create index %s because no mappings are set'%index_name)
+                logging.info("%s index created"%index_name)
             return
+
+    def _enforce_mapping(self, index_name):
+        for index_root in ElasticSearchConfiguration.INDEX_MAPPPINGS:
+            if index_root in index_name:
+                return True
+        return False
 
     def clear_index(self, index_name):
         if not self.dry_run:

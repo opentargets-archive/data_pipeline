@@ -36,12 +36,10 @@ class MouseModelsActions(Actions):
 
 class Phenodigm():
 
-    def __init__(self, adapter, es, sparql):
-        self.adapter = adapter
-        self.session = adapter.session
+    def __init__(self,es, sparql):
         self.es = es
         self.sparql = sparql
-        self.ev = EvidenceValidationFileChecker(self.adapter, self.es, self.sparql)
+        self.ev = EvidenceValidationFileChecker(self.es, self.sparql)
         self.cache = {}
         self.counter = 0
         self.mmGenes = {}
