@@ -414,8 +414,8 @@ class ElasticSearchConfiguration():
                 "filter": {
                     "edgeNGram_filter": {
                         "type": "edgeNGram",
-                        "min_gram": 2,
-                        "max_gram": 20,
+                        "min_gram": "2",
+                        "max_gram": "20",
                         "token_chars": [
                             "letter",
                             "digit"
@@ -462,8 +462,8 @@ class ElasticSearchConfiguration():
                 "filter": {
                     "edgeNGram_filter": {
                         "type": "edgeNGram",
-                        "min_gram": 2,
-                        "max_gram": 20,
+                        "min_gram": "2",
+                        "max_gram": "20",
                         "token_chars": [
                             "letter",
                             "digit"
@@ -835,8 +835,8 @@ class ElasticSearchConfiguration():
                 "filter": {
                     "edgeNGram_filter": {
                         "type": "edgeNGram",
-                        "min_gram": 2,
-                        "max_gram": 20,
+                        "min_gram": "2",
+                        "max_gram": "20",
                         "token_chars": [
                             "letter",
                             "digit"
