@@ -5,6 +5,8 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisLookupTablePickle
+from modules.Ontology import OntologyClassReader, DiseaseUtils
+from rdflib import URIRef
 from settings import Config
 
 
@@ -34,6 +36,7 @@ class EFO(JSONSerializable):
                  code='',
                  label='',
                  synonyms=[],
+                 phenotypes=[],
                  path=[],
                  path_codes=[],
                  path_labels=[],
@@ -42,6 +45,7 @@ class EFO(JSONSerializable):
         self.code = code
         self.label = label
         self.efo_synonyms = synonyms
+        self.phenotypes = phenotypes
         self.path = path
         self.path_codes = path_codes
         self.path_labels = path_labels
@@ -84,97 +88,42 @@ class EfoProcess():
         self.efos = OrderedDict()
 
     def process_all(self):
-        self._process_efo_data()
+        self._process_ontology_data()
         self._store_efo()
 
+    def _process_ontology_data(self):
 
-    def _get_efo_names(self):
-        raise NotImplementedError
+        self.disease_ontology = OntologyClassReader()
+        self.disease_ontology.load_open_targets_disease_ontology()
+        '''
+        Get all phenotypes
+        '''
+        utils = DiseaseUtils()
+        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology)
 
-    def _get_efo_path(self):
-        raise NotImplementedError
-
-    def _get_efo_first_child(self):
-        raise NotImplementedError
-
-    def _process_efo_data(self):
-
-        # efo_uri = {}
-        for row in self._get_efo_names():
+        for uri,label in self.disease_ontology.current_classes.items():
+            properties = self.disease_ontology.parse_properties(URIRef(uri))
+            definition = ''
+            if 'http://www.ebi.ac.uk/efo/definition' in properties:
+                definition = ". ".join(properties['http://www.ebi.ac.uk/efo/definition'])
             synonyms = []
-            if row.synonyms != [None]:
-                synonyms = sorted(list(set(row.synonyms)))
-            self.efos[get_ontology_code_from_url(row.uri)] = EFO(row.uri,
-                                     row.label,
-                                     synonyms,
-                                     # id_org=row.uri_id_org,
-                                     definition=row.description,
-                                     path_codes= [],
-                                     path_labels=[],
-                                     path = [])
+            if 'http://www.ebi.ac.uk/efo/alternative_term' in properties:
+                synonyms = properties['http://www.ebi.ac.uk/efo/alternative_term']
+            phenotypes = []
+            if uri in disease_phenotypes:
+                phenotypes = disease_phenotypes[uri]['phenotypes']
 
-
-        for row in self._get_efo_path():
-            full_path_codes = []
-            full_path_labels = []
-            efo_code = get_ontology_code_from_url(row.uri)
-            if  (efo_code in self.efos) and \
-                    (efo_code != 'cttv_root'):
-                efo = self.efos[efo_code]
-                full_tree_path = row.tree_path[1:]#skip cttv_root
-                for node in row.tree_path:
-                    if isinstance(node, list):
-                        for node_element in node:
-                            full_path_codes.append(get_ontology_code_from_url(node_element['uri']))
-                            full_path_labels.append(node_element['label'])
-                    else:
-                        full_path_codes.append(get_ontology_code_from_url(node['uri']))
-                        full_path_labels.append(node['label'])
-                if 'cttv_root' in full_path_codes:
-                    del full_path_codes[full_path_codes.index('cttv_root')]
-                    del full_path_labels[full_path_labels.index('CTTV Root')]
-
-                efo.path_codes.append(full_path_codes)
-                efo.path_labels.append(full_path_labels)
-                efo.path.append(full_tree_path)
-                self.efos[efo_code] = efo
-
-        """temporary clean efos with empty path"""
-        keys = self.efos.keys()
-        for k in keys:
-            efo = self.efos[k]
-            if not efo.path:
-                del self.efos[k]
-                logging.warning("removed efo %s since it has an empty path, add it in postgres"%k)
-
-        """temporary drop genetic_disorder uncharectized fields"""
-        keys = self.efos.keys()
-        for k in keys:
-            efo = self.efos[k]
-            if k == 'genetic_disorder_uncategorized':
-                del self.efos[k]
-            else:
-                for path in efo.path_codes:
-                    if 'genetic_disorder_uncategorized' in path:
-                        del self.efos[k]
-                        logging.warning("removed efo %s it is mapped to genetic_disorder_uncategorized bucket"%k)
-                        break
-
-
-        for row in self._get_efo_first_child():
-            if get_ontology_code_from_url(row.first_child_uri) == 'genetic_disorder_uncategorized':
-                continue
-            efo_code_parent = get_ontology_code_from_url(row.parent_uri)
-            efo_code_child = get_ontology_code_from_url(row.first_child_uri)
-            if efo_code_parent in self.efos:
-                efo_parent = self.efos[efo_code_parent]
-                efo_child = self.efos[efo_code_child]
-                efo_parent.children.append(dict(code = efo_code_child,
-                                         label = efo_child.label))
-                self.efos[efo_code_parent] = efo_parent
-
-
-
+            efo = EFO(code=uri,
+                      label=label,
+                      synonyms=synonyms,
+                      phenotypes=phenotypes,
+                      path=self.disease_ontology.classes_paths[uri]['all'],
+                      path_codes=self.disease_ontology.classes_paths[uri]['ids'],
+                      path_labels=self.disease_ontology.classes_paths[uri]['labels'],
+                      definition=definition
+                      )
+            id = self.disease_ontology.classes_paths[uri]['ids'][0][-1]
+            self.efos[id] = efo
 
     def _store_efo(self):
 
@@ -241,3 +190,37 @@ class EFOLookUpTable(object):
 
     def keys(self):
         return self._table.keys()
+
+
+class DiseaseGraph:
+    """
+    A DAG of disease nodes whose elements are instances of class DiseaseNode
+    Input: g - an RDFLib-generated ConjugativeGraph, i.e. list of RDF triples
+    """
+
+    def __init__(self, g):
+        self.g = g
+        self.root = None
+        self.node_map = {}
+        self.node_cnt = 0
+        self.print_rdf_tree_from_root(g)
+        self.make_node_graph(g)
+
+    def print_rdf_tree_from_root(self, g):
+        print("STUB for method: print_rdf_tree_from_root()")
+
+    def make_node_graph(self, g):
+        print("STUB for method: make_node_graph()")
+
+
+class DiseaseNode:
+    """
+    A class representing all triples associated with a particular disease subject
+    e.g. asthma: http://www.ebi.ac.uk/efo/EFO_0000270
+    and its parents and children
+    """
+
+    def __init__(self, name="name", parents = [], children = []):
+        self.name = name,
+        self.parents = parents
+        self.children = children

@@ -21,7 +21,7 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from modules.ECO import EcoProcess
+from modules.EFO import EfoProcess
 from modules.Ontology import OntologyClassReader
 from settings import Config
 import logging
@@ -61,23 +61,19 @@ def my_teardown_function():
 
 
 @with_setup(my_setup_function, my_teardown_function)
-def test_eco_load():
-    eco_process = EcoProcess(loader=None)
-    assert not eco_process == None
-    eco_process._process_ontology_data()
-    obj = eco_process.evidence_ontology
-    assert not obj == None
-    logger.info(len(obj.current_classes))
+def test_efo_load():
+    efo_process = EfoProcess(loader=None)
+    assert efo_process is not None
+    efo_process._process_ontology_data()
 
-    assert obj.current_classes["http://purl.obolibrary.org/obo/SO_0001549"] == "transcription_variant"
-    assert obj.current_classes["http://purl.obolibrary.org/obo/ECO_0000205"] == "curator inference"
-    assert obj.current_classes["http://purl.obolibrary.org/obo/ECO_0000084"] == "gene neighbors evidence"
-    assert obj.current_classes["http://purl.obolibrary.org/obo/SO_0002053"] == "gain_of_function_variant"
-    assert obj.current_classes["http://purl.obolibrary.org/obo/ECO_0000177"] == "genomic context evidence"
-
-    logger.error("Show classes paths")
-    for node, value in obj.classes_paths.iteritems():
-        logger.error(node)
-        logger.error(json.dumps(value, indent=2))
-
-    print(__name__)
+    for id in [
+        'EFO_0000398',
+        'EFO_0000706',
+        'EFO_0004719',
+        'EFO_0000384',
+        'EFO_0005140',
+        'Orphanet_1812'
+    ]:
+        logger.debug("check %s contains phenotypes"%id)
+        assert id in efo_process.efos
+        assert len(efo_process.efos[id].phenotypes) > 0
