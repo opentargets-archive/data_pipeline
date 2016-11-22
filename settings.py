@@ -109,10 +109,6 @@ class Config():
         '4932':'yeast'
     }
 
-    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
-    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
-    CHEMBL_DRUG_SYNONYMS = '''https://www.ebi.ac.uk/chembl/api/data/molecule/{}.json'''
-
     HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
@@ -188,7 +184,13 @@ class Config():
     CHEMBL_URIS = dict(
         protein_class='https://www.ebi.ac.uk/chembl/api/data/protein_class',
         target_component='https://www.ebi.ac.uk/chembl/api/data/target_component',
+        target = 'https://www.ebi.ac.uk/chembl/api/data/target',
+        mechanism = 'https://www.ebi.ac.uk/chembl/api/data/mechanism',
+        molecule = 'https://www.ebi.ac.uk/chembl/api/data/molecule'
     )
+    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
+    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
+    CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5

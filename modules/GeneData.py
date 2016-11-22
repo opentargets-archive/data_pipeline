@@ -17,6 +17,7 @@ from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from common.UniprotIO import UniprotIterator
+from modules.ChEMBL import ChEMBLLookup
 from modules.Reactome import ReactomeRetriever
 from settings import Config
 
@@ -497,6 +498,7 @@ class GeneManager():
         self.esquery = ESQuery(loader.es)
         self.genes = GeneSet()
         self.reactome_retriever=ReactomeRetriever(loader.es)
+        self.chembl_handler = ChEMBLLookup()
 
 
 
@@ -647,35 +649,26 @@ class GeneManager():
 
     def _get_chembl_data(self):
         logging.info("Chembl Drug parsing ")
-
+        self.chembl_handler.download_molecules_linked_to_target()
         for gene_id, gene in tqdm(self.genes.iterate(),
                                   desc='Getting drug data from chembl',
-                                  unit= ' gene'):
-            req = requests.get(Config.CHEMBL_TARGET_BY_UNIPROT_ID,params={'target_components__accession': gene.uniprot_id})
-            req.raise_for_status()
-            target_chembl_ids = [x['target_chembl_id'] for x in req.json()['targets']]
-
-            molecules = []
-            for target_id in target_chembl_ids:
-                r = requests.get(Config.CHEMBL_MECHANISM, params={'target_chembl_id': target_id})
-                r.raise_for_status()
-                molecules.extend([x['molecule_chembl_id'] for x in r.json()['mechanisms']])
-
-            target_drugnames = {}
-            for chembl_id in molecules:
-                r = requests.get(Config.CHEMBL_DRUG_SYNONYMS.format(chembl_id))
-                r.raise_for_status()
-                target_drugnames[chembl_id]=[]
-                #target_drugnames[chembl_id] = list(set([x['synonyms'] for x in r.json()['molecule_synonyms']]))
-                #TODO : remove dups
-                for x in r.json()['molecule_synonyms']:
-                    synonym_data = {}
-                    synonym_data['synonym']=x['synonyms']
-                    synonym_data['synonym_type'] = x['syn_type']
-                    target_drugnames[chembl_id].append(synonym_data)
-
+                                  unit=' gene'):
+            target_drugnames = []
             ''' extend gene with related drug names '''
-            gene.drugs['chembl_drugs'] = target_drugnames
+            if gene.uniprot_accessions:
+                for a in gene.uniprot_accessions:
+                    if a in self.chembl_handler.uni2chembl:
+                        chembl_id = self.chembl_handler.uni2chembl[a]
+                        if chembl_id in self.chembl_handler.target2molecule:
+                            molecules = self.chembl_handler.target2molecule[chembl_id]
+                            for mol in molecules:
+                                synonyms = self.chembl_handler.molecule2synonyms[mol]
+                                target_drugnames.extend(synonyms)
+                        break
+            if target_drugnames:
+                gene.drugs['chembl_drugs'] = target_drugnames
+
+
 
 
 
