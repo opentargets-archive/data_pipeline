@@ -648,7 +648,9 @@ class GeneManager():
     def _get_chembl_data(self):
         logging.info("Chembl Drug parsing ")
 
-        for gene_id, gene in self.genes.iterate():
+        for gene_id, gene in tqdm(self.genes.iterate(),
+                                  desc='Getting drug data from chembl',
+                                  unit= ' gene'):
             req = requests.get(Config.CHEMBL_TARGET_BY_UNIPROT_ID,params={'target_components__accession': gene.uniprot_id})
             req.raise_for_status()
             target_chembl_ids = [x['target_chembl_id'] for x in req.json()['targets']]
