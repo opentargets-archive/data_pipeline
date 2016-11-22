@@ -62,7 +62,7 @@ def my_teardown_function():
 
 @with_setup(my_setup_function, my_teardown_function)
 def test_eco_load():
-    eco_process = EcoProcess()
+    eco_process = EcoProcess(loader=None)
     assert not eco_process == None
     eco_process._process_ontology_data()
     obj = eco_process.evidence_ontology
