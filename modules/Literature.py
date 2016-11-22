@@ -39,7 +39,7 @@ class LiteratureActions(Actions):
     PROCESS= 'process'
 
 # List of symbols we don't care about
-SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "?", "?", "'ve"]
+SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "“", "”", "'ve"]
 
 LABELS = {
     u'ENT': u'ENT',
@@ -764,5 +764,6 @@ class PubmedLiteratureParser(object):
 
 
         return article
+
 
 
