@@ -384,17 +384,17 @@ class ElasticSearchConfiguration():
                             },
                         },
                     },
-                    "private": {
-                        # "type" : "object",
-                        "properties": {
-                            "suggestions": {
-                                "type": "completion",
-                                "analyzer": "whitespace_analyzer",
-                                "search_analyzer": "edgeNGram_analyzer",
-                                "payloads": True
-                            },
-                        },
-                    },
+                    # "private": {
+                    #     # "type" : "object",
+                    #     "properties": {
+                    #         "suggestions": {
+                    #             "type": "completion",
+                    #             "analyzer": "whitespace_analyzer",
+                    #             "search_analyzer": "edgeNGram_analyzer",
+                    #             "payloads": True
+                    #         },
+                    #     },
+                    # },
                 }
             }
         },
@@ -519,12 +519,12 @@ class ElasticSearchConfiguration():
                     "_private": {
                         # "type" : "object",
                         "properties": {
-                            "suggestions": {
-                                "type": "completion",
-                                "analyzer": "whitespace_analyzer",
-                                "search_analyzer": "whitespace_analyzer",
-                                "payloads": True
-                            },
+                            # "suggestions": {
+                            #     "type": "completion",
+                            #     "analyzer": "whitespace_analyzer",
+                            #     "search_analyzer": "whitespace_analyzer",
+                            #     "payloads": True
+                            # },
                             "facets": {
                                 # "type" : "object",
                                 "properties": {
