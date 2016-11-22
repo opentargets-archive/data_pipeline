@@ -6,6 +6,7 @@ sys.setdefaultencoding("utf8")
 import os
 import pysftp
 import gzip
+import pickle
 from paramiko import AuthenticationException
 import opentargets.model.core as opentargets
 import logging
@@ -257,9 +258,9 @@ class OntologyClassReader():
         count = 0
         qres = self.rdf_graph.query(sparql_query % base_class)
 
-        for row in qres:
-            uri = str(row[0])
-            label = str(row[1])
+        for (ont_node, ont_label) in qres:
+            uri = str(ont_node)
+            label = str(ont_label)
             self.current_classes[uri] = label
             count +=1
             # logger.debug("RDFLIB '%s' '%s'" % (uri, label))
@@ -278,11 +279,11 @@ class OntologyClassReader():
 
         qres = self.rdf_graph.query(sparql_query)
         obsoletes = dict()
-        for row in qres:
-            uri = str(row[0])
-            label = str(row[1])
-            id = str(row[2])
-            new_uri = str(row[3])
+        for (ont_node, ont_label, ont_id, ont_new) in qres:
+            uri = str(ont_node)
+            label = str(ont_label)
+            id = str(ont_id)
+            new_uri = str(ont_new)
             # point to the new URI
             obsoletes[uri] = { 'label': label, 'new_uri' : new_uri }
             count +=1
@@ -404,7 +405,7 @@ class OntologyClassReader():
         """Loads the HPO graph and extracts the current and obsolete classes.
            Status: production
         """
-        logging.debug("load_hpo_classes...")
+        logger.debug("load_hpo_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
         base_class = 'http://purl.obolibrary.org/obo/HP_0000118'
         self.load_ontology_classes(base_class=base_class)
@@ -413,7 +414,7 @@ class OntologyClassReader():
         """Loads the HPO graph and extracts the current and obsolete classes.
            Status: production
         """
-        logging.debug("load_mp_classes...")
+        logger.debug("load_mp_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
         base_class = 'http://purl.obolibrary.org/obo/MP_0000001'
         self.load_ontology_classes(base_class= base_class)
@@ -425,22 +426,27 @@ class OntologyClassReader():
         """Loads the EFO graph and extracts the current and obsolete classes.
            Status: production
         """
-        logging.debug("load_efo_classes...")
+        logger.debug("load_efo_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
-        # load disease, phenotype, measurement, biological process and function
+
+        # load disease, phenotype, measurement, biological process, function and injury and mental health
         for base_class in [ 'http://www.ebi.ac.uk/efo/EFO_0000408',
                             'http://www.ebi.ac.uk/efo/EFO_0000651',
                             'http://www.ebi.ac.uk/efo/EFO_0001444',
-                            'http://purl.obolibrary.org/obo/GO_0008150'
-                            'http://www.ifomis.org/bfo/1.1/snap#Function' ]:
+                            'http://purl.obolibrary.org/obo/GO_0008150',
+                            'http://www.ifomis.org/bfo/1.1/snap#Function',
+                            'http://www.ebi.ac.uk/efo/EFO_0000546',
+                            'http://www.ebi.ac.uk/efo/EFO_0003935' ]:
             self.load_ontology_classes(base_class=base_class)
 
     def load_open_targets_disease_ontology(self):
         """Loads the EFO graph and extracts the current and obsolete classes.
-           Compute the therapeutic
+           Generates the therapeutic areas
+           Creates the other disease class
+           Move injury under other disease
            Status: production
         """
-        logging.debug("load_efo_classes...")
+        logger.debug("load_open_targets_disease_ontology...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
 
         '''
@@ -472,13 +478,21 @@ class OntologyClassReader():
         for c in self.rdf_graph.subjects(predicate=RDFS.subClassOf, object=disease_uri):
             self.rdf_graph.add([c, RDFS.subClassOf, other_disease_uri])
 
+        '''
+        Move 'injury' under 'other disease'
+        injuries are treated with medication recorded in ChEMBL
+        Move 'mental health' under 'other disease'
+        '''
+        self.rdf_graph.add([URIRef('http://www.ebi.ac.uk/efo/EFO_0000546'), RDFS.subClassOf, other_disease_uri])
+        self.rdf_graph.add([URIRef('http://www.ebi.ac.uk/efo/EFO_0003935'), RDFS.subClassOf, other_disease_uri])
+
 
         # other disease, phenotype, measurement, biological process, function
         for base_class in [ 'http://www.targetvalidation.org/disease/other',
                             'http://www.ebi.ac.uk/efo/EFO_0000651',
                             'http://www.ebi.ac.uk/efo/EFO_0001444',
                             'http://purl.obolibrary.org/obo/GO_0008150',
-                            'http://www.ifomis.org/bfo/1.1/snap#Function' ]:
+                            'http://www.ifomis.org/bfo/1.1/snap#Function']:
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
 
@@ -548,76 +562,98 @@ class OntologyClassReader():
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
 
+
 class DiseaseUtils():
 
     def __init__(self):
+        pass
 
-        self.diseases = OntologyClassReader()
-        self.diseases.load_efo_classes()
-        self.diseases.get_classes_paths(root_uri="http://www.ebi.ac.uk/efo/EFO_0000408")
-
-    def get_disease_tas(self, filename=None):
+    def get_disease_tas(self, ontologyreader=None, filename=None):
 
         # get all tas per
         fh = open(filename, 'w')
-        for uri, label in self.diseases.current_classes.items():
-            if uri in self.diseases.classes_paths and uri != "http://www.ebi.ac.uk/efo/EFO_0000408":
-                tas = map(lambda x: x[1]['label'], self.diseases.classes_paths[uri]['all'])
+        for uri, label in ontologyreader.current_classes.items():
+            if uri in ontologyreader.classes_paths and uri != "http://www.ebi.ac.uk/efo/EFO_0000408":
+                tas = map(lambda x: x[1]['label'], ontologyreader.classes_paths[uri]['all'])
                 fh.write("%s\t%s\t%s\n"%(uri, label, ",".join(set(tas))))
         fh.close()
 
+    def check_disease_phenotypes_cache(self):
+        return os.path.isfile(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), "disease_phenotypes.pck"))
 
+    def read_disease_phenotypes_cache(self):
+        return pickle.load( open( os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'),"disease_phenotypes.pck"), "rb" ) )
 
-class DiseasePhenotypes():
+    def update_disease_phenotypes_cache(self, disease_phenotypes):
+        pickle.dump(disease_phenotypes,
+            open(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), "disease_phenotypes.pck"), "wb"))
 
-    def __init__(self):
-        self.rdf_graph = None
-        pass
+    def write_disease_phenotypes(self, ontologyreader=None, filename=None):
 
-    # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/
-    # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw
-    def parse_owl_url(self):
-        self.get_disease_phenotypes()
+        pmap = self.get_disease_phenotypes(ontologyreader)
 
-    def get_disease_phenotypes(self):
-        # we care about namespaces
-        #oban = Namespace('http://purl.org/oban/')
-        self.rdf_graph = rdflib.Graph()
+        fh = open(filename, 'w')
+        for uri, ds in pmap.items():
+            label = ds['label']
+            phenotypes = map(lambda x: x['label'], ds['phenotypes'])
+            fh.write("%s\t%s\t%s\n" % (uri, label, ",".join(set(phenotypes))))
+        fh.close()
+        '''
+        for uri, label in self.diseases.current_classes.items():
+            logger.debug("%s %s"%(uri, label))
+            if uri in pmap:
+                logger.debug("=> OK")
+                tas = []
+                phenotypes = map(lambda x: x['label'], map[uri])
+                if uri in self.diseases.classes_paths and uri != "http://www.ebi.ac.uk/efo/EFO_0000408":
+                    tas = map(lambda x: x[1]['label'], self.diseases.classes_paths[uri]['all'])
+                fh.write("%s\t%s\t%s\t%s\n" % (uri, label, ",".join(set(phenotypes)), ",".join(set(tas))))
+        '''
+
+    def get_disease_phenotypes(self, ontologyclassreader=None):
+
+        disease_phenotypes_map = {}
+
+        if self.check_disease_phenotypes_cache():
+            return self.read_disease_phenotypes_cache()
+
         # load HPO:
-        logger.debug("parse HPO")
-        self.rdf_graph.parse(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'), format='xml')
-        logger.debug("parse MP")
-        self.rdf_graph.parse(Config.ONTOLOGY_CONFIG.get('uris', 'mp'), format='xml')
-        #print ("parse EFO")
-        #self.rdf_graph.parse('/Users/koscieln/Downloads/hp.owl', format='xml')
+        logger.debug("Merge HPO graph")
+        ontologyclassreader.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+        logger.debug("Merge MP graph")
+        ontologyclassreader.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+
         for key, uri in Config.ONTOLOGY_CONFIG.items('disease_phenotypes_uris'):
             logger.debug("merge phenotypes from %s" % uri)
-            self.rdf_graph.parse(uri, format='xml')
+            ontologyclassreader.rdf_graph.parse(uri, format='xml')
 
-        #for subject, predicate, obj in self.rdf_graph:
-        #    print subject, predicate, obj
-        #for stmt in graph:
-        #    pprint.pprint(stmt)
-
-        qres = self.rdf_graph.query(
+        qres = ontologyclassreader.rdf_graph.query(
             """
             PREFIX obo: <http://purl.obolibrary.org/obo/>
             PREFIX oban: <http://purl.org/oban/>
-            select DISTINCT ?disease_id ?phenotype_label ?phenotype_id
+            select DISTINCT ?disease_id ?disease_label ?phenotype_id ?phenotype_label
             where {
               ?code oban:association_has_subject ?disease_id .
+              ?disease_id rdfs:label ?disease_label .
               ?code oban:association_has_object ?phenotype_id .
               ?phenotype_id rdfs:label ?phenotype_label
             }
             """
         )
 
-        for row in qres:
-            logger.debug("%s hasPhenotype %s (%s)" % row)
+        '''
+        Results are tuple of values
+        '''
+        for rdisease_uri, rdisease_label, rphenotype_uri, rphenotype_label in qres:
+            (disease_uri, disease_label, phenotype_uri, phenotype_label) = (str(rdisease_uri), str(rdisease_label), str(rphenotype_uri), str(rphenotype_label))
+            logger.debug("%s (%s) hasPhenotype %s (%s)" % (disease_uri, disease_label, phenotype_uri, phenotype_label))
+            if disease_uri not in disease_phenotypes_map:
+                disease_phenotypes_map[disease_uri] = { 'label': disease_label, 'phenotypes': [] }
+            disease_phenotypes_map[disease_uri]['phenotypes'].append({'label': phenotype_label, 'uri': phenotype_uri})
 
-        # EXTRACT THE GOOD BITS for EFO
-        # TODO
+        self.update_disease_phenotypes_cache(disease_phenotypes_map)
 
+        return disease_phenotypes_map
 
 class PhenotypeSlim():
 

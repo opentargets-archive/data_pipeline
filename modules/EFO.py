@@ -5,7 +5,8 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisLookupTablePickle
-from modules.Ontology import OntologyClassReader
+from modules.Ontology import OntologyClassReader, DiseaseUtils
+from rdflib import URIRef
 from settings import Config
 
 
@@ -35,6 +36,7 @@ class EFO(JSONSerializable):
                  code='',
                  label='',
                  synonyms=[],
+                 phenotypes=[],
                  path=[],
                  path_codes=[],
                  path_labels=[],
@@ -43,6 +45,7 @@ class EFO(JSONSerializable):
         self.code = code
         self.label = label
         self.efo_synonyms = synonyms
+        self.phenotypes = phenotypes
         self.path = path
         self.path_codes = path_codes
         self.path_labels = path_labels
@@ -92,6 +95,12 @@ class EfoProcess():
 
         self.disease_ontology = OntologyClassReader()
         self.disease_ontology.load_open_targets_disease_ontology()
+        '''
+        Get all phenotypes
+        '''
+        utils = DiseaseUtils()
+        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology)
+
         for uri,label in self.disease_ontology.current_classes.items():
             properties = self.disease_ontology.parse_properties(URIRef(uri))
             definition = ''
@@ -100,10 +109,14 @@ class EfoProcess():
             synonyms = []
             if 'http://www.ebi.ac.uk/efo/alternative_term' in properties:
                 synonyms = properties['http://www.ebi.ac.uk/efo/alternative_term']
+            phenotypes = []
+            if uri in disease_phenotypes:
+                phenotypes = disease_phenotypes[uri]['phenotypes']
 
             efo = EFO(code=uri,
                       label=label,
                       synonyms=synonyms,
+                      phenotypes=phenotypes,
                       path=self.disease_ontology.classes_paths[uri]['all'],
                       path_codes=self.disease_ontology.classes_paths[uri]['ids'],
                       path_labels=self.disease_ontology.classes_paths[uri]['labels'],
