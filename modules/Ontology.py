@@ -432,7 +432,7 @@ class OntologyClassReader():
                             'http://www.ebi.ac.uk/efo/EFO_0000651',
                             'http://www.ebi.ac.uk/efo/EFO_0001444',
                             'http://purl.obolibrary.org/obo/GO_0008150'
-                            'http://www.ebi.ac.uk/efo/EFO_0001441' ]:
+                            'http://www.ifomis.org/bfo/1.1/snap#Function' ]:
             self.load_ontology_classes(base_class=base_class)
 
     def load_open_targets_disease_ontology(self):
@@ -473,14 +473,18 @@ class OntologyClassReader():
             self.rdf_graph.add([c, RDFS.subClassOf, other_disease_uri])
 
 
-        # other disease, phenotype, measurement, biological process
-        for base_class in [ 'http://www.targetvalidation.org/disease',
+        # other disease, phenotype, measurement, biological process, function
+        for base_class in [ 'http://www.targetvalidation.org/disease/other',
                             'http://www.ebi.ac.uk/efo/EFO_0000651',
                             'http://www.ebi.ac.uk/efo/EFO_0001444',
                             'http://purl.obolibrary.org/obo/GO_0008150',
-                            'http://www.ebi.ac.uk/efo/EFO_0001441' ]:
+                            'http://www.ifomis.org/bfo/1.1/snap#Function' ]:
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
+
+        '''
+        Add all phenotypes to the EFO classes
+        '''
 
     def load_evidence_classes(self):
         '''
