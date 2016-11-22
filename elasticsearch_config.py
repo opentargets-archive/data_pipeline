@@ -372,6 +372,14 @@ class ElasticSearchConfiguration():
                         "type": "string",
                         "index": "not_analyzed"
                     },
+                    "phenotypes": {
+                        "properties": {
+                            "uri": {
+                                "type": "string",
+                                "index": "not_analyzed"
+                            },
+                        },
+                    },
                     "path_codes": {
                         "type": "string",
                         "index": "not_analyzed"
