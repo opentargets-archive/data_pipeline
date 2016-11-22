@@ -1,8 +1,8 @@
 import json
-import time
 
 import mysql.connector
 import requests
+import time
 
 from common import Actions
 from settings import Config
@@ -10,11 +10,8 @@ from settings import Config
 '''
 
 '''
-
-
 class EnsemblActions(Actions):
-    PROCESS = 'process'
-
+    PROCESS='process'
 
 class EnsemblMysqlGene(object):
     '''
@@ -22,7 +19,6 @@ class EnsemblMysqlGene(object):
     This list is then used by "EnsemblRestGenePost" to generate JSONs containing
     all required gene information for the CTTV pipeline.
     '''
-
     def __init__(self, ensembl_release):
         '''
         Instantiate with an Ensembl release number and set the MySQL connection instance.
@@ -31,8 +27,7 @@ class EnsemblMysqlGene(object):
         '''
         dbname = 'homo_sapiens_core_%d_38' % ensembl_release
         try:
-            self.conn = mysql.connector.connect(host='ensembldb.ensembl.org', user='anonymous', port=5306, db=dbname,
-                                                passwd='')
+            self.conn = mysql.connector.connect(host='ensembldb.ensembl.org', user='anonymous', port=5306, db=dbname, passwd='')
         except mysql.connector.OperationalError as mysql_ex:
             raise mysql_ex
 
@@ -47,7 +42,6 @@ class EnsemblMysqlGene(object):
         ensembl_gene_ids = [element[0] for element in cursor.fetchall()]
         cursor.close()
         return ensembl_gene_ids
-
     def conn_close(self):
         '''
         Explicitly close the connection to the Ensembl MySQL database.
@@ -55,12 +49,10 @@ class EnsemblMysqlGene(object):
         '''
         self.conn.close()
 
-
 class EnsemblRestGenePost():
     '''
     Use the Ensembl REST API obtain gene information to be used in the data pipeline.
     '''
-
     def __init__(self, ensembl_gene_ids):
         '''
         Initialize with a list of Ensembl gene IDs.
@@ -76,14 +68,13 @@ class EnsemblRestGenePost():
         '''
         server = "http://rest.ensembl.org"
         ext = "/lookup/id"
-        headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        gene_id_string_formatted_for_post = '[' + ', '.join(
-            ['"' + ensembl_gene_id + '"' for ensembl_gene_id in self.ensembl_gene_ids]) + ']'
+        headers={ "Content-Type" : "application/json", "Accept" : "application/json"}
+        gene_id_string_formatted_for_post = '[' + ', '.join(['"' + ensembl_gene_id + '"' for ensembl_gene_id in self.ensembl_gene_ids]) + ']'
         ids_list = '{ "ids" : %s }' % gene_id_string_formatted_for_post
-        req = requests.post(server + ext, headers=headers, data=ids_list)
+        req = requests.post(server+ext, headers=headers, data=ids_list)
         return req.json()
 
-    def get_gene_post_output(self, max_retry_count=10):
+    def get_gene_post_output(self, max_retry_count = 10):
         '''
         Calls "__query_rest_api()" in a loop to allow for
         failures. If the call does not generate an exception, the gene info JSON is returned.
@@ -109,7 +100,6 @@ class EnsemblRestGenePost():
                 else:
                     raise ex
         return gene_post_output
-
 
 class EnsemblGeneInfo(object):
     def __init__(self, ensembl_release):
@@ -174,6 +164,7 @@ class EnsemblGeneInfo(object):
 
 
 class EnsemblProcess(object):
+
     def __init__(self, loader):
         self.loader = loader
 
