@@ -913,7 +913,7 @@ class EvidenceProcesser(multiprocessing.Process):
                     with self.lock:
                         self.output_computed_count.value +=1
 
-                except Exception, error:
+                except Exception as error:
                     if error:
                         logger.info(str(error))
                     else:
@@ -923,11 +923,8 @@ class EvidenceProcesser(multiprocessing.Process):
                     # UploadError(ev, error, idev).save()
                     # err += 1
 
-                    if isinstance(error,AttributeError):
-                        logger.error("Error loading data for id %s: %s" % (idev, str(error)))
-                        # logger.error("%i %i"%(self.output_computed_count.value,self.processing_errors_count.value))
-                    else:
-                        logger.exception("Error loading data for id %s: %s" % (idev, str(error)))
+
+                    logger.exception("Error loading data for id %s: %s" % (idev, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
 
 
