@@ -27,6 +27,8 @@ class EcoActions(Actions):
     UPLOAD='upload'
 
 def get_ontology_code_from_url(url):
+    if isinstance(url, list):
+        url = url[0]
     return url.split('/')[-1]
 
 
@@ -48,7 +50,7 @@ class ECO(JSONSerializable):
 
     def get_id(self):
         # return self.code
-        return get_ontology_code_from_url(self.path_codes[-1])
+        return get_ontology_code_from_url(self.code)
 
 
 
