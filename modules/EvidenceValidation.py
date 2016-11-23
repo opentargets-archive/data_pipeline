@@ -1476,7 +1476,7 @@ class SubmissionAuditElasticStorage():
                     body=SUBMISSION_FILTER_MD5_QUERY%md5,
             )
 
-            if search and search["hits"]["total"] == 1:
+            if search and "hits" in search and search["hits"]["total"] == 1:
                 return search["hits"]["hits"][0]
         except NotFoundError:
             pass
