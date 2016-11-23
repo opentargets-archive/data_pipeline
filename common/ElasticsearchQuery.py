@@ -603,6 +603,23 @@ class ESQuery(object):
         #        'http://europepmc.org/abstract/MED/24817865',
         #        ]
 
+    def count_publications_for_file(self, filename):
+        query_body = {
+            "query": {
+                "term": {"filename": filename}
+            },
+            '_source': False,
+            'size': 0
+
+        }
+
+        res = self.handler.search(index=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                           doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                           body=query_body,
+                            )
+        return res['hits']['total']
+
+
     def get_all_associations_ids(self,):
         res = helpers.scan(client=self.handler,
                            query={"query": {

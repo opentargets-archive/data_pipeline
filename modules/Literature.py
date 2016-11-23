@@ -810,7 +810,7 @@ class MedlineRetriever(object):
         #filter for update files
         gzip_files = [i for i in files if i.endswith('.xml.gz')]
 
-        for file_ in tqdm(gzip_files,
+        for file_ in tqdm(gzip_files[1:3],
                   desc='enqueuing remote files'):
             if host.path.isfile(file_):
                 # Remote name, local name, binary mode
@@ -853,16 +853,24 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
+        self.update = update
+        self.es = Elasticsearch(hosts=Config.ELASTICSEARCH_URL,
+                                maxsize=50,
+                                timeout=1800,
+                                sniff_on_connection_fail=True,
+                                retry_on_timeout=True,
+                                max_retries=10,
+                                )
+        self.es_query = ESQuery(self.es)
         if update:
             self.ftp = ftp_connect(dir=MEDLINE_UPDATE_PATH)
         else:
             self.ftp = ftp_connect()
 
-
-
     def process(self, data):
         file_path = data
         if self.skip_file_processing(os.path.basename(file_path)):
+            self.logger.info("Skipping file {}".format(file_path))
             return
         if not os.path.isfile(file_path):
             try:
@@ -901,8 +909,17 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
             logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
 
     def skip_file_processing(self, file_name):
-        #TODO check in es if there the file has already been fully processed
+
+        total_docs = self.es_query.count_publications_for_file(file_name)
+        if self.update:
+            if total_docs > 1:
+                return True
+        else:
+            ''' baseline files fixed 30k records'''
+            if total_docs == 30000:
+                return True
         return False
+
 
     def close(self):
         self.ftp.close()
