@@ -1650,8 +1650,7 @@ class EvidenceValidationFileChecker():
                                      evidence_q,
                                      self.es,
                                      )
-                                     for i in range(1)
-                                     # for i in range(2)
+                                     for i in range(3)
                                      ]
         # ) for i in range(2)]
         for w in readers:
