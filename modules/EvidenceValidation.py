@@ -1248,10 +1248,10 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                         # self.logger.info(json.dumps(result))
                         disease = top_diseases['key']
                         doc_count = top_diseases['doc_count']
-                        if top_diseases['key'] in self.lookup_data.available_efos:
+                        if disease in self.lookup_data.efo_ontology.current_classes:
                             text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(disease, doc_count,
                                                                            doc_count * 100.0 / nb_documents,
-                                                                           self.lookup_data.available_efos[disease]))
+                                                                           self.lookup_data.efo_ontology.current_classes[disease]))
                         else:
                             text.append("\t-{0}:\t{1} ({2:.2f}%)".format(disease, doc_count, doc_count * 100.0 / nb_documents))
                     text.append("")
