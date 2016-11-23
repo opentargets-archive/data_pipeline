@@ -8,11 +8,8 @@ import os
 import re
 import string
 import time
-import urllib
 from StringIO import StringIO
 from collections import Counter
-from ftplib import FTP,all_errors
-from itertools import chain
 
 import ftputil as ftputil
 import requests
@@ -74,7 +71,6 @@ def ftp_connect(dir=MEDLINE_BASE_PATH):
     host = ftputil.FTPHost(Config.PUBMED_FTP_SERVER, 'anonymous', 'support@targetvalidation.org')
     host.chdir(dir)
     return host
-
 
 # def download_file(ftp, file_path, download_attempt = 5):
 #
@@ -239,7 +235,7 @@ class Publication(JSONSerializable):
                  title = u"",
                  abstract = u"",
                  authors = [],
-                 year = None,
+                 pub_date = None,
                  date = None,
                  journal = u"",
                  full_text = u"",
@@ -263,7 +259,7 @@ class Publication(JSONSerializable):
         self.title = title
         self.abstract = abstract
         self.authors = authors
-        self.year = year
+        self.pub_date = pub_date
         self.date = date
         self.journal = journal
         self.full_text = full_text
@@ -283,14 +279,14 @@ class Publication(JSONSerializable):
         self.filename = filename
 
     def __str__(self):
-        return "id:%s | title:%s | abstract:%s | authors:%s | year:%s | date:%s | journal:%s" \
+        return "id:%s | title:%s | abstract:%s | authors:%s | pub_date:%s | date:%s | journal:%s" \
                "| full_text:%s | epmc_text_mined_entities:%s | epmc_keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
                "| has_text_mined_entities:%s | is_open_access:%s | pub_type:%s | date_of_revision:%s | has_references:%s | references:%s" \
                "| mesh_headings:%s | chemicals:%s | filename:%s"%(self.pub_id,
                                                    self.title,
                                                    self.abstract,
                                                    self.authors,
-                                                   self.year,
+                                                   self.pub_date,
                                                     self.date,
                                                     self.journal,
                                                     self.full_text,
@@ -1000,10 +996,9 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                     else:
                         publication['journal']['medlineAbbreviation'] = ''
 
-                publication['pub_year'] = ''
-                for pubdate in e.JournalIssue.PubDate.getchildren():
-                    if pubdate.tag == 'Year':
-                        publication['pub_year'] = pubdate.text
+                for el in e.JournalIssue.PubDate.getchildren():
+                    if el.tag == 'Year':
+                        publication['pub_date'] = el.text
 
             if e.tag == 'PublicationTypeList':
                 pub_types = []
@@ -1066,7 +1061,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                               title=publication['title'],
                               abstract=publication.get('abstract'),
                               authors=publication.get('authors'),
-                              year=publication.get('pub_year'),
+                              pub_date=publication.get('pub_date'),
                               date=publication.get("firstPublicationDate"),
                               journal=publication.get('journal'),
                               full_text=u"",

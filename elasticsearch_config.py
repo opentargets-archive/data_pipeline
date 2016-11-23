@@ -900,6 +900,10 @@ class ElasticSearchConfiguration():
                             "type": "date",
                             "format": "strict_date_optional_time||epoch_millis",
                         },
+                        "pub_date": {
+                            "type": "date",
+                            "format": "year",
+                        },
                         "title": {
                             "type": "string",
                             "index": "analyzed",
