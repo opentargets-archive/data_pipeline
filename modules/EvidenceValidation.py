@@ -883,9 +883,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 # for line :)
 
 
-            ''' write results in ES '''
-
-            self.loader.flush()
 
 
             'Inform the audit trailer to generate a report and send an e-mail to the data provider'
@@ -919,6 +916,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                    logfile,
                    end_of_transmission)
 
+    def close(self):
+        self.loader.close()
 
 
 
@@ -1628,7 +1627,7 @@ class EvidenceValidationFileChecker():
                             job_timeout=12000)
         evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_evidence_q',
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
-                            job_timeout=120)
+                            job_timeout=1200)
         audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
                             job_timeout=1200)
