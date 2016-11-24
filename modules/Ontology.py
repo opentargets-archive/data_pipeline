@@ -510,8 +510,8 @@ class OntologyClassReader():
 
         evidence_uri = URIRef('http://purl.obolibrary.org/obo/ECO_0000000')
 
-        for triple in self.rdf_graph.triples((evidence_uri, None, None)):
-             logger.debug(triple)
+        # for triple in self.rdf_graph.triples((evidence_uri, None, None)):
+        #      logger.debug(triple)
 
         '''
             Open Targets specific evidence:
@@ -544,8 +544,8 @@ class OntologyClassReader():
             self.rdf_graph.add([u, RDFS.subClassOf, evidence_uri])
 
         u = URIRef('http://identifiers.org/eco/target_drug')
-        for triple in self.rdf_graph.triples((u, None, None)):
-             logger.debug(triple)
+        # for triple in self.rdf_graph.triples((u, None, None)):
+        #      logger.debug(triple)
 
         #(a, b, c) = self.rdf_graph.namespace_manager.compute_qname(unicode('http://identifiers.org/eco/target_drug'))
         #logger.debug(c)

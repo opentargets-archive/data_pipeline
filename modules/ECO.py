@@ -27,8 +27,6 @@ class EcoActions(Actions):
     UPLOAD='upload'
 
 def get_ontology_code_from_url(url):
-    if isinstance(url, list):
-        url = url[0]
     return url.split('/')[-1]
 
 
