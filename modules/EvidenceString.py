@@ -574,7 +574,7 @@ class EvidenceManager():
                 literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
                 year = None
                 if literature_info.data['year']:
-                    year = int(year)
+                    year = int(literature_info.data['year'])
                 extended_evidence['literature']['year'] = year
                 extended_evidence['literature']['abstract'] = literature_info.data['abstract']
                 extended_evidence['literature']['journal_data'] = literature_info.data['journal']
