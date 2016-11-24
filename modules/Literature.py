@@ -810,7 +810,7 @@ class MedlineRetriever(object):
         #filter for update files
         gzip_files = [i for i in files if i.endswith('.xml.gz')]
 
-        for file_ in tqdm(gzip_files[1:3],
+        for file_ in tqdm(gzip_files,
                   desc='enqueuing remote files'):
             if host.path.isfile(file_):
                 # Remote name, local name, binary mode
