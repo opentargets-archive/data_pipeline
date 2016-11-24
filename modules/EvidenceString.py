@@ -564,28 +564,32 @@ class EvidenceManager():
         if inject_literature:
             pmid_url = extended_evidence['literature']['references'][0]['lit_id']
             pmid = pmid_url.split('/')[-1]
+            pubs={}
             if pmid in self.available_publications:
                 pub = self.available_publications[pmid]
-                pubs = [pub, PublicationAnalysisSpacy(pmid)]
+                pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
             else:
                 pubs = []#pub_fetcher.get_publication_with_analyzed_data([pmid])
             if pubs:
                 literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
-                extended_evidence['literature']['year'] = literature_info.data['year']
+                year = None
+                if literature_info.data['year']:
+                    year = int(year)
+                extended_evidence['literature']['year'] = year
                 extended_evidence['literature']['abstract'] = literature_info.data['abstract']
                 extended_evidence['literature']['journal_data'] = literature_info.data['journal']
                 extended_evidence['literature']['title'] = literature_info.data['title']
                 extended_evidence['private']['facets']['literature'] = {}
-                extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
-                    'abstract_lemmas')
+                # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
+                #     'abstract_lemmas')
                 extended_evidence['private']['facets']['literature']['doi'] = literature_info.data.get('doi')
                 extended_evidence['private']['facets']['literature']['pub_type'] = literature_info.data.get('pub_type')
-                extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
-                    'mesh_headings')
-                extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
-                    'chemicals')
-                extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
-                    'noun_chunks')
+                # extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
+                #     'mesh_headings')
+                # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
+                #     'chemicals')
+                # extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
+                #     'noun_chunks')
 
         return Evidence(extended_evidence)
 
@@ -920,7 +924,7 @@ class EvidenceProcesser(multiprocessing.Process):
                 self.input_processed_count.value += 1
             if data:
                 idev, ev = data
-                if 1:
+                try:
                     fixed_ev, fixed = self.evidence_manager.fix_evidence(ev)
                     # logger.critical("%i processed"%self.output_computed_count.value)
                     if self.evidence_manager.is_valid(fixed_ev, datasource=fixed_ev.datasource):
@@ -941,19 +945,19 @@ class EvidenceProcesser(multiprocessing.Process):
                     with self.lock:
                         self.output_computed_count.value += 1
 
-                # except Exception as error:
-                #     if error:
-                #         logger.info(str(error))
-                #     else:
-                #         logger.info(Exception.message)
-                #     with self.lock:
-                #         self.processing_errors_count.value += 1
-                #     # UploadError(ev, error, idev).save()
-                #     # err += 1
-                #
-                #
-                #     logger.exception("Error loading data for id %s: %s" % (idev, str(error)))
-                #     # traceback.print_exc(limit=1, file=sys.stdout)
+                except Exception as error:
+                    if error:
+                        logger.info(str(error))
+                    else:
+                        logger.info(Exception.message)
+                    with self.lock:
+                        self.processing_errors_count.value += 1
+                    # UploadError(ev, error, idev).save()
+                    # err += 1
+
+
+                    logger.exception("Error loading data for id %s: %s" % (idev, str(error)))
+                    # traceback.print_exc(limit=1, file=sys.stdout)
 
                 if self.input_processed_count.value % 5e4 == 0:
                     logger.info("%i processed | %i errors | processing %1.2f evidence per second" % (

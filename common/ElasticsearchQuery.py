@@ -610,7 +610,6 @@ class ESQuery(object):
                 for pub in self.get_publications_by_id(batch):
                     yield pub
                 batch =[]
-                break
         if batch:
             for pub in self.get_publications_by_id(batch):
                 yield pub
