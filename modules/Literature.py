@@ -5,6 +5,7 @@ import io
 import logging
 import multiprocessing
 import os
+import random
 import re
 import string
 import time
@@ -800,7 +801,7 @@ class MedlineRetriever(object):
         for w in loaders:
             w.start()
 
-        shift_downloading = 2
+        shift_downloading = 2*random.random()
         if update:
             host = ftp_connect(MEDLINE_UPDATE_PATH)
         else:
