@@ -534,7 +534,8 @@ class OntologyClassReader():
             'http://identifiers.org/eco/clinvar_gene_assignments':'ClinVAR SNP-gene pipeline',
             'http://identifiers.org/eco/cttv_mapping_pipeline':'CTTV-custom annotation pipeline',
             'http://identifiers.org/eco/GWAS_fine_mapping':'Fine-mapping study evidence',
-            'http://www.targetvalidation.org/evidence/genomics_evidence':'genomics evidence'
+            'http://www.targetvalidation.org/evidence/genomics_evidence':'genomics evidence',
+            'http://www.targetvalidation.org/evidence/literature_mining': 'Literature mining'
         }
 
         for uri, label in open_targets_terms.iteritems():
