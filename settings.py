@@ -25,7 +25,7 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.08'
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'16.12'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     try:
         ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
@@ -90,10 +90,8 @@ class Config():
         print 'no postgres instance'
         POSTGRES_DATABASE = {}
 
-    # HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
-    HGNC_COMPLETE_SET = 'https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer'
-    # HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
-    HGNC_ORTHOLOGS = 'https://5.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9oY29wL2h1bWFuX2FsbF9oY29wX3NpeHRlZW5fY29sdW1uLnR4dC5neg%3D%3D&f=norefer'
+    HGNC_COMPLETE_SET = 'http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
+    HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
     HGNC_ORTHOLOGS_SPECIES = {
         '9606':'human',
         '9598':'chimpanzee',
@@ -109,14 +107,10 @@ class Config():
         '4932':'yeast'
     }
 
-    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
-    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
-    CHEMBL_DRUG_SYNONYMS = '''https://www.ebi.ac.uk/chembl/api/data/molecule/{}.json'''
-
     HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v15.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'http://v15.proteinatlas.org/download/rna.csv.zip'
+    HPA_RNA_URL = 'http://v15.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
@@ -188,7 +182,13 @@ class Config():
     CHEMBL_URIS = dict(
         protein_class='https://www.ebi.ac.uk/chembl/api/data/protein_class',
         target_component='https://www.ebi.ac.uk/chembl/api/data/target_component',
+        target = 'https://www.ebi.ac.uk/chembl/api/data/target',
+        mechanism = 'https://www.ebi.ac.uk/chembl/api/data/mechanism',
+        molecule = 'https://www.ebi.ac.uk/chembl/api/data/molecule'
     )
+    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
+    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
+    CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
@@ -244,7 +244,7 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION=85
+    ENSEMBL_RELEASE_VERSION=86
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 

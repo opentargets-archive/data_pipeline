@@ -23,6 +23,7 @@ class LookUpData():
 class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
+    EFO = 'efo'
     ECO = 'eco'
     PUBLICATION = 'publication'
     MP = 'mp'
@@ -59,6 +60,10 @@ class LookUpDataRetriever(object):
                 self._get_mp()
             elif dt == LookUpDataType.HPO:
                 self._get_hpo()
+            elif dt == LookUpDataType.EFO:
+                self._get_efo()
+            elif dt == LookUpDataType.PUBLICATION:
+                self._get_available_publications()
 
             self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
 
@@ -109,3 +114,17 @@ class LookUpDataRetriever(object):
         '''
         self.lookup.mp_ontology = OntologyClassReader()
         self.lookup.mp_ontology.load_mp_classes()
+
+
+    def _get_efo(self):
+        '''
+        Load EFO current and obsolete classes to report them to data providers
+        :return:
+        '''
+        self.lookup.efo_ontology = OntologyClassReader()
+        self.lookup.efo_ontology.load_efo_classes()
+
+
+    def _get_available_publications(self):
+        self.logger.info('getting literature/publications')
+        self.lookup.available_publications = LiteratureLookUpTable(self.es, 'LITERATURE_LOOKUP', self.r_server)

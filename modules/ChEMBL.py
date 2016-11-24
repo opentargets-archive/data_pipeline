@@ -52,33 +52,75 @@ except:
     pass
 logger = logging.getLogger(__name__)
 
-class ChEMBLLookup(Downloader):
+
+class ChEMBLMetadata():
+    limit= 1000
+    next= None
+    offset= 0
+    previous= None
+    total_count= 100000000
+
+    def __init__(self, **kwargs):
+        if kwargs:
+            self.__dict__.update(kwargs)
+
+class ChEMBLQuery(object):
+    def __init__(self):
+        pass
+
+    def get_from_url(self, url):
+        metadata = ChEMBLMetadata()
+        while (metadata.offset + metadata.limit) < metadata.total_count:
+            response =requests.get(url=url, params=dict(limit = metadata.limit,
+                                                        offset = metadata.offset))
+            response.raise_for_status()
+            metadata, data = self.parse_chembl_metadata(response.json())
+            for i in data:
+                yield i
+            metadata.offset+=metadata.limit
+    def parse_chembl_metadata(self, raw_response):
+        metadata_element = 'page_meta'
+        if metadata_element in raw_response:
+            metadata = ChEMBLMetadata(**raw_response[metadata_element])
+            raw_response.pop(metadata_element)
+        else:
+            metadata = ChEMBLMetadata()
+
+        return metadata, raw_response.values()[0]
+
+class ChEMBLLookup(object):
+
     def __init__(self):
         super(ChEMBLLookup, self).__init__()
+        self.downloader = Downloader()
+        self.query = ChEMBLQuery()
         self.protein_class = dict()
         self.target_component = dict()
+        self.mechanisms = {}
+        self.target2molecule = {}
+        self.targets = {}
+        self.uni2chembl ={}
+        self.molecule2synonyms = {}
 
-    def download(self):
+
+    def download_xml(self):
         now = datetime.utcnow()
         today = datetime.strptime("{:%Y-%m-%d}".format(datetime.now()), '%Y-%m-%d')
 
-        for label, url in Config.CHEMBL_URIS.iteritems():
-            logging.debug(url)
+        for label, url in Config.CHEMBL_URIS.items():
+            logger.debug(url)
 
             start = 0
             rows = 100
-            nbItems = 0
             counter = 0
             total = 1
 
             while (start < total):
 
                 counter+=1
-                #print start
                 uri = '%s?limit=%i&offset=%i' %(url,rows,start)
-                logging.info("REQUEST {0}. {1}".format(counter, uri))
-                raw = self.get_response(uri, directory=None, filename=None)
-                print raw
+                logger.info("REQUEST {0}. {1}".format(counter, uri))
+                raw = self.downloader.get_resource(uri, directory=None, filename=None)
                 root = ElementTree.fromstring(raw)
                 print root.tag, root.attrib
                 #response><page_meta><limit>40</limit><next>/chembl/api/data/target_component?limit=40&offset=60</next><offset>20</offset><previous/><total_count>7234</total_count>
@@ -189,13 +231,68 @@ class ChEMBLLookup(Downloader):
             logging.debug("Now having %s"%",".join(protein_classes))
         return protein_classes
 
+    def download_targets(self):
+        targets = self.query.get_from_url(Config.CHEMBL_TARGET_BY_UNIPROT_ID)
+        for i in targets:
+            if 'target_components' in i and \
+                    i['target_components'] and \
+                    'accession' in i['target_components'][0] and \
+                    i['target_components'][0]['accession']:
+                uniprot_id = i['target_components'][0]['accession']
+                self.targets[uniprot_id] = i
+                self.uni2chembl[uniprot_id] = i['target_chembl_id']
+
+
+    def download_mechanisms(self):
+
+        mechanisms = self.query.get_from_url(Config.CHEMBL_MECHANISM)
+        allowed_target_chembl_ids = set(self.uni2chembl.values())
+        for i in mechanisms:
+            self.mechanisms[i['record_id']] = i
+            target_id = i['target_chembl_id']
+            if target_id in allowed_target_chembl_ids:
+                if target_id not in self.target2molecule:
+                    self.target2molecule[target_id] = []
+                self.target2molecule[target_id].append(i['molecule_chembl_id'])
+
+    def download_molecules_linked_to_target(self):
+        if not self.targets:
+            self.download_targets()
+        if not self.target2molecule:
+            self.download_mechanisms()
+        required_molecules = set()
+        for molecules in self.target2molecule.values():
+            for molecule in molecules:
+                required_molecules.add(molecule)
+        required_molecules=list(required_molecules)
+        batch_size = 100
+        for i in range(0,len(required_molecules)+1,batch_size):
+            url = Config.CHEMBL_MOLECULE_SET.format(';'.join(required_molecules[i:i+batch_size]))
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            for i in data['molecules']:
+                if 'molecule_synonyms' in i and i['molecule_synonyms']:
+                    synonyms=[]
+                    for syn in i['molecule_synonyms']:
+                        synonyms.append(syn['synonyms'])
+                        synonyms.append(syn['molecule_synonym'])
+                    synonyms = list(set(synonyms))
+                    self.molecule2synonyms[i['molecule_chembl_id']]=synonyms
+
+
+
+
+
+
+
 def main():
 
     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
     logging.info("Load ChEMBL protein class data")
     chembl = ChEMBLLookup()
-    chembl.download()
+    chembl.download_xml()
 
 if __name__ == "__main__":
     main()

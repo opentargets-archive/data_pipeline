@@ -1,66 +1,26 @@
 import warnings
 from collections import OrderedDict
-import copy
-import datetime
-import time
 import logging
 from StringIO import StringIO
 import urllib2
-
 import requests
 import gzip
 import csv
-
-import sys
-
 import multiprocessing
-from sqlalchemy import and_
 import ujson as json
 
 from tqdm import tqdm
 
 from common import Actions
 from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import JSONObjectStorage, Loader
+from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
-from common.PGAdapter import HgncGeneInfo, EnsemblGeneInfo, UniprotInfo, ElasticsearchLoad
 from common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from common.UniprotIO import UniprotIterator
+from modules.ChEMBL import ChEMBLLookup
 from modules.Reactome import ReactomeRetriever
 from settings import Config
 
-
-'''line profiler code'''
-try:
-    from line_profiler import LineProfiler
-
-    def do_profile(follow=[]):
-        def inner(func):
-            def profiled_func(*args, **kwargs):
-                try:
-                    profiler = LineProfiler()
-                    profiler.add_function(func)
-                    for f in follow:
-                        profiler.add_function(f)
-                    profiler.enable_by_count()
-                    return func(*args, **kwargs)
-                finally:
-                    profiler.print_stats()
-                    print 'done'
-            return profiled_func
-        return inner
-
-except ImportError:
-    def do_profile(follow=[]):
-        "Helpful if you accidentally leave in production!"
-        def inner(func):
-            def nothing(*args, **kwargs):
-                return func(*args, **kwargs)
-            return nothing
-        return inner
-'''end of line profiler code'''
-
-__author__ = 'andreap'
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
 ENS_ID_ORG_PREFIX = 'http://identifiers.org/ensembl/'
@@ -538,6 +498,7 @@ class GeneManager():
         self.esquery = ESQuery(loader.es)
         self.genes = GeneSet()
         self.reactome_retriever=ReactomeRetriever(loader.es)
+        self.chembl_handler = ChEMBLLookup()
 
 
 
@@ -688,72 +649,27 @@ class GeneManager():
 
     def _get_chembl_data(self):
         logging.info("Chembl Drug parsing ")
-
-        for gene_id, gene in self.genes.iterate():
-            req = requests.get(Config.CHEMBL_TARGET_BY_UNIPROT_ID,params={'target_components__accession': gene.uniprot_id})
-            req.raise_for_status()
-            target_chembl_ids = [x['target_chembl_id'] for x in req.json()['targets']]
-
-            molecules = []
-            for target_id in target_chembl_ids:
-                r = requests.get(Config.CHEMBL_MECHANISM, params={'target_chembl_id': target_id})
-                r.raise_for_status()
-                molecules.extend([x['molecule_chembl_id'] for x in r.json()['mechanisms']])
-
-            target_drugnames = {}
-            for chembl_id in molecules:
-                r = requests.get(Config.CHEMBL_DRUG_SYNONYMS.format(chembl_id))
-                r.raise_for_status()
-                target_drugnames[chembl_id]=[]
-                #target_drugnames[chembl_id] = list(set([x['synonyms'] for x in r.json()['molecule_synonyms']]))
-                #TODO : remove dups
-                for x in r.json()['molecule_synonyms']:
-                    synonym_data = {}
-                    synonym_data['synonym']=x['synonyms']
-                    synonym_data['synonym_type'] = x['syn_type']
-                    target_drugnames[chembl_id].append(synonym_data)
-
+        self.chembl_handler.download_molecules_linked_to_target()
+        for gene_id, gene in tqdm(self.genes.iterate(),
+                                  desc='Getting drug data from chembl',
+                                  unit=' gene'):
+            target_drugnames = []
             ''' extend gene with related drug names '''
-            gene.drugs['chembl_drugs'] = target_drugnames
+            if gene.uniprot_accessions:
+                for a in gene.uniprot_accessions:
+                    if a in self.chembl_handler.uni2chembl:
+                        chembl_id = self.chembl_handler.uni2chembl[a]
+                        if chembl_id in self.chembl_handler.target2molecule:
+                            molecules = self.chembl_handler.target2molecule[chembl_id]
+                            for mol in molecules:
+                                synonyms = self.chembl_handler.molecule2synonyms[mol]
+                                target_drugnames.extend(synonyms)
+                        break
+            if target_drugnames:
+                gene.drugs['chembl_drugs'] = target_drugnames
 
 
-class GeneRetriever():
-    """
-    DEPRECATED USE TargetLookUpTable
-    Will retrieve a Gene object form the processed json stored in postgres
-    """
-    def __init__(self,
-                 adapter,
-                 cache_size = 25):
-        warnings.warn('use GeneLookUpTable instead', DeprecationWarning, stacklevel=2)
-        self.adapter=adapter
-        self.session=adapter.session
-        self.cache = OrderedDict()
-        self.cache_size = cache_size
 
-    def get_gene(self, geneid):
-        if geneid in self.cache:
-            gene = self.cache[geneid]
-        else:
-            gene = self._get_from_db(geneid)
-            self._add_to_cache(geneid, gene)
-
-        return gene
-
-    def _get_from_db(self, geneid):
-        json_data = JSONObjectStorage.get_data_from_pg(self.session,
-                                                       Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                                       Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                                                       geneid)
-        gene = Gene(geneid)
-        if json_data:
-            gene.load_json(json_data)
-        return gene
-
-    def _add_to_cache(self, geneid, gene):
-        self.cache[geneid]=gene
-        while len(self.cache) >self.cache_size:
-            self.cache.popitem(last=False)
 
 
 class GeneLookUpTable(object):

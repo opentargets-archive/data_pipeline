@@ -360,6 +360,14 @@ class ElasticSearchConfiguration():
                         "type": "string",
                         "index": "not_analyzed"
                     },
+                    "phenotypes": {
+                        "properties": {
+                            "uri": {
+                                "type": "string",
+                                "index": "not_analyzed"
+                            },
+                        },
+                    },
                     "path_codes": {
                         "type": "string",
                         "index": "not_analyzed"
@@ -372,17 +380,17 @@ class ElasticSearchConfiguration():
                             },
                         },
                     },
-                    "private": {
-                        # "type" : "object",
-                        "properties": {
-                            "suggestions": {
-                                "type": "completion",
-                                "analyzer": "whitespace_analyzer",
-                                "search_analyzer": "edgeNGram_analyzer",
-                                "payloads": True
-                            },
-                        },
-                    },
+                    # "private": {
+                    #     # "type" : "object",
+                    #     "properties": {
+                    #         "suggestions": {
+                    #             "type": "completion",
+                    #             "analyzer": "whitespace_analyzer",
+                    #             "search_analyzer": "edgeNGram_analyzer",
+                    #             "payloads": True
+                    #         },
+                    #     },
+                    # },
                 }
             }
         },
@@ -394,8 +402,8 @@ class ElasticSearchConfiguration():
                 "filter": {
                     "edgeNGram_filter": {
                         "type": "edgeNGram",
-                        "min_gram": 2,
-                        "max_gram": 20,
+                        "min_gram": "2",
+                        "max_gram": "20",
                         "token_chars": [
                             "letter",
                             "digit"
@@ -442,8 +450,8 @@ class ElasticSearchConfiguration():
                 "filter": {
                     "edgeNGram_filter": {
                         "type": "edgeNGram",
-                        "min_gram": 2,
-                        "max_gram": 20,
+                        "min_gram": "2",
+                        "max_gram": "20",
                         "token_chars": [
                             "letter",
                             "digit"
@@ -507,12 +515,12 @@ class ElasticSearchConfiguration():
                     "_private": {
                         # "type" : "object",
                         "properties": {
-                            "suggestions": {
-                                "type": "completion",
-                                "analyzer": "whitespace_analyzer",
-                                "search_analyzer": "whitespace_analyzer",
-                                "payloads": True
-                            },
+                            # "suggestions": {
+                            #     "type": "completion",
+                            #     "analyzer": "whitespace_analyzer",
+                            #     "search_analyzer": "whitespace_analyzer",
+                            #     "payloads": True
+                            # },
                             "facets": {
                                 # "type" : "object",
                                 "properties": {
@@ -815,8 +823,8 @@ class ElasticSearchConfiguration():
                 "filter": {
                     "edgeNGram_filter": {
                         "type": "edgeNGram",
-                        "min_gram": 2,
-                        "max_gram": 20,
+                        "min_gram": "2",
+                        "max_gram": "20",
                         "token_chars": [
                             "letter",
                             "digit"
@@ -854,19 +862,19 @@ class ElasticSearchConfiguration():
         },
         "mappings": {
             '_default_': {
-                "properties": {
-                    "private": {
-                        # "type" : "object",
-                        "properties": {
-                            "suggestions": {
-                                "type": "completion",
-                                "analyzer": "whitespace_analyzer",
-                                "search_analyzer": "whitespace_analyzer",
-                                "payloads": True
-                            }
-                        }
-                    }
-                },
+                # "properties": {
+                #     "private": {
+                #         # "type" : "object",
+                #         "properties": {
+                #             "suggestions": {
+                #                 "type": "completion",
+                #                 "analyzer": "whitespace_analyzer",
+                #                 "search_analyzer": "whitespace_analyzer",
+                #                 "payloads": True
+                #             }
+                #         }
+                #     }
+                # },
                 "dynamic_templates": [
                     {
                         "do_not_analyze_ortholog": {

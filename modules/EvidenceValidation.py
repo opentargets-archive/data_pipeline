@@ -109,92 +109,6 @@ VALIDATION FAILED
 -----------------
 '''
 
-eva_curated = {
-    "http://www.orpha.net/ORDO/Orphanet_1838": "http://www.orpha.net/ORDO/Orphanet_175",
-    "http://www.orpha.net/ORDO/Orphanet_68381": "http://www.orpha.net/ORDO/Orphanet_183497",
-    "http://www.orpha.net/ORDO/Orphanet_120487": "http://www.orpha.net/ORDO/Orphanet_903",
-    "http://www.orpha.net/ORDO/Orphanet_91414": "http://www.orpha.net/ORDO/Orphanet_183487",
-    "http://www.orpha.net/ORDO/Orphanet_1047": "http://www.orpha.net/ORDO/Orphanet_98362",
-    "http://www.orpha.net/ORDO/Orphanet_121066": "http://www.orpha.net/ORDO/Orphanet_818",
-# http://www.orpha.net/ORDO/Orphanet_818
-    "http://www.orpha.net/ORDO/Orphanet_216675": "http://www.ebi.ac.uk/efo/EFO_0005269",
-    "http://www.orpha.net/ORDO/Orphanet_117623": "http://www.orpha.net/ORDO/Orphanet_827",
-    "http://www.orpha.net/ORDO/Orphanet_306773": "http://www.orpha.net/ORDO/Orphanet_3197",
-    "http://www.orpha.net/ORDO/Orphanet_137646": "http://www.orpha.net/ORDO/Orphanet_110",
-    "http://www.orpha.net/ORDO/Orphanet_121730": "http://www.orpha.net/ORDO/Orphanet_84",
-    "http://www.orpha.net/ORDO/Orphanet_211247": "http://www.ebi.ac.uk/efo/EFO_0006888",
-    "http://www.orpha.net/ORDO/Orphanet_98867": "http://www.orpha.net/ORDO/Orphanet_288",  # obsolete
-    "http://www.orpha.net/ORDO/Orphanet_99977": "http://www.ebi.ac.uk/efo/EFO_0005922",
-    "http://www.orpha.net/ORDO/Orphanet_118746": "http://www.orpha.net/ORDO/Orphanet_59",
-# Allan-Herndon-Dudley syndrome
-    "http://www.orpha.net/ORDO/Orphanet_86834": "http://www.ebi.ac.uk/efo/EFO_1000309",
-    "http://www.orpha.net/ORDO/Orphanet_120431": "http://www.orpha.net/ORDO/Orphanet_79277",
-    "http://www.orpha.net/ORDO/Orphanet_120935": "http://www.orpha.net/ORDO/Orphanet_379",
-    "http://www.orpha.net/ORDO/Orphanet_121722": "http://www.orpha.net/ORDO/Orphanet_84",
-    "http://www.orpha.net/ORDO/Orphanet_120345": "http://www.orpha.net/ORDO/Orphanet_794",
-    "http://www.orpha.net/ORDO/Orphanet_364559": "http://www.orpha.net/ORDO/Orphanet_183524",
-    "http://www.orpha.net/ORDO/Orphanet_122492": "http://www.orpha.net/ORDO/Orphanet_79430",
-    "http://www.orpha.net/ORDO/Orphanet_123772": "http://www.orpha.net/ORDO/Orphanet_636",
-    "http://www.orpha.net/ORDO/Orphanet_120309": "http://www.orpha.net/ORDO/Orphanet_805",
-    "http://www.orpha.net/ORDO/Orphanet_117820": "http://www.orpha.net/ORDO/Orphanet_397596",
-# not mapped. -- a gene only valid this time Activated PI3K-delta syndrome Orphanet_397596
-    "http://www.orpha.net/ORDO/Orphanet_449": "http://www.ebi.ac.uk/efo/EFO_1000292",
-    "http://www.orpha.net/ORDO/Orphanet_52416": "http://www.ebi.ac.uk/efo/EFO_0000096",
-# Mantle cell lymphoma (climbed up ontology)
-    "http://www.orpha.net/ORDO/Orphanet_251612": "http://www.ebi.ac.uk/efo/EFO_0000272",  # (climbed up ontology)
-    "http://www.orpha.net/ORDO/Orphanet_2965": "http://www.ebi.ac.uk/efo/EFO_0004125",  # (climbed up ontology)
-    "http://www.orpha.net/ORDO/Orphanet_121715": "http://www.orpha.net/ORDO/Orphanet_84",
-    "http://www.orpha.net/ORDO/Orphanet_121719": "http://www.orpha.net/ORDO/Orphanet_84",
-# (this and record above are mapped to versions of complementation group)
-    "http://www.orpha.net/ORDO/Orphanet_767": "http://www.ebi.ac.uk/efo/EFO_0006803",
-# (Polyarteritis nodosa ->climbed up ontology)
-    "http://www.orpha.net/ORDO/Orphanet_282196": "http://www.orpha.net/ORDO/Orphanet_3453",
-    "http://www.orpha.net/ORDO/Orphanet_99927": "http://www.ebi.ac.uk/efo/EFO_1000298",
-    "http://www.orpha.net/ORDO/Orphanet_803": "http://www.ebi.ac.uk/efo/EFO_0000253",
-    "http://www.orpha.net/ORDO/Orphanet_1501": "http://www.ebi.ac.uk/efo/EFO_0003093",
-    "http://www.orpha.net/ORDO/Orphanet_123411": "http://www.ebi.ac.uk/efo/EFO_1000642",
-    "http://www.orpha.net/ORDO/Orphanet_118978": "http://www.orpha.net/ORDO/Orphanet_110",
-    "http://www.orpha.net/ORDO/Orphanet_547": "http://www.ebi.ac.uk/efo/EFO_0005952",
-    "http://www.orpha.net/ORDO/Orphanet_123257": "http://www.orpha.net/ORDO/Orphanet_2478",
-    "http://www.orpha.net/ORDO/Orphanet_79358": "http://www.orpha.net/ORDO/Orphanet_183444",
-    "http://www.orpha.net/ORDO/Orphanet_553": "http://www.ebi.ac.uk/efo/EFO_0003099",
-    "http://www.orpha.net/ORDO/Orphanet_88": "http://www.ebi.ac.uk/efo/EFO_0006926",  #
-    "http://www.orpha.net/ORDO/Orphanet_120353": "http://www.orpha.net/ORDO/Orphanet_79431",
-# tyrosinase, oculocutaneous albinism IA => Oculocutaneous albinism type 1A
-    "http://www.orpha.net/ORDO/Orphanet_120795": "http://www.orpha.net/ORDO/Orphanet_157",
-# carnitine palmitoyltransferase 2 => Carnitine palmitoyltransferase II deficiency
-    "http://www.orpha.net/ORDO/Orphanet_121802": "http://www.orpha.net/ORDO/Orphanet_710",
-# fibroblast growth factor receptor 1 => Pfeiffer syndrome
-    "http://www.orpha.net/ORDO/Orphanet_178826": "http://www.orpha.net/ORDO/Orphanet_65",
-# spermatogenesis associated 7 => Leber congenital amaurosis
-    # "Orphanet_132262" : "Orphanet_93262" # Crouzon syndrome with acanthosis nigricans, Crouzon syndrome => need intermediate Crouzon Syndrome in EFO!!!
-    "http://www.orpha.net/ORDO/Orphanet_123572": "http://www.orpha.net/ORDO/Orphanet_2170",
-# 5-methyltetrahydrofolate-homocysteine methyltransferase => METHYLCOBALAMIN DEFICIENCY, cblG TYPE => Methylcobalamin deficiency type cblG
-    "http://www.orpha.net/ORDO/Orphanet_189330": "http://www.orpha.net/ORDO/Orphanet_250",
-# ALX3 mutations leading to Frontonasal dysplasia
-    "http://www.orpha.net/ORDO/Orphanet_121400": "http://www.orpha.net/ORDO/Orphanet_976",
-# APRT mutations leading to Adenine phosphoribosyltransferase deficiency
-    "http://www.orpha.net/ORDO/Orphanet_1984": "http://www.orpha.net/ORDO/Orphanet_182050",
-# obsolete Fechtner syndrome => http://www.orpha.net/ORDO/Orphanet_182050 with label: MYH9-related disease
-    "http://www.orpha.net/ORDO/Orphanet_79354": "http://www.orpha.net/ORDO/Orphanet_183426",
-# map to upper term as EFO does not have this one, should request it!
-    "http://www.orpha.net/ORDO/Orphanet_850": "http://www.orpha.net/ORDO/Orphanet_182050",
-# May-Hegglin thrombocytopenia deprecated => The preferred class is use http://www.orpha.net/ORDO/Orphanet_182050 with label: MYH9-related disease
-    "http://www.orpha.net/ORDO/Orphanet_123524": "http://www.orpha.net/ORDO/Orphanet_379",
-# Granulomatous disease, chronic, autosomal recessive, cytochrome b-negative => Chronic granulomatous disease
-    "http://www.orpha.net/ORDO/Orphanet_69": "http://www.orpha.net/ORDO/Orphanet_2118",
-# wrong eVA mapping!! should be 4-Hydroxyphenylpyruvate dioxygenase deficiency
-    "http://www.orpha.net/ORDO/Orphanet_123334": "http://www.orpha.net/ORDO/Orphanet_99901",
-# wrong mapping should be Acyl-CoA dehydrogenase 9 deficiency
-    "http://www.orpha.net/ORDO/Orphanet_123421": "http://www.orpha.net/ORDO/Orphanet_361",
-# wrong mapping in eVA for this gene: mutations lead to ACTH resistance
-    # "http://www.orpha.net/ORDO/Orphanet_171059" # needs to be refined variant by variant, terms exists in EFO for each of the conditions : methylmalonic aciduria (cobalamin deficiency) cblD type, with homocystinuria in CLinVAR: Homocystinuria, cblD type, variant 1 OR Methylmalonic aciduria, cblD type, variant 2
-    "http://www.orpha.net/ORDO/Orphanet_158032": "http://www.orpha.net/ORDO/Orphanet_540",
-# STX11, STXBP2 => Familial hemophagocytic lymphohistiocytosis
-    "http://www.orpha.net/ORDO/Orphanet_159550": "http://www.orpha.net/ORDO/Orphanet_35698"
-# POLG : Mitochondrial DNA depletion syndrome
-}
-
 class FileTypes():
     LOCAL='local'
     SFTP='sftp'
@@ -488,7 +402,8 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                 total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
                 if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
                     total_chunks +=1
-                self.queue_out.incr_total(total_chunks, self.r_server)
+                self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
+
                 with srv.open(file_path, mode='rb', bufsize=1) as f:
                     with gzip.GzipFile(filename = file_path.split('/')[1],
                                        mode = 'rb',
@@ -523,7 +438,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
             if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
                 total_chunks +=1
-            self.queue_out.incr_total(total_chunks, self.r_server)
+            self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
             with open(file_path, mode='rb',) as f:
                 with gzip.GzipFile(filename = file_path.split('/')[1],
                                    mode = 'rb',
@@ -779,14 +694,11 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                 for disease_id in obj.disease.id:
                                     disease_count += 1
                                     efo_id = disease_id
-                                    # fix for EVA data for release 1.0
-                                    if disease_id in eva_curated:
-                                       obj.disease.id[index] = eva_curated[disease_id];
-                                       disease_id = obj.disease.id[index];
                                     index += 1
                                     short_disease_id = disease_id.split('/')[-1]
                                     ' Check disease term or phenotype term '
-                                    if (short_disease_id not in self.lookup_data.available_efos) and \
+                                    #if (short_disease_id not in self.lookup_data.available_efos) and \
+                                    if (disease_id not in self.lookup_data.efo_ontology.current_classes) and \
                                             (disease_id not in self.lookup_data.hpo_ontology.current_classes) and \
                                             (disease_id not in self.lookup_data.mp_ontology.current_classes):# or \
                                             # (disease_id in self.efo_uncat):
@@ -797,15 +709,15 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                         else:
                                             invalid_diseases[disease_id] += 1
                                         nb_efo_invalid += 1
-                                    # if disease_id in self.efo_obsolete:
-                                    #     audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
-                                    #     # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
-                                    #     disease_failed = True
-                                    #     if disease_id not in obsolete_diseases:
-                                    #         obsolete_diseases[disease_id] = 1
-                                    #     else:
-                                    #         obsolete_diseases[disease_id] += 1
-                                    #     nb_efo_obsolete += 1
+                                    if disease_id in self.lookup_data.efo_ontology.obsolete_classes:
+                                         audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
+                                         # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                         disease_failed = True
+                                         if disease_id not in obsolete_diseases:
+                                             obsolete_diseases[disease_id] = 1
+                                         else:
+                                             obsolete_diseases[disease_id] += 1
+                                         nb_efo_obsolete += 1
                                     elif (disease_id in self.lookup_data.hpo_ontology.obsolete_classes) or \
                                             (disease_id in self.lookup_data.mp_ontology.obsolete_classes):
                                         audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
@@ -971,9 +883,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 # for line :)
 
 
-            ''' write results in ES '''
-
-            self.loader.flush()
 
 
             'Inform the audit trailer to generate a report and send an e-mail to the data provider'
@@ -1007,6 +916,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                    logfile,
                    end_of_transmission)
 
+    def close(self):
+        self.loader.close()
 
 
 
@@ -1337,10 +1248,10 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                         # self.logger.info(json.dumps(result))
                         disease = top_diseases['key']
                         doc_count = top_diseases['doc_count']
-                        if top_diseases['key'] in self.lookup_data.available_efos:
+                        if disease in self.lookup_data.efo_ontology.current_classes:
                             text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(disease, doc_count,
                                                                            doc_count * 100.0 / nb_documents,
-                                                                           self.lookup_data.available_efos[disease]))
+                                                                           self.lookup_data.efo_ontology.current_classes[disease]))
                         else:
                             text.append("\t-{0}:\t{1} ({2:.2f}%)".format(disease, doc_count, doc_count * 100.0 / nb_documents))
                     text.append("")
@@ -1564,7 +1475,7 @@ class SubmissionAuditElasticStorage():
                     body=SUBMISSION_FILTER_MD5_QUERY%md5,
             )
 
-            if search and search["hits"]["total"] == 1:
+            if search and "hits" in search and search["hits"]["total"] == 1:
                 return search["hits"]["hits"][0]
         except NotFoundError:
             pass
@@ -1703,7 +1614,7 @@ class EvidenceValidationFileChecker():
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=(LookUpDataType.TARGET,
-                                                      LookUpDataType.DISEASE,
+                                                      LookUpDataType.EFO,
                                                       LookUpDataType.ECO,
                                                       LookUpDataType.HPO,
                                                       LookUpDataType.MP,
@@ -1716,7 +1627,7 @@ class EvidenceValidationFileChecker():
                             job_timeout=12000)
         evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_evidence_q',
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
-                            job_timeout=120)
+                            job_timeout=1200)
         audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
                             job_timeout=1200)
@@ -1738,8 +1649,7 @@ class EvidenceValidationFileChecker():
                                      evidence_q,
                                      self.es,
                                      )
-                                     for i in range(1)
-                                     # for i in range(2)
+                                     for i in range(3)
                                      ]
         # ) for i in range(2)]
         for w in readers:

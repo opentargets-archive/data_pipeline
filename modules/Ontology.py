@@ -1,3 +1,4 @@
+import copy
 import re
 import sys
 reload(sys)
@@ -5,6 +6,7 @@ sys.setdefaultencoding("utf8")
 import os
 import pysftp
 import gzip
+import pickle
 from paramiko import AuthenticationException
 import opentargets.model.core as opentargets
 import logging
@@ -35,6 +37,27 @@ try:
 except:
     pass
 logger = logging.getLogger('Ontology')
+
+EFO_TAS = [
+    'http://www.ebi.ac.uk/efo/EFO_1000018', # bladder disease
+    'http://www.ebi.ac.uk/efo/EFO_0000319', # cardiovascular disease
+    'http://www.ebi.ac.uk/efo/EFO_0000405', # digestive system disease
+    'http://www.ebi.ac.uk/efo/EFO_0001379', # endocrine
+    'http://www.ebi.ac.uk/efo/EFO_0003966', # eye disease
+    'http://www.ebi.ac.uk/efo/EFO_0000508', # genetic disorder
+    'http://www.ebi.ac.uk/efo/EFO_0000524', # head disease
+    'http://www.ebi.ac.uk/efo/EFO_0005803', # henmatological
+    'http://www.ebi.ac.uk/efo/EFO_0000540', # immune system disease
+    'http://www.ebi.ac.uk/efo/EFO_0003086', # kidney disease
+    'http://www.ebi.ac.uk/efo/EFO_0005741', # infection disease
+    'http://www.ebi.ac.uk/efo/EFO_0000589', # metabolic disease
+    'http://www.ebi.ac.uk/efo/EFO_0000616', # neoplasm
+    'http://www.ebi.ac.uk/efo/EFO_0000618', # nervous system
+    'http://www.ebi.ac.uk/efo/EFO_0000512', # reproductive system
+    'http://www.ebi.ac.uk/efo/EFO_0000684', # respiratory system
+    'http://www.ebi.ac.uk/efo/EFO_0002461', # skeletal system
+    'http://www.ebi.ac.uk/efo/EFO_0000701', # skin disease
+]
 
 TOP_LEVELS = '''
 PREFIX obo: <http://purl.obolibrary.org/obo/>
@@ -155,17 +178,17 @@ def _get_subclass_of(arg, graph):
 superclass generators: yield a series of values
 '''
 def write_superclasses(arg, source_graph):
-    print "[write_superclasses] %i"%len(arg)
+    # print "[write_superclasses] %i"%len(arg)
     node = arg[0]
     destination_graph = arg[1]
-    print node
-    print node.qname()
-    print node.value(RDFS.label)
+    # print node
+    # print node.qname()
+    # print node.value(RDFS.label)
     if (node, None, None) not in destination_graph:
         superclasses = list(node.transitive_objects(RDFS.subClassOf))
         for c in superclasses:
             if node.qname() != c.qname():
-                print c
+                # print c
                 label = c.value(RDFS.label)
                 destination_graph.add((node, RDFS.subClassOf, c))
                 yield (c, destination_graph)
@@ -235,9 +258,9 @@ class OntologyClassReader():
         count = 0
         qres = self.rdf_graph.query(sparql_query % base_class)
 
-        for row in qres:
-            uri = str(row[0])
-            label = str(row[1])
+        for (ont_node, ont_label) in qres:
+            uri = str(ont_node)
+            label = str(ont_label)
             self.current_classes[uri] = label
             count +=1
             # logger.debug("RDFLIB '%s' '%s'" % (uri, label))
@@ -256,11 +279,11 @@ class OntologyClassReader():
 
         qres = self.rdf_graph.query(sparql_query)
         obsoletes = dict()
-        for row in qres:
-            uri = str(row[0])
-            label = str(row[1])
-            id = str(row[2])
-            new_uri = str(row[3])
+        for (ont_node, ont_label, ont_id, ont_new) in qres:
+            uri = str(ont_node)
+            label = str(ont_label)
+            id = str(ont_id)
+            new_uri = str(ont_new)
             # point to the new URI
             obsoletes[uri] = { 'label': label, 'new_uri' : new_uri }
             count +=1
@@ -346,11 +369,43 @@ class OntologyClassReader():
 
         return
 
+    def parse_properties(self, rdf_node):
+        logger.debug("parse_properties for rdf_node: {}".format(rdf_node))
+        raw_properties = predicate_objects = list(self.rdf_graph.predicate_objects(subject=rdf_node))
+        rdf_properties = {}
+        logger.debug("raw_properties for rdf_node: {}".format(rdf_node))
+        for index, property in enumerate(raw_properties):
+            logger.debug("{}. {}".format(index, property))
+            property_name = str(property[0])
+            property_value = str(property[1])
+            # rdf_properties[property_name].append(property_value)
+            if property_name in rdf_properties:
+                rdf_properties[property_name].append(property_value)
+            else:
+                rdf_properties[property_name] = [property_value]
+        '''
+        logger.debug("rdf_properties: {}".format(rdf_properties))
+        for index, key in enumerate(rdf_properties):
+            rdf_values = list(map(str, rdf_properties[key]))
+            logger.debug("{}. k: {}, v: {}, {}".format(index, key, len(rdf_values), rdf_values))
+        if 'http://www.ebi.ac.uk/efo/alternative_term' in rdf_properties:
+            alternative_terms = rdf_properties['http://www.ebi.ac.uk/efo/alternative_term']
+            logger.debug("alternative_terms: {}, {}".format(len(alternative_terms), alternative_terms))
+        else:
+            logger.debug("no alternative terms")
+        if 'http://www.w3.org/2000/01/rdf-schema#label' in rdf_properties:
+            label = rdf_properties['http://www.w3.org/2000/01/rdf-schema#label']
+            logger.debug("label: {}, {}".format(len(label), label))
+        else:
+            logger.debug("no label")
+        '''
+        return rdf_properties
+
     def load_hpo_classes(self):
         """Loads the HPO graph and extracts the current and obsolete classes.
            Status: production
         """
-        logging.debug("load_hpo_classes...")
+        logger.debug("load_hpo_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
         base_class = 'http://purl.obolibrary.org/obo/HP_0000118'
         self.load_ontology_classes(base_class=base_class)
@@ -359,7 +414,7 @@ class OntologyClassReader():
         """Loads the HPO graph and extracts the current and obsolete classes.
            Status: production
         """
-        logging.debug("load_mp_classes...")
+        logger.debug("load_mp_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
         base_class = 'http://purl.obolibrary.org/obo/MP_0000001'
         self.load_ontology_classes(base_class= base_class)
@@ -371,14 +426,79 @@ class OntologyClassReader():
         """Loads the EFO graph and extracts the current and obsolete classes.
            Status: production
         """
-        logging.debug("load_efo_classes...")
+        logger.debug("load_efo_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
-        # load disease, phenotype, measurement, biological process
+
+        # load disease, phenotype, measurement, biological process, function and injury and mental health
         for base_class in [ 'http://www.ebi.ac.uk/efo/EFO_0000408',
                             'http://www.ebi.ac.uk/efo/EFO_0000651',
                             'http://www.ebi.ac.uk/efo/EFO_0001444',
-                            'http://purl.obolibrary.org/obo/GO_0008150' ]:
+                            'http://purl.obolibrary.org/obo/GO_0008150',
+                            'http://www.ifomis.org/bfo/1.1/snap#Function',
+                            'http://www.ebi.ac.uk/efo/EFO_0000546',
+                            'http://www.ebi.ac.uk/efo/EFO_0003935' ]:
             self.load_ontology_classes(base_class=base_class)
+
+    def load_open_targets_disease_ontology(self):
+        """Loads the EFO graph and extracts the current and obsolete classes.
+           Generates the therapeutic areas
+           Creates the other disease class
+           Move injury under other disease
+           Status: production
+        """
+        logger.debug("load_open_targets_disease_ontology...")
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
+
+        '''
+        Detach the TAs from the disease node
+        and load all the classes
+        '''
+        disease_uri = URIRef('http://www.ebi.ac.uk/efo/EFO_0000408')
+        for base_class in EFO_TAS:
+            uri = URIRef(base_class)
+            self.rdf_graph.remove((uri, None, disease_uri))
+            self.load_ontology_classes(base_class=base_class)
+            self.get_classes_paths(root_uri=base_class, level=0)
+
+        '''
+        Create an other disease node
+        '''
+        cttv = Namespace(unicode("http://www.targetvalidation.org/disease"))
+
+        # namespace_manager = NamespaceManager(self.rdf_graph)
+        self.rdf_graph.namespace_manager.bind('cttv', cttv)
+
+        other_disease_uri = URIRef('http://www.targetvalidation.org/disease/other')
+        self.rdf_graph.add((other_disease_uri, RDF.type, rdflib.term.URIRef(u'http://www.w3.org/2002/07/owl#Class')))
+        self.rdf_graph.add([other_disease_uri, RDFS.label, rdflib.Literal('other disease')])
+
+        '''
+        Get all children of 'disease' and assign them to 'other disease'
+        '''
+        for c in self.rdf_graph.subjects(predicate=RDFS.subClassOf, object=disease_uri):
+            self.rdf_graph.add([c, RDFS.subClassOf, other_disease_uri])
+
+        '''
+        Move 'injury' under 'other disease'
+        injuries are treated with medication recorded in ChEMBL
+        Move 'mental health' under 'other disease'
+        '''
+        self.rdf_graph.add([URIRef('http://www.ebi.ac.uk/efo/EFO_0000546'), RDFS.subClassOf, other_disease_uri])
+        self.rdf_graph.add([URIRef('http://www.ebi.ac.uk/efo/EFO_0003935'), RDFS.subClassOf, other_disease_uri])
+
+
+        # other disease, phenotype, measurement, biological process, function
+        for base_class in [ 'http://www.targetvalidation.org/disease/other',
+                            'http://www.ebi.ac.uk/efo/EFO_0000651',
+                            'http://www.ebi.ac.uk/efo/EFO_0001444',
+                            'http://purl.obolibrary.org/obo/GO_0008150',
+                            'http://www.ifomis.org/bfo/1.1/snap#Function']:
+            self.load_ontology_classes(base_class=base_class)
+            self.get_classes_paths(root_uri=base_class, level=0)
+
+        '''
+        Add all phenotypes to the EFO classes
+        '''
 
     def load_evidence_classes(self):
         '''
@@ -390,8 +510,8 @@ class OntologyClassReader():
 
         evidence_uri = URIRef('http://purl.obolibrary.org/obo/ECO_0000000')
 
-        for triple in self.rdf_graph.triples((evidence_uri, None, None)):
-             logger.debug(triple)
+        # for triple in self.rdf_graph.triples((evidence_uri, None, None)):
+        #      logger.debug(triple)
 
         '''
             Open Targets specific evidence:
@@ -424,8 +544,8 @@ class OntologyClassReader():
             self.rdf_graph.add([u, RDFS.subClassOf, evidence_uri])
 
         u = URIRef('http://identifiers.org/eco/target_drug')
-        for triple in self.rdf_graph.triples((u, None, None)):
-             logger.debug(triple)
+        # for triple in self.rdf_graph.triples((u, None, None)):
+        #      logger.debug(triple)
 
         #(a, b, c) = self.rdf_graph.namespace_manager.compute_qname(unicode('http://identifiers.org/eco/target_drug'))
         #logger.debug(c)
@@ -442,76 +562,98 @@ class OntologyClassReader():
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
 
+
 class DiseaseUtils():
 
     def __init__(self):
+        pass
 
-        self.diseases = OntologyClassReader()
-        self.diseases.load_efo_classes()
-        self.diseases.get_classes_paths(root_uri="http://www.ebi.ac.uk/efo/EFO_0000408")
-
-    def get_disease_tas(self, filename=None):
+    def get_disease_tas(self, ontologyreader=None, filename=None):
 
         # get all tas per
         fh = open(filename, 'w')
-        for uri, label in self.diseases.current_classes.items():
-            if uri in self.diseases.classes_paths and uri != "http://www.ebi.ac.uk/efo/EFO_0000408":
-                tas = map(lambda x: x[1]['label'], self.diseases.classes_paths[uri]['all'])
+        for uri, label in ontologyreader.current_classes.items():
+            if uri in ontologyreader.classes_paths and uri != "http://www.ebi.ac.uk/efo/EFO_0000408":
+                tas = map(lambda x: x[1]['label'], ontologyreader.classes_paths[uri]['all'])
                 fh.write("%s\t%s\t%s\n"%(uri, label, ",".join(set(tas))))
         fh.close()
 
+    def check_disease_phenotypes_cache(self):
+        return os.path.isfile(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), "disease_phenotypes.pck"))
 
+    def read_disease_phenotypes_cache(self):
+        return pickle.load( open( os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'),"disease_phenotypes.pck"), "rb" ) )
 
-class DiseasePhenotypes():
+    def update_disease_phenotypes_cache(self, disease_phenotypes):
+        pickle.dump(disease_phenotypes,
+            open(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), "disease_phenotypes.pck"), "wb"))
 
-    def __init__(self):
-        self.rdf_graph = None
-        pass
+    def write_disease_phenotypes(self, ontologyreader=None, filename=None):
 
-    # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/
-    # https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw
-    def parse_owl_url(self):
-        self.get_disease_phenotypes()
+        pmap = self.get_disease_phenotypes(ontologyreader)
 
-    def get_disease_phenotypes(self):
-        # we care about namespaces
-        #oban = Namespace('http://purl.org/oban/')
-        self.rdf_graph = rdflib.Graph()
+        fh = open(filename, 'w')
+        for uri, ds in pmap.items():
+            label = ds['label']
+            phenotypes = map(lambda x: x['label'], ds['phenotypes'])
+            fh.write("%s\t%s\t%s\n" % (uri, label, ",".join(set(phenotypes))))
+        fh.close()
+        '''
+        for uri, label in self.diseases.current_classes.items():
+            logger.debug("%s %s"%(uri, label))
+            if uri in pmap:
+                logger.debug("=> OK")
+                tas = []
+                phenotypes = map(lambda x: x['label'], map[uri])
+                if uri in self.diseases.classes_paths and uri != "http://www.ebi.ac.uk/efo/EFO_0000408":
+                    tas = map(lambda x: x[1]['label'], self.diseases.classes_paths[uri]['all'])
+                fh.write("%s\t%s\t%s\t%s\n" % (uri, label, ",".join(set(phenotypes)), ",".join(set(tas))))
+        '''
+
+    def get_disease_phenotypes(self, ontologyclassreader=None):
+
+        disease_phenotypes_map = {}
+
+        if self.check_disease_phenotypes_cache():
+            return self.read_disease_phenotypes_cache()
+
         # load HPO:
-        logger.debug("parse HPO")
-        self.rdf_graph.parse(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'), format='xml')
-        logger.debug("parse MP")
-        self.rdf_graph.parse(Config.ONTOLOGY_CONFIG.get('uris', 'mp'), format='xml')
-        #print ("parse EFO")
-        #self.rdf_graph.parse('/Users/koscieln/Downloads/hp.owl', format='xml')
+        logger.debug("Merge HPO graph")
+        ontologyclassreader.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+        logger.debug("Merge MP graph")
+        ontologyclassreader.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+
         for key, uri in Config.ONTOLOGY_CONFIG.items('disease_phenotypes_uris'):
             logger.debug("merge phenotypes from %s" % uri)
-            self.rdf_graph.parse(uri, format='xml')
+            ontologyclassreader.rdf_graph.parse(uri, format='xml')
 
-        #for subject, predicate, obj in self.rdf_graph:
-        #    print subject, predicate, obj
-        #for stmt in graph:
-        #    pprint.pprint(stmt)
-
-        qres = self.rdf_graph.query(
+        qres = ontologyclassreader.rdf_graph.query(
             """
             PREFIX obo: <http://purl.obolibrary.org/obo/>
             PREFIX oban: <http://purl.org/oban/>
-            select DISTINCT ?disease_id ?phenotype_label ?phenotype_id
+            select DISTINCT ?disease_id ?disease_label ?phenotype_id ?phenotype_label
             where {
               ?code oban:association_has_subject ?disease_id .
+              ?disease_id rdfs:label ?disease_label .
               ?code oban:association_has_object ?phenotype_id .
               ?phenotype_id rdfs:label ?phenotype_label
             }
             """
         )
 
-        for row in qres:
-            logger.debug("%s hasPhenotype %s (%s)" % row)
+        '''
+        Results are tuple of values
+        '''
+        for rdisease_uri, rdisease_label, rphenotype_uri, rphenotype_label in qres:
+            (disease_uri, disease_label, phenotype_uri, phenotype_label) = (str(rdisease_uri), str(rdisease_label), str(rphenotype_uri), str(rphenotype_label))
+            logger.debug("%s (%s) hasPhenotype %s (%s)" % (disease_uri, disease_label, phenotype_uri, phenotype_label))
+            if disease_uri not in disease_phenotypes_map:
+                disease_phenotypes_map[disease_uri] = { 'label': disease_label, 'phenotypes': [] }
+            disease_phenotypes_map[disease_uri]['phenotypes'].append({'label': phenotype_label, 'uri': phenotype_uri})
 
-        # EXTRACT THE GOOD BITS for EFO
-        # TODO
+        self.update_disease_phenotypes_cache(disease_phenotypes_map)
 
+        return disease_phenotypes_map
 
 class PhenotypeSlim():
 
@@ -611,14 +753,14 @@ class PhenotypeSlim():
                     self.exclude_phenotypes(al)
 
     def _store_remote_filename(self, filename):
-        print "%s" % filename
+        # print "%s" % filename
         self.logger.debug("%s" % filename)
         if filename.startswith('/upload/submissions/') and \
             filename.endswith('.json.gz'):
             self.logger.debug("%s" % filename)
             if True:
                 version_name = filename.split('/')[3].split('.')[0]
-                print "%s" % filename
+                # print "%s" % filename
                 if '-' in version_name:
                     user, day, month, year = version_name.split('-')
                     if '_' in user:
@@ -740,7 +882,7 @@ class PhenotypeSlim():
         fh.close()
 
     def parse_sftp_gzipfile(self, file_path, u, p):
-        print "---->%s"%file_path
+        # print "---->%s"%file_path
         self.logger.info("%s %s" % (u, p))
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None  # disable host key checking.

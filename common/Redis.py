@@ -9,6 +9,8 @@ import datetime
 from threading import Thread
 
 import numpy as np
+import psutil
+
 np.seterr(divide='warn', invalid='warn')
 from tqdm import tqdm
 try:
@@ -342,6 +344,9 @@ class RedisQueueStatusReporter(Process):
                                                             reception_speed = [],
                                                             processed_jobs = [],
                                                             received_jobs = [],
+                                                            cpu_load=[],
+                                                            memory_load=[],
+                                                            memory_use=[],
                                                             )
 
 
@@ -455,6 +460,14 @@ class RedisQueueStatusReporter(Process):
                     historical_data['reception_speed'].append(reception_speed)
                     historical_data['processed_jobs'].append(data['processed_counter'])
                     historical_data['received_jobs'].append(data['submitted_counter'])
+                    cpu_load = psutil.cpu_percent(interval=None)
+                    if isinstance(cpu_load, float):
+                        historical_data['cpu_load'].append(cpu_load)
+                    else:
+                        historical_data['cpu_load'].append(0.)
+                    memory_load = psutil.virtual_memory()
+                    historical_data['memory_load'].append(memory_load.percent)
+                    historical_data['memory_use'].append(round(memory_load.used/(1024*1024*1024),2))#Gb of used memory
 
                 lines.append(self._compose_history_line(data['queue_id'], 'received_jobs'))
                 lines.append(self._compose_history_line(data['queue_id'], 'reception_speed'))
@@ -462,6 +475,9 @@ class RedisQueueStatusReporter(Process):
                 lines.append(self._compose_history_line(data['queue_id'], 'processing_speed'))
                 lines.append(self._compose_history_line(data['queue_id'], 'processing_jobs'))
                 lines.append(self._compose_history_line(data['queue_id'], 'timedout_jobs'))
+                lines.append(self._compose_history_line(data['queue_id'], 'cpu_load'))
+                lines.append(self._compose_history_line(data['queue_id'], 'memory_load'))
+                lines.append(self._compose_history_line(data['queue_id'], 'memory_use'))
                 lines.append(self._compose_history_line(data['queue_id'], 'queue_size', queue_size_status))
             else:#log single datapoint
 

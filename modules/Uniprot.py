@@ -4,7 +4,6 @@ from xml.etree import cElementTree as ElementTree
 import requests
 from common import Actions
 from common.ElasticsearchLoader import Loader
-from common.PGAdapter import UniprotInfo
 from common.UniprotIO import UniprotIterator, Parser
 from requests.exceptions import Timeout, HTTPError, ConnectionError
 import jsonpickle
@@ -84,36 +83,19 @@ class OLDUniprotDownloader():
             logging.debug("cannot get uniprot data for uniprot id %s" % uniprotid)
 
     def get_single_entry_xml(self, uniprotid):
-        try:
-            '''get from uniprot.org'''
-            return self.get_single_entry_xml_remote(uniprotid)
-        except:
-            ''' get from local postgresql'''
-            return self.get_single_entry_xml_local(uniprotid)
+        return self.get_single_entry_xml_remote(uniprotid)
+
 
     def get_single_entry_xml_remote(self, uniprotid):
         url = self.url + uniprotid + self.format
         r = requests.get(url, timeout=60)
         if r.status_code == 200:
-            self._save_to_postgresql(uniprotid, r.content)
             return r.content
         else:
             logging.debug('cannot get data from remote uniprot.org for uniprotid: %s' % uniprotid)
         return
 
-    def get_single_entry_xml_local(self, uniprotid):
-        uniprot_data = self.pg.query(UniprotInfo).filter(UniprotInfo.uniprot_accession == uniprotid).first()
-        if uniprot_data:
-            return uniprot_data.uniprot_entry
 
-    def _save_to_postgresql(self, uniprotid, uniprot_xml):
-        entry = self.pg.query(UniprotInfo).filter_by(uniprot_accession=uniprotid).count()
-        if not entry:
-            self.pg.add(UniprotInfo(uniprot_accession=uniprotid,
-                                    uniprot_entry=uniprot_xml))
-            self.pg.commit()
-            # except:
-            # logging.warning("cannot store to postgres uniprot xml")
 
 
 class UniprotDownloader():

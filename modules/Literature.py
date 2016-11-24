@@ -217,7 +217,7 @@ class PublicationFetcher(object):
         return pub
 
     def get_publication_with_analyzed_data(self, pub_ids):
-        logging.debug("getting publication/analyzed data for id {}".format(pub_ids))
+        # logging.debug("getting publication/analyzed data for id {}".format(pub_ids))
         pubs = {}
         for parent_publication,analyzed_publication in self.es_query.get_publications_with_analyzed_data(ids=pub_ids):
             pub = Publication()
@@ -498,7 +498,7 @@ class LiteratureProcess(object):
         #TODO: load everything with a fetcher in parallel
         pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
         fetched_pub_ids=set()
-        for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(),
+        for ev in tqdm(self.es_query.get_all_pub_ids_from_validated_evidence(),
                     desc='Reading available evidence_strings to fetch publications ids',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                     unit=' evidence',
@@ -538,7 +538,7 @@ class LiteratureProcess(object):
         #TODO : Use separate queue for retrieving evidences?
         pub_fetcher = PublicationFetcher(self.es, loader=self.loader)
 
-        for ev in tqdm(self.es_query.get_all_pub_ids_from_evidence(datasources= datasources),
+        for ev in tqdm(self.es_query.get_all_pub_ids_from_validated_evidence(datasources= datasources),
                     desc='Reading available evidence_strings to analyse publications',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                     unit=' evidence',
@@ -619,24 +619,23 @@ class LiteratureLookUpTable(object):
             self._load_literature_data(r_server)
 
     def _load_literature_data(self, r_server = None):
-        for parent_publication, analyzed_publication in tqdm(self._es_query.get_all_publications(),
+        for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
                         desc='loading publications',
                         unit=' publication',
                         unit_scale=True,
-                        total=self._es_query.count_all_publications(),
                         leave=False,
                         ):
-            literature = parent_publication
-            literature['abstract_lemmas'] = analyzed_publication['lemmas']
-            literature['noun_chunks'] = analyzed_publication['noun_chunks']
-            self.set_literature(literature,self._get_r_server(
+            pub = Publication()
+            pub.load_json(pub_source)
+
+            self.set_literature(pub,self._get_r_server(
                     r_server))# TODO can be improved by sending elements in batches
 
     def get_literature(self, pmid, r_server = None):
         return self._table.get(pmid, r_server=r_server)
 
     def set_literature(self, literature, r_server = None):
-        self._table.set((literature['pub_id']), literature, r_server=self._get_r_server(
+        self._table.set((literature.pub_id), literature, r_server=self._get_r_server(
             r_server))
 
     def get_available_literature_ids(self, r_server = None):
