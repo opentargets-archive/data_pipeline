@@ -874,19 +874,19 @@ class ElasticSearchConfiguration():
         },
         "mappings": {
             '_default_': {
-                "properties": {
-                    "private": {
-                        # "type" : "object",
-                        "properties": {
-                            "suggestions": {
-                                "type": "completion",
-                                "analyzer": "whitespace_analyzer",
-                                "search_analyzer": "whitespace_analyzer",
-                                "payloads": True
-                            }
-                        }
-                    }
-                },
+                # "properties": {
+                #     "private": {
+                #         # "type" : "object",
+                #         "properties": {
+                #             "suggestions": {
+                #                 "type": "completion",
+                #                 "analyzer": "whitespace_analyzer",
+                #                 "search_analyzer": "whitespace_analyzer",
+                #                 "payloads": True
+                #             }
+                #         }
+                #     }
+                # },
                 "dynamic_templates": [
                     {
                         "do_not_analyze_ortholog": {
