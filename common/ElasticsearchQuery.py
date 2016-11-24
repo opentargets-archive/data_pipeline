@@ -7,7 +7,7 @@ from elasticsearch import helpers
 from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
 from settings import Config
-
+import json
 
 class AssociationSummary(object):
 
@@ -239,12 +239,10 @@ class ESQuery(object):
         return AssociationSummary(res)
 
 
-    def get_validated_evidence_strings(self, fields = None, size=1000, datasources = []):
+    def get_validated_evidence_strings(self,  size=1000, datasources = []):
 
 
-        source = self._get_source_from_fields(fields)
 
-        # TODO: do a scroll to get all the ids without sorting, and use many async mget queries to fetch the sources
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
         doc_type = None
@@ -253,8 +251,8 @@ class ESQuery(object):
             doc_type = datasources
         res = helpers.scan(client=self.handler,
                            query={"query":  {"match_all": {}},
-                               '_source': source,
-                               'size': 1000,
+                               '_source': True,
+                               'size': size,
                            },
                            scroll='12h',
                            doc_type=doc_type,
@@ -262,7 +260,7 @@ class ESQuery(object):
                            timeout="10m",
                            )
 
-
+        # res = list(res)
         for hit in res:
             yield hit['_source']
 
@@ -583,25 +581,39 @@ class ESQuery(object):
                 yield hit['_source']
 
 
-    def get_all_pub_ids_from_evidence(self,datasources= None):
-        #TODO: get all the validated evidencestrings and fetch medline abstracts there
-        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='evidence_string.literature.references.lit_id'
-        return self.get_validated_evidence_strings(fields='evidence_string.literature.references.lit_id',
-                                                   datasources=datasources)
+    def get_all_pub_ids_from_validated_evidence(self, datasources= None):
+        for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
+                                                                    size=10000,
+                                                   datasources=datasources)):
+            if hit:
+                try:
+                    ev = json.loads(hit['evidence_string'])
+                    for lit in ev['literature']['references']:
+                        yield lit['lit_id'].split('/')[-1]
+                except KeyError:
+                    pass
 
-        # return ['http://europepmc.org/abstract/MED/24523595',
-        #        'http://europepmc.org/abstract/MED/26784250',
-        #        'http://europepmc.org/abstract/MED/27409410',
-        #        'http://europepmc.org/abstract/MED/26290144',
-        #        'http://europepmc.org/abstract/MED/25787843',
-        #        'http://europepmc.org/abstract/MED/26836588',
-        #        'http://europepmc.org/abstract/MED/26781615',
-        #        'http://europepmc.org/abstract/MED/26646452',
-        #        'http://europepmc.org/abstract/MED/26774881',
-        #        'http://europepmc.org/abstract/MED/26629442',
-        #        'http://europepmc.org/abstract/MED/26371324',
-        #        'http://europepmc.org/abstract/MED/24817865',
-        #        ]
+
+    def get_all_pub_from_validated_evidence(self,datasources= None, batch_size=1000):
+        batch = []
+        for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
+                                                                    size=batch_size,
+                                                   datasources=datasources)):
+            if hit:
+                try:
+                    ev = json.loads(hit['evidence_string'])
+                    for lit in ev['literature']['references']:
+                        batch.append(lit['lit_id'].split('/')[-1])
+                except KeyError:
+                    pass
+            if len(batch)>=batch_size:
+                for pub in self.get_publications_by_id(batch):
+                    yield pub
+                batch =[]
+                break
+        if batch:
+            for pub in self.get_publications_by_id(batch):
+                yield pub
 
     def get_all_associations_ids(self,):
         res = helpers.scan(client=self.handler,
