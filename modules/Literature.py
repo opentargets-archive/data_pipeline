@@ -801,7 +801,7 @@ class MedlineRetriever(object):
         for w in loaders:
             w.start()
 
-        shift_downloading = 2*random.random()
+        shift_downloading = 2
         if update:
             host = ftp_connect(MEDLINE_UPDATE_PATH)
         else:
@@ -816,7 +816,7 @@ class MedlineRetriever(object):
                 # Remote name, local name, binary mode
                 file_path = os.path.join(pubmed_xml_locn, file_)
                 retriever_q.put(file_path)
-                time.sleep(shift_downloading)
+                time.sleep(shift_downloading*random.random())
         host.close()
         retriever_q.set_submission_finished(r_server=self.r_server)
 
