@@ -171,7 +171,7 @@ class PublicationFetcher(object):
         return pub
 
     def get_publication_with_analyzed_data(self, pub_ids):
-        logging.debug("getting publication/analyzed data for id {}".format(pub_ids))
+        # logging.debug("getting publication/analyzed data for id {}".format(pub_ids))
         pubs = {}
         for parent_publication,analyzed_publication in self.es_query.get_publications_with_analyzed_data(ids=pub_ids):
             pub = Publication()
