@@ -15,7 +15,7 @@ from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import  HPAActions, HPAProcess
-from modules.Literature import LiteratureActions, LiteratureProcess
+from modules.Literature import LiteratureActions, MedlineRetriever
 from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions,  ReactomeProcess
 from modules.Association import AssociationActions, ScoringProcess
