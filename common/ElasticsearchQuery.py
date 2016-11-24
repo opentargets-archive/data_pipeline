@@ -682,7 +682,7 @@ class ESQuery(object):
 
         return count
 
-    def delete_data(self, index, query, doc_type = '', chunk_size=1000, altered_keys=None):
+    def delete_data(self, index, query, doc_type = '', chunk_size=1000, altered_keys=()):
         '''
         Delete all the documents in an index matching a given query
         :param index: index to use
@@ -719,12 +719,15 @@ class ESQuery(object):
                                     doc_type=doc_type,
                                     timeout='1h',
                                        ):
-                batch.append({
-                                '_op_type': 'delete',
-                                '_index': hit['_index'],
-                                '_type': hit['_type'],
-                                '_id': hit['_id'],
-                            })
+                action = {
+                    '_op_type': 'delete',
+                    '_index': hit['_index'],
+                    '_type': hit['_type'],
+                    '_id': hit['_id'],
+                }
+                if '_routing' in hit:
+                    action['_routing'] = hit['_routing']
+                batch.append(action)
                 flat_source = self.flatten(hit['_source'])
                 for key in altered_keys:
                     if key in flat_source:
