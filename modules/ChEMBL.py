@@ -275,8 +275,8 @@ class ChEMBLLookup(object):
                 if 'molecule_synonyms' in i and i['molecule_synonyms']:
                     synonyms=[]
                     for syn in i['molecule_synonyms']:
-                        synonyms.extend(syn['synonyms'])
-                        synonyms.extend(syn['molecule_synonym'])
+                        synonyms.append(syn['synonyms'])
+                        synonyms.append(syn['molecule_synonym'])
                     synonyms = list(set(synonyms))
                     self.molecule2synonyms[i['molecule_chembl_id']]=synonyms
 
