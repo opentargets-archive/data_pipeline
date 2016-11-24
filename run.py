@@ -222,8 +222,10 @@ if __name__ == '__main__':
                         action="append_const", const=LiteratureActions.ALL)
     parser.add_argument("--lit-fetch", dest='lit', help="fetch literature data",
                         action="append_const", const=LiteratureActions.FETCH)
-    parser.add_argument("--lit-process", dest='lit', help="fetch literature data",
+    parser.add_argument("--lit-process", dest='lit', help="process literature data",
                         action="append_const", const=LiteratureActions.PROCESS)
+    parser.add_argument("--lit-update", dest='lit', help="update literature data",
+                        action="append_const", const=LiteratureActions.UPDATE)
     parser.add_argument("--qc", dest='qc',
                         help="Run quality control scripts",
                         action="append_const", const=QCActions.ALL)
