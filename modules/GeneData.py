@@ -87,6 +87,7 @@ class Gene(JSONSerializable):
         self.ortholog = {}
         self._private ={}
         self.drugs = {}
+        self.protein_classification = {}
 
 
     def _set_id(self):
@@ -508,12 +509,12 @@ class GeneManager():
                    unit= 'steps')
         self._get_hgnc_data_from_json()
         bar.update()
-        self._get_ortholog_data()
-        bar.update()
-        self._get_ensembl_data()
-        bar.update()
-        self._get_uniprot_data()
-        bar.update()
+        # self._get_ortholog_data()
+        # bar.update()
+        # self._get_ensembl_data()
+        # bar.update()
+        # self._get_uniprot_data()
+        # bar.update()
         self._get_chembl_data()
         bar.update()
         self._store_data(dry_run=dry_run)
@@ -648,8 +649,11 @@ class GeneManager():
         logging.info('all gene objects pushed to elasticsearch')
 
     def _get_chembl_data(self):
-        logging.info("Chembl Drug parsing ")
+        logging.info("Retrieving Chembl Drug")
         self.chembl_handler.download_molecules_linked_to_target()
+        logging.info("Retrieving Chembl Target Class ")
+        self.chembl_handler.download_protein_classification()
+        logging.info("Adding Chembl data to genes ")
         for gene_id, gene in tqdm(self.genes.iterate(),
                                   desc='Getting drug data from chembl',
                                   unit=' gene'):
@@ -664,9 +668,12 @@ class GeneManager():
                             for mol in molecules:
                                 synonyms = self.chembl_handler.molecule2synonyms[mol]
                                 target_drugnames.extend(synonyms)
+                        if a in self.chembl_handler.protein_classification:
+                            gene.protein_classification['chembl'] = self.chembl_handler.protein_classification[a]
                         break
             if target_drugnames:
                 gene.drugs['chembl_drugs'] = target_drugnames
+
 
 
 
