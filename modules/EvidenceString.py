@@ -571,41 +571,43 @@ class EvidenceManager():
 
         ''' Add literature data '''
         if inject_literature:
-            pmid_url = extended_evidence['literature']['references'][0]['lit_id']
-            pmid = pmid_url.split('/')[-1]
-            pubs={}
-            if pmid in self.available_publications:
-                pub = self.available_publications[pmid]
-                pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
-            else:
-                # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
-                pub = pub_fetcher.get_publications([pmid])
-                if pub:
-                    pubs[pmid] = [pub[pmid], PublicationAnalysisSpacy(pmid)]
-            if pubs:
-                literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
-                year = None
-                if literature_info.data['year']:
-                    try:
-                        year = int(literature_info.data['year'])
-                    except:
-                        pass
-                extended_evidence['literature']['year'] = year
-                extended_evidence['literature']['date'] = literature_info.data['date']
-                extended_evidence['literature']['abstract'] = literature_info.data['abstract']
-                extended_evidence['literature']['journal_data'] = literature_info.data['journal']
-                extended_evidence['literature']['title'] = literature_info.data['title']
-                extended_evidence['private']['facets']['literature'] = {}
-                # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
-                #     'abstract_lemmas')
-                extended_evidence['literature']['doi'] = literature_info.data.get('doi')
-                extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
-                # extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
-                #     'mesh_headings')
-                # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
-                #     'chemicals')
-                # extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
-                #     'noun_chunks')
+            if 'literature' in extended_evidence:
+                pmid_url = extended_evidence['literature']['references'][0]['lit_id']
+                pmid = pmid_url.split('/')[-1]
+                pubs={}
+                if pmid in self.available_publications:
+                    pub = self.available_publications[pmid]
+                    pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
+                else:
+                    # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
+                    pub = pub_fetcher.get_publications([pmid])
+                    if pub:
+                        pubs[pmid] = [pub[pmid], PublicationAnalysisSpacy(pmid)]
+                        self.available_publications.set_literature(pub)
+                if pubs:
+                    literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
+                    year = None
+                    if literature_info.data['year']:
+                        try:
+                            year = int(literature_info.data['year'])
+                        except:
+                            pass
+                    extended_evidence['literature']['year'] = year
+                    extended_evidence['literature']['date'] = literature_info.data['date']
+                    extended_evidence['literature']['abstract'] = literature_info.data['abstract']
+                    extended_evidence['literature']['journal_data'] = literature_info.data['journal']
+                    extended_evidence['literature']['title'] = literature_info.data['title']
+                    extended_evidence['private']['facets']['literature'] = {}
+                    # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
+                    #     'abstract_lemmas')
+                    extended_evidence['literature']['doi'] = literature_info.data.get('doi')
+                    extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
+                    # extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
+                    #     'mesh_headings')
+                    # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
+                    #     'chemicals')
+                    # extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
+                    #     'noun_chunks')
 
         return Evidence(extended_evidence)
 
