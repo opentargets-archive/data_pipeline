@@ -466,7 +466,7 @@ class ESQuery(object):
                         if doc['found']:
                             yield doc['_source']
                         else:
-                            raise ValueError('document with id %s not found'%(doc['_id']))
+                            raise KeyError('document with id %s not found'%(doc['_id']))
                     id_buffer = []
             if id_buffer:
                 res_get = get_ids(id_buffer)
@@ -474,7 +474,7 @@ class ESQuery(object):
                     if doc['found']:
                         yield doc['_source']
                     else:
-                        raise ValueError('document with id %s not found' % (doc['_id']))
+                        raise KeyError('document with id %s not found' % (doc['_id']))
 
 
     def get_all_target_ids_with_evidence_data(self):
@@ -592,7 +592,7 @@ class ESQuery(object):
             if doc['found']:
                 yield doc['_source']
             else:
-                raise ValueError('publication with id %s not found' % (doc['_id']))
+                raise KeyError('publication with id %s not found' % (doc['_id']))
 
 
     def get_all_pub_ids_from_validated_evidence(self, datasources= None):
