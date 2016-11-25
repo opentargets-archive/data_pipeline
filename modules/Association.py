@@ -95,6 +95,9 @@ class Association(JSONSerializable):
                         cellular_component=[],
                         molecular_function=[],
                         )
+        target_class = dict(level1=[],
+                            level2=[])
+
         uniprot_keywords = []
         #TODO: handle domains
         genes_info=ExtendedInfoGene(gene)
@@ -127,6 +130,9 @@ class Association(JSONSerializable):
         if pathway_data['pathway_code']:
             pathway_data['pathway_type_code']=list(set(pathway_data['pathway_type_code']))
             pathway_data['pathway_code']=list(set(pathway_data['pathway_code']))
+        if gene.protein_classification:
+            target_class['level1'].extend([i['l1'] for i in gene.protein_classification if 'l1' in i])
+            target_class['level2'].extend([i['l2'] for i in gene.protein_classification if 'l2' in i])
 
 
 
@@ -140,6 +146,8 @@ class Association(JSONSerializable):
             GO_terms['molecular_function'] or \
             GO_terms['cellular_component'] :
             self.private['facets']['go'] = GO_terms
+        if target_class['l1']:
+            self.private['facets']['target_class'] = target_class
 
     def set_disease_data(self, efo):
         """get generic efo info"""
