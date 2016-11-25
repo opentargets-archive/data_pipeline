@@ -592,7 +592,7 @@ class ESQuery(object):
             if doc['found']:
                 yield doc['_source']
             else:
-                self.logger.error('publication %s not found when getting by id'%doc['_id'])
+                raise ValueError('publication with id %s not found' % (doc['_id']))
 
 
     def get_all_pub_ids_from_validated_evidence(self, datasources= None):
