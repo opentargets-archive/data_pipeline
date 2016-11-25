@@ -1,36 +1,30 @@
 import logging
-
+import unittest
 from modules.ChEMBL import ChEMBLLookup
-from nose.tools import assert_greater
 
 logger = logging.getLogger(__name__)
 
 
 
 
-class TestChembl(object):
-    @classmethod
-    def setup_class(cls):
-        pass
+class TestChembl(unittest.TestCase):
 
-    @classmethod
-    def teardown_class(cls):
-        pass
 
-    def setup(self):
+    def setUp(self):
         self.handler = ChEMBLLookup()
 
-    def teardown(self):
-        pass
 
     def test_drug_names_for_targets(self):
-        handler = ChEMBLLookup()
-        handler.download_targets()
-        assert_greater(len(handler.targets),0)
-        handler.download_mechanisms()
-        assert_greater(len(handler.mechanisms), 0)
-        handler.download_molecules_linked_to_target()
-        assert_greater(len(handler.molecule2synonyms), 0)
+        self.handler.download_targets()
+        self.assertGreater(len(self.handler.targets),0)
+        self.handler.download_mechanisms()
+        self.assertGreater(len(self.handler.mechanisms), 0)
+        self.handler.download_molecules_linked_to_target()
+        self.assertGreater(len(self.handler.molecule2synonyms), 0)
+
+
+    def test_protein_classes(self):
+        self.handler.download_protein_classification()
 
 
 

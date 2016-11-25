@@ -179,16 +179,11 @@ class Config():
     # put the path to the file where you want to write the SLIM file (turtle format)
     ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
 
-    CHEMBL_URIS = dict(
-        protein_class='https://www.ebi.ac.uk/chembl/api/data/protein_class',
-        target_component='https://www.ebi.ac.uk/chembl/api/data/target_component',
-        target = 'https://www.ebi.ac.uk/chembl/api/data/target',
-        mechanism = 'https://www.ebi.ac.uk/chembl/api/data/mechanism',
-        molecule = 'https://www.ebi.ac.uk/chembl/api/data/molecule'
-    )
     CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
     CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
+    CHEMBL_PROTEIN_CLASS = '''https://www.ebi.ac.uk/chembl/api/data/protein_class.json'''
+    CHEMBL_TARGET_COMPONENT = '''https://www.ebi.ac.uk/chembl/api/data/target_component.json'''
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
