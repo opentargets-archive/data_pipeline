@@ -580,10 +580,13 @@ class EvidenceManager():
                     pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
                 else:
                     # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
-                    pub = pub_fetcher.get_publications([pmid])
-                    if pub:
-                        pubs[pmid] = [pub[pmid], PublicationAnalysisSpacy(pmid)]
-                        self.available_publications.set_literature(pub)
+                    try:
+                        pub = pub_fetcher.get_publications([pmid])
+                        if pub:
+                            pubs[pmid] = [pub[pmid], PublicationAnalysisSpacy(pmid)]
+                            self.available_publications.set_literature(pub)
+                    except KeyError:
+                        logger.error('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
                 if pubs:
                     literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
                     year = None
