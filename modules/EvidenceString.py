@@ -471,6 +471,8 @@ class EvidenceManager():
                         cellular_component=[],
                         molecular_function=[],
                         )
+        target_class = dict(level1=[],
+                            level2=[])
         uniprot_keywords = []
         # TODO: handle domains
         geneid = extended_evidence['target']['id']
@@ -507,6 +509,9 @@ class EvidenceManager():
         if pathway_data['pathway_code']:
             pathway_data['pathway_type_code'] = list(set(pathway_data['pathway_type_code']))
             pathway_data['pathway_code'] = list(set(pathway_data['pathway_code']))
+        if gene.protein_classification:
+            target_class['level1'].extend([i['l1'] for i in gene.protein_classification if 'l1' in i])
+            target_class['level2'].extend([i['l2'] for i in gene.protein_classification if 'l2' in i])
 
         """get generic efo info"""
         all_efo_codes = []
@@ -560,6 +565,9 @@ class EvidenceManager():
                 GO_terms['cellular_component']:
             extended_evidence['private']['facets']['go'] = GO_terms
 
+        if target_class['l1']:
+            extended_evidence['private']['facets']['target_class'] = target_class
+
         ''' Add literature data '''
         if inject_literature:
             pmid_url = extended_evidence['literature']['references'][0]['lit_id']
@@ -574,16 +582,20 @@ class EvidenceManager():
                 literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
                 year = None
                 if literature_info.data['year']:
-                    year = int(literature_info.data['year'])
+                    try:
+                        year = int(literature_info.data['year'])
+                    except:
+                        pass
                 extended_evidence['literature']['year'] = year
+                extended_evidence['literature']['date'] = literature_info.data['date']
                 extended_evidence['literature']['abstract'] = literature_info.data['abstract']
                 extended_evidence['literature']['journal_data'] = literature_info.data['journal']
                 extended_evidence['literature']['title'] = literature_info.data['title']
                 extended_evidence['private']['facets']['literature'] = {}
                 # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
                 #     'abstract_lemmas')
-                extended_evidence['private']['facets']['literature']['doi'] = literature_info.data.get('doi')
-                extended_evidence['private']['facets']['literature']['pub_type'] = literature_info.data.get('pub_type')
+                extended_evidence['literature']['doi'] = literature_info.data.get('doi')
+                extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
                 # extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
                 #     'mesh_headings')
                 # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
