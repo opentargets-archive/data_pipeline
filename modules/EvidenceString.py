@@ -584,7 +584,7 @@ class EvidenceManager():
                         pub = pub_fetcher.get_publications([pmid])
                         if pub:
                             pubs[pmid] = [pub[pmid], PublicationAnalysisSpacy(pmid)]
-                            self.available_publications.set_literature(pub)
+                            self.available_publications.set_literature(pub[pmid])
                     except KeyError:
                         logger.error('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
                 if pubs:
