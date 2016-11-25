@@ -588,7 +588,7 @@ class ESQuery(object):
                                 doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                                 body=dict(ids=ids),
                                 )
-        for doc in res:
+        for doc in res['docs']:
             if doc['found']:
                 yield doc['_source']
             else:
