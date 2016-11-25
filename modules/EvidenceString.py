@@ -211,7 +211,8 @@ class ExtendedInfoLiterature(ExtendedInfo):
                          mesh_headings=literature.mesh_headings,
                          chemicals=literature.chemicals,
                          abstract_lemmas=analyzed_literature.lemmas,
-                         noun_chunks=analyzed_literature.noun_chunks)
+                         noun_chunks=analyzed_literature.noun_chunks,
+                         date=literature.date)
 
 
 class ProcessedEvidenceStorer():
@@ -565,7 +566,7 @@ class EvidenceManager():
                 GO_terms['cellular_component']:
             extended_evidence['private']['facets']['go'] = GO_terms
 
-        if target_class['l1']:
+        if target_class['level1']:
             extended_evidence['private']['facets']['target_class'] = target_class
 
         ''' Add literature data '''
@@ -577,7 +578,10 @@ class EvidenceManager():
                 pub = self.available_publications[pmid]
                 pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
             else:
-                pubs = []#pub_fetcher.get_publication_with_analyzed_data([pmid])
+                # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
+                pub = pub_fetcher.get_publications([pmid])
+                if pub:
+                    pubs[pmid] = [pub[pmid], PublicationAnalysisSpacy(pmid)]
             if pubs:
                 literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
                 year = None
