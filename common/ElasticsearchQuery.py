@@ -1,13 +1,14 @@
+import collections
+import json
+import logging
 from collections import Counter
 
-import collections
 import jsonpickle
 from elasticsearch import helpers
 
 from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
 from settings import Config
-import json
 
 class AssociationSummary(object):
 
@@ -37,6 +38,8 @@ class ESQuery(object):
     def __init__(self, es, dry_run = False):
         self.handler = es
         self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
+
 
     @staticmethod
     def _get_source_from_fields(fields = None):
@@ -552,38 +555,49 @@ class ESQuery(object):
         return res['hits']['total']
 
 
+    # def get_publications_by_id(self, ids):
+    #     query_body = {"query": {
+    #                            "ids": {
+    #                                "values": ids,
+    #                            }
+    #                        },
+    #                            '_source': True,
+    #                            'size': 100,
+    #                        }
+    #     if len(ids) <10000:
+    #         query_body['size']=10000
+    #         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+    #                                   doc_type = Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+    #                                   body=query_body,
+    #                                   )
+    #         for hit in res['hits']['hits']:
+    #             yield hit['_source']
+    #     else:
+    #         res = helpers.scan(client=self.handler,
+    #                            query=query_body,
+    #                            scroll='12h',
+    #                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+    #                            doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+    #                            timeout="10m",
+    #                            )
+    #         for hit in res:
+    #             yield hit['_source']
+
     def get_publications_by_id(self, ids):
-        query_body = {"query": {
-                               "ids": {
-                                   "values": ids,
-                               }
-                           },
-                               '_source': True,
-                               'size': 100,
-                           }
-        if len(ids) <10000:
-            query_body['size']=10000
-            res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-                                      doc_type = Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                                      body=query_body,
-                                      )
-            for hit in res['hits']['hits']:
-                yield hit['_source']
-        else:
-            res = helpers.scan(client=self.handler,
-                               query=query_body,
-                               scroll='12h',
-                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-                               doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                               timeout="10m",
-                               )
-            for hit in res:
-                yield hit['_source']
+        res = self.handler.mget(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                                doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                                body=dict(ids=ids),
+                                )
+        for doc in res:
+            if doc['found']:
+                yield doc['_source']
+            else:
+                self.logger.error('publication %s not found when getting by id'%doc['_id'])
 
 
     def get_all_pub_ids_from_validated_evidence(self, datasources= None):
         for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
-                                                                    size=10000,
+                                                                    size=1000,
                                                    datasources=datasources)):
             if hit:
                 try:
