@@ -571,7 +571,9 @@ class EvidenceManager():
 
         ''' Add literature data '''
         if inject_literature:
-            if 'literature' in extended_evidence:
+            if 'literature' in extended_evidence and \
+                    'references' in extended_evidence['literature'] and \
+                    extended_evidence['literature']['references']:
                 pmid_url = extended_evidence['literature']['references'][0]['lit_id']
                 pmid = pmid_url.split('/')[-1]
                 pubs={}
@@ -581,10 +583,10 @@ class EvidenceManager():
                 else:
                     # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
                     try:
-                        pub = pub_fetcher.get_publications([pmid])
-                        if pub:
-                            pubs[pmid] = [pub[pmid], PublicationAnalysisSpacy(pmid)]
-                            self.available_publications.set_literature(pub[pmid])
+                        pub_dict = pub_fetcher.get_publications([pmid])
+                        if pub_dict:
+                            pubs[pmid] = [pub_dict[pmid], PublicationAnalysisSpacy(pmid)]
+                            # self.available_publications.set_literature(pub_dict[pmid])
                     except KeyError:
                         logger.error('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
                 if pubs:
