@@ -837,6 +837,6 @@ class ESQuery(object):
 
     def exists(self, index, doc_type, id,realtime = False):
         return self.handler.exists(index = Loader.get_versioned_index(index),
-                                   doc_type = Loader.get_versioned_index(doc_type),
+                                   doc_type =doc_type,
                                    id = id,
                                    realtime = realtime)
