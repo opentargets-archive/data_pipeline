@@ -969,10 +969,7 @@ class EvidenceProcesser(multiprocessing.Process):
                         self.output_computed_count.value += 1
 
                 except Exception as error:
-                    if error:
-                        logger.info(str(error))
-                    else:
-                        logger.info(Exception.message)
+                    logger.exception(error)
                     with self.lock:
                         self.processing_errors_count.value += 1
                     # UploadError(ev, error, idev).save()

@@ -760,7 +760,15 @@ class GeneLookUpTable(object):
         return self._table.keys(r_server = self._get_r_server(r_server))
 
     def __contains__(self, key, r_server = None):
-        return self._table.__contains__(key, r_server = self._get_r_server(r_server))
+        redis_contain = self._table.__contains__(key, r_server = self._get_r_server(r_server))
+        if redis_contain:
+            return True
+        if not redis_contain:
+            es_contain = self._es_query.exists(index = Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                   doc_type = Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                                   id = key,
+                                   )
+            return es_contain
 
     def __getitem__(self, key, r_server = None):
         return self.get_gene(key, r_server)
