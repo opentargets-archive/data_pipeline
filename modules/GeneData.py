@@ -689,7 +689,8 @@ class GeneLookUpTable(object):
                  namespace = None,
                  r_server = None,
                  ttl = 60*60*24+7,
-                 targets = []):
+                 targets = [],
+                 autoload=True):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = r_server,
                                             ttl = ttl)
@@ -697,7 +698,7 @@ class GeneLookUpTable(object):
         self._es_query = ESQuery(es)
         self.r_server = r_server
         self.uniprot2ensembl = {}
-        if r_server is not None:
+        if (r_server is not None) and autoload:
             self._load_gene_data(r_server, targets)
 
 
@@ -721,8 +722,15 @@ class GeneLookUpTable(object):
             for accession in target['uniprot_accessions']:
                 self.uniprot2ensembl[accession] = target['id']
 
-    def get_gene(self, target_id, r_server = None):#TODO: return a gene object not a dictionary
-        return self._table.get(target_id, r_server=self._get_r_server(r_server))
+    def get_gene(self, target_id, r_server = None):
+        try:
+            return self._table.get(target_id, r_server=self._get_r_server(r_server))
+        except KeyError:
+            target = self._es_query.get_objects_by_id([target_id],
+                                             Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                             Config.ELASTICSEARCH_GENE_NAME_DOC_NAME)
+            self.set_gene(target, r_server)
+            return target
 
     def set_gene(self, target, r_server = None):
         self._table.set(target['id'],target, r_server=self._get_r_server(r_server))

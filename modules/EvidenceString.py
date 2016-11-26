@@ -1072,6 +1072,7 @@ class EvidenceStringProcess():
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=lookup_data_types,
+                                          autoload=False
                                           ).lookup
         get_evidence_page_size = 5000
         '''create and overwrite old data'''

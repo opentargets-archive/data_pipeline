@@ -583,17 +583,41 @@ class ESQuery(object):
     #         for hit in res:
     #             yield hit['_source']
 
-    def get_publications_by_id(self, ids):
-        res = self.handler.mget(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-                                doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                                body=dict(ids=ids),
-                                )
+    def get_objects_by_doc(self, docs):
+        '''
+
+        :param docs: list of dictionaries {'id':doc_id,"index":index,"doc_type":doc_type}
+        :return: generator of documents
+        '''
+        res = self.handler.mget(body=dict(docs=docs))
         for doc in res['docs']:
             if doc['found']:
                 yield doc['_source']
             else:
                 raise KeyError('publication with id %s not found' % (doc['_id']))
 
+    def get_objects_by_id(self, ids, index, doc_type):
+        '''
+
+        :param ids: list of idientifiers for documents
+        :param index: index for all the documents
+        :param doc_type: doc type for all the documents
+        :return: generator of documents
+        '''
+        res = self.handler.mget(index=Loader.get_versioned_index(index),
+                                doc_type=doc_type,
+                                body=dict(ids=ids),
+                                )
+        for doc in res['docs']:
+            if doc['found']:
+                yield doc['_source']
+            else:
+                raise KeyError('object with id %s not found' % (doc['_id']))
+
+    def get_publications_by_id(self, ids):
+        return self.get_objects_by_id(ids,
+                                      Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                                      Config.ELASTICSEARCH_PUBLICATION_DOC_NAME)
 
     def get_all_pub_ids_from_validated_evidence(self, datasources= None):
         for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
