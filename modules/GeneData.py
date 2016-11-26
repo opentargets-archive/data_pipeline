@@ -699,10 +699,10 @@ class GeneLookUpTable(object):
         self.r_server = r_server
         self.uniprot2ensembl = {}
         if (r_server is not None) and autoload:
-            self._load_gene_data(r_server, targets)
+            self.load_gene_data(r_server, targets)
 
 
-    def _load_gene_data(self, r_server = None, targets = []):
+    def load_gene_data(self, r_server = None, targets = []):
         if targets:
             data = self._es_query.get_targets_by_id(targets)
             total = len(targets)

@@ -44,7 +44,7 @@ class ESQuery(object):
     @staticmethod
     def _get_source_from_fields(fields = None):
         if fields is None:
-            fields = ['*']
+            return True
         source = {"include": fields}
         return source
 
@@ -69,23 +69,10 @@ class ESQuery(object):
         if not isinstance(ids, list):
             ids = [ids]
 
-        source = self._get_source_from_fields(fields)
-        res = helpers.scan(client=self.handler,
-                            query={"query": {
-                                            "ids" : {
-                                                "values" : ids
-                                              }
-                                          },
-                                          '_source': source,
-                                          'size': 20,
-                                      },
-                            scroll='12h',
-                            doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
-                            timeout="30m",
-                            )
-        for hit in res:
-            yield hit['_source']
+        self.get_objects_by_id(ids,
+                               Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                               Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                               fields)
     
     def count_all_targets(self):
 
@@ -583,20 +570,30 @@ class ESQuery(object):
     #         for hit in res:
     #             yield hit['_source']
 
-    def get_objects_by_doc(self, docs):
+    def get_objects_by_doc(self, docs,
+                           fields=[],
+                           realtime = False):
         '''
 
         :param docs: list of dictionaries {'id':doc_id,"index":index,"doc_type":doc_type}
         :return: generator of documents
         '''
-        res = self.handler.mget(body=dict(docs=docs))
+        res = self.handler.mget(body=dict(docs=docs),
+                                source=self._get_source_from_fields(fields),
+                                realtime=realtime,
+                                )
         for doc in res['docs']:
             if doc['found']:
                 yield doc['_source']
             else:
                 raise KeyError('publication with id %s not found' % (doc['_id']))
 
-    def get_objects_by_id(self, ids, index, doc_type):
+    def get_objects_by_id(self,
+                          ids,
+                          index,
+                          doc_type,
+                          fields = [],
+                          realtime = False):
         '''
 
         :param ids: list of idientifiers for documents
@@ -607,6 +604,8 @@ class ESQuery(object):
         res = self.handler.mget(index=Loader.get_versioned_index(index),
                                 doc_type=doc_type,
                                 body=dict(ids=ids),
+                                source=self._get_source_from_fields(fields),
+                                realtime=realtime,
                                 )
         for doc in res['docs']:
             if doc['found']:

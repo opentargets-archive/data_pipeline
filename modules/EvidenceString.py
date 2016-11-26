@@ -1088,7 +1088,8 @@ class EvidenceStringProcess():
             recreate=overwrite_indices)
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
-        if datasources:
+        if datasources and overwrite_indices:
+            logging.info('deleting data for datasources %s'%','.join(datasources))
             self.es_query.delete_evidence_for_datasources(datasources)
 
         '''create queues'''
