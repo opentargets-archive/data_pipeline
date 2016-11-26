@@ -1074,6 +1074,7 @@ class EvidenceStringProcess():
                                           data_types=lookup_data_types,
                                           autoload=False
                                           ).lookup
+        lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
         '''create and overwrite old data'''
         loader = Loader(self.es)

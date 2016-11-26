@@ -722,6 +722,27 @@ class GeneLookUpTable(object):
             for accession in target['uniprot_accessions']:
                 self.uniprot2ensembl[accession] = target['id']
 
+    def load_uniprot2ensembl(self, targets = []):
+        uniprot_fields = ['uniprot_id','uniprot_accessions', 'id']
+        if targets:
+            data = self._es_query.get_targets_by_id(targets,
+                                                    fields= uniprot_fields)
+            total = len(targets)
+        else:
+            data = self._es_query.get_all_targets(fields= uniprot_fields)
+            total = self._es_query.count_all_targets()
+        for target in tqdm(data,
+                           desc='loading mappings from uniprot to ensembl',
+                           unit=' genes',
+                           unit_scale=True,
+                           total=total,
+                           leave=False,
+                           ):
+            if target['uniprot_id']:
+                self.uniprot2ensembl[target['uniprot_id']] = target['id']
+            for accession in target['uniprot_accessions']:
+                self.uniprot2ensembl[accession] = target['id']
+
     def get_gene(self, target_id, r_server = None):
         try:
             return self._table.get(target_id, r_server=self._get_r_server(r_server))
