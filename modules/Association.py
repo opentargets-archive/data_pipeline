@@ -146,7 +146,7 @@ class Association(JSONSerializable):
             GO_terms['molecular_function'] or \
             GO_terms['cellular_component'] :
             self.private['facets']['go'] = GO_terms
-        if target_class['l1']:
+        if target_class['level1']:
             self.private['facets']['target_class'] = target_class
 
     def set_disease_data(self, efo):
