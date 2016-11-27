@@ -43,7 +43,7 @@ class ESQuery(object):
 
     @staticmethod
     def _get_source_from_fields(fields = None):
-        if fields is None:
+        if fields:
             return True
         source = {"include": fields}
         return source
