@@ -747,7 +747,7 @@ class GeneLookUpTable(object):
             target = self._es_query.get_objects_by_id([target_id],
                                              Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                                              Config.ELASTICSEARCH_GENE_NAME_DOC_NAME)
-            self.set_gene(target, r_server)
+            self.set_gene(target.next(), r_server)
             return target
 
     def set_gene(self, target, r_server = None):
