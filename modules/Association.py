@@ -508,7 +508,8 @@ class ScoringProcess():
                                                       LookUpDataType.DISEASE,
                                                       LookUpDataType.TARGET,
                                                       LookUpDataType.ECO,
-                                                      )
+                                                      ),
+                                          autoload=False,
                                           ).lookup
 
         '''create queues'''
