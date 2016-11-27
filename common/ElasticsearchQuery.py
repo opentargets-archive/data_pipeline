@@ -579,7 +579,7 @@ class ESQuery(object):
         :return: generator of documents
         '''
         res = self.handler.mget(body=dict(docs=docs),
-                                source=self._get_source_from_fields(fields),
+                                _source=self._get_source_from_fields(fields),
                                 realtime=realtime,
                                 )
         for doc in res['docs']:
@@ -604,7 +604,7 @@ class ESQuery(object):
         res = self.handler.mget(index=Loader.get_versioned_index(index),
                                 doc_type=doc_type,
                                 body=dict(ids=ids),
-                                source=self._get_source_from_fields(fields),
+                                _source=self._get_source_from_fields(fields),
                                 realtime=realtime,
                                 )
         for doc in res['docs']:
