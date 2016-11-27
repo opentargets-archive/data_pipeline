@@ -103,6 +103,7 @@ class ChEMBLLookup(object):
         self.molecule2synonyms = {}
         self.protein_classification = {}
         self.protein_class = {}
+        self.protein_class_label_to_id ={}
 
 
 
@@ -179,8 +180,27 @@ class ChEMBLLookup(object):
         protein_classes = self.query.get_from_url(Config.CHEMBL_PROTEIN_CLASS)
         for i in protein_classes:
             protein_class_id = i.pop('protein_class_id')
-            protein_class_data = dict((k, v) for k, v in i.items() if v)#remove values with none
+            protein_class_data = dict((k, dict(label=v,id='')) for k, v in i.items() if v)#remove values with none
             self.protein_class[protein_class_id] = protein_class_data
+            self._store_label_to_protein_class(protein_class_id, protein_class_data)
+
+        '''inject missing ids'''
+        for k,v in self.protein_class.items():
+            for level, data in v.items():
+                label = data['label']
+                if label in self.protein_class_label_to_id:
+                    data['id'] = self.protein_class_label_to_id[label]
+
+    def _store_label_to_protein_class(self, protein_class_id, protein_class_data):
+        max_level = 0
+        label = ''
+        for k,v in protein_class_data.items():
+            level = int(k[1])
+            if level >= max_level:
+                max_level = level
+                label = v['label']
+        self.protein_class_label_to_id[label]=protein_class_id
+
 
 
 
