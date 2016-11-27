@@ -904,8 +904,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                     record = []
                     entries_in_file +=1
 
-        #TODO - N/A for update files
-        if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE:
+        if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE and not self.update:
             logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
 
     def skip_file_processing(self, file_name):
