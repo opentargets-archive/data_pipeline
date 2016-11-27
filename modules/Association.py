@@ -130,7 +130,7 @@ class Association(JSONSerializable):
         if pathway_data['pathway_code']:
             pathway_data['pathway_type_code']=list(set(pathway_data['pathway_type_code']))
             pathway_data['pathway_code']=list(set(pathway_data['pathway_code']))
-        if ['chembl'] in gene.protein_classification and gene.protein_classification['chembl']:
+        if 'chembl' in gene.protein_classification and gene.protein_classification['chembl']:
             target_class['level1'].append([i['l1'] for i in gene.protein_classification['chembl'] if 'l1' in i])
             target_class['level2'].append([i['l2'] for i in gene.protein_classification['chembl'] if 'l2' in i])
 
