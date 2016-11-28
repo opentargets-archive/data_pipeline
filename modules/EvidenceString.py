@@ -204,7 +204,6 @@ class ExtendedInfoLiterature(ExtendedInfo):
 
         self.data = dict(abstract=literature.abstract,
                          journal=literature.journal,
-                         year=literature.year,
                          title=literature.title,
                          doi=literature.doi,
                          pub_type=literature.pub_type,
@@ -591,13 +590,6 @@ class EvidenceManager():
                         logger.error('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
                 if pubs:
                     literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
-                    year = None
-                    if literature_info.data['year']:
-                        try:
-                            year = int(literature_info.data['year'])
-                        except:
-                            pass
-                    extended_evidence['literature']['year'] = year
                     extended_evidence['literature']['date'] = literature_info.data['date']
                     extended_evidence['literature']['abstract'] = literature_info.data['abstract']
                     extended_evidence['literature']['journal_data'] = literature_info.data['journal']
