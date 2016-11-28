@@ -776,13 +776,17 @@ class MedlineRetriever(object):
             os.makedirs(pubmed_xml_locn)
 
         '''Start file-reader workers'''
+        ftp_readers = no_of_workers
+        max_ftp_readers = 10 #avoid too many connections errors
+        if ftp_readers >max_ftp_readers:
+            ftp_readers = max_ftp_readers
         retrievers = [PubmedFTPReaderProcess(retriever_q,
                                           self.r_server.db,
                                           parser_q,
                                           self.dry_run,
                                           update=update
                                           )
-                      for i in range(no_of_workers)]
+                      for i in range(ftp_readers)]
 
         for w in retrievers:
             w.start()
