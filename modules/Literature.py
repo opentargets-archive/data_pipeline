@@ -1074,7 +1074,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
             for pmid in delete_pmids:
                 '''update parent and analyzed child publication with empty values'''
 
-                pub = Publication(pub_id=pmid)
+                pub = Publication(pub_id=pmid,filename=publication['filename'])
                 self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                                 Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                                 pmid,
