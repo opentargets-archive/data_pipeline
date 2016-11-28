@@ -908,7 +908,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
             record = []
             skip = True
             for line in f:
-                if line.startswith("<MedlineCitation Owner") or line.startswith("<DeleteCitation>") :
+                if line.startswith("<MedlineCitation ") or line.startswith("<DeleteCitation>") :
                     skip = False
                 if not skip:
                     record.append(line)
