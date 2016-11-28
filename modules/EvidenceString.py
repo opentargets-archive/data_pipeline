@@ -211,7 +211,8 @@ class ExtendedInfoLiterature(ExtendedInfo):
                          mesh_headings=literature.mesh_headings,
                          chemicals=literature.chemicals,
                          abstract_lemmas=analyzed_literature.lemmas,
-                         noun_chunks=analyzed_literature.noun_chunks)
+                         noun_chunks=analyzed_literature.noun_chunks,
+                         date=literature.date)
 
 
 class ProcessedEvidenceStorer():
@@ -471,6 +472,8 @@ class EvidenceManager():
                         cellular_component=[],
                         molecular_function=[],
                         )
+        target_class = dict(level1=[],
+                            level2=[])
         uniprot_keywords = []
         # TODO: handle domains
         geneid = extended_evidence['target']['id']
@@ -507,6 +510,9 @@ class EvidenceManager():
         if pathway_data['pathway_code']:
             pathway_data['pathway_type_code'] = list(set(pathway_data['pathway_type_code']))
             pathway_data['pathway_code'] = list(set(pathway_data['pathway_code']))
+        if 'chembl' in gene.protein_classification and gene.protein_classification['chembl']:
+            target_class['level1'].append([i['l1'] for i in gene.protein_classification['chembl'] if 'l1' in i])
+            target_class['level2'].append([i['l2'] for i in gene.protein_classification['chembl'] if 'l2' in i])
 
         """get generic efo info"""
         all_efo_codes = []
@@ -560,36 +566,53 @@ class EvidenceManager():
                 GO_terms['cellular_component']:
             extended_evidence['private']['facets']['go'] = GO_terms
 
+        if target_class['level1']:
+            extended_evidence['private']['facets']['target_class'] = target_class
+
         ''' Add literature data '''
         if inject_literature:
-            pmid_url = extended_evidence['literature']['references'][0]['lit_id']
-            pmid = pmid_url.split('/')[-1]
-            pubs={}
-            if pmid in self.available_publications:
-                pub = self.available_publications[pmid]
-                pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
-            else:
-                pubs = []#pub_fetcher.get_publication_with_analyzed_data([pmid])
-            if pubs:
-                literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
-                year = None
-                if literature_info.data['year']:
-                    year = int(literature_info.data['year'])
-                extended_evidence['literature']['year'] = year
-                extended_evidence['literature']['abstract'] = literature_info.data['abstract']
-                extended_evidence['literature']['journal_data'] = literature_info.data['journal']
-                extended_evidence['literature']['title'] = literature_info.data['title']
-                extended_evidence['private']['facets']['literature'] = {}
-                # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
-                #     'abstract_lemmas')
-                extended_evidence['private']['facets']['literature']['doi'] = literature_info.data.get('doi')
-                extended_evidence['private']['facets']['literature']['pub_type'] = literature_info.data.get('pub_type')
-                # extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
-                #     'mesh_headings')
-                # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
-                #     'chemicals')
-                # extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
-                #     'noun_chunks')
+            if 'literature' in extended_evidence and \
+                    'references' in extended_evidence['literature'] and \
+                    extended_evidence['literature']['references']:
+                pmid_url = extended_evidence['literature']['references'][0]['lit_id']
+                pmid = pmid_url.split('/')[-1]
+                pubs={}
+                if pmid in self.available_publications:
+                    pub = self.available_publications[pmid]
+                    pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
+                else:
+                    # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
+                    try:
+                        pub_dict = pub_fetcher.get_publications([pmid])
+                        if pub_dict:
+                            pubs[pmid] = [pub_dict[pmid], PublicationAnalysisSpacy(pmid)]
+                            # self.available_publications.set_literature(pub_dict[pmid])
+                    except KeyError:
+                        logger.error('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
+                if pubs:
+                    literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
+                    year = None
+                    if literature_info.data['year']:
+                        try:
+                            year = int(literature_info.data['year'])
+                        except:
+                            pass
+                    extended_evidence['literature']['year'] = year
+                    extended_evidence['literature']['date'] = literature_info.data['date']
+                    extended_evidence['literature']['abstract'] = literature_info.data['abstract']
+                    extended_evidence['literature']['journal_data'] = literature_info.data['journal']
+                    extended_evidence['literature']['title'] = literature_info.data['title']
+                    extended_evidence['private']['facets']['literature'] = {}
+                    # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
+                    #     'abstract_lemmas')
+                    extended_evidence['literature']['doi'] = literature_info.data.get('doi')
+                    extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
+                    # extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
+                    #     'mesh_headings')
+                    # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
+                    #     'chemicals')
+                    # extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
+                    #     'noun_chunks')
 
         return Evidence(extended_evidence)
 
@@ -946,10 +969,7 @@ class EvidenceProcesser(multiprocessing.Process):
                         self.output_computed_count.value += 1
 
                 except Exception as error:
-                    if error:
-                        logger.info(str(error))
-                    else:
-                        logger.info(Exception.message)
+                    logger.exception(error)
                     with self.lock:
                         self.processing_errors_count.value += 1
                     # UploadError(ev, error, idev).save()
@@ -1049,7 +1069,9 @@ class EvidenceStringProcess():
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=lookup_data_types,
+                                          autoload=False
                                           ).lookup
+        lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
         '''create and overwrite old data'''
         loader = Loader(self.es)
@@ -1064,7 +1086,8 @@ class EvidenceStringProcess():
             recreate=overwrite_indices)
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
-        if datasources:
+        if datasources and overwrite_indices:
+            logging.info('deleting data for datasources %s'%','.join(datasources))
             self.es_query.delete_evidence_for_datasources(datasources)
 
         '''create queues'''

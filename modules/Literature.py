@@ -228,6 +228,15 @@ class PublicationFetcher(object):
             pubs[pub.pub_id] = [pub,analyzed_pub]
         return pubs
 
+    def get_publications(self, pub_ids):
+        pubs = {}
+        for publication_doc in self.es_query.get_publications_by_id(ids=pub_ids):
+            pub = Publication()
+            pub.load_json(publication_doc)
+            pubs[pub.pub_id] = pub
+        return pubs
+
+
 
 class Publication(JSONSerializable):
 
@@ -620,17 +629,18 @@ class LiteratureLookUpTable(object):
             self._load_literature_data(r_server)
 
     def _load_literature_data(self, r_server = None):
-        for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
-                        desc='loading publications',
-                        unit=' publication',
-                        unit_scale=True,
-                        leave=False,
-                        ):
-            pub = Publication()
-            pub.load_json(pub_source)
-
-            self.set_literature(pub,self._get_r_server(
-                    r_server))# TODO can be improved by sending elements in batches
+        # for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
+        #                 desc='loading publications',
+        #                 unit=' publication',
+        #                 unit_scale=True,
+        #                 leave=False,
+        #                 ):
+        #     pub = Publication()
+        #     pub.load_json(pub_source)
+        #
+        #     self.set_literature(pub,self._get_r_server(
+        #             r_server))# TODO can be improved by sending elements in batches
+        return
 
     def get_literature(self, pmid, r_server = None):
         return self._table.get(pmid, r_server=r_server)

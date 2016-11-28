@@ -1,13 +1,14 @@
+import collections
+import json
+import logging
 from collections import Counter
 
-import collections
 import jsonpickle
 from elasticsearch import helpers
 
 from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
 from settings import Config
-import json
 
 class AssociationSummary(object):
 
@@ -37,11 +38,13 @@ class ESQuery(object):
     def __init__(self, es, dry_run = False):
         self.handler = es
         self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
+
 
     @staticmethod
     def _get_source_from_fields(fields = None):
-        if fields is None:
-            fields = ['*']
+        if not fields:
+            return True
         source = {"include": fields}
         return source
 
@@ -66,23 +69,10 @@ class ESQuery(object):
         if not isinstance(ids, list):
             ids = [ids]
 
-        source = self._get_source_from_fields(fields)
-        res = helpers.scan(client=self.handler,
-                            query={"query": {
-                                            "ids" : {
-                                                "values" : ids
-                                              }
-                                          },
-                                          '_source': source,
-                                          'size': 20,
-                                      },
-                            scroll='12h',
-                            doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
-                            timeout="30m",
-                            )
-        for hit in res:
-            yield hit['_source']
+        self.get_objects_by_id(ids,
+                               Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                               Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                               fields)
     
     def count_all_targets(self):
 
@@ -463,7 +453,7 @@ class ESQuery(object):
                         if doc['found']:
                             yield doc['_source']
                         else:
-                            raise ValueError('document with id %s not found'%(doc['_id']))
+                            raise KeyError('document with id %s not found'%(doc['_id']))
                     id_buffer = []
             if id_buffer:
                 res_get = get_ids(id_buffer)
@@ -471,7 +461,7 @@ class ESQuery(object):
                     if doc['found']:
                         yield doc['_source']
                     else:
-                        raise ValueError('document with id %s not found' % (doc['_id']))
+                        raise KeyError('document with id %s not found' % (doc['_id']))
 
 
     def get_all_target_ids_with_evidence_data(self):
@@ -552,38 +542,85 @@ class ESQuery(object):
         return res['hits']['total']
 
 
-    def get_publications_by_id(self, ids):
-        query_body = {"query": {
-                               "ids": {
-                                   "values": ids,
-                               }
-                           },
-                               '_source': True,
-                               'size': 100,
-                           }
-        if len(ids) <10000:
-            query_body['size']=10000
-            res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-                                      doc_type = Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                                      body=query_body,
-                                      )
-            for hit in res['hits']['hits']:
-                yield hit['_source']
-        else:
-            res = helpers.scan(client=self.handler,
-                               query=query_body,
-                               scroll='12h',
-                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-                               doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                               timeout="10m",
-                               )
-            for hit in res:
-                yield hit['_source']
+    # def get_publications_by_id(self, ids):
+    #     query_body = {"query": {
+    #                            "ids": {
+    #                                "values": ids,
+    #                            }
+    #                        },
+    #                            '_source': True,
+    #                            'size': 100,
+    #                        }
+    #     if len(ids) <10000:
+    #         query_body['size']=10000
+    #         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+    #                                   doc_type = Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+    #                                   body=query_body,
+    #                                   )
+    #         for hit in res['hits']['hits']:
+    #             yield hit['_source']
+    #     else:
+    #         res = helpers.scan(client=self.handler,
+    #                            query=query_body,
+    #                            scroll='12h',
+    #                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+    #                            doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+    #                            timeout="10m",
+    #                            )
+    #         for hit in res:
+    #             yield hit['_source']
 
+    def get_objects_by_doc(self, docs,
+                           fields=[],
+                           realtime = False):
+        '''
+
+        :param docs: list of dictionaries {'id':doc_id,"index":index,"doc_type":doc_type}
+        :return: generator of documents
+        '''
+        res = self.handler.mget(body=dict(docs=docs),
+                                _source=self._get_source_from_fields(fields),
+                                realtime=realtime,
+                                )
+        for doc in res['docs']:
+            if doc['found']:
+                yield doc['_source']
+            else:
+                raise KeyError('publication with id %s not found' % (doc['_id']))
+
+    def get_objects_by_id(self,
+                          ids,
+                          index,
+                          doc_type,
+                          fields = [],
+                          realtime = False):
+        '''
+
+        :param ids: list of idientifiers for documents
+        :param index: index for all the documents
+        :param doc_type: doc type for all the documents
+        :return: generator of documents
+        '''
+        res = self.handler.mget(index=Loader.get_versioned_index(index),
+                                doc_type=doc_type,
+                                body=dict(ids=ids),
+                                _source=self._get_source_from_fields(fields),
+                                realtime=realtime,
+                                )
+        for doc in res['docs']:
+            if doc['found']:
+                yield doc['_source']
+            else:
+                raise KeyError('object with id %s not found' % (doc['_id']))
+
+    def get_publications_by_id(self, ids):
+        return self.get_objects_by_id(ids,
+                                      Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                                      Config.ELASTICSEARCH_PUBLICATION_DOC_NAME)
 
     def get_all_pub_ids_from_validated_evidence(self, datasources= None):
         for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
-                                                                    size=10000,
+                                                                    size=1000,
                                                    datasources=datasources)):
             if hit:
                 try:
@@ -814,3 +851,9 @@ class ESQuery(object):
             else:
                 flat_fields.append((flat_key, v))
         return dict(flat_fields)
+
+    def exists(self, index, doc_type, id,realtime = False):
+        return self.handler.exists(index = Loader.get_versioned_index(index),
+                                   doc_type =doc_type,
+                                   id = id,
+                                   realtime = realtime)

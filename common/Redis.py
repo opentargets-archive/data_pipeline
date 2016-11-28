@@ -691,8 +691,10 @@ class RedisLookupTable(object):
     def get(self, key, r_server = None):
         r_server = self._get_r_server(r_server)
         value = r_server.get(self._get_key_namespace(key))
-        if value:
+        if value is not None:
             return self._decode(value)
+        raise KeyError(key)
+
 
     def keys(self, r_server = None):
         r_server = self._get_r_server(r_server)

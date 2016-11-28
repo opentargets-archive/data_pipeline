@@ -95,6 +95,9 @@ class Association(JSONSerializable):
                         cellular_component=[],
                         molecular_function=[],
                         )
+        target_class = dict(level1=[],
+                            level2=[])
+
         uniprot_keywords = []
         #TODO: handle domains
         genes_info=ExtendedInfoGene(gene)
@@ -127,6 +130,9 @@ class Association(JSONSerializable):
         if pathway_data['pathway_code']:
             pathway_data['pathway_type_code']=list(set(pathway_data['pathway_type_code']))
             pathway_data['pathway_code']=list(set(pathway_data['pathway_code']))
+        if 'chembl' in gene.protein_classification and gene.protein_classification['chembl']:
+            target_class['level1'].append([i['l1'] for i in gene.protein_classification['chembl'] if 'l1' in i])
+            target_class['level2'].append([i['l2'] for i in gene.protein_classification['chembl'] if 'l2' in i])
 
 
 
@@ -140,6 +146,8 @@ class Association(JSONSerializable):
             GO_terms['molecular_function'] or \
             GO_terms['cellular_component'] :
             self.private['facets']['go'] = GO_terms
+        if target_class['level1']:
+            self.private['facets']['target_class'] = target_class
 
     def set_disease_data(self, efo):
         """get generic efo info"""
@@ -421,11 +429,29 @@ class ScoreProducer(RedisQueueWorkerProcess):
             if score.get_scoring_method(
                     ScoringMethods.HARMONIC_SUM).overall != 0:  # skip associations only with data with score 0
                 gene_data = Gene()
-                gene_data.load_json(self.lookup_data.available_genes.get_gene(target))
-                score.set_target_data(gene_data)
+                try:
+                    gene_data.load_json(self.lookup_data.available_genes.get_gene(target))
+                    score.set_target_data(gene_data)
+                except KeyError:
+                    self.logger.error('Cannot find gene code "%target" in lookup table'%target)
+                    try:
+                        score.set_target_data(gene_data)
+                    except Exception:
+                        pass
+                else:
+                    score.set_target_data(gene_data)
+
                 disease_data = EFO()
-                disease_data.load_json(self.lookup_data.available_efos.get_efo(disease))
-                score.set_disease_data(disease_data)
+                try:
+                    disease_data.load_json(self.lookup_data.available_efos.get_efo(disease))
+                except KeyError:
+                    self.logger.error('Cannot find EFO code "%disease" in lookup table'%disease)
+                    try:
+                        score.set_disease_data(disease_data)
+                    except Exception:
+                        pass
+                else:
+                    score.set_disease_data(disease_data)
                 return (target, disease, score)
 
 
@@ -500,7 +526,8 @@ class ScoringProcess():
                                                       LookUpDataType.DISEASE,
                                                       LookUpDataType.TARGET,
                                                       LookUpDataType.ECO,
-                                                      )
+                                                      ),
+                                          autoload=False,
                                           ).lookup
 
         '''create queues'''

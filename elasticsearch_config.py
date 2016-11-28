@@ -745,12 +745,12 @@ class ElasticSearchConfiguration():
                                               }
                                               }
 
-    score_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
+    association_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
                                        "number_of_replicas": evidence_replicas_number,
-                                       # "index.store.type": "memory",
+                                             # "index.store.type": "memory",
                                        "refresh_interval": "60s",
                                        "max_result_window": str(int(5e6)),
-                                       },
+                                             },
                           "mappings": {
                               Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {
                                   "_all": {"enabled": True},
@@ -762,7 +762,19 @@ class ElasticSearchConfiguration():
                                                   "type": "string",
                                                   "index": "not_analyzed",
                                               },
-                                              "target_type": {
+                                              "gene_info": {
+                                                  "properties": {
+                                                      "name": {
+                                                          "type": "string",
+                                                          "index": "not_analyzed",
+                                                      },
+                                                      "symbol": {
+                                                          "type": "string",
+                                                          "index": "not_analyzed",
+                                                      },
+                                                  }
+                                              },
+                                              "activity": {
                                                   "type": "string",
                                                   "index": "not_analyzed",
                                               },
@@ -778,7 +790,23 @@ class ElasticSearchConfiguration():
                                               "id": {
                                                   "type": "string",
                                                   "index": "not_analyzed",
-                                              }
+                                              },
+                                              "efo_info": {
+                                                  "properties": {
+                                                      "label": {
+                                                          "type": "string",
+                                                          "index": "not_analyzed",
+                                                      },
+                                                      "therapeutic_area": {
+                                                          "properties": {
+                                                              "label": {
+                                                                  "type": "string",
+                                                                  "index": "not_analyzed",
+                                                              },
+                                                          },
+                                                      },
+                                                  },
+                                              },
                                           }
 
                                       },
@@ -813,7 +841,7 @@ class ElasticSearchConfiguration():
                                   },
                               }
                           }
-                          }
+                                }
     search_obj_data_mapping = {
         "settings": {
             "number_of_shards": generic_shard_number,
@@ -970,7 +998,7 @@ class ElasticSearchConfiguration():
 
 
     INDEX_MAPPPINGS = {Config.ELASTICSEARCH_DATA_INDEX_NAME: evidence_data_mapping,
-                       Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME: score_data_mapping,
+                       Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME: association_data_mapping,
                        Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME: efo_data_mapping,
                        Config.ELASTICSEARCH_ECO_INDEX_NAME: eco_data_mapping,
                        Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME: gene_data_mapping,
