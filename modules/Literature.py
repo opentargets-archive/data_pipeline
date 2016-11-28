@@ -820,7 +820,7 @@ class MedlineRetriever(object):
         #filter for update files
         gzip_files = [i for i in files if i.endswith('.xml.gz')]
 
-        for file_ in tqdm(gzip_files[2:3],
+        for file_ in tqdm(gzip_files,
                   desc='enqueuing remote files'):
             if host.path.isfile(file_):
                 # Remote name, local name, binary mode
@@ -1072,13 +1072,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
         if 'delete_pmids' in publication:
             delete_pmids = publication['delete_pmids']
             for pmid in delete_pmids:
-                '''delete parent and analyzed child publication'''
-                # self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-                #                 Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                #                 pmid,
-                #                 body=None,
-                #                 create_index=False,
-                #                 operation='delete')
+                '''update parent and analyzed child publication with empty values'''
 
                 pub = Publication(pub_id=pmid)
                 self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
