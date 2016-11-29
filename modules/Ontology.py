@@ -711,7 +711,8 @@ class DiseaseUtils():
             logger.debug("%s (%s) hasPhenotype %s (%s)" % (disease_uri, disease_label, phenotype_uri, phenotype_label))
             if disease_uri not in disease_phenotypes_map:
                 disease_phenotypes_map[disease_uri] = { 'label': disease_label, 'phenotypes': [] }
-            disease_phenotypes_map[disease_uri]['phenotypes'].append({'label': phenotype_label, 'uri': phenotype_uri})
+            if phenotype_uri not in map(lambda x: x['uri'], disease_phenotypes_map[disease_uri]['phenotypes']):
+                disease_phenotypes_map[disease_uri]['phenotypes'].append({'label': phenotype_label, 'uri': phenotype_uri})
 
         self.update_disease_phenotypes_cache(disease_phenotypes_map)
 
