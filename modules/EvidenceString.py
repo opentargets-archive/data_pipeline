@@ -211,7 +211,8 @@ class ExtendedInfoLiterature(ExtendedInfo):
                          chemicals=literature.chemicals,
                          abstract_lemmas=analyzed_literature.lemmas,
                          noun_chunks=analyzed_literature.noun_chunks,
-                         date=literature.date)
+                         date=literature.pub_date,
+                         info = literature.info)
 
 
 class ProcessedEvidenceStorer():
@@ -584,23 +585,34 @@ class EvidenceManager():
                     try:
                         pub_dict = pub_fetcher.get_publications([pmid])
                         if pub_dict:
-                            pubs[pmid] = [pub_dict[pmid], PublicationAnalysisSpacy(pmid)]
+                            pubs[pmid] = [pub_dict[int(pmid)], PublicationAnalysisSpacy(pmid)]
                             # self.available_publications.set_literature(pub_dict[pmid])
                     except KeyError:
+
                         logger.error('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
+
+
                 if pubs:
                     literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
                     extended_evidence['literature']['date'] = literature_info.data['date']
                     extended_evidence['literature']['abstract'] = literature_info.data['abstract']
                     extended_evidence['literature']['journal_data'] = literature_info.data['journal']
                     extended_evidence['literature']['title'] = literature_info.data['title']
+                    info = ''
+                    if 'volume' in literature_info.data['info']:
+                        info += literature_info.data['info']['volume']
+                    if 'issue' in literature_info.data['info']:
+                        info += "(%s)" % literature_info.data['info']['issue']
+                    if 'pgn' in literature_info.data['info']:
+                        info += ":%s" % literature_info.data['info']['pgn']
+                    extended_evidence['literature']['info'] = info
                     extended_evidence['private']['facets']['literature'] = {}
                     # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
                     #     'abstract_lemmas')
                     extended_evidence['literature']['doi'] = literature_info.data.get('doi')
                     extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
-                    # extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
-                    #     'mesh_headings')
+                    extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
+                        'mesh_headings')
                     # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
                     #     'chemicals')
                     # extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
@@ -1058,6 +1070,7 @@ class EvidenceStringProcess():
         if inject_literature:
             lookup_data_types = [LookUpDataType.PUBLICATION,LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
             # lookup_data_types.append(LookUpDataType.PUBLICATION)
+
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=lookup_data_types,

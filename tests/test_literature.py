@@ -46,24 +46,15 @@ class LiteratureTestCase(unittest.TestCase):
 
 
 
-    def evidence_publication_loading(self):
+    def test_evidence_publication_loading(self):
 
         logging.basicConfig(filename='output.log',
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         level=logging.INFO)
 
-        r_server = Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': []})
-
-        # TODO : ES mocking for unit tests - use dryrun
-        es = Elasticsearch(hosts=[{'host': 'targethub-es.gdosand.aws.biogen.com', 'port': 80}],
-                           maxsize=50,
-                           timeout=1800,
-                           sniff_on_connection_fail=True,
-                           retry_on_timeout=True,
-                           max_retries=10,
-                           )
-        loader = Loader(es=es,dry_run=True)
-        EvidenceStringProcess(es, r_server).process_all(datasources=['europepmc'],inject_literature=True)
+        p = PipelineConnectors()
+        p.init_services_connections()
+        EvidenceStringProcess(p.es, p.r_server).process_all(datasources=['europepmc'],inject_literature=True)
 
 
     def test_medline_parser(self):

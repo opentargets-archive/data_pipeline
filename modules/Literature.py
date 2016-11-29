@@ -249,6 +249,7 @@ class Publication(JSONSerializable):
                  pub_date = None,
                  date = None,
                  journal = None,
+                 info=None,
                  full_text = u"",
                  epmc_text_mined_entities = {},
                  epmc_keywords = [],
@@ -273,6 +274,7 @@ class Publication(JSONSerializable):
         self.pub_date = pub_date
         self.date = date
         self.journal = journal
+        self.info=info
         self.full_text = full_text
         self.epmc_text_mined_entities = epmc_text_mined_entities
         self.epmc_keywords = epmc_keywords
@@ -291,7 +293,7 @@ class Publication(JSONSerializable):
 
     def __str__(self):
         return "id:%s | title:%s | abstract:%s | authors:%s | pub_date:%s | date:%s | journal:%s" \
-               "| full_text:%s | epmc_text_mined_entities:%s | epmc_keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
+               "| info:%s | full_text:%s | epmc_text_mined_entities:%s | epmc_keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
                "| has_text_mined_entities:%s | is_open_access:%s | pub_type:%s | date_of_revision:%s | has_references:%s | references:%s" \
                "| mesh_headings:%s | chemicals:%s | filename:%s"%(self.pub_id,
                                                    self.title,
@@ -300,6 +302,7 @@ class Publication(JSONSerializable):
                                                    self.pub_date,
                                                     self.date,
                                                     self.journal,
+                                                    self.info,
                                                     self.full_text,
                                                     self.epmc_text_mined_entities,
                                                     self.epmc_keywords,
@@ -902,14 +905,14 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 response.raise_for_status()
                 file_size = int(response.headers['content-length'])
                 file_handler = StringIO()
-                t = tqdm(desc= 'downloading %s via HTTP'%os.path.basename(file_path),
+                t = tqdm(desc = 'downloading %s via HTTP' % os.path.basename(file_path),
                          total = file_size,
                          unit = 'B',
-                         unit_scale=True)
+                         unit_scale = True)
                 for chunk in response.iter_content(chunk_size=128):
                     file_handler.write(chunk)
                     t.update(len(chunk))
-                logging.debug('Downloaded file %s from HTTP at %.2fMB/s'%(os.path.basename(file_path),(file_size/1e6)/(t.last_print_t - t.start_t)))
+                logging.debug('Downloaded file %s from HTTP at %.2fMB/s' % (os.path.basename(file_path), (file_size / 1e6) / (t.last_print_t - t.start_t)))
                 t.close()
                 response.close()
                 file_handler.seek(0)
@@ -1005,6 +1008,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                         publication['first_publication_date'] = parse(' '.join(first_publication_date))
 
                     if child.tag == 'Article':
+                        publication['info'] = {}
                         publication = self.parse_article_info(child,publication)
 
                     if child.tag == 'ChemicalList':
@@ -1057,9 +1061,15 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                     else:
                         publication['journal']['medlineAbbreviation'] = ''
 
-                for el in e.JournalIssue.PubDate.getchildren():
-                    if el.tag == 'Year':
-                        publication['pub_date'] = el.text
+                for el in e.JournalIssue.getchildren():
+                    if el.tag == 'PubDate':
+                        for pubdate in el.getchildren():
+                            if pubdate.tag == 'Year':
+                                publication['pub_date'] = pubdate.text
+                    if el.tag == 'Volume':
+                        publication['info']['volume'] = el.text
+                    if el.tag == 'Issue':
+                        publication['info']['issue'] = el.text
 
             if e.tag == 'PublicationTypeList':
                 pub_types = []
@@ -1079,6 +1089,10 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                             author_dict[e.tag] = e.text
 
                     publication['authors'].append(author_dict)
+
+            if e.tag == 'Pagination':
+                publication['info']['pgn'] = e.MedlinePgn.text
+
 
         return publication
 
@@ -1119,6 +1133,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
         else:
 
             try:
+
                 pub = Publication(pub_id=publication['pmid'],
                               title=publication['title'],
                               abstract=publication.get('abstract'),
@@ -1126,6 +1141,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                               pub_date=publication.get('pub_date'),
                               date=publication.get("firstPublicationDate"),
                               journal=publication.get('journal'),
+                              info=publication.get("info"),
                               full_text=u"",
                               #full_text_url=publication['fullTextUrlList']['fullTextUrl'],
                               epmc_keywords=publication.get('keywords'),

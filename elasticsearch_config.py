@@ -111,13 +111,8 @@ def _get_evidence_string_generic_mapping():
                                         "index": "not_analyzed"
                                     },
                                     "mesh_headings": {
-                                        "properties": {
-                                            "descriptorName": {
-                                                "type": "string",
-                                                "index": "not_analyzed"
-                                            }
-                                        }
-
+                                        "type": "string",
+                                        "index": "not_analyzed"
                                     }
                     }
                 }
