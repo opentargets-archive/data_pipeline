@@ -33,7 +33,7 @@ from settings import Config
 
 logger = logging.getLogger(__name__)
 
-MAX_PUBLICATION_CHUNKS =1000
+MAX_PUBLICATION_CHUNKS =100
 
 class LiteratureActions(Actions):
     FETCH='fetch'
@@ -531,11 +531,12 @@ class LiteratureProcess(object):
         #todo, add method to process all cached publications??
 
         # Literature Queue
+        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+
         literature_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_analyzer_q',
-                                  max_size=MAX_PUBLICATION_CHUNKS,
+                                  max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
                                   job_timeout=120)
 
-        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
 
         # Start literature-analyser-worker processes
         analyzers = [LiteratureAnalyzerProcess(literature_q,
@@ -749,17 +750,17 @@ class MedlineRetriever(object):
 
         # FTP Retriever Queue
         retriever_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_retriever',
-                                         max_size=ftp_readers*2,
+                                         max_size=ftp_readers*3,
                                          job_timeout=1200)
 
         # Parser Queue
         parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_parser',
-                                  max_size=MAX_PUBLICATION_CHUNKS,
+                                  max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
                                   job_timeout=120)
 
         # ES-Loader Queue
         loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
-                                         max_size=MAX_PUBLICATION_CHUNKS,
+                                         max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
                                          job_timeout=120)
 
 
