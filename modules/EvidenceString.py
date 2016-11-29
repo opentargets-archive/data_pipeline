@@ -205,6 +205,7 @@ class ExtendedInfoLiterature(ExtendedInfo):
         self.data = dict(abstract=literature.abstract,
                          journal=literature.journal,
                          title=literature.title,
+                         authors=literature.authors,
                          doi=literature.doi,
                          pub_type=literature.pub_type,
                          mesh_headings=literature.mesh_headings,
@@ -212,7 +213,7 @@ class ExtendedInfoLiterature(ExtendedInfo):
                          abstract_lemmas=analyzed_literature.lemmas,
                          noun_chunks=analyzed_literature.noun_chunks,
                          date=literature.pub_date,
-                         info = literature.info)
+                         journal_reference = literature.journal_reference)
 
 
 class ProcessedEvidenceStorer():
@@ -606,6 +607,7 @@ class EvidenceManager():
                     if 'pgn' in literature_info.data['journal_reference']:
                         journal_reference += ":%s" % journal_reference.data['journal_reference']['pgn']
                     extended_evidence['literature']['journal_reference'] = journal_reference
+                    extended_evidence['literature']['authors'] = literature_info.data['authors']
                     extended_evidence['private']['facets']['literature'] = {}
                     # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
                     #     'abstract_lemmas')
