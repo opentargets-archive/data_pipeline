@@ -898,9 +898,21 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
             http_url.append(os.path.basename(file_path))
             http_url='/'.join(http_url)
             try:
-                req = requests.get(http_url, stream = True)
-                req.raise_for_status()
-                file_handler =StringIO(req.raw.read())
+                response = requests.get(http_url, stream = True)
+                response.raise_for_status()
+                file_size = int(response.headers['content-length'])
+                file_handler = StringIO()
+                t = tqdm(desc= 'downloading %s via HTTP'%os.path.basename(file_path),
+                         total = file_size,
+                         unit = 'B',
+                         unit_scale=True)
+                for chunk in response.iter_content(chunk_size=128):
+                    file_handler.write(chunk)
+                    t.update(len(chunk))
+                logging.debug('Downloaded file %s from HTTP at %.2fMB/s'%(os.path.basename(file_path),(file_size/1e6)/(t.last_print_t - t.start_t)))
+                t.close()
+                response.close()
+                file_handler.seek(0)
             except Exception as e:
                 self.logger.exception('Could not parse via HTTP, trying via FTP')
 
