@@ -18,6 +18,7 @@ from common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusRep
 from modules.ChEMBL import ChEMBLLookup
 from modules.Reactome import ReactomeRetriever
 from settings import Config
+from elasticsearch.exceptions import NotFoundError
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
 ENS_ID_ORG_PREFIX = 'http://identifiers.org/ensembl/'
@@ -85,6 +86,7 @@ class Gene(JSONSerializable):
         self._private ={}
         self.drugs = {}
         self.protein_classification = {}
+        self._logger = logging.getLogger(__name__)
 
 
     def _set_id(self):
@@ -322,7 +324,7 @@ class Gene(JSONSerializable):
                               'pathway type name': reactome_retriever.get_reaction(type_code).label
                               })
         except:
-            logging.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
+            self._logger.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
         return types
 
     def get_id_org(self):
@@ -497,6 +499,7 @@ class GeneManager():
         self.genes = GeneSet()
         self.reactome_retriever=ReactomeRetriever(loader.es)
         self.chembl_handler = ChEMBLLookup()
+        self._logger = logging.getLogger(__name__)
 
 
 
@@ -508,9 +511,15 @@ class GeneManager():
         bar.update()
         self._get_ortholog_data()
         bar.update()
-        self._get_ensembl_data()
+        try:
+            self._get_ensembl_data()
+        except NotFoundError:
+            self._logger.error('no ensembl index in ES. Skipping. Has the --ensembl step been run?')
         bar.update()
-        self._get_uniprot_data()
+        try:
+            self._get_uniprot_data()
+        except NotFoundError:
+            self._logger.error('no uniprot index in ES. Skipping. Has the --uniprot step been run?')
         bar.update()
         self._get_chembl_data()
         bar.update()
@@ -519,10 +528,10 @@ class GeneManager():
 
 
     def _get_hgnc_data_from_json(self):
-        logging.info("HGNC parsing - requesting from URL %s" % Config.HGNC_COMPLETE_SET)
+        self._logger.info("HGNC parsing - requesting from URL %s" % Config.HGNC_COMPLETE_SET)
         req = urllib2.Request(Config.HGNC_COMPLETE_SET)
         response = urllib2.urlopen(req)
-        logging.info("HGNC parsing - response code %s" % response.code)
+        self._logger.info("HGNC parsing - response code %s" % response.code)
         data = json.loads(response.read())
         for row in tqdm(data['response']['docs'],
                         desc='loading genes from HGNC',
@@ -533,13 +542,13 @@ class GeneManager():
             gene.load_hgnc_data_from_json(row)
             self.genes.add_gene(gene)
 
-        logging.info("STATS AFTER HGNC PARSING:\n" + self.genes.get_stats())
+        self._logger.info("STATS AFTER HGNC PARSING:\n" + self.genes.get_stats())
 
     def _get_ortholog_data(self):
 
-        logging.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
+        self._logger.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
         req = requests.get(Config.HGNC_ORTHOLOGS)
-        logging.info("Ortholog parsing - response code %s" % req.status_code)
+        self._logger.info("Ortholog parsing - response code %s" % req.status_code)
         req.raise_for_status()
 
         # io.BytesIO is StringIO.StringIO in python 2
@@ -554,7 +563,7 @@ class GeneManager():
 
 
 
-        logging.info("STATS AFTER HGNC ortholog PARSING:\n" + self.genes.get_stats())
+        self._logger.info("STATS AFTER HGNC ortholog PARSING:\n" + self.genes.get_stats())
 
 
 
@@ -576,7 +585,7 @@ class GeneManager():
 
         self._clean_non_reference_genes()
 
-        logging.info("STATS AFTER ENSEMBL PARSING:\n" + self.genes.get_stats())
+        self._logger.info("STATS AFTER ENSEMBL PARSING:\n" + self.genes.get_stats())
 
     def _clean_non_reference_genes(self):
         for geneid, gene in self.genes.iterate():
@@ -594,7 +603,7 @@ class GeneManager():
                            total= self.esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
             c += 1
             if c % 1000 == 0:
-                logging.info("%i entries retrieved for uniprot" % c)
+                self._logger.info("%i entries retrieved for uniprot" % c)
             if 'Ensembl' in seqrec.annotations['dbxref_extended']:
                 ensembl_data=seqrec.annotations['dbxref_extended']['Ensembl']
                 ensembl_genes_id=[]
@@ -610,12 +619,12 @@ class GeneManager():
                         success=True
                         break
                 if not success:
-                    logging.debug('Cannot find ensembl id(s) %s coming from uniprot entry %s in available geneset' % (ensembl_genes_id, seqrec.id))
+                    self._logger.debug('Cannot find ensembl id(s) %s coming from uniprot entry %s in available geneset' % (ensembl_genes_id, seqrec.id))
             else:
-                logging.debug('Cannot find ensembl mapping in the uniprot entry %s' % seqrec.id)
-        logging.info("%i entries retrieved for uniprot" % c)
+                self._logger.debug('Cannot find ensembl mapping in the uniprot entry %s' % seqrec.id)
+        self._logger.info("%i entries retrieved for uniprot" % c)
 
-        # logging.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
+        # self._logger.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
 
 
 
@@ -643,14 +652,14 @@ class GeneManager():
         for w in workers:
             w.join()
 
-        logging.info('all gene objects pushed to elasticsearch')
+        self._logger.info('all gene objects pushed to elasticsearch')
 
     def _get_chembl_data(self):
-        logging.info("Retrieving Chembl Drug")
+        self._logger.info("Retrieving Chembl Drug")
         self.chembl_handler.download_molecules_linked_to_target()
-        logging.info("Retrieving Chembl Target Class ")
+        self._logger.info("Retrieving Chembl Target Class ")
         self.chembl_handler.download_protein_classification()
-        logging.info("Adding Chembl data to genes ")
+        self._logger.info("Adding Chembl data to genes ")
         for gene_id, gene in tqdm(self.genes.iterate(),
                                   desc='Getting drug data from chembl',
                                   unit=' gene'):
