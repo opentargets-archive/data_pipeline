@@ -14,6 +14,7 @@ from collections import Counter
 
 import ftputil as ftputil
 import requests
+from dateutil.parser import parse
 from elasticsearch import Elasticsearch
 from lxml import etree,objectify
 from nltk.corpus import stopwords
@@ -967,12 +968,12 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                 publication['pmid'] = medline.PMID.text
                 for child in medline.getchildren():
                     if child.tag == 'DateCreated':
-                        firstPublicationDate = []
-                        firstPublicationDate.append(child.Year.text)
-                        firstPublicationDate.append(child.Month.text)
-                        firstPublicationDate.append(child.Day.text)
+                        first_publication_date = []
+                        first_publication_date.append(child.Year.text)
+                        first_publication_date.append(child.Month.text)
+                        first_publication_date.append(child.Day.text)
 
-                        publication['firstPublicationDate'] = '-'.join(firstPublicationDate)
+                        publication['first_publication_date'] = parse(' '.join(first_publication_date))
 
                     if child.tag == 'Article':
                         publication = self.parse_article_info(child,publication)
