@@ -213,6 +213,7 @@ class OntologyClassReader():
         self.top_level_classes = dict()
         self.classes_paths = dict()
         self.obsoletes = dict()
+        self.children = dict()
 
     def load_ontology_graph(self, uri):
         """Loads the ontology from a URI in a RDFLib graph.
@@ -264,6 +265,12 @@ class OntologyClassReader():
             label = str(ont_label)
             self.current_classes[uri] = label
             count +=1
+
+            '''
+             Add the children too
+            '''
+            self.get_children(uri=uri)
+
             # logger.debug("RDFLIB '%s' '%s'" % (uri, label))
         logger.debug("parsed %i classes"%count)
 
@@ -288,6 +295,7 @@ class OntologyClassReader():
             self.obsoletes[uri] = { 'label': label, 'new_uri' : new_uri }
             count +=1
             logger.debug("WARNING: Obsolete %s '%s' %s" % (uri, label, new_uri))
+
         """
         Still need to loop over to find the next new class to replace the
         old URI with the latest URI (some intermediate classes can be obsolete too)
@@ -320,6 +328,17 @@ class OntologyClassReader():
             logger.info("RDFLIB TOP LEVEL '%s' '%s'" % (uri, label))
 
         return
+
+    def get_children(self, uri):
+        disease_uri = URIRef(uri)
+        if uri not in self.children:
+            self.children[uri] = []
+        for c in self.rdf_graph.subjects(predicate=RDFS.subClassOf, object=disease_uri):
+            cr = rdflib.resource.Resource(self.rdf_graph, c)
+            label = str(cr.value(RDFS.label))
+            c_uri = str(cr.identifier)
+            (prefix, namespace, id) = self.rdf_graph.namespace_manager.compute_qname(cr.identifier)
+            self.children[uri].append({'code': id, 'label': label})
 
     def get_new_from_obsolete_uri(self, old_uri):
 
