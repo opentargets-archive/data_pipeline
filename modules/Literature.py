@@ -1009,7 +1009,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                         else:
                             first_publication_date.append('1')
 
-                        publication['first_publication_date'] = parse(' '.join(first_publication_date))
+                        publication['first_publication_date'] = parse(' '.join(first_publication_date)).date()
 
                     if child.tag == 'Article':
                         publication['journal_reference'] = {}
@@ -1067,15 +1067,15 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
                 for el in e.JournalIssue.getchildren():
                     if el.tag == 'PubDate':
-                        year, month, day = 1800, 1, 1
+                        year, month, day = '1800', 'Gen', '1'
                         for pubdate in el.getchildren():
                             if pubdate.tag == 'Year':
-                                year = int(pubdate.text)
+                                year = pubdate.text
                             elif pubdate.tag == 'Month':
-                                month = int(pubdate.text)
+                                month = pubdate.text
                             elif pubdate.tag == 'Day':
-                                day = int(pubdate.text)
-                        publication['pub_date'] = date(year, month, day)
+                                day = pubdate.text
+                        publication['pub_date'] =  parse(' '.join((year, month, day))).date()
                     if el.tag == 'Volume':
                         publication['journal_reference']['volume'] = el.text
                     if el.tag == 'Issue':
