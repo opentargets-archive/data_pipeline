@@ -1063,7 +1063,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
                 for el in e.JournalIssue.getchildren():
                     if el.tag == 'PubDate':
-                        publication_date = ['','','']
+                        publication_date = ['','','1']
                         for pubdate in el.getchildren():
                             if pubdate.tag == 'Year':
                                 publication_date[0]=pubdate.text
