@@ -261,3 +261,5 @@ class Config():
     PUBMED_XML_LOCN = '/tmp/medline/baseline'
     PUBMED_XML_UPDATE_LOCN = '/tmp/medline/update'
 
+    PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
+

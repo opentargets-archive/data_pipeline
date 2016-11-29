@@ -743,7 +743,7 @@ class MedlineRetriever(object):
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         ftp_readers = no_of_workers
-        max_ftp_readers = 10 #avoid too many connections errors
+        max_ftp_readers = 8 #avoid too many connections errors
         if ftp_readers >max_ftp_readers:
             ftp_readers = max_ftp_readers
 
@@ -816,7 +816,7 @@ class MedlineRetriever(object):
         for w in loaders:
             w.start()
 
-        shift_downloading = 2
+        # shift_downloading = 2
         if update:
             host = ftp_connect(MEDLINE_UPDATE_PATH)
         else:
@@ -831,7 +831,7 @@ class MedlineRetriever(object):
                 # Remote name, local name, binary mode
                 file_path = os.path.join(pubmed_xml_locn, file_)
                 retriever_q.put(file_path)
-                time.sleep(shift_downloading*random.random())
+                # time.sleep(shift_downloading*random.random())
         host.close()
         retriever_q.set_submission_finished(r_server=self.r_server)
 
@@ -888,17 +888,34 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
             self.logger.info("Skipping file {}".format(file_path))
             return
         if not os.path.isfile(file_path):
+            '''try to fetch via http'''
+            http_url = [Config.PUBMED_HTTP_MIRROR]
+            if self.update:
+                http_url.append(MEDLINE_UPDATE_PATH.split('/')[1])
+            else:
+                http_url.append(MEDLINE_BASE_PATH.split('/')[1])
+            http_url.append(os.path.basename(file_path))
+            http_url='/'.join(http_url)
             try:
-                ftp_file_handler =self.ftp.open(os.path.basename(file_path),'rb')
-                file_handler = StringIO(ftp_file_handler.read())
+                self.logger.debug('fetching file via HTTP: %s' % http_url)
+                req = requests.get(http_url, stream = True)
+                req.raise_for_status()
+                file_handler =StringIO(req.raw.read())
             except Exception as e:
-                self.logger.exception('Error fetching file: %s. %s . SKIPPED.' % ('/'.join([
-                    Config.PUBMED_FTP_SERVER,
-                    MEDLINE_BASE_PATH,
-                    os.path.basename(file_path)
-                ]),
-                e.message))
-                return
+                self.logger.exception('Could not parse via HTTP, trying via FTP')
+
+                '''try to fetch via ftp'''
+                try:
+                    ftp_file_handler =self.ftp.open(os.path.basename(file_path),'rb')
+                    file_handler = StringIO(ftp_file_handler.read())
+                except Exception as e:
+                    self.logger.exception('Error fetching file: %s. %s . SKIPPED.' % ('/'.join([
+                        Config.PUBMED_FTP_SERVER,
+                        MEDLINE_BASE_PATH,
+                        os.path.basename(file_path)
+                    ]),
+                    e.message))
+                    return
         else:
             file_handler=io.open(file_path,'rb')
         entries_in_file = 0
