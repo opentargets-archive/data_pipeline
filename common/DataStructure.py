@@ -3,7 +3,7 @@ from ConfigParser import NoSectionError
 from UserDict import UserDict
 from json import JSONEncoder
 
-from datetime import datetime
+from datetime import datetime, date
 
 from settings import Config
 
@@ -19,6 +19,8 @@ class PipelineEncoder(JSONEncoder):
 
 def json_serialize(obj):
     if isinstance(obj, datetime):
+        return obj.isoformat(' ')
+    elif isinstance(obj, date):
         return obj.isoformat()
     else:
         try:

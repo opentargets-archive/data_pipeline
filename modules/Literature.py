@@ -14,6 +14,7 @@ from collections import Counter
 
 import ftputil as ftputil
 import requests
+from datetime import date
 from dateutil.parser import parse
 from elasticsearch import Elasticsearch
 from lxml import etree,objectify
@@ -1003,7 +1004,10 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                         first_publication_date = []
                         first_publication_date.append(child.Year.text)
                         first_publication_date.append(child.Month.text)
-                        first_publication_date.append(child.Day.text)
+                        if child.Day.text:
+                            first_publication_date.append(child.Day.text)
+                        else:
+                            first_publication_date.append('1')
 
                         publication['first_publication_date'] = parse(' '.join(first_publication_date))
 
@@ -1063,15 +1067,15 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
                 for el in e.JournalIssue.getchildren():
                     if el.tag == 'PubDate':
-                        publication_date = ['','1','1']
+                        year, month, day = 1800, 1, 1
                         for pubdate in el.getchildren():
                             if pubdate.tag == 'Year':
-                                publication_date[0]=pubdate.text
+                                year = int(pubdate.text)
                             elif pubdate.tag == 'Month':
-                                publication_date[1]=pubdate.text
+                                month = int(pubdate.text)
                             elif pubdate.tag == 'Day':
-                                publication_date[2]=pubdate.text
-                        publication['pub_date'] = parse(' '.join(publication_date))
+                                day = int(pubdate.text)
+                        publication['pub_date'] = date(year, month, day)
                     if el.tag == 'Volume':
                         publication['journal_reference']['volume'] = el.text
                     if el.tag == 'Issue':
