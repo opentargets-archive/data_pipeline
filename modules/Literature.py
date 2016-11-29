@@ -249,7 +249,7 @@ class Publication(JSONSerializable):
                  pub_date = None,
                  date = None,
                  journal = None,
-                 info=None,
+                 journal_reference=None,
                  full_text = u"",
                  epmc_text_mined_entities = {},
                  epmc_keywords = [],
@@ -274,7 +274,7 @@ class Publication(JSONSerializable):
         self.pub_date = pub_date
         self.date = date
         self.journal = journal
-        self.info=info
+        self.journal_reference=journal_reference
         self.full_text = full_text
         self.epmc_text_mined_entities = epmc_text_mined_entities
         self.epmc_keywords = epmc_keywords
@@ -293,7 +293,7 @@ class Publication(JSONSerializable):
 
     def __str__(self):
         return "id:%s | title:%s | abstract:%s | authors:%s | pub_date:%s | date:%s | journal:%s" \
-               "| info:%s | full_text:%s | epmc_text_mined_entities:%s | epmc_keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
+               "| journal_reference:%s | full_text:%s | epmc_text_mined_entities:%s | epmc_keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
                "| has_text_mined_entities:%s | is_open_access:%s | pub_type:%s | date_of_revision:%s | has_references:%s | references:%s" \
                "| mesh_headings:%s | chemicals:%s | filename:%s"%(self.pub_id,
                                                    self.title,
@@ -302,7 +302,7 @@ class Publication(JSONSerializable):
                                                    self.pub_date,
                                                     self.date,
                                                     self.journal,
-                                                    self.info,
+                                                    self.journal_reference,
                                                     self.full_text,
                                                     self.epmc_text_mined_entities,
                                                     self.epmc_keywords,
@@ -1008,7 +1008,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                         publication['first_publication_date'] = parse(' '.join(first_publication_date))
 
                     if child.tag == 'Article':
-                        publication['info'] = {}
+                        publication['journal_reference'] = {}
                         publication = self.parse_article_info(child,publication)
 
                     if child.tag == 'ChemicalList':
@@ -1063,13 +1063,19 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
                 for el in e.JournalIssue.getchildren():
                     if el.tag == 'PubDate':
+                        publication_date = ['','','']
                         for pubdate in el.getchildren():
                             if pubdate.tag == 'Year':
-                                publication['pub_date'] = pubdate.text
+                                publication_date[0]=pubdate.text
+                            elif pubdate.tag == 'Month':
+                                publication_date[1]=pubdate.text
+                            elif pubdate.tag == 'Day':
+                                publication_date[2]=pubdate.text
+                        publication['pub_date'] = parse(' '.join(publication_date))
                     if el.tag == 'Volume':
-                        publication['info']['volume'] = el.text
+                        publication['journal_reference']['volume'] = el.text
                     if el.tag == 'Issue':
-                        publication['info']['issue'] = el.text
+                        publication['journal_reference']['issue'] = el.text
 
             if e.tag == 'PublicationTypeList':
                 pub_types = []
@@ -1091,7 +1097,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                     publication['authors'].append(author_dict)
 
             if e.tag == 'Pagination':
-                publication['info']['pgn'] = e.MedlinePgn.text
+                publication['journal_reference']['pgn'] = e.MedlinePgn.text
 
 
         return publication
@@ -1110,7 +1116,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                 retry_on_timeout=True,
                                 max_retries=10,
                                 )
-        self.loader = Loader(self.es, chunk_size=1000, dry_run=dry_run)
+        self.loader = Loader(self.es, chunk_size=10000, dry_run=dry_run)
         self.es_query = ESQuery(self.es)
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
@@ -1135,26 +1141,26 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
             try:
 
                 pub = Publication(pub_id=publication['pmid'],
-                              title=publication['title'],
-                              abstract=publication.get('abstract'),
-                              authors=publication.get('authors'),
-                              pub_date=publication.get('pub_date'),
-                              date=publication.get("firstPublicationDate"),
-                              journal=publication.get('journal'),
-                              info=publication.get("info"),
-                              full_text=u"",
-                              #full_text_url=publication['fullTextUrlList']['fullTextUrl'],
-                              epmc_keywords=publication.get('keywords'),
-                              doi=publication.get('doi',''),
-                              #cited_by=publication['citedByCount'],
-                              #has_text_mined_terms=publication['hasTextMinedTerms'] == u'Y',
-                              #has_references=publication['hasReferences'] == u'Y',
-                              #is_open_access=publication['isOpenAccess'] == u'Y',
-                              pub_type=publication.get('pub_types'),
-                              filename=publication.get('filename'),
-                              mesh_headings=publication.get('mesh_terms'),
-                              chemicals=publication.get('chemicals')
-                              )
+                                  title=publication['title'],
+                                  abstract=publication.get('abstract'),
+                                  authors=publication.get('authors'),
+                                  pub_date=publication.get('pub_date'),
+                                  date=publication.get("first_publication_date"),
+                                  journal=publication.get('journal'),
+                                  journal_reference=publication.get("journal_reference"),
+                                  full_text=u"",
+                                  #full_text_url=publication['fullTextUrlList']['fullTextUrl'],
+                                  epmc_keywords=publication.get('keywords'),
+                                  doi=publication.get('doi',''),
+                                  #cited_by=publication['citedByCount'],
+                                  #has_text_mined_terms=publication['hasTextMinedTerms'] == u'Y',
+                                  #has_references=publication['hasReferences'] == u'Y',
+                                  #is_open_access=publication['isOpenAccess'] == u'Y',
+                                  pub_type=publication.get('pub_types'),
+                                  filename=publication.get('filename'),
+                                  mesh_headings=publication.get('mesh_terms'),
+                                  chemicals=publication.get('chemicals')
+                                  )
 
             # if 'dateOfRevision' in publication:
             #     pub.date_of_revision = publication["dateOfRevision"]
