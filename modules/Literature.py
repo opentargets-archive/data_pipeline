@@ -931,10 +931,10 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
         else:
             file_handler=io.open(file_path,'rb')
         entries_in_file = 0
-        with gzip.GzipFile(filename=os.path.basename(file_path),
+        with io.BufferedReader(gzip.GzipFile(filename=os.path.basename(file_path),
                            mode='rb',
                            fileobj=file_handler,
-                           ) as f:
+                           )) as f:
             record = []
             skip = True
             for line in f:
