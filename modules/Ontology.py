@@ -57,6 +57,7 @@ EFO_TAS = [
     'http://www.ebi.ac.uk/efo/EFO_0000684', # respiratory system
     'http://www.ebi.ac.uk/efo/EFO_0002461', # skeletal system
     'http://www.ebi.ac.uk/efo/EFO_0000701', # skin disease
+    'http://www.ebi.ac.uk/efo/EFO_0001421', # liver disease
 ]
 
 TOP_LEVELS = '''

@@ -201,6 +201,8 @@ def test_load_open_targets_disease_ontology():
     assert obj.current_classes['http://www.ebi.ac.uk/efo/EFO_0000684'] == "respiratory system disease"
     assert obj.current_classes['http://www.ebi.ac.uk/efo/EFO_0002461'] == "skeletal system disease"
     assert obj.current_classes['http://www.ebi.ac.uk/efo/EFO_0000701'] == "skin disease"
+    assert obj.current_classes['http://www.ebi.ac.uk/efo/EFO_0001421'] == "liver disease"
+
     assert "http://www.ebi.ac.uk/efo/EFO_0000408" not in obj.current_classes
 
     '''
