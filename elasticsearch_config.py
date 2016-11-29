@@ -833,6 +833,27 @@ class ElasticSearchConfiguration():
                                                                   "index": "not_analyzed",
                                                               },
                                                           }
+                                                      },
+                                                      "target_class": {
+                                                          "properties": {
+                                                              "level1": {
+                                                                  "properties": {
+                                                                            "label": {
+                                                                      "type": "string",
+                                                                      "index": "not_analyzed",
+                                                                     },
+                                                                  },
+                                                              },
+                                                               "level2": {
+                                                                  "properties": {
+                                                                            "label": {
+                                                                      "type": "string",
+                                                                      "index": "not_analyzed",
+                                                                     },
+                                                                  },
+                                                              },
+
+                                                          }
                                                       }
                                                   }
                                               }
