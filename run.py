@@ -130,6 +130,9 @@ if __name__ == '__main__':
     parser.add_argument("--local-file", dest='local_file',
                         help="pass the path to a local gzipped file to use as input for the data validation step",
                         action='append', default=[])
+    parser.add_argument("--remote-file", dest='remote_file',
+                        help="pass the url to a remote gzipped file to use as input for the data validation step",
+                        action='append', default=[])
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
                         action='store', default='INFO')
@@ -223,7 +226,8 @@ if __name__ == '__main__':
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(connectors.es, connectors.r_server, dry_run=args.dry_run).check_all(args.local_file)
+                EvidenceValidationFileChecker(connectors.es, connectors.r_server, dry_run=args.dry_run).check_all(local_files=args.local_file,
+                                                                                                                  remote_files=args.remote_file)
         if args.valreset:
             EvidenceValidationFileChecker( connectors.es, connectors.r_server).reset()
         if args.evs or run_full_pipeline:

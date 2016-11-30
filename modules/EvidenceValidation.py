@@ -1,4 +1,6 @@
 from __future__ import division
+
+import io
 import os
 import sys
 import copy
@@ -113,6 +115,7 @@ class FileTypes():
     LOCAL='local'
     SFTP='sftp'
     S3='s3'
+    HTTP='http'
 
 class ValidationActions(Actions):
     CHECKFILES = 'checkfiles'
@@ -127,6 +130,7 @@ class DirectoryCrawlerProcess():
                  es,
                  r_server,
                  local_files = [],
+                 remote_files = [],
                  dry_run = False):
         self.output_q = output_q
         self.es = es
@@ -136,6 +140,7 @@ class DirectoryCrawlerProcess():
         self.r_server = r_server
         self._remote_filenames =dict()
         self.local_files = local_files
+        self.remote_files = remote_files
         self.logger = logging.getLogger(__name__)
 
     def _store_remote_filename(self, filename):
@@ -184,6 +189,31 @@ class DirectoryCrawlerProcess():
 
         '''scroll through remote  user directories and find the latest files'''
 
+        if self.remote_files:
+            for url in self.remote_files:
+                f = url.split('/')[-1]
+                if re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, f):
+                    version_name = f.split('/')[-1].split('.')[0]
+                    if '-' in version_name:
+                        user, day, month, year = version_name.split('-')
+                        if '_' in user:
+                            datasource = ''.join(user.split('_')[1:])
+                            user = user.split('_')[0]
+                        else:
+                            datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
+                        EvidenceChunkElasticStorage.storage_delete(self.loader, datasource)
+                        EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
+                        try:
+                            logfile = os.path.join('/tmp', version_name + ".log")
+                            self.check_file(url, version_name, user, datasource, None, logfile, FileTypes.HTTP)
+                            self.logger.debug("%s %s DONE" % (self.__class__.__name__, version_name))
+
+                        except AttributeError, e:
+                            self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, f, e))
+                else:
+                    raise AttributeError(
+                        'invalid filename, should match regex: %s' % Config.EVIDENCEVALIDATION_FILENAME_REGEX)
+
         if self.local_files:
             for f in self.local_files:
                 if re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, f):
@@ -212,7 +242,7 @@ class DirectoryCrawlerProcess():
 
 
 
-        else:
+        if not self.local_files and not self.remote_files:
 
             for u, p in tqdm(Config.EVIDENCEVALIDATION_FTP_ACCOUNTS.items(),
                              desc='scanning ftp accounts',
@@ -274,7 +304,7 @@ class DirectoryCrawlerProcess():
                    file_version,
                    provider_id,
                    data_source_name,
-                   md5_hash,
+                   md5_hash = None,
                    logfile=None,
                    file_type= FileTypes.SFTP,
                    validate=True,
@@ -282,18 +312,21 @@ class DirectoryCrawlerProcess():
                    ):
         '''check if the file was already parsed in ES'''
 
-        existing_submission= self.submission_audit.get_submission_md5(md5=md5_hash)
+        if md5_hash:
+            existing_submission= self.submission_audit.get_submission_md5(md5=md5_hash)
 
-        if existing_submission:
-            md5 = existing_submission["_source"]["md5"]
-            if md5 == md5_hash:
-                    self.logger.info('%s file already recorded. Won\'t parse' % file_path)
-                    ''' should be false, set to true if you want to parse anyway '''
-                    validate = Config.EVIDENCEVALIDATION_FORCE_VALIDATION
-            else:
-                self.logger.info('file recorded with a different hash %s, revalidatiing.' % (md5))
-                validate = True
-                self.logger.info('validate for file %s %r' % (file_version,validate))
+            if existing_submission:
+                md5 = existing_submission["_source"]["md5"]
+                if md5 == md5_hash:
+                        self.logger.info('%s file already recorded. Won\'t parse' % file_path)
+                        ''' should be false, set to true if you want to parse anyway '''
+                        validate = Config.EVIDENCEVALIDATION_FORCE_VALIDATION
+                else:
+                    self.logger.info('file recorded with a different hash %s, revalidatiing.' % (md5))
+                    validate = True
+                    self.logger.info('validate for file %s %r' % (file_version,validate))
+        else:
+            existing_submission = False
 
         if validate == True:
 
@@ -457,6 +490,51 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                             line_buffer = []
 
                         line = fh.readline()
+
+        elif file_type == FileTypes.HTTP:
+            '''temprorary get lines total'''
+            response = requests.get(file_path, stream=True)
+            response.raise_for_status()
+            file_size = int(response.headers['content-length'])
+            file_handler = StringIO()
+            t = tqdm(desc='downloading %s via HTTP' % file_version,
+                     total=file_size,
+                     unit='B',
+                     unit_scale=True)
+            for remote_file_chunk in response.iter_content(chunk_size=128):
+                file_handler.write(remote_file_chunk)
+                t.update(len(remote_file_chunk))
+            logging.debug('Downloaded file %s from HTTP at %.2fMB/s' % (
+                file_version, (file_size / 1e6) / (t.last_print_t - t.start_t)))
+            t.close()
+            response.close()
+            file_handler.seek(0)
+            with io.BufferedReader(gzip.GzipFile(filename=file_version.split('/')[-1],
+                                                 mode='rb',
+                                                 fileobj=file_handler,
+                                                 )) as fh:
+                    lines = self._count_file_lines(fh)
+            file_handler.seek(0)
+            total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+            if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
+                total_chunks +=1
+            self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
+            with io.BufferedReader(gzip.GzipFile(filename=file_version.split('/')[-1],
+                                                 mode='rb',
+                                                 fileobj=file_handler,
+                                                 )) as fh:
+                line = fh.readline()
+                while line:
+                    line_buffer.append(line)
+                    line_number += 1
+                    if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
+                        self.put_into_queue_out(
+                            (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                             offset, list(line_buffer), False))
+                        offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+                        chunk += 1
+                        line_buffer = []
+                    line = fh.readline()
         else:
             raise AttributeError('File type %s is not supported'%file_type)
 
@@ -1601,7 +1679,10 @@ class EvidenceValidationFileChecker():
         return self.buffer.getvalue()
 
 
-    def check_all(self, local_files = [], dry_run = False):
+    def check_all(self,
+                  local_files = [],
+                  remote_files = [],
+                  dry_run = False):
         '''
         Check every given evidence string
         :return:
@@ -1619,7 +1700,10 @@ class EvidenceValidationFileChecker():
                                                       LookUpDataType.HPO,
                                                       LookUpDataType.MP,
                                                      ),
+                                          autoload=False,
                                           ).lookup
+
+        lookup_data.available_genes.load_uniprot2ensembl()
 
         'Create queues'
         file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
@@ -1689,6 +1773,7 @@ class EvidenceValidationFileChecker():
                 self.es,
                 self.r_server,
                 local_files,
+                remote_files,
                 dry_run=dry_run,
         )
 
