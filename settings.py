@@ -30,7 +30,13 @@ class Config():
     try:
         ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
         ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
-        ELASTICSEARCH_URL = 'http://'+ELASTICSEARCH_HOST
+
+        if ',' in ELASTICSEARCH_HOST:
+            ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
+            ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
+        else:
+            ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
+        ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
     except ConfigParser.NoOptionError:
