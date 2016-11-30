@@ -30,7 +30,13 @@ class Config():
     try:
         ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
         ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
-        ELASTICSEARCH_URL = 'http://'+ELASTICSEARCH_HOST
+
+        if ',' in ELASTICSEARCH_HOST:
+            ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
+            ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
+        else:
+            ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
+        ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
     except ConfigParser.NoOptionError:
@@ -165,7 +171,7 @@ class Config():
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
-    MOUSEMODELS_CACHE_DIRECTORY = '~/.phenodigmcache'
+    MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
 
     # hardcoded folder of json file to be preprocessed to extract
     # HP and MP terms not in EFO but that will be combined in a SLIM

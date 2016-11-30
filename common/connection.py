@@ -36,7 +36,9 @@ class PipelineConnectors():
         connection_attempt = 1
         hosts=[]
         #es = None
-        if Config.ELASTICSEARCH_HOST and Config.ELASTICSEARCH_PORT:
+        if len(Config.ELASTICSEARCH_NODES) > 1 and Config.ELASTICSEARCH_PORT:
+            hosts = [dict(host=node, port=Config.ELASTICSEARCH_PORT) for node in Config.ELASTICSEARCH_NODES]
+        elif Config.ELASTICSEARCH_HOST and Config.ELASTICSEARCH_PORT:
             while 1:
                 import socket
                 try:#is a valid ip
@@ -59,25 +61,25 @@ class PipelineConnectors():
                             self.logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
                             break
                         connection_attempt+=1
-            if hosts:
-                self.es = Elasticsearch(hosts = hosts,
-                                   maxsize=50,
-                                   timeout=1800,
-                                   sniff_on_connection_fail=True,
-                                   retry_on_timeout=True,
-                                   max_retries=10,
-                                   )
-                connection_attempt = 1
-                while not self.es.ping():
-                    wait_time = 3*connection_attempt
-                    self.logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
-                    time.sleep(wait_time)
-                    if connection_attempt >=3:
-                        self.logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
-                        break
-                    connection_attempt += 1
-            else:
-                self.es=None
+        if hosts:
+            self.es = Elasticsearch(hosts = hosts,
+                               maxsize=50,
+                               timeout=1800,
+                               sniff_on_connection_fail=True,
+                               retry_on_timeout=True,
+                               max_retries=10,
+                               )
+            connection_attempt = 1
+            while not self.es.ping():
+                wait_time = 3*connection_attempt
+                self.logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
+                time.sleep(wait_time)
+                if connection_attempt >=3:
+                    self.logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_URL)
+                    break
+                connection_attempt += 1
+        else:
+            self.es=None
 
 
         '''init sparql endpoint client'''

@@ -148,6 +148,24 @@ def test_load_efo_classes():
         logger.info("%s => %s "%(k, v))
         assert obj.obsolete_classes[k] == v
 
+def test_load_efo_children():
+
+    obj = OntologyClassReader()
+    assert not obj == None
+    obj.load_efo_classes()
+    logger.info("Number of current classes: %i" % len(obj.current_classes))
+    logger.info("Number of classes with children: %i" % len(obj.children))
+
+    '''
+    Check EFO children
+    Test with Crohn's disease
+    '''
+    assert len(obj.children["http://www.ebi.ac.uk/efo/EFO_0000384"]) == 5
+    for child in obj.children["http://www.ebi.ac.uk/efo/EFO_0000384"]:
+        assert child['code'] in ["EFO_0005622", "EFO_0005624", "EFO_0005625", "EFO_0005627", "EFO_0005629"]
+        assert child['label'] in ["Crohn's colitis", "ileocolitis", "oral Crohn's disease", "perianal Crohn's disease", "small bowel Crohn's disease"]
+
+
 @with_setup(my_setup_function, my_teardown_function)
 def test_load_open_targets_disease_ontology():
 
@@ -183,6 +201,8 @@ def test_load_open_targets_disease_ontology():
     assert obj.current_classes['http://www.ebi.ac.uk/efo/EFO_0000684'] == "respiratory system disease"
     assert obj.current_classes['http://www.ebi.ac.uk/efo/EFO_0002461'] == "skeletal system disease"
     assert obj.current_classes['http://www.ebi.ac.uk/efo/EFO_0000701'] == "skin disease"
+    assert obj.current_classes['http://www.ebi.ac.uk/efo/EFO_0001421'] == "liver disease"
+
     assert "http://www.ebi.ac.uk/efo/EFO_0000408" not in obj.current_classes
 
     '''

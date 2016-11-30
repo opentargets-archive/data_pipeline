@@ -203,27 +203,26 @@ class Loader():
                 mappings = self.es.indices.get_mapping(index=index_name)
                 settings = self.es.indices.get_settings(index=index_name)
 
-                try:
-                    if 'mappings' in body:
-                        datatypes = body['mappings'].keys()
-                        for dt in datatypes:
-                            if dt != '_default_':
-                                keys = body['mappings'][dt].keys()
-                                if 'dynamic_templates' in keys:
-                                    del keys[keys.index('dynamic_templates')]
-                                assertJSONEqual(mappings[index_name]['mappings'][dt],
-                                                body['mappings'][dt],
-                                                msg='mappings in elasticsearch are different from the ones sent for datatype %s'%dt,
-                                                keys = keys)
-                    if 'settings' in body:
-                        assertJSONEqual(settings[index_name]['settings']['index'],
-                                        body['settings'],
-                                        msg='settings in elasticsearch are different from the ones sent',
-                                        keys=body['settings'].keys(),#['number_of_replicas','number_of_shards','refresh_interval']
-                                        )
-                except ValueError as e:
-                    self.logger.exception("elasticsearch settings error")
-
+            try:
+                if 'mappings' in body:
+                    datatypes = body['mappings'].keys()
+                    for dt in datatypes:
+                        if dt != '_default_':
+                            keys = body['mappings'][dt].keys()
+                            if 'dynamic_templates' in keys:
+                                del keys[keys.index('dynamic_templates')]
+                            assertJSONEqual(mappings[index_name]['mappings'][dt],
+                                            body['mappings'][dt],
+                                            msg='mappings in elasticsearch are different from the ones sent for datatype %s'%dt,
+                                            keys = keys)
+                if 'settings' in body:
+                    assertJSONEqual(settings[index_name]['settings']['index'],
+                                    body['settings'],
+                                    msg='settings in elasticsearch are different from the ones sent',
+                                    keys=body['settings'].keys(),#['number_of_replicas','number_of_shards','refresh_interval']
+                                    )
+            except ValueError as e:
+                self.logger.exception("elasticsearch settings error")
 
     def create_new_index(self, index_name, recreate = False):
         if not self.dry_run:
@@ -252,8 +251,9 @@ class Loader():
                     break
 
             if not index_created:
-                raise ValueError('Cannot create index %s because no mappings are set'%index_name)
-            self.logger.info("%s index created"%index_name)
+                self._safe_create_index(index_name)
+                logging.warning('Index %s created without explicit mappings' % index_name)
+            logging.info("%s index created" % index_name)
             return
 
     def _enforce_mapping(self, index_name):
