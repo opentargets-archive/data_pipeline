@@ -30,7 +30,13 @@ class Config():
     try:
         ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
         ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
-        ELASTICSEARCH_URL = 'http://'+ELASTICSEARCH_HOST
+
+        if ',' in ELASTICSEARCH_HOST:
+            ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
+            ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
+        else:
+            ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
+        ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
     except ConfigParser.NoOptionError:
@@ -90,10 +96,8 @@ class Config():
         print 'no postgres instance'
         POSTGRES_DATABASE = {}
 
-    # HGNC_COMPLETE_SET = 'ftp://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
-    HGNC_COMPLETE_SET = 'https://4.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9uZXcvanNvbi9oZ25jX2NvbXBsZXRlX3NldC5qc29u&f=norefer'
-    # HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
-    HGNC_ORTHOLOGS = 'https://5.hidemyass.com/ip-1/encoded/Oi8vZnRwLmViaS5hYy51ay9wdWIvZGF0YWJhc2VzL2dlbmVuYW1lcy9oY29wL2h1bWFuX2FsbF9oY29wX3NpeHRlZW5fY29sdW1uLnR4dC5neg%3D%3D&f=norefer'
+    HGNC_COMPLETE_SET = 'http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
+    HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
     HGNC_ORTHOLOGS_SPECIES = {
         '9606':'human',
         '9598':'chimpanzee',
@@ -108,10 +112,6 @@ class Config():
         '6239':'worm',
         '4932':'yeast'
     }
-
-    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
-    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
-    CHEMBL_DRUG_SYNONYMS = '''https://www.ebi.ac.uk/chembl/api/data/molecule/{}.json'''
 
     HPA_NORMAL_TISSUE_URL = 'http://v15.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v15.proteinatlas.org/download/cancer.csv.zip'
@@ -185,10 +185,11 @@ class Config():
     # put the path to the file where you want to write the SLIM file (turtle format)
     ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
 
-    CHEMBL_URIS = dict(
-        protein_class='https://www.ebi.ac.uk/chembl/api/data/protein_class',
-        target_component='https://www.ebi.ac.uk/chembl/api/data/target_component',
-    )
+    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
+    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
+    CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
+    CHEMBL_PROTEIN_CLASS = '''https://www.ebi.ac.uk/chembl/api/data/protein_class.json'''
+    CHEMBL_TARGET_COMPONENT = '''https://www.ebi.ac.uk/chembl/api/data/target_component.json'''
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5

@@ -179,17 +179,17 @@ def _get_subclass_of(arg, graph):
 superclass generators: yield a series of values
 '''
 def write_superclasses(arg, source_graph):
-    print "[write_superclasses] %i"%len(arg)
+    # print "[write_superclasses] %i"%len(arg)
     node = arg[0]
     destination_graph = arg[1]
-    print node
-    print node.qname()
-    print node.value(RDFS.label)
+    # print node
+    # print node.qname()
+    # print node.value(RDFS.label)
     if (node, None, None) not in destination_graph:
         superclasses = list(node.transitive_objects(RDFS.subClassOf))
         for c in superclasses:
             if node.qname() != c.qname():
-                print c
+                # print c
                 label = c.value(RDFS.label)
                 destination_graph.add((node, RDFS.subClassOf, c))
                 yield (c, destination_graph)
@@ -572,8 +572,8 @@ class OntologyClassReader():
 
         evidence_uri = URIRef('http://purl.obolibrary.org/obo/ECO_0000000')
 
-        for triple in self.rdf_graph.triples((evidence_uri, None, None)):
-             logger.debug(triple)
+        # for triple in self.rdf_graph.triples((evidence_uri, None, None)):
+        #      logger.debug(triple)
 
         '''
             Open Targets specific evidence:
@@ -606,8 +606,8 @@ class OntologyClassReader():
             self.rdf_graph.add([u, RDFS.subClassOf, evidence_uri])
 
         u = URIRef('http://identifiers.org/eco/target_drug')
-        for triple in self.rdf_graph.triples((u, None, None)):
-             logger.debug(triple)
+        # for triple in self.rdf_graph.triples((u, None, None)):
+        #      logger.debug(triple)
 
         #(a, b, c) = self.rdf_graph.namespace_manager.compute_qname(unicode('http://identifiers.org/eco/target_drug'))
         #logger.debug(c)
@@ -816,14 +816,14 @@ class PhenotypeSlim():
                     self.exclude_phenotypes(al)
 
     def _store_remote_filename(self, filename):
-        print "%s" % filename
+        # print "%s" % filename
         self.logger.debug("%s" % filename)
         if filename.startswith('/upload/submissions/') and \
             filename.endswith('.json.gz'):
             self.logger.debug("%s" % filename)
             if True:
                 version_name = filename.split('/')[3].split('.')[0]
-                print "%s" % filename
+                # print "%s" % filename
                 if '-' in version_name:
                     user, day, month, year = version_name.split('-')
                     if '_' in user:
@@ -945,7 +945,7 @@ class PhenotypeSlim():
         fh.close()
 
     def parse_sftp_gzipfile(self, file_path, u, p):
-        print "---->%s"%file_path
+        # print "---->%s"%file_path
         self.logger.info("%s %s" % (u, p))
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None  # disable host key checking.

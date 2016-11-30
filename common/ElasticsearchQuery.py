@@ -1,13 +1,14 @@
+import collections
+import json
+import logging
 from collections import Counter
 
-import collections
 import jsonpickle
 from elasticsearch import helpers
 
 from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
 from settings import Config
-
 
 class AssociationSummary(object):
 
@@ -37,11 +38,13 @@ class ESQuery(object):
     def __init__(self, es, dry_run = False):
         self.handler = es
         self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
+
 
     @staticmethod
     def _get_source_from_fields(fields = None):
-        if fields is None:
-            fields = ['*']
+        if not fields:
+            return True
         source = {"include": fields}
         return source
 
@@ -66,23 +69,10 @@ class ESQuery(object):
         if not isinstance(ids, list):
             ids = [ids]
 
-        source = self._get_source_from_fields(fields)
-        res = helpers.scan(client=self.handler,
-                            query={"query": {
-                                            "ids" : {
-                                                "values" : ids
-                                              }
-                                          },
-                                          '_source': source,
-                                          'size': 20,
-                                      },
-                            scroll='12h',
-                            doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME),
-                            timeout="30m",
-                            )
-        for hit in res:
-            yield hit['_source']
+        self.get_objects_by_id(ids,
+                               Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                               Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                               fields)
     
     def count_all_targets(self):
 
@@ -239,12 +229,10 @@ class ESQuery(object):
         return AssociationSummary(res)
 
 
-    def get_validated_evidence_strings(self, fields = None, size=1000, datasources = []):
+    def get_validated_evidence_strings(self,  size=1000, datasources = []):
 
 
-        source = self._get_source_from_fields(fields)
 
-        # TODO: do a scroll to get all the ids without sorting, and use many async mget queries to fetch the sources
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
         doc_type = None
@@ -253,8 +241,8 @@ class ESQuery(object):
             doc_type = datasources
         res = helpers.scan(client=self.handler,
                            query={"query":  {"match_all": {}},
-                               '_source': source,
-                               'size': 1000,
+                               '_source': True,
+                               'size': size,
                            },
                            scroll='12h',
                            doc_type=doc_type,
@@ -262,7 +250,7 @@ class ESQuery(object):
                            timeout="10m",
                            )
 
-
+        # res = list(res)
         for hit in res:
             yield hit['_source']
 
@@ -465,7 +453,7 @@ class ESQuery(object):
                         if doc['found']:
                             yield doc['_source']
                         else:
-                            raise ValueError('document with id %s not found'%(doc['_id']))
+                            raise KeyError('document with id %s not found'%(doc['_id']))
                     id_buffer = []
             if id_buffer:
                 res_get = get_ids(id_buffer)
@@ -473,7 +461,7 @@ class ESQuery(object):
                     if doc['found']:
                         yield doc['_source']
                     else:
-                        raise ValueError('document with id %s not found' % (doc['_id']))
+                        raise KeyError('document with id %s not found' % (doc['_id']))
 
 
     def get_all_target_ids_with_evidence_data(self):
@@ -554,54 +542,114 @@ class ESQuery(object):
         return res['hits']['total']
 
 
+    # def get_publications_by_id(self, ids):
+    #     query_body = {"query": {
+    #                            "ids": {
+    #                                "values": ids,
+    #                            }
+    #                        },
+    #                            '_source': True,
+    #                            'size': 100,
+    #                        }
+    #     if len(ids) <10000:
+    #         query_body['size']=10000
+    #         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+    #                                   doc_type = Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+    #                                   body=query_body,
+    #                                   )
+    #         for hit in res['hits']['hits']:
+    #             yield hit['_source']
+    #     else:
+    #         res = helpers.scan(client=self.handler,
+    #                            query=query_body,
+    #                            scroll='12h',
+    #                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+    #                            doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+    #                            timeout="10m",
+    #                            )
+    #         for hit in res:
+    #             yield hit['_source']
+
+    def get_objects_by_doc(self, docs,
+                           fields=[],
+                           realtime = False):
+        '''
+
+        :param docs: list of dictionaries {'id':doc_id,"index":index,"doc_type":doc_type}
+        :return: generator of documents
+        '''
+        res = self.handler.mget(body=dict(docs=docs),
+                                _source=self._get_source_from_fields(fields),
+                                realtime=realtime,
+                                )
+        for doc in res['docs']:
+            if doc['found']:
+                yield doc['_source']
+            else:
+                raise KeyError('publication with id %s not found' % (doc['_id']))
+
+    def get_objects_by_id(self,
+                          ids,
+                          index,
+                          doc_type,
+                          fields = [],
+                          realtime = False):
+        '''
+
+        :param ids: list of idientifiers for documents
+        :param index: index for all the documents
+        :param doc_type: doc type for all the documents
+        :return: generator of documents
+        '''
+        res = self.handler.mget(index=Loader.get_versioned_index(index),
+                                doc_type=doc_type,
+                                body=dict(ids=ids),
+                                _source=self._get_source_from_fields(fields),
+                                realtime=realtime,
+                                )
+        for doc in res['docs']:
+            if doc['found']:
+                yield doc['_source']
+            else:
+                raise KeyError('object with id %s not found' % (doc['_id']))
+
     def get_publications_by_id(self, ids):
-        query_body = {"query": {
-                               "ids": {
-                                   "values": ids,
-                               }
-                           },
-                               '_source': True,
-                               'size': 100,
-                           }
-        if len(ids) <10000:
-            query_body['size']=10000
-            res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-                                      doc_type = Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                                      body=query_body,
-                                      )
-            for hit in res['hits']['hits']:
-                yield hit['_source']
-        else:
-            res = helpers.scan(client=self.handler,
-                               query=query_body,
-                               scroll='12h',
-                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-                               doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                               timeout="10m",
-                               )
-            for hit in res:
-                yield hit['_source']
+        return self.get_objects_by_id(ids,
+                                      Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                                      Config.ELASTICSEARCH_PUBLICATION_DOC_NAME)
+
+    def get_all_pub_ids_from_validated_evidence(self, datasources= None):
+        for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
+                                                                    size=1000,
+                                                   datasources=datasources)):
+            if hit:
+                try:
+                    ev = json.loads(hit['evidence_string'])
+                    for lit in ev['literature']['references']:
+                        yield lit['lit_id'].split('/')[-1]
+                except KeyError:
+                    pass
 
 
-    def get_all_pub_ids_from_evidence(self,datasources= None):
-        #TODO: get all the validated evidencestrings and fetch medline abstracts there
-        #USE THIS INSTEAD: self.es_query.get_validated_evidence_strings(datasources=datasources, fields='evidence_string.literature.references.lit_id'
-        return self.get_validated_evidence_strings(fields='evidence_string.literature.references.lit_id',
-                                                   datasources=datasources)
-
-        # return ['http://europepmc.org/abstract/MED/24523595',
-        #        'http://europepmc.org/abstract/MED/26784250',
-        #        'http://europepmc.org/abstract/MED/27409410',
-        #        'http://europepmc.org/abstract/MED/26290144',
-        #        'http://europepmc.org/abstract/MED/25787843',
-        #        'http://europepmc.org/abstract/MED/26836588',
-        #        'http://europepmc.org/abstract/MED/26781615',
-        #        'http://europepmc.org/abstract/MED/26646452',
-        #        'http://europepmc.org/abstract/MED/26774881',
-        #        'http://europepmc.org/abstract/MED/26629442',
-        #        'http://europepmc.org/abstract/MED/26371324',
-        #        'http://europepmc.org/abstract/MED/24817865',
-        #        ]
+    def get_all_pub_from_validated_evidence(self,datasources= None, batch_size=1000):
+        batch = []
+        for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
+                                                                    size=batch_size,
+                                                   datasources=datasources)):
+            if hit:
+                try:
+                    ev = json.loads(hit['evidence_string'])
+                    for lit in ev['literature']['references']:
+                        batch.append(lit['lit_id'].split('/')[-1])
+                except KeyError:
+                    pass
+            if len(batch)>=batch_size:
+                for pub in self.get_publications_by_id(batch):
+                    yield pub
+                batch =[]
+        if batch:
+            for pub in self.get_publications_by_id(batch):
+                yield pub
 
     def get_all_associations_ids(self,):
         res = helpers.scan(client=self.handler,
@@ -682,7 +730,7 @@ class ESQuery(object):
 
         return count
 
-    def delete_data(self, index, query, doc_type = '', chunk_size=1000, altered_keys=None):
+    def delete_data(self, index, query, doc_type = '', chunk_size=1000, altered_keys=()):
         '''
         Delete all the documents in an index matching a given query
         :param index: index to use
@@ -719,12 +767,15 @@ class ESQuery(object):
                                     doc_type=doc_type,
                                     timeout='1h',
                                        ):
-                batch.append({
-                                '_op_type': 'delete',
-                                '_index': hit['_index'],
-                                '_type': hit['_type'],
-                                '_id': hit['_id'],
-                            })
+                action = {
+                    '_op_type': 'delete',
+                    '_index': hit['_index'],
+                    '_type': hit['_type'],
+                    '_id': hit['_id'],
+                }
+                if '_routing' in hit:
+                    action['_routing'] = hit['_routing']
+                batch.append(action)
                 flat_source = self.flatten(hit['_source'])
                 for key in altered_keys:
                     if key in flat_source:
@@ -733,11 +784,11 @@ class ESQuery(object):
                     self._flush_bulk(batch)
                     batch = []
 
-        if len(batch) >= chunk_size:
-            self._flush_bulk(batch)
-        '''flush changes'''
-        self.handler.indices.flush(Loader.get_versioned_index(index),
-                         wait_if_ongoing=True)
+            if len(batch) >= chunk_size:
+                self._flush_bulk(batch)
+            '''flush changes'''
+            self.handler.indices.flush(Loader.get_versioned_index(index),
+                             wait_if_ongoing=True)
 
         return altered
 
@@ -783,3 +834,9 @@ class ESQuery(object):
             else:
                 flat_fields.append((flat_key, v))
         return dict(flat_fields)
+
+    def exists(self, index, doc_type, id,realtime = False):
+        return self.handler.exists(index = Loader.get_versioned_index(index),
+                                   doc_type =doc_type,
+                                   id = id,
+                                   realtime = realtime)

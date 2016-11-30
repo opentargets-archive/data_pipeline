@@ -48,7 +48,7 @@ class ECO(JSONSerializable):
 
     def get_id(self):
         # return self.code
-        return get_ontology_code_from_url(self.path_codes[-1])
+        return get_ontology_code_from_url(self.code)
 
 
 
@@ -121,10 +121,11 @@ class EcoProcess():
 
 
     def _store_eco(self):
-        for eco in self.ecos:
+        for eco_id, eco_obj in self.ecos.items():
             self.loader.put(index_name=Config.ELASTICSEARCH_ECO_INDEX_NAME,
                             doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
-                            body=eco)
+                            ID=eco_id,
+                            body=eco_obj)
 
 
 

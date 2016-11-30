@@ -35,6 +35,7 @@ class LookUpDataRetriever(object):
                  r_server = None,
                  targets = [],
                  data_types=(LookUpDataType.TARGET,LookUpDataType.DISEASE,LookUpDataType.ECO),
+                 autoload  = True,
                  ):
 
         self.es = es
@@ -51,7 +52,7 @@ class LookUpDataRetriever(object):
                          ):
             start_time = time.time()
             if dt == LookUpDataType.TARGET:
-                self._get_gene_info(targets)
+                self._get_gene_info(targets, autoload=autoload)
             elif dt == LookUpDataType.DISEASE:
                 self._get_available_efos()
             elif dt == LookUpDataType.ECO:
@@ -62,6 +63,8 @@ class LookUpDataRetriever(object):
                 self._get_hpo()
             elif dt == LookUpDataType.EFO:
                 self._get_efo()
+            elif dt == LookUpDataType.PUBLICATION:
+                self._get_available_publications()
 
             self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
 
@@ -76,9 +79,13 @@ class LookUpDataRetriever(object):
         self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
 
 
-    def _get_gene_info(self, targets=[]):
+    def _get_gene_info(self, targets=[], autoload = True):
         self.logger.info('getting gene info')
-        self.lookup.available_genes = GeneLookUpTable(self.es, 'GENE_LOOKUP', self.r_server, targets = targets)
+        self.lookup.available_genes = GeneLookUpTable(self.es,
+                                                      'GENE_LOOKUP',
+                                                      self.r_server,
+                                                      targets = targets,
+                                                      autoload = autoload)
         self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
         self._get_non_reference_gene_mappings()
 
@@ -121,3 +128,8 @@ class LookUpDataRetriever(object):
         '''
         self.lookup.efo_ontology = OntologyClassReader()
         self.lookup.efo_ontology.load_efo_classes()
+
+
+    def _get_available_publications(self):
+        self.logger.info('getting literature/publications')
+        self.lookup.available_publications = LiteratureLookUpTable(self.es, 'LITERATURE_LOOKUP', self.r_server)

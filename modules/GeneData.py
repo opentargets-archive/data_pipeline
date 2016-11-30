@@ -1,14 +1,13 @@
-import warnings
-from collections import OrderedDict
-import logging
-from StringIO import StringIO
-import urllib2
-import requests
-import gzip
 import csv
+import gzip
+import logging
 import multiprocessing
 import ujson as json
+import urllib2
+from StringIO import StringIO
+from collections import OrderedDict
 
+import requests
 from tqdm import tqdm
 
 from common import Actions
@@ -16,10 +15,9 @@ from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from common.UniprotIO import UniprotIterator
+from modules.ChEMBL import ChEMBLLookup
 from modules.Reactome import ReactomeRetriever
 from settings import Config
-
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
 ENS_ID_ORG_PREFIX = 'http://identifiers.org/ensembl/'
@@ -86,6 +84,7 @@ class Gene(JSONSerializable):
         self.ortholog = {}
         self._private ={}
         self.drugs = {}
+        self.protein_classification = {}
 
 
     def _set_id(self):
@@ -497,6 +496,7 @@ class GeneManager():
         self.esquery = ESQuery(loader.es)
         self.genes = GeneSet()
         self.reactome_retriever=ReactomeRetriever(loader.es)
+        self.chembl_handler = ChEMBLLookup()
 
 
 
@@ -646,34 +646,33 @@ class GeneManager():
         logging.info('all gene objects pushed to elasticsearch')
 
     def _get_chembl_data(self):
-        logging.info("Chembl Drug parsing ")
-
-        for gene_id, gene in self.genes.iterate():
-            req = requests.get(Config.CHEMBL_TARGET_BY_UNIPROT_ID,params={'target_components__accession': gene.uniprot_id})
-            req.raise_for_status()
-            target_chembl_ids = [x['target_chembl_id'] for x in req.json()['targets']]
-
-            molecules = []
-            for target_id in target_chembl_ids:
-                r = requests.get(Config.CHEMBL_MECHANISM, params={'target_chembl_id': target_id})
-                r.raise_for_status()
-                molecules.extend([x['molecule_chembl_id'] for x in r.json()['mechanisms']])
-
-            target_drugnames = {}
-            for chembl_id in molecules:
-                r = requests.get(Config.CHEMBL_DRUG_SYNONYMS.format(chembl_id))
-                r.raise_for_status()
-                target_drugnames[chembl_id]=[]
-                #target_drugnames[chembl_id] = list(set([x['synonyms'] for x in r.json()['molecule_synonyms']]))
-                #TODO : remove dups
-                for x in r.json()['molecule_synonyms']:
-                    synonym_data = {}
-                    synonym_data['synonym']=x['synonyms']
-                    synonym_data['synonym_type'] = x['syn_type']
-                    target_drugnames[chembl_id].append(synonym_data)
-
+        logging.info("Retrieving Chembl Drug")
+        self.chembl_handler.download_molecules_linked_to_target()
+        logging.info("Retrieving Chembl Target Class ")
+        self.chembl_handler.download_protein_classification()
+        logging.info("Adding Chembl data to genes ")
+        for gene_id, gene in tqdm(self.genes.iterate(),
+                                  desc='Getting drug data from chembl',
+                                  unit=' gene'):
+            target_drugnames = []
             ''' extend gene with related drug names '''
-            gene.drugs['chembl_drugs'] = target_drugnames
+            if gene.uniprot_accessions:
+                for a in gene.uniprot_accessions:
+                    if a in self.chembl_handler.uni2chembl:
+                        chembl_id = self.chembl_handler.uni2chembl[a]
+                        if chembl_id in self.chembl_handler.target2molecule:
+                            molecules = self.chembl_handler.target2molecule[chembl_id]
+                            for mol in molecules:
+                                synonyms = self.chembl_handler.molecule2synonyms[mol]
+                                target_drugnames.extend(synonyms)
+                        if a in self.chembl_handler.protein_classification:
+                            gene.protein_classification['chembl'] = self.chembl_handler.protein_classification[a]
+                        break
+            if target_drugnames:
+                gene.drugs['chembl_drugs'] = target_drugnames
+
+
+
 
 
 
@@ -687,7 +686,8 @@ class GeneLookUpTable(object):
                  namespace = None,
                  r_server = None,
                  ttl = 60*60*24+7,
-                 targets = []):
+                 targets = [],
+                 autoload=True):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = r_server,
                                             ttl = ttl)
@@ -695,11 +695,11 @@ class GeneLookUpTable(object):
         self._es_query = ESQuery(es)
         self.r_server = r_server
         self.uniprot2ensembl = {}
-        if r_server is not None:
-            self._load_gene_data(r_server, targets)
+        if (r_server is not None) and autoload:
+            self.load_gene_data(r_server, targets)
 
 
-    def _load_gene_data(self, r_server = None, targets = []):
+    def load_gene_data(self, r_server = None, targets = []):
         if targets:
             data = self._es_query.get_targets_by_id(targets)
             total = len(targets)
@@ -719,8 +719,36 @@ class GeneLookUpTable(object):
             for accession in target['uniprot_accessions']:
                 self.uniprot2ensembl[accession] = target['id']
 
-    def get_gene(self, target_id, r_server = None):#TODO: return a gene object not a dictionary
-        return self._table.get(target_id, r_server=self._get_r_server(r_server))
+    def load_uniprot2ensembl(self, targets = []):
+        uniprot_fields = ['uniprot_id','uniprot_accessions', 'id']
+        if targets:
+            data = self._es_query.get_targets_by_id(targets,
+                                                    fields= uniprot_fields)
+            total = len(targets)
+        else:
+            data = self._es_query.get_all_targets(fields= uniprot_fields)
+            total = self._es_query.count_all_targets()
+        for target in tqdm(data,
+                           desc='loading mappings from uniprot to ensembl',
+                           unit=' genes',
+                           unit_scale=True,
+                           total=total,
+                           leave=False,
+                           ):
+            if target['uniprot_id']:
+                self.uniprot2ensembl[target['uniprot_id']] = target['id']
+            for accession in target['uniprot_accessions']:
+                self.uniprot2ensembl[accession] = target['id']
+
+    def get_gene(self, target_id, r_server = None):
+        try:
+            return self._table.get(target_id, r_server=self._get_r_server(r_server))
+        except KeyError:
+            target = self._es_query.get_objects_by_id([target_id],
+                                             Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                             Config.ELASTICSEARCH_GENE_NAME_DOC_NAME).next()
+            self.set_gene(target, r_server)
+            return target
 
     def set_gene(self, target, r_server = None):
         self._table.set(target['id'],target, r_server=self._get_r_server(r_server))
@@ -728,8 +756,15 @@ class GeneLookUpTable(object):
     def get_available_gene_ids(self, r_server = None):
         return self._table.keys(r_server = self._get_r_server(r_server))
 
-    def __contains__(self, key, r_server = None):
-        return self._table.__contains__(key, r_server = self._get_r_server(r_server))
+    def __contains__(self, key, r_server=None):
+        redis_contain = self._table.__contains__(key, r_server=self._get_r_server(r_server))
+        if redis_contain:
+            return True
+        if not redis_contain:
+            return self._es_query.exists(index=Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                         doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                                         id=key,
+                                         )
 
     def __getitem__(self, key, r_server = None):
         return self.get_gene(key, r_server)

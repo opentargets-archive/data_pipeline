@@ -883,9 +883,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 # for line :)
 
 
-            ''' write results in ES '''
-
-            self.loader.flush()
 
 
             'Inform the audit trailer to generate a report and send an e-mail to the data provider'
@@ -919,6 +916,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                    logfile,
                    end_of_transmission)
 
+    def close(self):
+        self.loader.close()
 
 
 
@@ -1249,10 +1248,10 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
                         # self.logger.info(json.dumps(result))
                         disease = top_diseases['key']
                         doc_count = top_diseases['doc_count']
-                        if top_diseases['key'] in self.lookup_data.available_efos:
+                        if disease in self.lookup_data.efo_ontology.current_classes:
                             text.append("\t-{0}:\t{1} ({2:.2f}%) {3}".format(disease, doc_count,
                                                                            doc_count * 100.0 / nb_documents,
-                                                                           self.lookup_data.available_efos[disease]))
+                                                                           self.lookup_data.efo_ontology.current_classes[disease]))
                         else:
                             text.append("\t-{0}:\t{1} ({2:.2f}%)".format(disease, doc_count, doc_count * 100.0 / nb_documents))
                     text.append("")
@@ -1476,7 +1475,7 @@ class SubmissionAuditElasticStorage():
                     body=SUBMISSION_FILTER_MD5_QUERY%md5,
             )
 
-            if search and search["hits"]["total"] == 1:
+            if search and "hits" in search and search["hits"]["total"] == 1:
                 return search["hits"]["hits"][0]
         except NotFoundError:
             pass
@@ -1628,7 +1627,7 @@ class EvidenceValidationFileChecker():
                             job_timeout=12000)
         evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_evidence_q',
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
-                            job_timeout=120)
+                            job_timeout=1200)
         audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
                             job_timeout=1200)
@@ -1650,8 +1649,7 @@ class EvidenceValidationFileChecker():
                                      evidence_q,
                                      self.es,
                                      )
-                                     for i in range(1)
-                                     # for i in range(2)
+                                     for i in range(3)
                                      ]
         # ) for i in range(2)]
         for w in readers:

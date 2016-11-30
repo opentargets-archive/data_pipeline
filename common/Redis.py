@@ -509,7 +509,7 @@ class RedisQueueStatusReporter(Process):
                 np_data /= np.max(np.abs(np_data), axis=0) # normalize by max value
                 if np_data.max() >0:
                     np_data *= (self._history_plot_interval / np_data.max()) #map to interval
-            except:
+            except RuntimeWarning:
                 pass
         return np_data
 
@@ -691,8 +691,10 @@ class RedisLookupTable(object):
     def get(self, key, r_server = None):
         r_server = self._get_r_server(r_server)
         value = r_server.get(self._get_key_namespace(key))
-        if value:
+        if value is not None:
             return self._decode(value)
+        raise KeyError(key)
+
 
     def keys(self, r_server = None):
         r_server = self._get_r_server(r_server)

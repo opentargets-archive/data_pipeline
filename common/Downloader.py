@@ -23,6 +23,8 @@ limitations under the License.
     :synopsis: A data pipeline module to download data.
 .. moduleauthor:: Gautier Koscielny <gautierk@opentargets.org>
 """
+import logging
+import socket
 
 import requests
 import re
@@ -48,7 +50,7 @@ class Downloader(object):
         if Config.HAS_PROXY:
             self.proxies = { "http": Config.PROXY, "https" : Config.PROXY }
 
-    def get_response(self, url, directory, filename=None):
+    def get_resource(self, url, directory, filename=None):
 
         debug_level = 2
         txt = None
@@ -92,14 +94,12 @@ class Downloader(object):
                 connection.quit()
 
             else:
-                response = None
                 if self.proxies:
                     response = requests.get(url, proxies=self.proxies, stream=True)
                 else:
                     response = requests.get(url, stream=True)
 
-                if not response.ok:
-                    response.raise_for_status()
+                response.raise_for_status()
 
                 if filename is not None:
                     # Open our local file for writing
@@ -111,9 +111,8 @@ class Downloader(object):
                     logging.info("downloaded %s"%filename)
 
                 else:
-                    txt = response.text;
-                response.close()
-                return txt;
+                    txt = response.text
+                return txt
                 #handle errors
         except requests.exceptions.RequestException as e:
             print "Request Error:",e.message
