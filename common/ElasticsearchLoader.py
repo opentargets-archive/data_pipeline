@@ -186,7 +186,7 @@ class Loader():
                 self.optimize_index(index_name)
 
 
-    def _safe_create_index(self, index_name, body, ignore=400):
+    def _safe_create_index(self, index_name, body={}, ignore=400):
         if not self.dry_run:
             res = self.es.indices.create(index=index_name,
                                          ignore=ignore,
