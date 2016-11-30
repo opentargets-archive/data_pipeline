@@ -123,7 +123,10 @@ class EfoProcess():
                       definition=definition
                       )
             id = self.disease_ontology.classes_paths[uri]['ids'][0][-1]
+            if uri in self.disease_ontology.children:
+                efo.children = self.disease_ontology.children[uri]
             self.efos[id] = efo
+
 
     def _store_efo(self):
 

@@ -165,7 +165,7 @@ class Config():
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
-    MOUSEMODELS_CACHE_DIRECTORY = '~/.phenodigmcache'
+    MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
 
     # hardcoded folder of json file to be preprocessed to extract
     # HP and MP terms not in EFO but that will be combined in a SLIM

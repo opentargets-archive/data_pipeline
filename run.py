@@ -92,7 +92,7 @@ if __name__ == '__main__':
                         action='store_true', default=False)
     parser.add_argument("--musu", dest='mus', help="update mouse model data",
                         action="append_const", const = MouseModelsActions.UPDATE_CACHE)
-    parser.add_argument("--musg", dest='mus', help="update mus musculus gene list",
+    parser.add_argument("--musg", dest='mus', help="update mus musculus and home sapiens gene list",
                         action="append_const", const = MouseModelsActions.UPDATE_GENES)
     parser.add_argument("--muse", dest='mus', help="generate mouse model evidence",
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
@@ -197,11 +197,11 @@ if __name__ == '__main__':
         if args.mus or run_full_pipeline:
             do_all = (MouseModelsActions.ALL in args.mus) or run_full_pipeline
             if (MouseModelsActions.UPDATE_CACHE in args.mus) or do_all:
-                Phenodigm(connectors.es, connectors.sparql).update_cache()
+                Phenodigm(connectors.es, connectors.r_server).update_cache()
             if (MouseModelsActions.UPDATE_GENES in args.mus) or do_all:
-                Phenodigm(connectors.es, connectors.sparql).update_genes()
+                Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
-                Phenodigm(connectors.es, connectors.sparql).generate_evidence()
+                Phenodigm(connectors.es, connectors.r_server).generate_evidence()
         if args.lit or run_full_pipeline:
             do_all = (LiteratureActions.ALL in args.lit) or run_full_pipeline
             if (LiteratureActions.FETCH in args.lit) or do_all:
