@@ -748,7 +748,7 @@ class MedlineRetriever(object):
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         ftp_readers = no_of_workers
-        max_ftp_readers = 16 #avoid too many connections errors
+        max_ftp_readers = 1 #avoid too many connections errors
         if ftp_readers >max_ftp_readers:
             ftp_readers = max_ftp_readers
 
@@ -860,7 +860,7 @@ class MedlineRetriever(object):
 
 
 
-class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
+class PubmedFTPReaderProcess(RedisQueueWorkerThread):
 
     def __init__(self,
                  queue_in,
@@ -972,7 +972,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
     def close(self):
         self.ftp.close()
 
-class PubmedXMLParserProcess(RedisQueueWorkerProcess):
+class PubmedXMLParserProcess(RedisQueueWorkerThread):
     def __init__(self,
                  queue_in,
                  redis_path,
@@ -1067,7 +1067,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
                 for el in e.JournalIssue.getchildren():
                     if el.tag == 'PubDate':
-                        year, month, day = '1800', 'Gen', '1'
+                        year, month, day = '1800', 'Jan', '1'
                         for pubdate in el.getchildren():
                             if pubdate.tag == 'Year':
                                 year = pubdate.text
@@ -1075,7 +1075,10 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                                 month = pubdate.text
                             elif pubdate.tag == 'Day':
                                 day = pubdate.text
-                        publication['pub_date'] =  parse(' '.join((year, month, day))).date()
+                        try:
+                            publication['pub_date'] =  parse(' '.join((year, month, day))).date()
+                        except ValueError:
+                            pass
                     if el.tag == 'Volume':
                         publication['journal_reference']['volume'] = el.text
                     if el.tag == 'Issue':
