@@ -8,6 +8,7 @@ from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import parallel_bulk, bulk
 from common.DataStructure import JSONSerializable
 from common.EvidenceJsonUtils import assertJSONEqual
+from common.connection import PipelineConnectors
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
 __author__ = 'andreap'
@@ -24,6 +25,10 @@ class Loader():
                  dry_run = False,
                  max_flush_interval = random.choice(range(8,16))):
 
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
         self.es = es
         self.cache = []
         self.results = defaultdict(list)

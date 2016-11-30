@@ -1116,14 +1116,8 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                  redis_path,
                  dry_run=False):
         super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path)
-        self.es = Elasticsearch(hosts=Config.ELASTICSEARCH_URL,
-                                maxsize=50,
-                                timeout=1800,
-                                sniff_on_connection_fail=True,
-                                retry_on_timeout=True,
-                                max_retries=10,
-                                )
-        self.loader = Loader(self.es, chunk_size=10000, dry_run=dry_run)
+        self.loader = Loader(chunk_size=10000, dry_run=dry_run)
+        self.es = self.loader.es
         self.es_query = ESQuery(self.es)
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
