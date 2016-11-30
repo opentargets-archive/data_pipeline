@@ -86,8 +86,6 @@ class Gene(JSONSerializable):
         self._private ={}
         self.drugs = {}
         self.protein_classification = {}
-        self._logger = logging.getLogger(__name__)
-
 
     def _set_id(self):
         if self.ensembl_gene_id:
@@ -324,7 +322,8 @@ class Gene(JSONSerializable):
                               'pathway type name': reactome_retriever.get_reaction(type_code).label
                               })
         except:
-            self._logger.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
+            logger = logging.getLogger(__name__)
+            logger.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
         return types
 
     def get_id_org(self):
@@ -509,18 +508,18 @@ class GeneManager():
                    unit= 'steps')
         self._get_hgnc_data_from_json()
         bar.update()
-        self._get_ortholog_data()
-        bar.update()
-        try:
-            self._get_ensembl_data()
-        except NotFoundError:
-            self._logger.error('no ensembl index in ES. Skipping. Has the --ensembl step been run?')
-        bar.update()
-        try:
-            self._get_uniprot_data()
-        except NotFoundError:
-            self._logger.error('no uniprot index in ES. Skipping. Has the --uniprot step been run?')
-        bar.update()
+        # self._get_ortholog_data()
+        # bar.update()
+        # try:
+        #     self._get_ensembl_data()
+        # except NotFoundError:
+        #     self._logger.error('no ensembl index in ES. Skipping. Has the --ensembl step been run?')
+        # bar.update()
+        # try:
+        #     self._get_uniprot_data()
+        # except NotFoundError:
+        #     self._logger.error('no uniprot index in ES. Skipping. Has the --uniprot step been run?')
+        # bar.update()
         self._get_chembl_data()
         bar.update()
         self._store_data(dry_run=dry_run)
