@@ -860,7 +860,7 @@ class MedlineRetriever(object):
 
 
 
-class PubmedFTPReaderProcess(RedisQueueWorkerThread):
+class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
 
     def __init__(self,
                  queue_in,
@@ -972,7 +972,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerThread):
     def close(self):
         self.ftp.close()
 
-class PubmedXMLParserProcess(RedisQueueWorkerThread):
+class PubmedXMLParserProcess(RedisQueueWorkerProcess):
     def __init__(self,
                  queue_in,
                  redis_path,

@@ -21,7 +21,7 @@ def json_serialize(obj):
     if isinstance(obj, datetime):
         return obj.isoformat(' ')
     elif isinstance(obj, date):
-        return obj.strftime('%Y%m%d')
+        return obj.isoformat()
     else:
         try:
             return obj.__dict__
