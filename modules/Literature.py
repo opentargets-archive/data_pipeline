@@ -748,7 +748,7 @@ class MedlineRetriever(object):
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         ftp_readers = no_of_workers
-        max_ftp_readers = 1 #avoid too many connections errors
+        max_ftp_readers = 16 #avoid too many connections errors
         if ftp_readers >max_ftp_readers:
             ftp_readers = max_ftp_readers
 

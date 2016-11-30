@@ -954,7 +954,7 @@ class ElasticSearchConfiguration():
                         },
                         "pub_date": {
                             "type": "date",
-                            "format": "year",
+                            "format": "strict_date_optional_time||epoch_millis",
                         },
                         "title": {
                             "type": "string",
