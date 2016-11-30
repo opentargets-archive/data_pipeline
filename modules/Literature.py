@@ -903,7 +903,10 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 for chunk in response.iter_content(chunk_size=128):
                     file_handler.write(chunk)
                     t.update(len(chunk))
-                logging.debug('Downloaded file %s from HTTP at %.2fMB/s' % (os.path.basename(file_path), (file_size / 1e6) / (t.last_print_t - t.start_t)))
+                try:
+                    self.logger.debug('Downloaded file %s from HTTP at %.2fMB/s' % (os.path.basename(file_path), (file_size / 1e6) / (t.last_print_t - t.start_t)))
+                except ZeroDivisionError:
+                    self.logger.debug('Downloaded file %s from HTTP'%os.path.basename(file_path))
                 t.close()
                 response.close()
                 file_handler.seek(0)

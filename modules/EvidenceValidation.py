@@ -504,8 +504,11 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             for remote_file_chunk in response.iter_content(chunk_size=128):
                 file_handler.write(remote_file_chunk)
                 t.update(len(remote_file_chunk))
-            logging.debug('Downloaded file %s from HTTP at %.2fMB/s' % (
+            try:
+                self.logger.debug('Downloaded file %s from HTTP at %.2fMB/s' % (
                 file_version, (file_size / 1e6) / (t.last_print_t - t.start_t)))
+            except ZeroDivisionError:
+                self.logger.debug('Downloaded file %s from HTTP'%file_path)
             t.close()
             response.close()
             file_handler.seek(0)
