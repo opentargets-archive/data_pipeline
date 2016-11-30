@@ -1703,10 +1703,10 @@ class EvidenceValidationFileChecker():
                                                       LookUpDataType.HPO,
                                                       LookUpDataType.MP,
                                                      ),
-                                          autoload=False,
+                                          # autoload=False,
                                           ).lookup
 
-        lookup_data.available_genes.load_uniprot2ensembl()
+        # lookup_data.available_genes.load_uniprot2ensembl()
 
         'Create queues'
         file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
