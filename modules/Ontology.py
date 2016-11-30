@@ -326,7 +326,6 @@ class OntologyClassReader():
             uri = str(row[0])
             label = str(row[1])
             self.top_level_classes[uri] = label
-            logger.info("RDFLIB TOP LEVEL '%s' '%s'" % (uri, label))
 
         return
 
