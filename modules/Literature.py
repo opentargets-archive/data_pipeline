@@ -123,12 +123,11 @@ class PublicationFetcher(object):
 
     #"EXT_ID:17440703 OR EXT_ID:17660818 OR EXT_ID:18092167 OR EXT_ID:18805785 OR EXT_ID:19442247 OR EXT_ID:19808788 OR EXT_ID:19849817 OR EXT_ID:20192983 OR EXT_ID:20871604 OR EXT_ID:21270825"
 
-    def __init__(self, es, loader = None, dry_run = False):
+    def __init__(self, es = None, loader = None, dry_run = False):
         if loader is None:
             self.loader = Loader(es, dry_run=dry_run)
         else:
             self.loader=loader
-        self.es = es
         self.es_query=ESQuery(es)
         self.logger = logging.getLogger(__name__)
 
@@ -497,8 +496,7 @@ class LiteratureProcess(object):
                  loader,
                  r_server=None,
                  ):
-        self.es = es
-        self.es_query=ESQuery(es)
+        self.es_query=ESQuery()
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
@@ -690,11 +688,10 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
         super(LiteratureAnalyzerProcess, self).__init__(queue_in, redis_path)
         self.queue_in = queue_in
         self.redis_path = redis_path
-        self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
         self.start_time = time.time()
         self.audit = list()
         self.logger = logging.getLogger(__name__)
-        pub_fetcher = PublicationFetcher(self.es)
+        pub_fetcher = PublicationFetcher()
         self.chunk_size = chunk_size
         self.dry_run = dry_run
         self.pub_analyser = PublicationAnalyserSpacy(pub_fetcher, self.es)
@@ -708,7 +705,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
                 spacy_analysed_pub = self.pub_analyser.analyse_publication(pub_id=pub_id,
                                                                        pub=pub)
 
-            with Loader(self.es, chunk_size=self.chunk_size, dry_run=self.dry_run) as es_loader:
+            with Loader(chunk_size=self.chunk_size, dry_run=self.dry_run) as es_loader:
                 es_loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                             doc_type=spacy_analysed_pub.get_type(),
                             ID=pub_id,
@@ -874,14 +871,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
         self.update = update
-        self.es = Elasticsearch(hosts=Config.ELASTICSEARCH_URL,
-                                maxsize=50,
-                                timeout=1800,
-                                sniff_on_connection_fail=True,
-                                retry_on_timeout=True,
-                                max_retries=10,
-                                )
-        self.es_query = ESQuery(self.es)
+        self.es_query = ESQuery()
         if update:
             self.ftp = ftp_connect(dir=MEDLINE_UPDATE_PATH)
         else:
@@ -979,13 +969,6 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                  queue_out,
                  dry_run=False):
         super(PubmedXMLParserProcess, self).__init__(queue_in, redis_path,queue_out)
-        self.es = Elasticsearch(hosts=Config.ELASTICSEARCH_URL,
-                                maxsize=50,
-                                timeout=1800,
-                                sniff_on_connection_fail=True,
-                                retry_on_timeout=True,
-                                max_retries=10,
-                                )
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)

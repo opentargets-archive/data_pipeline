@@ -8,6 +8,7 @@ from elasticsearch import helpers
 
 from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
+from common.connection import PipelineConnectors
 from settings import Config
 
 class AssociationSummary(object):
@@ -35,7 +36,11 @@ class AssociationSummary(object):
 
 class ESQuery(object):
 
-    def __init__(self, es, dry_run = False):
+    def __init__(self, es = None, dry_run = False):
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
         self.handler = es
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
