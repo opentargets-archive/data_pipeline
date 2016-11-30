@@ -57,6 +57,7 @@ EFO_TAS = [
     'http://www.ebi.ac.uk/efo/EFO_0000684', # respiratory system
     'http://www.ebi.ac.uk/efo/EFO_0002461', # skeletal system
     'http://www.ebi.ac.uk/efo/EFO_0000701', # skin disease
+    'http://www.ebi.ac.uk/efo/EFO_0001421', # liver disease
 ]
 
 TOP_LEVELS = '''
@@ -212,6 +213,8 @@ class OntologyClassReader():
         self.obsolete_classes = dict()
         self.top_level_classes = dict()
         self.classes_paths = dict()
+        self.obsoletes = dict()
+        self.children = dict()
 
     def load_ontology_graph(self, uri):
         """Loads the ontology from a URI in a RDFLib graph.
@@ -263,6 +266,12 @@ class OntologyClassReader():
             label = str(ont_label)
             self.current_classes[uri] = label
             count +=1
+
+            '''
+             Add the children too
+            '''
+            self.get_children(uri=uri)
+
             # logger.debug("RDFLIB '%s' '%s'" % (uri, label))
         logger.debug("parsed %i classes"%count)
 
@@ -278,28 +287,28 @@ class OntologyClassReader():
         '''
 
         qres = self.rdf_graph.query(sparql_query)
-        obsoletes = dict()
         for (ont_node, ont_label, ont_id, ont_new) in qres:
             uri = str(ont_node)
             label = str(ont_label)
             id = str(ont_id)
             new_uri = str(ont_new)
             # point to the new URI
-            obsoletes[uri] = { 'label': label, 'new_uri' : new_uri }
+            self.obsoletes[uri] = { 'label': label, 'new_uri' : new_uri }
             count +=1
             logger.debug("WARNING: Obsolete %s '%s' %s" % (uri, label, new_uri))
+
         """
         Still need to loop over to find the next new class to replace the
         old URI with the latest URI (some intermediate classes can be obsolete too)
         """
 
-        for old_uri in obsoletes.keys():
-            next_uri = obsoletes[old_uri]['new_uri']
-            while next_uri in obsoletes.keys():
-                next_uri = obsoletes[next_uri]['new_uri']
+        for old_uri in self.obsoletes.keys():
+            next_uri = self.obsoletes[old_uri]['new_uri']
+            while next_uri in self.obsoletes.keys():
+                next_uri = self.obsoletes[next_uri]['new_uri']
             if next_uri in self.current_classes:
                 new_label = self.current_classes[next_uri]
-                logger.warn("%s => %s" % (old_uri, obsoletes[old_uri]))
+                logger.warn("%s => %s" % (old_uri, self.obsoletes[old_uri]))
                 self.obsolete_classes[old_uri] = "Use %s label:%s" % (next_uri, new_label)
             else:
                 self.obsolete_classes[old_uri] = "Obsolete class"
@@ -320,6 +329,29 @@ class OntologyClassReader():
             logger.info("RDFLIB TOP LEVEL '%s' '%s'" % (uri, label))
 
         return
+
+    def get_children(self, uri):
+        disease_uri = URIRef(uri)
+        if uri not in self.children:
+            self.children[uri] = []
+        for c in self.rdf_graph.subjects(predicate=RDFS.subClassOf, object=disease_uri):
+            cr = rdflib.resource.Resource(self.rdf_graph, c)
+            label = str(cr.value(RDFS.label))
+            c_uri = str(cr.identifier)
+            (prefix, namespace, id) = self.rdf_graph.namespace_manager.compute_qname(cr.identifier)
+            self.children[uri].append({'code': id, 'label': label})
+
+    def get_new_from_obsolete_uri(self, old_uri):
+
+        next_uri = self.obsoletes[old_uri]['new_uri']
+        while next_uri in self.obsoletes.keys():
+            next_uri = self.obsoletes[next_uri]['new_uri']
+        if next_uri in self.current_classes:
+            new_label = self.current_classes[next_uri]
+            logger.warn("%s => %s" % (old_uri, self.obsoletes[old_uri]))
+            return next_uri
+        else:
+            return None
 
     def get_classes_paths(self, root_uri, level=0):
 
@@ -500,6 +532,36 @@ class OntologyClassReader():
         Add all phenotypes to the EFO classes
         '''
 
+    def load_efo_omim_xrefs(self):
+        '''
+        Load ontology xref from OMIM
+        :return:
+        '''
+        sparql_query = '''
+        PREFIX efo: <http://www.ebi.ac.uk/efo/>
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#> SELECT DISTINCT ?subject ?label ?omim WHERE {
+            ?subject rdfs:subClassOf* efo:EFO_0000408 .
+            ?subject rdfs:label ?label .
+            ?subject efo:OMIM_definition_citation ?omim
+        }
+        '''
+
+        OMIMmap = dict()
+
+        qres = self.rdf_graph.query(sparql_query)
+
+        for row in qres:
+            uri = str(row[0])
+            label = str(row[1])
+            omimID = str(row[2])
+            if omimID in OMIMmap and not uri in OMIMmap[omimID]:
+                OMIMmap[omimID].append(uri)
+            elif omimID not in OMIMmap:
+                OMIMmap[omimID] = [ uri ]
+        return OMIMmap
+
     def load_evidence_classes(self):
         '''
         Loads evidence from ECO, SO and the Open Targets evidence classes
@@ -649,7 +711,8 @@ class DiseaseUtils():
             logger.debug("%s (%s) hasPhenotype %s (%s)" % (disease_uri, disease_label, phenotype_uri, phenotype_label))
             if disease_uri not in disease_phenotypes_map:
                 disease_phenotypes_map[disease_uri] = { 'label': disease_label, 'phenotypes': [] }
-            disease_phenotypes_map[disease_uri]['phenotypes'].append({'label': phenotype_label, 'uri': phenotype_uri})
+            if phenotype_uri not in map(lambda x: x['uri'], disease_phenotypes_map[disease_uri]['phenotypes']):
+                disease_phenotypes_map[disease_uri]['phenotypes'].append({'label': phenotype_label, 'uri': phenotype_uri})
 
         self.update_disease_phenotypes_cache(disease_phenotypes_map)
 
