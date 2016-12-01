@@ -635,7 +635,10 @@ class ESQuery(object):
                                     _source=self._get_source_from_fields(fields),
                                     realtime=realtime,
                                     )
-            yield res['_source']
+            try:
+                yield res['_source']
+            except:
+                pass
 
     def get_publications_by_id(self, ids):
         return self.get_objects_by_id(ids,
