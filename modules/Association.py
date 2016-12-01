@@ -527,7 +527,7 @@ class ScoringProcess():
                                                       LookUpDataType.TARGET,
                                                       LookUpDataType.ECO,
                                                       ),
-                                          autoload=True,
+                                          autoload=False,
                                           ).lookup
 
         '''create queues'''
