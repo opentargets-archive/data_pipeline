@@ -839,6 +839,31 @@ class ESQuery(object):
                                 batch,
                                 stats_only=True)
 
+    def get_all_evidence_for_datasource(self, datasources, fields = None, ):
+
+
+
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
+        doc_type = None
+
+        if datasources:
+            doc_type = datasources
+        res = helpers.scan(client=self.handler,
+                           query={"query":  {"match_all": {}},
+                               '_source': self._get_source_from_fields(fields),
+                               'size': 1000,
+                           },
+                           scroll='12h',
+                           doc_type=doc_type,
+                           index=index_name,
+                           timeout="10m",
+                           )
+
+        # res = list(res)
+        for hit in res:
+            yield hit['_source']
+
     @staticmethod
     def flatten(d, parent_key='', separator='.'):
         '''
