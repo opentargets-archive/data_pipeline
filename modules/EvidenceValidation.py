@@ -463,36 +463,53 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             file_stat = os.stat(file_path)
             file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
             '''temprorary get lines total'''
-            lines = 0
-            with open(file_path, mode='rb') as f:
-                with io.BufferedReader(gzip.GzipFile(filename=file_path.split('/')[1],
-                                   mode='rb',
-                                   fileobj=f,
-                                   mtime=file_mod_time)) as fh:
-                    lines = self._count_file_lines(fh)
-            total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
-            if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
-                total_chunks +=1
-            self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
-            with open(file_path, mode='rb',) as f:
-
-                with io.BufferedReader(gzip.GzipFile(filename = file_path.split('/')[1],
-                                   mode = 'rb',
-                                   fileobj = f,
-                                   mtime = file_mod_time)) as fh:
-                    line = fh.readline()
-                    while line:
-                        line_buffer.append(line)
-                        line_number += 1
-                        if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
+            if file_path.endswith('.gz'):
+                lines = 0
+                with open(file_path, mode='rb') as f:
+                    with io.BufferedReader(gzip.GzipFile(filename=file_path.split('/')[1],
+                                       mode='rb',
+                                       fileobj=f,
+                                       mtime=file_mod_time)) as fh:
+                        lines = self._count_file_lines(fh)
+                total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+                if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
+                    total_chunks +=1
+                self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
+                with open(file_path, mode='rb',) as f:
+                    with io.BufferedReader(gzip.GzipFile(filename = file_path.split('/')[1],
+                                       mode = 'rb',
+                                       fileobj = f,
+                                       mtime = file_mod_time)) as fh:
+                        for line in fh.readlines():
                             self.put_into_queue_out(
                                 (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
-                                 offset, list(line_buffer), False))
-                            offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
-                            chunk += 1
-                            line_buffer = []
+                                 offset, [line], False))
+            else:
+                with open(file_path) as fh:
+                    lines = self._count_file_lines(fh)
+                    total_chunks = lines / EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+                    if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
+                        total_chunks += 1
+                    self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
+                    fh.seek(0)
+                    for line in fh.readlines():
+                        self.put_into_queue_out(
+                            (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                             offset, [line], False))
 
-                        line = fh.readline()
+                    # line = fh.readline()
+                    # while line:
+                    #     line_buffer.append(line)
+                    #     line_number += 1
+                    #     if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
+                    #         self.put_into_queue_out(
+                    #             (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                    #              offset, list(line_buffer), False))
+                    #         offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+                    #         chunk += 1
+                    #         line_buffer = []
+                    #
+                    #     line = fh.readline()
 
         elif file_type == FileTypes.HTTP:
             '''temprorary get lines total'''
@@ -530,25 +547,29 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                                                  fileobj=file_handler,
                                                  )) as fh:
                 for line in fh.readlines():
-                    line_buffer.append(line)
-                    line_number += 1
-                    if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
-                        self.put_into_queue_out(
-                            (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
-                             offset, list(line_buffer), False))
-                        offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
-                        chunk += 1
-                        line_buffer = []
+                    self.put_into_queue_out(
+                        (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                         offset, [line], False))
+                # for line in fh.readlines():
+                #     line_buffer.append(line)
+                #     line_number += 1
+                #     if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
+                #         self.put_into_queue_out(
+                #             (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                #              offset, list(line_buffer), False))
+                #         offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+                #         chunk += 1
+                #         line_buffer = []
         else:
             raise AttributeError('File type %s is not supported'%file_type)
-
-        if line_buffer:
-            self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
-                               list(line_buffer), False),
-                               self.r_server)
-            offset += len(line_buffer)
-            chunk += 1
-            line_buffer = []
+        #
+        # if line_buffer:
+        #     self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
+        #                        list(line_buffer), False),
+        #                        self.r_server)
+        #     offset += len(line_buffer)
+        #     chunk += 1
+        #     line_buffer = []
 
 
         '''
@@ -556,7 +577,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         '''
         self.logger.info('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
         self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
-                           line_buffer, True),
+                           [], True),
                            self.r_server)
 
         return
@@ -592,7 +613,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.queue_in = queue_in
         self.queue_out = queue_out
         self.es = es
-        self.loader= Loader(self.es, dry_run=dry_run)
+        self.loader= Loader(dry_run=dry_run)
         self.lookup_data = lookup_data
         self.start_time = time.time()
         self.audit = list()

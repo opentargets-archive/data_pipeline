@@ -152,7 +152,7 @@ class Config():
     # ftp user and passwords
     EVIDENCEVALIDATION_FTP_HOST= dict( host = 'ftp.targetvalidation.org',
                                        port = 22)
-    EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}\.json\.gz$"
+    EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
