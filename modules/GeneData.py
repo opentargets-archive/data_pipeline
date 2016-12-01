@@ -509,18 +509,18 @@ class GeneManager():
                    unit= 'steps')
         self._get_hgnc_data_from_json()
         bar.update()
-        # self._get_ortholog_data()
-        # bar.update()
-        # try:
-        #     self._get_ensembl_data()
-        # except NotFoundError:
-        #     self._logger.error('no ensembl index in ES. Skipping. Has the --ensembl step been run?')
-        # bar.update()
-        # try:
-        #     self._get_uniprot_data()
-        # except NotFoundError:
-        #     self._logger.error('no uniprot index in ES. Skipping. Has the --uniprot step been run?')
-        # bar.update()
+        self._get_ortholog_data()
+        bar.update()
+        try:
+            self._get_ensembl_data()
+        except NotFoundError:
+            self._logger.error('no ensembl index in ES. Skipping. Has the --ensembl step been run?')
+        bar.update()
+        try:
+            self._get_uniprot_data()
+        except NotFoundError:
+            self._logger.error('no uniprot index in ES. Skipping. Has the --uniprot step been run?')
+        bar.update()
         self._get_chembl_data()
         bar.update()
         self._store_data(dry_run=dry_run)
