@@ -118,6 +118,7 @@ class LookUpDataRetriever(object):
         if obj is None:
             obj = OntologyClassReader()
             obj.load_hpo_classes()
+            obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.hpo_ontology = obj
 
@@ -131,6 +132,7 @@ class LookUpDataRetriever(object):
         if obj is None:
             obj = OntologyClassReader()
             obj.load_mp_classes()
+            obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.mp_ontology = obj
 
@@ -146,6 +148,7 @@ class LookUpDataRetriever(object):
         if obj is None:
             obj = OntologyClassReader()
             obj.load_efo_classes()
+            obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.efo_ontology = obj
 
@@ -156,17 +159,15 @@ class LookUpDataRetriever(object):
 
 
     def _get_from_pickled_file_cache(self, file_id):
-        return
-        # file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
-        # if os.path.isfile(file_path):
-        #     return pickle.load(open(file_path, 'rb'))
+        file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
+        if os.path.isfile(file_path):
+            return pickle.load(open(file_path, 'rb'))
 
     def _set_in_pickled_file_cache(self, obj, file_id):
-        return
-        # if not os.path.isdir(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'))):
-        #     os.makedirs(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir')))
-        # file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
-        # pickle.dump(obj,
-        #             open(file_path, 'wb'),)
-        #
-        #
+        if not os.path.isdir(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'))):
+            os.makedirs(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir')))
+        file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
+        pickle.dump(obj,
+                    open(file_path, 'wb'),)
+
+
