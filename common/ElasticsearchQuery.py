@@ -4,6 +4,7 @@ import logging
 from collections import Counter
 
 import jsonpickle
+import time
 from elasticsearch import helpers
 
 from common.DataStructure import SparseFloatDict
@@ -606,17 +607,35 @@ class ESQuery(object):
         :param doc_type: doc type for all the documents
         :return: generator of documents
         '''
-        res = self.handler.mget(index=Loader.get_versioned_index(index),
-                                doc_type=doc_type,
-                                body=dict(ids=ids),
-                                _source=self._get_source_from_fields(fields),
-                                realtime=realtime,
-                                )
-        for doc in res['docs']:
-            if doc['found']:
-                yield doc['_source']
-            else:
-                raise KeyError('object with id %s not found' % (doc['_id']))
+        if isinstance(ids, (list, tuple)):
+            res = self.handler.mget(index=Loader.get_versioned_index(index),
+                                    doc_type=doc_type,
+                                    body=dict(ids=ids),
+                                    _source=self._get_source_from_fields(fields),
+                                    realtime=realtime,
+                                    )
+            if not res:
+                time.sleep(0.1)
+                res = self.handler.mget(index=Loader.get_versioned_index(index),
+                                        doc_type=doc_type,
+                                        body=dict(ids=ids),
+                                        _source=self._get_source_from_fields(fields),
+                                        realtime=realtime,
+                                        )
+            for doc in res['docs']:
+                if doc['found']:
+                    yield doc['_source']
+                else:
+                    raise KeyError('object with id %s not found' % (doc['_id']))
+
+        else:
+            res = self.handler.get(index=Loader.get_versioned_index(index),
+                                    doc_type=doc_type,
+                                    id=ids,
+                                    _source=self._get_source_from_fields(fields),
+                                    realtime=realtime,
+                                    )
+            yield res['_source']
 
     def get_publications_by_id(self, ids):
         return self.get_objects_by_id(ids,

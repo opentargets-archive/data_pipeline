@@ -705,6 +705,8 @@ class GeneLookUpTable(object):
         self.uniprot2ensembl = {}
         if (r_server is not None) and autoload:
             self.load_gene_data(r_server, targets)
+        self._logger = logging.getLogger(__name__)
+
 
 
     def load_gene_data(self, r_server = None, targets = []):
@@ -752,9 +754,13 @@ class GeneLookUpTable(object):
         try:
             return self._table.get(target_id, r_server=self._get_r_server(r_server))
         except KeyError:
-            target = self._es_query.get_objects_by_id([target_id],
-                                             Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                             Config.ELASTICSEARCH_GENE_NAME_DOC_NAME).next()
+            try:
+                target = self._es_query.get_objects_by_id(target_id,
+                                                 Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                                 Config.ELASTICSEARCH_GENE_NAME_DOC_NAME).next()
+            except Exception as e:
+                self._logger.exception('Cannot retrieve target from elasticsearch')
+                raise KeyError()
             self.set_gene(target, r_server)
             return target
 
