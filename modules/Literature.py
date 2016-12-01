@@ -30,6 +30,7 @@ from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle, \
     RedisQueueWorkerThread
+from common.connection import PipelineConnectors
 from settings import Config
 
 logger = logging.getLogger(__name__)
@@ -619,35 +620,51 @@ class LiteratureLookUpTable(object):
     """
 
     def __init__(self,
-                 es,
+                 es = None,
                  namespace = None,
                  r_server = None,
                  ttl = 60*60*24+7):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = r_server,
                                             ttl = ttl)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
         self._es = es
         self._es_query = ESQuery(es)
         self.r_server = r_server
         if r_server is not None:
             self._load_literature_data(r_server)
+        self._logger = logging.getLogger(__name__)
 
     def _load_literature_data(self, r_server = None):
-        for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
-                        desc='loading publications',
-                        unit=' publication',
-                        unit_scale=True,
-                        leave=False,
-                        ):
-            pub = Publication()
-            pub.load_json(pub_source)
-
-            self.set_literature(pub,self._get_r_server(
-                    r_server))# TODO can be improved by sending elements in batches
+        # for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
+        #                 desc='loading publications',
+        #                 unit=' publication',
+        #                 unit_scale=True,
+        #                 leave=False,
+        #                 ):
+        #     pub = Publication()
+        #     pub.load_json(pub_source)
+        #
+        #     self.set_literature(pub,self._get_r_server(
+        #             r_server))# TODO can be improved by sending elements in batches
         return
 
     def get_literature(self, pmid, r_server = None):
-        return self._table.get(pmid, r_server=r_server)
+        try:
+            return self._table.get(pmid, r_server=self._get_r_server(r_server))
+        except KeyError:
+            try:
+                pub = self._es_query.get_objects_by_id(pmid,
+                                                          Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                                                          Config.ELASTICSEARCH_PUBLICATION_DOC_NAME).next()
+            except Exception as e:
+                self._logger.exception('Cannot retrieve target from elasticsearch')
+                raise KeyError()
+            self.set_literature(pub, r_server)
+            return pub
 
     def set_literature(self, literature, r_server = None):
         self._table.set((literature.pub_id), literature, r_server=self._get_r_server(

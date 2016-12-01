@@ -15,6 +15,7 @@ from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from common.connection import PipelineConnectors
 from modules.ChEMBL import ChEMBLLookup
 from modules.Reactome import ReactomeRetriever
 from settings import Config
@@ -690,7 +691,7 @@ class GeneLookUpTable(object):
     """
 
     def __init__(self,
-                 es,
+                 es=None,
                  namespace = None,
                  r_server = None,
                  ttl = 60*60*24+7,
@@ -699,6 +700,10 @@ class GeneLookUpTable(object):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = r_server,
                                             ttl = ttl)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
         self._es = es
         self._es_query = ESQuery(es)
         self.r_server = r_server

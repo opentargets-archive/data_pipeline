@@ -588,7 +588,7 @@ class EvidenceManager():
                 else:
                     # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
                     try:
-                        pub_dict = pub_fetcher.get_publications([pmid])
+                        pub_dict = pub_fetcher.get_publications(pmid)
                         if pub_dict:
                             pubs[pmid] = [pub_dict[int(pmid)], PublicationAnalysisSpacy(pmid)]
                             # self.available_publications.set_literature(pub_dict[pmid])

@@ -612,7 +612,7 @@ class ESQuery(object):
                                     doc_type=doc_type,
                                     body=dict(ids=ids),
                                     _source=self._get_source_from_fields(fields),
-                                    realtime=realtime,
+                                    realtime=True,
                                     )
             if not res:
                 time.sleep(0.1)
@@ -620,7 +620,7 @@ class ESQuery(object):
                                         doc_type=doc_type,
                                         body=dict(ids=ids),
                                         _source=self._get_source_from_fields(fields),
-                                        realtime=realtime,
+                                        realtime=True,
                                         )
             for doc in res['docs']:
                 if doc['found']:
@@ -633,7 +633,7 @@ class ESQuery(object):
                                     doc_type=doc_type,
                                     id=ids,
                                     _source=self._get_source_from_fields(fields),
-                                    realtime=realtime,
+                                    realtime=True,
                                     )
             try:
                 yield res['_source']
