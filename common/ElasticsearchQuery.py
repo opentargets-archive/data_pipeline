@@ -4,10 +4,12 @@ import logging
 from collections import Counter
 
 import jsonpickle
+import time
 from elasticsearch import helpers
 
 from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
+from common.connection import PipelineConnectors
 from settings import Config
 
 class AssociationSummary(object):
@@ -35,7 +37,11 @@ class AssociationSummary(object):
 
 class ESQuery(object):
 
-    def __init__(self, es, dry_run = False):
+    def __init__(self, es = None, dry_run = False):
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
         self.handler = es
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
@@ -601,17 +607,38 @@ class ESQuery(object):
         :param doc_type: doc type for all the documents
         :return: generator of documents
         '''
-        res = self.handler.mget(index=Loader.get_versioned_index(index),
-                                doc_type=doc_type,
-                                body=dict(ids=ids),
-                                _source=self._get_source_from_fields(fields),
-                                realtime=realtime,
-                                )
-        for doc in res['docs']:
-            if doc['found']:
-                yield doc['_source']
-            else:
-                raise KeyError('object with id %s not found' % (doc['_id']))
+        if isinstance(ids, (list, tuple)):
+            res = self.handler.mget(index=Loader.get_versioned_index(index),
+                                    doc_type=doc_type,
+                                    body=dict(ids=ids),
+                                    _source=self._get_source_from_fields(fields),
+                                    realtime=realtime,
+                                    )
+            if not res:
+                time.sleep(0.1)
+                res = self.handler.mget(index=Loader.get_versioned_index(index),
+                                        doc_type=doc_type,
+                                        body=dict(ids=ids),
+                                        _source=self._get_source_from_fields(fields),
+                                        realtime=realtime,
+                                        )
+            for doc in res['docs']:
+                if doc['found']:
+                    yield doc['_source']
+                else:
+                    raise KeyError('object with id %s not found' % (doc['_id']))
+
+        else:
+            res = self.handler.get(index=Loader.get_versioned_index(index),
+                                    doc_type=doc_type,
+                                    id=ids,
+                                    _source=self._get_source_from_fields(fields),
+                                    realtime=realtime,
+                                    )
+            try:
+                yield res['_source']
+            except:
+                pass
 
     def get_publications_by_id(self, ids):
         return self.get_objects_by_id(ids,
@@ -650,6 +677,23 @@ class ESQuery(object):
         if batch:
             for pub in self.get_publications_by_id(batch):
                 yield pub
+
+    def count_publications_for_file(self, filename):
+        query_body = {
+            "query": {
+                "term": {"filename": filename}
+            },
+            '_source': False,
+            'size': 0
+
+        }
+
+        res = self.handler.search(index=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                           doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+                           body=query_body,
+                            )
+        return res['hits']['total']
+
 
     def get_all_associations_ids(self,):
         res = helpers.scan(client=self.handler,
@@ -816,6 +860,31 @@ class ESQuery(object):
             return helpers.bulk(self.handler,
                                 batch,
                                 stats_only=True)
+
+    def get_all_evidence_for_datasource(self, datasources, fields = None, ):
+
+
+
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
+        doc_type = None
+
+        if datasources:
+            doc_type = datasources
+        res = helpers.scan(client=self.handler,
+                           query={"query":  {"match_all": {}},
+                               '_source': self._get_source_from_fields(fields),
+                               'size': 1000,
+                           },
+                           scroll='12h',
+                           doc_type=doc_type,
+                           index=index_name,
+                           timeout="10m",
+                           )
+
+        # res = list(res)
+        for hit in res:
+            yield hit['_source']
 
     @staticmethod
     def flatten(d, parent_key='', separator='.'):

@@ -16,7 +16,7 @@ from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import  HPAActions, HPAProcess
-from modules.Literature import LiteratureActions, LiteratureProcess
+from modules.Literature import LiteratureActions, MedlineRetriever
 from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions,  ReactomeProcess
 from modules.Association import AssociationActions, ScoringProcess
@@ -108,8 +108,10 @@ if __name__ == '__main__':
                         action="append_const", const=LiteratureActions.ALL)
     parser.add_argument("--lit-fetch", dest='lit', help="fetch literature data",
                         action="append_const", const=LiteratureActions.FETCH)
-    parser.add_argument("--lit-process", dest='lit', help="fetch literature data",
+    parser.add_argument("--lit-process", dest='lit', help="process literature data",
                         action="append_const", const=LiteratureActions.PROCESS)
+    parser.add_argument("--lit-update", dest='lit', help="update literature data",
+                        action="append_const", const=LiteratureActions.UPDATE)
     parser.add_argument("--qc", dest='qc',
                         help="Run quality control scripts",
                         action="append_const", const=QCActions.ALL)
@@ -127,6 +129,9 @@ if __name__ == '__main__':
                         action='store_true', default=False)
     parser.add_argument("--local-file", dest='local_file',
                         help="pass the path to a local gzipped file to use as input for the data validation step",
+                        action='append', default=[])
+    parser.add_argument("--remote-file", dest='remote_file',
+                        help="pass the url to a remote gzipped file to use as input for the data validation step",
                         action='append', default=[])
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
@@ -205,9 +210,11 @@ if __name__ == '__main__':
         if args.lit or run_full_pipeline:
             do_all = (LiteratureActions.ALL in args.lit) or run_full_pipeline
             if (LiteratureActions.FETCH in args.lit) or do_all:
-                LiteratureProcess(connectors.es, loader).fetch()
+                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.local_file)
             if (LiteratureActions.PROCESS in args.lit) or do_all:
-                LiteratureProcess(connectors.es, loader, connectors.r_server).process(dry_run=args.dry_run)
+                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).process()
+            if (LiteratureActions.UPDATE in args.lit):
+                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(update=True)
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
@@ -219,7 +226,8 @@ if __name__ == '__main__':
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(connectors.es, connectors.r_server, dry_run=args.dry_run).check_all(args.local_file)
+                EvidenceValidationFileChecker(connectors.es, connectors.r_server, dry_run=args.dry_run).check_all(local_files=args.local_file,
+                                                                                                                  remote_files=args.remote_file)
         if args.valreset:
             EvidenceValidationFileChecker( connectors.es, connectors.r_server).reset()
         if args.evs or run_full_pipeline:

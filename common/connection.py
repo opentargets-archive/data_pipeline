@@ -65,7 +65,7 @@ class PipelineConnectors():
             self.es = Elasticsearch(hosts = hosts,
                                maxsize=50,
                                timeout=1800,
-                               sniff_on_connection_fail=True,
+                               # sniff_on_connection_fail=True,
                                retry_on_timeout=True,
                                max_retries=10,
                                )

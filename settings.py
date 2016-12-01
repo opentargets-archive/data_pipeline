@@ -261,3 +261,11 @@ class Config():
     DUMP_REMOTE_API = 'https://beta.targetvalidation.org'
     DUMP_REMOTE_API_SECRET = '1RT6L519zkcTH9i3F99OjeYn13k79Wep'
     DUMP_REMOTE_API_APPNAME = 'load-test'
+
+    #Literature Pipeline -- Pubmed/Medline FTP server
+    PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
+    PUBMED_XML_LOCN = '/tmp/medline/baseline'
+    PUBMED_XML_UPDATE_LOCN = '/tmp/medline/update'
+
+    PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
+
