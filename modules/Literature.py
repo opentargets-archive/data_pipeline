@@ -633,17 +633,17 @@ class LiteratureLookUpTable(object):
             self._load_literature_data(r_server)
 
     def _load_literature_data(self, r_server = None):
-        # for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
-        #                 desc='loading publications',
-        #                 unit=' publication',
-        #                 unit_scale=True,
-        #                 leave=False,
-        #                 ):
-        #     pub = Publication()
-        #     pub.load_json(pub_source)
-        #
-        #     self.set_literature(pub,self._get_r_server(
-        #             r_server))# TODO can be improved by sending elements in batches
+        for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
+                        desc='loading publications',
+                        unit=' publication',
+                        unit_scale=True,
+                        leave=False,
+                        ):
+            pub = Publication()
+            pub.load_json(pub_source)
+
+            self.set_literature(pub,self._get_r_server(
+                    r_server))# TODO can be improved by sending elements in batches
         return
 
     def get_literature(self, pmid, r_server = None):
