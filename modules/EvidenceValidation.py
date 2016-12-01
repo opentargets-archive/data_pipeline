@@ -142,6 +142,7 @@ class DirectoryCrawlerProcess():
         self.local_files = local_files
         self.remote_files = remote_files
         self.logger = logging.getLogger(__name__)
+        self.dry_run = dry_run
 
     def _store_remote_filename(self, filename):
         if re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename):
