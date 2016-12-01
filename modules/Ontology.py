@@ -725,7 +725,7 @@ class DiseaseUtils():
             if phenotype_uri not in map(lambda x: x['uri'], disease_phenotypes_map[disease_uri]['phenotypes']):
                 disease_phenotypes_map[disease_uri]['phenotypes'].append({'label': phenotype_label, 'uri': phenotype_uri})
 
-        self.update_disease_phenotypes_cache(disease_phenotypes_map)/
+        self.update_disease_phenotypes_cache(disease_phenotypes_map)
 
         return disease_phenotypes_map
 
