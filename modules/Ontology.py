@@ -595,8 +595,19 @@ class OntologyClassReader():
             'http://identifiers.org/eco/target_drug':'biological target to drug evidence',
             'http://identifiers.org/eco/clinvar_gene_assignments':'ClinVAR SNP-gene pipeline',
             'http://identifiers.org/eco/cttv_mapping_pipeline':'CTTV-custom annotation pipeline',
-            'http://identifiers.org/eco/GWAS_fine_mapping':'Fine-mapping study evidence',
-            'http://www.targetvalidation.org/evidence/genomics_evidence':'genomics evidence'
+            'http://identifiers.org/eco/GWAS':'Genome-wide association study evidence',
+            'http://identifiers.org/eco/GWAS_fine_mapping': 'Fine-mapping study evidence',
+            'http://identifiers.org/eco/somatic_mutation_evidence':'Somatic mutation evidence',
+            'http://www.targetvalidation.org/evidence/genomics_evidence':'genomics evidence',
+            'http://targetvalidation.org/sequence/nearest_gene_five_prime_end':'Nearest gene counting from 5&apos; end',
+            'http://targetvalidation.org/sequence/regulatory_nearest_gene_five_prime_end':'Nearest regulatory gene from 5&apos; end',
+            'http://www.targetvalidation.org/evidence/literature_mining':'Literature mining',
+            'http://www.targetvalidation.org/provenance/DatabaseProvenance':'database provenance',
+            'http://www.targetvalidation.org/provenance/ExpertProvenance':'expert provenance',
+            'http://www.targetvalidation.org/provenance/GWAS_SNP_to_trait_association':'GWAS SNP to trait association',
+            'http://www.targetvalidation.org/provenance/LiteratureProvenance':'literature provenance',
+            'http://www.targetvalidation.org/provenance/disease_to_phenotype_association':'disease to phenotype association',
+            'http://www.targetvalidation.org/provenance/gene_to_disease_association':'gene to disease association'
         }
 
         for uri, label in open_targets_terms.iteritems():
@@ -714,7 +725,7 @@ class DiseaseUtils():
             if phenotype_uri not in map(lambda x: x['uri'], disease_phenotypes_map[disease_uri]['phenotypes']):
                 disease_phenotypes_map[disease_uri]['phenotypes'].append({'label': phenotype_label, 'uri': phenotype_uri})
 
-        self.update_disease_phenotypes_cache(disease_phenotypes_map)
+        self.update_disease_phenotypes_cache(disease_phenotypes_map)/
 
         return disease_phenotypes_map
 
