@@ -590,10 +590,10 @@ class EvidenceManager():
                     try:
                         pub_dict = pub_fetcher.get_publications(pmid)
                         if pub_dict:
-                            pubs[pmid] = [pub_dict[int(pmid)], PublicationAnalysisSpacy(pmid)]
+                            pubs[pmid] = [pub_dict[pmid], PublicationAnalysisSpacy(pmid)]
                             # self.available_publications.set_literature(pub_dict[pmid])
-                    except KeyError:
-
+                    except KeyError as e:
+                        print e
                         logger.error('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
 
 
@@ -609,7 +609,7 @@ class EvidenceManager():
                     if 'issue' in literature_info.data['journal_reference']:
                         journal_reference += "(%s)" % literature_info.data['journal_reference']['issue']
                     if 'pgn' in literature_info.data['journal_reference']:
-                        journal_reference += ":%s" % journal_reference.data['journal_reference']['pgn']
+                        journal_reference += ":%s" % literature_info.data['journal_reference']['pgn']
                     extended_evidence['literature']['journal_reference'] = journal_reference
                     extended_evidence['literature']['authors'] = literature_info.data['authors']
                     extended_evidence['private']['facets']['literature'] = {}
