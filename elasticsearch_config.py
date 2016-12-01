@@ -127,8 +127,16 @@ def _get_evidence_string_generic_mapping():
                         "index": "not_analyzed",
                     },
                     "provenance_type": {
-                        "enabled": False,
-                        "type": "object"
+                        "properties": {
+                            "database": {
+                                "properties": {
+                                    "version": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    }
+                                }
+                            }
+                        }
                     },
                 }
             },
