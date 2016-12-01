@@ -11,6 +11,7 @@ from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter
+from common.connection import PipelineConnectors
 from modules.EFO import EFO
 from modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from modules.GeneData import Gene
@@ -356,8 +357,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                                                             redis_path=r_path,
                                                             queue_out=target_disease_pair_q)
 
-        self.es = Elasticsearch(Config.ELASTICSEARCH_URL, timeout = 10*60)
-        self.es_query = ESQuery(self.es)
+        self.es_query = ESQuery()
         self.target_disease_pair_q = target_disease_pair_q
 
 
@@ -496,10 +496,10 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 class ScoringProcess():
 
     def __init__(self,
-                 loader,
                  r_server):
-        self.es = loader.es
-        self.es_loader = loader
+        connections = PipelineConnectors()
+        self.es = connections.es
+        self.es_loader = Loader(self.es)
         self.es_query = ESQuery(self.es)
         self.r_server = r_server
 
@@ -544,12 +544,12 @@ class ScoringProcess():
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
                                            max_size=queue_per_worker * number_of_workers,
                                            job_timeout=1200,
-                                           batch_size=100,
+                                           batch_size=10,
                                            r_server=self.r_server)
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
                                   max_size=queue_per_worker * number_of_storers,
                                   job_timeout=1200,
-                                  batch_size=100,
+                                  batch_size=10,
                                   r_server=self.r_server)
 
         q_reporter = RedisQueueStatusReporter([target_q,

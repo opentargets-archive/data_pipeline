@@ -5,6 +5,7 @@ import time
 import pickle
 from tqdm import tqdm
 from common.ElasticsearchQuery import ESQuery
+from modules.ChEMBL import ChEMBLLookup
 from modules.ECO import ECOLookUpTable
 from modules.EFO import EFOLookUpTable
 from modules.GeneData import GeneLookUpTable
@@ -23,6 +24,7 @@ class LookUpData():
         self.available_gene_objects = None
         self.available_efo_objects = None
         self.available_eco_objects = None
+        self.chembl = None
 
 class LookUpDataType(object):
     TARGET = 'target'
@@ -32,6 +34,7 @@ class LookUpDataType(object):
     PUBLICATION = 'publication'
     MP = 'mp'
     HPO = 'hpo'
+    CHEMBL_DRUGS = 'chembl_drugs'
 
 class LookUpDataRetriever(object):
     def __init__(self,
@@ -69,6 +72,8 @@ class LookUpDataRetriever(object):
                 self._get_efo()
             elif dt == LookUpDataType.PUBLICATION:
                 self._get_available_publications()
+            elif dt == LookUpDataType.CHEMBL_DRUGS:
+                self._get_available_chembl_mappings()
 
             self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
 
@@ -169,5 +174,21 @@ class LookUpDataRetriever(object):
         file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
         pickle.dump(obj,
                     open(file_path, 'wb'),)
+
+    def _get_available_chembl_mappings(self):
+        chembl_handler = ChEMBLLookup()
+        chembl_handler.get_molecules_from_evidence()
+        all_molecules = set()
+        for target, molecules in  chembl_handler.target2molecule.items():
+            all_molecules = all_molecules|molecules
+        all_molecules = list(all_molecules)
+        query_batch_size = 100
+        for i in range(0, len(all_molecules) + 1, query_batch_size):
+            chembl_handler._populate_synonyms_for_molecule(all_molecules[i:i + query_batch_size])
+        self.lookup.chembl = chembl_handler
+
+
+
+
 
 
