@@ -289,15 +289,15 @@ class ElasticSearchConfiguration():
     available_databases = Config().DATASOURCE_TO_DATATYPE_MAPPING.keys()
     available_databases.append('other')
 
-    generic_shard_number = '3'
+    generic_shard_number = '5'
     generic_replicas_number = '1'
-    evidence_shard_number = '3'
+    evidence_shard_number = '5'
     evidence_replicas_number = '1'
     relation_shard_number = '10'
     relation_replicas_number = '1'
     publication_shard_number = '10'
     publication_replicas_number = '1'
-    validation_shard_number = '1'
+    validation_shard_number = '5'
     validation_replicas_number = '1'
     submission_audit_shard_number = '1'
     submission_audit_replicas_number = '1'

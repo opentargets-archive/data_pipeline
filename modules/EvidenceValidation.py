@@ -201,8 +201,9 @@ class DirectoryCrawlerProcess():
                             user = user.split('_')[0]
                         else:
                             datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
-                        EvidenceChunkElasticStorage.storage_delete(self.loader, datasource)
-                        EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
+                        if not self.dry_run:
+                            EvidenceChunkElasticStorage.storage_delete(self.loader, datasource)
+                            EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
                         try:
                             logfile = os.path.join('/tmp', version_name + ".log")
                             self.check_file(url, version_name, user, datasource, None, logfile, FileTypes.HTTP)
@@ -1521,6 +1522,7 @@ class EvidenceChunkElasticStorage():
 
     @staticmethod
     def storage_delete(loader, data_source_name):
+        #TODO: THIS STUFF SHOULD LOOK AT DRY RUN!!!
         versioned_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)
         if loader.es.indices.exists(versioned_name):
             loader.es.indices.delete(versioned_name)
@@ -1741,7 +1743,7 @@ class EvidenceValidationFileChecker():
 
 
 
-        'Start validating the evidence in chunks on the evidence queue'
+        'Start validating the evidence in chunks on the evidence queuei'
 
         validators = [ValidatorProcess(evidence_q,
                                        self.r_server.db,
