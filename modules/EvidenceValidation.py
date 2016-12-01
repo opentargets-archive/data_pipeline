@@ -18,7 +18,7 @@ import re
 import gzip
 import time
 import logging
-from StringIO import StringIO
+from cStringIO import StringIO
 import json
 from datetime import datetime, date
 from common import Actions
@@ -463,20 +463,21 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             '''temprorary get lines total'''
             lines = 0
             with open(file_path, mode='rb') as f:
-                with gzip.GzipFile(filename=file_path.split('/')[1],
+                with io.BufferedReader(gzip.GzipFile(filename=file_path.split('/')[1],
                                    mode='rb',
                                    fileobj=f,
-                                   mtime=file_mod_time) as fh:
+                                   mtime=file_mod_time)) as fh:
                     lines = self._count_file_lines(fh)
             total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
             if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
                 total_chunks +=1
             self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
             with open(file_path, mode='rb',) as f:
-                with gzip.GzipFile(filename = file_path.split('/')[1],
+
+                with io.BufferedReader(gzip.GzipFile(filename = file_path.split('/')[1],
                                    mode = 'rb',
                                    fileobj = f,
-                                   mtime = file_mod_time) as fh:
+                                   mtime = file_mod_time)) as fh:
                     line = fh.readline()
                     while line:
                         line_buffer.append(line)
@@ -526,8 +527,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                                                  mode='rb',
                                                  fileobj=file_handler,
                                                  )) as fh:
-                line = fh.readline()
-                while line:
+                for line in fh.readlines():
                     line_buffer.append(line)
                     line_number += 1
                     if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
@@ -537,7 +537,6 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                         offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
                         chunk += 1
                         line_buffer = []
-                    line = fh.readline()
         else:
             raise AttributeError('File type %s is not supported'%file_type)
 
@@ -560,13 +559,10 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
         return
 
-    def _count_file_lines(self, fh):
-        lines = 0
-        line = fh.readline()
-        while line:
-            lines += 1
-            line = fh.readline()
-        return lines
+    def _count_file_lines(self, f):
+        for i,line in enumerate(f.readlines()):
+            pass
+        return i+1
 
     def _estimate_file_lines(self, fh, file_size, max_lines = 50000):
         lines = 0
@@ -685,7 +681,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 lc += 1
                 try:
                     python_raw = json.loads(line)
-                except Exception, e:
+                except Exception as e:
                     self.logger.error('cannot parse line %i: %s'%(lc, e))
                     audit.append((lc, EVIDENCE_STRING_INVALID_UNPARSABLE_JSON, None))
                     nb_errors += 1
@@ -1703,10 +1699,10 @@ class EvidenceValidationFileChecker():
                                                       LookUpDataType.HPO,
                                                       LookUpDataType.MP,
                                                      ),
-                                          # autoload=False,
+                                          autoload=False,
                                           ).lookup
 
-        # lookup_data.available_genes.load_uniprot2ensembl()
+        lookup_data.available_genes.load_uniprot2ensembl()
 
         'Create queues'
         file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
