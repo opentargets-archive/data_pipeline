@@ -138,6 +138,10 @@ class SearchObjectTarget(SearchObject, object):
                 ]
         if json_input['drugs']:
             self.drugs = json_input['drugs']
+            self.drugs['drugbank'] = []
+            for drug in json_input['drugbank']:
+                if 'value' in drug and 'generic name' in drug['value']:
+                    self.drugs['drugbank'].append(drug['value']['generic name'])
 
 
 

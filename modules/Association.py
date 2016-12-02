@@ -496,11 +496,10 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 class ScoringProcess():
 
     def __init__(self,
+                 loader,
                  r_server):
-        connections = PipelineConnectors()
-        self.es = connections.es
-        self.es_loader = Loader(self.es)
-        self.es_query = ESQuery(self.es)
+        self.es_loader = loader
+        self.es_query = ESQuery(loader.es)
         self.r_server = r_server
 
     def process_all(self,
