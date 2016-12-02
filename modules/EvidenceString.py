@@ -353,14 +353,14 @@ class EvidenceManager():
                 if 'uniprot_literature' != evidence['sourceID']:
                     logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
-        '''use just one mutation per somatic data'''
-        if 'known_mutations' in evidence['evidence'] and evidence['evidence']['known_mutations']:
-            if len(evidence['evidence']['known_mutations']) == 1:
-                evidence['evidence']['known_mutations'] = evidence['evidence']['known_mutations'][0]
-            else:
-                raise AttributeError('only one mutation is allowed. %i submitted for evidence id %s' % (
-                len(evidence['evidence']['known_mutations']),
-                evidence['id']))
+        # '''use just one mutation per somatic data'''
+        # if 'known_mutations' in evidence['evidence'] and evidence['evidence']['known_mutations']:
+        #     if len(evidence['evidence']['known_mutations']) == 1:
+        #         evidence['evidence']['known_mutations'] = evidence['evidence']['known_mutations'][0]
+        #     else:
+        #         raise AttributeError('only one mutation is allowed. %i submitted for evidence id %s' % (
+        #         len(evidence['evidence']['known_mutations']),
+        #         evidence['id']))
 
         '''remove identifiers.org from genes and map to ensembl ids'''
         target_id = evidence['target']['id'][0]
@@ -806,11 +806,15 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'somatic_mutation':
                 frequency = 1.
                 if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
-                    if 'number_samples_with_mutation_type' in self.evidence['evidence']['known_mutations']:
-                        frequency = float(
-                            self.evidence['evidence']['known_mutations']['number_samples_with_mutation_type']) / float(
-                            self.evidence['evidence']['known_mutations']['number_mutated_samples'])
-                        frequency = DataNormaliser.renormalize(frequency, [0., 9.], [.5, 1.])
+                    frequencies = []
+                    for mutation in self.evidence['evidence']['known_mutations']:
+                        if 'number_samples_with_mutation_type' in mutation:
+                            frequency = float(
+                                mutation['number_samples_with_mutation_type']) / float(
+                                mutation['number_mutated_samples'])
+                            frequency = DataNormaliser.renormalize(frequency, [0., 9.], [.5, 1.])
+                            frequencies.append(frequency)
+                    frequency = sum(frequencies)/len(frequencies)#store frequency as an average of all of them
                 self.evidence['scores']['association_score'] = float(
                     self.evidence['evidence']['resource_score']['value']) * frequency
             elif self.evidence['type'] == 'literature':
