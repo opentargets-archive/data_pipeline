@@ -13,7 +13,8 @@ from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisQueue, RedisQueueStatusReporter
+from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from  multiprocessing import Process
 from elasticsearch import Elasticsearch, helpers
 
@@ -181,7 +182,7 @@ class SearchObjectDisease(SearchObject, object):
         self.phenotypes = json_input['phenotypes']
 
 
-class SearchObjectAnalyserWorker(Process):
+class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
     ''' read a list of objects from the processing queue and analyse them with the available association data before
     storing them in elasticsearch
     '''
@@ -191,52 +192,57 @@ class SearchObjectAnalyserWorker(Process):
     data_handlers[SearchObjectTypes.TARGET] = SearchObjectTarget
     data_handlers[SearchObjectTypes.DISEASE] = SearchObjectDisease
 
-    def __init__(self, queue):
-        super(SearchObjectAnalyserWorker, self).__init__()
+    def __init__(self,
+                 queue,
+                 redis_path,
+                 dry_run = False,
+                 lookup = None):
+        super(SearchObjectAnalyserWorker, self).__init__(queue,redis_path)
         self.queue = queue
-        self.r_server = Redis(Config.REDISLITE_DB_PATH)
-        self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
-        self.es_query = ESQuery(self.es)
+        self.lookup = lookup
+        self.loader = Loader(dry_run = dry_run)
+        self.es_query = ESQuery(self.loader.es)
         # logging.info('%s started'%self.name)
 
-    def run(self):
-        with Loader(self.es, chunk_size=50) as loader:
-            while not self.queue.is_done(r_server=self.r_server):
-                data = self.queue.get(r_server=self.r_server, timeout= 1)
-                if data is not None:
-                    key, value = data
-                    error = False
-                    try:
-                        '''process objects to simple search object'''
-                        so = self.data_handlers[value[SearchObjectTypes.__ROOT__]]()
-                        so.digest(json_input=value)
-                        '''count associations '''
-                        if value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
-                            ass_data = self.es_query.get_associations_for_target(value['id'], fields=['id','harmonic-sum.overall'], size = 20)
-                            so.set_associations(self._summarise_association(ass_data.top_associations),
-                                                ass_data.associations_count)
+    def process(self, data):
+        '''process objects to simple search object'''
+        so = self.data_handlers[data[SearchObjectTypes.__ROOT__]]()
+        so.digest(json_input=data)
+        '''inject drug data'''
+        if not hasattr(so, 'drugs'):
+            so.drugs = {}
+        so.drugs['evidence_data'] = []
+        '''count associations '''
+        if data[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
+            ass_data = self.es_query.get_associations_for_target(data['id'], fields=['id','harmonic-sum.overall'], size = 20)
+            so.set_associations(self._summarise_association(ass_data.top_associations),
+                                ass_data.associations_count)
+            if so.id in self.lookup.chembl.target2molecule:
+                drugs_synonyms = set()
+                for molecule in self.lookup.chembl.target2molecule[so.id]:
+                    drugs_synonyms = drugs_synonyms | set(self.lookup.chembl.molecule2synonyms[molecule])
+                so.drugs['evidence_data'] = list(drugs_synonyms)
 
-                        elif value[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
-                            ass_data = self.es_query.get_associations_for_disease(value['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
-                            so.set_associations(self._summarise_association(ass_data.top_associations),
-                                                ass_data.associations_count)
-                        else:
-                            so.set_associations()
-                        '''store search objects'''
-                        loader.put(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
-                                   Config.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
-                                   so.id,
-                                   so.to_json(),
-                                   create_index=False)
-                    except Exception, e:
-                        error = True
-                        logging.exception('Error processing key %s'%key)
-                    self.queue.done(key, error=error, r_server=self.r_server)
+        elif data[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
+            ass_data = self.es_query.get_associations_for_disease(data['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
+            so.set_associations(self._summarise_association(ass_data.top_associations),
+                                ass_data.associations_count)
+            if so.id in self.lookup.chembl.disease2molecule:
+                drugs_synonyms = set()
+                for molecule in self.lookup.chembl.disease2molecule[so.id]:
+                    drugs_synonyms = drugs_synonyms | set(self.lookup.chembl.molecule2synonyms[molecule])
+                so.drugs['evidence_data'] = list(drugs_synonyms)
+        else:
+            so.set_associations()
 
 
 
-
-        # logging.info('%s done processing'%self.name)
+        '''store search objects'''
+        self.loader.put(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
+                   Config.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
+                   so.id,
+                   so.to_json(),
+                   create_index=False)
 
     def _summarise_association(self, data):
         def cap_score(value):
@@ -262,7 +268,7 @@ class SearchObjectProcess(object):
         self.esquery = ESQuery(loader.es)
         self.r_server = r_server
 
-    def process_all(self):
+    def process_all(self, dry_run = False):
         ''' process all the objects that needs to be returned by the search method
         :return:
         '''
@@ -275,8 +281,11 @@ class SearchObjectProcess(object):
 
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
-
-        workers = [SearchObjectAnalyserWorker(queue) for i in range(multiprocessing.cpu_count())]
+        lookup_data = LookUpDataRetriever(self.loader.es,self.r_server,data_types=[LookUpDataType.CHEMBL_DRUGS]).lookup
+        workers = [SearchObjectAnalyserWorker(queue,
+                                              self.r_server.db,
+                                              lookup=lookup_data,
+                                              dry_run=dry_run) for i in range(multiprocessing.cpu_count())]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()
@@ -293,10 +302,8 @@ class SearchObjectProcess(object):
 
         queue.set_submission_finished(r_server=self.r_server)
 
-
-        while not queue.is_done(r_server=self.r_server):
-            time.sleep(0.5)
-
+        for w in workers:
+            w.join()
 
         logging.info(queue.get_status(r_server=self.r_server))
         logging.info('ALL DONE! Execution time: %s'%(datetime.now()-start_time))
