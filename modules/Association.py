@@ -499,6 +499,7 @@ class ScoringProcess():
                  loader,
                  r_server):
         self.es_loader = loader
+        self.es = loader.es
         self.es_query = ESQuery(loader.es)
         self.r_server = r_server
 
