@@ -212,7 +212,7 @@ class ExtendedInfoLiterature(ExtendedInfo):
                          chemicals=literature.chemicals,
                          abstract_lemmas=analyzed_literature.lemmas,
                          noun_chunks=analyzed_literature.noun_chunks,
-                         date=literature.pub_date,
+                         date=literature.date,
                          journal_reference = literature.journal_reference)
 
 
