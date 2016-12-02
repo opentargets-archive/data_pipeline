@@ -15,6 +15,7 @@ from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from common.connection import PipelineConnectors
 from modules.ChEMBL import ChEMBLLookup
 from modules.Reactome import ReactomeRetriever
 from settings import Config
@@ -86,8 +87,6 @@ class Gene(JSONSerializable):
         self._private ={}
         self.drugs = {}
         self.protein_classification = {}
-        self._logger = logging.getLogger(__name__)
-
 
     def _set_id(self):
         if self.ensembl_gene_id:
@@ -324,7 +323,8 @@ class Gene(JSONSerializable):
                               'pathway type name': reactome_retriever.get_reaction(type_code).label
                               })
         except:
-            self._logger.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
+            logger = logging.getLogger(__name__)
+            logger.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
         return types
 
     def get_id_org(self):
@@ -691,7 +691,7 @@ class GeneLookUpTable(object):
     """
 
     def __init__(self,
-                 es,
+                 es=None,
                  namespace = None,
                  r_server = None,
                  ttl = 60*60*24+7,
@@ -700,12 +700,18 @@ class GeneLookUpTable(object):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = r_server,
                                             ttl = ttl)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
         self._es = es
         self._es_query = ESQuery(es)
         self.r_server = r_server
         self.uniprot2ensembl = {}
         if (r_server is not None) and autoload:
             self.load_gene_data(r_server, targets)
+        self._logger = logging.getLogger(__name__)
+
 
 
     def load_gene_data(self, r_server = None, targets = []):
@@ -753,9 +759,13 @@ class GeneLookUpTable(object):
         try:
             return self._table.get(target_id, r_server=self._get_r_server(r_server))
         except KeyError:
-            target = self._es_query.get_objects_by_id([target_id],
-                                             Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                             Config.ELASTICSEARCH_GENE_NAME_DOC_NAME).next()
+            try:
+                target = self._es_query.get_objects_by_id(target_id,
+                                                 Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                                 Config.ELASTICSEARCH_GENE_NAME_DOC_NAME).next()
+            except Exception as e:
+                self._logger.exception('Cannot retrieve target from elasticsearch')
+                raise KeyError()
             self.set_gene(target, r_server)
             return target
 

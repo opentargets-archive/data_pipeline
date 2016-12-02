@@ -326,7 +326,6 @@ class OntologyClassReader():
             uri = str(row[0])
             label = str(row[1])
             self.top_level_classes[uri] = label
-            logger.info("RDFLIB TOP LEVEL '%s' '%s'" % (uri, label))
 
         return
 
@@ -644,11 +643,14 @@ class DiseaseUtils():
         return os.path.isfile(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), "disease_phenotypes.pck"))
 
     def read_disease_phenotypes_cache(self):
-        return pickle.load( open( os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'),"disease_phenotypes.pck"), "rb" ) )
+        return pickle.load( open( os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'),"disease_phenotypes.pck"), 'rb'))
 
     def update_disease_phenotypes_cache(self, disease_phenotypes):
+        if not os.path.isdir(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'))):
+            os.makedirs(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir')))
         pickle.dump(disease_phenotypes,
-            open(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), "disease_phenotypes.pck"), "wb"))
+            open(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), "disease_phenotypes.pck"), 'wb'),
+                    protocol=pickle.HIGHEST_PROTOCOL)
 
     def write_disease_phenotypes(self, ontologyreader=None, filename=None):
 

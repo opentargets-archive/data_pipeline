@@ -2,6 +2,9 @@ import json
 from ConfigParser import NoSectionError
 from UserDict import UserDict
 from json import JSONEncoder
+
+from datetime import datetime, date
+
 from settings import Config
 
 __author__ = 'andreap'
@@ -14,11 +17,22 @@ class PipelineEncoder(JSONEncoder):
             pass
         return o.__dict__
 
+def json_serialize(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat(' ')
+    elif isinstance(obj, date):
+        return obj.isoformat()
+    else:
+        try:
+            return obj.__dict__
+        except AttributeError:
+            raise TypeError('Type not serializable')
+
 class JSONSerializable(object):
     def to_json(self):
         self.stamp_data_release()
         return json.dumps(self,
-                          default=lambda o: o.__dict__,
+                          default=json_serialize,
                           sort_keys=True,
                           # indent=4,
                           cls=PipelineEncoder)

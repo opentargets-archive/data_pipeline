@@ -204,15 +204,16 @@ class ExtendedInfoLiterature(ExtendedInfo):
 
         self.data = dict(abstract=literature.abstract,
                          journal=literature.journal,
-                         year=literature.year,
                          title=literature.title,
+                         authors=literature.authors,
                          doi=literature.doi,
                          pub_type=literature.pub_type,
                          mesh_headings=literature.mesh_headings,
                          chemicals=literature.chemicals,
                          abstract_lemmas=analyzed_literature.lemmas,
                          noun_chunks=analyzed_literature.noun_chunks,
-                         date=literature.date)
+                         date=literature.date,
+                         journal_reference = literature.journal_reference)
 
 
 class ProcessedEvidenceStorer():
@@ -320,17 +321,26 @@ class EvidenceManager():
             try:
                 available_score = evidence['evidence']['gene2variant']['resource_score']['value']
             except KeyError:
-                logger.debug(
-                    "malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']["
-                    "'resource_score']['value']" %
-                    evidence['id'])
+                if 'resource_score' in evidence['evidence'] and \
+                    'value' in  evidence['evidence']['resource_score']:
+                        available_score = evidence['evidence']['resource_score']['value']
+                else:
+                    logger.debug(
+                        "malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']["
+                        "'resource_score']['value']" %
+                        evidence['id'])
             try:
                 eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
+                if 'evidence_codes' in evidence['evidence']:
+                    eco_uri = evidence['evidence']['evidence_codes']
             except KeyError:
-                logger.debug(
-                    "malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']["
-                    "'functional_consequence']" %
-                    evidence['id'])
+                if 'evidence_codes' in evidence['evidence']:
+                    eco_uri = evidence['evidence']['evidence_codes']
+                else:
+                    logger.debug(
+                        "malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']["
+                        "'functional_consequence']" %
+                        evidence['id'])
 
             if eco_uri in self.eco_scores:
                 if 'resource_score' not in evidence['evidence']['gene2variant']:
@@ -343,14 +353,14 @@ class EvidenceManager():
                 if 'uniprot_literature' != evidence['sourceID']:
                     logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
-        '''use just one mutation per somatic data'''
-        if 'known_mutations' in evidence['evidence'] and evidence['evidence']['known_mutations']:
-            if len(evidence['evidence']['known_mutations']) == 1:
-                evidence['evidence']['known_mutations'] = evidence['evidence']['known_mutations'][0]
-            else:
-                raise AttributeError('only one mutation is allowed. %i submitted for evidence id %s' % (
-                len(evidence['evidence']['known_mutations']),
-                evidence['id']))
+        # '''use just one mutation per somatic data'''
+        # if 'known_mutations' in evidence['evidence'] and evidence['evidence']['known_mutations']:
+        #     if len(evidence['evidence']['known_mutations']) == 1:
+        #         evidence['evidence']['known_mutations'] = evidence['evidence']['known_mutations'][0]
+        #     else:
+        #         raise AttributeError('only one mutation is allowed. %i submitted for evidence id %s' % (
+        #         len(evidence['evidence']['known_mutations']),
+        #         evidence['id']))
 
         '''remove identifiers.org from genes and map to ensembl ids'''
         target_id = evidence['target']['id'][0]
@@ -450,12 +460,12 @@ class EvidenceManager():
             logger.error(
                 "%s Evidence %s has an invalid efo id in disease.id: %s" % (datasource, evidence_id, efo_id))
             return False
-        for eco_id in ev['evidence']['evidence_codes']:
-            if eco_id not in self.available_ecos:
-                logger.error(
-                    "%s Evidence %s has an invalid eco id in evidence.evidence_codes: %s" % (
-                    datasource, evidence_id, eco_id))
-                return False
+        # for eco_id in ev['evidence']['evidence_codes']:
+        #     if eco_id not in self.available_ecos:
+        #         logger.error(
+        #             "%s Evidence %s has an invalid eco id in evidence.evidence_codes: %s" % (
+        #             datasource, evidence_id, eco_id))
+        #         return False
 
         return True
 
@@ -530,25 +540,29 @@ class EvidenceManager():
         all_efo_codes = list(set(all_efo_codes))
 
         """get generic eco info"""
-        all_eco_codes = extended_evidence['evidence']['evidence_codes']
         try:
-            all_eco_codes.append(
-                get_ontology_code_from_url(extended_evidence['evidence']['gene2variant']['functional_consequence']))
-        except KeyError:
-            pass
-        ecos_info = []
-        for eco_id in all_eco_codes:
-            eco = self._get_eco_obj(eco_id)
-            if eco is not None:
-                ecos_info.append(ExtendedInfoECO(eco))
-            else:
-                logger.warning("Cannot get generic info for eco: %s" % eco_id)
+            all_eco_codes = extended_evidence['evidence']['evidence_codes']
+            try:
+                all_eco_codes.append(
+                    get_ontology_code_from_url(extended_evidence['evidence']['gene2variant']['functional_consequence']))
+            except KeyError:
+                pass
+            ecos_info = []
+            for eco_id in all_eco_codes:
+                eco = self._get_eco_obj(eco_id)
+                if eco is not None:
+                    ecos_info.append(ExtendedInfoECO(eco))
+                else:
+                    logger.warning("Cannot get generic info for eco: %s" % eco_id)
 
-        if ecos_info:
-            data = []
-            for eco_info in ecos_info:
-                data.append(eco_info.data)
-            extended_evidence['evidence'][ExtendedInfoECO.root] = data
+            if ecos_info:
+                data = []
+                for eco_info in ecos_info:
+                    data.append(eco_info.data)
+                extended_evidence['evidence'][ExtendedInfoECO.root] = data
+        except:
+            extended_evidence['evidence'][ExtendedInfoECO.root] = None
+            all_eco_codes=[]
 
         '''Add private objects used just for faceting'''
 
@@ -583,32 +597,37 @@ class EvidenceManager():
                 else:
                     # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
                     try:
-                        pub_dict = pub_fetcher.get_publications([pmid])
+                        pub_dict = pub_fetcher.get_publications(pmid)
                         if pub_dict:
                             pubs[pmid] = [pub_dict[pmid], PublicationAnalysisSpacy(pmid)]
                             # self.available_publications.set_literature(pub_dict[pmid])
-                    except KeyError:
+                    except KeyError as e:
+                        print e
                         logger.error('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
+
+
                 if pubs:
                     literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
-                    year = None
-                    if literature_info.data['year']:
-                        try:
-                            year = int(literature_info.data['year'])
-                        except:
-                            pass
-                    extended_evidence['literature']['year'] = year
                     extended_evidence['literature']['date'] = literature_info.data['date']
                     extended_evidence['literature']['abstract'] = literature_info.data['abstract']
                     extended_evidence['literature']['journal_data'] = literature_info.data['journal']
                     extended_evidence['literature']['title'] = literature_info.data['title']
+                    journal_reference = ''
+                    if 'volume' in literature_info.data['journal_reference']:
+                        journal_reference += literature_info.data['journal_reference']['volume']
+                    if 'issue' in literature_info.data['journal_reference']:
+                        journal_reference += "(%s)" % literature_info.data['journal_reference']['issue']
+                    if 'pgn' in literature_info.data['journal_reference']:
+                        journal_reference += ":%s" % literature_info.data['journal_reference']['pgn']
+                    extended_evidence['literature']['journal_reference'] = journal_reference
+                    extended_evidence['literature']['authors'] = literature_info.data['authors']
                     extended_evidence['private']['facets']['literature'] = {}
                     # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
                     #     'abstract_lemmas')
                     extended_evidence['literature']['doi'] = literature_info.data.get('doi')
                     extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
-                    # extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
-                    #     'mesh_headings')
+                    extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
+                        'mesh_headings')
                     # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
                     #     'chemicals')
                     # extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
@@ -627,9 +646,12 @@ class EvidenceManager():
         return efo
 
     def _get_eco_obj(self, ecoid):
-        eco = ECO(ecoid)
-        eco.load_json(self.available_ecos[ecoid])
-        return eco
+        try:
+            eco = ECO(ecoid)
+            eco.load_json(self.available_ecos[ecoid])
+            return eco
+        except KeyError:
+            return
 
     def _get_non_reference_gene_mappings(self):
         self.non_reference_genes = {}
@@ -784,11 +806,15 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'somatic_mutation':
                 frequency = 1.
                 if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
-                    if 'number_samples_with_mutation_type' in self.evidence['evidence']['known_mutations']:
-                        frequency = float(
-                            self.evidence['evidence']['known_mutations']['number_samples_with_mutation_type']) / float(
-                            self.evidence['evidence']['known_mutations']['number_mutated_samples'])
-                        frequency = DataNormaliser.renormalize(frequency, [0., 9.], [.5, 1.])
+                    frequencies = []
+                    for mutation in self.evidence['evidence']['known_mutations']:
+                        if 'number_samples_with_mutation_type' in mutation:
+                            frequency = float(
+                                mutation['number_samples_with_mutation_type']) / float(
+                                mutation['number_mutated_samples'])
+                            frequency = DataNormaliser.renormalize(frequency, [0., 9.], [.5, 1.])
+                            frequencies.append(frequency)
+                    frequency = sum(frequencies)/len(frequencies)#store frequency as an average of all of them
                 self.evidence['scores']['association_score'] = float(
                     self.evidence['evidence']['resource_score']['value']) * frequency
             elif self.evidence['type'] == 'literature':
@@ -1066,10 +1092,11 @@ class EvidenceStringProcess():
         if inject_literature:
             lookup_data_types = [LookUpDataType.PUBLICATION,LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
             # lookup_data_types.append(LookUpDataType.PUBLICATION)
+
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=lookup_data_types,
-                                          autoload=False
+                                          autoload=True
                                           ).lookup
         lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000

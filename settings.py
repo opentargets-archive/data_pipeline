@@ -152,7 +152,7 @@ class Config():
     # ftp user and passwords
     EVIDENCEVALIDATION_FTP_HOST= dict( host = 'ftp.targetvalidation.org',
                                        port = 22)
-    EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}\.json\.gz$"
+    EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
     EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
     EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
@@ -261,3 +261,11 @@ class Config():
     DUMP_REMOTE_API = 'https://beta.targetvalidation.org'
     DUMP_REMOTE_API_SECRET = '1RT6L519zkcTH9i3F99OjeYn13k79Wep'
     DUMP_REMOTE_API_APPNAME = 'load-test'
+
+    #Literature Pipeline -- Pubmed/Medline FTP server
+    PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
+    PUBMED_XML_LOCN = '/tmp/medline/baseline'
+    PUBMED_XML_UPDATE_LOCN = '/tmp/medline/update'
+
+    PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
+
