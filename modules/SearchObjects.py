@@ -220,7 +220,8 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
             if so.id in self.lookup.chembl.target2molecule:
                 drugs_synonyms = set()
                 for molecule in self.lookup.chembl.target2molecule[so.id]:
-                    drugs_synonyms = drugs_synonyms | set(self.lookup.chembl.molecule2synonyms[molecule])
+                    if molecule in self.lookup.chembl.molecule2synonyms:
+                        drugs_synonyms = drugs_synonyms | set(self.lookup.chembl.molecule2synonyms[molecule])
                 so.drugs['evidence_data'] = list(drugs_synonyms)
 
         elif data[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
@@ -230,7 +231,8 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
             if so.id in self.lookup.chembl.disease2molecule:
                 drugs_synonyms = set()
                 for molecule in self.lookup.chembl.disease2molecule[so.id]:
-                    drugs_synonyms = drugs_synonyms | set(self.lookup.chembl.molecule2synonyms[molecule])
+                    if molecule in self.lookup.chembl.molecule2synonyms:
+                        drugs_synonyms = drugs_synonyms | set(self.lookup.chembl.molecule2synonyms[molecule])
                 so.drugs['evidence_data'] = list(drugs_synonyms)
         else:
             so.set_associations()
