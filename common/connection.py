@@ -1,10 +1,10 @@
 import logging
 import os
-
 import time
 
 from SPARQLWrapper import SPARQLWrapper
 from elasticsearch import Elasticsearch
+from elasticsearch import RequestsHttpConnection
 from redislite import Redis
 
 from settings import Config
@@ -37,7 +37,7 @@ class PipelineConnectors():
         hosts=[]
         #es = None
         if len(Config.ELASTICSEARCH_NODES) > 1 and Config.ELASTICSEARCH_PORT:
-            hosts = [dict(host=node, port=Config.ELASTICSEARCH_PORT) for node in Config.ELASTICSEARCH_NODES]
+            hosts = [dict(host=node, port=int(Config.ELASTICSEARCH_PORT)) for node in Config.ELASTICSEARCH_NODES]
         elif Config.ELASTICSEARCH_HOST and Config.ELASTICSEARCH_PORT:
             while 1:
                 import socket
@@ -49,7 +49,7 @@ class PipelineConnectors():
                     try:
                         socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
                         nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
-                        hosts = [dict(host=h, port=Config.ELASTICSEARCH_PORT) for h in nr_host ]
+                        hosts = [dict(host=h, port=int(Config.ELASTICSEARCH_PORT)) for h in nr_host ]
                         self.logger.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
                         break
                     except socket.gaierror:
@@ -62,13 +62,14 @@ class PipelineConnectors():
                             break
                         connection_attempt+=1
         if hosts:
-            self.es = Elasticsearch(hosts = hosts,
-                               maxsize=50,
-                               timeout=1800,
-                               # sniff_on_connection_fail=True,
-                               retry_on_timeout=True,
-                               max_retries=10,
-                               )
+            self.es = Elasticsearch(hosts=hosts,
+                                    maxsize=50,
+                                    timeout=1800,
+                                    # sniff_on_connection_fail=True,
+                                    retry_on_timeout=True,
+                                    max_retries=10,
+                                    connection_class=RequestsHttpConnection,
+                                    )
             connection_attempt = 1
             while not self.es.ping():
                 wait_time = 3*connection_attempt

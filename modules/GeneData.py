@@ -761,8 +761,10 @@ class GeneLookUpTable(object):
         except KeyError:
             try:
                 target = self._es_query.get_objects_by_id(target_id,
-                                                 Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                                 Config.ELASTICSEARCH_GENE_NAME_DOC_NAME).next()
+                                                          Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                                          Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                                                          source_exclude='ortholog.*'
+                                                          ).next()
             except Exception as e:
                 self._logger.exception('Cannot retrieve target from elasticsearch')
                 raise KeyError()

@@ -51,8 +51,7 @@ class ESQuery(object):
     def _get_source_from_fields(fields = None):
         if not fields:
             return True
-        source = {"include": fields}
-        return source
+        return fields
 
     def get_all_targets(self, fields = None):
         source = self._get_source_from_fields(fields)
@@ -598,7 +597,8 @@ class ESQuery(object):
                           ids,
                           index,
                           doc_type,
-                          fields = [],
+                          source = True,
+                          source_exclude=[],
                           realtime = False):
         '''
 
@@ -611,7 +611,8 @@ class ESQuery(object):
             res = self.handler.mget(index=Loader.get_versioned_index(index),
                                     doc_type=doc_type,
                                     body=dict(ids=ids),
-                                    _source=self._get_source_from_fields(fields),
+                                    _source=source,
+                                    _source_exclude=source_exclude,
                                     realtime=True,
                                     )
             if not res:
@@ -619,7 +620,8 @@ class ESQuery(object):
                 res = self.handler.mget(index=Loader.get_versioned_index(index),
                                         doc_type=doc_type,
                                         body=dict(ids=ids),
-                                        _source=self._get_source_from_fields(fields),
+                                        _source=source,
+                                        _source_exclude=source_exclude,
                                         realtime=True,
                                         )
             for doc in res['docs']:
@@ -632,13 +634,14 @@ class ESQuery(object):
             res = self.handler.get(index=Loader.get_versioned_index(index),
                                     doc_type=doc_type,
                                     id=ids,
-                                    _source=self._get_source_from_fields(fields),
+                                    _source=source,
+                                    _source_exclude=source_exclude,
                                     realtime=True,
                                     )
             try:
                 yield res['_source']
-            except:
-                pass
+            except Exception as e:
+                self.logger.exception('cannot retrieve single object by id %s '%e.msg)
 
     def get_publications_by_id(self, ids):
         return self.get_objects_by_id(ids,

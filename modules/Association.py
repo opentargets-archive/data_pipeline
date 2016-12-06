@@ -433,7 +433,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                     gene_data.load_json(self.lookup_data.available_genes.get_gene(target))
                     score.set_target_data(gene_data)
                 except KeyError:
-                    self.logger.error('Cannot find gene code "%target" in lookup table'%target)
+                    self.logger.error('Cannot find gene code "%s" in lookup table'%target)
                     try:
                         score.set_target_data(gene_data)
                     except Exception:
@@ -445,7 +445,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 try:
                     disease_data.load_json(self.lookup_data.available_efos.get_efo(disease))
                 except KeyError:
-                    self.logger.error('Cannot find EFO code "%disease" in lookup table'%disease)
+                    self.logger.error('Cannot find EFO code "%s" in lookup table'%disease)
                     try:
                         score.set_disease_data(disease_data)
                     except Exception:
