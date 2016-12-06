@@ -810,9 +810,9 @@ class Evidence(JSONSerializable):
                     max_sample_size = 0.
                     for mutation in self.evidence['evidence']['known_mutations']:
                         if 'number_samples_with_mutation_type' in mutation:
-                            sample_total_coverage += mutation['number_samples_with_mutation_type']
-                            if mutation['number_mutated_samples'] >  max_sample_size:
-                                max_sample_size = mutation['number_mutated_samples']
+                            sample_total_coverage += int(mutation['number_samples_with_mutation_type'])
+                            if int(mutation['number_mutated_samples']) >  max_sample_size:
+                                max_sample_size = int(mutation['number_mutated_samples'])
                     if sample_total_coverage > max_sample_size:
                         sample_total_coverage = max_sample_size
                     frequency = DataNormaliser.renormalize(sample_total_coverage/max_sample_size, [0., 9.], [.5, 1.])
