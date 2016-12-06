@@ -169,7 +169,8 @@ class SearchObjectDisease(SearchObject, object):
         self.efo_url=json_input['code']
         self.efo_label=json_input['label']
         self.efo_definition=json_input['definition']
-        self.efo_synonyms=json_input['efo_synonyms']
+        clean_synonyms = [i for i in json_input['efo_synonyms'] if not i.startswith('MSH:')]
+        self.efo_synonyms=clean_synonyms
         self.efo_path_codes=json_input['path_codes']
         self.efo_path_labels=json_input['path_labels']
         self.min_path_len=len(json_input['path_codes'][0])
