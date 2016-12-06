@@ -873,7 +873,12 @@ class ESQuery(object):
         doc_type = None
 
         if datasources:
-            doc_type = datasources
+            if isinstance(datasources, str):
+                doc_type='evidencestring-'+datasources
+            elif isinstance(datasources, list):
+                doc_type=['evidencestring-'+ds for ds in datasources]
+            else:
+                raise AttributeError()
         res = helpers.scan(client=self.handler,
                            query={"query":  {"match_all": {}},
                                '_source': self._get_source_from_fields(fields),

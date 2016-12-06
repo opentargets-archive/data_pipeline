@@ -806,15 +806,16 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'somatic_mutation':
                 frequency = 1.
                 if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
-                    frequencies = []
+                    sample_total_coverage =  0.
+                    max_sample_size = 0.
                     for mutation in self.evidence['evidence']['known_mutations']:
                         if 'number_samples_with_mutation_type' in mutation:
-                            frequency = float(
-                                mutation['number_samples_with_mutation_type']) / float(
-                                mutation['number_mutated_samples'])
-                            frequency = DataNormaliser.renormalize(frequency, [0., 9.], [.5, 1.])
-                            frequencies.append(frequency)
-                    frequency = sum(frequencies)/len(frequencies)#store frequency as an average of all of them
+                            sample_total_coverage += mutation['number_samples_with_mutation_type']
+                            if mutation['number_mutated_samples'] >  max_sample_size:
+                                max_sample_size = mutation['number_mutated_samples']
+                    if sample_total_coverage > max_sample_size:
+                        sample_total_coverage = max_sample_size
+                    frequency = DataNormaliser.renormalize(sample_total_coverage/max_sample_size, [0., 9.], [.5, 1.])
                 self.evidence['scores']['association_score'] = float(
                     self.evidence['evidence']['resource_score']['value']) * frequency
             elif self.evidence['type'] == 'literature':
