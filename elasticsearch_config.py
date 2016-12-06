@@ -765,18 +765,18 @@ class ElasticSearchConfiguration():
                                                   "type": "string",
                                                   "index": "not_analyzed",
                                               },
-                                              "gene_info": {
-                                                  "properties": {
-                                                      "name": {
-                                                          "type": "string",
-                                                          "index": "not_analyzed",
-                                                      },
-                                                      "symbol": {
-                                                          "type": "string",
-                                                          "index": "not_analyzed",
-                                                      },
-                                                  }
-                                              },
+                                              # "gene_info": {
+                                              #     "properties": {
+                                              #         "name": {
+                                              #             "type": "string",
+                                              #             "index": "not_analyzed",
+                                              #         },
+                                              #         "symbol": {
+                                              #             "type": "string",
+                                              #             "index": "not_analyzed",
+                                              #         },
+                                              #     }
+                                              # },
                                               "activity": {
                                                   "type": "string",
                                                   "index": "not_analyzed",
@@ -794,22 +794,22 @@ class ElasticSearchConfiguration():
                                                   "type": "string",
                                                   "index": "not_analyzed",
                                               },
-                                              "efo_info": {
-                                                  "properties": {
-                                                      "label": {
-                                                          "type": "string",
-                                                          "index": "not_analyzed",
-                                                      },
-                                                      "therapeutic_area": {
-                                                          "properties": {
-                                                              "label": {
-                                                                  "type": "string",
-                                                                  "index": "not_analyzed",
-                                                              },
-                                                          },
-                                                      },
-                                                  },
-                                              },
+                                              # "efo_info": {
+                                              #     "properties": {
+                                              #         "label": {
+                                              #             "type": "string",
+                                              #             "index": "not_analyzed",
+                                              #         },
+                                              #         "therapeutic_area": {
+                                              #             "properties": {
+                                              #                 "label": {
+                                              #                     "type": "string",
+                                              #                     "index": "not_analyzed",
+                                              #                 },
+                                              #             },
+                                              #         },
+                                              #     },
+                                              # },
                                           }
 
                                       },
