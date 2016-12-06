@@ -43,7 +43,7 @@ class PipelineConnectors():
                 import socket
                 try:#is a valid ip
                     socket.inet_aton(Config.ELASTICSEARCH_HOST)
-                    hosts = [dict(host=Config.ELASTICSEARCH_HOST, port=Config.ELASTICSEARCH_PORT)]
+                    hosts = [dict(host=Config.ELASTICSEARCH_HOST, port=int(Config.ELASTICSEARCH_PORT))]
                     break
                 except socket.error:#resolve nameserver to list of ips
                     try:
