@@ -165,13 +165,14 @@ class EFOLookUpTable(object):
                         total=self._es_query.count_all_diseases(),
                         leave=False,
                         ):
-            self._table.set(get_ontology_code_from_url(efo['code']),efo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
+            self.set_efo(efo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
     def get_efo(self, efo_id, r_server = None):
         return self._table.get(efo_id, r_server=self._get_r_server(r_server))
 
     def set_efo(self, efo, r_server = None):
-        self._table.set(get_ontology_code_from_url(efo['code']),efo, r_server=self._get_r_server(r_server))
+        efo_key = efo['path_codes'][0][-1]
+        self._table.set(efo_key,efo, r_server=self._get_r_server(r_server))
 
     def get_available_gefo_ids(self, r_server = None):
         return self._table.keys(r_server = self._get_r_server(r_server))
