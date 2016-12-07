@@ -32,7 +32,7 @@ class QCRunner(object):
         # self.run_associationQC()
 
     def run_associationQC(self):
-        self.run_association2evidenceQC()
+        # self.run_association2evidenceQC()
         self.run_evidence2associationQC()
 
     def run_association2evidenceQC(self):
