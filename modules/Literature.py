@@ -32,6 +32,7 @@ from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerP
     RedisQueueWorkerThread
 from common.connection import PipelineConnectors
 from settings import Config
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -796,6 +797,7 @@ class MedlineRetriever(object):
         else:
             pubmed_xml_locn = Config.PUBMED_XML_LOCN
 
+
         if not os.path.exists(pubmed_xml_locn):
             os.makedirs(pubmed_xml_locn)
 
@@ -843,7 +845,6 @@ class MedlineRetriever(object):
         files = host.listdir(host.curdir)
         #filter for update files
         gzip_files = [i for i in files if i.endswith('.xml.gz')]
-
         for file_ in tqdm(gzip_files,
                   desc='enqueuing remote files'):
             if host.path.isfile(file_):
@@ -949,22 +950,29 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                            mode='rb',
                            fileobj=file_handler,
                            )) as f:
-            record = []
-            skip = True
-            for line in f:
-                line = line.strip()
-                if line.startswith("<MedlineCitation ") or line.startswith("<DeleteCitation>") :
-                    skip = False
-                if not skip:
-                    record.append(line)
-                if line.startswith("</MedlineCitation>") or line.startswith("</DeleteCitation>"):
-                    self.put_into_queue_out(('\n'.join(record), os.path.basename(file_path)))
-                    skip = True
-                    record = []
-                    entries_in_file +=1
+            for medline_rec in self.retrieve_medline_record(f):
+                self.put_into_queue_out(('\n'.join(medline_rec), os.path.basename(file_path)))
+                entries_in_file += 1
 
         if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE and not self.update:
             logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
+
+    def retrieve_medline_record(self, file):
+
+        record = []
+        skip = True
+        for line in file:
+            line = line.strip()
+            if line.startswith("<MedlineCitation ") or line.startswith("<DeleteCitation>"):
+                skip = False
+            if not skip:
+                record.append(line)
+            if line.startswith("</MedlineCitation>") or line.startswith("</DeleteCitation>"):
+                rec = record
+                skip = True
+                record = []
+
+                yield rec
 
     def skip_file_processing(self, file_name):
 
@@ -1044,7 +1052,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
             publication['filename'] = filename
             return publication
         except etree.XMLSyntaxError as e:
-            logging.error("Error parsing XML file {} - medline record {}".format(filename,record),e.message)
+            self.logger.error("Error parsing XML file {} - medline record {} %s".format(filename,record),e.message)
 
     def parse_article_info(self, article, publication):
 
@@ -1078,6 +1086,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                                 month = pubdate.text
                             elif pubdate.tag == 'Day':
                                 day = pubdate.text
+
                         try:
                             publication['pub_date'] =  parse(' '.join((year, month, day))).date()
                         except ValueError:
