@@ -71,7 +71,8 @@ class Association(JSONSerializable):
             self.evidence_count['datatypes'][dt]= 0.0
         self.private = {}
         self.private['facets']=dict(datatype = [],
-                                    datasource = [])
+                                    datasource = [],
+                                    free_text_search = [])
 
     def get_scoring_method(self, method):
         if method not in ScoringMethods.__dict__.values():
@@ -102,6 +103,10 @@ class Association(JSONSerializable):
         uniprot_keywords = []
         #TODO: handle domains
         genes_info=ExtendedInfoGene(gene)
+        '''collect data to use for free text search'''
+        self.private['facets']['free_text_search'].append(genes_info.data['geneid'])
+        self.private['facets']['free_text_search'].append(genes_info.data['name'])
+        self.private['facets']['free_text_search'].append(genes_info.data['symbol'])
 
         if 'facets' in gene._private and 'reactome' in gene._private['facets']:
             pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
@@ -150,9 +155,15 @@ class Association(JSONSerializable):
         if target_class['level1']:
             self.private['facets']['target_class'] = target_class
 
+
+
     def set_disease_data(self, efo):
         """get generic efo info"""
         efo_info=ExtendedInfoEFO(efo)
+        '''collect data to use for free text search'''
+        self.private['facets']['free_text_search'].append(efo_info.data['efo_id'])
+        self.private['facets']['free_text_search'].append(efo_info.data['label'])
+        self.private['facets']['free_text_search'].extend(efo_info.data['therapeutic_area']['labels'])
 
         if efo_info:
             self.disease[ExtendedInfoEFO.root] = efo_info.data
@@ -160,9 +171,11 @@ class Association(JSONSerializable):
     def set_available_datasource(self, ds):
         if ds not in self.private['facets']['datasource']:
             self.private['facets']['datasource'].append(ds)
+            self.private['facets']['free_text_search'].append(ds)
     def set_available_datatype(self, dt):
         if dt not in self.private['facets']['datatype']:
             self.private['facets']['datatype'].append(dt)
+            self.private['facets']['free_text_search'].append(dt)
 
     def __bool__(self):
         return self.get_scoring_method(ScoringMethods.HARMONIC_SUM).overall != 0
