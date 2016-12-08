@@ -335,7 +335,7 @@ class EvidenceManager():
                     eco_uri = evidence['evidence']['evidence_codes']
             except KeyError:
                 if 'evidence_codes' in evidence['evidence']:
-                    eco_uri = evidence['evidence']['evidence_codes']
+                    eco_uri = evidence['evidence']['evidence_codes'][0]
                 else:
                     logger.debug(
                         "malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']["
@@ -350,7 +350,7 @@ class EvidenceManager():
                 if available_score != self.eco_scores[eco_uri]:
                     fixed = True
             else:
-                if 'uniprot_literature' != evidence['sourceID']:
+                if  evidence['sourceID'] not in ['uniprot_literature', 'gene2phenotype']:
                     logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
         # '''use just one mutation per somatic data'''
@@ -1099,7 +1099,7 @@ class EvidenceStringProcess():
                                           data_types=lookup_data_types,
                                           autoload=True
                                           ).lookup
-        lookup_data.available_genes.load_uniprot2ensembl()
+        # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
         '''create and overwrite old data'''
         loader = Loader(self.es)
