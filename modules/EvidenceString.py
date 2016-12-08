@@ -324,11 +324,6 @@ class EvidenceManager():
                 if 'resource_score' in evidence['evidence'] and \
                     'value' in  evidence['evidence']['resource_score']:
                         available_score = evidence['evidence']['resource_score']['value']
-                else:
-                    logger.debug(
-                        "malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']["
-                        "'resource_score']['value']" %
-                        evidence['id'])
             try:
                 eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
                 if 'evidence_codes' in evidence['evidence']:
@@ -336,21 +331,18 @@ class EvidenceManager():
             except KeyError:
                 if 'evidence_codes' in evidence['evidence']:
                     eco_uri = evidence['evidence']['evidence_codes'][0]
-                else:
-                    logger.debug(
-                        "malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']["
-                        "'functional_consequence']" %
-                        evidence['id'])
+
 
             if eco_uri in self.eco_scores:
-                if 'resource_score' not in evidence['evidence']['gene2variant']:
-                    evidence['evidence']['gene2variant']['resource_score'] = {}
-                evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
-                evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
-                if available_score != self.eco_scores[eco_uri]:
-                    fixed = True
+                if 'gene2variant' in evidence['evidence']:
+                    if 'resource_score' not in evidence['evidence']['gene2variant']:
+                        evidence['evidence']['gene2variant']['resource_score'] = {}
+                    evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
+                    evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
+                    if available_score != self.eco_scores[eco_uri]:
+                        fixed = True
             else:
-                if  evidence['sourceID'] not in ['uniprot_literature', 'gene2phenotype']:
+                if evidence['sourceID'] not in ['uniprot_literature', 'gene2phenotype']:
                     logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
         # '''use just one mutation per somatic data'''
@@ -773,6 +765,7 @@ class Evidence(JSONSerializable):
                 self.evidence['scores']['association_score'] = score
 
             elif self.evidence['type'] == 'genetic_association':
+                score=0.
                 if 'gene2variant' in self.evidence['evidence']:
                     g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
                     if self.evidence['evidence']['variant2disease']['resource_score']['type'] == 'pvalue':
@@ -1002,7 +995,7 @@ class EvidenceProcesser(multiprocessing.Process):
                     # UploadError(ev, error, idev).save()
                     # err += 1
 
-
+                    # raise
                     logger.exception("Error loading data for id %s: %s" % (idev, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
 
