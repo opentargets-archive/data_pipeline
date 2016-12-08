@@ -140,12 +140,12 @@ class PublicationFetcher(object):
             pub_ids=[pub_ids]
 
         '''get from elasticsearch cache'''
-        logging.info( "getting pub id {}".format( pub_ids))
+        logging.debug( "getting pub id {}".format( pub_ids))
         pubs ={}
         try:
 
             for pub_source in self.es_query.get_publications_by_id(pub_ids):
-                logging.info( 'got pub %s from cache'%pub_source['pub_id'])
+                logging.debug( 'got pub %s from cache'%pub_source['pub_id'])
                 pub = Publication()
                 pub.load_json(pub_source)
                 pubs[pub.pub_id] = pub
@@ -900,6 +900,20 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
         if self.skip_file_processing(os.path.basename(file_path)):
             self.logger.info("Skipping file {}".format(file_path))
             return
+        file_handler = self.fetch_file(file_path)
+        entries_in_file = 0
+        with io.BufferedReader(gzip.GzipFile(filename=os.path.basename(file_path),
+                           mode='rb',
+                           fileobj=file_handler,
+                           )) as f:
+            for medline_rec in self.retrieve_medline_record(f):
+                self.put_into_queue_out(('\n'.join(medline_rec), os.path.basename(file_path)))
+                entries_in_file += 1
+
+        if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE and not self.update:
+            logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
+
+    def fetch_file(self,file_path):
         if not os.path.isfile(file_path):
             '''try to fetch via http'''
             http_url = [Config.PUBMED_HTTP_MIRROR]
@@ -945,17 +959,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                     return
         else:
             file_handler=io.open(file_path,'rb')
-        entries_in_file = 0
-        with io.BufferedReader(gzip.GzipFile(filename=os.path.basename(file_path),
-                           mode='rb',
-                           fileobj=file_handler,
-                           )) as f:
-            for medline_rec in self.retrieve_medline_record(f):
-                self.put_into_queue_out(('\n'.join(medline_rec), os.path.basename(file_path)))
-                entries_in_file += 1
-
-        if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE and not self.update:
-            logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
+        return file_handler
 
     def retrieve_medline_record(self, file):
 

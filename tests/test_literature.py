@@ -3,7 +3,7 @@ import unittest
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisQueue
 from modules.Literature import PublicationFetcher,PublicationAnalyserSpacy, LiteratureProcess, MedlineRetriever, \
-    PubmedFTPReaderProcess, PubmedXMLParserProcess, MEDLINE_UPDATE_PATH
+    PubmedFTPReaderProcess, PubmedXMLParserProcess, MEDLINE_UPDATE_PATH, Publication
 from common.ElasticsearchLoader import Loader
 from modules.EvidenceString import EvidenceStringProcess
 from elasticsearch import Elasticsearch
@@ -14,28 +14,8 @@ from run import PipelineConnectors
 import io
 import gzip
 import os
-from collections import Counter
-from modules.Literature import ftp_connect
-from StringIO import StringIO
-
-
 
 class LiteratureTestCase(unittest.TestCase):
-#
-#         _test_pub_ids =['24523595',
-#                     '26784250',
-#                     '27409410',
-#                     '26290144',
-#                     '25787843',Open
-#                     '26836588',
-#                     '26781615',
-#                     '26646452',
-#                    '26774881',
-#                     '26629442',
-#                     '26371324',
-#                     '24817865',
-#                   PublicationAnalyserSpacy]
-
 
     def analyse_publication(self):
         logging.basicConfig(filename='output.log',
@@ -52,9 +32,6 @@ class LiteratureTestCase(unittest.TestCase):
                        )
         loader = Loader(es=es,dry_run=True)
         LiteratureProcess(es, loader, r_server).process(['europepmc'])
-
-
-
 
     def test_evidence_publication_loading(self):
 
@@ -97,7 +74,7 @@ class LiteratureTestCase(unittest.TestCase):
         reader = PubmedFTPReaderProcess(retriever_q, None, None)
         parser = PubmedXMLParserProcess(parser_q,None,None)
 
-        file_path = 'resources/test-medlinexml/medline16n0001.xml.gz'
+        file_path = 'resources/test-medlinexml/test_baseline.xml.gz'
         file_handler = io.open(file_path, 'rb')
 
         with io.BufferedReader(gzip.GzipFile(filename=os.path.basename(file_path),
@@ -115,7 +92,27 @@ class LiteratureTestCase(unittest.TestCase):
                 if pmid == '16691646':
                     dt = publication['pub_date']
                     self.assertEqual(str(dt), '1865-01-01')
+                if pmid == '17796445':
+                    dt = publication['pub_date']
+                    self.assertEqual(str(dt), '1881-04-16')
 
+                expected_abstract = ['abc\\n', 'pqr']
+                if pmid == '17832547':
+                    self.assertEqual(publication['abstract'], expected_abstract)
+                if pmid == '25053090':
+                    dt = publication['pub_date']
+                    self.assertEqual(str(dt), '2015-01-01')
+                    self.assertEqual(publication['doi'],'10.1016/j.foodchem.2014.05.102')
+                    mesh_terms =  ['Antioxidants', 'Betacyanins', 'Cactaceae', 'Chromatography, High Pressure Liquid', 'Fruit', 'Nitric Oxide', 'Peroxides', 'Plant Extracts']
+                    keywords = ['Antioxidant', 'Betacyanin', 'ESR', 'Hylocereus polyrhizus', 'Nitric oxide', 'Peroxyl radical']
+                    journal = {'medlineAbbreviation': 'Food Chem', 'title': 'Food chemistry'}
+                    chemicals = [{'registryNumber': '0', 'name': 'Antioxidants'}, {'registryNumber': '0', 'name': 'Betacyanins'}, {'registryNumber': '0', 'name': 'Peroxides'}, {'registryNumber': '0', 'name': 'Plant Extracts'}, {'registryNumber': '0', 'name': 'phyllocactin'}, {'registryNumber': '3170-83-0', 'name': 'perhydroxyl radical'}, {'registryNumber': '31C4KY9ESH', 'name': 'Nitric Oxide'}, {'registryNumber': '5YJC992ZP6', 'name': 'betanin'}]
+                    authors = [{'LastName': 'Taira', 'Initials': 'J', 'ForeName': 'Junsei'}, {'LastName': 'Tsuchida', 'Initials': 'E', 'ForeName': 'Eito'}, {'LastName': 'Katoh', 'Initials': 'MC', 'ForeName': 'Megumi C'}, {'LastName': 'Uehara', 'Initials': 'M', 'ForeName': 'Masatsugu'}, {'LastName': 'Ogi', 'Initials': 'T', 'ForeName': 'Takayuki'}]
+                    self.assertEqual(publication['mesh_terms'], mesh_terms)
+                    self.assertEqual(publication['journal'], journal)
+                    self.assertEqual(publication['chemicals'], chemicals)
+                    self.assertEqual(publication['authors'], authors)
+                    self.assertEqual(publication['keywords'], keywords)
 
     def test_medline_update_xml_parsing(self):
 
@@ -129,8 +126,9 @@ class LiteratureTestCase(unittest.TestCase):
         reader = PubmedFTPReaderProcess(retriever_q, None, None)
         parser = PubmedXMLParserProcess(parser_q, None, None)
 
-        file_path = 'resources/test-medlinexml/medline16n0773.xml.gz'
+        file_path = 'resources/test-medlinexml/test_update.xml.gz'
         file_handler = io.open(file_path, 'rb')
+        parsed_publications = []
 
         with io.BufferedReader(gzip.GzipFile(filename=os.path.basename(file_path),
                                              mode='rb',
@@ -140,96 +138,14 @@ class LiteratureTestCase(unittest.TestCase):
                 self.assertIsNotNone(medline_record)
                 publication = parser.process((''.join(medline_record), os.path.basename(file_path)))
                 self.assertIsNotNone(publication)
+                parsed_publications.append(publication)
 
-    def test_medline_baseline_record_no(self):
-
-        logging.basicConfig(filename='output.log',
-                            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                            level=logging.INFO)
-
-
-        retriever_q = RedisQueue()
-        parser_q = RedisQueue()
-        reader = PubmedFTPReaderProcess(retriever_q, None, None)
-        parser = PubmedXMLParserProcess(parser_q, None, None)
-
-        file_path = 'resources/test-medlinexml/medline16n0156.xml.gz'
-        file_handler = io.open(file_path, 'rb')
-        pmid_list = []
-        with io.BufferedReader(gzip.GzipFile(filename=os.path.basename(file_path),
-                                             mode='rb',
-                                             fileobj=file_handler,
-                                             )) as f:
-            for medline_record in reader.retrieve_medline_record(f):
-                self.assertIsNotNone(medline_record)
-                publication = parser.process((''.join(medline_record), os.path.basename(file_path)))
-                self.assertIsNotNone(publication)
-                pmid_list.append(publication['pmid'])
-
-        duplicate_pmids = [k for k, v in Counter(pmid_list).items() if v > 1]
-        print duplicate_pmids
-
-    '''To be run after each baseline load and before update files are loaded'''
-    def test_loader_medline_baseline(self):
-        ftp = ftp_connect()
-        files = ftp.listdir(ftp.curdir)
-        es_query = ESQuery()
-        for file_ in files[100:300]:
-
-            total = es_query.count_publications_for_file(file_)
-            self.assertEqual(total,30000,file_)
-
-
-    '''To be run after only after update files are loaded'''
-    def test_loader_medline_update(self):
-        logging.basicConfig(filename='output.log',
-                            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                            level=logging.INFO)
-
-        ftp = ftp_connect(MEDLINE_UPDATE_PATH)
-        files = ftp.listdir(ftp.curdir)
-        retriever_q = RedisQueue()
-        parser_q = RedisQueue()
-        reader = PubmedFTPReaderProcess(retriever_q, None, None)
-        parser = PubmedXMLParserProcess(parser_q, None, None)
-
-        p = PipelineConnectors()
-        p.init_services_connections()
-        fetcher = PublicationFetcher(p.es)
-        es_query = ESQuery(p.es)
-        for file_ in files[0:1]:
-            total_parsed = 0
-            ftp_file_handler = ftp.open(file_, 'rb')
-            file_handler = StringIO(ftp_file_handler.read())
-
-            with io.BufferedReader(gzip.GzipFile(filename=file_,
-                                                 mode='rb',
-                                                 fileobj=file_handler,
-                                                 )) as f:
-                for medline_record in reader.retrieve_medline_record(f):
-                    self.assertIsNotNone(medline_record)
-                    publication = parser.process((''.join(medline_record), file_))
-                    self.assertIsNotNone(publication)
-
-                    total_parsed +=1
-
-            delete_pmids = publication['delete_pmids']
-            total_parsed += len(delete_pmids)
-            total = es_query.count_publications_for_file(file_)
-            self.assertEqual(total, total_parsed - 1, file_)
-
-            ''' Verify deletedcitations are emptied in ES '''
-
-            for pmid in delete_pmids:
-                pubs = fetcher.get_publication(pmid)
-                pub = pubs[str(pmid)]
-                self.assertEqual(pub.title, '')
-                self.assertEqual(pub.pub_date, None)
-                self.assertEqual(pub.abstract, '')
-                self.assertEqual(pub.journal, None)
-
-
-
+            self.assertEqual(parsed_publications[0]['journal'], {'medlineAbbreviation': 'Nature', 'title': 'Nature'})
+            self.assertEqual(parsed_publications[0]['journal_reference'], {'volume': '526', 'pgn': '391-6', 'issue': '7573'})
+            self.assertEqual(parsed_publications[0]['doi'], '10.1038/nature14655')
+            self.assertEqual(str(parsed_publications[0]['first_publication_date']),'2015-10-16')
+            self.assertEqual(parsed_publications[0]['title'], 'Molecular basis of ligand recognition and transport by glucose transporters.')
+            self.assertEqual(publication['delete_pmids'], ['26470892','26477054'])
 
 if __name__ == '__main__':
     unittest.main()
