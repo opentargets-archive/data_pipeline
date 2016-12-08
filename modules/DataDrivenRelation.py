@@ -207,12 +207,10 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
                      queue_in,
                      redis_path,
                      queue_out=None,
-                     es= None,
                      dry_run = False,
                      chunk_size=1000):
             super(DistanceStorageWorker, self).__init__(queue_in, redis_path, queue_out)
-            self.es = es
-            self.loader = Loader(self.es, chunk_size=chunk_size, dry_run = dry_run)
+            self.loader = Loader( chunk_size=chunk_size, dry_run = dry_run)
 
         def process(self, data):
             r = data
@@ -615,7 +613,7 @@ class DataDrivenRelationProcess(object):
         target_keys = target_data.keys()
 
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-        number_of_storers = number_of_workers
+        number_of_storers = number_of_workers / 2
         queue_per_worker =150
 
         # rel_handler = RelationHandlerProduceAll(target_data=target_data,
@@ -653,18 +651,18 @@ class DataDrivenRelationProcess(object):
         d2d_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_processing',
                                           max_size=number_of_workers * queue_per_worker,
                                           job_timeout=300,
-                                          batch_size=100,
+                                          batch_size=10,
                                           ttl=60 * 60 * 24 * 14)
         t2t_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_processing',
                                           max_size=number_of_workers * queue_per_worker,
                                           job_timeout=300,
-                                          batch_size=100,
+                                          batch_size=10,
                                           ttl=60 * 60 * 24 * 14)
 
         queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
                                    max_size=int(queue_per_worker * number_of_storers*10),
-                                   batch_size=100,
-                                   job_timeout=120)
+                                   batch_size=10,
+                                   job_timeout=300)
         '''start shared workers'''
         q_reporter = RedisQueueStatusReporter([d2d_pair_producing,
                                                t2t_pair_producing,
@@ -677,7 +675,6 @@ class DataDrivenRelationProcess(object):
 
         storage_workers = [DistanceStorageWorker(queue_storage,
                                                  self.r_server.db,
-                                                 es=self.es,
                                                  dry_run=dry_run,
                                                  chunk_size=queue_per_worker,
                                                  # ) for i in range(multiprocessing.cpu_count())]
