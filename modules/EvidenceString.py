@@ -166,10 +166,10 @@ class ExtendedInfoEFO(ExtendedInfo):
     def extract_info(self, efo):
         therapeutic_area_codes = set()
         therapeutic_area_labels = set()
-        for path in efo.path:
-            if len(path) > 1:
-                therapeutic_area_codes.add(get_ontology_code_from_url(path[0]['uri']))
-                therapeutic_area_labels.add(get_ontology_code_from_url(path[0]['label']))
+        for i,path_codes in enumerate(efo.path_codes):
+            if len(path_codes) > 1:
+                therapeutic_area_codes.add(path_codes[0])
+                therapeutic_area_labels.add(efo.path_labels[i][0])
         self.data = dict(efo_id=efo.get_id(),
                          label=efo.label,
                          path=efo.path_codes,
@@ -324,33 +324,25 @@ class EvidenceManager():
                 if 'resource_score' in evidence['evidence'] and \
                     'value' in  evidence['evidence']['resource_score']:
                         available_score = evidence['evidence']['resource_score']['value']
-                else:
-                    logger.debug(
-                        "malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']["
-                        "'resource_score']['value']" %
-                        evidence['id'])
             try:
                 eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
                 if 'evidence_codes' in evidence['evidence']:
                     eco_uri = evidence['evidence']['evidence_codes']
             except KeyError:
                 if 'evidence_codes' in evidence['evidence']:
-                    eco_uri = evidence['evidence']['evidence_codes']
-                else:
-                    logger.debug(
-                        "malformed evidence string %s: KeyError in  evidence['evidence']['gene2variant']["
-                        "'functional_consequence']" %
-                        evidence['id'])
+                    eco_uri = evidence['evidence']['evidence_codes'][0]
+
 
             if eco_uri in self.eco_scores:
-                if 'resource_score' not in evidence['evidence']['gene2variant']:
-                    evidence['evidence']['gene2variant']['resource_score'] = {}
-                evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
-                evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
-                if available_score != self.eco_scores[eco_uri]:
-                    fixed = True
+                if 'gene2variant' in evidence['evidence']:
+                    if 'resource_score' not in evidence['evidence']['gene2variant']:
+                        evidence['evidence']['gene2variant']['resource_score'] = {}
+                    evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
+                    evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
+                    if available_score != self.eco_scores[eco_uri]:
+                        fixed = True
             else:
-                if 'uniprot_literature' != evidence['sourceID']:
+                if evidence['sourceID'] not in ['uniprot_literature', 'gene2phenotype']:
                     logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
         # '''use just one mutation per somatic data'''
@@ -773,6 +765,7 @@ class Evidence(JSONSerializable):
                 self.evidence['scores']['association_score'] = score
 
             elif self.evidence['type'] == 'genetic_association':
+                score=0.
                 if 'gene2variant' in self.evidence['evidence']:
                     g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
                     if self.evidence['evidence']['variant2disease']['resource_score']['type'] == 'pvalue':
@@ -806,15 +799,16 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'somatic_mutation':
                 frequency = 1.
                 if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
-                    frequencies = []
+                    sample_total_coverage =  0.
+                    max_sample_size = 0.
                     for mutation in self.evidence['evidence']['known_mutations']:
                         if 'number_samples_with_mutation_type' in mutation:
-                            frequency = float(
-                                mutation['number_samples_with_mutation_type']) / float(
-                                mutation['number_mutated_samples'])
-                            frequency = DataNormaliser.renormalize(frequency, [0., 9.], [.5, 1.])
-                            frequencies.append(frequency)
-                    frequency = sum(frequencies)/len(frequencies)#store frequency as an average of all of them
+                            sample_total_coverage += int(mutation['number_samples_with_mutation_type'])
+                            if int(mutation['number_mutated_samples']) >  max_sample_size:
+                                max_sample_size = int(mutation['number_mutated_samples'])
+                    if sample_total_coverage > max_sample_size:
+                        sample_total_coverage = max_sample_size
+                    frequency = DataNormaliser.renormalize(sample_total_coverage/max_sample_size, [0., 9.], [.5, 1.])
                 self.evidence['scores']['association_score'] = float(
                     self.evidence['evidence']['resource_score']['value']) * frequency
             elif self.evidence['type'] == 'literature':
@@ -1001,7 +995,7 @@ class EvidenceProcesser(multiprocessing.Process):
                     # UploadError(ev, error, idev).save()
                     # err += 1
 
-
+                    # raise
                     logger.exception("Error loading data for id %s: %s" % (idev, str(error)))
                     # traceback.print_exc(limit=1, file=sys.stdout)
 
@@ -1098,7 +1092,7 @@ class EvidenceStringProcess():
                                           data_types=lookup_data_types,
                                           autoload=True
                                           ).lookup
-        lookup_data.available_genes.load_uniprot2ensembl()
+        # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
         '''create and overwrite old data'''
         loader = Loader(self.es)

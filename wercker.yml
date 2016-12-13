@@ -1,0 +1,16 @@
+box: python:2.7
+build:
+  steps:
+    - pip-install
+    - script:
+        name: test empty run to catch import errors
+        code: |
+          python run.py
+    - internal/docker-push:
+        cmd: python run.py
+        working-dir: $WERCKER_ROOT
+        tag: latest, $WERCKER_GIT_COMMIT, $WERCKER_GIT_BRANCH
+        username: _json_key
+        password: $GCR_JSON_KEY_FILE
+        repository: $GCR_REPO
+        registry: $GCR_HOST

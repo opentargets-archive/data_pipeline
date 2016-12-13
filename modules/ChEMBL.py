@@ -194,16 +194,18 @@ class ChEMBLLookup(object):
                                                                fields=['target.id',
                                                                        'disease.id',
                                                                        'evidence.target2drug.urls']):
-            molecule_id = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
+            molecule_ids = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
                            '/compound/' in i['url']]
-            disease_id = e['disease']['id']
-            target_id = e['target']['id']
-            if disease_id not in self.disease2molecule:
-                self.disease2molecule[disease_id]=set()
-            self.disease2molecule[disease_id].add(molecule_id)
-            if target_id not in self.target2molecule:
-                self.target2molecule[target_id]=set()
-            self.target2molecule[target_id].add(molecule_id)
+            if molecule_ids:
+                molecule_id=molecule_ids[0]
+                disease_id = e['disease']['id']
+                target_id = e['target']['id']
+                if disease_id not in self.disease2molecule:
+                    self.disease2molecule[disease_id]=set()
+                self.disease2molecule[disease_id].add(molecule_id)
+                if target_id not in self.target2molecule:
+                    self.target2molecule[target_id]=set()
+                self.target2molecule[target_id].add(molecule_id)
 
     def _populate_synonyms_for_molecule(self, molecule_set):
         url = Config.CHEMBL_MOLECULE_SET.format(';'.join(molecule_set))
