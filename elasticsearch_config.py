@@ -167,15 +167,10 @@ def _get_evidence_string_generic_mapping():
                     },
                     "journal_data": {
                         "properties": {
-                            "journal": {
-                                "properties": {
                                     "medlineAbbreviation": {
                                         "type": "string",
                                         "index": "not_analyzed"
                                     }
-                                }
-                            }
-
                         }
                     }
                 }
