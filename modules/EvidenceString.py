@@ -17,7 +17,8 @@ from modules import GeneData
 from modules.ECO import ECO
 from modules.EFO import EFO, get_ontology_code_from_url
 from modules.GeneData import Gene
-from modules.Literature import Publication, PublicationFetcher, PublicationAnalysisSpacy
+from modules.Literature import Publication, PublicationFetcher
+from modules.LiteratureNLP import PublicationAnalysisSpacy
 from settings import Config
 
 logger = logging.getLogger(__name__)
