@@ -681,7 +681,20 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                     if child.tag == 'MeshHeadingList':
                         publication['mesh_terms'] = list()
                         for meshheading in child.getchildren():
-                            publication['mesh_terms'].append(meshheading.DescriptorName.text)
+                            mesh_heading = dict()
+                            for label in meshheading.getchildren():
+                                if label.tag == 'DescriptorName':
+                                    mesh_heading['id'] = label.attrib['UI']
+                                    mesh_heading['label'] = label.text
+                                # if label.tag == 'QualifierName':
+                                #     if 'qualifier' not in mesh_heading.keys():
+                                #         mesh_heading['qualifier'] = list()
+                                #     qualifier = dict()
+                                #     qualifier['label'] = label.text
+                                #     qualifier['id'] = label.attrib['UI']
+                                #     mesh_heading['qualifier'].append(qualifier)
+
+                            publication['mesh_terms'].append(mesh_heading)
 
             elif medline.tag == 'DeleteCitation':
                 publication['delete_pmids'] = list()
