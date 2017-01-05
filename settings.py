@@ -221,14 +221,12 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
     DATASOURCE_TO_DATATYPE_MAPPING['europepmc'] = 'literature'
-    DATASOURCE_TO_DATATYPE_MAPPING['disgenet'] = 'literature'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
-    # DATASOURCE_TO_INDEX_KEY_MAPPING['disgenet'] = 'disgenet'
     # DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
     # DATASOURCE_TO_INDEX_KEY_MAPPING['phenodigm'] = DATASOURCE_TO_DATATYPE_MAPPING['phenodigm']
     # DATASOURCE_TO_INDEX_KEY_MAPPING['expression_atlas'] = DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas']
