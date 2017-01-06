@@ -50,12 +50,14 @@ class LiteratureNLPProcess(object):
 
 
     def __init__(self,
-                 es,
-                 loader,
+                 es = None,
+                 loader = None,
                  r_server=None,
                  ):
         self.es = es
         self.es_query = ESQuery(self.es)
+        if loader is None:
+            loader = Loader(es)
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
@@ -198,7 +200,7 @@ class PublicationAnalyserSpacy(object):
             tokens.remove("\n\n")
         filtered = []
         for tok in tokens_all:
-            if tok.lemma_.lower().strip() in tokens and tok.pos_ in ['PROP', 'PROPN', 'NOUN', 'ORG', 'FCA', 'PERSON']:
+            if tok.lemma_.lower().strip() in tokens and tok.pos_ in ['PROP', 'PROPN', 'NOUN', 'ORG', 'FCA', 'PERSON', ]:
                 filtered.append(tok)
         c = Counter([tok.lemma_.lower().strip() for tok in filtered])
         sents_count = len(list(tokens_all.sents))
