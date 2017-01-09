@@ -79,6 +79,7 @@ class HPADataDownloader():
         logging.info('inserted %i rows in hpa_rna' % c)
 
     def retrieve_cancer_data(self):
+        logging.info('retrieve cancer data from HPA')
         reader = self._get_csv_reader(self._download_data(Config.HPA_CANCER_URL))
         for c, row in enumerate(reader):
             yield dict(tumor=row['Tumor'],
@@ -155,6 +156,7 @@ class HPAProcess():
 
             self.data[gene]['expression'].tissues, \
             self.data[gene]['expression'].cell_lines = self.get_rna_data_for_gene(gene)
+        logging.info('process_rna completed')
         return
 
     def process_cancer(self):
@@ -164,6 +166,7 @@ class HPAProcess():
         pass
 
     def store_data(self):
+        logging.info('store_data called')
         if self.data.values()[0]['expression']:  # if there is expression data
 
             for gene, data in self.data.items():
