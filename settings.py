@@ -244,6 +244,7 @@ class Config():
 
 
     ENSEMBL_RELEASE_VERSION=86
+    ENSEMBL_CHUNK_SIZE=100
 
     REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
 
