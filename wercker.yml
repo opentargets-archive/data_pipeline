@@ -1,4 +1,4 @@
-box: python:2.7
+box: python:2.7-onbuild
 build:
   steps:
     - pip-install
