@@ -9,7 +9,7 @@ build:
     - script:
         name: copy to /usr/src/app working dir
         code: |
-          rsync -rv --exclude=.git "$WERCKER_ROOT/" /usr/src/app
+          cp -R $WERCKER_ROOT/* /usr/src/app
     - internal/docker-push:
         cmd: python run.py
         working-dir: /usr/src/app
