@@ -22,7 +22,7 @@ Indices and tables
 * :ref:`search`
 * :ref:`ontology.rst`
 
-`relative link`_.
+`ontology`_.
 
 .. _relative link: ontology.rst
 
