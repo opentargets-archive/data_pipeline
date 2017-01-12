@@ -33,7 +33,10 @@ class LexiconItem(object):
         return '\n'.join(string)
 
     def to_dict(self):
-        d = {self.id : [self.ent_type, {}, [[{'ORTH': i} for i in self.all_forms]]]}
+        d = {self.id : [self.ent_type,
+                        {"label" : self.label},
+                        [[{'ORTH': token} for token in form.split()] for form in self.all_forms]]
+             }
         return d
 
 
@@ -49,6 +52,17 @@ class LiteratureNLPTestCase(unittest.TestCase):
 
         LiteratureNLPProcess(p.es, r_server=p.r_server).process(['europepmc'])
 
+    def print_matched_entities(self, matcher, doc, i, matches):
+        ''' callback '''
+        # '''all matches'''
+        # spans = [(matcher.get_entity(ent_id), label, doc[start : end]) for ent_id, label, start, end in matches]
+        # for span in spans:
+        #     print span
+        '''just the matched one'''
+        ent_id, label, start, end = matches[i]
+        span = (matcher.get_entity(ent_id), label, doc[start: end])
+        print span
+
     def test_text_analysis(self):
 
         logging.basicConfig(filename='output.log',
@@ -58,23 +72,14 @@ class LiteratureNLPTestCase(unittest.TestCase):
 
 
 
-        def print_matched_entities(matcher, doc, i, matches):
-            ''' callback '''
-            # '''all matches'''
-            # spans = [(matcher.get_entity(ent_id), label, doc[start : end]) for ent_id, label, start, end in matches]
-            # for span in spans:
-            #     print span
-            '''just the matched one'''
-            ent_id, label, start, end = matches[i]
-            span = (matcher.get_entity(ent_id), label, doc[start: end])
-            print span
+
 
         nlp = spacy.en.English()
         matcher = Matcher(nlp.vocab)
         matcher.add_entity(
             "Chr 8p",  # Entity ID -- Helps you act on the match.
             {"ent_type": "BIO", "label": "this is a chromosome"},  # Arbitrary attributes (optional)
-            on_match=print_matched_entities
+            on_match=self.print_matched_entities
         )
 
         matcher.add_pattern(
@@ -93,7 +98,7 @@ class LiteratureNLPTestCase(unittest.TestCase):
         matcher.add_entity(
             "schizophrenia",  # Entity ID -- Helps you act on the match.
             {"ent_type": "DISEASE", "label": "schizophrenia"},  # Arbitrary attributes (optional)
-            on_match=print_matched_entities
+            on_match=self.print_matched_entities
         )
 
         matcher.add_pattern(
@@ -159,11 +164,19 @@ class LiteratureNLPTestCase(unittest.TestCase):
                     item.add_variant(variant.attrib['writtenForm'],
                                      variant.attrib['mlfreq'])
             if item.all_forms:
-                token_specs = [{ORTH: i} for i in item.all_forms]
-                matcher.add_pattern(entity_key = item.id,
-                                    token_specs = token_specs,
-                                    label = item.label,
-                                    )
+                matcher.add_entity(
+                    item.id,  # Entity ID -- Helps you act on the match.
+                    {"ent_type": item.ent_type, "label": item.label},  # Arbitrary attributes (optional)
+                    on_match=self.print_matched_entities,
+                    if_exists = 'ignore',
+                )
+                for form in item.all_forms:
+                    token_specs = [{ORTH: token} for token in form.split()]
+                    matcher.add_pattern(item.id,
+                                        token_specs,
+                                        label = form,
+                                        )
+
                 encoded_lexicon.update(item.to_dict())
             lexicon[item.id] = item
             if c % 10000 == 0:
@@ -198,46 +211,31 @@ class LiteratureNLPTestCase(unittest.TestCase):
 
         doc = nlp(unicode(text))
         matches = matcher(doc)
-        print matches
+        for ent_id, label, start, end in matches:
+            span = (matcher.get_entity(ent_id), label, doc[start: end])
+            print span
 
 
-        json.dump(encoded_lexicon,
-                  open(encoded_lexicon_json_file,'w'),
-                  indent=4)
+        # json.dump(encoded_lexicon,
+        #           open(encoded_lexicon_json_file,'w'),
+        #           indent=4)
 
     def test_match_from_gene_lexicon(self):
         nlp = spacy.en.English()
         # matcher = Matcher.load(path = 'gene_lexicon.json',
         #                        vocab=nlp.vocab)
+        # FIXED IN SPACY MASTER BUT A BUG IN 1.5.0
 
         '''load all the new patterns, do not use Matcher.load since there is a bug'''
         matcher = Matcher(vocab = nlp.vocab,
                           patterns= json.load(open('gene_lexicon.json'))
                           )
-        # matcher.add_pattern(
-        #     "UNIPR_DKK4_HUMAN",  # Entity ID -- Created if doesn't exist.
-        #     [  # The pattern is a list of *Token Specifiers*.
-        #         {
-        #             ORTH: u"DKK4"
-        #         # match case insensitive
-        #             # https://www.reddit.com/r/spacynlp/comments/4oclbi/nlp_matcher_add_caseinsensitive_patterns/
-        #         },
-        #
-        #     ],
-        #     label='DKK4'  # Can associate a label to the pattern-match, to handle it better.
-        # )
+
         self.assertTrue(matcher.has_entity('UNIPR_DKK4_HUMAN'))
         '''should save the new vocab now'''
         # Matcher.vocab.dump('lexeme.bin')
         #TODO
 
-        # '''test short sentence'''
-        # text = u'Chromosome DKK4 as a potential hub for developmental neuropsychiatric disorders:'
-        # doc = nlp(
-        #     u'Chromosome DKK4 as a potential hub for developmental neuropsychiatric disorders.')
-        # print("PRIVATE")
-        # matches = matcher(doc)
-        # print matches
 
         '''test real abstract'''
         pmid = '19204725'
@@ -266,7 +264,9 @@ class LiteratureNLPTestCase(unittest.TestCase):
 
         doc = nlp(unicode(text))
         matches = matcher(doc)
-        print matches
+        for ent_id, label, start, end in matches:
+            span = (matcher.get_entity(ent_id), label, doc[start: end])
+            print span
 
 
 
