@@ -269,3 +269,11 @@ class Config():
 
     PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
 
+    #GE Pipeline
+
+    LIST_PANELS_CACHE = "/tmp/list_panels.json"
+    SEARCH_GENES_ALL_CACHE = "/tmp/search_genes_all.json"
+    ZOOMA_OUTPUT = "/tmp/zooma_output.json"
+    GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
+    GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
+

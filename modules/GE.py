@@ -13,6 +13,8 @@ import os.path
 import time
 import requests_cache
 
+from settings import Config
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -22,15 +24,6 @@ h = logging.StreamHandler()
 h.setFormatter(fmt)
 logger.addHandler(h)
 
-LIST_PANELS_CACHE = "/tmp/list_panels.json"
-
-SEARCH_GENES_ALL_CACHE = "/tmp/search_genes_all.json"
-
-ZOOMA_OUTPUT = "/tmp/zooma_output.json"
-
-GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
-
-GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
 
 
 def check_cache(filename=None):
@@ -50,12 +43,12 @@ def update_cache(data=None, filename=None):
 
 # create a file of panel names and use it later
 def request_to_panel_app():
-    results = check_cache(filename=LIST_PANELS_CACHE)
+    results = check_cache(filename=Config.LIST_PANELS_CACHE)
 
     if results is None:
         r = requests.get('https://bioinfo.extge.co.uk/crowdsourcing/WebServices/list_panels', params={})
         results = r.json()
-        update_cache(data=results, filename=LIST_PANELS_CACHE)
+        update_cache(data=results, filename=Config.LIST_PANELS_CACHE)
 
     for item in results['result']:
         yield (item['Name'], item['Panel_Id'])
@@ -86,12 +79,12 @@ def execute_ge_request():
 
 
 def request_to_search_genes():
-    results = check_cache(filename=SEARCH_GENES_ALL_CACHE)
+    results = check_cache(filename=Config.SEARCH_GENES_ALL_CACHE)
     if results is None:
         url = 'https://bioinfo.extge.co.uk/crowdsourcing/WebServices/search_genes/all/'
         r = requests.get(url)
         results = r.json()
-        update_cache(data=results, filename=SEARCH_GENES_ALL_CACHE)
+        update_cache(data=results, filename=Config.SEARCH_GENES_ALL_CACHE)
     phenotype_list = []
     for item in results['results']:
         # print(results)
@@ -288,7 +281,7 @@ def main():
     ge = GE()
     ge.process_disease_mapping_file()
     ge.process_panel_app_file()
-    ge.write_evidence_strings(GE_EVIDENCE_STRING)
+    ge.write_evidence_strings(Config.GE_EVIDENCE_STRING)
     logger.info("---- DONE ------")
 
 if __name__ == "__main__":
