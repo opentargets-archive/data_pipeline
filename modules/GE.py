@@ -28,6 +28,10 @@ SEARCH_GENES_ALL_CACHE = "/tmp/search_genes_all.json"
 
 ZOOMA_OUTPUT = "/tmp/zooma_output.json"
 
+GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
+
+GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
+
 
 def check_cache(filename=None):
     data = None
@@ -42,7 +46,6 @@ def update_cache(data=None, filename=None):
     if data is not None:
         with open(filename, 'w') as outfile:
             json.dump(data, outfile)
-        outfile.close()
 
 
 # create a file of panel names and use it later
@@ -60,8 +63,9 @@ def request_to_panel_app():
 
 def get_gene_info(panel_name, panel_id,fh=None):
     url = 'https://bioinfo.extge.co.uk/crowdsourcing/WebServices/search_genes/all/'
-    #logging.debug("get_gene_info : %s"%(panel_id))
-    filename = '/tmp/' + panel_id + '.json'
+    logging.debug("get_gene_info : %s"%(panel_id))
+    #filename = '/tmp/' + panel_id + '.json'
+    filename = os.path.join('/tmp/' + panel_id + '.json')
     results = check_cache(filename=filename)
 
     if results is None:
@@ -72,16 +76,13 @@ def get_gene_info(panel_name, panel_id,fh=None):
     for item in results['results']:
         if item['EnsembleGeneIds']:
             fh.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n"%(panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'],  item['Publications'], item['Evidences']))
-            print(panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'], item['Publications'], item['Evidences'])
+            #print(panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'], item['Publications'], item['Evidences'])
 
 
 def execute_ge_request():
-    with open('/tmp/all_panel_app_information.csv', 'w', encoding='utf-8') as outfile:
-        '''outfile.write("panel_name", "panel_id", "number_of_genes", "gene_symbol", "EnsembleGeneIds", "LevelOfConfidence", "Phenotypes",
-          "ModeOfInheritance", sep='\t', end='\n')'''
+    with open('/tmp/all_panel_app_information.csv', 'w') as outfile:
         for panel_name, panel_id in request_to_panel_app():
             get_gene_info(panel_name, panel_id, fh=outfile)
-    outfile.close()
 
 
 def request_to_search_genes():
@@ -123,10 +124,10 @@ def request_to_zooma(property_value, fh=None):
 
 def execute_zooma():
     phenotype_unique_set = request_to_search_genes()
-    with open('/tmp/zooma_disease_mapping.csv', 'w', encoding='utf-8') as outfile:
+    with open('/tmp/zooma_disease_mapping.csv', 'w') as outfile:
         for phenotype in phenotype_unique_set:
             request_to_zooma(phenotype, fh=outfile)
-    outfile.close()
+
 
 
 class GE():
@@ -148,9 +149,7 @@ class GE():
                     ge_property = ge_property.strip()
                     self.disease_mappings[ge_property] = {'uri': correct_mapping, 'label': label}
                 except ValueError:
-                    print('Ignoring: malformed line: "{}"'.format(row))
-            #closed by with statement
-            #sample_file.close()
+                    logger.debug('Ignoring: malformed line: "{}"'.format(row))
         return self.disease_mappings
 
         '''
@@ -168,7 +167,7 @@ class GE():
 
                 for item in phenotypes:
                     if item in self.disease_mappings:
-                        print(1)
+                        logger.debug(1)
                         single_lit_ref_list = []
                         if publications is not None:
                             publications = re.findall(r"\'(.+?)\'", str(publications))
@@ -242,7 +241,7 @@ class GE():
                         obj.evidence.resource_score = resource_score
                         #specific
                         linkout = evidence_linkout.Linkout(
-                            url='https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview/%s/%s' % (panel_id,
+                            url='GE_LINKOUT_URL/%s/%s' % (panel_id,
                             gene_symbol,),
                             nice_name='Further details in the Genomics England PanelApp')
                         obj.evidence.urls = [linkout]
@@ -253,36 +252,34 @@ class GE():
                                 logger.error(obj.to_JSON())
                                 # sys.exit(1)
                             else:
-                                print("NoError")
+                                logger.debug("NoError")
                         except NameError:
-                            print("NameError")
+                            logger.debug("NameError")
                         self.evidence_strings.append(obj)
         return self.evidence_strings
 
     def write_evidence_strings(self, filename):
-        logger.info("Writing IntOGen evidence strings")
-        print(self.evidence_strings)
+        logger.info("Writing Genomics England evidence strings")
+        logger.debug(self.evidence_strings)
         with open(filename, 'w', encoding='utf-8') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
                 n += 1
-                print(evidence_string)
-                print(n)
+                #print(evidence_string)
+                #print(n)
                 logger.info(evidence_string.disease.id[0])
                 # get max_phase_for_all_diseases
                 try:
                     error = evidence_string.validate(logger)
                     if error == 0:
-                        print("noError")
+                        logger.debug("noError")
                     else:
                         logger.error("REPORTING ERROR %i" % n)
                         logger.error(evidence_string.to_JSON(indentation=4))
                     #sys.exit(1)
                 except NameError:
-                    print("NameError")
+                    logger.debug("NameError")
                 tp_file.write(evidence_string.to_JSON(indentation=None) + "\n")
-
-        tp_file.close()
 
 
 def main():
@@ -291,8 +288,8 @@ def main():
     ge = GE()
     ge.process_disease_mapping_file()
     ge.process_panel_app_file()
-    ge.write_evidence_strings('/tmp/genomics_england_evidence_string.json')
-    print("---- DONE ------")
+    ge.write_evidence_strings(GE_EVIDENCE_STRING)
+    logger.info("---- DONE ------")
 
 if __name__ == "__main__":
     main()
