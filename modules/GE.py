@@ -54,7 +54,7 @@ def request_to_panel_app():
         yield (item['Name'], item['Panel_Id'])
 
 
-def get_gene_info(panel_name, panel_id,fh=None):
+def get_gene_info(panel_name, panel_id,tsvwriter):
     url = 'https://bioinfo.extge.co.uk/crowdsourcing/WebServices/search_genes/all/'
     logging.debug("get_gene_info : %s"%(panel_id))
     #filename = '/tmp/' + panel_id + '.json'
@@ -68,14 +68,16 @@ def get_gene_info(panel_name, panel_id,fh=None):
 
     for item in results['results']:
         if item['EnsembleGeneIds']:
-            fh.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n"%(panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'],  item['Publications'], item['Evidences']))
+            tsvwriter.writerow([panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'], item['Publications'], item['Evidences']])
+            #fh.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n"%(panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'],  item['Publications'], item['Evidences']))
             #print(panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'], item['Publications'], item['Evidences'])
 
 
 def execute_ge_request():
     with open('/tmp/all_panel_app_information.csv', 'w') as outfile:
+        tsvwriter = csv.writer(outfile, delimiter='\t')
         for panel_name, panel_id in request_to_panel_app():
-            get_gene_info(panel_name, panel_id, fh=outfile)
+            get_gene_info(panel_name, panel_id, tsvwriter)
 
 
 def request_to_search_genes():
