@@ -6,14 +6,15 @@ import opentargets.model.evidence.association_score as association_score
 import logging
 import csv
 import re
-
 import requests
 import json
 import os.path
-import time
 import requests_cache
-
 from settings import Config
+
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 
 logger = logging.getLogger(__name__)
@@ -23,11 +24,6 @@ fmt = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
 h = logging.StreamHandler()
 h.setFormatter(fmt)
 logger.addHandler(h)
-
-import sys
-reload(sys)
-sys.setdefaultencoding('utf-8')
-
 
 
 def check_cache(filename=None):
@@ -74,7 +70,6 @@ def get_gene_info(panel_name, panel_id, tsvwriter):
         if item['EnsembleGeneIds']:
             tsvwriter.writerow([panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'], item['Publications'], item['Evidences']])
             #fh.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n"%(panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'],  item['Publications'], item['Evidences']))
-            #print(panel_name, panel_id, item['GeneSymbol'], item['EnsembleGeneIds'][0], item['LevelOfConfidence'], item['Phenotypes'], item['Publications'], item['Evidences'])
 
 
 def execute_ge_request():
@@ -120,14 +115,12 @@ def request_to_zooma(property_value, tsvwriter):
                       item['derivedFrom']['annotatedProperty']['propertyValue'].encode("utf-8").strip()])
 
 
-
 def execute_zooma():
     phenotype_unique_set = request_to_search_genes()
     with open('/tmp/zooma_disease_mapping.csv', 'w') as outfile:
         tsvwriter = csv.writer(outfile, delimiter='\t')
         for phenotype in phenotype_unique_set:
             request_to_zooma(phenotype, tsvwriter)
-
 
 
 class GE():
@@ -139,7 +132,6 @@ class GE():
         # use python3 for encoding entire file
 
     def process_disease_mapping_file(self):
-
         with open('/tmp/zooma_disease_mapping.csv', 'r') as sample_file:
             #sample_file_reader = csv.reader(sample_file, delimiter='\t')
             for row in sample_file:
@@ -156,8 +148,6 @@ class GE():
         '''
         Read all my panel information from what I extracted before from the web services
         '''
-
-
 
     def process_panel_app_file(self):
         with open('/tmp/all_panel_app_information.csv', 'r') as panel_app_file:
