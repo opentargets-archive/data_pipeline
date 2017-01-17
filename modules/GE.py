@@ -24,6 +24,10 @@ h = logging.StreamHandler()
 h.setFormatter(fmt)
 logger.addHandler(h)
 
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 
 
 def check_cache(filename=None):
@@ -54,7 +58,7 @@ def request_to_panel_app():
         yield (item['Name'], item['Panel_Id'])
 
 
-def get_gene_info(panel_name, panel_id,tsvwriter):
+def get_gene_info(panel_name, panel_id, tsvwriter):
     url = 'https://bioinfo.extge.co.uk/crowdsourcing/WebServices/search_genes/all/'
     logging.debug("get_gene_info : %s"%(panel_id))
     #filename = '/tmp/' + panel_id + '.json'
@@ -93,16 +97,16 @@ def request_to_search_genes():
         if item['Phenotypes']:
             if item['LevelOfConfidence'] == 'HighEvidence':
                 for element in item['Phenotypes']:
-                    element.strip()
-                    phenotype_list.append(element)
+                    new_element = element.encode('utf-8').strip()
+                    phenotype_list.append(new_element)
     phenotype_set = set(phenotype_list)
     return phenotype_set
 
 
-def request_to_zooma(property_value, fh=None):
-    requests_cache.install_cache('zooma_results_cache', backend='sqlite', expire_after=2000000)
+def request_to_zooma(property_value, tsvwriter):
+    requests_cache.install_cache('zooma_results_cache_jan', backend='sqlite', expire_after=2000000)
     r = requests.get('http://www.ebi.ac.uk/spot/zooma/v2/api/services/annotate',
-                         params={'propertyValue': property_value, 'propertyType': 'phenotype'})
+                         params={'propertyValue': property_value, 'propertyType': 'phenotype'} )
     if r.encoding == 'UTF-8':
         results = r.json()
 
@@ -112,16 +116,17 @@ def request_to_zooma(property_value, fh=None):
                       item['_links']['olslinks'][0]['semanticTag'].encode('utf-8').decode("utf-8"),
                       item['derivedFrom']['annotatedProperty']['propertyValue'].encode('utf-8').decode("utf-8"))
                 property_value.strip('\t')
-                fh.write("%s\t%s\t%s\n" % (property_value,item['_links']['olslinks'][0]['semanticTag'],
-                      item['derivedFrom']['annotatedProperty']['propertyValue']))
+                tsvwriter.writerow([property_value,item['_links']['olslinks'][0]['semanticTag'],
+                      item['derivedFrom']['annotatedProperty']['propertyValue'].encode("utf-8").strip()])
 
 
 
 def execute_zooma():
     phenotype_unique_set = request_to_search_genes()
     with open('/tmp/zooma_disease_mapping.csv', 'w') as outfile:
+        tsvwriter = csv.writer(outfile, delimiter='\t')
         for phenotype in phenotype_unique_set:
-            request_to_zooma(phenotype, fh=outfile)
+            request_to_zooma(phenotype, tsvwriter)
 
 
 
@@ -135,7 +140,7 @@ class GE():
 
     def process_disease_mapping_file(self):
 
-        with open('/tmp/zooma_disease_mapping.csv', 'r', encoding='utf-8') as sample_file:
+        with open('/tmp/zooma_disease_mapping.csv', 'r') as sample_file:
             #sample_file_reader = csv.reader(sample_file, delimiter='\t')
             for row in sample_file:
                 try:
@@ -144,6 +149,7 @@ class GE():
                     ge_property = ge_property.strip()
                     self.disease_mappings[ge_property] = {'uri': correct_mapping, 'label': label}
                 except ValueError:
+                    logger.debug(self.disease_mappings)
                     logger.debug('Ignoring: malformed line: "{}"'.format(row))
         return self.disease_mappings
 
@@ -154,7 +160,7 @@ class GE():
 
 
     def process_panel_app_file(self):
-        with open('/tmp/all_panel_app_information.csv', 'r', encoding='utf-8') as panel_app_file:
+        with open('/tmp/all_panel_app_information.csv', 'r') as panel_app_file:
 
             for line in panel_app_file:
                 panel_name, panel_id, gene_symbol, ensemble_gene_ids, level_of_confidence, phenotypes, publications, evidences = line.split('\t')
@@ -256,7 +262,7 @@ class GE():
     def write_evidence_strings(self, filename):
         logger.info("Writing Genomics England evidence strings")
         logger.debug(self.evidence_strings)
-        with open(filename, 'w', encoding='utf-8') as tp_file:
+        with open(filename, 'w') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
                 n += 1
@@ -284,7 +290,8 @@ def main():
     ge.process_disease_mapping_file()
     ge.process_panel_app_file()
     ge.write_evidence_strings(Config.GE_EVIDENCE_STRING)
-    logger.info("---- DONE ------")
+    print("---- DONE ------")
+
 
 if __name__ == "__main__":
     main()
