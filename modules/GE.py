@@ -10,6 +10,7 @@ import requests
 import json
 import os.path
 import requests_cache
+import urlparse
 from settings import Config
 
 import sys
@@ -232,8 +233,8 @@ class GE():
                         obj.evidence.resource_score = resource_score
                         #specific
                         linkout = evidence_linkout.Linkout(
-                            url='GE_LINKOUT_URL/%s/%s' % (panel_id,
-                            gene_symbol,),
+                            urlparse.urljoin(Config.GE_LINKOUT_URL, panel_id, gene_symbol),
+                            #url='GE_LINKOUT_URL/%s/%s' % (panel_id,gene_symbol,),
                             nice_name='Further details in the Genomics England PanelApp')
                         obj.evidence.urls = [linkout]
                         logger.debug("validating: %s"%disease_uri)
@@ -280,7 +281,8 @@ def main():
     ge.process_disease_mapping_file()
     ge.process_panel_app_file()
     ge.write_evidence_strings(Config.GE_EVIDENCE_STRING)
-    print("---- DONE ------")
+    logger.info("---- DONE ------")
+    sys.exit(0)
 
 
 if __name__ == "__main__":
