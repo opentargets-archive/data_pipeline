@@ -105,7 +105,6 @@ def request_to_zooma(property_value, tsvwriter):
                          params={'propertyValue': property_value, 'propertyType': 'phenotype'} )
     if r.encoding == 'UTF-8':
         results = r.json()
-
         for item in results:
             if item['confidence'] == "HIGH":
                 print(property_value.encode('utf-8').decode("utf-8"),
@@ -114,6 +113,20 @@ def request_to_zooma(property_value, tsvwriter):
                 property_value.strip('\t')
                 tsvwriter.writerow([property_value,item['_links']['olslinks'][0]['semanticTag'],
                       item['derivedFrom']['annotatedProperty']['propertyValue'].encode("utf-8").strip()])
+    elif r.encoding == 'iso-8859-1':
+        results = r.json()
+        for item in results:
+            if item['confidence'] == "HIGH":
+                print(property_value.decode('iso-8859-1').encode('utf8'),
+                      item['_links']['olslinks'][0]['semanticTag'].decode('iso-8859-1').encode('utf8'),
+                      item['derivedFrom']['annotatedProperty']['propertyValue'].decode('iso-8859-1').encode('utf8'))
+                property_value.strip('\t')
+                tsvwriter.writerow([property_value,item['_links']['olslinks'][0]['semanticTag'],
+                      item['derivedFrom']['annotatedProperty']['propertyValue']])
+    else:
+        logger.info(" Encoding is not 'UTF-8' or 'iso-8859-1' ")
+
+
 
 
 def execute_zooma():
