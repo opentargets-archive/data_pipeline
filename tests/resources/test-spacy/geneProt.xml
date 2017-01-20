@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!--Generated on: Wed Aug  4 14:51:29 BST 2010-->
+<!DOCTYPE InputData SYSTEM "LexEBI-v1.dtd">
+<InputData>
+<Cluster clsId="UNIPR_ROA1_PANTR" semType="geneProt">
+<Entry entryId="UNIPR_ROA1_PANTR_1" baseForm="Heterogeneous nuclear ribonucleoprotein A1" type="PREFERRED" mlfreq="13">
+
+        <SourceDC sourceName="BioThesaurus" sourceId="A5A6H4"/>
+        <PosDC posName="POS" pos="N"/>
+        <Variant writtenForm="HNRPA1LK1" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="TPT1P" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="heterogeneous nuclear ribonucleoprotein A1, transcript variant 1" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="heterogeneous nuclear ribonucleoprotein A1-like" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="heterogeneous nuclear ribonucleoprotein A1" type="orthographic" mlfreq="92"/>
+        <Variant writtenForm="Single-strand-binding protein" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="Helix-destabilizing protein" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="HNRPA1" type="orthographic" mlfreq="14"/>
+        <Variant writtenForm="hormonally upregulated Neu-associated kinase" type="orthographic" mlfreq="1"/>
+        <Variant writtenForm="hnRNP core protein A1" type="orthographic" mlfreq="9"/>
+        <Variant writtenForm="hnrpa1" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="heterogeneous nuclear ribonucleoprotein A1-like 2" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="HNRNPA1" type="orthographic" mlfreq="1"/>
+        <Variant writtenForm="HNRNPA1L2" type="orthographic" mlfreq="0"/>
+        <DC att="uniprot_ac" val="A5A6H4"/>
+        <DC att="speciesNameNCBI" val="9598"/>
+
+</Entry>
+</Cluster>
+</InputData>
