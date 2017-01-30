@@ -74,6 +74,8 @@ class Config():
     ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
     ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
     ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
+    ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME = '!lit-entities-test'
+    ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME = 'litentity'
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
@@ -266,6 +268,9 @@ class Config():
     PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
     PUBMED_XML_LOCN = '/tmp/medline/baseline'
     PUBMED_XML_UPDATE_LOCN = '/tmp/medline/update'
-
     PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
+    BIOLEXICON_GENE_XML_LOCN = 'geneProt (1).xml'
+    BIOLEXICON_DISEASE_XML_LOCN = 'umlsDisease.xml'
+    GENE_LEXICON_JSON_LOCN = 'gene_lexicon.json'
+    DISEASE_LEXICON_JSON_LOCN = 'disease_lexicon.json'
 

@@ -5,7 +5,9 @@ import multiprocessing
 import re
 import string
 import time
+import json
 from collections import Counter
+import os
 
 from nltk.corpus import stopwords
 from sklearn.base import TransformerMixin
@@ -19,6 +21,12 @@ from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisQueue, RedisQueueWorkerProcess
 from modules.Literature import PublicationFetcher
 from settings import Config
+from lxml import etree
+from spacy.attrs import ORTH, TAG, LEMMA
+from spacy.matcher import Matcher
+from spacy.tokenizer import Tokenizer
+from spacy.language_data import TOKENIZER_INFIXES
+import spacy.util
 
 # List of symbols we don't care about
 SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "“", "”", "'ve"]
@@ -44,7 +52,12 @@ LABELS = {
     u'ORDINAL': u'ORDINAL',
     u'CARDINAL': u'CARDINAL'
 }
+
+SUBJECTS = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl"]
+OBJECTS = ["dobj", "dative", "attr", "oprd"]
+
 MAX_CHUNKS =100
+MAX_TERM_FREQ = 200000
 
 class LiteratureNLPProcess(object):
 
@@ -317,5 +330,272 @@ class PublicationAnalysisSpacy(PublicationAnalysis):
     def get_type(self):
         '''Define the type for elasticsearch here'''
         return Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME
+
+
+class LiteratureInfoExtractor(object):
+
+    def __init__(self,
+                 es = None,
+                 loader = None,
+                 r_server=None,
+                 ):
+        self.es = es
+        self.es_query = ESQuery(self.es)
+        if loader is None:
+            loader = Loader(es)
+        self.loader = loader
+        self.r_server = r_server
+        self.logger = logging.getLogger(__name__)
+
+
+    def process(self,
+                datasources=None,
+                dry_run=False):
+
+
+        if not os.path.isfile(Config.GENE_LEXICON_JSON_LOCN):
+            logging.info('Generating gene matcher patterns')
+            gene_lexicon_parser = LexiconParser(Config.BIOLEXICON_GENE_XML_LOCN,Config.GENE_LEXICON_JSON_LOCN,'GENE')
+            gene_lexicon_parser.parse_lexicon()
+
+        if not os.path.isfile(Config.DISEASE_LEXICON_JSON_LOCN):
+            logging.info('Generating disease matcher patterns')
+            disease_lexicon_parser = LexiconParser(Config.BIOLEXICON_DISEASE_XML_LOCN, Config.DISEASE_LEXICON_JSON_LOCN, 'DISEASE')
+            disease_lexicon_parser.parse_lexicon()
+
+        spacyManager = NLPManager()
+        i=1
+        j=0
+
+        logging.info('Loading lexicon json')
+        disease_patterns = json.load(open(Config.DISEASE_LEXICON_JSON_LOCN))
+        gene_patterns = json.load(open(Config.GENE_LEXICON_JSON_LOCN))
+
+
+        logging.info('Finding entity matches')
+        for ev in tqdm(self.es_query.get_abstracts_from_val_ev(),
+                    desc='Reading available publications for nlp information extraction',
+                    total = self.es_query.count_validated_evidence_strings(),
+                    unit=' evidence',
+                    unit_scale=True):
+
+            j=j+1
+            if ev['literature']['title'] and ev['literature']['abstract']:
+                i = i + 1
+                if (i > 101):
+                    break
+
+                text_to_analyze = unicode(ev['literature']['title'] + ' ' + ''.join(ev['literature']['abstract']))
+                tokens = spacyManager.tokenizeText(text_to_analyze)
+
+                disease_matches = spacyManager.findEntityMatches(disease_patterns,tokens)
+                gene_matches = spacyManager.findEntityMatches(gene_patterns,tokens)
+                logging.info('Text to analyze - {} --------- Gene Matches {}'.format(text_to_analyze,gene_matches))
+
+                #spacyManager.generateRelations(disease_matches,gene_matches)
+
+
+        logging.info("Total abstracts {}".format(j))
+        logging.info("DONE")
+
+    @staticmethod
+    def get_pub_id_from_url(url):
+        return url.split('/')[-1]
+
+
+''' base class to parse biolexicon xml files and create '''
+class LexiconParser(object):
+
+    def __init__(self,
+                 lexicon_xml,
+                 matcher_json,
+                 lexicon_type
+                 ):
+        self.lexicon_xml = lexicon_xml
+        self.matcher_json = matcher_json
+        self.lexicon_type = lexicon_type
+        self.lexicon = {}
+        self.logger = logging.getLogger(__name__)
+
+    def parse_lexicon(self):
+        nlp = English()
+        matcher = Matcher(vocab=nlp.vocab, )
+
+        '''parse a list of genes from biolexicon'''
+
+        #TODO - clear root elements to avoid memory issues while parsing
+        context = etree.iterparse(open(self.lexicon_xml),
+                                  # context = etree.iterparse(open("resources/test-spacy/geneProt.xml"),
+                                  tag='Cluster')  # requries geneProt.xml from LexEBI
+        # ftp://ftp.ebi.ac.uk/pub/software/textmining/bootstrep/termrepository/LexEBI/
+
+
+        encoded_lexicon = {}
+        encoded_lexicon_json_file = self.matcher_json
+        for item in self.retreive_items_from_lexicon_xml(context,self.lexicon_type):
+            if item.all_forms:
+                matcher.add_entity(
+                    item.id,  # Entity ID -- Helps you act on the match.
+                    {"ent_type": item.ent_type, "label": item.label},  # Arbitrary attributes (optional)
+                    on_match=self.print_matched_entities,
+                    if_exists='ignore',
+                )
+                for form in item.all_forms:
+                    token_specs = [{ORTH: token} for token in form.split()]
+                    matcher.add_pattern(item.id,
+                                        token_specs,
+                                        label=form,
+                                        )
+
+
+                encoded_lexicon.update(item.to_dict())
+
+        json.dump(encoded_lexicon,
+                  open(encoded_lexicon_json_file, 'w'),
+                  indent=4)
+
+    def retreive_items_from_lexicon_xml(self, context, entity_type):
+        c = 0
+
+        for action, cluster in context:
+            c += 1
+            cluster_name = cluster.attrib['clsId']
+            if 'UN13C' in cluster_name:
+                self.logger.info('Found {} !!'.format(cluster_name))
+
+            item = LexiconItem(cluster.attrib['clsId'], ent_type=entity_type)
+            for entry in cluster.iterchildren(tag='Entry'):
+                if entry.attrib['baseForm']:
+                    if int(entry.attrib['mlfreq']) < MAX_TERM_FREQ:
+                        if not item.label and entry.attrib['baseForm']:
+                            item.label = entry.attrib['baseForm']
+                        item.add_variant(entry.attrib['baseForm'],
+                                         entry.attrib['mlfreq'])
+                '''Synonyms'''
+                for variant in entry.iterchildren(tag='Variant'):
+                    if int(variant.attrib['mlfreq']) < MAX_TERM_FREQ:
+                        item.add_variant(variant.attrib['writtenForm'],
+                                         variant.attrib['mlfreq'])
+
+            self.lexicon[item.id] = item
+            if c % 10000 == 0:
+                logging.info('parsed %i lexicon term' % c)
+            yield item
+
+    def print_matched_entities(self, matcher, doc, i, matches):
+        ''' callback '''
+        # '''all matches'''
+        # spans = [(matcher.get_entity(ent_id), label, doc[start : end]) for ent_id, label, start, end in matches]
+        # for span in spans:
+        #     print span
+        '''just the matched one'''
+        ent_id, label, start, end = matches[i]
+        print i
+        span = (matcher.get_entity(ent_id), label, doc[start: end])
+        print span
+
+
+
+class LexiconItem(object):
+    def __init__(self, id, label = None, ent_type ='ENT'):
+        self.id = id
+        self.label = label
+        self.ent_type = ent_type
+        '''variants identify synonymns'''
+        self.variants = []
+        self.all_forms = set()
+
+    def add_variant(self, term, freq):
+        self.variants.append(dict(term=term,
+                                  freq=freq))
+        self.all_forms.add(term)
+
+    def __str__(self):
+        string = ['ID: %s\nBASE:  %s'%(self.id,self.label)]
+        for i in self.variants:
+            string.append('VARIANT: %s'%i['term'])
+        return '\n'.join(string)
+
+    def to_dict(self):
+        d = {self.id : [self.ent_type,
+                        {"label" : self.label},
+                        [[{'ORTH': token} for token in form.split()] for form in self.all_forms]]
+             }
+        return d
+
+class NLPManager(object):
+    def __init__(self, nlp=None):
+        self.nlp = nlp
+
+    def tokenizeText(self,text):
+
+        def create_tokenizer(nlp):
+            infix_re = spacy.util.compile_infix_regex(tuple(TOKENIZER_INFIXES + ['/',',']))
+            return Tokenizer(nlp.vocab,{},nlp.tokenizer.prefix_search,nlp.tokenizer.suffix_search,
+                             infix_re.finditer)
+
+        if self.nlp is None:
+            self.nlp = spacy.load('en', create_make_doc=create_tokenizer)
+        custom_tokens = self.nlp(unicode(text))
+        return custom_tokens
+
+
+    def findEntityMatches(self,patterns, tokens):
+        entities = []
+        matcher = Matcher(vocab=self.nlp.vocab,
+                          patterns=patterns
+                          )
+
+        matches = matcher(tokens)
+
+        for ent_id, label, start, end in matches:
+            '''doc[start: end] - actual match in document; could be a synonymn'''
+            span = (matcher.get_entity(ent_id), label, tokens[start: end])
+            entities.append(span)
+        return entities
+
+    def generateRelations(self,entity1,entity2,doc):
+        self.extract_entity_relations_by_verb(entity1,entity2,doc)
+
+    def getSubject(self,predicate):
+        subjects = [tok for tok in predicate.lefts if tok.dep_ in SUBJECTS and tok.pos_ != "DET"]
+        return subjects
+
+    def getObject(self,predicate):
+        rights = list(predicate.rights)
+        objects = []
+        for token in rights:
+            if token.dep_ in OBJECTS:
+                objects.append(token)
+            elif token.dep_ == 'prep':
+                rts = list(token.rights)
+                objects.append(rts[0])
+
+
+
+        #objects = [tok for tok in rights if tok.dep_ in OBJECTS ]
+        return objects
+
+    def extract_entity_relations_by_verb(self,gene_matches,disease_matches,doc):
+        over_simplified_text = 'Studies have identified that ADRA1A contributes' \
+                               ' to schizophrenia'
+        context = ''
+
+        relations = []
+        #TODO - handle aux verbs?????
+        # Auxiliary Verb List : be(am, are, is, was, were, being),can,could,do(did, does, doing),have(had, has, having),may,might,must,shall,should,will,would
+        for predicate in filter(lambda w: w.pos_ == 'VERB', doc):
+            subject = self.getSubject(predicate)
+            object = self.getObject(predicate)
+            for child in predicate.children:
+                if child.dep_ == 'neg':
+                    context = 'Negative'
+
+            print 'Subject {}  Predicate {} {}  Object {}'.format(subject,context , predicate,object)
+
+
+
+
+
 
 
