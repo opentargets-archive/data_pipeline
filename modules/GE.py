@@ -74,7 +74,7 @@ def get_gene_info(panel_name, panel_id, tsvwriter):
 
 
 def execute_ge_request():
-    with open('/tmp/all_panel_app_information.csv', 'w') as outfile:
+    with open(Config.PANEL_APP_INFO, 'w') as outfile:
         tsvwriter = csv.writer(outfile, delimiter='\t')
         for panel_name, panel_id in request_to_panel_app():
             get_gene_info(panel_name, panel_id, tsvwriter)
@@ -127,11 +127,9 @@ def request_to_zooma(property_value, tsvwriter):
         logger.info(" Encoding is not 'UTF-8' or 'iso-8859-1' ")
 
 
-
-
 def execute_zooma():
     phenotype_unique_set = request_to_search_genes()
-    with open('/tmp/zooma_disease_mapping.csv', 'w') as outfile:
+    with open(Config.ZOOMA_DISEASE_MAPPING, 'w') as outfile:
         tsvwriter = csv.writer(outfile, delimiter='\t')
         for phenotype in phenotype_unique_set:
             request_to_zooma(phenotype, tsvwriter)
@@ -164,7 +162,7 @@ class GE():
         '''
 
     def process_panel_app_file(self):
-        with open('/tmp/all_panel_app_information.csv', 'r') as panel_app_file:
+        with open(Config.PANEL_APP_INFO, 'r') as panel_app_file:
 
             for line in panel_app_file:
                 panel_name, panel_id, gene_symbol, ensemble_gene_ids, level_of_confidence, phenotypes, publications, evidences = line.split('\t')

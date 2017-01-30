@@ -276,4 +276,6 @@ class Config():
     ZOOMA_OUTPUT = "/tmp/zooma_output.json"
     GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
     GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
+    PANEL_APP_INFO = '/tmp/all_panel_app_information.csv'
+    ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
 

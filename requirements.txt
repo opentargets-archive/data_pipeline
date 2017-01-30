@@ -38,3 +38,4 @@ coverage
 ftputil
 psutil
 requests_cache
+pytest
