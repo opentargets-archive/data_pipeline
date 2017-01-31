@@ -113,7 +113,7 @@ class EnsemblGeneInfo(object):
         self.ensembl_release = ensembl_release
         mysql_gene.conn_close()
 
-    def __chunk_list(self, input_list, chunk_size=500):
+    def __chunk_list(self, input_list, chunk_size=Config.ENSEMBL_CHUNK_SIZE):
         '''
         Breaks the input list into chunks. Used to limit the number of identifiers
         sent to Ensembl REST POST API calls (limit 1000).

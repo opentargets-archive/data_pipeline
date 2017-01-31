@@ -1,4 +1,4 @@
-box: python:2.7
+box: python:2.7-onbuild
 build:
   steps:
     - pip-install
@@ -6,9 +6,13 @@ build:
         name: test empty run to catch import errors
         code: |
           python run.py
+    - script:
+        name: copy to /usr/src/app working dir
+        code: |
+          cp -R $WERCKER_ROOT/* /usr/src/app
     - internal/docker-push:
         cmd: python run.py
-        working-dir: $WERCKER_ROOT
+        working-dir: /usr/src/app
         tag: latest, $WERCKER_GIT_COMMIT, $WERCKER_GIT_BRANCH
         username: _json_key
         password: $GCR_JSON_KEY_FILE
