@@ -363,14 +363,26 @@ class LiteratureInfoExtractor(object):
             disease_lexicon_parser = LexiconParser(Config.BIOLEXICON_DISEASE_XML_LOCN, Config.DISEASE_LEXICON_JSON_LOCN, 'DISEASE')
             disease_lexicon_parser.parse_lexicon()
 
+        i = 1
+        j = 0
         spacyManager = NLPManager()
-        i=1
-        j=0
-
         logging.info('Loading lexicon json')
         disease_patterns = json.load(open(Config.DISEASE_LEXICON_JSON_LOCN))
         gene_patterns = json.load(open(Config.GENE_LEXICON_JSON_LOCN))
 
+        # matcher = Matcher.load(path = 'gene_lexicon.json',
+        #                        vocab=nlp.vocab)
+        # TODO: FIXED IN SPACY MASTER BUT A BUG IN 1.5.0
+        logging.info('Generating matcher patterns')
+        '''load all the new patterns, do not use Matcher.load since there is a bug'''
+        disease_matcher = Matcher(vocab=spacyManager.nlp.vocab,
+                          patterns=disease_patterns
+                          )
+        gene_matcher = Matcher(vocab=spacyManager.nlp.vocab,
+                                  patterns=gene_patterns
+                                  )
+        '''should save the new vocab now'''
+        # Matcher.vocab.dump('lexeme.bin')
 
         logging.info('Finding entity matches')
         for ev in tqdm(self.es_query.get_abstracts_from_val_ev(),
@@ -388,19 +400,13 @@ class LiteratureInfoExtractor(object):
                 text_to_analyze = unicode(ev['literature']['title'] + ' ' + ''.join(ev['literature']['abstract']))
                 tokens = spacyManager.tokenizeText(text_to_analyze)
 
-                disease_matches = spacyManager.findEntityMatches(disease_patterns,tokens)
-                gene_matches = spacyManager.findEntityMatches(gene_patterns,tokens)
-                logging.info('Text to analyze - {} --------- Gene Matches {}'.format(text_to_analyze,gene_matches))
+                disease_matches = spacyManager.findEntityMatches(disease_matcher,tokens)
+                gene_matches = spacyManager.findEntityMatches(gene_matcher,tokens)
+                logging.info('Text to analyze - {} --------- Gene Matches {} -------- Disease Matches {}'.format(text_to_analyze,gene_matches, disease_matches))
 
                 #spacyManager.generateRelations(disease_matches,gene_matches)
-
-
-        logging.info("Total abstracts {}".format(j))
         logging.info("DONE")
 
-    @staticmethod
-    def get_pub_id_from_url(url):
-        return url.split('/')[-1]
 
 
 ''' base class to parse biolexicon xml files and create '''
@@ -419,8 +425,6 @@ class LexiconParser(object):
 
     def parse_lexicon(self):
         nlp = English()
-        matcher = Matcher(vocab=nlp.vocab, )
-
         '''parse a list of genes from biolexicon'''
 
         #TODO - clear root elements to avoid memory issues while parsing
@@ -434,20 +438,18 @@ class LexiconParser(object):
         encoded_lexicon_json_file = self.matcher_json
         for item in self.retreive_items_from_lexicon_xml(context,self.lexicon_type):
             if item.all_forms:
-                matcher.add_entity(
-                    item.id,  # Entity ID -- Helps you act on the match.
-                    {"ent_type": item.ent_type, "label": item.label},  # Arbitrary attributes (optional)
-                    on_match=self.print_matched_entities,
-                    if_exists='ignore',
-                )
-                for form in item.all_forms:
-                    token_specs = [{ORTH: token} for token in form.split()]
-                    matcher.add_pattern(item.id,
-                                        token_specs,
-                                        label=form,
-                                        )
-
-
+                # matcher.add_entity(
+                #     item.id,  # Entity ID -- Helps you act on the match.
+                #     {"ent_type": item.ent_type, "label": item.label},  # Arbitrary attributes (optional)
+                #     on_match=self.print_matched_entities,
+                #     if_exists='ignore',
+                # )
+                # for form in item.all_forms:
+                #     token_specs = [{ORTH: token} for token in form.split()]
+                #     matcher.add_pattern(item.id,
+                #                         token_specs,
+                #                         label=form,
+                #                         )
                 encoded_lexicon.update(item.to_dict())
 
         json.dump(encoded_lexicon,
@@ -459,9 +461,6 @@ class LexiconParser(object):
 
         for action, cluster in context:
             c += 1
-            cluster_name = cluster.attrib['clsId']
-            if 'UN13C' in cluster_name:
-                self.logger.info('Found {} !!'.format(cluster_name))
 
             item = LexiconItem(cluster.attrib['clsId'], ent_type=entity_type)
             for entry in cluster.iterchildren(tag='Entry'):
@@ -523,35 +522,89 @@ class LexiconItem(object):
              }
         return d
 
+class LitEntity(JSONSerializable):
+    def __init__(self, id, label=None, ent_type='ENT', matched_word=None, start_pos = None, end_pos = None, doc_id = None):
+        self.id = id
+        self.label = label
+        self.ent_type = ent_type
+        self.matched_word = matched_word
+        self.start_pos = start_pos
+        self.end_pos = end_pos
+        self.doc_id = doc_id
+
+# This is meant only for testing purpose
+def load_entity_matches(self, loader, nlp, doc):
+    matcher = Matcher(vocab=nlp.vocab,
+                      patterns=json.load(open('disease_lexicon.json'))
+                      )
+    disease_matches = matcher(doc)
+    disease_matched_list = []
+    logging.info('Disease Matches!!!!!!!!!!!!!!!!!!!')
+    i = 1
+    for ent_id, label, start, end in disease_matches:
+        i = i + 1
+        span = (matcher.get_entity(ent_id), label, doc[start: end])
+        litentity = LitEntity(ent_id, matcher.get_entity(ent_id)['label'], 'DISEASE', doc[start: end].text, start,
+                              end, 1)
+        loader.put(Config.ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME,
+                   Config.ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME,
+                   i,
+                   litentity,
+                   create_index=False)
+
+        logging.info(span)
+    disease_matched_entities = {"entities": disease_matched_list}
+
+    matcher = Matcher(vocab=nlp.vocab,
+                      patterns=json.load(open('gene_lexicon.json'))
+                      )
+    gene_matches = matcher(doc)
+    gene_matched_list = []
+    logging.info('Gene Matches!!!!!!!!!!!!!!!!!!!')
+    for ent_id, label, start, end in gene_matches:
+        i = i + 1
+        span = (matcher.get_entity(ent_id), label, doc[start: end])
+        litentity = LitEntity(ent_id, matcher.get_entity(ent_id)['label'], 'GENE', doc[start: end].text, start, end,
+                              1)
+        loader.put(Config.ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME,
+                   Config.ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME,
+                   i,
+                   litentity,
+                   create_index=False)
+        logging.info(span)
+    gene_matched_entities = {"litentity": gene_matched_list}
+
+
 class NLPManager(object):
     def __init__(self, nlp=None):
-        self.nlp = nlp
+        def create_tokenizer(nlp):
+            infix_re = spacy.util.compile_infix_regex(tuple(TOKENIZER_INFIXES + ['/', ',']))
+            return Tokenizer(nlp.vocab, {}, nlp.tokenizer.prefix_search, nlp.tokenizer.suffix_search,
+                             infix_re.finditer)
+        if nlp is None:
+           if nlp is None:
+                    self.nlp = spacy.load('en', create_make_doc=create_tokenizer)
+        else:
+            self.nlp = nlp
 
     def tokenizeText(self,text):
 
-        def create_tokenizer(nlp):
-            infix_re = spacy.util.compile_infix_regex(tuple(TOKENIZER_INFIXES + ['/',',']))
-            return Tokenizer(nlp.vocab,{},nlp.tokenizer.prefix_search,nlp.tokenizer.suffix_search,
-                             infix_re.finditer)
 
-        if self.nlp is None:
-            self.nlp = spacy.load('en', create_make_doc=create_tokenizer)
         custom_tokens = self.nlp(unicode(text))
         return custom_tokens
 
 
-    def findEntityMatches(self,patterns, tokens):
+    def findEntityMatches(self,matcher, tokens):
         entities = []
-        matcher = Matcher(vocab=self.nlp.vocab,
-                          patterns=patterns
-                          )
 
         matches = matcher(tokens)
 
         for ent_id, label, start, end in matches:
             '''doc[start: end] - actual match in document; could be a synonymn'''
             span = (matcher.get_entity(ent_id), label, tokens[start: end])
-            entities.append(span)
+            litentity = LitEntity(ent_id, matcher.get_entity(ent_id)['label'], 'GENE', tokens[start: end].text, start, end)
+            #TODO - store entities in ES index
+            entities.append(litentity)
         return entities
 
     def generateRelations(self,entity1,entity2,doc):
