@@ -1,29 +1,32 @@
+import os
 from modules import GE
 from settings import Config
 
+GE_REST_object = GE.GenomicsEnglandRESTClient()
+
 
 def test_request_to_panel_app():
-    assert "Multiple endocrine tumours", "553f94b4bb5a1616e5ed4595" in GE.request_to_panel_app()
-    assert "Congenital myopathy", "553f94b6bb5a1616e5ed459a" in GE.request_to_panel_app()
-    assert "Renal tubular acidosis", "553f94d5bb5a1616e5ed45a4" in GE.request_to_panel_app()
+    assert "Multiple endocrine tumours", "553f94b4bb5a1616e5ed4595" in GE_REST_object.request_to_panel_app()
+    assert "Congenital myopathy", "553f94b6bb5a1616e5ed459a" in GE_REST_object.request_to_panel_app()
+    assert "Renal tubular acidosis", "553f94d5bb5a1616e5ed45a4" in GE_REST_object.request_to_panel_app()
 
 
 def test_check_cache():
-    assert GE.check_cache(filename="/tmp/553f94b4bb5a1616e5ed4595.json") is not None
-    assert GE.check_cache(filename="/tmp/553f94b6bb5a1616e5ed459a.json") is not None
-    assert GE.check_cache(filename="/tmp/553f94d5bb5a1616e5ed45a4.json") is not None
+    assert GE_REST_object.check_cache(filename=os.path.join(Config.GE_CACHE_DIRECTORY, "553f94b4bb5a1616e5ed4595.json")) is not None
+    assert GE_REST_object.check_cache(filename=os.path.join(Config.GE_CACHE_DIRECTORY, "553f94b6bb5a1616e5ed459a.json")) is not None
+    assert GE_REST_object.check_cache(filename=os.path.join(Config.GE_CACHE_DIRECTORY, "553f94d5bb5a1616e5ed45a4.json")) is not None
 
 
 def test_update_cache():
-    assert GE.update_cache(data=None) is None
+    assert GE_REST_object.update_cache(data=None) is None
 
 
 def test_execute_ge_request():
-    assert Config.PANEL_APP_INFO is not None
+    assert Config.GE_PANEL_APP_INFO is not None
 
 
-def test_execute_zomma():
-    assert Config.ZOOMA_DISEASE_MAPPING is not None
+def test_execute_zooma():
+    assert Config.GE_ZOOMA_DISEASE_MAPPING is not None
 
 GE_object = GE.GE()
 

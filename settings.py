@@ -270,11 +270,13 @@ class Config():
 
     #GE Pipeline
 
-    LIST_PANELS_CACHE = "/tmp/list_panels.json"
-    SEARCH_GENES_ALL_CACHE = "/tmp/search_genes_all.json"
-    ZOOMA_OUTPUT = "/tmp/zooma_output.json"
-    GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
-    GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
-    PANEL_APP_INFO = '/tmp/all_panel_app_information.csv'
-    ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
+    GE_CACHE_DIRECTORY = "/tmp"
+    GE_LIST_PANELS_CACHE = os.path.join(GE_CACHE_DIRECTORY, "list_panels.json")
+    GE_SEARCH_GENES_ALL_CACHE = os.path.join(GE_CACHE_DIRECTORY, "search_genes_all.json")
+    GE_ZOOMA_OUTPUT = os.path.join(GE_CACHE_DIRECTORY, "zooma_output.json")
+    GE_EVIDENCE_STRING = os.path.join(GE_CACHE_DIRECTORY,'genomics_england_evidence_string.json')
+    GE_LINKOUT_URL = os.path.join(GE_CACHE_DIRECTORY,'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview')
+    GE_PANEL_APP_INFO = os.path.join(GE_CACHE_DIRECTORY, 'all_panel_app_information.csv')
+    GE_ZOOMA_DISEASE_MAPPING = os.path.join(GE_CACHE_DIRECTORY, 'zooma_disease_mapping.csv')
+    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = os.path.join(GE_CACHE_DIRECTORY, 'zooma_disease_mapping_low_confidence.csv')
 
