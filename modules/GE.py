@@ -312,6 +312,7 @@ def main():
     ge.process_disease_mapping_file()
     ge.process_panel_app_file()
     ge.write_evidence_strings(Config.GE_EVIDENCE_STRING)
+    print("Done")
     sys.exit(0)
 
 
