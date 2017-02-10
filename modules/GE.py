@@ -75,6 +75,7 @@ class GE(object):
                                                     item['Evidences']
                                                     ])
         self.phenotype_set = set(phenotype_list)
+        return self.phenotype_set
 
     def request_to_zooma(self, property_value):
         '''
@@ -109,12 +110,14 @@ class GE(object):
             for phenotype, value in self.other_zooma_mappings.items():
                 csv_writer.writerow([phenotype, value['uri'], value['label']])
 
-    def execute_zooma(self):
+        return self.high_confidence_mappings
+
+    def use_zooma(self):
         '''
         Call request to Zooma function
         :return: None.
         '''
-        logger.info("execute Zooma")
+        logger.info("use Zooma")
         for phenotype in self.phenotype_set:
             if phenotype:
                 self.request_to_zooma(phenotype)
@@ -214,18 +217,15 @@ class GE(object):
         with open(filename, 'w') as tp_file:
             for evidence_string in self.evidence_strings:
                 error = evidence_string.validate(logger)
-                if error == 0:
-                    logger.debug("noError")
-                else:
+                if error > 1:
                     logger.error(evidence_string.to_JSON(indentation=4))
-                    #sys.exit(1)
                 tp_file.write(evidence_string.to_JSON(indentation=None) + "\n")
 
 
 def main():
     ge_object = GE()
     ge_object.execute_ge_request()
-    ge_object.execute_zooma()
+    ge_object.use_zooma()
     ge_object.process_panel_app_file()
     ge_object.write_evidence_strings(Config.GE_EVIDENCE_STRING)
 

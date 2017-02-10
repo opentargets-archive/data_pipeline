@@ -11,19 +11,20 @@ def test_request_to_panel_app():
 
 
 def test_execute_ge_request():
-    assert ge_object.panel_app_info is not None
+    assert 'Meningioma' in ge_object.execute_ge_request()
+    assert 'ischemic stroke' in ge_object.execute_ge_request()
+    assert 'Perlman Syndrome' in ge_object.execute_ge_request()
 
 
-def test_execute_zooma():
-    assert ge_object.high_confidence_mappings is not None
+def test_request_to_zooma():
+    assert 'Meningioma' in ge_object.request_to_zooma('Meningioma')
+    assert 'http://www.orpha.net/ORDO/Orphanet_2495' in ge_object.request_to_zooma('Meningioma')['Meningioma']['uri']
 
 
 def test_evidence_strings():
-    assert ge_object.evidence_strings is not None
-
-
-def test_write_evidence_strings():
-    assert Config.GE_EVIDENCE_STRING is not None
+    with open(Config.GE_EVIDENCE_STRING, 'r') as evidence_file:
+        for row in evidence_file:
+            assert "validated_against_schema_version" in row
 
 
 
