@@ -7,7 +7,7 @@ import logging
 import csv
 import re
 import requests
-import requests_cache
+#import requests_cache
 import urlparse
 from settings import Config
 import sys
@@ -31,6 +31,7 @@ class GE(object):
         self.other_zooma_mappings = dict()
         self.phenotype_set = set()
         self.evidence_strings = list()
+        self.map_omim = dict()
 
     @staticmethod
     def request_to_panel_app():
@@ -38,7 +39,7 @@ class GE(object):
         Makes a request to panel app to get the list of all panels
         :return: tuple of list of panel name and panel id's
         '''
-        requests_cache.install_cache('GE_results_cache_Feb', backend='sqlite', expire_after=3000000)
+        #requests_cache.install_cache('GE_results_cache_Feb', backend='sqlite', expire_after=3000000)
         r = requests.get('https://bioinfo.extge.co.uk/crowdsourcing/WebServices/list_panels', params={})
         results = r.json()
 
@@ -48,7 +49,7 @@ class GE(object):
     def execute_ge_request(self):
         '''
         Create panel app info list and phenotype set
-        :return: None
+        :return: Unique phenotype list
         '''
         phenotype_list = []
         for panel_name, panel_id in self.request_to_panel_app():
@@ -61,10 +62,12 @@ class GE(object):
                         new_element = element.decode('iso-8859-1').encode('utf-8').strip()
                         new_element = re.sub(r"\#", "", new_element)
                         new_element = re.sub(r"\t", "", new_element)
+                        omim_id = re.findall(r"\d{5}",new_element)
                         new_element = re.sub(r"\d{5}", "", new_element)
                         new_element = re.sub(r"\{", "", new_element)
                         new_element = re.sub(r"\}", "", new_element)
                         phenotype_list.append(new_element)
+                        self.map_omim[new_element] = omim_id
                         self.panel_app_info.append([panel_name,
                                                     panel_id,
                                                     item['GeneSymbol'],
@@ -81,9 +84,9 @@ class GE(object):
         '''
         Make a request to Zooma to get correct phenotype mapping and disease label
         :param property_value: Phenotype name from Genomics England
-        :return: None .  Writes the output in the input file
+        :return: High confidence mappings .  Writes the output in the input file
         '''
-        requests_cache.install_cache('zooma_results_cache_jan', backend='sqlite', expire_after=3000000)
+        #requests_cache.install_cache('zooma_results_cache_jan', backend='sqlite', expire_after=3000000)
         r = requests.get('http://www.ebi.ac.uk/spot/zooma/v2/api/services/annotate',
                              params={'propertyValue': property_value, 'propertyType': 'phenotype'})
         results = r.json()
@@ -91,24 +94,26 @@ class GE(object):
             if item['confidence'] == "HIGH":
                 self.high_confidence_mappings[property_value] = {
                     'uri': item['_links']['olslinks'][0]['semanticTag'],
-                    'label': item['derivedFrom']['annotatedProperty']['propertyValue']
+                    'label': item['derivedFrom']['annotatedProperty']['propertyValue'],
+                    'omim_id': self.map_omim[property_value]
                 }
 
             else:
                 self.other_zooma_mappings[property_value] = {
                     'uri': item['_links']['olslinks'][0]['semanticTag'],
-                    'label': item['derivedFrom']['annotatedProperty']['propertyValue']
+                    'label': item['derivedFrom']['annotatedProperty']['propertyValue'],
+                    'omim_id': self.map_omim[property_value]
                 }
 
         with open(Config.GE_ZOOMA_DISEASE_MAPPING, 'w') as outfile:
             tsv_writer = csv.writer(outfile, delimiter='\t')
             for phenotype, value in self.high_confidence_mappings.items():
-                tsv_writer.writerow([phenotype, value['uri'], value['label']])
+                tsv_writer.writerow([phenotype, value['uri'], value['label'], value['omim_id']])
 
         with open(Config.GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT, 'w') as map_file:
             csv_writer = csv.writer(map_file, delimiter='\t')
             for phenotype, value in self.other_zooma_mappings.items():
-                csv_writer.writerow([phenotype, value['uri'], value['label']])
+                csv_writer.writerow([phenotype, value['uri'], value['label'], value['omim_id']])
 
         return self.high_confidence_mappings
 
@@ -135,7 +140,7 @@ class GE(object):
                 if publications is not None:
                     publications = re.findall(r"\'(.+?)\'", str(publications))
                     for paper_set in publications:
-                        paper_set = re.findall(r"(?<!\d)\d{7,12}(?!\d)", paper_set)
+                        paper_set = re.findall(r"\d{7,12}", paper_set)
                         for paper in paper_set:
                             lit_url = "http://europepmc.org/abstract/MED/" + paper
                             single_lit_ref_list.append(evidence_core.Single_Lit_Reference(lit_id = lit_url))
