@@ -840,9 +840,8 @@ class Evidence(JSONSerializable):
                 #     pass
                 # elif self.evidence['sourceID']=='europmc':
                 #     pass
-                # elif self.evidence['sourceID']=='disgenet':
-                #     pass
-        except Exception, e:
+
+        except Exception as e:
             logger.error(
                 "Cannot score evidence %s of type %s. Error: %s" % (self.evidence['id'], self.evidence['type'], e))
 

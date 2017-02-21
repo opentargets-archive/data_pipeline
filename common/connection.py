@@ -19,9 +19,8 @@ class PipelineConnectors():
         """
         ''' Elastic Search connection'''
         self.es = None
-        ''' sparql endpoint client'''
-        self.sparql = None
-        ''' redis '''
+
+        ''' Redis '''
         self.r_server = None
 
         self.logger = logging.getLogger(__name__)
@@ -30,8 +29,10 @@ class PipelineConnectors():
     def clear_redislite_db(self):
         if os.path.exists(Config.REDISLITE_DB_PATH):
             os.remove(Config.REDISLITE_DB_PATH)
+        time.sleep(2)
 
     def init_services_connections(self, redispersist=False):
+        print "init_services_connections"
         '''init es client'''
         connection_attempt = 1
         hosts=[]
@@ -83,11 +84,10 @@ class PipelineConnectors():
             self.es=None
 
 
-        '''init sparql endpoint client'''
-        self.sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
-
-
         if not redispersist:
             self.clear_redislite_db()
-        self.r_server= Redis(Config.REDISLITE_DB_PATH, serverconfig={'save': [],
-                                                                     'maxclients': 10000})
+        self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH), serverconfig={ 'save': [], 'maxclients': 10000} )
+        '''
+        Check that the setup worked
+        '''
+        print "Redis server is %s"%(self.r_server.db)
