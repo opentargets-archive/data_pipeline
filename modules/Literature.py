@@ -28,7 +28,6 @@ MAX_PUBLICATION_CHUNKS =100
 
 class LiteratureActions(Actions):
     FETCH='fetch'
-    PROCESS= 'process'
     UPDATE = 'update'
 
 

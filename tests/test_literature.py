@@ -89,7 +89,7 @@ class LiteratureTestCase(unittest.TestCase):
                     dt = publication['pub_date']
                     self.assertEqual(str(dt), '2015-01-01')
                     self.assertEqual(publication['doi'],'10.1016/j.foodchem.2014.05.102')
-                    mesh_terms =  ['Antioxidants', 'Betacyanins', 'Cactaceae', 'Chromatography, High Pressure Liquid', 'Fruit', 'Nitric Oxide', 'Peroxides', 'Plant Extracts']
+                    mesh_terms =  [{'id': 'D000975', 'label': 'Antioxidants'}, {'id': 'D050859', 'label': 'Betacyanins'}, {'id': 'D029421', 'label': 'Cactaceae'}, {'id': 'D002851', 'label': 'Chromatography, High Pressure Liquid'}, {'id': 'D005638', 'label': 'Fruit'}, {'id': 'D009569', 'label': 'Nitric Oxide'}, {'id': 'D010545', 'label': 'Peroxides'}, {'id': 'D010936', 'label': 'Plant Extracts'}]
                     keywords = ['Antioxidant', 'Betacyanin', 'ESR', 'Hylocereus polyrhizus', 'Nitric oxide', 'Peroxyl radical']
                     journal = {'medlineAbbreviation': 'Food Chem', 'title': 'Food chemistry'}
                     chemicals = [{'registryNumber': '0', 'name': 'Antioxidants'}, {'registryNumber': '0', 'name': 'Betacyanins'}, {'registryNumber': '0', 'name': 'Peroxides'}, {'registryNumber': '0', 'name': 'Plant Extracts'}, {'registryNumber': '0', 'name': 'phyllocactin'}, {'registryNumber': '3170-83-0', 'name': 'perhydroxyl radical'}, {'registryNumber': '31C4KY9ESH', 'name': 'Nitric Oxide'}, {'registryNumber': '5YJC992ZP6', 'name': 'betanin'}]

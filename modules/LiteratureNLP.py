@@ -8,11 +8,10 @@ import time
 from collections import Counter
 
 from nltk.corpus import stopwords
-from sklearn.base import TransformerMixin
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 from spacy.en import English
 from tqdm import tqdm
-
+from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
@@ -45,6 +44,11 @@ LABELS = {
     u'CARDINAL': u'CARDINAL'
 }
 MAX_CHUNKS =100
+
+class LiteratureNLPActions(Actions):
+
+    PROCESS= 'process'
+
 
 class LiteratureNLPProcess(object):
 

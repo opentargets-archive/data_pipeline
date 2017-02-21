@@ -18,7 +18,7 @@ from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import  HPAActions, HPAProcess
 from modules.IntOGen import IntOGenActions, IntOGen
 from modules.Literature import LiteratureActions, MedlineRetriever
-from modules.LiteratureNLP import LiteratureNLPProcess
+from modules.LiteratureNLP import LiteratureNLPProcess,LiteratureNLPActions
 from modules.MouseModels import MouseModelsActions, Phenodigm
 from modules.Ontology import OntologyActions, PhenotypeSlim
 from modules.QC import QCActions, QCRunner
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     parser.add_argument("--lit-fetch", dest='lit', help="fetch literature data",
                         action="append_const", const=LiteratureActions.FETCH)
     parser.add_argument("--lit-process", dest='lit', help="process literature data",
-                        action="append_const", const=LiteratureActions.PROCESS)
+                        action="append_const", const=LiteratureNLPActions.PROCESS)
     parser.add_argument("--lit-update", dest='lit', help="update literature data",
                         action="append_const", const=LiteratureActions.UPDATE)
     parser.add_argument("--qc", dest='qc',
@@ -197,13 +197,12 @@ if __name__ == '__main__':
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
         if args.lit or run_full_pipeline:
-            do_all = (LiteratureActions.ALL in args.lit) or run_full_pipeline
-            if (LiteratureActions.FETCH in args.lit) or do_all:
+            if LiteratureActions.FETCH in args.lit :
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.local_file)
-            if (LiteratureActions.PROCESS in args.lit) or do_all:
-                LiteratureNLPProcess(connectors.es, loader, connectors.r_server).process()
             if LiteratureActions.UPDATE in args.lit:
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(update=True)
+            if LiteratureNLPActions.PROCESS in args.lit :
+                LiteratureNLPProcess(connectors.es, loader, connectors.r_server).process()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
