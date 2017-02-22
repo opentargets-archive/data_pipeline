@@ -79,11 +79,6 @@ class Config():
     DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
-    try:
-        SPARQL_ENDPOINT_URL = 'http://'+ iniparser.get(ENV, 'virtuoso_host') + ':' + iniparser.get(ENV, 'virtuoso_port') + '/sparql'
-    except ConfigParser.NoOptionError:
-        print 'no virtuoso instance'
-        SPARQL_ENDPOINT_URL = ''
 
     try:
         POSTGRES_DATABASE = {'drivername': 'postgres',
@@ -248,13 +243,14 @@ class Config():
     ENSEMBL_RELEASE_VERSION=86
     ENSEMBL_CHUNK_SIZE=100
 
-    REDISLITE_DB_PATH = '/tmp/cttv-redislite.rdb'
+    TEMP_DIR = os.path.join(os.path.sep, 'tmp')
+    REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 
 
     #dump file names
-    DUMP_FILE_FOLDER = os.environ.get('CTTV_DUMP_FOLDER') or '/tmp'
+    DUMP_FILE_FOLDER = os.environ.get('CTTV_DUMP_FOLDER') or TEMP_DIR
     DUMP_FILE_EVIDENCE=RELEASE_VERSION+'_evidence_data.json.gz'
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
     DUMP_PAGE_SIZE = 10000
@@ -264,9 +260,12 @@ class Config():
     DUMP_REMOTE_API_APPNAME = 'load-test'
 
     #Literature Pipeline -- Pubmed/Medline FTP server
+    PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
     PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
-    PUBMED_XML_LOCN = '/tmp/medline/baseline'
-    PUBMED_XML_UPDATE_LOCN = '/tmp/medline/update'
+
+    PUBMED_XML_LOCN = os.path.join(PUBMED_TEMP_DIR, 'baseline')
+    PUBMED_XML_UPDATE_LOCN = os.path.join(PUBMED_TEMP_DIR, 'update')
+
     PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
     BIOLEXICON_GENE_XML_LOCN = 'geneProt (1).xml'
     BIOLEXICON_DISEASE_XML_LOCN = 'umlsDisease.xml'

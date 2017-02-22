@@ -721,13 +721,13 @@ class GeneLookUpTable(object):
         else:
             data = self._es_query.get_all_targets()
             total = self._es_query.count_all_targets()
-        for target in tqdm(data,
-                           desc = 'loading genes',
-                           unit=' genes',
-                           unit_scale=True,
-                           total= total,
-                           leave=False,
-                           ):
+        for target in tqdm(
+                data,
+                desc = 'loading genes',
+                unit = ' gene',
+                unit_scale = True,
+                total = total,
+                leave=False):
             self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
             if target['uniprot_id']:
                 self.uniprot2ensembl[target['uniprot_id']] = target['id']
@@ -745,7 +745,7 @@ class GeneLookUpTable(object):
             total = self._es_query.count_all_targets()
         for target in tqdm(data,
                            desc='loading mappings from uniprot to ensembl',
-                           unit=' genes',
+                           unit=' gene mapping',
                            unit_scale=True,
                            total=total,
                            leave=False,
