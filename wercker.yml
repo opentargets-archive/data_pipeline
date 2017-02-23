@@ -67,7 +67,7 @@ build:
         username: _json_key
         password: $GCR_JSON_KEY_FILE
         working-dir: /usr/src/app
-        tag: $WERCKER_GIT_COMMIT
+        tag: $WERCKER_GIT_COMMIT, $WERCKER_GIT_BRANCH, $LATEST_FLAG
         repository: $GCR_REPO
         registry: $GCR_HOST
         cmd: python run.py
