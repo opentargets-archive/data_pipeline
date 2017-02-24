@@ -13,7 +13,7 @@ ujson==1.33
 urllib3==1.10.3
 iso8601>=0.1.11
 lxml>=3.4.4
--e git+https://github.com/CTTV/data_model.git#egg=data_model
+-e git+https://github.com/opentargets/data_model.git@591108d8ef05c04703b40f8be17a997209ee04fc#egg=data_model
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.0.12.tar.gz
 SPARQLWrapper>=1.7.6
 grequests
@@ -37,5 +37,3 @@ colorama
 coverage
 ftputil
 psutil
-requests_cache
-pytest

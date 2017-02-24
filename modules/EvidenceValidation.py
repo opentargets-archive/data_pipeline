@@ -23,6 +23,7 @@ import json
 from datetime import datetime, date
 from common import Actions
 from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from redislite.client import RedisLiteException
 from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueueWorkerThread
 import opentargets.model.core as opentargets
 from  common.EvidenceJsonUtils import DatatStructureFlattener
@@ -35,7 +36,6 @@ from elasticsearch import helpers
 # This bit is necessary for text mining data
 reload(sys)
 sys.setdefaultencoding("utf8")
-
 
 __author__ = 'gautierk'
 
@@ -206,7 +206,7 @@ class DirectoryCrawlerProcess():
                             EvidenceChunkElasticStorage.storage_delete(self.loader, datasource)
                             EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
                         try:
-                            logfile = os.path.join('/tmp', version_name + ".log")
+                            logfile = os.path.join(Config.TEMP_DIR, version_name + ".log")
                             self.check_file(url, version_name, user, datasource, None, logfile, FileTypes.HTTP)
                             self.logger.debug("%s %s DONE" % (self.__class__.__name__, version_name))
 
@@ -233,7 +233,7 @@ class DirectoryCrawlerProcess():
                             ''' get md5 '''
                             md5_hash = self.md5_hash_local_file(f)
                             self.logger.debug("%s %s %s" % (self.__class__.__name__, f, md5_hash))
-                            logfile = os.path.join('/tmp', version_name + ".log")
+                            logfile = os.path.join(Config.TEMP_DIR, version_name + ".log")
                             self.check_file(f, version_name, user, datasource, md5_hash, logfile, FileTypes.LOCAL)
                             self.logger.debug("%s %s DONE" % (self.__class__.__name__, version_name))
 
@@ -266,7 +266,7 @@ class DirectoryCrawlerProcess():
                             file_version = file_data['file_version']
                             self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
 
-                            logfile = os.path.join('/tmp', file_version+ ".log")
+                            logfile = os.path.join(Config.TEMP_DIR, file_version+ ".log")
                             self.logger.info("%s checking file: %s" % (self.__class__.__name__, file_version))
                             EvidenceChunkElasticStorage.storage_delete(self.loader, datasource,)
                             EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource,recreate=False)
@@ -747,181 +747,187 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
                         if obj is not None:
                             if obj.target.id:
-                                for tid in obj.target.id:
-                                    if tid in targets:
-                                        targets[tid] += 1
+                                target_id = obj.target.id
+                                if target_id in targets:
+                                    targets[target_id] += 1
+                                else:
+                                    targets[target_id] = 1
+                                if not target_id in top_targets:
+                                    if len(top_targets) < Config.EVIDENCEVALIDATION_NB_TOP_TARGETS:
+                                        top_targets.append(target_id)
                                     else:
-                                        targets[tid] = 1
-                                    if not tid in top_targets:
-                                        if len(top_targets) < Config.EVIDENCEVALIDATION_NB_TOP_TARGETS:
-                                            top_targets.append(tid)
-                                        else:
-                                            # map,reduce
-                                            for n in range(0, len(top_targets)):
-                                                if targets[top_targets[n]] < targets[tid]:
-                                                    top_targets[n] = tid;
-                                                    break;
+                                        # map,reduce
+                                        for n in range(0, len(top_targets)):
+                                            if targets[top_targets[n]] < targets[target_id]:
+                                                top_targets[n] = target_id;
+                                                break;
 
                             if obj.disease.id:
-                                for tid in obj.disease.id:
-                                    if tid in diseases:
-                                        diseases[tid] += 1
+                                efo_id = obj.disease.id
+                                if efo_id in diseases:
+                                    diseases[efo_id] += 1
+                                else:
+                                    diseases[efo_id] = 1
+                                if not efo_id in top_diseases:
+                                    if len(top_diseases) < Config.EVIDENCEVALIDATION_NB_TOP_DISEASES:
+                                        top_diseases.append(efo_id)
                                     else:
-                                        diseases[tid] = 1
-                                    if not tid in top_diseases:
-                                        if len(top_diseases) < Config.EVIDENCEVALIDATION_NB_TOP_DISEASES:
-                                            top_diseases.append(tid)
-                                        else:
-                                            # map,reduce
-                                            for n in range(0, len(top_diseases)):
-                                                if diseases[top_diseases[n]] < diseases[tid]:
-                                                    top_diseases[n] = tid;
-                                                    break;
+                                        # map,reduce
+                                        for n in range(0, len(top_diseases)):
+                                            if diseases[top_diseases[n]] < diseases[efo_id]:
+                                                top_diseases[n] = efo_id
+                                                break
 
                             # flatten
                             uniq_elements = obj.unique_association_fields
                             uniq_elements_flat = DatatStructureFlattener(uniq_elements)
                             uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
 
-                            'Validate evidence string'
+                            '''
+                            VALIDATE EVIDENCE STRING
+                            This will return errors and
+                            will log the errors in the chosen logger
+                            '''
                             validation_result = obj.validate(self.logger)
                             nb_errors += validation_result
 
-                            'Check EFO'
-                            disease_count = 0
-                            if obj.disease.id:
-                                index = 0
-                                for disease_id in obj.disease.id:
-                                    disease_count += 1
-                                    efo_id = disease_id
-                                    index += 1
-                                    short_disease_id = disease_id.split('/')[-1]
-                                    ' Check disease term or phenotype term '
-                                    #if (short_disease_id not in self.lookup_data.available_efos) and \
-                                    if (disease_id not in self.lookup_data.efo_ontology.current_classes) and \
-                                            (disease_id not in self.lookup_data.hpo_ontology.current_classes) and \
-                                            (disease_id not in self.lookup_data.mp_ontology.current_classes):# or \
-                                            # (disease_id in self.efo_uncat):
-                                        audit.append((lc, DISEASE_ID_INVALID, disease_id))
-                                        disease_failed = True
-                                        if disease_id not in invalid_diseases:
-                                            invalid_diseases[disease_id] = 1
-                                        else:
-                                            invalid_diseases[disease_id] += 1
-                                        nb_efo_invalid += 1
-                                    if disease_id in self.lookup_data.efo_ontology.obsolete_classes:
-                                         audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
-                                         # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
-                                         disease_failed = True
-                                         if disease_id not in obsolete_diseases:
-                                             obsolete_diseases[disease_id] = 1
-                                         else:
-                                             obsolete_diseases[disease_id] += 1
-                                         nb_efo_obsolete += 1
-                                    elif (disease_id in self.lookup_data.hpo_ontology.obsolete_classes) or \
-                                            (disease_id in self.lookup_data.mp_ontology.obsolete_classes):
-                                        audit.append((lc, DISEASE_ID_OBSOLETE, disease_id))
-                                        # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
-                                        disease_failed = True
-                                        if disease_id not in obsolete_diseases:
-                                            obsolete_diseases[disease_id] = 1
-                                        else:
-                                            obsolete_diseases[disease_id] += 1
-                                        nb_efo_obsolete += 1
+                            '''
+                            CHECK DISEASE IDENTIFIER
+                            Now check that the disease IRI is a valid disease term
+                            There is only one disease to look at
+                            '''
+                            if efo_id:
+                                short_disease_id = efo_id.split('/')[-1]
+                                ' Check disease term or phenotype term '
+                                #if (short_disease_id not in self.lookup_data.available_efos) and \
+                                if (efo_id not in self.lookup_data.efo_ontology.current_classes) and \
+                                        (efo_id not in self.lookup_data.hpo_ontology.current_classes) and \
+                                        (efo_id not in self.lookup_data.mp_ontology.current_classes):# or \
+                                        # (disease_id in self.efo_uncat):
+                                    audit.append((lc, DISEASE_ID_INVALID, efo_id))
+                                    disease_failed = True
+                                    if efo_id not in invalid_diseases:
+                                        invalid_diseases[efo_id] = 1
+                                    else:
+                                        invalid_diseases[efo_id] += 1
+                                    nb_efo_invalid += 1
+                                if efo_id in self.lookup_data.efo_ontology.obsolete_classes:
+                                     audit.append((lc, DISEASE_ID_OBSOLETE, efo_id))
+                                     # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                     disease_failed = True
+                                     if efo_id not in obsolete_diseases:
+                                         obsolete_diseases[efo_id] = 1
+                                     else:
+                                         obsolete_diseases[efo_id] += 1
+                                     nb_efo_obsolete += 1
+                                elif (efo_id in self.lookup_data.hpo_ontology.obsolete_classes) or \
+                                        (efo_id in self.lookup_data.mp_ontology.obsolete_classes):
+                                    audit.append((lc, DISEASE_ID_OBSOLETE, efo_id))
+                                    # self.logger.error("Line {0}: Obsolete disease term detected {1} ('{2}'): {3}".format(lc+1, disease_id, self.efo_current[disease_id], self.efo_obsolete[disease_id]))
+                                    disease_failed = True
+                                    if efo_id not in obsolete_diseases:
+                                        obsolete_diseases[efo_id] = 1
+                                    else:
+                                        obsolete_diseases[efo_id] += 1
+                                    nb_efo_obsolete += 1
 
-                            if obj.disease.id is None or disease_count == 0:
+                            else:
                                 ''' no disease id !!!! '''
                                 audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_DISEASE))
                                 disease_failed = True
 
-                            ' Check Ensembl ID, UniProt ID and UniProt ID mapping to a Gene ID'
-                            target_count = 0
-                            if obj.target.id:
-                                for tid in obj.target.id:
-                                    target_count += 1
-                                    # http://identifiers.org/ensembl/ENSG00000178573
-                                    ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', tid)
-                                    uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', tid)
-                                    if ensemblMatch:
-                                        # ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
-                                        ensembl_id = tid.split('/')[-1]
-                                        target_id = tid
-                                        if not ensembl_id in self.lookup_data.available_genes:
-                                            gene_failed = True
-                                            audit.append((lc, ENSEMBL_GENE_ID_UNKNOWN, ensembl_id))
-                                            # self.logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                                            if not ensembl_id in invalid_ensembl_ids:
-                                                invalid_ensembl_ids[ensembl_id] = 1
-                                            else:
-                                                invalid_ensembl_ids[ensembl_id] += 1
-                                            nb_ensembl_invalid += 1
-                                        elif ensembl_id in self.lookup_data.non_reference_genes:
-                                            gene_mapping_failed = True
-                                            audit.append((lc, ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE, ensembl_id))
-                                            # self.logger.warning("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                                            if not ensembl_id in invalid_ensembl_ids:
-                                                nonref_ensembl_ids[ensembl_id] = 1
-                                            else:
-                                                nonref_ensembl_ids[ensembl_id] += 1
-                                            nb_ensembl_nonref += 1
-
-                                    elif uniprotMatch:
-                                        # uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
-                                        uniprot_id =  tid.split('/')[-1]
-                                        if uniprot_id not in self.lookup_data.uni2ens:
-                                            gene_failed = True
-                                            audit.append((lc, UNIPROT_PROTEIN_ID_UNKNOWN, uniprot_id))
-                                            # self.logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier".format(lc+1, uniprot_id))
-                                            if uniprot_id not in invalid_uniprot_ids:
-                                                invalid_uniprot_ids[uniprot_id] = 1
-                                            else:
-                                                invalid_uniprot_ids[uniprot_id] += 1
-                                            nb_uniprot_invalid += 1
-                                        elif not self.lookup_data.uni2ens[uniprot_id]:#TODO:this will not happen wit the current gene processing pipeline
-                                            # check symbol mapping (get symbol first)
-                                            # gene_mapping_failed = True
-                                            gene_failed = True
-                                            audit.append((lc, UNIPROT_PROTEIN_ID_MISSING_ENSEMBL_XREF, uniprot_id))
-                                            # self.logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
-                                            if not uniprot_id in missing_uniprot_id_xrefs:
-                                                missing_uniprot_id_xrefs[uniprot_id] = 1
-                                            else:
-                                                missing_uniprot_id_xrefs[uniprot_id] += 1
-                                            nb_missing_uniprot_id_xrefs += 1
-                                            # This identifier is not in the current EnsEMBL database
-                                        elif (uniprot_id in self.lookup_data.uni2ens) and  \
-                                                        self.lookup_data.uni2ens[uniprot_id] in self.lookup_data.available_genes  and \
-                                                        'is_reference' in  self.lookup_data.available_genes[self.lookup_data.uni2ens[uniprot_id]]  and \
-                                                        (not self.lookup_data.available_genes[self.lookup_data.uni2ens[uniprot_id]]['is_reference'] is True) :
-                                            audit.append((lc, UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF, uniprot_id))
-                                            # self.logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
-                                            if not uniprot_id in invalid_uniprot_id_mappings:
-                                                invalid_uniprot_id_mappings[uniprot_id] = 1
-                                            else:
-                                                invalid_uniprot_id_mappings[uniprot_id] += 1
-                                            nb_uniprot_invalid_mapping += 1
+                            '''
+                            CHECK GENE/PROTEIN IDENTIFIER
+                            Check Ensembl ID, UniProt ID and UniProt ID mapping to a Gene ID
+                            http://identifiers.org/ensembl/ENSG00000178573
+                            '''
+                            if target_id:
+                                ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', target_id)
+                                uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', target_id)
+                                if ensemblMatch:
+                                    # ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
+                                    ensembl_id = target_id.split('/')[-1]
+                                    if not ensembl_id in self.lookup_data.available_genes:
+                                        gene_failed = True
+                                        audit.append((lc, ENSEMBL_GENE_ID_UNKNOWN, ensembl_id))
+                                        # self.logger.error("Line {0}: Unknown Ensembl gene detected {1}. Please provide a correct gene identifier on the reference genome assembly {2}".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                        if not ensembl_id in invalid_ensembl_ids:
+                                            invalid_ensembl_ids[ensembl_id] = 1
                                         else:
-                                            try:
-                                                reference_target_list =self.lookup_data.available_genes[self.lookup_data.uni2ens[uniprot_id]]['is_reference'] is True
-                                            except KeyError:
-                                                reference_target_list = []
-                                            if reference_target_list:
-                                                target_id = 'http://identifiers.org/ensembl/%s' % reference_target_list[
-                                                    0]
-                                            else:
-                                                # get the first one, needs a better way
-                                                target_id = self.lookup_data.uni2ens[uniprot_id]
-                                            # self.logger.info("Found target id being: %s for %s" %(target_id, uniprot_id))
-                                            if target_id is None:
-                                                self.logger.info("Found no target id for %s" % (uniprot_id))
+                                            invalid_ensembl_ids[ensembl_id] += 1
+                                        nb_ensembl_invalid += 1
+                                    elif ensembl_id in self.lookup_data.non_reference_genes:
+                                        gene_mapping_failed = True
+                                        audit.append((lc, ENSEMBL_GENE_ID_ALTERNATIVE_SEQUENCE, ensembl_id))
+                                        # self.logger.warning("Line {0}: Human Alternative sequence Ensembl Gene detected {1}. We will attempt to map it to a gene identifier on the reference genome assembly {2} or choose a Human Alternative sequence Ensembl Gene Id".format(lc+1, ensembl_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                        if not ensembl_id in invalid_ensembl_ids:
+                                            nonref_ensembl_ids[ensembl_id] = 1
+                                        else:
+                                            nonref_ensembl_ids[ensembl_id] += 1
+                                        nb_ensembl_nonref += 1
 
-                            if obj.target.id is None or target_count == 0 or target_id is None:
+                                elif uniprotMatch:
+                                    # uniprot_id = uniprotMatch.groups()[0].rstrip("\s")
+                                    uniprot_id =  target_id.split('/')[-1]
+                                    if uniprot_id not in self.lookup_data.uni2ens:
+                                        gene_failed = True
+                                        audit.append((lc, UNIPROT_PROTEIN_ID_UNKNOWN, uniprot_id))
+                                        # self.logger.error("Line {0}: Invalid UniProt entry detected {1}. Please provide a correct identifier".format(lc+1, uniprot_id))
+                                        if uniprot_id not in invalid_uniprot_ids:
+                                            invalid_uniprot_ids[uniprot_id] = 1
+                                        else:
+                                            invalid_uniprot_ids[uniprot_id] += 1
+                                        nb_uniprot_invalid += 1
+                                    elif not self.lookup_data.uni2ens[uniprot_id]:#TODO:this will not happen wit the current gene processing pipeline
+                                        # check symbol mapping (get symbol first)
+                                        # gene_mapping_failed = True
+                                        gene_failed = True
+                                        audit.append((lc, UNIPROT_PROTEIN_ID_MISSING_ENSEMBL_XREF, uniprot_id))
+                                        # self.logger.warning("Line {0}: UniProt entry {1} does not have any cross-reference to Ensembl.".format(lc+1, uniprot_id))
+                                        if not uniprot_id in missing_uniprot_id_xrefs:
+                                            missing_uniprot_id_xrefs[uniprot_id] = 1
+                                        else:
+                                            missing_uniprot_id_xrefs[uniprot_id] += 1
+                                        nb_missing_uniprot_id_xrefs += 1
+                                        # This identifier is not in the current EnsEMBL database
+                                    elif (uniprot_id in self.lookup_data.uni2ens) and  \
+                                                    self.lookup_data.uni2ens[uniprot_id] in self.lookup_data.available_genes  and \
+                                                    'is_reference' in  self.lookup_data.available_genes[self.lookup_data.uni2ens[uniprot_id]]  and \
+                                                    (not self.lookup_data.available_genes[self.lookup_data.uni2ens[uniprot_id]]['is_reference'] is True) :
+                                        audit.append((lc, UNIPROT_PROTEIN_ID_ALTERNATIVE_ENSEMBL_XREF, uniprot_id))
+                                        # self.logger.warning("Line {0}: The UniProt entry {1} does not have a cross-reference to an Ensembl Gene Id on the reference genome assembly {2}. It will be mapped to a Human Alternative sequence Ensembl Gene Id.".format(lc+1, uniprot_id, Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
+                                        if not uniprot_id in invalid_uniprot_id_mappings:
+                                            invalid_uniprot_id_mappings[uniprot_id] = 1
+                                        else:
+                                            invalid_uniprot_id_mappings[uniprot_id] += 1
+                                        nb_uniprot_invalid_mapping += 1
+                                    else:
+                                        try:
+                                            reference_target_list =self.lookup_data.available_genes[self.lookup_data.uni2ens[uniprot_id]]['is_reference'] is True
+                                        except KeyError:
+                                            reference_target_list = []
+                                        if reference_target_list:
+                                            target_id = 'http://identifiers.org/ensembl/%s' % reference_target_list[
+                                                0]
+                                        else:
+                                            # get the first one, needs a better way
+                                            target_id = self.lookup_data.uni2ens[uniprot_id]
+                                        # self.logger.info("Found target id being: %s for %s" %(target_id, uniprot_id))
+                                        if target_id is None:
+                                            self.logger.info("Found no target id for %s" % (uniprot_id))
+
+                            '''
+                            If there is no target id after the processing step
+                            '''
+                            if obj.target.id is None or target_id is None:
                                 ''' no target id !!!! '''
                                 audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_TARGET))
                                 gene_failed = True
                                 nb_errors += 1
 
-                            ''' store the evidence '''
+                            '''
+                            STORE THE EVIDENCE
+                            '''
                             if validation_result == 0 and not disease_failed and not gene_failed:
                                 nb_valid += 1
                                 # self.logger.info("Add evidence for %s %s " %(target_id, disease_id))
@@ -967,15 +973,14 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                            )
                       ):
                     audit.append((lc, EVIDENCE_STRING_INVALID_SCHEMA_VERSION))
-                    # self.logger.error("Line {0}: Not a valid 1.2.1 evidence string - please check the 'validated_against_schema_version' mandatory attribute".format(lc+1))
+                    self.logger.error("Line %i: Not a valid %s evidence string - please check the 'validated_against_schema_version' mandatory attribute"%(lc+1, Config.EVIDENCEVALIDATION_SCHEMA))
                     nb_errors += 1
                     validation_failed = True
                 else:
                     ''' type '''
                     audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_TYPE))
                     self.logger.error(
-                        "Line {0}: Not a valid 1.2.2 evidence string - please add the mandatory 'type' attribute".format(
-                            lc + 1))
+                        "Line %i: Not a valid %s evidence string - please add the mandatory 'type' attribute"%(lc+1, Config.EVIDENCEVALIDATION_SCHEMA))
                     nb_errors += 1
                     validation_failed = True
 
@@ -1017,7 +1022,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                    end_of_transmission)
 
     def close(self):
-        self.loader.close()
+        super(ValidatorProcess, self).close()
+        if hasattr(self, 'loader') and self.loader is not None:
+            self.loader.close()
 
 
 
@@ -1533,6 +1540,9 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
         return
 
 
+    def close(self):
+        super(AuditTrailProcess, self).close()
+
 class EvidenceChunkElasticStorage():
     def __init__(self, loader,):
         self.loader = loader
@@ -1748,7 +1758,6 @@ class EvidenceValidationFileChecker():
 
 
         workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-
 
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
