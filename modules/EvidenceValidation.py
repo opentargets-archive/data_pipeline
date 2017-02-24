@@ -129,9 +129,10 @@ class DirectoryCrawlerProcess():
                  output_q,
                  es,
                  r_server,
-                 local_files = [],
-                 remote_files = [],
-                 dry_run = False):
+                 local_files=[],
+                 remote_files=[],
+                 dry_run=False,
+                 increment=False):
         self.output_q = output_q
         self.es = es
         self.loader = Loader(self.es,  dry_run = dry_run)
