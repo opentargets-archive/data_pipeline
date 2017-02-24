@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='CTTV processing pipeline')
+    parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
                         action="append_const", const = Actions.ALL)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",
@@ -120,6 +120,9 @@ if __name__ == '__main__':
     parser.add_argument("--targets", dest='targets', help="just process data for this target. Does not work with all the steps!!",
                         action='append', default=[])
     parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
+                        action='store_true', default=False)
+    parser.add_argument("--increment", dest='increment',
+                        help="add new evidence from a data source but does not delete existing evidence. Works only for the validation step",
                         action='store_true', default=False)
     parser.add_argument("--local-file", dest='local_file',
                         help="pass the path to a local gzipped file to use as input for the data validation step",
@@ -217,13 +220,14 @@ if __name__ == '__main__':
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
                 PhenotypeSlim().create_phenotype_slim(args.local_file)
+
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.CHECKFILES in args.val) or do_all:
                 EvidenceValidationFileChecker(connectors.es, connectors.r_server, dry_run=args.dry_run).check_all(local_files=args.local_file,
-                                                                                                                  remote_files=args.remote_file)
+                                                                                                                  remote_files=args.remote_file, increment=args.increment)
         if args.valreset:
-            EvidenceValidationFileChecker( connectors.es, connectors.r_server).reset()
+            EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
