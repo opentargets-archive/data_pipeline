@@ -1,35 +1,30 @@
-
+import argparse
 import logging
-import os
 import sys
-import time
-from elasticsearch import Elasticsearch
-from SPARQLWrapper import SPARQLWrapper
+
 from common import Actions
 from common.ElasticsearchLoader import Loader
 from common.connection import PipelineConnectors
+from elasticsearch_config import ElasticSearchConfiguration
+from modules.Association import AssociationActions, ScoringProcess
 from modules.DataDrivenRelation import DataDrivenRelationActions, DataDrivenRelationProcess
 from modules.Dump import DumpActions, DumpGenerator
 from modules.ECO import EcoActions, EcoProcess
 from modules.EFO import EfoActions, EfoProcess
+from modules.Ensembl import  EnsemblActions, EnsemblProcess
 from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from modules.GeneData import GeneActions, GeneManager
 from modules.HPA import  HPAActions, HPAProcess
+from modules.IntOGen import IntOGenActions, IntOGen
 from modules.Literature import LiteratureActions, MedlineRetriever
+from modules.LiteratureNLP import LiteratureNLPProcess,LiteratureNLPActions
+from modules.MouseModels import MouseModelsActions, Phenodigm
+from modules.Ontology import OntologyActions, PhenotypeSlim
 from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions,  ReactomeProcess
-from modules.Association import AssociationActions, ScoringProcess
 from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from modules.Uniprot import UniProtActions,UniprotDownloader
-from modules.Ensembl import  EnsemblActions, EnsemblProcess
-from modules.MouseModels import MouseModelsActions, Phenodigm
-from modules.IntOGen import IntOGenActions, IntOGen
-from modules.Ontology import OntologyActions, PhenotypeSlim
-import argparse
-from settings import Config
-from elasticsearch_config import ElasticSearchConfiguration
-from redislite import Redis
 
 __author__ = 'andreap'
 
@@ -103,7 +98,7 @@ if __name__ == '__main__':
     parser.add_argument("--lit-fetch", dest='lit', help="fetch literature data",
                         action="append_const", const=LiteratureActions.FETCH)
     parser.add_argument("--lit-process", dest='lit', help="process literature data",
-                        action="append_const", const=LiteratureActions.PROCESS)
+                        action="append_const", const=LiteratureNLPActions.PROCESS)
     parser.add_argument("--lit-update", dest='lit', help="update literature data",
                         action="append_const", const=LiteratureActions.UPDATE)
     parser.add_argument("--qc", dest='qc',
@@ -205,13 +200,12 @@ if __name__ == '__main__':
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
         if args.lit or run_full_pipeline:
-            do_all = (LiteratureActions.ALL in args.lit) or run_full_pipeline
-            if (LiteratureActions.FETCH in args.lit) or do_all:
+            if LiteratureActions.FETCH in args.lit :
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.local_file)
-            if (LiteratureActions.PROCESS in args.lit) or do_all:
-                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).process()
-            if (LiteratureActions.UPDATE in args.lit):
+            if LiteratureActions.UPDATE in args.lit:
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(update=True)
+            if LiteratureNLPActions.PROCESS in args.lit :
+                LiteratureNLPProcess(connectors.es, loader, connectors.r_server).process()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
