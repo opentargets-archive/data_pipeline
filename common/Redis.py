@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import base64
-import json
+import ujson as json
+import jsonpickle
+jsonpickle.set_preferred_backend('ujson')
 import logging
 import uuid
 import datetime
@@ -24,6 +26,17 @@ from settings import Config
 from colorama import Fore, Back, Style
 
 logger = logging.getLogger(__name__)
+
+
+import signal
+
+class TimeoutException(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutException
+
+signal.signal(signal.SIGALRM, timeout_handler)
 
 def millify(n):
     try:
@@ -84,13 +97,16 @@ class RedisQueue(object):
                  job_timeout = 30,
                  ttl = 60*60*24+2,
                  total=None,
-                 batch_size=1):
+                 batch_size=1,
+                 serialiser = 'json'):
         '''
         :param queue_id: queue id to attach to preconfigured queues
         :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
                              will not be pickable
         :param max_size: maximum size of the queue. queue will block if full, and allow put only if smaller than the
                          maximum size.
+        :param serialiser: choose the serialiser backend: json (use ujson, default) jsonpickle (use ujson) else will
+                           use pickle
         :return:
         '''
         if not queue_id:
@@ -108,6 +124,7 @@ class RedisQueue(object):
         self.job_timeout = job_timeout#todo: store in redis
         self.max_queue_size = max_size#todo: store in redis
         self.default_ttl = ttl#todo: store in redis
+        self.serialiser = serialiser
         self.batch_size = batch_size  # todo: store in redis
         self.started = False
         self.start_time = time.time()
@@ -116,6 +133,21 @@ class RedisQueue(object):
             if r_server is not None:
                 self.set_total(total, r_server)
 
+    def dumps(self, element):
+        if self.serialiser == 'json':
+            return json.dumps(element)
+        elif  self.serialiser == 'jsonpickle':
+            return jsonpickle.dumps(element)
+        else:
+            return base64.encodestring(pickle.dumps(element, protocol=pickle.HIGHEST_PROTOCOL))
+
+    def loads(self, element):
+        if self.serialiser == 'json':
+            return json.loads(element)
+        elif  self.serialiser == 'jsonpickle':
+            return jsonpickle.loads(element)
+        else:
+            return base64.decodestring(pickle.loads(element))
 
     def put(self, element, r_server=None):
         if element is None:
@@ -134,14 +166,14 @@ class RedisQueue(object):
         pipe.lpush(self.main_queue, key)
         pipe.expire(self.main_queue, self.default_ttl)
         pipe.setex(self._get_value_key(key),
-                   base64.encodestring(pickle.dumps(element, pickle.HIGHEST_PROTOCOL)),
+                   self.dumps(element),
                    self.default_ttl)
         pipe.incr(self.submitted_counter)
         pipe.expire(self.submitted_counter, self.default_ttl)
         pipe.execute()
         return key
 
-    def get(self, r_server=None, wait_on_empty = 0, timeout = 0):
+    def get(self, r_server=None, timeout = 0):
         '''
 
         :param r_server:
@@ -157,9 +189,9 @@ class RedisQueue(object):
         pipe.zadd(self.processing_key, key, time.time())
         pipe.expire(self.processing_key, self.default_ttl)
         pipe.execute()
-        pickled = r_server.get(self._get_value_key(key))
-        if pickled is not None:
-            return key, pickle.loads(base64.decodestring(pickled))
+        serialised = r_server.get(self._get_value_key(key))
+        if serialised is not None:
+            return key, self.loads(serialised)
         return None
 
     def done(self,key, r_server=None, error = False):
@@ -243,9 +275,9 @@ class RedisQueue(object):
                     total=self.get_total(r_server),
                     client_data = r_server.info('clients'),
                     )
-
-        if data['timedout_jobs']:
-            self.put_back_timedout_jobs(r_server=r_server)
+        # todo: add proper support for timedout jobs, possibly kill them: http://stackoverflow.com/questions/25027122/break-the-function-after-certain-time
+        # if data['timedout_jobs']:
+        #     self.put_back_timedout_jobs(r_server=r_server)
         return data
 
     def close(self, r_server=None):
@@ -583,6 +615,7 @@ def get_redis_worker(base = Process):
                 if job is not None:
                     key, data = job
                     error = False
+                    signal.alarm(self.queue_in.job_timeout)
                     try:
                         if self.queue_in_as_batch:
                             job_results = [self.process(d) for d in data]
@@ -590,9 +623,14 @@ def get_redis_worker(base = Process):
                             job_results = self.process(data)
                         if self.queue_out is not None and job_results is not None:
                             self.put_into_queue_out(job_results, aggregated_input = self.queue_in_as_batch)
+                    except TimeoutException as e:
+                        error = True
+                        self.logger.exception('Timed out processing job %s: %s' % (key, e.message))
                     except Exception as e:
                         error = True
                         self.logger.exception('Error processing job %s: %s' % (key, e.message))
+                    else:
+                        signal.alarm(0)
 
                     self.queue_in.done(key, error=error, r_server=self.r_server)
                 else:
@@ -641,7 +679,6 @@ def get_redis_worker(base = Process):
             '''
             pass
 
-        #TODO: enforce timeout
         def process(self, data):
             raise NotImplementedError('please add an implementation to process the data')
 
