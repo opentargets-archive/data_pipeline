@@ -32,7 +32,6 @@ class PipelineConnectors():
         time.sleep(2)
 
     def init_services_connections(self, redispersist=False):
-        print "init_services_connections"
         '''init es client'''
         connection_attempt = 1
         hosts=[]
@@ -87,7 +86,4 @@ class PipelineConnectors():
         if not redispersist:
             self.clear_redislite_db()
         self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH), serverconfig={ 'save': [], 'maxclients': 10000} )
-        '''
-        Check that the setup worked
-        '''
-        print "Redis server is %s"%(self.r_server.db)
+
