@@ -113,7 +113,6 @@ VALIDATION FAILED
 
 class FileTypes():
     LOCAL='local'
-    SFTP='sftp'
     S3='s3'
     HTTP='http'
 
@@ -216,7 +215,7 @@ class DirectoryCrawlerProcess():
                             self.check_file(url, version_name, user, datasource, None, logfile, FileTypes.HTTP)
                             self.logger.debug("%s %s DONE" % (self.__class__.__name__, version_name))
 
-                        except AttributeError, e:
+                        except AttributeError as e:
                             self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, f, e))
                 else:
                     raise AttributeError(
@@ -233,8 +232,9 @@ class DirectoryCrawlerProcess():
                             user = user.split('_')[0]
                         else:
                             datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
-                        EvidenceChunkElasticStorage.storage_delete(self.loader, datasource )
-                        EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
+                        if not self.dry_run and not self.increment:
+                            EvidenceChunkElasticStorage.storage_delete(self.loader, datasource )
+                            EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
                         try:
                             ''' get md5 '''
                             md5_hash = self.md5_hash_local_file(f)
@@ -243,53 +243,12 @@ class DirectoryCrawlerProcess():
                             self.check_file(f, version_name, user, datasource, md5_hash, logfile, FileTypes.LOCAL)
                             self.logger.debug("%s %s DONE" % (self.__class__.__name__, version_name))
 
-                        except AttributeError, e:
+                        except AttributeError as e:
                             self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, f, e))
                 else:
                     raise AttributeError('invalid filename, should match regex: %s'%Config.EVIDENCEVALIDATION_FILENAME_REGEX)
 
 
-
-        if not self.local_files and not self.remote_files:
-
-            for u, p in tqdm(Config.EVIDENCEVALIDATION_FTP_ACCOUNTS.items(),
-                             desc='scanning ftp accounts',
-                             leave=False):
-                try:
-                    cnopts = pysftp.CnOpts()
-                    cnopts.hostkeys = None  # disable host key checking.
-                    with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
-                                           port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
-                                           username=u,
-                                           password=p,
-                                           cnopts = cnopts,
-                                           ) as srv:
-                        srv.walktree('/', fcallback=self._store_remote_filename, dcallback=self._callback_not_used, ucallback=self._callback_not_used)
-                        for datasource, file_data in tqdm(self._remote_filenames[u].items(),
-                                                          desc='scanning available datasource for account %s'%u,
-                                                          leave=False,):
-                            latest_file = file_data['file_path']
-                            file_version = file_data['file_version']
-                            self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
-
-                            logfile = os.path.join(Config.TEMP_DIR, file_version+ ".log")
-                            self.logger.info("%s checking file: %s" % (self.__class__.__name__, file_version))
-                            EvidenceChunkElasticStorage.storage_delete(self.loader, datasource,)
-                            EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource,recreate=False)
-
-
-                            try:
-                                ''' get md5 '''
-                                md5_hash = self.md5_hash_remote_file(latest_file, srv)
-                                self.logger.debug("%s %s %s" % (self.__class__.__name__, file_version, md5_hash))
-                                self.check_file(latest_file, file_version, u, datasource, md5_hash, logfile, FileTypes.SFTP)
-                                self.logger.debug("%s %s DONE" % (self.__class__.__name__, file_version))
-
-                            except AttributeError, e:
-                                self.logger.error("%s Error checking file %s: %s" % (self.__class__.__name__, latest_file, e))
-
-                except AuthenticationException:
-                    self.logger.error( 'cannot connect with credentials: user:%s password:%s' % (u, p))
 
         self.output_q.set_submission_finished(self.r_server)
 
@@ -314,7 +273,7 @@ class DirectoryCrawlerProcess():
                    data_source_name,
                    md5_hash = None,
                    logfile=None,
-                   file_type= FileTypes.SFTP,
+                   file_type= FileTypes.LOCAL,
                    validate=True,
 
                    ):
@@ -407,7 +366,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
 
 
-    def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None, file_type = FileTypes.SFTP):
+    def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None, file_type = FileTypes.LOCAL):
 
 
 
@@ -420,56 +379,11 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None  # disable host key checking.
-        if file_type == FileTypes.SFTP:
-            with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
-                                   port=Config.EVIDENCEVALIDATION_FTP_HOST['port'],
-                                   username=provider_id,
-                                   password=Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[provider_id],
-                                   cnopts=cnopts,
-                                   ) as srv:
-
-                file_stat = srv.stat(file_path)
+        if file_path.endswith('.gz'):
+            if file_type == FileTypes.LOCAL:
+                file_stat = os.stat(file_path)
                 file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
                 '''temprorary get lines total'''
-                lines = 0
-                with srv.open(file_path, mode='rb', bufsize=1) as f:
-                    with gzip.GzipFile(filename=file_path.split('/')[1],
-                                       mode='rb',
-                                       fileobj=f,
-                                       mtime=file_mod_time) as fh:
-                        # lines = self._count_file_lines(fh)
-                        gzip_compression_estimate = 10.5
-                        lines = self._estimate_file_lines(fh, file_size*gzip_compression_estimate)
-                total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
-                if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
-                    total_chunks +=1
-                self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
-
-                with srv.open(file_path, mode='rb', bufsize=1) as f:
-                    with gzip.GzipFile(filename = file_path.split('/')[1],
-                                       mode = 'rb',
-                                       fileobj = f,
-                                       mtime = file_mod_time) as fh:
-                        line = fh.readline()
-                        while line:
-                            line_buffer.append(line)
-                            line_number += 1
-                            if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
-                                self.put_into_queue_out(
-                                    (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
-                                     offset, list(line_buffer), False))
-                                offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
-                                chunk += 1
-                                line_buffer = []
-
-                            line = fh.readline()
-        elif file_type == FileTypes.LOCAL:
-
-
-            file_stat = os.stat(file_path)
-            file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
-            '''temprorary get lines total'''
-            if file_path.endswith('.gz'):
                 lines = 0
                 with open(file_path, mode='rb') as f:
                     with io.BufferedReader(gzip.GzipFile(filename=file_path.split('/')[1],
@@ -486,11 +400,54 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                                        mode = 'rb',
                                        fileobj = f,
                                        mtime = file_mod_time)) as fh:
-                        for line in fh.readlines():
+                        for i, line in enumerate(fh.readlines()):
                             self.put_into_queue_out(
-                                (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                                (file_path, file_version, provider_id, data_source_name, md5_hash, logfile,
+                                 i / EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
                                  offset, [line], False))
-            else:
+            elif file_type == FileTypes.HTTP:
+                '''temprorary get lines total'''
+                response = requests.get(file_path, stream=True)
+                response.raise_for_status()
+                file_size = int(response.headers['content-length'])
+                file_handler = StringIO()
+                t = tqdm(desc='downloading %s via HTTP' % file_version,
+                         total=file_size,
+                         unit='B',
+                         unit_scale=True)
+                for remote_file_chunk in response.iter_content(chunk_size=512):
+                    file_handler.write(remote_file_chunk)
+                    t.update(len(remote_file_chunk))
+                try:
+                    self.logger.debug('Downloaded file %s from HTTP at %.2fMB/s' % (
+                        file_version, (file_size / 1e6) / (t.last_print_t - t.start_t)))
+                except ZeroDivisionError:
+                    self.logger.debug('Downloaded file %s from HTTP' % file_path)
+                t.close()
+                response.close()
+                file_handler.seek(0)
+                with io.BufferedReader(gzip.GzipFile(filename=file_version.split('/')[-1],
+                                                     mode='rb',
+                                                     fileobj=file_handler,
+                                                     )) as fh:
+                    lines = self._count_file_lines(fh)
+                file_handler.seek(0)
+                total_chunks = lines / EVIDENCESTRING_VALIDATION_CHUNK_SIZE
+                if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
+                    total_chunks += 1
+                self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
+                with io.BufferedReader(gzip.GzipFile(filename=file_version.split('/')[-1],
+                                                     mode='rb',
+                                                     fileobj=file_handler,
+                                                     )) as fh:
+                    for i,line in enumerate(fh.readlines()):
+                        self.put_into_queue_out(
+                            (file_path, file_version, provider_id, data_source_name, md5_hash, logfile,
+                             i / EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
+                             offset, [line], False))
+
+        elif file_path.endswith('.json'):
+            if file_type == FileTypes.LOCAL:
                 with open(file_path) as fh:
                     lines = self._count_file_lines(fh)
                     total_chunks = lines / EVIDENCESTRING_VALIDATION_CHUNK_SIZE
@@ -498,76 +455,38 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                         total_chunks += 1
                     self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
                     fh.seek(0)
-                    for line in fh.readlines():
+                    for i,line in enumerate(fh.readlines()):
                         self.put_into_queue_out(
-                            (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                            (file_path, file_version, provider_id, data_source_name, md5_hash, logfile,
+                             i/EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
                              offset, [line], False))
-
-                    # line = fh.readline()
-                    # while line:
-                    #     line_buffer.append(line)
-                    #     line_number += 1
-                    #     if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
-                    #         self.put_into_queue_out(
-                    #             (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
-                    #              offset, list(line_buffer), False))
-                    #         offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
-                    #         chunk += 1
-                    #         line_buffer = []
-                    #
-                    #     line = fh.readline()
-
-        elif file_type == FileTypes.HTTP:
-            '''temprorary get lines total'''
-            response = requests.get(file_path, stream=True)
-            response.raise_for_status()
-            file_size = int(response.headers['content-length'])
-            file_handler = StringIO()
-            t = tqdm(desc='downloading %s via HTTP' % file_version,
-                     total=file_size,
-                     unit='B',
-                     unit_scale=True)
-            for remote_file_chunk in response.iter_content(chunk_size=128):
-                file_handler.write(remote_file_chunk)
-                t.update(len(remote_file_chunk))
-            try:
-                self.logger.debug('Downloaded file %s from HTTP at %.2fMB/s' % (
-                file_version, (file_size / 1e6) / (t.last_print_t - t.start_t)))
-            except ZeroDivisionError:
-                self.logger.debug('Downloaded file %s from HTTP'%file_path)
-            t.close()
-            response.close()
-            file_handler.seek(0)
-            with io.BufferedReader(gzip.GzipFile(filename=file_version.split('/')[-1],
-                                                 mode='rb',
-                                                 fileobj=file_handler,
-                                                 )) as fh:
-                    lines = self._count_file_lines(fh)
-            file_handler.seek(0)
-            total_chunks = lines/EVIDENCESTRING_VALIDATION_CHUNK_SIZE
-            if lines % EVIDENCESTRING_VALIDATION_CHUNK_SIZE:
-                total_chunks +=1
-            self.queue_out.incr_total(int(round(total_chunks)), self.r_server)
-            with io.BufferedReader(gzip.GzipFile(filename=file_version.split('/')[-1],
-                                                 mode='rb',
-                                                 fileobj=file_handler,
-                                                 )) as fh:
-                for line in fh.readlines():
+            if file_type == FileTypes.HTTP:
+                response = requests.get(file_path, stream=True)
+                response.raise_for_status()
+                file_size = int(response.headers['content-length'])
+                t = tqdm(desc='downloading %s via HTTP' % file_version,
+                         total=file_size,
+                         unit='B',
+                         unit_scale=True)
+                for i,line in enumerate(response.iter_lines()):
+                    t.update(len(line))
                     self.put_into_queue_out(
-                        (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
+                        (file_path, file_version, provider_id, data_source_name, md5_hash, logfile,
+                         i/EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
                          offset, [line], False))
-                # for line in fh.readlines():
-                #     line_buffer.append(line)
-                #     line_number += 1
-                #     if line_number % EVIDENCESTRING_VALIDATION_CHUNK_SIZE == 0:
-                #         self.put_into_queue_out(
-                #             (file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk,
-                #              offset, list(line_buffer), False))
-                #         offset += EVIDENCESTRING_VALIDATION_CHUNK_SIZE
-                #         chunk += 1
-                #         line_buffer = []
+                t.close()
+                response.close()
+                try:
+                    self.logger.debug('Downloaded file %s from HTTP at %.2fMB/s' % (
+                        file_version, (file_size / 1e6) / (t.last_print_t - t.start_t)))
+                except ZeroDivisionError:
+                    self.logger.debug('Downloaded file %s from HTTP' % file_path)
+
+
+
+
         else:
-            raise AttributeError('File type %s is not supported'%file_type)
+            raise AttributeError('File %s is not supported'%file_type)
         #
         # if line_buffer:
         #     self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,

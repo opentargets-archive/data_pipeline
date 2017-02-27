@@ -144,21 +144,8 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk', 'bpalka@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk', 'cyenyxe@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
-    # ftp user and passwords
-    EVIDENCEVALIDATION_FTP_HOST= dict( host = 'ftp.targetvalidation.org',
-                                       port = 22)
     EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
-    EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv010"] = 'c2a64557'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv011"] = 'bde373ca'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv012"] = '10441b6b'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv008"] = '409a0d21'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv007"] = 'a6052a3b'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv025"] = 'd2b315fa'
-    # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
+
 
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
