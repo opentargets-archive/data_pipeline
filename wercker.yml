@@ -13,7 +13,10 @@ build:
           export GITHUB_CONTEXT="continous-integration/container-build"
           export WERCKER_GITHUB_BUILD_NOTIFY_STATE="{\"state\":\"$WERCKER_PIPELINE_STATUS\",\"target_url\":\"$WERCKER_BUILD_URL\",\"context\":\"$GITHUB_CONTEXT\"}";
           curl -L -H "Authorization: token $GITHUB_TOKEN" -H "Content-type: application/json" -X POST -d $WERCKER_GITHUB_BUILD_NOTIFY_STATE https://api.github.com/repos/$WERCKER_GIT_OWNER/$WERCKER_GIT_REPOSITORY/statuses/$WERCKER_GIT_COMMIT
-
+    - script:
+        name: isntall double conversion dependency
+        code: |
+          apt-get update && apt-get install -y --no-install-recommends double-conversion && rm -rf /var/lib/apt/lists/*
     - pip-install
     - script:
         name: test empty run to catch import errors
