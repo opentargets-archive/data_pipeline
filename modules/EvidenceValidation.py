@@ -1661,16 +1661,15 @@ class EvidenceValidationFileChecker():
 
         workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         loaders_number = int(workers_number/3+1)
-
+        readers_number = min([3, len(local_files)+len(remote_files)])
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
                                      self.r_server.db,
                                      evidence_q,
                                      self.es,
                                      )
-                                     for i in range(3)
+                                     for i in range(readers_number)
                                      ]
-        # ) for i in range(2)]
         for w in readers:
             w.start()
 
