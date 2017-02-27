@@ -1,37 +1,34 @@
 from __future__ import division
 
-import io
-import os
-import sys
 import copy
+import gzip
+import hashlib
+import io
+import json
+import logging
+import multiprocessing
+import os
+import re
+import sys
+import time
+from cStringIO import StringIO
+from datetime import datetime, date
 
+import opentargets.model.core as opentargets
 import pysftp
 import requests
-from elasticsearch.exceptions import HTTP_EXCEPTIONS, NotFoundError
-from paramiko import AuthenticationException
+from elasticsearch import helpers
+from elasticsearch.exceptions import NotFoundError
 from requests.packages.urllib3.exceptions import HTTPError
 from tqdm import tqdm
 
-from common.ElasticsearchLoader import Loader
-from common.ElasticsearchQuery import ESQuery
-import re
-import gzip
-import time
-import logging
-from cStringIO import StringIO
-import json
-from datetime import datetime, date
 from common import Actions
-from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from redislite.client import RedisLiteException
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueueWorkerThread
-import opentargets.model.core as opentargets
+from common.ElasticsearchLoader import Loader, LoaderWorker
+from common.ElasticsearchQuery import ESQuery
 from  common.EvidenceJsonUtils import DatatStructureFlattener
-from modules.Ontology import OntologyClassReader
+from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from settings import Config
-import hashlib
-import multiprocessing
-from elasticsearch import helpers
 
 # This bit is necessary for text mining data
 reload(sys)
@@ -44,7 +41,7 @@ logging.getLogger("paramiko").setLevel(logging.WARNING)
 
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
-MAX_NB_EVIDENCE_CHUNKS = 1000
+MAX_NB_EVIDENCE_CHUNKS = 1000*multiprocessing.cpu_count()
 EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 1
 
 EVIDENCE_STRING_INVALID = 10
@@ -134,8 +131,7 @@ class DirectoryCrawlerProcess():
                  increment=False):
         self.output_q = output_q
         self.es = es
-        self.loader = Loader(self.es,  dry_run = dry_run)
-        self.submission_audit = SubmissionAuditElasticStorage(self.loader)
+        self.loader = Loader(dry_run = dry_run)
         self.start_time = time.time()
         self.r_server = r_server
         self._remote_filenames =dict()
@@ -171,7 +167,7 @@ class DirectoryCrawlerProcess():
                             self._remote_filenames[user][datasource] = dict(date=release_date,
                                                                 file_path=filename,
                                                                 file_version=version_name)
-            except Exception, e:
+            except Exception as e:
                 self.logger.error('error getting remote file %s: %s'%(filename, e))
 
     def _callback_not_used(self, path):
@@ -204,12 +200,10 @@ class DirectoryCrawlerProcess():
                             user = user.split('_')[0]
                         else:
                             datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
-                        '''
-                        Recreate the index if we are not in dry run mode and not in increment mode
-                        '''
-                        if not self.dry_run and not self.increment:
-                            EvidenceChunkElasticStorage.storage_delete(self.loader, datasource)
-                            EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
+                        'Recreate the index if we are not in dry run mode and not in increment mode'
+                        self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + datasource,
+                                                recreate= not self.increment)
+
                         try:
                             logfile = os.path.join(Config.TEMP_DIR, version_name + ".log")
                             self.check_file(url, version_name, user, datasource, None, logfile, FileTypes.HTTP)
@@ -232,9 +226,8 @@ class DirectoryCrawlerProcess():
                             user = user.split('_')[0]
                         else:
                             datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
-                        if not self.dry_run and not self.increment:
-                            EvidenceChunkElasticStorage.storage_delete(self.loader, datasource )
-                            EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
+                        self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + datasource,
+                                                recreate= not self.increment)
                         try:
                             ''' get md5 '''
                             md5_hash = self.md5_hash_local_file(f)
@@ -533,13 +526,15 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                  es=None,
                  lookup_data= None,
                  dry_run=False,
-                 increment=False
+                 increment=False,
+                 queue_storage = None,
                  ):
         super(ValidatorProcess, self).__init__(queue_in, redis_path, queue_out)
         self.queue_in = queue_in
         self.queue_out = queue_out
+        self.queue_storage = queue_storage
         self.es = es
-        self.loader= Loader(dry_run=dry_run)
+        self.loader= Loader(dry_run=dry_run, chunk_size=1000)
         self.lookup_data = lookup_data
         self.start_time = time.time()
         self.audit = list()
@@ -856,25 +851,22 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                             '''
                             if validation_result == 0 and not disease_failed and not gene_failed:
                                 nb_valid += 1
-                                # self.logger.info("Add evidence for %s %s " %(target_id, disease_id))
-                                # flatten data structure
-                                # self.logger.info('%s Adding to chunk %s %s'% (self.name, target_id, disease_id))
                                 json_doc_hashdig = DatatStructureFlattener(python_raw).get_hexdigest()
-                                self.loader.put(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + data_source_name,
-                                                data_source_name,
-                                                uniq_elements_flat_hexdig,
-                                                dict(
-                                                    uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
-                                                    json_doc_hashdig=json_doc_hashdig,
-                                                    evidence_string=line,
-                                                    # evidence_string=json.loads(obj.to_JSON(indent=None)),
-                                                    target_id=target_id,
-                                                    disease_id=efo_id,
-                                                    data_source_name=data_source_name,
-                                                    json_schema_version="1.2.3",
-                                                    json_doc_version=1,
-                                                    release_date=VALIDATION_DATE),
-                                                create_index=False)
+                                loader_args = (Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + data_source_name,
+                                               data_source_name,
+                                               uniq_elements_flat_hexdig,
+                                               dict(
+                                                   uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
+                                                   json_doc_hashdig=json_doc_hashdig,
+                                                   evidence_string=line,
+                                                   target_id=target_id,
+                                                   disease_id=efo_id,
+                                                   data_source_name=data_source_name,
+                                                   json_schema_version=Config.EVIDENCEVALIDATION_SCHEMA,
+                                                   json_doc_version=1,
+                                                   release_date=VALIDATION_DATE))
+                                loader_kwargs = dict(create_index=False)
+                                self.queue_storage.put((loader_args, loader_kwargs), r_server=self.r_server)
 
                             else:
                                 if disease_failed:
@@ -883,15 +875,11 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                     nb_errors += 1
                         else:
                             audit.append((lc, EVIDENCE_STRING_INVALID))
-                            # self.logger.error("Line {0}: Not a valid 1.2.2 evidence string - There was an error parsing the JSON document. The document may contain an invalid field".format(lc+1))
                             nb_errors += 1
-                            validation_failed = True
 
                     else:
                         audit.append((lc, EVIDENCE_STRING_INVALID_TYPE, data_type))
-                        # self.logger.error("Line {0}: '{1}' is not a valid 1.2.2 evidence string type".format(lc+1, data_type))
                         nb_errors += 1
-                        validation_failed = True
 
                 elif (not 'validated_against_schema_version' in python_raw or
                           ('validated_against_schema_version' in python_raw and
@@ -901,17 +889,14 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                     audit.append((lc, EVIDENCE_STRING_INVALID_SCHEMA_VERSION))
                     self.logger.error("Line %i: Not a valid %s evidence string - please check the 'validated_against_schema_version' mandatory attribute"%(lc+1, Config.EVIDENCEVALIDATION_SCHEMA))
                     nb_errors += 1
-                    validation_failed = True
                 else:
                     ''' type '''
                     audit.append((lc, EVIDENCE_STRING_INVALID_MISSING_TYPE))
                     self.logger.error(
                         "Line %i: Not a valid %s evidence string - please add the mandatory 'type' attribute"%(lc+1, Config.EVIDENCEVALIDATION_SCHEMA))
                     nb_errors += 1
-                    validation_failed = True
 
                 cc += len(line)
-                # for line :)
 
 
 
@@ -1141,7 +1126,7 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
             '''
              refresh the indice
             '''
-            self.es.indices.refresh(index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'))
+            self.es.indices.refresh(index=Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+ data_source_name))
 
             '''
             Sum up numbers across chunks (map reduce)
@@ -1469,21 +1454,6 @@ class AuditTrailProcess(RedisQueueWorkerProcess):
     def close(self):
         super(AuditTrailProcess, self).close()
 
-class EvidenceChunkElasticStorage():
-    def __init__(self, loader,):
-        self.loader = loader
-        self.logger = logging.getLogger(__name__)
-
-    @staticmethod
-    def storage_create_index(loader, data_source_name, recreate=False):
-        loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name, recreate = recreate)
-
-    @staticmethod
-    def storage_delete(loader, data_source_name):
-        #TODO: THIS STUFF SHOULD LOOK AT DRY RUN!!!
-        versioned_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+data_source_name)
-        if loader.es.indices.exists(versioned_name):
-            loader.es.indices.delete(versioned_name)
 
 
 class SubmissionAuditElasticStorage():
@@ -1582,6 +1552,7 @@ class EvidenceValidationFileChecker():
                  ):
         self.es = es
         self.esquery = ESQuery(self.es, dry_run = dry_run)
+        self.es_loader = Loader(self.es)
         self.dry_run = dry_run
         self.r_server = r_server
         self.chunk_size = chunk_size
@@ -1670,14 +1641,18 @@ class EvidenceValidationFileChecker():
                             max_size=NB_JSON_FILES,
                             job_timeout=86400)
         evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_evidence_q',
-                            max_size=MAX_NB_EVIDENCE_CHUNKS+1,
+                            max_size=MAX_NB_EVIDENCE_CHUNKS,
                             job_timeout=1200)
+        store_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_store_q',
+                             max_size=MAX_NB_EVIDENCE_CHUNKS,
+                             job_timeout=1200)
         audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
-                            max_size=MAX_NB_EVIDENCE_CHUNKS+1,
-                            job_timeout=1200)
+                             max_size=MAX_NB_EVIDENCE_CHUNKS,
+                             job_timeout=1200)
 
         q_reporter = RedisQueueStatusReporter([file_q,
                                                evidence_q,
+                                               store_q,
                                                audit_q
                                                ],
                                               interval=30)
@@ -1685,6 +1660,7 @@ class EvidenceValidationFileChecker():
 
 
         workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        loaders_number = int(workers_number/3+1)
 
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
@@ -1709,10 +1685,21 @@ class EvidenceValidationFileChecker():
                                        self.es,
                                        lookup_data = lookup_data,
                                        dry_run=dry_run,
-                                       increment = increment
+                                       increment = increment,
+                                       queue_storage = store_q,
                                        ) for i in range(workers_number)]
                                         # ) for i in range(1)]
         for w in validators:
+            w.start()
+
+        max_chunk_size = 500
+        if MAX_NB_EVIDENCE_CHUNKS/loaders_number <max_chunk_size:
+            max_chunk_size = MAX_NB_EVIDENCE_CHUNKS/loaders_number
+        loaders = [LoaderWorker(store_q,
+                                self.r_server.db,
+                                chunk_size=max_chunk_size
+                                ) for i in range(loaders_number)]
+        for w in loaders:
             w.start()
 
         'Audit the whole process and send e-mails'
@@ -1725,7 +1712,6 @@ class EvidenceValidationFileChecker():
             )
 
         auditor.start()
-
 
         'Start crawling the FTP directory'
         directory_crawler = DirectoryCrawlerProcess(
@@ -1743,6 +1729,9 @@ class EvidenceValidationFileChecker():
         '''wait for the validator workers to finish'''
 
         for w in validators:
+            w.join()
+
+        for w in loaders:
             w.join()
 
         # audit_q.set_submission_finished(self.r_server)

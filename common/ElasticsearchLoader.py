@@ -8,6 +8,7 @@ from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import parallel_bulk, bulk
 from common.DataStructure import JSONSerializable
 from common.EvidenceJsonUtils import assertJSONEqual
+from common.Redis import RedisQueueWorkerProcess
 from common.connection import PipelineConnectors
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
@@ -52,7 +53,16 @@ class Loader():
 
 
 
-    def put(self, index_name, doc_type, ID, body, create_index = True, operation= None,routing = None, parent = None, auto_optimise = False):
+    def put(self,
+            index_name,
+            doc_type,
+            ID,
+            body,
+            create_index = True,
+            operation= None,
+            routing = None,
+            parent = None,
+            auto_optimise = False):
 
         if index_name not in self.indexes_created:
             if create_index:
@@ -238,6 +248,7 @@ class Loader():
                     if not self._check_is_aknowledge(res):
                         raise ValueError(
                             'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
+                    time.sleep(0.5)#wait for the index to be deleted
                     try:
                         self.es.indices.flush(index_name,  wait_if_ongoing =True)
                     except NotFoundError:
@@ -287,3 +298,36 @@ class Loader():
 
     def _check_is_aknowledge(self, res):
         return (u'acknowledged' in res) and (res[u'acknowledged'] == True)
+
+
+
+class LoaderWorker(RedisQueueWorkerProcess):
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 chunk_size = 1000,
+                 dry_run = False
+                 ):
+        super(LoaderWorker, self).__init__(queue_in, redis_path)
+        self.chunk_size = chunk_size
+        self.loader = Loader(chunk_size=chunk_size,
+                             dry_run=dry_run)
+        self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
+
+
+    def process(self, data):
+        '''
+        expects an array of args and kwargs to pass to a loader.put method
+        :param data:
+        :return:
+        '''
+        if data:
+            args, kwargs = data
+            self.loader.put(*args,
+                            **kwargs
+                            )
+
+
+    def close(self):
+        self.loader.close()
