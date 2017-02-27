@@ -132,6 +132,7 @@ class DirectoryCrawlerProcess():
         self.output_q = output_q
         self.es = es
         self.loader = Loader(dry_run = dry_run)
+        self.submission_audit = SubmissionAuditElasticStorage(self.loader)
         self.start_time = time.time()
         self.r_server = r_server
         self._remote_filenames =dict()
