@@ -1668,7 +1668,7 @@ class EvidenceValidationFileChecker():
         'Create queues'
         file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
                             max_size=NB_JSON_FILES,
-                            job_timeout=12000)
+                            job_timeout=86400)
         evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_evidence_q',
                             max_size=MAX_NB_EVIDENCE_CHUNKS+1,
                             job_timeout=1200)
