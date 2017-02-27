@@ -1409,7 +1409,7 @@ class EvidenceValidationFileChecker():
 
 
         workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-        loaders_number = int(workers_number/3+1)
+        loaders_number = int(workers_number/2+1)
         readers_number = min([3, len(local_files)+len(remote_files)])
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
