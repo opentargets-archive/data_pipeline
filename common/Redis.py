@@ -135,7 +135,7 @@ class RedisQueue(object):
 
     def dumps(self, element):
         if self.serialiser == 'json':
-            return json.dumps(element)
+            return json.dumps(element, double_precision=32)
         elif  self.serialiser == 'jsonpickle':
             return jsonpickle.dumps(element)
         else:

@@ -9,8 +9,8 @@ python-dateutil==2.4.2
 pytz==2015.2
 requests==2.6.2
 six==1.9.0
-#ujson==1.36
--e git+https://github.com/esnme/ultrajson.git@eb7d894f225bb89d269188ba6ec559b914a71b8a#egg=ujson
+ujson==1.35
+#-e git+https://github.com/esnme/ultrajson.git@eb7d894f225bb89d269188ba6ec559b914a71b8a#egg=ujson
 urllib3==1.10.3
 iso8601>=0.1.11
 lxml>=3.4.4
