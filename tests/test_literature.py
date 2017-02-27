@@ -61,7 +61,8 @@ class LiteratureTestCase(unittest.TestCase):
         parser = PubmedXMLParserProcess(parser_q,None,None)
 
         file_path = 'resources/test-medlinexml/test_baseline.xml.gz'
-        file_handler = io.open(file_path, 'rb')
+        filedir = os.path.dirname(__file__)
+        file_handler = io.open(os.path.join(filedir,file_path), 'rb')
 
         with io.BufferedReader(gzip.GzipFile(filename=os.path.basename(file_path),
                                              mode='rb',
@@ -113,7 +114,8 @@ class LiteratureTestCase(unittest.TestCase):
         parser = PubmedXMLParserProcess(parser_q, None, None)
 
         file_path = 'resources/test-medlinexml/test_update.xml.gz'
-        file_handler = io.open(file_path, 'rb')
+        filedir = os.path.dirname(__file__)
+        file_handler = io.open(os.path.join(filedir,file_path), 'rb')
         parsed_publications = []
 
         with io.BufferedReader(gzip.GzipFile(filename=os.path.basename(file_path),
