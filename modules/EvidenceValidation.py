@@ -107,7 +107,7 @@ class ValidationActions(Actions):
     RESET = 'reset'
 
 
-class DirectoryCrawlerProcess():
+class FileProcesser():
     def __init__(self,
                  output_q,
                  es,
@@ -143,10 +143,10 @@ class DirectoryCrawlerProcess():
         self.logger.info("%s started" % self.__class__.__name__)
 
 
-        # SubmissionAuditElasticStorage.storage_create_index(self.loader,recreate=False)
 
         '''scroll through remote  user directories and find the latest files'''
 
+        processed_datasources = []
         if self.remote_files:
             for url in self.remote_files:
                 f = url.split('/')[-1]
@@ -162,6 +162,10 @@ class DirectoryCrawlerProcess():
                         'Recreate the index if we are not in dry run mode and not in increment mode'
                         self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + datasource,
                                                 recreate= not self.increment)
+                        self.loader.prepare_for_bulk_indexing(self.loader.get_versioned_index(
+                            Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + datasource))
+                        processed_datasources.append(datasource)
+
 
                         try:
                             logfile = os.path.join(Config.TEMP_DIR, version_name + ".log")
@@ -187,6 +191,10 @@ class DirectoryCrawlerProcess():
                             datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
                         self.loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + datasource,
                                                 recreate= not self.increment)
+                        self.loader.prepare_for_bulk_indexing(self.loader.get_versioned_index(
+                            Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + datasource))
+                        processed_datasources.append(datasource)
+
                         try:
                             ''' get md5 '''
                             md5_hash = self.md5_hash_local_file(f)
@@ -203,6 +211,7 @@ class DirectoryCrawlerProcess():
         self.output_q.set_submission_finished(self.r_server)
 
         self.logger.info("%s finished" % self.__class__.__name__)
+        return processed_datasources
 
     def md5_hash_local_file(self, filename):
         return self.md5_hash_from_file_stat(os.stat(filename))
@@ -245,6 +254,9 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
     def process(self, data):
         file_path, file_version, provider_id, data_source_name, md5_hash, logfile, file_type = data
+
+
+
         self.logger.info('Starting to parse  file %s' % file_path)
         ''' parse the file and put evidence in the queue '''
         self.parse_file(file_path, file_version, provider_id, data_source_name, md5_hash,
@@ -262,7 +274,6 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         line_buffer = []
         offset = 0
         chunk = 1
-        line_number = 0
 
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None  # disable host key checking.
@@ -373,23 +384,8 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
         else:
             raise AttributeError('File %s is not supported'%file_type)
-        #
-        # if line_buffer:
-        #     self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
-        #                        list(line_buffer), False),
-        #                        self.r_server)
-        #     offset += len(line_buffer)
-        #     chunk += 1
-        #     line_buffer = []
 
-
-        '''
-        finally send a signal to inform that parsing is completed for this file and no other line are to be expected
-        '''
-        self.logger.info('%s %s %i %i' % (self.name, md5_hash, offset, len(line_buffer)))
-        self.queue_out.put((file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset,
-                           [], True),
-                           self.r_server)
+        self.queue_out.set_submission_finished(self.r_server)
 
         return
 
@@ -419,13 +415,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                  es=None,
                  lookup_data= None,
                  dry_run=False,
-                 increment=False,
-                 # queue_storage = None,
                  ):
         super(ValidatorProcess, self).__init__(queue_in, redis_path, queue_out)
-        self.queue_in = queue_in
-        self.queue_out = queue_out
-        # self.queue_storage = queue_storage
         self.es = es
         self.loader= Loader(dry_run=dry_run, chunk_size=1000)
         self.lookup_data = lookup_data
@@ -434,13 +425,21 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.logger = logging.getLogger(__name__)
 
     def process(self, data):
+        #TODO: remove =unused params from  endpoint feeding this queue
         file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
-        return self.validate_evidence(file_path, file_version, provider_id, data_source_name, md5_hash, chunk,
-                                   offset, line_buffer, end_of_transmission, logfile=logfile)
+        return self.validate_evidence(file_path,
+                                      data_source_name,
+                                      offset,
+                                      line_buffer,
+                                      logfile=logfile)
 
     # @profile
-    def validate_evidence(self, file_path, file_version, provider_id, data_source_name, md5_hash, chunk, offset,
-                          line_buffer, end_of_transmission, logfile=None):
+    def validate_evidence(self,
+                          file_path,
+                          data_source_name,
+                          offset,
+                          line_buffer,
+                          logfile=None):
         '''
         validate evidence strings from a chunk
         cumulate the logs, acquire a lock,
@@ -634,7 +633,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
             loader_args = (Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + data_source_name,
                            data_source_name,
-                           uniq_elements_flat_hexdig,
+                           json_doc_hashdig,
                            dict(
                                uniq_assoc_fields_hashdig=uniq_elements_flat_hexdig,
                                json_doc_hashdig=json_doc_hashdig,
@@ -1357,9 +1356,9 @@ class EvidenceValidationFileChecker():
         workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         loaders_number = int(workers_number/2+1)
         readers_number = min([3, len(local_files)+len(remote_files)])
-        max_loader_chunk_size = 500
-        if MAX_NB_EVIDENCE_CHUNKS / loaders_number < max_loader_chunk_size:
-            max_loader_chunk_size = MAX_NB_EVIDENCE_CHUNKS / loaders_number
+        max_loader_chunk_size = 100
+        if (MAX_NB_EVIDENCE_CHUNKS / loaders_number) < max_loader_chunk_size:
+            max_loader_chunk_size = int(MAX_NB_EVIDENCE_CHUNKS / loaders_number)
 
         'Create queues'
         file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
@@ -1406,7 +1405,6 @@ class EvidenceValidationFileChecker():
                                        self.es,
                                        lookup_data = lookup_data,
                                        dry_run=dry_run,
-                                       increment = increment,
                                        ) for i in range(workers_number)]
                                         # ) for i in range(1)]
         for w in validators:
@@ -1432,7 +1430,7 @@ class EvidenceValidationFileChecker():
         # auditor.start()
 
         'Start crawling the files'
-        directory_crawler = DirectoryCrawlerProcess(
+        file_processer = FileProcesser(
                 file_q,
                 self.es,
                 self.r_server,
@@ -1442,7 +1440,7 @@ class EvidenceValidationFileChecker():
                 increment = increment
         )
 
-        directory_crawler.run()
+        processed_datasources = file_processer.run()
 
         '''wait for the validator workers to finish'''
 
@@ -1457,11 +1455,7 @@ class EvidenceValidationFileChecker():
         # auditor.join()
 
         if not dry_run:
-
-            self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME),
-                                  wait_if_ongoing=True)
-            self.es.indices.flush(Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*'),
-                                  wait_if_ongoing=True)
+            self.es_loader.restore_after_bulk_indexing()
         return
 
     def reset(self):

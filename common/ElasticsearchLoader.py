@@ -198,6 +198,8 @@ class Loader():
             for index_name in self.indexes_optimised:
                 self.es.indices.put_settings(index=index_name,
                                              body=self.indexes_optimised[index_name]['settings_to_restore'])
+                self.es.indices.flush(index_name,
+                                      wait_if_ongoing=True)
                 self.optimize_index(index_name)
 
 
