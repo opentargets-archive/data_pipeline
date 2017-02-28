@@ -406,6 +406,9 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                 return int(round(file_size/(float(size)/max_lines)))
         return lines
 
+    def close(self):
+        self.loader.close()
+
 
 class ValidatorProcess(RedisQueueWorkerProcess):
     def __init__(self,
@@ -1356,7 +1359,7 @@ class EvidenceValidationFileChecker():
         workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         loaders_number = int(workers_number/2+1)
         readers_number = min([3, len(local_files)+len(remote_files)])
-        max_loader_chunk_size = 100
+        max_loader_chunk_size = 1000
         if (MAX_NB_EVIDENCE_CHUNKS / loaders_number) < max_loader_chunk_size:
             max_loader_chunk_size = int(MAX_NB_EVIDENCE_CHUNKS / loaders_number)
 
@@ -1368,7 +1371,7 @@ class EvidenceValidationFileChecker():
                             max_size=MAX_NB_EVIDENCE_CHUNKS*workers_number,
                             job_timeout=1200)
         store_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_store_q',
-                             max_size=MAX_NB_EVIDENCE_CHUNKS*max_loader_chunk_size*10,
+                             max_size=MAX_NB_EVIDENCE_CHUNKS*loaders_number*5,
                              job_timeout=1200)
         # audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
         #                      max_size=MAX_NB_EVIDENCE_CHUNKS,
@@ -1455,7 +1458,11 @@ class EvidenceValidationFileChecker():
         # auditor.join()
 
         if not dry_run:
-            self.es_loader.restore_after_bulk_indexing()
+            file_processer.loader.restore_after_bulk_indexing()
+            # for datasource in processed_datasources:
+            #     self.logger.debug('flushing index for dataource %s'%datasource)
+            #     self.es.indices.flush(self.es_loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+datasource),
+            #                           wait_if_ongoing=True)
         return
 
     def reset(self):

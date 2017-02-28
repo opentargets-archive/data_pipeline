@@ -119,33 +119,6 @@ class Loader():
             bulk(self.es,
                 self.cache,
                  stats_only=True)
-            # thread_count = 10
-            # chunk_size = int(self.chunk_size/thread_count)
-            # parallel_bulk(
-            #     self.es,
-            #     self.cache,
-            #     thread_count=thread_count,
-            #     chunk_size=chunk_size,)
-            # for ok, results in parallel_bulk(
-            #         self.es,
-            #         self.cache,
-            #         thread_count=thread_count,
-            #         chunk_size=chunk_size,
-            #         request_timeout=60000,
-                # ):
-
-                # action, result = results.popitem()
-                # self.results[result['_index']].append(result['_id'])
-                # doc_id = '/%s/%s' % (result['_index'], result['_id'])
-                # try:
-                #     if (len(self.results[result['_index']]) % self.chunk_size) == 0:
-                #         self.logger.debug(
-                #             "%i entries uploaded in elasticsearch for index %s" % (
-                #             len(self.results[result['_index']]), result['_index']))
-                #     if not ok:
-                #         self.logger.error('Failed to %s document %s: %r' % (action, doc_id, result))
-                # except ZeroDivisionError:
-                #     pass
 
 
     def close(self):
@@ -193,13 +166,15 @@ class Loader():
                             "translog.durability": 'request',
                         }
                 })
+
     def restore_after_bulk_indexing(self):
         if not self.dry_run:
             for index_name in self.indexes_optimised:
-                self.es.indices.put_settings(index=index_name,
-                                             body=self.indexes_optimised[index_name]['settings_to_restore'])
+                self.logger.debug('restoring to normal and flushing index: %s'%index_name)
                 self.es.indices.flush(index_name,
                                       wait_if_ongoing=True)
+                self.es.indices.put_settings(index=index_name,
+                                             body=self.indexes_optimised[index_name]['settings_to_restore'])
                 self.optimize_index(index_name)
 
 
@@ -216,7 +191,6 @@ class Loader():
                 else:
                     raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
             if self._enforce_mapping(index_name):
-
                 mappings = self.es.indices.get_mapping(index=index_name)
                 settings = self.es.indices.get_settings(index=index_name)
 
