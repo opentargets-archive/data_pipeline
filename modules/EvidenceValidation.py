@@ -42,7 +42,7 @@ logging.getLogger("paramiko").setLevel(logging.WARNING)
 
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
-MAX_NB_EVIDENCE_CHUNKS = 1000*multiprocessing.cpu_count()
+MAX_NB_EVIDENCE_CHUNKS = 1000
 EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 1
 
 
@@ -1354,15 +1354,22 @@ class EvidenceValidationFileChecker():
 
         # lookup_data.available_genes.load_uniprot2ensembl()
 
+        workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        loaders_number = int(workers_number/2+1)
+        readers_number = min([3, len(local_files)+len(remote_files)])
+        max_loader_chunk_size = 500
+        if MAX_NB_EVIDENCE_CHUNKS / loaders_number < max_loader_chunk_size:
+            max_loader_chunk_size = MAX_NB_EVIDENCE_CHUNKS / loaders_number
+
         'Create queues'
         file_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_file_q',
                             max_size=NB_JSON_FILES,
                             job_timeout=86400)
         evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_evidence_q',
-                            max_size=MAX_NB_EVIDENCE_CHUNKS,
+                            max_size=MAX_NB_EVIDENCE_CHUNKS*workers_number,
                             job_timeout=1200)
         store_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_store_q',
-                             max_size=MAX_NB_EVIDENCE_CHUNKS,
+                             max_size=MAX_NB_EVIDENCE_CHUNKS*max_loader_chunk_size*10,
                              job_timeout=1200)
         # audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
         #                      max_size=MAX_NB_EVIDENCE_CHUNKS,
@@ -1377,9 +1384,6 @@ class EvidenceValidationFileChecker():
         q_reporter.start()
 
 
-        workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
-        loaders_number = int(workers_number/2+1)
-        readers_number = min([3, len(local_files)+len(remote_files)])
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
                                      self.r_server.db,
@@ -1408,12 +1412,9 @@ class EvidenceValidationFileChecker():
         for w in validators:
             w.start()
 
-        max_chunk_size = 500
-        if MAX_NB_EVIDENCE_CHUNKS/loaders_number <max_chunk_size:
-            max_chunk_size = MAX_NB_EVIDENCE_CHUNKS/loaders_number
         loaders = [LoaderWorker(store_q,
                                 self.r_server.db,
-                                chunk_size=max_chunk_size,
+                                chunk_size=max_loader_chunk_size,
                                 dry_run=dry_run
                                 ) for i in range(loaders_number)]
         for w in loaders:
