@@ -128,34 +128,6 @@ class DirectoryCrawlerProcess():
         self.dry_run = dry_run,
         self.increment = increment
 
-    def _store_remote_filename(self, filename):
-        if re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename):
-            try:
-                version_name = filename.split('/')[3].split('.')[0]
-                if '-' in version_name:
-                    user, day, month, year = version_name.split('-')
-                    if '_' in user:
-                        datasource = ''.join(user.split('_')[1:])
-                        user = user.split('_')[0]
-                    else:
-                        datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
-                    release_date = date(int(year),int(month), int(day))
-                    if user not in self._remote_filenames:
-                        self._remote_filenames[user]={datasource : dict(date = release_date,
-                                                                          file_path = filename,
-                                                                          file_version = version_name)
-                                                      }
-                    elif datasource not in self._remote_filenames[user]:
-                        self._remote_filenames[user][datasource] = dict(date=release_date,
-                                                                        file_path=filename,
-                                                                        file_version=version_name)
-                    else:
-                        if release_date > self._remote_filenames[user][datasource]['date']:
-                            self._remote_filenames[user][datasource] = dict(date=release_date,
-                                                                file_path=filename,
-                                                                file_version=version_name)
-            except Exception as e:
-                self.logger.error('error getting remote file %s: %s'%(filename, e))
 
     def _callback_not_used(self, path):
         self.logger.debug("skipped "+path)
@@ -1460,7 +1432,7 @@ class EvidenceValidationFileChecker():
         #
         # auditor.start()
 
-        'Start crawling the FTP directory'
+        'Start crawling the files'
         directory_crawler = DirectoryCrawlerProcess(
                 file_q,
                 self.es,
