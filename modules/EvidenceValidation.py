@@ -1413,7 +1413,8 @@ class EvidenceValidationFileChecker():
             max_chunk_size = MAX_NB_EVIDENCE_CHUNKS/loaders_number
         loaders = [LoaderWorker(store_q,
                                 self.r_server.db,
-                                chunk_size=max_chunk_size
+                                chunk_size=max_chunk_size,
+                                dry_run=dry_run
                                 ) for i in range(loaders_number)]
         for w in loaders:
             w.start()
