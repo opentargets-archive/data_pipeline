@@ -159,7 +159,7 @@ class RedisQueue(object):
         queue_size = r_server.llen(self.main_queue)
         if queue_size:
             while queue_size >= self.max_queue_size:
-                time.sleep(0.1)
+                time.sleep(0.01)
                 queue_size = r_server.llen(self.main_queue)
         key = uuid.uuid4().hex
         pipe = r_server.pipeline()

@@ -200,8 +200,6 @@ class DirectoryCrawlerProcess():
                 else:
                     raise AttributeError('invalid filename, should match regex: %s'%Config.EVIDENCEVALIDATION_FILENAME_REGEX)
 
-
-
         self.output_q.set_submission_finished(self.r_server)
 
         self.logger.info("%s finished" % self.__class__.__name__)
@@ -249,13 +247,13 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         file_path, file_version, provider_id, data_source_name, md5_hash, logfile, file_type = data
         self.logger.info('Starting to parse  file %s' % file_path)
         ''' parse the file and put evidence in the queue '''
-        self.parse_gzipfile(file_path, file_version, provider_id, data_source_name, md5_hash,
-                            logfile=logfile, file_type= file_type)
+        self.parse_file(file_path, file_version, provider_id, data_source_name, md5_hash,
+                        logfile=logfile, file_type= file_type)
         self.logger.info("%s finished" % self.name)
 
 
 
-    def parse_gzipfile(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None, file_type = FileTypes.LOCAL):
+    def parse_file(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None, file_type = FileTypes.LOCAL):
 
 
 
@@ -295,7 +293,6 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                                  i / EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
                                  offset, [line], False))
             elif file_type == FileTypes.HTTP:
-                '''temprorary get lines total'''
                 response = requests.get(file_path, stream=True)
                 response.raise_for_status()
                 file_size = int(response.headers['content-length'])
@@ -475,7 +472,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             efo_id = None
             data_type = None
             evidence_obj_validation_error_count = 1
-            uniq_elements_flat_hexdig = None #uuid.uuid4()
+            uniq_elements_flat_hexdig = None #uuid.uuid4().hex
 
             if parsed_line is not None:
                 if (('label' in parsed_line or
