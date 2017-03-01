@@ -25,12 +25,18 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'17.02'
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or '17.02'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
-    try:
-        ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
-        ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
-
+    ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
+    ELASTICSEARCH_HOST = os.environ.get('ELASTICSEARCH_HOST')
+    ELASTICSEARCH_PORT = os.environ.get('ELASTICSEARCH_PORT')
+    if ELASTICSEARCH_HOST is None:
+        try:
+            ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
+            ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+        except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
+            pass
+    if ELASTICSEARCH_HOST is not None and ELASTICSEARCH_PORT is not None:
         if ',' in ELASTICSEARCH_HOST:
             ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
             ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
@@ -38,13 +44,8 @@ class Config():
             ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
         ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
         if ELASTICSEARCH_PORT:
-            ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
-    except ConfigParser.NoOptionError:
-        ELASTICSEARCH_HOST = None
-        ELASTICSEARCH_PORT = None
-        ELASTICSEARCH_URL = None
+            ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
-    # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
@@ -74,22 +75,10 @@ class Config():
     ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
     ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
     ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
-    DEBUG = ENV == 'dev'
+    DEBUG = True
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
 
-    try:
-        POSTGRES_DATABASE = {'drivername': 'postgres',
-            'host': iniparser.get(ENV, 'host'),
-            'port': iniparser.get(ENV, 'port'),
-            'username': iniparser.get(ENV, 'username'),
-            'password': iniparser.get(ENV, 'password'),
-            'database': iniparser.get(ENV, 'database')}
-    except ConfigParser.NoOptionError:
-        # the official logger is not loaded yet. not moving things around as we
-        # will likely put all of this in a config file.
-        print 'no postgres instance'
-        POSTGRES_DATABASE = {}
 
     HGNC_COMPLETE_SET = 'http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
