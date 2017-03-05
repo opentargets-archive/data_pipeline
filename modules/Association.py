@@ -558,12 +558,14 @@ class ScoringProcess():
                                            max_size=queue_per_worker * number_of_workers,
                                            job_timeout=1200,
                                            batch_size=10,
-                                           r_server=self.r_server)
+                                           r_server=self.r_server,
+                                           serialiser='jsonpickle')
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
                                   max_size=queue_per_worker * number_of_storers,
                                   job_timeout=1200,
                                   batch_size=10,
-                                  r_server=self.r_server)
+                                  r_server=self.r_server,
+                                  serialiser='jsonpickle')
 
         q_reporter = RedisQueueStatusReporter([target_q,
                                                target_disease_pair_q,
