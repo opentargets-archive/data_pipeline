@@ -142,7 +142,8 @@ class DirectoryCrawlerProcess():
         self.local_files = local_files
         self.remote_files = remote_files
         self.logger = logging.getLogger(__name__)
-        self.dry_run = dry_run
+        self.dry_run = dry_run,
+        self.increment = increment
 
     def _store_remote_filename(self, filename):
         if re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename):
@@ -180,6 +181,7 @@ class DirectoryCrawlerProcess():
         '''
         create index for"
          the evidence if it does not exists
+         if the evidence index exists, the index
          the submitted files if it does not exists
         '''
 
@@ -202,7 +204,10 @@ class DirectoryCrawlerProcess():
                             user = user.split('_')[0]
                         else:
                             datasource = Config.DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[user]
-                        if not self.dry_run:
+                        '''
+                        Recreate the index if we are not in dry run mode and not in increment mode
+                        '''
+                        if not self.dry_run and not self.increment:
                             EvidenceChunkElasticStorage.storage_delete(self.loader, datasource)
                             EvidenceChunkElasticStorage.storage_create_index(self.loader, datasource, recreate=False)
                         try:
@@ -608,6 +613,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                  es=None,
                  lookup_data= None,
                  dry_run=False,
+                 increment=False
                  ):
         super(ValidatorProcess, self).__init__(queue_in, redis_path, queue_out)
         self.queue_in = queue_in
@@ -1715,6 +1721,7 @@ class EvidenceValidationFileChecker():
     def check_all(self,
                   local_files = [],
                   remote_files = [],
+                  increment = False,
                   dry_run = False):
         '''
         Check every given evidence string
@@ -1782,6 +1789,7 @@ class EvidenceValidationFileChecker():
                                        self.es,
                                        lookup_data = lookup_data,
                                        dry_run=dry_run,
+                                       increment = increment
                                        ) for i in range(workers_number)]
                                         # ) for i in range(1)]
         for w in validators:
@@ -1807,6 +1815,7 @@ class EvidenceValidationFileChecker():
                 local_files,
                 remote_files,
                 dry_run=dry_run,
+                increment = increment
         )
 
         directory_crawler.run()

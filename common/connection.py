@@ -32,11 +32,9 @@ class PipelineConnectors():
         time.sleep(2)
 
     def init_services_connections(self, redispersist=False):
-        print "init_services_connections"
         '''init es client'''
         connection_attempt = 1
         hosts=[]
-        #es = None
         if len(Config.ELASTICSEARCH_NODES) > 1 and Config.ELASTICSEARCH_PORT:
             hosts = [dict(host=node, port=int(Config.ELASTICSEARCH_PORT)) for node in Config.ELASTICSEARCH_NODES]
         elif Config.ELASTICSEARCH_HOST and Config.ELASTICSEARCH_PORT:
@@ -81,13 +79,11 @@ class PipelineConnectors():
                     break
                 connection_attempt += 1
         else:
+            self.logger.warn('No valid configuration available for elasticsearch' )
             self.es=None
 
 
         if not redispersist:
             self.clear_redislite_db()
         self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH), serverconfig={ 'save': [], 'maxclients': 10000} )
-        '''
-        Check that the setup worked
-        '''
-        print "Redis server is %s"%(self.r_server.db)
+
