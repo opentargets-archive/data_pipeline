@@ -26,6 +26,8 @@ from spacy.matcher import Matcher
 from spacy.tokenizer import Tokenizer
 from spacy.language_data import TOKENIZER_INFIXES
 import spacy.util
+from spacy.tokens.doc import Doc
+
 
 # List of symbols we don't care about
 SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "“", "”", "'ve"]
@@ -324,11 +326,13 @@ class PublicationAnalysisSpacy(PublicationAnalysis):
                  lemmas=(),
                  noun_chunks=(),
                  analysed_sentences_count=1,
+                 entities=None
                  ):
         super(PublicationAnalysisSpacy, self).__init__(pub_id)
         self.lemmas = lemmas
         self.noun_chunks = noun_chunks
         self.analysed_sentences_count = analysed_sentences_count
+        self.entities = entities
 
 
     def get_type(self):
@@ -354,7 +358,8 @@ class LiteratureInfoExtractor(object):
 
     def process(self,
                 datasources=None,
-                dry_run=False):
+                dry_run=False,
+                force=False):
 
 
         if not os.path.isfile(Config.GENE_LEXICON_JSON_LOCN):
@@ -368,47 +373,112 @@ class LiteratureInfoExtractor(object):
             disease_lexicon_parser.parse_lexicon()
 
         i = 1
-        j = 0
-        spacyManager = NLPManager()
-        logging.info('Loading lexicon json')
-        disease_patterns = json.load(open(Config.DISEASE_LEXICON_JSON_LOCN))
-        gene_patterns = json.load(open(Config.GENE_LEXICON_JSON_LOCN))
+        if not self.loader.es.indices.exists(Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)):
+            self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
+        self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
-        # matcher = Matcher.load(path = 'gene_lexicon.json',
-        #                        vocab=nlp.vocab)
-        # TODO: FIXED IN SPACY MASTER BUT A BUG IN 1.5.0
-        logging.info('Generating matcher patterns')
-        '''load all the new patterns, do not use Matcher.load since there is a bug'''
-        disease_matcher = Matcher(vocab=spacyManager.nlp.vocab,
-                          patterns=disease_patterns
-                          )
-        gene_matcher = Matcher(vocab=spacyManager.nlp.vocab,
-                                  patterns=gene_patterns
-                                  )
-        '''should save the new vocab now'''
-        # Matcher.vocab.dump('lexeme.bin')
+        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        #no_of_workers = 2
+
+        # Gene Matcher Queue
+        tokenizer_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|tokenizer',
+                            max_size=MAX_CHUNKS * no_of_workers,
+                            job_timeout=1200)
+
+        # Gene Matcher Queue
+        gene_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|gene_matcher',
+                                 max_size=MAX_CHUNKS * no_of_workers,
+                                 job_timeout=1200)
+
+        # Disease Matcher Queue
+        disease_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|disease_matcher',
+                              max_size=MAX_CHUNKS * no_of_workers,
+                              job_timeout=120)
+
+        # ES-Loader Queue
+        loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|publication_loader',
+                              max_size=MAX_CHUNKS * no_of_workers,
+                              job_timeout=120)
+
+        tokenizers = [NLPTokenizerProcess(tokenizer_q,
+                                                self.r_server.db,
+                                                gene_q
+                                                )
+                         for i in range(no_of_workers/2)]
+        for w in tokenizers:
+            w.start()
+
+        gene_matchers = [GeneRecognitionProcess(gene_q,
+                                             self.r_server.db,
+                                             disease_q
+                                             )
+                      for i in range(no_of_workers/2)]
+
+        for w in gene_matchers:
+            w.start()
+
+        disease_matchers = [DiseaseRecognitionProcess(disease_q,
+                                             self.r_server.db,
+                                             loader_q
+                                             )
+                      for i in range(no_of_workers/2)]
+
+        for w in disease_matchers:
+            w.start()
+
+        loaders = [PublicationLoaderProcess(loader_q,
+                                           self.r_server.db,
+                                           dry_run
+                                           )
+                   for i in range(no_of_workers / 2 )]
+
+        for w in loaders:
+            w.start()
+        # loader = PublicationLoaderProcess(loader_q,self.r_server.db,dry_run)
+        # loader.start()
 
         logging.info('Finding entity matches')
-        for ev in tqdm(self.es_query.get_abstracts_from_val_ev(),
-                    desc='Reading available publications for nlp information extraction',
-                    total = self.es_query.count_validated_evidence_strings(),
-                    unit=' evidence',
-                    unit_scale=True):
+        # for ev in tqdm(self.es_query.get_abstracts_from_val_ev(),
+        #             desc='Reading available publications for nlp information extraction',
+        #             total = self.es_query.count_validated_evidence_strings(),
+        #             unit=' evidence',
+        #             unit_scale=True):
+        for pub in tqdm(self.es_query.get_all_publications(),
+                           desc='Reading available publications for nlp information extraction',
+                           total=self.es_query.count_validated_evidence_strings(),
+                           unit=' evidence',
+                           unit_scale=True):
 
-            j=j+1
-            if ev['literature']['title'] and ev['literature']['abstract']:
+
+            if pub['title'] and pub['abstract']:
                 i = i + 1
                 if (i > 101):
                     break
 
-                text_to_analyze = unicode(ev['literature']['title'] + ' ' + ''.join(ev['literature']['abstract']))
-                tokens = spacyManager.tokenizeText(text_to_analyze)
+                text_to_analyze = unicode(pub['title'] + ' ' + ''.join(pub['abstract']))
+                tokenizer_q.put((pub['pub_id'], text_to_analyze))
+                    # spacyManager.generateRelations(disease_matches,gene_matches)
+        tokenizer_q.set_submission_finished(r_server=self.r_server)
 
-                disease_matches = spacyManager.findEntityMatches(disease_matcher,tokens)
-                gene_matches = spacyManager.findEntityMatches(gene_matcher,tokens)
-                logging.info('Text to analyze - {} --------- Gene Matches {} -------- Disease Matches {}'.format(text_to_analyze,gene_matches, disease_matches))
+        for t in tokenizers:
+            t.join()
 
-                #spacyManager.generateRelations(disease_matches,gene_matches)
+        for g in gene_matchers:
+            g.join()
+
+        for d in disease_matchers:
+            d.join()
+
+        for l in loaders:
+            l.join()
+
+        logging.info('flushing data to index')
+
+        self.loader.es.indices.flush(
+            '%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+            wait_if_ongoing=True)
+
+            #spacyManager.generateRelations(disease_matches,gene_matches)
         logging.info("DONE")
 
 
@@ -527,14 +597,24 @@ class LexiconItem(object):
         return d
 
 class LitEntity(JSONSerializable):
-    def __init__(self, id, label=None, ent_type='ENT', matched_word=None, start_pos = None, end_pos = None, doc_id = None):
+    def __init__(self, id, label=None, ent_type='ENT', matched_word=None, start_pos = None, end_pos = None):
         self.id = id
         self.label = label
         self.ent_type = ent_type
         self.matched_word = matched_word
         self.start_pos = start_pos
         self.end_pos = end_pos
-        self.doc_id = doc_id
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def __hash__(self):
+        return hash((self.matched_word, self.label))
+
+    def __str__(self):
+        string = 'Matched Word {}, Lex_Label {}'.format(self.matched_word,self.label)
+        return string
+
 
 # This is meant only for testing purpose
 def load_entity_matches(self, loader, nlp, doc):
@@ -599,7 +679,7 @@ class NLPManager(object):
 
 
     def findEntityMatches(self,matcher, tokens):
-        entities = []
+        entities = set()
 
         matches = matcher(tokens)
 
@@ -607,8 +687,7 @@ class NLPManager(object):
             '''doc[start: end] - actual match in document; could be a synonymn'''
             span = (matcher.get_entity(ent_id), label, tokens[start: end])
             litentity = LitEntity(ent_id, matcher.get_entity(ent_id)['label'], 'GENE', tokens[start: end].text, start, end)
-            #TODO - store entities in ES index
-            entities.append(litentity)
+            entities.add(litentity)
         return entities
 
     def generateRelations(self,entity1,entity2,doc):
@@ -651,6 +730,117 @@ class NLPManager(object):
             print 'Subject {}  Predicate {} {}  Object {}'.format(subject,context , predicate,object)
 
 
+class NLPTokenizerProcess(RedisQueueWorkerProcess):
+
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 queue_out):
+        super(NLPTokenizerProcess, self).__init__(queue_in, redis_path, queue_out)
+        #self.nlp_manager = NLPManager()
+        nlp = spacy.load('en')
+        self.nlp_manager = NLPManager(nlp)
+        self.spacyDoc = Doc(self.nlp_manager.nlp.vocab)
+        self.start_time = time.time()  # reset timer start
+        self.logger = logging.getLogger(__name__)
+
+
+    def process(self, data):
+        pub_id, text = data
+
+        tokens = self.nlp_manager.tokenizeText(text)
+
+        return (pub_id,tokens.to_bytes())
+
+
+class GeneRecognitionProcess(RedisQueueWorkerProcess):
+
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 queue_out):
+        super(GeneRecognitionProcess, self).__init__(queue_in, redis_path, queue_out)
+        nlp = spacy.load('en')
+        self.nlp_manager = NLPManager(nlp)
+
+        gene_patterns = json.load(open(Config.GENE_LEXICON_JSON_LOCN))
+        self.gene_match_patterns = Matcher(vocab=self.nlp_manager.nlp.vocab,
+                                  patterns=gene_patterns
+                                  )
+        self.start_time = time.time()  # reset timer start
+        self.logger = logging.getLogger(__name__)
+
+
+    def process(self, data):
+        pub_id, tokens = data
+        spacyDoc = Doc(self.nlp_manager.nlp.vocab)
+        genes = self.nlp_manager.findEntityMatches(self.gene_match_patterns,spacyDoc.from_bytes(tokens))
+        analysed_pub = PublicationAnalysisSpacy(pub_id=pub_id,
+                                                entities=list(genes)
+                                                )
+        return (analysed_pub, tokens)
+
+
+
+class DiseaseRecognitionProcess(RedisQueueWorkerProcess):
+
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 queue_out):
+        super(DiseaseRecognitionProcess, self).__init__(queue_in, redis_path,queue_out)
+        #self.nlp_manager = NLPManager()
+        nlp = spacy.load('en')
+        self.nlp_manager = NLPManager(nlp)
+
+        disease_patterns = json.load(open(Config.DISEASE_LEXICON_JSON_LOCN))
+        self.disease_match_patterns = Matcher(vocab=self.nlp_manager.nlp.vocab,
+                                           patterns=disease_patterns
+                                           )
+        self.start_time = time.time()  # reset timer start
+        self.logger = logging.getLogger(__name__)
+
+
+    def process(self, data):
+        analysed_pub, tokens = data
+        spacyDoc = Doc(self.nlp_manager.nlp.vocab)
+        diseases = self.nlp_manager.findEntityMatches(self.disease_match_patterns,spacyDoc.from_bytes(tokens))
+        genes = analysed_pub.entities
+        analysed_pub.entities = genes + list(diseases)
+        return analysed_pub
+
+
+class PublicationLoaderProcess(RedisQueueWorkerProcess):
+
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 dry_run=False):
+        super(PublicationLoaderProcess, self).__init__(queue_in, redis_path)
+        self.loader = Loader(chunk_size=10000, dry_run=dry_run)
+        self.start_time = time.time()  # reset timer start
+        self.logger = logging.getLogger(__name__)
+
+
+    def process(self, data):
+
+        analysed_pub = data
+        logging.info('Pub Id - {} '.format(analysed_pub.pub_id))
+
+        # doc_body = json.dumps({'doc':analysed_pub.to_json(),'doc_as_upsert':True})
+        self.loader.put(index_name=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                        doc_type=analysed_pub.get_type(),
+                        ID=analysed_pub.pub_id,
+                        body=analysed_pub,
+                        # operation='update',
+                        parent=analysed_pub.pub_id,
+                        )
+
+
+
+
+    def close(self):
+        self.loader.close()
 
 
 
