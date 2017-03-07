@@ -663,7 +663,7 @@ class DataDrivenRelationProcess(object):
                                    max_size=int(queue_per_worker * number_of_storers*10),
                                    batch_size=10,
                                    job_timeout=300,
-                                   serialiser='jsonpickle')
+                                   serialiser='pickle')
         '''start shared workers'''
         q_reporter = RedisQueueStatusReporter([d2d_pair_producing,
                                                t2t_pair_producing,
