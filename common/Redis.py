@@ -147,7 +147,7 @@ class RedisQueue(object):
         elif  self.serialiser == 'jsonpickle':
             return jsonpickle.loads(element)
         else:
-            return base64.decodestring(pickle.loads(element))
+            return pickle.loads(base64.decodestring(element))
 
     def put(self, element, r_server=None):
         if element is None:
