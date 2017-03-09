@@ -22,6 +22,13 @@ except:
     pass
 logger = logging.getLogger(__name__)
 
+
+'''
+Module to Fetch the ECO ontology and store it in ElasticSearch to be used in evidence and association processing. 
+WHenever an evidence or association has an ECO code, we use this module to decorate and expand the information around the code and ultimately save it in the objects.
+'''
+
+
 class EcoActions(Actions):
     PROCESS='process'
     UPLOAD='upload'

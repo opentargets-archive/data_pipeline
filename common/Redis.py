@@ -662,7 +662,9 @@ class RedisLookupTable(object):
     '''
     Simple Redis-based key value store for string-based objects.
     Faster than its subclasses since it does not serialise and unseriliase strings.
-    By default keys will expire in 2 days
+    By default keys will expire in 2 days.
+
+    Allows to store a lookup table (key/value store) in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
     '''
 
     LOOK_UPTABLE_NAMESPACE = 'lookuptable:%(namespace)s'
