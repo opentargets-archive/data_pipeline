@@ -98,7 +98,7 @@ class Config():
     }
 
     HPA_NORMAL_TISSUE_URL = 'http://v16.proteinatlas.org/download/normal_tissue.csv.zip'
-    HPA_CANCER_URL = 'http://v16.proteinatlas.org/download/cancer.csv.zip'
+    HPA_CANCER_URL  = 'http://v16.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v16.proteinatlas.org/download/subcellular_location.csv.zip'
     HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
@@ -133,21 +133,8 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk', 'bpalka@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk', 'cyenyxe@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
-    # ftp user and passwords
-    EVIDENCEVALIDATION_FTP_HOST= dict( host = 'ftp.targetvalidation.org',
-                                       port = 22)
     EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
-    EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv010"] = 'c2a64557'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv011"] = 'bde373ca'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv012"] = '10441b6b'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv008"] = '409a0d21'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv007"] = 'a6052a3b'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv025"] = 'd2b315fa'
-    # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
+
 
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
@@ -242,7 +229,7 @@ class Config():
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
-    DUMP_REMOTE_API = 'https://beta.targetvalidation.org'
+    DUMP_REMOTE_API = 'http://beta.opentargets.io'
     DUMP_REMOTE_API_SECRET = '1RT6L519zkcTH9i3F99OjeYn13k79Wep'
     DUMP_REMOTE_API_APPNAME = 'load-test'
 

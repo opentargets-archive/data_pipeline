@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import base64
-import json
+import ujson as json
+import jsonpickle
+jsonpickle.set_preferred_backend('ujson')
 import logging
 import uuid
 import datetime
@@ -25,6 +27,17 @@ from colorama import Fore, Back, Style
 
 logger = logging.getLogger(__name__)
 
+
+import signal
+
+class TimeoutException(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutException
+
+signal.signal(signal.SIGALRM, timeout_handler)
+
 def millify(n):
     try:
         n = float(n)
@@ -33,7 +46,7 @@ def millify(n):
                            int(np.math.floor(np.math.log10(abs(n)) / 3))))
         return '%.1f%s'%(n/10**(3*millidx),millnames[millidx])
     except Exception, e:
-        return n
+        return str(n)
 
 class RedisQueue(object):
     '''
@@ -84,13 +97,16 @@ class RedisQueue(object):
                  job_timeout = 30,
                  ttl = 60*60*24+2,
                  total=None,
-                 batch_size=1):
+                 batch_size=1,
+                 serialiser = 'json'):
         '''
         :param queue_id: queue id to attach to preconfigured queues
         :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
                              will not be pickable
         :param max_size: maximum size of the queue. queue will block if full, and allow put only if smaller than the
                          maximum size.
+        :param serialiser: choose the serialiser backend: json (use ujson, default) jsonpickle (use ujson) else will
+                           use pickle
         :return:
         '''
         if not queue_id:
@@ -108,6 +124,7 @@ class RedisQueue(object):
         self.job_timeout = job_timeout#todo: store in redis
         self.max_queue_size = max_size#todo: store in redis
         self.default_ttl = ttl#todo: store in redis
+        self.serialiser = serialiser
         self.batch_size = batch_size  # todo: store in redis
         self.started = False
         self.start_time = time.time()
@@ -116,6 +133,21 @@ class RedisQueue(object):
             if r_server is not None:
                 self.set_total(total, r_server)
 
+    def dumps(self, element):
+        if self.serialiser == 'json':
+            return json.dumps(element, double_precision=32)
+        elif  self.serialiser == 'jsonpickle':
+            return jsonpickle.dumps(element)
+        else:
+            return base64.encodestring(pickle.dumps(element, protocol=pickle.HIGHEST_PROTOCOL))
+
+    def loads(self, element):
+        if self.serialiser == 'json':
+            return json.loads(element)
+        elif  self.serialiser == 'jsonpickle':
+            return jsonpickle.loads(element)
+        else:
+            return base64.decodestring(pickle.loads(element))
 
     def put(self, element, r_server=None):
         if element is None:
@@ -127,21 +159,21 @@ class RedisQueue(object):
         queue_size = r_server.llen(self.main_queue)
         if queue_size:
             while queue_size >= self.max_queue_size:
-                time.sleep(0.1)
+                time.sleep(0.01)
                 queue_size = r_server.llen(self.main_queue)
         key = uuid.uuid4().hex
         pipe = r_server.pipeline()
         pipe.lpush(self.main_queue, key)
         pipe.expire(self.main_queue, self.default_ttl)
         pipe.setex(self._get_value_key(key),
-                   base64.encodestring(pickle.dumps(element, pickle.HIGHEST_PROTOCOL)),
+                   self.dumps(element),
                    self.default_ttl)
         pipe.incr(self.submitted_counter)
         pipe.expire(self.submitted_counter, self.default_ttl)
         pipe.execute()
         return key
 
-    def get(self, r_server=None, wait_on_empty = 0, timeout = 0):
+    def get(self, r_server=None, timeout = 0):
         '''
 
         :param r_server:
@@ -157,9 +189,9 @@ class RedisQueue(object):
         pipe.zadd(self.processing_key, key, time.time())
         pipe.expire(self.processing_key, self.default_ttl)
         pipe.execute()
-        pickled = r_server.get(self._get_value_key(key))
-        if pickled is not None:
-            return key, pickle.loads(base64.decodestring(pickled))
+        serialised = r_server.get(self._get_value_key(key))
+        if serialised is not None:
+            return key, self.loads(serialised)
         return None
 
     def done(self,key, r_server=None, error = False):
@@ -243,9 +275,9 @@ class RedisQueue(object):
                     total=self.get_total(r_server),
                     client_data = r_server.info('clients'),
                     )
-
-        if data['timedout_jobs']:
-            self.put_back_timedout_jobs(r_server=r_server)
+        # todo: add proper support for timedout jobs, possibly kill them: http://stackoverflow.com/questions/25027122/break-the-function-after-certain-time
+        # if data['timedout_jobs']:
+        #     self.put_back_timedout_jobs(r_server=r_server)
         return data
 
     def close(self, r_server=None):
@@ -344,10 +376,11 @@ class RedisQueueStatusReporter(Process):
                                                             reception_speed = [],
                                                             processed_jobs = [],
                                                             received_jobs = [],
-                                                            cpu_load=[],
-                                                            memory_load=[],
-                                                            memory_use=[],
+                                                            job_flow=[],
                                                             )
+            self.historical_data['machine_status'] = dict (cpu_load = [],
+                                                           memory_load = [],
+                                                           memory_use = [])
 
 
     def run(self):
@@ -373,6 +406,17 @@ class RedisQueueStatusReporter(Process):
                                         )
 
         while not self.is_done():
+            '''get machine status data'''
+            cpu_load = psutil.cpu_percent(interval=None)
+            if isinstance(cpu_load, float):
+                self.historical_data['machine_status']['cpu_load'].append(cpu_load)
+            else:
+                self.historical_data['machine_status']['cpu_load'].append(0.)
+            memory_load = psutil.virtual_memory()
+            self.historical_data['machine_status']['memory_load'].append(memory_load.percent)
+            self.historical_data['machine_status']['memory_use'].append(round(memory_load.used / (1024 * 1024 * 1024), 2))  # Gb of used memory
+            self.log_machine_status()
+            ''' get queue(s) data'''
             for i,q in enumerate(self.queues):
                 queue_position = i * 3
                 data = q.get_status(self.r_server)
@@ -434,6 +478,7 @@ class RedisQueueStatusReporter(Process):
                     queue_size_status = "full"
                 else:
                     queue_size_status = 'accepting jobs'
+                queue_size_status+= ': %s/%s'%(millify(queue_size), millify(data['max_queue_size']))
 
             status = Fore.BLUE +'idle'+ Fore.RESET
             if submitted:
@@ -450,9 +495,11 @@ class RedisQueueStatusReporter(Process):
                     if not historical_data['processed_jobs']:
                         processing_speed = float(data['processed_counter'])/self.interval
                         reception_speed = float(data['submitted_counter']) / self.interval
+                        job_flow = reception_speed - processing_speed
                     else:
                         processing_speed = float(data['processed_counter']-historical_data['processed_jobs'][-1]) / self.interval
                         reception_speed = float(data['submitted_counter']-historical_data['received_jobs'][-1]) / self.interval
+                        job_flow = reception_speed - processing_speed
                     historical_data['queue_size'].append(data["queue_size"])
                     historical_data['processing_jobs'].append(data["processing_jobs"])
                     historical_data['timedout_jobs'].append(data["timedout_jobs"])
@@ -460,39 +507,28 @@ class RedisQueueStatusReporter(Process):
                     historical_data['reception_speed'].append(reception_speed)
                     historical_data['processed_jobs'].append(data['processed_counter'])
                     historical_data['received_jobs'].append(data['submitted_counter'])
-                    cpu_load = psutil.cpu_percent(interval=None)
-                    if isinstance(cpu_load, float):
-                        historical_data['cpu_load'].append(cpu_load)
-                    else:
-                        historical_data['cpu_load'].append(0.)
-                    memory_load = psutil.virtual_memory()
-                    historical_data['memory_load'].append(memory_load.percent)
-                    historical_data['memory_use'].append(round(memory_load.used/(1024*1024*1024),2))#Gb of used memory
-
+                    historical_data['job_flow'].append(job_flow)
+                lines.append(self._compose_history_line(data['queue_id'], 'job_flow'))
                 lines.append(self._compose_history_line(data['queue_id'], 'received_jobs'))
                 lines.append(self._compose_history_line(data['queue_id'], 'reception_speed'))
                 lines.append(self._compose_history_line(data['queue_id'], 'processed_jobs'))
                 lines.append(self._compose_history_line(data['queue_id'], 'processing_speed'))
                 lines.append(self._compose_history_line(data['queue_id'], 'processing_jobs'))
                 lines.append(self._compose_history_line(data['queue_id'], 'timedout_jobs'))
-                lines.append(self._compose_history_line(data['queue_id'], 'cpu_load'))
-                lines.append(self._compose_history_line(data['queue_id'], 'memory_load'))
-                lines.append(self._compose_history_line(data['queue_id'], 'memory_use'))
                 lines.append(self._compose_history_line(data['queue_id'], 'queue_size', queue_size_status))
             else:#log single datapoint
-
-                    lines.append('Received jobs: %i' % submitted)
-                    lines.append('Processed jobs: {} | {:.1%}'.format(processed, float(processed) / submitted))
-                    lines.append('Errors: {} | {:.1%}'.format(errors, error_percent))
-                    lines.append('Processing speed: {:.1f} jobs per second'.format(processing_speed))
-                    lines.append('-' * 50)
-                    lines.append('Queue size: %i | %s' % (queue_size, queue_size_status))
-                    lines.append('Jobs being processed: %i' % data["processing_jobs"])
-                    lines.append('Jobs timed out: %i' % data["timedout_jobs"])
-                    lines.append('Sumbmission finished: %s' % submission_finished)
-                    lines.append('-' * 50)
-                    lines.append('STATUS: %s' % status)
-                    lines.append('Elapsed time: %s' % datetime.timedelta(seconds=now - data['start_time']))
+                lines.append('Received jobs: %i' % submitted)
+                lines.append('Processed jobs: {} | {:.1%}'.format(processed, float(processed) / submitted))
+                lines.append('Errors: {} | {:.1%}'.format(errors, error_percent))
+                lines.append('Processing speed: {:.1f} jobs per second'.format(processing_speed))
+                lines.append('-' * 50)
+                lines.append('Queue size: %i | %s' % (queue_size, queue_size_status))
+                lines.append('Jobs being processed: %i' % data["processing_jobs"])
+                lines.append('Jobs timed out: %i' % data["timedout_jobs"])
+                lines.append('Sumbmission finished: %s' % submission_finished)
+                lines.append('-' * 50)
+                lines.append('STATUS: %s' % status)
+                lines.append('Elapsed time: %s' % datetime.timedelta(seconds=now - data['start_time']))
             lines.append(('=' * 50))
         else:
             lines = ['****** QUEUE: %s | STATUS: %s ******' % (Back.RED+Style.DIM+data['queue_id']+Style.RESET_ALL, status)]
@@ -518,7 +554,12 @@ class RedisQueueStatusReporter(Process):
         label = unicode(key.capitalize().replace('_',' '))
         if status is None:
             if data:
-                status = u'Current: %s | Max: %s'%(unicode(millify(data[-1])),unicode(millify(max(data))))
+                positive_max = max(data)
+                negative_max = min(data)
+                max_point = positive_max
+                if abs(negative_max) >positive_max:
+                    max_point = negative_max
+                status = u'Current: %s | Max: %s'%(unicode(millify(data[-1])),unicode(millify(max_point)))
         averaged_data = self._average_long_interval(data)
         output = u'%s |%s| %s'%(label.ljust(20), self.sparkplot(averaged_data), status)
         return output.encode('utf8')
@@ -529,14 +570,28 @@ class RedisQueueStatusReporter(Process):
             max_data = data.max()
             rounded_data = np.round(data).astype(int)
             for i, value in enumerate(data):
-                if value == max_data:
+                if abs(value) == max_data:
                     data_char = Fore.YELLOW+self._history_plot_max+Fore.RESET
-                elif 0. < value < self._history_plot_interval:
-                    data_char = self._history_plot[rounded_data[i]]
+                elif 0. < abs(value) < self._history_plot_interval:
+                    if value >0:
+                        data_char = Fore.LIGHTGREEN_EX+self._history_plot[rounded_data[i]]+Fore.RESET
+                    else:
+                        data_char = Fore.LIGHTRED_EX+self._history_plot[abs(rounded_data[i])]+Fore.RESET
                 else:
                     data_char = self._history_plot[0]
                 output.append(data_char)
         return u''.join(output)
+
+    def log_machine_status(self):
+        if self.history:  # log history
+            lines = ['\n***************** MACHINE STATUS *****************']
+            lines.append(self._compose_history_line('machine_status', 'cpu_load'))
+            lines.append(self._compose_history_line('machine_status', 'memory_load'))
+            lines.append(self._compose_history_line('machine_status', 'memory_use'))
+            lines.append(('=' * 50))
+            self.logger.debug('\n'.join(lines))
+
+
 
 
 def get_redis_worker(base = Process):
@@ -583,6 +638,7 @@ def get_redis_worker(base = Process):
                 if job is not None:
                     key, data = job
                     error = False
+                    signal.alarm(self.queue_in.job_timeout)
                     try:
                         if self.queue_in_as_batch:
                             job_results = [self.process(d) for d in data]
@@ -590,9 +646,14 @@ def get_redis_worker(base = Process):
                             job_results = self.process(data)
                         if self.queue_out is not None and job_results is not None:
                             self.put_into_queue_out(job_results, aggregated_input = self.queue_in_as_batch)
+                    except TimeoutException as e:
+                        error = True
+                        self.logger.exception('Timed out processing job %s: %s' % (key, e.message))
                     except Exception as e:
                         error = True
                         self.logger.exception('Error processing job %s: %s' % (key, e.message))
+                    else:
+                        signal.alarm(0)
 
                     self.queue_in.done(key, error=error, r_server=self.r_server)
                 else:
@@ -641,7 +702,6 @@ def get_redis_worker(base = Process):
             '''
             pass
 
-        #TODO: enforce timeout
         def process(self, data):
             raise NotImplementedError('please add an implementation to process the data')
 

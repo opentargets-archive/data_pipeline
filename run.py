@@ -218,8 +218,11 @@ if __name__ == '__main__':
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.CHECKFILES in args.val) or do_all:
-                EvidenceValidationFileChecker(connectors.es, connectors.r_server, dry_run=args.dry_run).check_all(local_files=args.local_file,
-                                                                                                                  remote_files=args.remote_file, increment=args.increment)
+                EvidenceValidationFileChecker(connectors.es,
+                                              connectors.r_server,
+                                              dry_run=args.dry_run).check_all(local_files=args.local_file,
+                                                                              remote_files=args.remote_file,
+                                                                              increment=args.increment)
         if args.valreset:
             EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
         if args.evs or run_full_pipeline:
