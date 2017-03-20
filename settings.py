@@ -241,6 +241,7 @@ class Config():
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
     DUMP_REMOTE_API = os.environ.get('DUMP_REMOTE_API_URL') or 'http://beta.opentargets.io'
+    DUMP_REMOTE_API_PORT = os.environ.get('DUMP_REMOTE_API_PORT') or '80'
     DUMP_REMOTE_API_SECRET = os.environ.get('DUMP_REMOTE_API_SECRET')
     DUMP_REMOTE_API_APPNAME = os.environ.get('DUMP_REMOTE_API_APPNAME')
 
