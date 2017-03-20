@@ -6,7 +6,6 @@ import gzip, time, logging
 
 from settings import Config
 from opentargets import OpenTargetsClient
-ot = OpenTargetsClient()
 
 class DumpActions(Actions):
     DUMP='dump'
