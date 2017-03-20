@@ -252,4 +252,4 @@ if __name__ == '__main__':
         if args.dump or run_full_pipeline:
             do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
             if (DumpActions.DUMP in args.dump) or do_all:
-                DumpGenerator(connectors.es).dump()
+                DumpGenerator().dump()

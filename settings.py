@@ -241,8 +241,8 @@ class Config():
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
     DUMP_REMOTE_API = os.environ.get('DUMP_REMOTE_API_URL') or 'http://beta.opentargets.io'
-    DUMP_REMOTE_API_SECRET = '1RT6L519zkcTH9i3F99OjeYn13k79Wep'
-    DUMP_REMOTE_API_APPNAME = 'load-test'
+    DUMP_REMOTE_API_SECRET = os.environ.get('DUMP_REMOTE_API_SECRET')
+    DUMP_REMOTE_API_APPNAME = os.environ.get('DUMP_REMOTE_API_APPNAME')
 
     #Literature Pipeline -- Pubmed/Medline FTP server
     PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
