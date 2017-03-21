@@ -23,22 +23,10 @@ class DumpGenerator(object):
 
     def dump(self):
 
-
         '''dump evidence data'''
-        logging.info('Dumping evidence data')
-        all_evidence = self.client.filter_evidence(size=10000)
-        with gzip.open(Config.DUMP_FILE_EVIDENCE, 'wb') as evidence_dump_file:
-            for evidence in tqdm(all_evidence,
-                                desc = 'Dumping evidence data'):
-                evidence_dump_file.write(json.dumps(evidence, separators=(',', ':')) + '\n')
-
-        '''dump association data'''
         logging.info('Dumping association data')
-        all_association = self.client.filter_association(size=10000)
-        with gzip.open(Config.DUMP_FILE_EVIDENCE, 'wb') as association_dump_file:
-            for association in tqdm(all_association,
-                                 desc='Dumping association data'):
-                association_dump_file.write(json.dumps(association, separators=(',', ':')) + '\n')
-
-
-
+        a = self.client.filter_associations(size=10000, )
+        a.to_file(Config.DUMP_FILE_ASSOCIATION, progress_bar=True)
+        logging.info('Dumping evidence data')
+        ev = self.client.filter_evidence(size=10000)
+        ev.to_file(Config.DUMP_FILE_EVIDENCE, progress_bar=True)
