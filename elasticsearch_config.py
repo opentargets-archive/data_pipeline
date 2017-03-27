@@ -308,7 +308,7 @@ class ElasticSearchConfiguration():
     relation_replicas_number = '1'
     publication_shard_number = '10'
     publication_replicas_number = '1'
-    validation_shard_number = '5'
+    validation_shard_number = '3'
     validation_replicas_number = '1'
     submission_audit_shard_number = '1'
     submission_audit_replicas_number = '1'

@@ -356,7 +356,7 @@ class EvidenceManager():
         #         evidence['id']))
 
         '''remove identifiers.org from genes and map to ensembl ids'''
-        target_id = evidence['target']['id'][0]
+        target_id = evidence['target']['id']
         new_target_id = None
         id_not_in_ensembl = False
         try:
@@ -391,7 +391,7 @@ class EvidenceManager():
             evidence['target']['activity'] = evidence['target']['activity'].split('/')[-1]
 
         '''remove identifiers.org from efos'''
-        disease_id = evidence['disease']['id'][0]
+        disease_id = evidence['disease']['id']
         new_disease_id = get_ontology_code_from_url(disease_id)
         if len(new_disease_id.split('_')) != 2:
             logger.warning("could not recognize disease.id: %s | added anyway" % disease_id)
