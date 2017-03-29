@@ -672,8 +672,9 @@ class GeneManager():
                         if chembl_id in self.chembl_handler.target2molecule:
                             molecules = self.chembl_handler.target2molecule[chembl_id]
                             for mol in molecules:
-                                synonyms = self.chembl_handler.molecule2synonyms[mol]
-                                target_drugnames.extend(synonyms)
+                                if mol in self.chembl_handler.molecule2synonyms:
+                                    synonyms = self.chembl_handler.molecule2synonyms[mol]
+                                    target_drugnames.extend(synonyms)
                         if a in self.chembl_handler.protein_classification:
                             gene.protein_classification['chembl'] = self.chembl_handler.protein_classification[a]
                         break
