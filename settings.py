@@ -215,7 +215,7 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION=86
+    ENSEMBL_RELEASE_VERSION=88
     ENSEMBL_CHUNK_SIZE=100
 
     TEMP_DIR = os.path.join(os.path.sep, 'tmp')
