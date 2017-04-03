@@ -874,7 +874,7 @@ class ESQuery(object):
                                 batch,
                                 stats_only=True)
 
-    def get_all_evidence_for_datasource(self, datasources, fields = None, ):
+    def get_all_evidence_for_datasource(self, datasources=None, fields = None, ):
 
 
 
