@@ -10,7 +10,7 @@ from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter
+from common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter, RedisQueueWorkerThread
 from common.connection import PipelineConnectors
 from modules.EFO import EFO
 from modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
@@ -419,7 +419,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
 
 
 
-class ScoreProducer(RedisQueueWorkerProcess):
+class ScoreProducer(RedisQueueWorkerThread):
 
     def __init__(self,
                  evidence_data_q,
@@ -444,27 +444,18 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 gene_data = Gene()
                 try:
                     gene_data.load_json(self.lookup_data.available_genes.get_gene(target))
-                    score.set_target_data(gene_data)
                 except KeyError:
                     self.logger.error('Cannot find gene code "%s" in lookup table'%target)
-                    try:
-                        score.set_target_data(gene_data)
-                    except Exception:
-                        pass
-                else:
-                    score.set_target_data(gene_data)
+                score.set_target_data(gene_data)
+
 
                 disease_data = EFO()
                 try:
                     disease_data.load_json(self.lookup_data.available_efos.get_efo(disease))
                 except KeyError:
                     self.logger.error('Cannot find EFO code "%s" in lookup table'%disease)
-                    try:
-                        score.set_disease_data(disease_data)
-                    except Exception:
-                        pass
-                else:
-                    score.set_disease_data(disease_data)
+                score.set_disease_data(disease_data)
+
                 return (target, disease, score)
 
 
@@ -558,12 +549,14 @@ class ScoringProcess():
                                            max_size=queue_per_worker * number_of_workers,
                                            job_timeout=1200,
                                            batch_size=10,
-                                           r_server=self.r_server)
+                                           r_server=self.r_server,
+                                           serialiser='jsonpickle')
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
                                   max_size=queue_per_worker * number_of_storers,
                                   job_timeout=1200,
                                   batch_size=10,
-                                  r_server=self.r_server)
+                                  r_server=self.r_server,
+                                  serialiser='jsonpickle')
 
         q_reporter = RedisQueueStatusReporter([target_q,
                                                target_disease_pair_q,
@@ -588,7 +581,7 @@ class ScoringProcess():
                                  self.r_server.db,
                                  score_data_q,
                                  lookup_data,
-                                 ) for i in range(number_of_workers*2)]
+                                 ) for i in range(1)]
         for w in scorers:
             w.start()
 

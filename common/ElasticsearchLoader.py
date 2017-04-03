@@ -8,6 +8,7 @@ from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import parallel_bulk, bulk
 from common.DataStructure import JSONSerializable
 from common.EvidenceJsonUtils import assertJSONEqual
+from common.Redis import RedisQueueWorkerProcess
 from common.connection import PipelineConnectors
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
@@ -52,7 +53,16 @@ class Loader():
 
 
 
-    def put(self, index_name, doc_type, ID, body, create_index = True, operation= None,routing = None, parent = None, auto_optimise = False):
+    def put(self,
+            index_name,
+            doc_type,
+            ID,
+            body,
+            create_index = True,
+            operation= None,
+            routing = None,
+            parent = None,
+            auto_optimise = False):
 
         if index_name not in self.indexes_created:
             if create_index:
@@ -109,33 +119,6 @@ class Loader():
             bulk(self.es,
                 self.cache,
                  stats_only=True)
-            # thread_count = 10
-            # chunk_size = int(self.chunk_size/thread_count)
-            # parallel_bulk(
-            #     self.es,
-            #     self.cache,
-            #     thread_count=thread_count,
-            #     chunk_size=chunk_size,)
-            # for ok, results in parallel_bulk(
-            #         self.es,
-            #         self.cache,
-            #         thread_count=thread_count,
-            #         chunk_size=chunk_size,
-            #         request_timeout=60000,
-                # ):
-
-                # action, result = results.popitem()
-                # self.results[result['_index']].append(result['_id'])
-                # doc_id = '/%s/%s' % (result['_index'], result['_id'])
-                # try:
-                #     if (len(self.results[result['_index']]) % self.chunk_size) == 0:
-                #         self.logger.debug(
-                #             "%i entries uploaded in elasticsearch for index %s" % (
-                #             len(self.results[result['_index']]), result['_index']))
-                #     if not ok:
-                #         self.logger.error('Failed to %s document %s: %r' % (action, doc_id, result))
-                # except ZeroDivisionError:
-                #     pass
 
 
     def close(self):
@@ -183,9 +166,13 @@ class Loader():
                             "translog.durability": 'request',
                         }
                 })
+
     def restore_after_bulk_indexing(self):
         if not self.dry_run:
             for index_name in self.indexes_optimised:
+                self.logger.debug('restoring to normal and flushing index: %s'%index_name)
+                self.es.indices.flush(index_name,
+                                      wait_if_ongoing=True)
                 self.es.indices.put_settings(index=index_name,
                                              body=self.indexes_optimised[index_name]['settings_to_restore'])
                 self.optimize_index(index_name)
@@ -204,7 +191,6 @@ class Loader():
                 else:
                     raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
             if self._enforce_mapping(index_name):
-
                 mappings = self.es.indices.get_mapping(index=index_name)
                 settings = self.es.indices.get_settings(index=index_name)
 
@@ -238,6 +224,7 @@ class Loader():
                     if not self._check_is_aknowledge(res):
                         raise ValueError(
                             'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
+                    time.sleep(0.5)#wait for the index to be deleted
                     try:
                         self.es.indices.flush(index_name,  wait_if_ongoing =True)
                     except NotFoundError:
@@ -287,3 +274,36 @@ class Loader():
 
     def _check_is_aknowledge(self, res):
         return (u'acknowledged' in res) and (res[u'acknowledged'] == True)
+
+
+
+class LoaderWorker(RedisQueueWorkerProcess):
+    def __init__(self,
+                 queue_in,
+                 redis_path,
+                 chunk_size = 1000,
+                 dry_run = False
+                 ):
+        super(LoaderWorker, self).__init__(queue_in, redis_path)
+        self.chunk_size = chunk_size
+        self.loader = Loader(chunk_size=chunk_size,
+                             dry_run=dry_run)
+        self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
+
+
+    def process(self, data):
+        '''
+        expects an array of args and kwargs to pass to a loader.put method
+        :param data:
+        :return:
+        '''
+        if data:
+            args, kwargs = data
+            self.loader.put(*args,
+                            **kwargs
+                            )
+
+
+    def close(self):
+        self.loader.close()

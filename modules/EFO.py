@@ -9,6 +9,11 @@ from modules.Ontology import OntologyClassReader, DiseaseUtils
 from rdflib import URIRef
 from settings import Config
 
+'''
+Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 
+WHenever an evidence or association has an EFO code, we use this module to decorate and expand the information around the code and ultimately save it in the objects.
+'''
+
 
 class EfoActions(Actions):
     PROCESS='process'
@@ -140,7 +145,8 @@ class EfoProcess():
 
 class EFOLookUpTable(object):
     """
-    A redis-based pickable efo look up table
+    A redis-based pickable efo look up table. 
+    Allows to grab the EFO saved in ES and load it up in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
     """
 
     def __init__(self,

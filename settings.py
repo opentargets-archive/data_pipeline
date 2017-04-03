@@ -25,12 +25,18 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or'17.02'
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or '17.02'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
-    try:
-        ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
-        ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
-
+    ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
+    ELASTICSEARCH_HOST = os.environ.get('ELASTICSEARCH_HOST')
+    ELASTICSEARCH_PORT = os.environ.get('ELASTICSEARCH_PORT')
+    if ELASTICSEARCH_HOST is None:
+        try:
+            ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
+            ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+        except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
+            pass
+    if ELASTICSEARCH_HOST is not None and ELASTICSEARCH_PORT is not None:
         if ',' in ELASTICSEARCH_HOST:
             ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
             ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
@@ -38,13 +44,8 @@ class Config():
             ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
         ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
         if ELASTICSEARCH_PORT:
-            ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
-    except ConfigParser.NoOptionError:
-        ELASTICSEARCH_HOST = None
-        ELASTICSEARCH_PORT = None
-        ELASTICSEARCH_URL = None
+            ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
-    # ELASTICSEARCH_URL = [{"host": iniparser.get(ENV, 'elurl'), "port": iniparser.get(ENV, 'elport')}]
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
@@ -74,22 +75,10 @@ class Config():
     ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
     ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
     ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
-    DEBUG = ENV == 'dev'
+    DEBUG = True
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
 
-    try:
-        POSTGRES_DATABASE = {'drivername': 'postgres',
-            'host': iniparser.get(ENV, 'host'),
-            'port': iniparser.get(ENV, 'port'),
-            'username': iniparser.get(ENV, 'username'),
-            'password': iniparser.get(ENV, 'password'),
-            'database': iniparser.get(ENV, 'database')}
-    except ConfigParser.NoOptionError:
-        # the official logger is not loaded yet. not moving things around as we
-        # will likely put all of this in a config file.
-        print 'no postgres instance'
-        POSTGRES_DATABASE = {}
 
     HGNC_COMPLETE_SET = 'http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
@@ -144,21 +133,8 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk', 'bpalka@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk', 'cyenyxe@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
-    # ftp user and passwords
-    EVIDENCEVALIDATION_FTP_HOST= dict( host = 'ftp.targetvalidation.org',
-                                       port = 22)
     EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
-    EVIDENCEVALIDATION_FTP_ACCOUNTS =OrderedDict()
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv001"] = '576f89aa'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv006"] = '7e2a0135'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv009"] = '2b72891d'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv010"] = 'c2a64557'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv011"] = 'bde373ca'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv012"] = '10441b6b'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv008"] = '409a0d21'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv007"] = 'a6052a3b'
-    EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv025"] = 'd2b315fa'
-    # EVIDENCEVALIDATION_FTP_ACCOUNTS["cttv018"] = 'a8059a72'
+
 
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
@@ -253,9 +229,10 @@ class Config():
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
-    DUMP_REMOTE_API = 'https://beta.targetvalidation.org'
-    DUMP_REMOTE_API_SECRET = '1RT6L519zkcTH9i3F99OjeYn13k79Wep'
-    DUMP_REMOTE_API_APPNAME = 'load-test'
+    DUMP_REMOTE_API = os.environ.get('DUMP_REMOTE_API_URL') or 'http://beta.opentargets.io'
+    DUMP_REMOTE_API_PORT = os.environ.get('DUMP_REMOTE_API_PORT') or '80'
+    DUMP_REMOTE_API_SECRET = os.environ.get('DUMP_REMOTE_API_SECRET')
+    DUMP_REMOTE_API_APPNAME = os.environ.get('DUMP_REMOTE_API_APPNAME')
 
     #Literature Pipeline -- Pubmed/Medline FTP server
     PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
@@ -264,4 +241,11 @@ class Config():
     PUBMED_XML_UPDATE_LOCN = os.path.join(PUBMED_TEMP_DIR, 'update')
 
     PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
+
+    #GE Pipeline
+
+    GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
+    GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
+    GE_ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
+    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
 

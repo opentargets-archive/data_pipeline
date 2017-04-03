@@ -1,16 +1,17 @@
 import collections
 import json
 import logging
+import time
 from collections import Counter
 
 import jsonpickle
-import time
 from elasticsearch import helpers
 
 from common.DataStructure import SparseFloatDict
 from common.ElasticsearchLoader import Loader
 from common.connection import PipelineConnectors
 from settings import Config
+
 
 class AssociationSummary(object):
 
@@ -245,7 +246,16 @@ class ESQuery(object):
         if datasources:
             doc_type = datasources
         res = helpers.scan(client=self.handler,
-                           query={"query":  {"match_all": {}},
+                           query={
+                               "query": {
+                                   "match": {
+                                       "is_valid": {
+                                           "query": True,
+                                           "type": "phrase"
+                                       }
+                                   }
+
+                               },
                                '_source': True,
                                'size': size,
                            },
@@ -864,7 +874,7 @@ class ESQuery(object):
                                 batch,
                                 stats_only=True)
 
-    def get_all_evidence_for_datasource(self, datasources, fields = None, ):
+    def get_all_evidence_for_datasource(self, datasources=None, fields = None, ):
 
 
 
