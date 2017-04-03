@@ -32,8 +32,10 @@ class QCRunner(object):
         # self.run_associationQC()
 
     def run_associationQC(self):
-        # self.run_association2evidenceQC()
-        self.run_evidence2associationQC()
+        self.run_association2evidenceQC()
+        # self.run_evidence2associationQC()
+        # self.check_association_gene_info()
+        # self.check_evidence_gene_info()
 
     def run_association2evidenceQC(self):
         c=0
@@ -86,6 +88,68 @@ class QCRunner(object):
             logger.error('\n'.join(list(missing_assocations_ids)))
         else:
             logger.info('no missing annotation found')
+
+    def check_association_gene_info(self):
+        logger.info('checking target info in associations')
+
+        c = 0
+        e = 0
+        id2symbol = dict()
+        for ass in tqdm(self.esquery.get_all_associations(),
+                        desc='checking target info is correct in all associations',
+                        unit=' associations',
+                        unit_scale=True,
+                        total=self.esquery.count_elements_in_index(
+                            Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+                        leave=True,
+                        ):
+
+            c += 1
+            if c % 1000 == 0:
+                logger.info('%i association processed, %i errors found' % (c, e))
+
+            target, disease = ass['target']['id'], ass['disease']['id']
+            target_symbol = ass['target']['gene_info']['symbol']
+
+            if target not in id2symbol:
+                id2symbol[target]=target_symbol
+            else:
+                if target_symbol != id2symbol[target]:
+                    e+=1
+
+        logger.info('%i association processed, %i errors found' % (c, e))
+        logger.info('DONE')
+
+    def check_evidence_gene_info(self):
+        logger.info('checking target info in associations')
+
+        c = 0
+        e = 0
+        id2symbol = dict()
+        for ass in tqdm(self.esquery.get_all_evidence_for_datasource(),
+                        desc='checking target info is correct in all evidence',
+                        unit=' evidence',
+                        unit_scale=True,
+                        total=self.esquery.count_elements_in_index(
+                            Config.ELASTICSEARCH_DATA_INDEX_NAME+'*'),
+                        leave=True,
+                        ):
+
+            c += 1
+            if c % 1000 == 0:
+                logger.info('%i evidence processed, %i errors found' % (c, e))
+
+            target, disease = ass['target']['id'], ass['disease']['id']
+            target_symbol = ass['target']['gene_info']['symbol']
+
+            if target not in id2symbol:
+                id2symbol[target] = target_symbol
+            else:
+                if target_symbol != id2symbol[target]:
+                    e += 1
+
+        logger.info('%i evidence processed, %i errors found' % (c, e))
+        logger.info('DONE')
 
 
     # def analyse_cancer_gene_census(self):
