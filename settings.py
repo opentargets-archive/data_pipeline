@@ -25,7 +25,7 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or '17.02'
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or '17.04'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
     ELASTICSEARCH_HOST = os.environ.get('ELASTICSEARCH_HOST')
@@ -107,7 +107,7 @@ class Config():
     REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
     REACTOME_PATHWAY_RELATION = 'http://www.reactome.org/download/current/ReactomePathwaysRelation.txt'
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
-    EVIDENCEVALIDATION_SCHEMA = "1.2.4"
+    EVIDENCEVALIDATION_SCHEMA = "1.2.5"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
