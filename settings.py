@@ -25,7 +25,7 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or '17.02'
+    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or '17.04'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
     ELASTICSEARCH_HOST = os.environ.get('ELASTICSEARCH_HOST')
