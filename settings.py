@@ -243,3 +243,10 @@ class Config():
 
     PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
 
+    #GE Pipeline
+
+    GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
+    GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
+    GE_ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
+    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
+

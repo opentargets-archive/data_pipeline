@@ -23,6 +23,8 @@ class LiteratureQCTestCase(unittest.TestCase):
         for file_ in files:
 
             total = es_query.count_publications_for_file(file_)
+            #medline packages its records in a series of files, 
+            # each with 30,000 records.
             if total != 30000:
                 errors.append('ES documents {} not equal to 30k for file {}'.format(total, file_))
         logging.error(errors)
