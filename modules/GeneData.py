@@ -633,6 +633,7 @@ class GeneManager():
         self.loader.create_new_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|gene_data_storage',
                            r_server=self.r_server,
+                           serialiser='jsonpickle',
                            max_size=10000,
                            job_timeout=600)
 
