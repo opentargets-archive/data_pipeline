@@ -1282,53 +1282,6 @@ class EvidenceValidationFileChecker():
         self.symbols = {}
         self.logger = logging.getLogger(__name__)
 
-    def startCapture(self, newLogLevel=None):
-        """ Start capturing log output to a string buffer.
-
-        http://docs.python.org/release/2.6/library/logging.html
-
-        @param newLogLevel: Optionally change the global logging level, e.g. logging.DEBUG
-        """
-        self.buffer = StringIO()
-        self.logHandler = logging.StreamHandler(self.buffer)
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        self.logHandler.setFormatter(formatter)
-
-        # print >> self.buffer, "Log output"
-
-        # for module in [ 'opentargets.model.core', 'opentargets.model.evidence.core', 'opentargets.model.evidence.association_score' ]:
-        rootLogger = logging.getLogger()
-
-        if newLogLevel:
-            self.oldLogLevel = rootLogger.getEffectiveLevel()
-            rootLogger.setLevel(newLogLevel)
-        else:
-            self.oldLogLevel = None
-
-        rootLogger.addHandler(self.logHandler)
-
-    def stopCapture(self):
-        """ Stop capturing log output.
-
-        @return: Collected log output as string
-        """
-
-        # Remove our handler
-        # for module in [ 'opentargets.model.core', 'opentargets.model.evidence.core', 'opentargets.model.evidence.association_score' ]:
-        rootLogger = logging.getLogger()
-
-        # Restore logging level (if any)
-        if self.oldLogLevel:
-            rootLogger.setLevel(self.oldLogLevel)
-
-        rootLogger.removeHandler(self.logHandler)
-
-        self.logHandler.flush()
-        self.buffer.flush()
-
-        return self.buffer.getvalue()
-
-
     def check_all(self,
                   local_files = [],
                   remote_files = [],

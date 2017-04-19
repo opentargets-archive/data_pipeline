@@ -6,19 +6,17 @@ from elasticsearch import Elasticsearch
 from tqdm import tqdm
 
 from common import Actions
-from common.DataStructure import JSONSerializable
+from common.DataStructure import JSONSerializable, denormDict
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter, RedisQueueWorkerThread
-from common.connection import PipelineConnectors
 from modules.EFO import EFO
 from modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from modules.GeneData import Gene
 from settings import Config
 
 __author__ = 'andreap'
-import math
 
 
 global_reporting_step = 5e5
@@ -26,53 +24,53 @@ logger = logging.getLogger(__name__)
 
 
 class AssociationActions(Actions):
-    EXTRACT='extract'
-    PROCESS='process'
-    UPLOAD='upload'
+    EXTRACT = 'extract'
+    PROCESS = 'process'
+    UPLOAD = 'upload'
 
 
 class ScoringMethods():
-    HARMONIC_SUM ='harmonic-sum'
+    HARMONIC_SUM = 'harmonic-sum'
     SUM = 'sum'
     MAX = 'max'
-
 
 
 class AssociationScore(JSONSerializable):
 
     def __init__(self):
-
-        self.overall = 0.0
         self.init_scores()
 
     def init_scores(self):
-        self.datatypes={}
-        self.datasources={}
+        """init scores to 0.0 and map to 2-maps init with 0.0"""
+        self.overall = 0.0
+        (self.datasources, self.datatypes) = denormDict(
+            Config.DATASOURCE_TO_DATATYPE_MAPPING, (0.0, 0.0))
 
-        for ds,dt in Config.DATASOURCE_TO_DATATYPE_MAPPING.items():
-            self.datasources[ds]=0.0
-            self.datatypes[dt]=0.0
 
 class Association(JSONSerializable):
 
     def __init__(self, target, disease, is_direct):
-        self.target = {'id':target}
-        self.disease = {'id':disease}
-        self.is_direct=is_direct
+        self.target = {'id': target}
+        self.disease = {'id': disease}
+        self.is_direct = is_direct
         self.set_id()
+
         for method_key, method in ScoringMethods.__dict__.items():
             if not method_key.startswith('_'):
-                self.set_scoring_method(method,AssociationScore())
-        self.evidence_count = dict(total = 0.0,
-                                   datatypes = {},
-                                   datasources = {})
-        for ds,dt in Config.DATASOURCE_TO_DATATYPE_MAPPING.items():
-            self.evidence_count['datasources'][ds]=0.0
-            self.evidence_count['datatypes'][dt]= 0.0
+                self.set_scoring_method(method, AssociationScore())
+
+        self.evidence_count = dict(total=0.0,
+                                   datatypes={},
+                                   datasources={})
+
+        (self.evidence_count['datasources'],
+         self.evidence_count['datatypes']) = denormDict(
+            Config.DATASOURCE_TO_DATATYPE_MAPPING, (0.0, 0.0))
+
         self.private = {}
-        self.private['facets']=dict(datatype = [],
-                                    datasource = [],
-                                    free_text_search = [])
+        self.private['facets'] = dict(datatype=[],
+                                      datasource=[],
+                                      free_text_search=[])
 
     def get_scoring_method(self, method):
         if method not in ScoringMethods.__dict__.values():
@@ -83,20 +81,23 @@ class Association(JSONSerializable):
         if method not in ScoringMethods.__dict__.values():
             raise AttributeError("method need to be a valid ScoringMethods")
         if not isinstance(score, AssociationScore):
-            raise AttributeError("score need to be an instance of AssociationScore")
+            raise AttributeError("score need to be an instance"
+                                 "of AssociationScore")
         self.__dict__[method] = score
 
     def set_id(self):
-        self.id = '%s-%s'%(self.target['id'], self.disease['id'])
+        self.id = '%s-%s' % (self.target['id'], self.disease['id'])
 
     def set_target_data(self, gene):
         """get generic gene info"""
         pathway_data = dict(pathway_type_code=[],
                             pathway_code=[])
-        GO_terms = dict(biological_process = [],
+
+        GO_terms = dict(biological_process=[],
                         cellular_component=[],
                         molecular_function=[],
                         )
+
         target_class = dict(level1=[],
                             level2=[])
 
@@ -104,9 +105,10 @@ class Association(JSONSerializable):
         #TODO: handle domains
         genes_info=ExtendedInfoGene(gene)
         '''collect data to use for free text search'''
-        self.private['facets']['free_text_search'].append(genes_info.data['geneid'])
-        self.private['facets']['free_text_search'].append(genes_info.data['name'])
-        self.private['facets']['free_text_search'].append(genes_info.data['symbol'])
+
+        for el in ['geneid', 'name', 'symbol']:
+            self.private['facets']['free_text_search'].append(
+                genes_info.data[el])
 
         if 'facets' in gene._private and 'reactome' in gene._private['facets']:
             pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
@@ -127,6 +129,7 @@ class Association(JSONSerializable):
                                                                    term=term))
                 except:
                     pass
+
         if gene.uniprot_keywords:
             uniprot_keywords = gene.uniprot_keywords
 

@@ -28,21 +28,10 @@ from modules.Uniprot import UniProtActions,UniprotDownloader
 
 __author__ = 'andreap'
 
-'''setup module default logging'''
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logging.basicConfig(filename = 'output.log',
-                    format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.DEBUG)
-logging.getLogger('elasticsearch').setLevel(logging.ERROR)
-logging.getLogger("requests").setLevel(logging.ERROR)
-logging.getLogger("urllib3").setLevel(logging.ERROR)
-logging.getLogger("redislite.client").setLevel(logging.ERROR)
-
-'''logger'''
-logger = logging.getLogger(__name__)
-
+logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
 
 if __name__ == '__main__':
+    logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
@@ -143,17 +132,15 @@ if __name__ == '__main__':
 
     if args.loglevel:
         try:
-            logging.basicConfig(filename = 'output.log',
-                                format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                                level=args.loglevel)
-        except:
-            pass
-    '''get local logger'''
-    logger = logging.getLogger(__name__)
+            logger = logging.getLogger()
+            logger.setLevel(logging.getLevelName(args.loglevel))
+        except Exception, e:
+            logger.exception(e)
 
     connectors.init_services_connections(redispersist=args.redispersist)
 
     if args.do_nothing:
+        logger.info("args do nothing")
         sys.exit(0)
 
     with Loader(connectors.es,
