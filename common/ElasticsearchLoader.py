@@ -1,11 +1,9 @@
-import json
 import random
 from collections import defaultdict
-from datetime import datetime
 import time
 import logging
 from elasticsearch.exceptions import NotFoundError
-from elasticsearch.helpers import parallel_bulk, bulk
+from elasticsearch.helpers import bulk
 from common.DataStructure import JSONSerializable
 from common.EvidenceJsonUtils import assertJSONEqual
 from common.Redis import RedisQueueWorkerProcess
