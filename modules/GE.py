@@ -14,14 +14,7 @@ import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-fmt = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
-h = logging.StreamHandler()
-h.setFormatter(fmt)
-logger.addHandler(h)
-
 
 class GE(object):
 

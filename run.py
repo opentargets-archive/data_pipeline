@@ -2,8 +2,6 @@ import argparse
 import logging
 import sys
 
-logger = logging.getLogger(__name__)
-
 from common import Actions
 from common.ElasticsearchLoader import Loader
 from common.connection import PipelineConnectors
@@ -32,8 +30,8 @@ __author__ = 'andreap'
 
 logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
 
-
 if __name__ == '__main__':
+    logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
@@ -134,7 +132,8 @@ if __name__ == '__main__':
 
     if args.loglevel:
         try:
-            logging.RootLogger.setLevel(args.loglevel)
+            logger = logging.getLogger()
+            logger.setLevel(logging.getLevelName(args.loglevel))
         except Exception, e:
             logger.exception(e)
 
