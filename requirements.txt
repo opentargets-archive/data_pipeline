@@ -14,7 +14,7 @@ ujson==1.35
 urllib3==1.10.3
 iso8601>=0.1.11
 lxml>=3.4.4
-git+https://github.com/opentargets/data_model.git@591108d8ef05c04703b40f8be17a997209ee04fc#egg=data_model
+git+https://github.com/opentargets/data_model.git@v1.2.5#egg=data_model
 opentargets
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.0.12.tar.gz
 SPARQLWrapper>=1.7.6
@@ -39,4 +39,3 @@ colorama
 coverage
 ftputil
 psutil
-
