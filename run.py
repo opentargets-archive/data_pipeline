@@ -2,12 +2,6 @@ import argparse
 import logging
 import sys
 
-logging.getLogger('elasticsearch').setLevel(logging.ERROR)
-logging.getLogger("requests").setLevel(logging.ERROR)
-logging.getLogger("urllib3").setLevel(logging.ERROR)
-logging.getLogger("redislite.client").setLevel(logging.ERROR)
-
-'''logger'''
 logger = logging.getLogger(__name__)
 
 from common import Actions
