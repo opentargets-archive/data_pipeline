@@ -50,6 +50,12 @@ class HPADataDownloader():
     def _get_csv_reader(self, csvfile):
         return csv.DictReader(csvfile)
 
+    """
+        Parse 'normal_tissue' csv file,
+        the expression profiles for proteins in human tissues from HPA
+
+    :return: dict
+    """
     def retrieve_normal_tissue_data(self):
         reader = self._get_csv_reader(self._download_data(Config.HPA_NORMAL_TISSUE_URL))
         for c, row in enumerate(reader):
@@ -58,17 +64,21 @@ class HPADataDownloader():
                        level=row['Level'],
                        reliability=row['Reliability'],
                        gene=row['Gene'],
-                       expression_type=row['Expression type'],
                        )
             if c + 1 % 10000 == 0:
                 logging.debug("%i rows parsed from hpa_normal_tissue" % c)
         logging.info('parsed %i rows from hpa_normal_tissue' % c)
 
+    """
+        Parse 'rna_tissue' csv file,
+        RNA levels in 56 cell lines and 37 tissues based on RNA-seq from HPA.
+
+    :return: dict
+    """
     def retrieve_rna_data(self):
         reader = self._get_csv_reader(self._download_data(Config.HPA_RNA_URL))
         for c, row in enumerate(reader):
             yield dict(sample=row['Sample'],
-                       abundance=row['Abundance'],
                        unit=row['Unit'],
                        value=row['Value'],
                        gene=row['Gene'],
@@ -120,11 +130,8 @@ class HPAProcess():
 
         self.process_normal_tissue()
         self.process_rna()
-        self.process_cancer()
-        self.process_subcellular_location()
         self.store_data()
         self.loader.close()
-
 
     def _get_available_genes(self, ):
         return self.available_genes
@@ -152,18 +159,12 @@ class HPAProcess():
             if gene not in self.rna_data:
                 self.rna_data[gene] = []
             self.rna_data[gene].append(row)
-        for gene in self.available_genes:
 
+        for gene in self.available_genes:
             self.data[gene]['expression'].tissues, \
             self.data[gene]['expression'].cell_lines = self.get_rna_data_for_gene(gene)
         logging.info('process_rna completed')
         return
-
-    def process_cancer(self):
-        pass
-
-    def process_subcellular_location(self):
-        pass
 
     def store_data(self):
         logging.info('store_data called')
@@ -194,7 +195,6 @@ class HPAProcess():
                 tissue_data[tissue] = {'protein': {
                     'cell_type': {},
                     'level': 0,
-                    'expression_type': '',
                     'reliability': False,
                 },
 
@@ -205,14 +205,11 @@ class HPAProcess():
                 tissue_data[tissue]['protein']['cell_type'][row['cell_type']] = []
             tissue_data[tissue]['protein']['cell_type'][row['cell_type']].append(
                 dict(level=self.level_translation[row['level']],
-                     expression_type=row['expression_type'],
                      reliability=self.reliability_translation[row['reliability']],
                      ))
             if self.level_translation[row['level']] > tissue_data[tissue]['protein']['level']:
                 tissue_data[tissue]['protein']['level'] = self.level_translation[row['level']]  # TODO: improvable by
                 # giving higher priority to reliable annotations over uncertain
-            if not tissue_data[tissue]['protein']['expression_type']:
-                tissue_data[tissue]['protein']['expression_type'] = row['expression_type']
             if self.reliability_translation[row['reliability']]:
                 tissue_data[tissue]['protein']['reliability'] = True
 
@@ -223,31 +220,28 @@ class HPAProcess():
         cell_line_data = {}
         if not tissue_data:
             tissue_data = {}
-        for row in self.rna_data[gene]:
-            sample = row['sample']
-            is_cell_line = sample not in self.tissue_translation.keys()
-            if is_cell_line:
-                if sample not in cell_line_data:
-                    cell_line_data[sample] = {'rna': {},
-                                              }
-                cell_line_data[sample]['rna']['level'] = self.level_translation[row['abundance']]
-                cell_line_data[sample]['rna']['value'] = row['value']
-                cell_line_data[sample]['rna']['unit'] = row['unit']
-            else:
-                if sample not in tissue_data:
-                    tissue_data[sample] = {'protein': {
-                        'cell_type': {},
-                        'level': 0,
-                        'expression_type': '',
-                        'reliability': False,
-                    },
-
-                        'rna': {
+            for row in self.rna_data[gene]:
+                sample = row['sample']
+                is_cell_line = sample not in self.tissue_translation.keys()
+                if is_cell_line:
+                    if sample not in cell_line_data:
+                        cell_line_data[sample] = {'rna': {},
+                                                  }
+                    cell_line_data[sample]['rna']['value'] = row['value']
+                    cell_line_data[sample]['rna']['unit'] = row['unit']
+                else:
+                    if sample not in tissue_data:
+                        tissue_data[sample] = {'protein': {
+                            'cell_type': {},
+                            'level': 0,
+                            'reliability': False,
                         },
-                        'efo_code': self.tissue_translation[sample]}
-                tissue_data[sample]['rna']['level'] = self.level_translation[row['abundance']]
-                tissue_data[sample]['rna']['value'] = row['value']
-                tissue_data[sample]['rna']['unit'] = row['unit']
+
+                            'rna': {
+                            },
+                            'efo_code': self.tissue_translation[sample]}
+                    tissue_data[sample]['rna']['value'] = row['value']
+                    tissue_data[sample]['rna']['unit'] = row['unit']
         return tissue_data, cell_line_data
 
     def set_translations(self):
@@ -258,6 +252,9 @@ class HPAProcess():
                                   }
         self.reliability_translation = {'Supportive': True,
                                         'Uncertain': False,
+                                        ## new types for hpa v16
+                                        'Approved' : True,
+                                        'Supported': True,
                                         }
 
         self.tissue_translation = {
@@ -308,4 +305,69 @@ class HPAProcess():
             'urinary bladder': 'UBERON_0001255',
             'vagina': 'UBERON_0000996',
             'adipose tissue': 'adipose tissue',
+            ## new tissue types added for hpa v16
+            'caudate': 'UBERON_0005383',
+            'eye': 'UBERON_0000970',
+            'hair': 'EFO_0007824',
+            'hypothalamus': 'UBERON_0001898',
+            'lactating breast': 'lactating breast',
+            'pituitary gland': 'UBERON_0000007',
+            'retina': 'UBERON_0000966',
+            'skin 1': 'UBERON_0000014',
+            'skin 2': 'UBERON_0000014',
+            'endometrium 1': 'UBERON_0001295',
+            'endometrium 2': 'UBERON_0001295',
+            'soft tissue 1': 'UBERON_0000916',
+            'soft tissue 2': 'UBERON_0000916',
+            'stomach 1': 'UBERON_0000945',
+            'stomach 2': 'UBERON_0000945',
+            ## new tissue types added for atlas baseline rna expression
+            'Brodmann(1909) area 24': 'UBERON_0006101',
+            'Brodmann(1909) area 9': 'UBERON_0013540',
+            'C1 segment of cervical spinal cord': 'UBERON_0006469',
+            'EBV - transformed lymphocyte': 'CL_0000542',
+            'amygdala': 'UBERON_0001876',
+            'aorta': 'UBERON_0000947',
+            'atrial appendage of heart': 'UBERON_0006618',
+            'blood': 'UBERON_0000178',
+            'brain': 'UBERON_0000955',
+            'breast(mammary tissue)': 'UBERON_0000310',
+            'caudate nucleus': 'UBERON_0001873',
+            'cerebellar hemisphere': 'UBERON_0002245',
+            'coronary artery': 'UBERON_0001621',
+            'cortex of kidney': 'UBERON_0001225',
+            'ectocervix': 'UBERON_0012249',
+            'endocervix': 'UBERON_0000458',
+            'esophagus muscularis mucosa': 'UBERON_0004648',
+            'frontal lobe': 'UBERON_0016525',
+            'gall bladder': 'UBERON_0002110',
+            'gastroesophageal junction': 'UBERON_0007650',
+            'heart': 'UBERON_0000948',
+            'heart left ventricle': 'UBERON_0002084',
+            'hippocampus proper': 'UBERON_0001954',
+            'ileum': 'UBERON_0002116',
+            'leukocyte': 'CL_0000738',
+            'minor salivary gland': 'UBERON_0001830',
+            'mucosa of esophagus': 'UBERON_0002469',
+            'nucleus accumbens': 'UBERON_0001882',
+            'omental fat pad': 'UBERON_0010414',
+            'prefrontal cortex': 'UBERON_0000451',
+            'prostate gland': 'UBERON_0002367',
+            'putamen': 'UBERON_0001874',
+            'saliva - secreting gland': 'UBERON_0001044',
+            'sigmoid colon': 'UBERON_0001159',
+            'skeletal muscle tissue': 'UBERON_0001134',
+            'skin of lower leg': 'UBERON_0004264',
+            'skin of suprapubic region': 'UBERON_0013203',
+            'smooth muscle tissue': 'UBERON_0001135',
+            'subcutaneous adipose tissue': 'UBERON_0002190',
+            'substantia nigra': 'UBERON_0002038',
+            'temporal lobe': 'UBERON_0001871',
+            'tibial artery': 'UBERON_0007610',
+            'tibial nerve': 'UBERON_0001323',
+            'transformed skin fibroblast': 'CL_0000057',
+            'transverse colon': 'UBERON_0001157',
+            'uterus': 'UBERON_0000995',
+            'vermiform appendix': 'UBERON_0001154',
+            'zone of skin': 'UBERON_0000014',
         }
