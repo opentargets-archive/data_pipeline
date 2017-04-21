@@ -40,10 +40,6 @@ __status__ = "Production"
 
 from logging.config import fileConfig
 
-try:
-    fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
-except:
-    pass
 logger = logging.getLogger(__name__)
 
 def setup_module(module):

@@ -37,7 +37,6 @@ __maintainer__ = "Gautier Koscielny"
 __email__ = "gautierk@targetvalidation.org"
 __status__ = "Production"
 
-fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
 logger = logging.getLogger()
 
 connectors = None

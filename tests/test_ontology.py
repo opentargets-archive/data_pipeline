@@ -38,10 +38,6 @@ __maintainer__ = "Gautier Koscielny"
 __email__ = "gautierk@opentargets.org"
 __status__ = "Production"
 
-try:
-    fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
-except:
-    pass
 logger = logging.getLogger(__name__)
 
 def setup_module(module):
