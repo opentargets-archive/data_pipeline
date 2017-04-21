@@ -8,6 +8,12 @@ __pycache__/
 # C extensions
 *.so
 
+# logs
+*.out
+
+# emacs virtualenv hidden var selector
+.venv
+
 # Distribution / packaging
 .Python
 env/

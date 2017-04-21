@@ -2,7 +2,6 @@ import logging
 import os
 import time
 
-from SPARQLWrapper import SPARQLWrapper
 from elasticsearch import Elasticsearch
 from elasticsearch import RequestsHttpConnection
 from redislite import Redis
@@ -25,7 +24,6 @@ class PipelineConnectors():
 
         self.logger = logging.getLogger(__name__)
 
-
     def clear_redislite_db(self):
         if os.path.exists(Config.REDISLITE_DB_PATH):
             os.remove(Config.REDISLITE_DB_PATH)
@@ -34,17 +32,24 @@ class PipelineConnectors():
     def init_services_connections(self, redispersist=False):
         '''init es client'''
         connection_attempt = 1
-        hosts=[]
+        hosts = []
         if len(Config.ELASTICSEARCH_NODES) > 1 and Config.ELASTICSEARCH_PORT:
-            hosts = [dict(host=node, port=int(Config.ELASTICSEARCH_PORT)) for node in Config.ELASTICSEARCH_NODES]
+            hosts = [dict(host=node, port=int(Config.ELASTICSEARCH_PORT))
+                     for node in Config.ELASTICSEARCH_NODES]
+
         elif Config.ELASTICSEARCH_HOST and Config.ELASTICSEARCH_PORT:
             while 1:
                 import socket
-                try:#is a valid ip
+
+                # is a valid ip
+                try:
                     socket.inet_aton(Config.ELASTICSEARCH_HOST)
-                    hosts = [dict(host=Config.ELASTICSEARCH_HOST, port=int(Config.ELASTICSEARCH_PORT))]
+                    hosts = [dict(host=Config.ELASTICSEARCH_HOST,
+                                  port=int(Config.ELASTICSEARCH_PORT))]
                     break
-                except socket.error:#resolve nameserver to list of ips
+
+                # resolve nameserver to list of ips
+                except socket.error:
                     try:
                         socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
                         nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
@@ -81,7 +86,6 @@ class PipelineConnectors():
         else:
             self.logger.warn('No valid configuration available for elasticsearch' )
             self.es=None
-
 
         if not redispersist:
             self.clear_redislite_db()
