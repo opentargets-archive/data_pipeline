@@ -218,8 +218,8 @@ class Publication(JSONSerializable):
                  journal = None,
                  journal_reference=None,
                  full_text = u"",
-                 epmc_text_mined_entities = {},
-                 epmc_keywords = [],
+                 text_mined_entities = {},
+                 keywords = [],
                  full_text_url=[],
                  doi=u'',
                  cited_by=None,
@@ -243,8 +243,8 @@ class Publication(JSONSerializable):
         self.journal = journal
         self.journal_reference=journal_reference
         self.full_text = full_text
-        self.epmc_text_mined_entities = epmc_text_mined_entities
-        self.epmc_keywords = epmc_keywords
+        self.text_mined_entities = text_mined_entities
+        self.keywords = keywords
         self.full_text_url = full_text_url
         self.doi = doi
         self.cited_by = cited_by
@@ -258,9 +258,13 @@ class Publication(JSONSerializable):
         self.chemicals = chemicals
         self.filename = filename
 
+        self._process_authors()
+        self._sanitize_abstract()
+        self._split_sentences()
+
     def __str__(self):
         return "id:%s | title:%s | abstract:%s | authors:%s | pub_date:%s | date:%s | journal:%s" \
-               "| journal_reference:%s | full_text:%s | epmc_text_mined_entities:%s | epmc_keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
+               "| journal_reference:%s | full_text:%s | text_mined_entities:%s | keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
                "| has_text_mined_entities:%s | is_open_access:%s | pub_type:%s | date_of_revision:%s | has_references:%s | references:%s" \
                "| mesh_headings:%s | chemicals:%s | filename:%s"%(self.pub_id,
                                                    self.title,
@@ -271,8 +275,8 @@ class Publication(JSONSerializable):
                                                     self.journal,
                                                     self.journal_reference,
                                                     self.full_text,
-                                                    self.epmc_text_mined_entities,
-                                                    self.epmc_keywords,
+                                                    self.text_mined_entities,
+                                                    self.keywords,
                                                     self.full_text_url,
                                                     self.doi,
                                                     self.cited_by,
@@ -286,7 +290,29 @@ class Publication(JSONSerializable):
                                                     self.chemicals,
                                                     self.filename
                                                     )
+    def _process_authors(self):
+        if self.authors:
+            for a in self.authors:
+                if a['LastName'] :
+                    a['last_name'] = a['LastName']
+                    a['short_name'] = a['LastName']
+                    a['full_name'] = a['LastName']
+                    if a['Initials']:
+                        a['short_name'] += ' ' + a['Initials']
+                    if a['ForeName']:
+                        a['full_name'] += ' ' + a['ForeName']
+                    del a['LastName']
+                    del a['Initials']
+                    del a['ForeName']
 
+    def _split_sentences(self):
+        #todo: use proper sentence detection with spacy
+        if self.abstract:
+            self.abstract_sentences = self.abstract.split('. ')
+
+    def _sanitize_abstract(self):
+        if isinstance(self.abstract, list):
+            self.abstract=' '.join(self.abstract)
 
 
 class LiteratureLookUpTable(object):
@@ -814,7 +840,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                   journal_reference=publication.get("journal_reference"),
                                   full_text=u"",
                                   #full_text_url=publication['fullTextUrlList']['fullTextUrl'],
-                                  epmc_keywords=publication.get('keywords'),
+                                  keywords=publication.get('keywords'),
                                   doi=publication.get('doi',''),
                                   #cited_by=publication['citedByCount'],
                                   #has_text_mined_terms=publication['hasTextMinedTerms'] == u'Y',
@@ -826,13 +852,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                   chemicals=publication.get('chemicals')
                                   )
 
-            # if 'dateOfRevision' in publication:
-            #     pub.date_of_revision = publication["dateOfRevision"]
-            #
-            # if pub.has_text_mined_entities:
-            #     self.get_epmc_text_mined_entities(pub)
-            # if pub.has_references:
-            #     self.get_epmc_ref_list(pub)
+
 
                 self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                                 Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
