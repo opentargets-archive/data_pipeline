@@ -11,14 +11,12 @@ from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter, RedisQueueWorkerThread
-from common.connection import PipelineConnectors
 from modules.EFO import EFO
 from modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from modules.GeneData import Gene
 from settings import Config
 
 __author__ = 'andreap'
-import math
 
 
 global_reporting_step = 5e5
