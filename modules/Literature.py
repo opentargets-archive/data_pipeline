@@ -308,11 +308,16 @@ class Publication(JSONSerializable):
     def _split_sentences(self):
         #todo: use proper sentence detection with spacy
         if self.abstract:
-            self.abstract_sentences = self.abstract.split('. ')
+            abstract_sentences = Publication.split_sentences(self.abstract)
+            self.abstract_sentences = [dict(order=i, value = sentence) for i, sentence in enumerate(abstract_sentences)]
 
     def _sanitize_abstract(self):
         if isinstance(self.abstract, list):
             self.abstract=' '.join(self.abstract)
+
+    @staticmethod
+    def split_sentences(text):
+        return text.split('. ')#todo: use spacy here
 
 
 class LiteratureLookUpTable(object):
@@ -739,7 +744,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
             if e.tag == 'Abstract':
                 abstracts = []
-                for abstractText in e.getchildren():
+                for abstractText in e.findall('AbstractText'):
                     abstracts.append(abstractText.text)
                 publication['abstract'] = abstracts
 
