@@ -121,19 +121,12 @@ class EcoProcess():
     #                       )
     #             self.ecos[code] = eco
 
-
-
     def _store_eco(self):
         for eco_id, eco_obj in self.ecos.items():
             self.loader.put(index_name=Config.ELASTICSEARCH_ECO_INDEX_NAME,
                             doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
                             ID=eco_id,
                             body=eco_obj)
-
-
-
-
-
 
 
 class ECOLookUpTable(object):

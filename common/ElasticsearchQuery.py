@@ -79,7 +79,7 @@ class ESQuery(object):
                                Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                                Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                                fields)
-    
+
     def count_all_targets(self):
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
@@ -106,7 +106,6 @@ class ESQuery(object):
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
 
-
     def get_all_eco(self, fields=None):
         source = self._get_source_from_fields(fields)
 
@@ -126,8 +125,30 @@ class ESQuery(object):
             yield hit['_source']
 
     def count_all_eco(self):
+        return self.count_elements_in_index(
+            Config.ELASTICSEARCH_ECO_INDEX_NAME)
 
-        return self.count_elements_in_index(Config.ELASTICSEARCH_ECO_INDEX_NAME)
+    def get_all_hpa(self, fields=None):
+        source = self._get_source_from_fields(fields)
+
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "match_all": {}
+                           },
+                                  '_source': source,
+                                  'size': 1000,
+                           },
+                           scroll='12h',
+                           doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+                           index=Loader.get_versioned_index(
+                               Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME),
+                           timeout="10m")
+        for hit in res:
+            yield hit['_source']
+
+    def count_all_hpa(self):
+        return self.count_elements_in_index(
+            Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
 
     def get_publications_with_analyzed_data(self,ids, fields=None):
         source = self._get_source_from_fields(fields)

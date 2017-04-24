@@ -2,14 +2,24 @@ import csv
 import logging
 from StringIO import StringIO
 from zipfile import ZipFile
+from tqdm import tqdm
 
 import requests
 
 from common import Actions
 from common.DataStructure import JSONSerializable
+from common.ElasticsearchQuery import ESQuery
+from common.Redis import RedisLookupTablePickle
+
 from settings import Config
 
 __author__ = 'andreap'
+
+
+def hpa2tissues(hpa=None):
+    '''return a list of tissues if any or empty list'''
+    return [k for k, _ in hpa.tissues
+            if hpa is not None and type(hpa) == type(HPAExpression)]
 
 
 class HPAActions(Actions):
@@ -17,7 +27,7 @@ class HPAActions(Actions):
 
 
 class HPAExpression(JSONSerializable):
-    def __init__(self, gene):
+    def __init__(self, gene=None):
         self.gene = gene
         self.tissues = {}
         self.cell_lines = {}
@@ -371,3 +381,65 @@ class HPAProcess():
             'vermiform appendix': 'UBERON_0001154',
             'zone of skin': 'UBERON_0000014',
         }
+
+
+class HPALookUpTable(object):
+    """
+    A redis-based pickable hpa look up table using gene id as table
+    id
+    """
+
+    def __init__(self,
+                 es,
+                 namespace=None,
+                 r_server=None,
+                 ttl=(60*60*24+7)):
+        self._table = RedisLookupTablePickle(namespace=namespace,
+                                             r_server=r_server,
+                                             ttl=ttl)
+        self._es = es
+        self._es_query = ESQuery(es)
+        self.r_server = r_server
+        if r_server is not None:
+            self._load_hpa_data(r_server)
+
+    def _load_hpa_data(self, r_server=None):
+        for el in tqdm(self._es_query.get_all_hpa(),
+                       desc='loading hpa',
+                       unit=' hpa',
+                       unit_scale=True,
+                       total=self._es_query.count_all_hpa(),
+                       leave=False):
+            self._table.set(el['gene'], el,
+                            r_server=self._get_r_server(r_server))
+
+    def get_hpa(self, idx, r_server=None):
+        return self._table.get(idx, r_server=r_server)
+
+    def set_hpa(self, hpa, r_server=None):
+        self._table.set(hpa['gene'], hpa,
+                        r_server=self._get_r_server(r_server))
+
+    def get_available_hpa_ids(self, r_server=None):
+        return self._table.keys()
+
+    def __contains__(self, key, r_server=None):
+        return self._table.__contains__(key,
+                                        r_server=self._get_r_server(r_server))
+
+    def __getitem__(self, key, r_server=None):
+        return self.get_hpa(key, r_server)
+
+    def __setitem__(self, key, value, r_server=None):
+        self._table.set(key, value, r_server=self._get_r_server(r_server))
+
+    def _get_r_server(self, r_server=None):
+        if not r_server:
+            r_server = self.r_server
+        if r_server is None:
+            raise AttributeError('A redis server is required either at class'
+                                 ' instantation or at the method level')
+        return r_server
+
+    def keys(self):
+        return self._table.keys()

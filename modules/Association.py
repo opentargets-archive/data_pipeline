@@ -12,6 +12,7 @@ from common.ElasticsearchQuery import ESQuery
 from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter, RedisQueueWorkerThread
 from modules.EFO import EFO
+from modules.HPA import HPAExpression, hpa2tissues
 from modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from modules.GeneData import Gene
 from settings import Config
@@ -143,8 +144,6 @@ class Association(JSONSerializable):
             target_class['level1'].append([i['l1'] for i in gene.protein_classification['chembl'] if 'l1' in i])
             target_class['level2'].append([i['l2'] for i in gene.protein_classification['chembl'] if 'l2' in i])
 
-
-
         '''Add private objects used just for indexing'''
 
         if pathway_data['pathway_code']:
@@ -158,7 +157,11 @@ class Association(JSONSerializable):
         if target_class['level1']:
             self.private['facets']['target_class'] = target_class
 
-
+    def set_hpa_data(self, hpa):
+        '''set a compat hpa expression data into the score object'''
+        filteredHPA = hpa2tissues(hpa)
+        if filteredHPA is not None and len(filteredHPA) > 0:
+            self.private['facets']['expression_tissues'] = filteredHPA
 
     def set_disease_data(self, efo):
         """get generic efo info"""
@@ -447,16 +450,36 @@ class ScoreProducer(RedisQueueWorkerThread):
                 gene_data = Gene()
                 try:
                     gene_data.load_json(self.lookup_data.available_genes.get_gene(target))
-                except KeyError:
-                    self.logger.error('Cannot find gene code "%s" in lookup table'%target)
+                except KeyError, e:
+                    self.logger.debug('Cannot find gene code "%s" '
+                                      'in lookup table' % target)
+                    self.logger.exception(e)
+
                 score.set_target_data(gene_data)
 
+                # create a hpa expression empty jsonserializable class
+                # to fill from Redis cache lookup_data
+                hpa_data = HPAExpression()
+                try:
+                    hpa_data.load_json(
+                        self.lookup_data.available_hpa.get_hpa(gene_data.id))
+                    score.set_hpa_data(hpa_data)
+
+                except Exception, e:
+                    self.logger.debug('Cannot find HPA code "%s" '
+                                      'in lookup table' % target)
+                    self.logger.exception(e)
 
                 disease_data = EFO()
                 try:
-                    disease_data.load_json(self.lookup_data.available_efos.get_efo(disease))
-                except KeyError:
-                    self.logger.error('Cannot find EFO code "%s" in lookup table'%disease)
+                    disease_data.load_json(
+                        self.lookup_data.available_efos.get_efo(disease))
+
+                except KeyError, e:
+                    self.logger.debug('Cannot find EFO code "%s" '
+                                      'in lookup table' % disease)
+                    self.logger.exception(e)
+
                 score.set_disease_data(disease_data)
 
                 return (target, disease, score)
@@ -530,12 +553,12 @@ class ScoringProcess():
                                           self.r_server,
                                           targets=targets,
                                           data_types=(
-                                                      LookUpDataType.DISEASE,
-                                                      LookUpDataType.TARGET,
-                                                      LookUpDataType.ECO,
-                                                      ),
-                                          autoload=False,
-                                          ).lookup
+                                              LookUpDataType.DISEASE,
+                                              LookUpDataType.TARGET,
+                                              LookUpDataType.ECO,
+                                              LookUpDataType.HPA
+                                          ),
+                                          autoload=False).lookup
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
@@ -624,6 +647,3 @@ class ScoringProcess():
 
 
         logger.info("DONE")
-
-
-

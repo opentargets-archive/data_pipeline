@@ -8,6 +8,7 @@ from common.ElasticsearchQuery import ESQuery
 from modules.ChEMBL import ChEMBLLookup
 from modules.ECO import ECOLookUpTable
 from modules.EFO import EFOLookUpTable
+from modules.HPA import HPALookUpTable
 from modules.GeneData import GeneLookUpTable
 from modules.Literature import LiteratureLookUpTable
 from modules.Ontology import OntologyClassReader
@@ -19,12 +20,14 @@ class LookUpData():
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
+        self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
         self.available_gene_objects = None
         self.available_efo_objects = None
         self.available_eco_objects = None
         self.chembl = None
+
 
 class LookUpDataType(object):
     TARGET = 'target'
@@ -35,15 +38,18 @@ class LookUpDataType(object):
     MP = 'mp'
     HPO = 'hpo'
     CHEMBL_DRUGS = 'chembl_drugs'
+    HPA = 'hpa'
+
 
 class LookUpDataRetriever(object):
     def __init__(self,
-                 es = None,
-                 r_server = None,
-                 targets = [],
-                 data_types=(LookUpDataType.TARGET,LookUpDataType.DISEASE,LookUpDataType.ECO),
-                 autoload  = True,
-                 ):
+                 es=None,
+                 r_server=None,
+                 targets=[],
+                 data_types=(LookUpDataType.TARGET,
+                             LookUpDataType.DISEASE,
+                             LookUpDataType.ECO),
+                 autoload=True):
 
         self.es = es
         self.r_server = r_server
@@ -51,12 +57,12 @@ class LookUpDataRetriever(object):
             self.esquery = ESQuery(es)
         self.lookup = LookUpData()
         self.logger = logging.getLogger(__name__)
-        #TODO: run the steps in parallel to speedup loading times
+
+        # TODO: run the steps in parallel to speedup loading times
         for dt in tqdm(data_types,
-                         desc='loading lookup data',
-                         unit=' steps',
-                         leave=False,
-                         ):
+                       desc='loading lookup data',
+                       unit=' steps',
+                       leave=False):
             start_time = time.time()
             if dt == LookUpDataType.TARGET:
                 self._get_gene_info(targets, autoload=autoload)
@@ -74,12 +80,13 @@ class LookUpDataRetriever(object):
                 self._get_available_publications()
             elif dt == LookUpDataType.CHEMBL_DRUGS:
                 self._get_available_chembl_mappings()
+            elif dt == LookUpDataType.HPA:
+                self._get_available_hpa()
 
             self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
 
 
 
-    def _get_available_efos(self):
         self.logger.info('getting efos')
         self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
 
@@ -187,8 +194,7 @@ class LookUpDataRetriever(object):
             chembl_handler._populate_synonyms_for_molecule(all_molecules[i:i + query_batch_size])
         self.lookup.chembl = chembl_handler
 
-
-
-
-
-
+    def _get_available_hpa(self):
+        self.logger.info('getting expressions')
+        self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP',
+                                                   self.r_server)
