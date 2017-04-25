@@ -25,6 +25,7 @@ from modules.QC import QCActions, QCRunner
 from modules.Reactome import ReactomeActions,  ReactomeProcess
 from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from modules.Uniprot import UniProtActions,UniprotDownloader
+from settings import Config
 
 __author__ = 'andreap'
 
@@ -142,6 +143,8 @@ if __name__ == '__main__':
     if args.do_nothing:
         logger.info("args do nothing")
         sys.exit(0)
+
+    logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,

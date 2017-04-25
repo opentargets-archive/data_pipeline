@@ -28,6 +28,9 @@ class Loader():
             connector = PipelineConnectors()
             connector.init_services_connections()
             es = connector.es
+            if es is None:
+                raise EnvironmentError('no elasticsearch connection '
+                                       'was properly setup')
         self.es = es
         self.cache = []
         self.results = defaultdict(list)
