@@ -19,7 +19,7 @@ class DrugSearchTestCase(unittest.TestCase):
                             level=logging.INFO)
         connectors = PipelineConnectors()
         connectors.init_services_connections()
-        from elasticsearch_config import ElasticSearchConfiguration
+        from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
         with Loader(connectors.es,
                     chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
 

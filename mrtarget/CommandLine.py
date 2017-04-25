@@ -5,7 +5,7 @@ import sys
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import PipelineConnectors
-from elasticsearch_config import ElasticSearchConfiguration
+from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 from mrtarget.modules.Association import AssociationActions, ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationActions, DataDrivenRelationProcess
 from mrtarget.modules.Dump import DumpActions, DumpGenerator
@@ -18,20 +18,20 @@ from mrtarget.modules.GeneData import GeneActions, GeneManager
 from mrtarget.modules.HPA import  HPAActions, HPAProcess
 from mrtarget.modules.IntOGen import IntOGenActions, IntOGen
 from mrtarget.modules.Literature import LiteratureActions, MedlineRetriever
-from mrtarget.modules.LiteratureNLP import LiteratureNLPProcess,LiteratureNLPActions
+from mrtarget.modules.LiteratureNLP import LiteratureNLPProcess, LiteratureNLPActions
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
 from mrtarget.modules.Ontology import OntologyActions, PhenotypeSlim
 from mrtarget.modules.QC import QCActions, QCRunner
-from mrtarget.modules.Reactome import ReactomeActions,  ReactomeProcess
+from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
-from mrtarget.modules.Uniprot import UniProtActions,UniprotDownloader
-from settings import Config
+from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
+from mrtarget.Settings import Config, file_or_resource
 
 __author__ = 'andreap'
 
-logging.config.fileConfig('logging.ini', disable_existing_loggers=False)
+logging.config.fileConfig(file_or_resource('logging.ini'))
 
-if __name__ == '__main__':
+def main():
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
@@ -243,3 +243,7 @@ if __name__ == '__main__':
             do_all = (DumpActions.ALL in args.dump) or run_full_pipeline
             if (DumpActions.DUMP in args.dump) or do_all:
                 DumpGenerator().dump()
+
+
+if __name__ == '__main__':
+    main()

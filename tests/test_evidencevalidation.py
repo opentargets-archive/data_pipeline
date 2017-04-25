@@ -23,7 +23,7 @@ from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
 from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
 from run import PipelineConnectors
-from settings import Config
+from mrtarget.Settings import Config
 import logging
 import os
 from logging.config import fileConfig

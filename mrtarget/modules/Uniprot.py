@@ -8,7 +8,7 @@ from mrtarget.common.UniprotIO import UniprotIterator, Parser
 from requests.exceptions import Timeout, HTTPError, ConnectionError
 import jsonpickle
 
-from settings import Config
+from mrtarget.Settings import Config
 
 __author__ = 'andreap'
 

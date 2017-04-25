@@ -4,7 +4,7 @@ from json import JSONEncoder
 
 from datetime import datetime, date
 
-from settings import Config
+from mrtarget.Settings import Config
 
 __author__ = 'andreap'
 

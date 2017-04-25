@@ -19,7 +19,7 @@ from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
 from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy
-from settings import Config
+from mrtarget.Settings import Config, file_or_resource
 
 logger = logging.getLogger(__name__)
 # logger = multiprocessing.get_logger()
@@ -649,7 +649,7 @@ class EvidenceManager():
     def _get_non_reference_gene_mappings(self):
         self.non_reference_genes = {}
         skip_header = True
-        for line in file('resources/genes_with_non_reference_ensembl_ids.tsv'):
+        for line in file(file_or_resource('genes_with_non_reference_ensembl_ids.tsv')):
             if skip_header:
                 skip_header = False
             symbol, ensg, assembly, chr, is_ref = line.split()
@@ -675,7 +675,7 @@ class EvidenceManager():
 
     def _get_eco_scoring_values(self):
         self.eco_scores = dict()
-        for line in file('resources/eco_scores.tsv'):
+        for line in file(file_or_resource('eco_scores.tsv')):
             try:
                 uri, label, score = line.strip().split('\t')
                 self.eco_scores[uri] = float(score)

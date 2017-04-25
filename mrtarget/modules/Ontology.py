@@ -19,7 +19,7 @@ from mrtarget.common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
 from tqdm import tqdm
 from datetime import date
-from settings import Config
+from mrtarget.Settings import Config
 
 __author__ = "Gautier Koscielny"
 __copyright__ = "Copyright 2014-2016, Open Targets"

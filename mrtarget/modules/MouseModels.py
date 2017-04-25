@@ -10,7 +10,7 @@ import re
 import hashlib
 import datetime
 from mrtarget.common import Actions
-from settings import Config
+from mrtarget.Settings import Config
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.modules.Ontology import OntologyClassReader
 from EvidenceValidation import EvidenceValidationFileChecker

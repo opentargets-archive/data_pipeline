@@ -8,8 +8,8 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.EvidenceJsonUtils import assertJSONEqual
 from mrtarget.common.Redis import RedisQueueWorkerProcess
 from mrtarget.common.connection import PipelineConnectors
-from settings import Config
-from elasticsearch_config import ElasticSearchConfiguration
+from mrtarget.Settings import Config
+from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 __author__ = 'andreap'
 
 

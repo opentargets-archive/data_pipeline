@@ -11,7 +11,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.modules.Ontology import OntologyClassReader
-from settings import Config
+from mrtarget.Settings import Config
 
 
 from logging.config import fileConfig

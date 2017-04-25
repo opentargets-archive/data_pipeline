@@ -7,7 +7,7 @@ import json
 import ConfigParser
 from mrtarget.common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
-#from settings import Config
+#from mrtarget.Settings import Config
 
 ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
 ONTOLOGY_CONFIG.read('../ontology_config.ini')

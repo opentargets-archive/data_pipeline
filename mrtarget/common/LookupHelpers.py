@@ -12,7 +12,7 @@ from mrtarget.modules.HPA import HPALookUpTable
 from mrtarget.modules.GeneData import GeneLookUpTable
 from mrtarget.modules.Literature import LiteratureLookUpTable
 from mrtarget.modules.Ontology import OntologyClassReader
-from settings import Config
+from mrtarget.Settings import Config, file_or_resource
 
 
 class LookUpData():
@@ -108,7 +108,7 @@ class LookUpDataRetriever(object):
     def _get_non_reference_gene_mappings(self):
         self.lookup.non_reference_genes = {}
         skip_header=True
-        for line in file('resources/genes_with_non_reference_ensembl_ids.tsv'):
+        for line in file(file_or_resource('resources/genes_with_non_reference_ensembl_ids.tsv')):
             if skip_header:
                 skip_header=False
             symbol, ensg, assembly, chr, is_ref = line.split()

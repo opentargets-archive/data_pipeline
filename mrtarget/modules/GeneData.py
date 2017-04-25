@@ -18,7 +18,7 @@ from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueue
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.modules.Reactome import ReactomeRetriever
-from settings import Config
+from mrtarget.Settings import Config
 from elasticsearch.exceptions import NotFoundError
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'

@@ -9,7 +9,7 @@ from tqdm import tqdm
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from settings import Config
+from mrtarget.Settings import Config
 logger = logging.getLogger(__name__)
 
 

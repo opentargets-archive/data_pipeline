@@ -17,7 +17,7 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.modules.Literature import PublicationFetcher
-from settings import Config
+from mrtarget.Settings import Config
 
 # List of symbols we don't care about
 SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "“", "”", "'ve"]

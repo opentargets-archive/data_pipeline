@@ -22,7 +22,7 @@ except ImportError:
 import time
 from multiprocessing import Process
 from redislite import Redis
-from settings import Config
+from mrtarget.Settings import Config
 from colorama import Fore, Back, Style
 
 logger = logging.getLogger(__name__)

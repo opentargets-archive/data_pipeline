@@ -24,7 +24,7 @@ from nose.tools.nontrivial import with_setup
 from mrtarget.modules.Ontology import OntologyClassReader, PhenotypeSlim, DiseaseUtils, EFO_TAS
 from rdflib import URIRef
 from SPARQLWrapper import SPARQLWrapper, JSON
-from settings import Config
+from mrtarget.Settings import Config
 import logging
 import os
 from logging.config import fileConfig

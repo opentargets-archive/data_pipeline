@@ -18,7 +18,7 @@ from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQue
 from  multiprocessing import Process
 from elasticsearch import Elasticsearch, helpers
 
-from settings import Config
+from mrtarget.Settings import Config
 
 
 

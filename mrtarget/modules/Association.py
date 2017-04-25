@@ -15,7 +15,7 @@ from mrtarget.modules.EFO import EFO
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
-from settings import Config
+from mrtarget.Settings import Config
 
 __author__ = 'andreap'
 

@@ -6,7 +6,7 @@ from elasticsearch import Elasticsearch
 from elasticsearch import RequestsHttpConnection
 from redislite import Redis
 
-from settings import Config
+from mrtarget.Settings import Config
 
 
 class PipelineConnectors():

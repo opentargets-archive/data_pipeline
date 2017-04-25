@@ -10,7 +10,7 @@ from elasticsearch import helpers
 from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import PipelineConnectors
-from settings import Config
+from mrtarget.Settings import Config
 
 
 class AssociationSummary(object):

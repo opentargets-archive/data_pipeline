@@ -8,7 +8,7 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.modules.EvidenceString import EvidenceStringProcess
 from elasticsearch import Elasticsearch
 from redislite import Redis
-from settings import Config
+from mrtarget.Settings import Config
 import logging
 from run import PipelineConnectors
 import io

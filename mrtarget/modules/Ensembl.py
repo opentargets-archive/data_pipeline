@@ -5,7 +5,7 @@ import requests
 import time
 
 from mrtarget.common import Actions
-from settings import Config
+from mrtarget.Settings import Config
 
 '''
 

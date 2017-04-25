@@ -7,7 +7,7 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.modules.Ontology import OntologyClassReader, DiseaseUtils
 from rdflib import URIRef
-from settings import Config
+from mrtarget.Settings import Config
 
 '''
 Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 
@@ -62,7 +62,7 @@ class EFO(JSONSerializable):
         return self.code
         # return get_ontology_code_from_url(self.path_codes[0][-1])
 
-    def creat_suggestions(self):
+    def create_suggestions(self):
 
         field_order = [self.label,
                        self.code,

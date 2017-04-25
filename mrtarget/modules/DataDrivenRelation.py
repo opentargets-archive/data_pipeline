@@ -24,7 +24,7 @@ from copy import copy
 import math
 
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from settings import Config
+from mrtarget.Settings import Config
 
 
 

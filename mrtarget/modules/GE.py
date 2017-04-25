@@ -9,7 +9,7 @@ import re
 import requests
 #import requests_cache
 import urlparse
-from settings import Config
+from mrtarget.Settings import Config
 import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')

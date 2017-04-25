@@ -31,7 +31,7 @@ import requests
 
 from mrtarget.common.Downloader import Downloader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from settings import Config
+from mrtarget.Settings import Config
 
 __copyright__ = "Copyright 2014-2016, GlaxoSmithKline"
 

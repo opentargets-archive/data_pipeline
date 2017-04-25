@@ -1,6 +1,4 @@
-import os
-
-from settings import Config
+from mrtarget.Settings import Config
 
 
 def _get_evidence_string_generic_mapping():

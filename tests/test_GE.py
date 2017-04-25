@@ -1,6 +1,6 @@
 import unittest
 from mrtarget.modules import GE
-from settings import Config
+from mrtarget.Settings import Config
 
 ge_object = GE.GE()
 

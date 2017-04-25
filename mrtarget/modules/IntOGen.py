@@ -1,23 +1,10 @@
-
 import sys
-import httplib
-import time
-import optparse
 import logging
-import os
-import json
-import re
-import hashlib
 import datetime
 from mrtarget.common import Actions
-from settings import Config
-from EvidenceValidation import EvidenceValidationFileChecker
-import elasticsearch
-from elasticsearch import Elasticsearch, helpers
-from SPARQLWrapper import SPARQLWrapper, JSON
+from mrtarget.Settings import Config, file_or_resource
 import opentargets.model.core as opentargets
 import opentargets.model.bioentity as bioentity
-import opentargets.model.evidence.phenotype as evidence_phenotype
 import opentargets.model.evidence.core as evidence_core
 import opentargets.model.evidence.linkout as evidence_linkout
 import opentargets.model.evidence.association_score as association_score
@@ -35,7 +22,7 @@ __status__ = "Production"
 
 INTOGEN_RELEASE_DATE = ''
 #INTOGEN_FILENAME = 'C:\Users\gk680303\github\data_pipeline\resources\intogen_opentargets.tsv'
-INTOGEN_FILENAME = '/Users/koscieln/Documents/work/gitlab/data_pipeline/resources/intogen_opentargets.tsv'
+INTOGEN_FILENAME = file_or_resource('intogen_opentargets.tsv')
 INTOGEN_EVIDENCE_FILENAME = '/Users/koscieln/Documents/data/ftp/cttv001/upload/submissions/cttv001_intogen-29-07-2016.json'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {

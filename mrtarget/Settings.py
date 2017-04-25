@@ -1,14 +1,30 @@
 import uuid
-from collections import defaultdict, OrderedDict
-
-
-__author__ = 'andreap'
+from collections import defaultdict
 import os
 import ConfigParser
+import pkg_resources as res
+import mrtarget
+
+__author__ = 'andreap'
+
+
+def file_or_resource(filename=None):
+    '''get filename and check if in getcwd then get from
+    the package resources folder
+    '''
+    resource_package = mrtarget.__name__
+    # Do not use os.path.join(), see below
+    resource_path = '/'.join(('resources', filename))
+
+    if filename is not None:
+        abs_filename = os.path.join(os.path.abspath(os.getcwd()), filename)
+        return abs_filename if os.path.isfile(abs_filename) \
+            else res.resource_string(resource_package, resource_path)
 
 
 iniparser = ConfigParser.ConfigParser()
-iniparser.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'db.ini'))
+iniparser.read(file_or_resource('db.ini'))
+
 
 class Config():
 
@@ -249,4 +265,7 @@ class Config():
     GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
     GE_ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
     GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
+
+    # package resources
+    RESOURCE_
 

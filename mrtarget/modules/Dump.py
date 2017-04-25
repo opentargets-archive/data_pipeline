@@ -4,7 +4,7 @@ from tqdm import tqdm
 from mrtarget.common import Actions
 import gzip, time, logging
 
-from settings import Config
+from mrtarget.Settings import Config
 from opentargets import OpenTargetsClient
 
 class DumpActions(Actions):

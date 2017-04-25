@@ -1,7 +1,7 @@
 import gzip
 import logging
 import json
-from settings import Config
+from mrtarget.Settings import Config
 import opentargets.model.core as opentargets
 import opentargets.model.evidence.association_score as evidence_association_score
 

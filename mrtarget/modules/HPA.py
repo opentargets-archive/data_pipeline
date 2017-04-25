@@ -11,7 +11,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
 
-from settings import Config
+from mrtarget.Settings import Config
 
 __author__ = 'andreap'
 

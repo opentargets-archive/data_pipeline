@@ -20,7 +20,7 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
 from mrtarget.common.connection import PipelineConnectors
-from settings import Config
+from mrtarget.Settings import Config
 
 logger = logging.getLogger(__name__)
 
