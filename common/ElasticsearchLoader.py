@@ -28,18 +28,16 @@ class Loader():
             connector = PipelineConnectors()
             connector.init_services_connections()
             es = connector.es
-            if es is None:
+            if es is None and not dry_run:
                 raise EnvironmentError('no elasticsearch connection '
                                        'was properly setup')
         self.es = es
         self.cache = []
         self.results = defaultdict(list)
         self.chunk_size = chunk_size
-        self.indexes_created=[]
+        self.indexes_created = []
         self.indexes_optimised = {}
         self.dry_run = dry_run
-        if es is None:
-            self.dry_run = True
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
         self.logger = logging.getLogger(__name__)

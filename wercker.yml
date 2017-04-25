@@ -21,7 +21,7 @@ build:
     - script:
         name: test empty run to catch import errors
         code: |
-          python run.py
+          python run.py --dry-run
     - script:
         name: log status in github
         code: |
