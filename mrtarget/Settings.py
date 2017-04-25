@@ -15,6 +15,7 @@ def file_or_resource(filename=None):
     resource_package = mrtarget.__name__
     # Do not use os.path.join(), see below
     resource_path = '/'.join(('resources', filename))
+    print resource_path
 
     if filename is not None:
         abs_filename = os.path.join(os.path.abspath(os.getcwd()), filename)
@@ -23,7 +24,7 @@ def file_or_resource(filename=None):
 
 
 iniparser = ConfigParser.ConfigParser()
-iniparser.read(file_or_resource('db.ini'))
+iniparser.read(os.path.join(os.path.abspath(os.getcwd()), 'db.ini'))
 
 
 class Config():
@@ -39,7 +40,7 @@ class Config():
         PROXY_PORT = int(iniparser.get('proxy', 'port'))
 
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
-    ONTOLOGY_CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ontology_config.ini'))
+    ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
     RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or '17.04'
     ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'

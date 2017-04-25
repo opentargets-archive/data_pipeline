@@ -7,10 +7,10 @@ import json
 import ConfigParser
 from mrtarget.common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
-#from mrtarget.Settings import Config
+from mrtarget.Settings import file_or_resource
 
 ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
-ONTOLOGY_CONFIG.read('../ontology_config.ini')
+ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
 class OntologyLookup(object):
 
