@@ -13,14 +13,12 @@ def file_or_resource(filename=None):
     the package resources folder
     '''
     resource_package = mrtarget.__name__
-    # Do not use os.path.join(), see below
     resource_path = '/'.join(('resources', filename))
-    print resource_path
 
     if filename is not None:
         abs_filename = os.path.join(os.path.abspath(os.getcwd()), filename)
         return abs_filename if os.path.isfile(abs_filename) \
-            else res.resource_string(resource_package, resource_path)
+            else res.resource_filename(resource_package, resource_path)
 
 
 iniparser = ConfigParser.ConfigParser()
