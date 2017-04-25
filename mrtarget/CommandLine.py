@@ -15,7 +15,7 @@ from mrtarget.modules.Ensembl import  EnsemblActions, EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneActions, GeneManager
-from mrtarget.modules.HPA import  HPAActions, HPAProcess
+from mrtarget.modules.HPA import HPAActions, HPAProcess
 from mrtarget.modules.IntOGen import IntOGenActions, IntOGen
 from mrtarget.modules.Literature import LiteratureActions, MedlineRetriever
 from mrtarget.modules.LiteratureNLP import LiteratureNLPProcess, LiteratureNLPActions
@@ -29,7 +29,9 @@ from mrtarget.Settings import Config, file_or_resource
 
 __author__ = 'andreap'
 
-logging.config.fileConfig(file_or_resource('logging.ini'))
+logging.config.fileConfig(file_or_resource('logging.ini'),
+                          disable_existing_loggers=False)
+
 
 def main():
     logger = logging.getLogger(__name__)
