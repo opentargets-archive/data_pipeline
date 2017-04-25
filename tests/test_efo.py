@@ -21,8 +21,8 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from modules.EFO import EfoProcess
-from modules.Ontology import OntologyClassReader
+from mrtarget.modules.EFO import EfoProcess
+from mrtarget.modules.Ontology import OntologyClassReader
 from settings import Config
 import logging
 import os

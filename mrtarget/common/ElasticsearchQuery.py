@@ -7,9 +7,9 @@ from collections import Counter
 import jsonpickle
 from elasticsearch import helpers
 
-from common.DataStructure import SparseFloatDict
-from common.ElasticsearchLoader import Loader
-from common.connection import PipelineConnectors
+from mrtarget.common.DataStructure import SparseFloatDict
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.connection import PipelineConnectors
 from settings import Config
 
 

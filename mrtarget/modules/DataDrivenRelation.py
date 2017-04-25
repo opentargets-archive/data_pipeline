@@ -14,16 +14,16 @@ from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
 from tqdm import tqdm
 
-from common import Actions
-from common.DataStructure import JSONSerializable, RelationType
-from common.ElasticsearchLoader import Loader
-from common.ElasticsearchQuery import ESQuery
+from mrtarget.common import Actions
+from mrtarget.common.DataStructure import JSONSerializable, RelationType
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
 from scipy.spatial.distance import pdist
 import time
 from copy import copy
 import math
 
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from settings import Config
 
 

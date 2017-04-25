@@ -717,7 +717,7 @@ class ElasticSearchConfiguration():
                              }
 
     relation_mappings = {}
-    from common.DataStructure import RelationType
+    from mrtarget.common.DataStructure import RelationType
     for rt in [RelationType.SHARED_DISEASE,
                RelationType.SHARED_TARGET,
                ]:

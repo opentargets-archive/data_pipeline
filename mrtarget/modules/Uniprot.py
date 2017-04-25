@@ -2,9 +2,9 @@ from StringIO import StringIO
 import logging
 from xml.etree import cElementTree as ElementTree
 import requests
-from common import Actions
-from common.ElasticsearchLoader import Loader
-from common.UniprotIO import UniprotIterator, Parser
+from mrtarget.common import Actions
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.UniprotIO import UniprotIterator, Parser
 from requests.exceptions import Timeout, HTTPError, ConnectionError
 import jsonpickle
 

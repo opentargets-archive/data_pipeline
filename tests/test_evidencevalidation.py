@@ -21,7 +21,7 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from modules.EvidenceValidation import EvidenceValidationFileChecker
+from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
 from run import PipelineConnectors
 from settings import Config
 import logging

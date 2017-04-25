@@ -6,9 +6,9 @@ from pprint import pprint
 from elasticsearch import helpers
 from tqdm import tqdm
 
-from common import Actions
-from common.ElasticsearchLoader import Loader
-from common.ElasticsearchQuery import ESQuery
+from mrtarget.common import Actions
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
 from settings import Config
 logger = logging.getLogger(__name__)
 

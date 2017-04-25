@@ -14,12 +14,12 @@ from dateutil.parser import parse
 from lxml import etree,objectify
 from tqdm import tqdm
 
-from common import Actions
-from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import Loader
-from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
-from common.connection import PipelineConnectors
+from mrtarget.common import Actions
+from mrtarget.common.DataStructure import JSONSerializable
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
+from mrtarget.common.connection import PipelineConnectors
 from settings import Config
 
 logger = logging.getLogger(__name__)

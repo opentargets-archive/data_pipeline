@@ -9,7 +9,7 @@ import json
 import re
 import hashlib
 import datetime
-from common import Actions
+from mrtarget.common import Actions
 from settings import Config
 from EvidenceValidation import EvidenceValidationFileChecker
 import elasticsearch
@@ -22,7 +22,7 @@ import opentargets.model.evidence.core as evidence_core
 import opentargets.model.evidence.linkout as evidence_linkout
 import opentargets.model.evidence.association_score as association_score
 import opentargets.model.evidence.mutation as evidence_mutation
-from common.ElasticsearchQuery import ESQuery
+from mrtarget.common.ElasticsearchQuery import ESQuery
 
 __author__ = "Gautier Koscielny"
 __copyright__ = "Copyright 2014-2016, Open Targets"

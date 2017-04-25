@@ -4,10 +4,10 @@ import time
 import logging
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import bulk
-from common.DataStructure import JSONSerializable
-from common.EvidenceJsonUtils import assertJSONEqual
-from common.Redis import RedisQueueWorkerProcess
-from common.connection import PipelineConnectors
+from mrtarget.common.DataStructure import JSONSerializable
+from mrtarget.common.EvidenceJsonUtils import assertJSONEqual
+from mrtarget.common.Redis import RedisQueueWorkerProcess
+from mrtarget.common.connection import PipelineConnectors
 from settings import Config
 from elasticsearch_config import ElasticSearchConfiguration
 __author__ = 'andreap'

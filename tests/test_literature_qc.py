@@ -1,8 +1,8 @@
 import unittest
 
-from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisQueue
-from modules.Literature import PublicationFetcher, \
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.Redis import RedisQueue
+from mrtarget.modules.Literature import PublicationFetcher, \
     PubmedFTPReaderProcess, PubmedXMLParserProcess, MEDLINE_UPDATE_PATH
 
 import logging
@@ -10,7 +10,7 @@ from run import PipelineConnectors
 import io
 import gzip
 
-from modules.Literature import ftp_connect
+from mrtarget.modules.Literature import ftp_connect
 
 class LiteratureQCTestCase(unittest.TestCase):
 

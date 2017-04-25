@@ -1,6 +1,6 @@
 import logging
 import unittest
-from modules.ChEMBL import ChEMBLLookup
+from mrtarget.modules.ChEMBL import ChEMBLLookup
 
 logger = logging.getLogger(__name__)
 

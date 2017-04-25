@@ -9,12 +9,12 @@ from datetime import datetime
 
 from redislite import Redis
 
-from common import Actions
-from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import Loader
-from common.ElasticsearchQuery import ESQuery
-from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common import Actions
+from mrtarget.common.DataStructure import JSONSerializable
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from  multiprocessing import Process
 from elasticsearch import Elasticsearch, helpers
 

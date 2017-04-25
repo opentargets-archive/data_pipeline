@@ -6,10 +6,10 @@ from tqdm import tqdm
 
 import requests
 
-from common import Actions
-from common.DataStructure import JSONSerializable
-from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisLookupTablePickle
+from mrtarget.common import Actions
+from mrtarget.common.DataStructure import JSONSerializable
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.Redis import RedisLookupTablePickle
 
 from settings import Config
 

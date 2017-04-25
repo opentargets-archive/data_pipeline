@@ -4,9 +4,9 @@ import networkx as nx
 import requests
 from networkx.algorithms import all_simple_paths
 
-from common import Actions
-from common.DataStructure import TreeNode, JSONSerializable
-from common.ElasticsearchQuery import ESQuery
+from mrtarget.common import Actions
+from mrtarget.common.DataStructure import TreeNode, JSONSerializable
+from mrtarget.common.ElasticsearchQuery import ESQuery
 from settings import Config
 
 __author__ = 'andreap'

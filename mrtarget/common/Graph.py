@@ -1,4 +1,4 @@
-from common.DataStructure import TreeNode
+from mrtarget.common.DataStructure import TreeNode
 
 __author__ = 'andreap'
 

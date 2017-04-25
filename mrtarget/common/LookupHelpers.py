@@ -4,14 +4,14 @@ import time
 
 import pickle
 from tqdm import tqdm
-from common.ElasticsearchQuery import ESQuery
-from modules.ChEMBL import ChEMBLLookup
-from modules.ECO import ECOLookUpTable
-from modules.EFO import EFOLookUpTable
-from modules.HPA import HPALookUpTable
-from modules.GeneData import GeneLookUpTable
-from modules.Literature import LiteratureLookUpTable
-from modules.Ontology import OntologyClassReader
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.modules.ChEMBL import ChEMBLLookup
+from mrtarget.modules.ECO import ECOLookUpTable
+from mrtarget.modules.EFO import EFOLookUpTable
+from mrtarget.modules.HPA import HPALookUpTable
+from mrtarget.modules.GeneData import GeneLookUpTable
+from mrtarget.modules.Literature import LiteratureLookUpTable
+from mrtarget.modules.Ontology import OntologyClassReader
 from settings import Config
 
 

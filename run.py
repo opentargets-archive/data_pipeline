@@ -2,29 +2,29 @@ import argparse
 import logging
 import sys
 
-from common import Actions
-from common.ElasticsearchLoader import Loader
-from common.connection import PipelineConnectors
+from mrtarget.common import Actions
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.connection import PipelineConnectors
 from elasticsearch_config import ElasticSearchConfiguration
-from modules.Association import AssociationActions, ScoringProcess
-from modules.DataDrivenRelation import DataDrivenRelationActions, DataDrivenRelationProcess
-from modules.Dump import DumpActions, DumpGenerator
-from modules.ECO import EcoActions, EcoProcess
-from modules.EFO import EfoActions, EfoProcess
-from modules.Ensembl import  EnsemblActions, EnsemblProcess
-from modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
-from modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
-from modules.GeneData import GeneActions, GeneManager
-from modules.HPA import  HPAActions, HPAProcess
-from modules.IntOGen import IntOGenActions, IntOGen
-from modules.Literature import LiteratureActions, MedlineRetriever
-from modules.LiteratureNLP import LiteratureNLPProcess,LiteratureNLPActions
-from modules.MouseModels import MouseModelsActions, Phenodigm
-from modules.Ontology import OntologyActions, PhenotypeSlim
-from modules.QC import QCActions, QCRunner
-from modules.Reactome import ReactomeActions,  ReactomeProcess
-from modules.SearchObjects import SearchObjectActions, SearchObjectProcess
-from modules.Uniprot import UniProtActions,UniprotDownloader
+from mrtarget.modules.Association import AssociationActions, ScoringProcess
+from mrtarget.modules.DataDrivenRelation import DataDrivenRelationActions, DataDrivenRelationProcess
+from mrtarget.modules.Dump import DumpActions, DumpGenerator
+from mrtarget.modules.ECO import EcoActions, EcoProcess
+from mrtarget.modules.EFO import EfoActions, EfoProcess
+from mrtarget.modules.Ensembl import  EnsemblActions, EnsemblProcess
+from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
+from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
+from mrtarget.modules.GeneData import GeneActions, GeneManager
+from mrtarget.modules.HPA import  HPAActions, HPAProcess
+from mrtarget.modules.IntOGen import IntOGenActions, IntOGen
+from mrtarget.modules.Literature import LiteratureActions, MedlineRetriever
+from mrtarget.modules.LiteratureNLP import LiteratureNLPProcess,LiteratureNLPActions
+from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
+from mrtarget.modules.Ontology import OntologyActions, PhenotypeSlim
+from mrtarget.modules.QC import QCActions, QCRunner
+from mrtarget.modules.Reactome import ReactomeActions,  ReactomeProcess
+from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
+from mrtarget.modules.Uniprot import UniProtActions,UniprotDownloader
 from settings import Config
 
 __author__ = 'andreap'

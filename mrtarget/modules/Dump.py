@@ -1,7 +1,7 @@
 import json
 from tqdm import tqdm
 
-from common import Actions
+from mrtarget.common import Actions
 import gzip, time, logging
 
 from settings import Config

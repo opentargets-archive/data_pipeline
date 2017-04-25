@@ -10,14 +10,14 @@ from collections import OrderedDict
 import requests
 from tqdm import tqdm
 
-from common import Actions
-from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import Loader
-from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from common.connection import PipelineConnectors
-from modules.ChEMBL import ChEMBLLookup
-from modules.Reactome import ReactomeRetriever
+from mrtarget.common import Actions
+from mrtarget.common.DataStructure import JSONSerializable
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common.connection import PipelineConnectors
+from mrtarget.modules.ChEMBL import ChEMBLLookup
+from mrtarget.modules.Reactome import ReactomeRetriever
 from settings import Config
 from elasticsearch.exceptions import NotFoundError
 

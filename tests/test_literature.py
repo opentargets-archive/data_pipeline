@@ -1,11 +1,11 @@
 import unittest
 
-from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisQueue
-from modules.Literature import PublicationFetcher, MedlineRetriever, \
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.Redis import RedisQueue
+from mrtarget.modules.Literature import PublicationFetcher, MedlineRetriever, \
     PubmedFTPReaderProcess, PubmedXMLParserProcess, MEDLINE_UPDATE_PATH, Publication
-from common.ElasticsearchLoader import Loader
-from modules.EvidenceString import EvidenceStringProcess
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.modules.EvidenceString import EvidenceStringProcess
 from elasticsearch import Elasticsearch
 from redislite import Redis
 from settings import Config

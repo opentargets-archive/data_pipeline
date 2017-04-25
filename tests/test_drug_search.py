@@ -3,9 +3,9 @@ import urllib2
 
 from run import PipelineConnectors
 import logging
-from common.ElasticsearchLoader import Loader
-from modules.GeneData import GeneManager
-from modules.SearchObjects import SearchObjectProcess
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.modules.GeneData import GeneManager
+from mrtarget.modules.SearchObjects import SearchObjectProcess
 from contextlib import closing
 import shutil
 

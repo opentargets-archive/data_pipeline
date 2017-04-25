@@ -5,16 +5,16 @@ from elasticsearch import Elasticsearch
 
 from tqdm import tqdm
 
-from common import Actions
-from common.DataStructure import JSONSerializable, denormDict
-from common.ElasticsearchLoader import Loader
-from common.ElasticsearchQuery import ESQuery
-from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter, RedisQueueWorkerThread
-from modules.EFO import EFO
-from modules.HPA import HPAExpression, hpa2tissues
-from modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
-from modules.GeneData import Gene
+from mrtarget.common import Actions
+from mrtarget.common.DataStructure import JSONSerializable, denormDict
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter, RedisQueueWorkerThread
+from mrtarget.modules.EFO import EFO
+from mrtarget.modules.HPA import HPAExpression, hpa2tissues
+from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
+from mrtarget.modules.GeneData import Gene
 from settings import Config
 
 __author__ = 'andreap'

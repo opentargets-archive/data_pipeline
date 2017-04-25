@@ -11,12 +11,12 @@ from nltk.corpus import stopwords
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 from spacy.en import English
 from tqdm import tqdm
-from common import Actions
-from common.DataStructure import JSONSerializable
-from common.ElasticsearchLoader import Loader
-from common.ElasticsearchQuery import ESQuery
-from common.Redis import RedisQueue, RedisQueueWorkerProcess
-from modules.Literature import PublicationFetcher
+from mrtarget.common import Actions
+from mrtarget.common.DataStructure import JSONSerializable
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
+from mrtarget.modules.Literature import PublicationFetcher
 from settings import Config
 
 # List of symbols we don't care about

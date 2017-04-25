@@ -9,10 +9,10 @@ import json
 import re
 import hashlib
 import datetime
-from common import Actions
+from mrtarget.common import Actions
 from settings import Config
-from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from modules.Ontology import OntologyClassReader
+from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.modules.Ontology import OntologyClassReader
 from EvidenceValidation import EvidenceValidationFileChecker
 import elasticsearch
 from elasticsearch import Elasticsearch, helpers

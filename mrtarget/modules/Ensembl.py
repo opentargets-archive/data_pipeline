@@ -4,7 +4,7 @@ import mysql.connector
 import requests
 import time
 
-from common import Actions
+from mrtarget.common import Actions
 from settings import Config
 
 '''

@@ -8,17 +8,17 @@ import time
 from elasticsearch import Elasticsearch
 from tqdm import tqdm
 
-from common import Actions
-from common.DataStructure import JSONSerializable, PipelineEncoder
-from common.ElasticsearchLoader import Loader
-from common.ElasticsearchQuery import ESQuery
-from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from modules import GeneData
-from modules.ECO import ECO
-from modules.EFO import EFO, get_ontology_code_from_url
-from modules.GeneData import Gene
-from modules.Literature import Publication, PublicationFetcher
-from modules.LiteratureNLP import PublicationAnalysisSpacy
+from mrtarget.common import Actions
+from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.modules import GeneData
+from mrtarget.modules.ECO import ECO
+from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
+from mrtarget.modules.GeneData import Gene
+from mrtarget.modules.Literature import Publication, PublicationFetcher
+from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy
 from settings import Config
 
 logger = logging.getLogger(__name__)

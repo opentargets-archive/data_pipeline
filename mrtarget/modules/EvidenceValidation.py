@@ -23,12 +23,12 @@ from elasticsearch.exceptions import NotFoundError
 from requests.packages.urllib3.exceptions import HTTPError
 from tqdm import tqdm
 
-from common import Actions
-from common.ElasticsearchLoader import Loader, LoaderWorker
-from common.ElasticsearchQuery import ESQuery
+from mrtarget.common import Actions
+from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
+from mrtarget.common.ElasticsearchQuery import ESQuery
 from  common.EvidenceJsonUtils import DatatStructureFlattener
-from common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from settings import Config
 
 # This bit is necessary for text mining data
