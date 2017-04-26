@@ -21,7 +21,6 @@ build:
     - script:
         name: manually install the current package mrtarget
         code: |
-          pip uninstall data-model
           pip install -r requirements.txt
     - script:
         name: test empty run to catch import errors
