@@ -53,7 +53,7 @@ setup(name=p.__pkgname__, version=p.__version__,
           'psutil'
       ],
       dependency_links=[
-          'git+https://github.com/opentargets/data_model.git@v1.2.5#egg=data_model',
+          'git+https://github.com/opentargets/data_model.git@v1.2.5',
           'https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.0.12.tar.gz'
       ],
       include_package_data=True,
