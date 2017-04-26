@@ -293,17 +293,18 @@ class Publication(JSONSerializable):
     def _process_authors(self):
         if self.authors:
             for a in self.authors:
-                if a['LastName'] :
+                if 'ForeName' in a and a['LastName']:
                     a['last_name'] = a['LastName']
                     a['short_name'] = a['LastName']
                     a['full_name'] = a['LastName']
-                    if a['Initials']:
+                    if 'Initials' in a and a['Initials']:
                         a['short_name'] += ' ' + a['Initials']
-                    if a['ForeName']:
+                        del a['Initials']
+                    if 'ForeName' in a and a['ForeName']:
                         a['full_name'] += ' ' + a['ForeName']
+                        del a['ForeName']
+
                     del a['LastName']
-                    del a['Initials']
-                    del a['ForeName']
 
     def _split_sentences(self):
         #todo: use proper sentence detection with spacy
@@ -421,10 +422,10 @@ class MedlineRetriever(object):
               local_file_locn = [],
               update=False,
               force = False):
-
-        if not self.loader.es.indices.exists(Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)):
-            self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
-        self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
+        if not self.dry_run:
+            if not self.loader.es.indices.exists(Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)):
+                self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
+            self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         ftp_readers = no_of_workers
@@ -444,8 +445,9 @@ class MedlineRetriever(object):
 
         # ES-Loader Queue
         loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
-                                         max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                                         job_timeout=120)
+                              serialiser='pickle',
+                              max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
+                              job_timeout=120)
 
 
 
@@ -530,9 +532,9 @@ class MedlineRetriever(object):
                 l.join()
 
         logging.info('flushing data to index')
-
-        self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-            wait_if_ongoing=True)
+        if not self.dry_run:
+            self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                wait_if_ongoing=True)
 
         logging.info("DONE")
 
@@ -644,8 +646,10 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 yield rec
 
     def skip_file_processing(self, file_name):
-
-        total_docs = self.es_query.count_publications_for_file(file_name)
+        try:
+            total_docs = self.es_query.count_publications_for_file(file_name)
+        except AttributeError:
+            return False #dry run
         if self.update:
             if total_docs > 1:
                 return True
@@ -700,6 +704,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                         for chemical in child.getchildren():
                             chemical_dict = dict()
                             chemical_dict['name'] = chemical.NameOfSubstance.text
+                            chemical_dict['name_id'] = chemical.NameOfSubstance.attrib['UI']
                             chemical_dict['registryNumber'] = chemical.RegistryNumber.text
                             publication['chemicals'].append(chemical_dict)
 
@@ -865,7 +870,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                 pub,
                                 create_index=False)
             except KeyError as e:
-                logging.error("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
+                logging.exception("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
                     publication['pmid'],
                     publication['filename'],
                     e.message))
