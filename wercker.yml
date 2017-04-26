@@ -21,7 +21,8 @@ build:
     - script:
         name: manually install the current package mrtarget
         code: |
-          pip install -r requirements.txt
+          sudo pip install -r requirements.txt
+          sudo python setup.py install
     - script:
         name: test empty run to catch import errors
         code: |
