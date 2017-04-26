@@ -40,11 +40,11 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION=os.environ.get('CTTV_DATA_VERSION') or '17.04'
-    ENV=os.environ.get('CTTV_EL_LOADER') or 'dev'
+    RELEASE_VERSION=os.getenv('CTTV_DATA_VERSION') or '17.04'
+    ENV= os.getenv('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
-    ELASTICSEARCH_HOST = os.environ.get('ELASTICSEARCH_HOST')
-    ELASTICSEARCH_PORT = os.environ.get('ELASTICSEARCH_PORT')
+    ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST')
+    ELASTICSEARCH_PORT = os.getenv('ELASTICSEARCH_PORT')
     if ELASTICSEARCH_HOST is None:
         try:
             ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
@@ -240,15 +240,15 @@ class Config():
 
 
     #dump file names
-    DUMP_FILE_FOLDER = os.environ.get('CTTV_DUMP_FOLDER') or TEMP_DIR
+    DUMP_FILE_FOLDER = os.getenv('CTTV_DUMP_FOLDER') or TEMP_DIR
     DUMP_FILE_EVIDENCE=RELEASE_VERSION+'_evidence_data.json.gz'
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
-    DUMP_REMOTE_API = os.environ.get('DUMP_REMOTE_API_URL') or 'http://beta.opentargets.io'
-    DUMP_REMOTE_API_PORT = os.environ.get('DUMP_REMOTE_API_PORT') or '80'
-    DUMP_REMOTE_API_SECRET = os.environ.get('DUMP_REMOTE_API_SECRET')
-    DUMP_REMOTE_API_APPNAME = os.environ.get('DUMP_REMOTE_API_APPNAME')
+    DUMP_REMOTE_API = os.getenv('DUMP_REMOTE_API_URL') or 'http://beta.opentargets.io'
+    DUMP_REMOTE_API_PORT = os.getenv('DUMP_REMOTE_API_PORT') or '80'
+    DUMP_REMOTE_API_SECRET = os.getenv('DUMP_REMOTE_API_SECRET')
+    DUMP_REMOTE_API_APPNAME = os.getenv('DUMP_REMOTE_API_APPNAME')
 
     #Literature Pipeline -- Pubmed/Medline FTP server
     PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
