@@ -17,7 +17,7 @@ build:
 #        name: install double conversion dependency
 #        code: |
 #          apt-get update && apt-get install -y --no-install-recommends libdouble-conversion-dev && rm -rf /var/lib/apt/lists/*
-    # - pip-install
+    - pip-install
     - script:
         name: manually install the current package mrtarget
         code: |
