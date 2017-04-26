@@ -52,7 +52,7 @@ setup(name=p.__pkgname__, version=p.__version__,
           'ftputil',
           'psutil',
           'data-model',
-          'mysql-connector-python'
+          'mysql-connector-python==1.0.12'
       ],
       dependency_links=[
           'git+https://github.com/opentargets/data_model.git@v1.2.5#egg=data-model',
