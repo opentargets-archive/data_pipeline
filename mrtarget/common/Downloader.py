@@ -33,7 +33,7 @@ import socks
 import ftplib
 from mrtarget.Settings import Config
 
-__author__ = "Gautier Koscielny"
+
 __copyright__ = "Copyright 2014-2016, Open Targets"
 __credits__ = []
 __license__ = "Apache 2.0"

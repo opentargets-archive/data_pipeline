@@ -5,7 +5,7 @@ from mrtarget.Settings import Config
 import opentargets.model.core as opentargets
 import opentargets.model.evidence.association_score as evidence_association_score
 
-__author__ = "Gautier Koscielny"
+
 __copyright__ = "Copyright 2014-2016, Open Targets"
 __credits__ = []
 __license__ = "Apache 2.0"

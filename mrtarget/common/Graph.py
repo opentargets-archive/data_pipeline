@@ -1,6 +1,6 @@
 from mrtarget.common.DataStructure import TreeNode
 
-__author__ = 'andreap'
+
 
 
 class NetworkHandler():

@@ -10,7 +10,7 @@ import jsonpickle
 
 from mrtarget.Settings import Config
 
-__author__ = 'andreap'
+
 
 def sanitise_dict_for_json(d):
     for k, v in d.iteritems():

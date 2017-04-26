@@ -10,7 +10,7 @@ from mrtarget.common.Redis import RedisQueueWorkerProcess
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
-__author__ = 'andreap'
+
 
 
 class Loader():

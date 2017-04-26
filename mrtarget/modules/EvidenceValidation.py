@@ -35,7 +35,7 @@ from mrtarget.Settings import Config
 reload(sys)
 sys.setdefaultencoding("utf8")
 
-__author__ = 'gautierk'
+
 
 logging.getLogger("paramiko").setLevel(logging.WARNING)
 

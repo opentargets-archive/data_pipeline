@@ -13,7 +13,7 @@ from mrtarget.common.Redis import RedisLookupTablePickle
 
 from mrtarget.Settings import Config
 
-__author__ = 'andreap'
+
 
 
 def hpa2tissues(hpa=None):

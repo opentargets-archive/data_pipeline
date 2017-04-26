@@ -1,7 +1,7 @@
 """MrTarget is the tool to build all target-validation database"""
 
 __pkgname__ = 'mrtarget'
-__author__ = 'Miguel Carmona <carmona@ebi.ac.uk>'
+__author__ = 'OpenTargets Core Team <core@opentargets.org>'
 __copyright__ = 'Copyright 2016 Biogen, GlaxoSmithKline, EMBL - European Bioinformatics Institute, Wellcome Trust Sanger Institute'
 __license__ = 'Apache License, Version 2.0'
 __homepage__ = 'http://www.opentargets.org'

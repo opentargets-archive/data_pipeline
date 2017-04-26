@@ -6,7 +6,7 @@ from datetime import datetime, date
 
 from mrtarget.Settings import Config
 
-__author__ = 'andreap'
+
 
 class PipelineEncoder(JSONEncoder):
     def default(self, o):

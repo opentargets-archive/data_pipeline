@@ -9,7 +9,7 @@ from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 
-__author__ = 'andreap'
+
 
 
 class ReactomeActions(Actions):

@@ -61,7 +61,7 @@ except ImportError:
         return inner
 '''end of line profiler code'''
 
-__author__ = 'andreap'
+
 
 
 class EvidenceStringActions(Actions):

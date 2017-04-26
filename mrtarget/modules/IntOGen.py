@@ -11,7 +11,7 @@ import opentargets.model.evidence.association_score as association_score
 import opentargets.model.evidence.mutation as evidence_mutation
 from mrtarget.common.ElasticsearchQuery import ESQuery
 
-__author__ = "Gautier Koscielny"
+
 __copyright__ = "Copyright 2014-2016, Open Targets"
 __credits__ = ["Gautier Koscielny", "David Tamborero"]
 __license__ = "Apache 2.0"

@@ -5,7 +5,7 @@ import ConfigParser
 import pkg_resources as res
 import mrtarget
 
-__author__ = 'andreap'
+
 
 
 def file_or_resource(filename=None):

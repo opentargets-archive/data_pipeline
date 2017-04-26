@@ -17,7 +17,7 @@ from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, Extended
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
 
-__author__ = 'andreap'
+
 
 
 global_reporting_step = 5e5

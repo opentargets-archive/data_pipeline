@@ -23,7 +23,7 @@ import opentargets.model.evidence.phenotype as evidence_phenotype
 import opentargets.model.evidence.core as evidence_core
 import opentargets.model.evidence.association_score as association_score
 
-__author__ = "Gautier Koscielny"
+
 __copyright__ = "Copyright 2014-2016, The Centre for Therapeutic Target Validation (CTTV)"
 __credits__ = ["Gautier Koscielny", "Damian Smedley"]
 __license__ = "Apache 2.0"
