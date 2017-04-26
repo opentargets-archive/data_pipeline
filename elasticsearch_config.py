@@ -954,16 +954,16 @@ class ElasticSearchConfiguration():
                 "properties": {
                     "date_of_revision": {
                         "type": "date",
-                        "format": "basic_date_time_no_millis",
+                        "format": "yyyy||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis",
 
                     },
                     "date": {
                         "type": "date",
-                        "format": "basic_date_time_no_millis",
+                        "format": "yyyy||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis",
                     },
                     "pub_date": {
                         "type": "date",
-                        "format": "basic_date_time_no_millis",
+                        "format": "yyyy||yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis",
                     },
                     "title": {
                         "type": "string",
