@@ -72,7 +72,7 @@ class Loader():
         # why an asterisk? because the index name is really a string
         # to be parsed by elasticsearch as a multiindex shiny thing
         suffix = '*' if index_name.endswith('*') else ''
-        raw_name = index_name[:-len(suffix)]
+        raw_name = index_name[:-len(suffix)] if len(suffix) > 0 else index_name
 
         return Config.ES_CUSTOM_IDXS.get('indexes', raw_name) \
             if check_custom_idxs and \
