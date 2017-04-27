@@ -4,7 +4,7 @@ import os
 import ConfigParser
 import pkg_resources as res
 import mrtarget
-import logging
+
 
 def ini_from_file_or_resource(filename=None):
     '''load the ini file using file_or_resource an
@@ -13,7 +13,9 @@ def ini_from_file_or_resource(filename=None):
     try:
         # trying to load file from somewhere
         f = file_or_resource(filename)
-        return ConfigParser.ConfigParser.read(f)
+        cfg = ConfigParser.ConfigParser()
+        cfg.read(f)
+        return cfg
     except Exception:
         # the function return none in case file wasnt found
         return None
@@ -57,6 +59,7 @@ class Config():
     ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
     ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST')
     ELASTICSEARCH_PORT = os.getenv('ELASTICSEARCH_PORT')
+
     if ELASTICSEARCH_HOST is None and iniparser is not None:
         try:
             ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
