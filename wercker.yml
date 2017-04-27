@@ -19,9 +19,14 @@ build:
 #          apt-get update && apt-get install -y --no-install-recommends libdouble-conversion-dev && rm -rf /var/lib/apt/lists/*
     - pip-install
     - script:
+        name: manually install the current package mrtarget
+        code: |
+          sudo pip install --process-dependency-links -r requirements.txt
+          # sudo python setup.py install
+    - script:
         name: test empty run to catch import errors
         code: |
-          python run.py
+          mrtarget --dry-run
     - script:
         name: log status in github
         code: |
@@ -63,7 +68,7 @@ build:
         repository: $QUAY_REPO
         registry: $QUAY_HOST
         working-dir: /usr/src/app
-        cmd: python run.py
+        cmd: mrtarget
         disable-sync: true
 
     - internal/docker-push:
@@ -73,7 +78,7 @@ build:
         tag: $WERCKER_GIT_COMMIT, $WERCKER_GIT_BRANCH, $LATEST_FLAG
         repository: $GCR_REPO
         registry: $GCR_HOST
-        cmd: python run.py
+        cmd: mrtarget
         disable-sync: true
   after-steps:
     - script:

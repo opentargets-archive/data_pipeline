@@ -3,9 +3,9 @@ import urllib2
 
 from run import PipelineConnectors
 import logging
-from common.ElasticsearchLoader import Loader
-from modules.GeneData import GeneManager
-from modules.SearchObjects import SearchObjectProcess
+from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.modules.GeneData import GeneManager
+from mrtarget.modules.SearchObjects import SearchObjectProcess
 from contextlib import closing
 import shutil
 
@@ -19,7 +19,7 @@ class DrugSearchTestCase(unittest.TestCase):
                             level=logging.INFO)
         connectors = PipelineConnectors()
         connectors.init_services_connections()
-        from elasticsearch_config import ElasticSearchConfiguration
+        from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
         with Loader(connectors.es,
                     chunk_size=ElasticSearchConfiguration.bulk_load_chunk) as loader:
 

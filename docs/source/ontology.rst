@@ -45,7 +45,7 @@ variations and the consequences of variation.
 
 We use SO terms to determine the functional consequence of the variants that are provided by GWAS
 Catalog, EVA, and UniProt. Additionally, the consequence is used to assign a score to an evidence. See mapping table in
-data_pipeline/resources/eco_scores (which really should be called functional consequence scores).
+mrtarget/resources/eco_scores (which really should be called functional consequence scores).
 
 We had a few terms not represented in SO but we decided to map them to existing SO classes.
 

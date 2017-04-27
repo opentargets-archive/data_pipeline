@@ -1,0 +1,4 @@
+
+
+class Actions():
+    ALL='all'

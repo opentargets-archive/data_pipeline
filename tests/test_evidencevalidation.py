@@ -21,14 +21,14 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from modules.EvidenceValidation import EvidenceValidationFileChecker
+from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
 from run import PipelineConnectors
-from settings import Config
+from mrtarget.Settings import Config
 import logging
 import os
 from logging.config import fileConfig
 
-__author__ = "Gautier Koscielny"
+
 __copyright__ = "Copyright 2014-2016, Open Targets"
 __credits__ = []
 __license__ = "Apache 2.0"
@@ -37,7 +37,6 @@ __maintainer__ = "Gautier Koscielny"
 __email__ = "gautierk@targetvalidation.org"
 __status__ = "Production"
 
-fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
 logger = logging.getLogger()
 
 connectors = None

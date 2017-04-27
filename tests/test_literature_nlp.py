@@ -1,6 +1,6 @@
 import unittest
 
-from modules.LiteratureNLP import PublicationFetcher,PublicationAnalyserSpacy, LiteratureNLPProcess
+from mrtarget.modules.LiteratureNLP import PublicationFetcher,PublicationAnalyserSpacy, LiteratureNLPProcess
 from run import PipelineConnectors
 
 import logging

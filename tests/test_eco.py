@@ -21,15 +21,15 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from modules.ECO import EcoProcess
-from modules.Ontology import OntologyClassReader
-from settings import Config
+from mrtarget.modules.ECO import EcoProcess
+from mrtarget.modules.Ontology import OntologyClassReader
+from mrtarget.Settings import Config
 import logging
 import os
 import json
 from logging.config import fileConfig
 
-__author__ = "Gautier Koscielny"
+
 __copyright__ = "Copyright 2014-2016, Open Targets"
 __credits__ = []
 __license__ = "Apache 2.0"
@@ -40,10 +40,6 @@ __status__ = "Production"
 
 from logging.config import fileConfig
 
-try:
-    fileConfig(os.path.join(os.path.abspath(os.path.dirname(__file__)), '../logging_config.ini'))
-except:
-    pass
 logger = logging.getLogger(__name__)
 
 def setup_module(module):
