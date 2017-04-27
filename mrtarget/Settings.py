@@ -4,8 +4,19 @@ import os
 import ConfigParser
 import pkg_resources as res
 import mrtarget
+import logging
 
-
+def ini_from_file_or_resource(filename=None):
+    '''load the ini file using file_or_resource an
+    return the configuration object or None
+    '''
+    try:
+        # trying to load file from somewhere
+        f = file_or_resource(filename)
+        return ConfigParser.ConfigParser.read(f)
+    except Exception:
+        # the function return none in case file wasnt found
+        return None
 
 
 def file_or_resource(filename=None):
@@ -16,18 +27,19 @@ def file_or_resource(filename=None):
     resource_path = '/'.join(('resources', filename))
 
     if filename is not None:
-        abs_filename = os.path.join(os.path.abspath(os.getcwd()), filename)
+        abs_filename = os.path.join(os.path.abspath(os.getcwd()), filename) \
+                       if not os.path.isabs(filename) else filename
+
         return abs_filename if os.path.isfile(abs_filename) \
             else res.resource_filename(resource_package, resource_path)
 
 
-iniparser = ConfigParser.ConfigParser()
-iniparser.read(os.path.join(os.path.abspath(os.getcwd()), 'db.ini'))
+# loading the ES db ini configuration file
+iniparser = ini_from_file_or_resource('db.ini')
 
 
 class Config():
-
-    HAS_PROXY = iniparser.has_section('proxy')
+    HAS_PROXY = iniparser is not None and iniparser.has_section('proxy')
     if HAS_PROXY:
         PROXY = iniparser.get('proxy', 'protocol') + "://" + iniparser.get('proxy', 'username') + ":" + iniparser.get(
             'proxy', 'password') + "@" + iniparser.get('proxy', 'host') + ":" + iniparser.get('proxy', 'port')
@@ -40,12 +52,12 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION=os.getenv('CTTV_DATA_VERSION') or '17.04'
-    ENV= os.getenv('CTTV_EL_LOADER') or 'dev'
+    RELEASE_VERSION = os.getenv('CTTV_DATA_VERSION') or '17.04'
+    ENV = os.getenv('CTTV_EL_LOADER') or 'dev'
     ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
     ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST')
     ELASTICSEARCH_PORT = os.getenv('ELASTICSEARCH_PORT')
-    if ELASTICSEARCH_HOST is None:
+    if ELASTICSEARCH_HOST is None and iniparser is not None:
         try:
             ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
             ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
@@ -60,6 +72,18 @@ class Config():
         ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
+
+    # This config file is like this and no prefixes or version will be
+    # appended
+    #
+    # [indexes]
+    # gene-data=new-gene-data-index-name
+    # ...
+    #
+    # if no index field or config file is found then a default
+    # composed index name will be returned
+    ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
+    ES_CUSTOM_IDXS = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME)
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
