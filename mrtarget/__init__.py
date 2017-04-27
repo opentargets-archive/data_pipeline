@@ -1,4 +1,4 @@
-"""MrTarget is the tool to build all target-validation database"""
+"""MrTarget is the tool to build the target-validation database"""
 
 __pkgname__ = 'mrtarget'
 __author__ = 'OpenTargets Core Team <core@opentargets.org>'

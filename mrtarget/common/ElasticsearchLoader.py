@@ -24,13 +24,18 @@ class Loader():
                  dry_run = False,
                  max_flush_interval = random.choice(range(8,16))):
 
+        self.logger = logging.getLogger(__name__)
+
         if es is None:
             connector = PipelineConnectors()
             connector.init_services_connections()
             es = connector.es
             if es is None and not dry_run:
-                raise EnvironmentError('no elasticsearch connection '
-                                       'was properly setup')
+                e = EnvironmentError('no elasticsearch connection '
+                                     'was properly setup')
+                self.logger.exception(e)
+                raise e
+
         self.es = es
         self.cache = []
         self.results = defaultdict(list)
@@ -40,17 +45,40 @@ class Loader():
         self.dry_run = dry_run
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
-        self.logger = logging.getLogger(__name__)
 
     @staticmethod
-    def get_versioned_index(index_name):
+    def get_versioned_index(index_name, check_custom_idxs=False):
+        '''get a composed real name of the index
+
+        If check_custom_idxs is set to True then it tries to get
+        from ES_CUSTOM_IDXS_FILENAME config file. This config file
+        is like this and no prefixes or versions will be appended
+
+        [indexes]
+        gene-data=new-gene-data-index-name
+
+        if no index field or config file is found then a default
+        composed index name will be returned
+        '''
         if index_name.startswith(Config.RELEASE_VERSION+'_'):
-            raise ValueError('Cannot add %s twice to index %s'%(Config.RELEASE_VERSION, index_name))
+            raise ValueError('Cannot add %s twice to index %s'
+                             % (Config.RELEASE_VERSION, index_name))
         if index_name.startswith('!'):
             return index_name
-        return Config.RELEASE_VERSION + '_' + index_name
 
+        # quite tricky, isn't it? we do code HYPERfunctions
+        # not mere functions you need to be reading this whole code
+        # for a 5-dimensions space to get it in its full
+        # why an asterisk? because the index name is really a string
+        # to be parsed by elasticsearch as a multiindex shiny thing
+        suffix = '*' if index_name.endswith('*') else ''
+        raw_name = index_name[:-len(suffix)] if len(suffix) > 0 else index_name
 
+        return Config.ES_CUSTOM_IDXS.get('indexes', raw_name) \
+            if check_custom_idxs and \
+            Config.ES_CUSTOM_IDXS is not None and \
+            Config.ES_CUSTOM_IDXS.has_option('indexes', raw_name) \
+            else Config.RELEASE_VERSION + '_' + index_name
 
     def put(self,
             index_name,
