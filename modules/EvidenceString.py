@@ -329,8 +329,7 @@ class EvidenceManager():
                 eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
                 #if 'evidence_codes' in evidence['evidence']:
                 #    eco_uri = evidence['evidence']['evidence_codes']
-            except KeyError:
-                eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
+            #except KeyError:
                 #if 'evidence_codes' in evidence['evidence']:
                 #    eco_uri = evidence['evidence']['evidence_codes'][0]
 
