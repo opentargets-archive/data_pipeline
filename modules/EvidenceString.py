@@ -254,6 +254,9 @@ class EvidenceManager():
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
         self._get_eco_scoring_values()
+
+        for i in self.eco_scores:
+            print i, self.eco_scores[i]
         # logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
@@ -681,9 +684,6 @@ class EvidenceManager():
                 self.eco_scores[uri] = float(score)
             except:
                 logger.error("cannot parse line in eco_scores.tsv: %s" % (line.strip()))
-
-        for i in self.eco_scores:
-            print i, self.eco_scores[i]
 
     def _get_score_modifiers(self):
         self.score_modifiers = {}
