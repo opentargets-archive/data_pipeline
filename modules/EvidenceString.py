@@ -327,11 +327,12 @@ class EvidenceManager():
                         available_score = evidence['evidence']['resource_score']['value']
             try:
                 eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
-                if 'evidence_codes' in evidence['evidence']:
-                    eco_uri = evidence['evidence']['evidence_codes']
+                #if 'evidence_codes' in evidence['evidence']:
+                #    eco_uri = evidence['evidence']['evidence_codes']
             except KeyError:
-                if 'evidence_codes' in evidence['evidence']:
-                    eco_uri = evidence['evidence']['evidence_codes'][0]
+                eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
+                #if 'evidence_codes' in evidence['evidence']:
+                #    eco_uri = evidence['evidence']['evidence_codes'][0]
 
 
             if eco_uri in self.eco_scores:
@@ -681,9 +682,6 @@ class EvidenceManager():
                 self.eco_scores[uri] = float(score)
             except:
                 logger.error("cannot parse line in eco_scores.tsv: %s" % (line.strip()))
-
-        for i in self.eco_scores:
-            print i, self.eco_scores[i]
 
     def _get_score_modifiers(self):
         self.score_modifiers = {}
