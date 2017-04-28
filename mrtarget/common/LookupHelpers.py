@@ -85,10 +85,9 @@ class LookUpDataRetriever(object):
 
             self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
 
-
-
+    def _get_available_efos(self):
         self.logger.info('getting efos')
-        self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
+        self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
 
     def _get_available_ecos(self):
         self.logger.info('getting ecos')
@@ -108,7 +107,7 @@ class LookUpDataRetriever(object):
     def _get_non_reference_gene_mappings(self):
         self.lookup.non_reference_genes = {}
         skip_header=True
-        for line in file(file_or_resource('resources/genes_with_non_reference_ensembl_ids.tsv')):
+        for line in file(file_or_resource('genes_with_non_reference_ensembl_ids.tsv')):
             if skip_header:
                 skip_header=False
             symbol, ensg, assembly, chr, is_ref = line.split()
