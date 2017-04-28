@@ -327,10 +327,10 @@ class EvidenceManager():
                         available_score = evidence['evidence']['resource_score']['value']
             try:
                 eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
-                #if 'evidence_codes' in evidence['evidence']:
+                if 'evidence_codes' in evidence['evidence']:
                 #    eco_uri = evidence['evidence']['evidence_codes']
             except KeyError:
-                #if 'evidence_codes' in evidence['evidence']:
+                if 'evidence_codes' in evidence['evidence']:
                 #    eco_uri = evidence['evidence']['evidence_codes'][0]
 
 
