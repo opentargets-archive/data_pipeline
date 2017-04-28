@@ -36,10 +36,6 @@ reload(sys)
 sys.setdefaultencoding("utf8")
 
 
-
-logging.getLogger("paramiko").setLevel(logging.WARNING)
-
-
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
 MAX_NB_EVIDENCE_CHUNKS = 1000
@@ -1303,6 +1299,7 @@ class EvidenceValidationFileChecker():
                                                       LookUpDataType.ECO,
                                                       LookUpDataType.HPO,
                                                       LookUpDataType.MP,
+                                                      LookUpDataType.HPA
                                                      ),
                                           autoload=True,
                                           ).lookup
