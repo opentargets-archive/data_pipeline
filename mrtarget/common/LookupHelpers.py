@@ -85,10 +85,9 @@ class LookUpDataRetriever(object):
 
             self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
 
-
-
+    def _get_available_efos(self):
         self.logger.info('getting efos')
-        self.lookup.available_efos = EFOLookUpTable(self.es,'EFO_LOOKUP', self.r_server)
+        self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
 
     def _get_available_ecos(self):
         self.logger.info('getting ecos')
