@@ -254,7 +254,10 @@ class EvidenceManager():
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
         self._get_eco_scoring_values()
-        # logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
+
+        for i in self.eco_scores:
+            print self.eco_scores.keys(i), self.eco_scores.values(i)
+        logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
         # self.gene_retriever = GeneLookUpTable(self.es)
