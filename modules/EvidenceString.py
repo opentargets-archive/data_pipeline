@@ -256,7 +256,8 @@ class EvidenceManager():
         self._get_eco_scoring_values()
 
         for i in self.eco_scores:
-            print self.eco_scores.keys(i), self.eco_scores.values(i)
+            print i, self.eco_scores[i]
+
         logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
