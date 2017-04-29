@@ -258,7 +258,7 @@ class EvidenceManager():
         for i in self.eco_scores:
             print i, self.eco_scores[i]
 
-        logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
+        #logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
         # self.gene_retriever = GeneLookUpTable(self.es)
