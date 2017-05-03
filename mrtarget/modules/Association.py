@@ -546,8 +546,7 @@ class ScoringProcess():
         overwrite_indices = not dry_run
         if overwrite_indices:
             overwrite_indices = not bool(targets)
-        if not targets:
-            targets = list(self.es_query.get_all_target_ids_with_evidence_data())
+
 
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
@@ -558,7 +557,12 @@ class ScoringProcess():
                                               LookUpDataType.ECO,
                                               LookUpDataType.HPA
                                           ),
-                                          autoload=False).lookup
+                                          autoload=True if not targets
+                                          or len(targets) > 100
+                                          else False).lookup
+
+        if not targets:
+            targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
