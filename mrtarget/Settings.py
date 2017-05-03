@@ -78,7 +78,12 @@ class Config():
 
     DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') or False)
     DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') or True)
-    DRY_RUN_OUTPUT_COUNT = int(os.getenv('DRY_RUN_OUTPUT_COUNT') or 10000)
+    DRY_RUN_OUTPUT_COUNT = os.getenv('DRY_RUN_OUTPUT_COUNT')
+    if DRY_RUN_OUTPUT_COUNT:
+        DRY_RUN_OUTPUT_COUNT = int(DRY_RUN_OUTPUT_COUNT)
+    else:
+        DRY_RUN_OUTPUT_COUNT = 10000
+
     # This config file is like this and no prefixes or version will be
     # appended
     #
@@ -184,7 +189,11 @@ class Config():
 
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
-    WORKERS_NUMBER = os.getenv('WORKERS_NUMBER') or None
+    WORKERS_NUMBER = os.getenv('WORKERS_NUMBER')
+    if WORKERS_NUMBER:
+        WORKERS_NUMBER = int(WORKERS_NUMBER)
+    else:
+        WORKERS_NUMBER = None
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
