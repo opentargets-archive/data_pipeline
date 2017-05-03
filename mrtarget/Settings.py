@@ -76,9 +76,9 @@ class Config():
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
-    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE')) or False
-    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE')) or True
-    DRY_RUN_OUTPUT_COUNT = int(os.getenv('DRY_RUN_OUTPUT_COUNT')) or 10000
+    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') or False)
+    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') or True)
+    DRY_RUN_OUTPUT_COUNT = int(os.getenv('DRY_RUN_OUTPUT_COUNT') or 10000)
     # This config file is like this and no prefixes or version will be
     # appended
     #
