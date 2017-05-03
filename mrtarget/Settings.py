@@ -76,6 +76,9 @@ class Config():
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
+    DRY_RUN_OUTPUT_ENABLE = False
+    DRY_RUN_OUTPUT_DELETE = True
+    DRY_RUN_OUTPUT_COUNT = 10000
     # This config file is like this and no prefixes or version will be
     # appended
     #

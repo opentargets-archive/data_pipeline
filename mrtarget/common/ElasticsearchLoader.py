@@ -2,6 +2,8 @@ import random
 from collections import defaultdict
 import time
 import logging
+import tempfile
+import json
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import bulk
 from mrtarget.common.DataStructure import JSONSerializable
@@ -45,6 +47,10 @@ class Loader():
         self.dry_run = dry_run
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
+        self._tmp_fd = None
+        self._tmp_fd_enable = getattr(Config, 'DRY_RUN_OUTPUT_ENABLE', False)
+        self._tmp_fd_delete = getattr(Config, 'DRY_RUN_OUTPUT_DELETE', True)
+        self._tmp_fd_count = getattr(Config, 'DRY_RUN_OUTPUT_COUNT', 10000)
 
     @staticmethod
     def get_versioned_index(index_name, check_custom_idxs=False):
@@ -144,15 +150,27 @@ class Loader():
     def _flush(self):
         if not self.dry_run:
             bulk(self.es,
-                self.cache,
+                 self.cache,
                  stats_only=True)
+        else:
+            # create a temporal file if necessary
+            if self._tmp_fd_enable and self._tmp_fd_count > 0:
+                if self._tmp_fd is None:
+                    self.logger.info('create temporary file to output '
+                                     'generated index docs while dry_run '
+                                     'is activated')
+                    self._tmp_fd = tempfile.NamedTemporaryFile(
+                        delete=self._tmp_fd_delete)
 
+                # flush self.cache into temp file converted as text lines
+                self._tmp_fd.writelines([json.dumps(el) + '\n'
+                                         for el in self.cache])
+                self._tmp_fd_count = self._tmp_fd_count - len(self.cache) if \
+                    self._tmp_fd_count > 0 else 0
 
     def close(self):
-
         self.flush()
         self.restore_after_bulk_indexing()
-
 
     def __enter__(self):
         return self
