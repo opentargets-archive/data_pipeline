@@ -254,10 +254,6 @@ class EvidenceManager():
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
         self._get_eco_scoring_values()
-
-        for i in self.eco_scores:
-            print i, self.eco_scores[i]
-
         #logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
@@ -336,6 +332,7 @@ class EvidenceManager():
             except KeyError:
                 if 'evidence_codes' in evidence['evidence']:
                     eco_uri = evidence['evidence']['evidence_codes'][0]
+                    eco_uri.rstrip()
 
 
             if eco_uri in self.eco_scores:
@@ -682,6 +679,8 @@ class EvidenceManager():
         for line in file('resources/eco_scores.tsv'):
             try:
                 uri, label, score = line.strip().split('\t')
+                uri.rstrip()
+                print("TEST for", uri, "is", label, score)
                 self.eco_scores[uri] = float(score)
             except:
                 logger.error("cannot parse line in eco_scores.tsv: %s" % (line.strip()))
