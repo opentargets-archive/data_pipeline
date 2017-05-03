@@ -184,7 +184,7 @@ class Config():
 
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
-    WORKERS_NUMBER = None
+    WORKERS_NUMBER = os.getenv('WORKERS_NUMBER') or None
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'

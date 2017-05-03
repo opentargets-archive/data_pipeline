@@ -465,9 +465,11 @@ class ScoreProducer(RedisQueueWorkerThread):
                         self.lookup_data.available_hpa.get_hpa(gene_data.id))
                     score.set_hpa_data(hpa_data)
 
-                except Exception, e:
+                except KeyError, ke:
                     self.logger.debug('Cannot find HPA code "%s" '
                                       'in lookup table' % target)
+
+                except Exception, e:
                     self.logger.exception(e)
 
                 disease_data = EFO()
