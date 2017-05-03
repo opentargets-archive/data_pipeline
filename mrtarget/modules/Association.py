@@ -71,7 +71,8 @@ class Association(JSONSerializable):
         self.private = {}
         self.private['facets'] = dict(datatype=[],
                                       datasource=[],
-                                      free_text_search=[])
+                                      free_text_search=[],
+                                      expression_tissues=[])
 
     def get_scoring_method(self, method):
         if method not in ScoringMethods.__dict__.values():
@@ -161,7 +162,7 @@ class Association(JSONSerializable):
         '''set a compat hpa expression data into the score object'''
         filteredHPA = hpa2tissues(hpa)
         if filteredHPA is not None and len(filteredHPA) > 0:
-            self.private['facets']['expression_tissues'] = filteredHPA
+            self.private['facets']['expression_tissues'].extend(filteredHPA)
 
     def set_disease_data(self, efo):
         """get generic efo info"""

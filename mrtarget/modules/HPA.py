@@ -19,7 +19,7 @@ from mrtarget.Settings import Config
 def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     return [k for k, _ in hpa.tissues.iteritems()
-            if hpa is not None and type(hpa) == type(HPAExpression)]
+            if hpa is not None]
 
 
 class HPAActions(Actions):
