@@ -680,7 +680,6 @@ class EvidenceManager():
             try:
                 uri, label, score = line.strip().split('\t')
                 uri.rstrip()
-                print("TEST for", uri, "is", label, score)
                 self.eco_scores[uri] = float(score)
             except:
                 logger.error("cannot parse line in eco_scores.tsv: %s" % (line.strip()))
