@@ -1,8 +1,7 @@
 import gzip
 import urllib2
-from io import StringIO, BytesIO
+from io import BytesIO
 import zipfile
-import requests
 
 from contextlib import contextmanager
 from petl.errors import ArgumentError
