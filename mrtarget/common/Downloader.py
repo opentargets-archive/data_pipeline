@@ -42,6 +42,7 @@ __maintainer__ = "Gautier Koscielny"
 __email__ = "gautierk@opentargets.org"
 __status__ = "Production"
 
+
 class Downloader(object):
 
     def __init__(self):
@@ -127,7 +128,7 @@ class Downloader(object):
             sock = socket.socket_formal(af, socktype, proto)
 
             # Wrap it within a proxy socket
-            return ProxySock(
+            return sock.ProxySock(
                     sock,
                     proxy_host,
                     proxy_port)

@@ -4,6 +4,8 @@ import os
 import ConfigParser
 import pkg_resources as res
 import mrtarget
+import petl
+from mrtarget.common import URLGZSource, URLZSource
 
 
 def ini_from_file_or_resource(filename=None):
@@ -147,6 +149,8 @@ class Config():
         '4932':'yeast'
     }
 
+    TISSUE_TRANSLATION_MAP_URL = 'https://storage.googleapis.com/ot-input-dev/tissue_translation_map.csv.gz'
+    TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLGZSource(TISSUE_TRANSLATION_MAP_URL)).tol())
     HPA_NORMAL_TISSUE_URL = 'http://v16.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v16.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v16.proteinatlas.org/download/subcellular_location.csv.zip'
