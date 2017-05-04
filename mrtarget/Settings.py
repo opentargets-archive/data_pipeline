@@ -150,7 +150,7 @@ class Config():
     HPA_NORMAL_TISSUE_URL = 'http://v16.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v16.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v16.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'http://storage.googleapis.com/atlas_baseline_expression/rna_tissue_atlas.csv.zip'
+    HPA_RNA_URL = 'https://storage.googleapis.com/atlas_baseline_expression/rna_tissue_atlas.csv.zip'
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
