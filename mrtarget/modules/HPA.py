@@ -5,6 +5,8 @@ from zipfile import ZipFile
 from tqdm import tqdm
 
 import requests
+import petl
+from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -39,13 +41,6 @@ class HPADataDownloader():
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def retrieve_all(self):
-
-        self.retrieve_normal_tissue_data()
-        self.retrieve_cancer_data()
-        self.retrieve_rna_data()
-        self.retrieve_subcellular_location_data()
-
     def _download_data(self, url):
         r = requests.get(url)
         try:
@@ -59,71 +54,78 @@ class HPADataDownloader():
     def _get_csv_reader(self, csvfile):
         return csv.DictReader(csvfile)
 
-    """
-        Parse 'normal_tissue' csv file,
+    def retrieve_normal_tissue_data(self):
+        """Parse 'normal_tissue' csv file,
         the expression profiles for proteins in human tissues from HPA
 
-    :return: dict
-    """
-    def retrieve_normal_tissue_data(self):
-        reader = self._get_csv_reader(self._download_data(Config.HPA_NORMAL_TISSUE_URL))
-        for c, row in enumerate(reader):
-            yield dict(tissue=row['Tissue'],
-                       cell_type=row['Cell type'],
-                       level=row['Level'],
-                       reliability=row['Reliability'],
-                       gene=row['Gene'],
-                       )
-            if c + 1 % 10000 == 0:
-                logging.debug("%i rows parsed from hpa_normal_tissue" % c)
-        logging.info('parsed %i rows from hpa_normal_tissue' % c)
+        :return: dict
+        """
+        logging.info('get normal tissue rows into dicts')
+        table = (
+            petl.fromcsv(URLZSource(Config.HPA_NORMAL_TISSUE_URL))
+            .rename({'Tissue': 'tissue',
+                     'Cell type': 'cell_type',
+                     'Level': 'level',
+                     'Reliability': 'reliability',
+                     'Gene': 'gene'})
+            .cut('tissue', 'cell_type', 'level', 'reliability', 'gene')
+            )
 
-    """
+        for d in table.dicts():
+            yield d
+
+    def retrieve_rna_data(self):
+        """
         Parse 'rna_tissue' csv file,
         RNA levels in 56 cell lines and 37 tissues based on RNA-seq from HPA.
 
-    :return: dict
-    """
-    def retrieve_rna_data(self):
-        reader = self._get_csv_reader(self._download_data(Config.HPA_RNA_URL))
-        for c, row in enumerate(reader):
-            yield dict(sample=row['Sample'],
-                       unit=row['Unit'],
-                       value=row['Value'],
-                       gene=row['Gene'],
-                       )
+        :return: dict
+        """
+        logging.info('get rna tissue rows into dicts')
+        table = (
+            petl.fromcsv(URLZSource(Config.HPA_RNA_URL))
+            .rename({'Sample': 'sample',
+                     'Unit': 'unit',
+                     'Value': 'value',
+                     'Gene': 'gene'})
+            .cut('sample', 'unit', 'value', 'gene')
+            )
 
-            if c + 1 % 10000 == 0:
-                logging.debug("%i rows uploaded to hpa_rna" % c)
-        logging.info('inserted %i rows in hpa_rna' % c)
+        for d in table.dicts():
+            yield d
 
     def retrieve_cancer_data(self):
         logging.info('retrieve cancer data from HPA')
-        reader = self._get_csv_reader(self._download_data(Config.HPA_CANCER_URL))
-        for c, row in enumerate(reader):
-            yield dict(tumor=row['Tumor'],
-                       level=row['Level'],
-                       count_patients=row['Count patients'],
-                       total_patients=row['Total patients'],
-                       gene=row['Gene'],
-                       expression_type=row['Expression type'],
-                       )
-            if c + 1 % 10000 == 0:
-                logging.debug("%i rows uploaded to hpa_cancer" % c)
-            logging.info('inserted %i rows in hpa_cancer' % c)
+        table = (
+            petl.fromcsv(URLZSource(Config.HPA_CANCER_URL))
+            .rename({'Tumor': 'tumor',
+                     'Level': 'level',
+                     'Count patients': 'count_patients',
+                     'Total patients': 'total_patients',
+                     'Gene': 'gene',
+                     'Expression type': 'expression_type'})
+            .cut('tumor', 'count_patients', 'level', 'total_patients', 'gene',
+                 'expression_type')
+            )
+
+        for d in table.dicts():
+            yield d
 
     def retrieve_subcellular_location_data(self):
-        reader = self._get_csv_reader(self._download_data(Config.HPA_SUBCELLULAR_LOCATION_URL))
-        for c, row in enumerate(reader):
-            yield dict(main_location=row['Main location'],
-                       other_location=row['Other location'],
-                       gene=row['Gene'],
-                       expression_type=row['Expression type'],
-                       reliability=row['Reliability'],
-                       )
-            if c + 1 % 10000 == 0:
-                logging.debug("%i rows uploaded to hpa_subcellular_location" % c)
-        logging.info('inserted %i rows in hpa_subcellular_location' % c)
+        logging.info('retrieve subcellular location data from HPA')
+        table = (
+            petl.fromcsv(URLZSource(Config.HPA_SUBCELLULAR_LOCATION_URL))
+            .rename({'Main location': 'main_location',
+                     'Other location': 'other_location',
+                     'Gene': 'gene',
+                     'Reliability': 'reliability',
+                     'Expression type': 'expression_type'})
+            .cut('main_location', 'other_location', 'gene', 'reliability',
+                 'expression_type')
+            )
+
+        for d in table.dicts():
+            yield d
 
 
 class HPAProcess():
@@ -209,7 +211,7 @@ class HPAProcess():
 
                     'rna': {
                     },
-                    'efo_code': tissue_translation_map[tissue]}
+                    'efo_code': Config.TISSUE_TRANSLATION_MAP[tissue]}
             if row['cell_type'] not in tissue_data[tissue]['protein']['cell_type']:
                 tissue_data[tissue]['protein']['cell_type'][row['cell_type']] = []
             tissue_data[tissue]['protein']['cell_type'][row['cell_type']].append(
@@ -231,7 +233,7 @@ class HPAProcess():
             tissue_data = {}
             for row in self.rna_data[gene]:
                 sample = row['sample']
-                is_cell_line = sample not in tissue_translation_map.keys()
+                is_cell_line = sample not in Config.TISSUE_TRANSLATION_MAP.keys()
                 if is_cell_line:
                     if sample not in cell_line_data:
                         cell_line_data[sample] = {'rna': {},
@@ -248,7 +250,7 @@ class HPAProcess():
 
                             'rna': {
                             },
-                            'efo_code': tissue_translation_map[sample]}
+                            'efo_code': Config.TISSUE_TRANSLATION_MAP[sample]}
                     tissue_data[sample]['rna']['value'] = row['value']
                     tissue_data[sample]['rna']['unit'] = row['unit']
         return tissue_data, cell_line_data
