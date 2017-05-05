@@ -150,7 +150,7 @@ class Config():
     }
 
     TISSUE_TRANSLATION_MAP_URL = 'https://storage.googleapis.com/ot-input-dev/tissue_translation_map.csv.gz'
-    TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLGZSource(TISSUE_TRANSLATION_MAP_URL),
+    TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
                                                 delimiter='|').data().tol())
     HPA_NORMAL_TISSUE_URL = 'http://v16.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v16.proteinatlas.org/download/cancer.csv.zip'
