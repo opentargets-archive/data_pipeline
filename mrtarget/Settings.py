@@ -5,7 +5,7 @@ import ConfigParser
 import pkg_resources as res
 import mrtarget
 import petl
-from mrtarget.common import URLGZSource, URLZSource
+from mrtarget.common import URLZSource
 
 
 def ini_from_file_or_resource(filename=None):
