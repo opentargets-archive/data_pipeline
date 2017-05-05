@@ -162,7 +162,7 @@ class Association(JSONSerializable):
         '''set a compat hpa expression data into the score object'''
         filteredHPA = hpa2tissues(hpa)
         if filteredHPA is not None and len(filteredHPA) > 0:
-            self.private['facets']['expression_tissues'].extend(filteredHPA)
+            self.private['facets']['expression_tissues'] = filteredHPA
 
     def set_disease_data(self, efo):
         """get generic efo info"""

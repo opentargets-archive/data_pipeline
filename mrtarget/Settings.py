@@ -78,8 +78,8 @@ class Config():
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
-    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') or False)
-    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') or True)
+    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
+    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
     DRY_RUN_OUTPUT_COUNT = os.getenv('DRY_RUN_OUTPUT_COUNT')
     if DRY_RUN_OUTPUT_COUNT:
         DRY_RUN_OUTPUT_COUNT = int(DRY_RUN_OUTPUT_COUNT)
@@ -149,7 +149,7 @@ class Config():
         '4932':'yeast'
     }
 
-    TISSUE_TRANSLATION_MAP_URL = 'https://storage.googleapis.com/ot-input-dev/tissue_translation_map.csv.gz'
+    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
                                                 delimiter='|').data().tol())
     HPA_NORMAL_TISSUE_URL = 'http://v16.proteinatlas.org/download/normal_tissue.csv.zip'

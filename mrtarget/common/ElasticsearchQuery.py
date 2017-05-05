@@ -141,7 +141,7 @@ class ESQuery(object):
                            scroll='12h',
                            doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
                            index=Loader.get_versioned_index(
-                               Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME),
+                               Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME, True),
                            timeout="10m")
         for hit in res:
             yield hit['_source']

@@ -80,11 +80,13 @@ class Loader():
         suffix = '*' if index_name.endswith('*') else ''
         raw_name = index_name[:-len(suffix)] if len(suffix) > 0 else index_name
 
-        return Config.ES_CUSTOM_IDXS.get('indexes', raw_name) \
+        idx_name = Config.ES_CUSTOM_IDXS.get('indexes', raw_name) \
             if check_custom_idxs and \
             Config.ES_CUSTOM_IDXS is not None and \
             Config.ES_CUSTOM_IDXS.has_option('indexes', raw_name) \
             else Config.RELEASE_VERSION + '_' + index_name
+
+        return idx_name + suffix
 
     def put(self,
             index_name,
