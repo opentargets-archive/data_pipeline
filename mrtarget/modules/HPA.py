@@ -52,7 +52,8 @@ def hpa2tissues(hpa=None):
 
         return x
 
-    return {'rna': ft.reduce(_reduce_func, rnas, {}), 'protein': ft.reduce(_reduce_func, proteins, {})}
+    return {'rna': ft.reduce(_reduce_func, rnas, {}),
+            'protein': ft.reduce(_reduce_func, proteins, {})}
 
 
 class HPAActions(Actions):
