@@ -88,7 +88,6 @@ class ChEMBLQuery(object):
 class ChEMBLLookup(object):
     def __init__(self):
         super(ChEMBLLookup, self).__init__()
-        self.downloader = Downloader()
         self.query = ChEMBLQuery()
         self.es_query = ESQuery()
         self.protein_class = dict()
