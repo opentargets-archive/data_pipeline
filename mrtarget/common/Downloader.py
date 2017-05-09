@@ -31,7 +31,7 @@ import socket
 import requests
 import re
 import os
-import socks
+import mrtarget.common.socks as msocks
 import ftplib
 from mrtarget.Settings import Config
 
@@ -72,15 +72,15 @@ class Downloader(object):
                     #https://gist.github.com/Motoma/594590
                     # -e https://sourceforge.net/projects/socksipy/files/socksipy/SocksiPy%201.00/SocksiPy.zip/download#eggSocksipy
                     # http://stackoverflow.com/questions/15160922/how-can-i-unwrap-a-module-with-socksipy
-                    socks.setdefaultproxy(
-                        socks.PROXY_TYPE_HTTP,
+                    msocks.setdefaultproxy(
+                        msocks.PROXY_TYPE_HTTP,
                         Config.PROXY_HOST,
                         Config.PROXY_PORT,
                         True,
                         Config.PROXY_USERNAME,
                         Config.PROXY_PASSWORD)
                     #socket.socket = socks.socksocket
-                    socks.wrapmodule(ftplib)
+                    msocks.wrapmodule(ftplib)
                     connection = ftplib.FTP(server_site)
                     connection.set_debuglevel( debug_level )
                     #connection.login( Config.PROXY_USERNAME, Config.PROXY_PASSWORD )
