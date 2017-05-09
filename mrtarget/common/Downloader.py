@@ -95,6 +95,7 @@ class Downloader(object):
                 connection.quit()
 
             else:
+                response = None
                 if self.proxies:
                     response = requests.get(url, proxies=self.proxies, stream=True)
                 else:
