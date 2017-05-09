@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import csv
 import logging
 import functools as ft
@@ -7,7 +8,7 @@ from tqdm import tqdm
 
 import requests
 import petl
-from mrtarget.common import URLZSource
+from mrtarget.common.petl import URLZSource
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable

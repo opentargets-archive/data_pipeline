@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import uuid
 from collections import defaultdict
 import os
@@ -5,7 +6,7 @@ import ConfigParser
 import pkg_resources as res
 import mrtarget
 import petl
-from mrtarget.common import URLZSource
+from mrtarget.common.petl import URLZSource
 
 
 def ini_from_file_or_resource(filename=None):
