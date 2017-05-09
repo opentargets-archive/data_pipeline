@@ -94,6 +94,7 @@ class ChEMBLLookup(object):
         self.mechanisms = {}
         self.target2molecule = {}
         self.disease2molecule = {}
+        self.download = Downloader()
         self.targets = {}
         self.uni2chembl = {}
         self.molecule2synonyms = {}
