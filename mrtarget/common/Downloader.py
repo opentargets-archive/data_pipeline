@@ -23,6 +23,8 @@ limitations under the License.
     :synopsis: A data pipeline module to download data.
 .. moduleauthor:: Gautier Koscielny <gautierk@opentargets.org>
 """
+from __future__ import absolute_import
+
 import logging
 import socket
 
