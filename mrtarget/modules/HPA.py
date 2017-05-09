@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 import requests
 import petl
-from mrtarget.common.petl import URLZSource
+from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
