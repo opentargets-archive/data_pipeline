@@ -7,8 +7,6 @@ import petl as p
 import tempfile as tmp
 import requests as r
 
-from mrtarget.common.io import url_to_tmpfile
-
 
 @contextmanager
 def url_to_tmpfile(url, *args, **kwargs):
