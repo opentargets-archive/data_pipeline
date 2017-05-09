@@ -29,7 +29,6 @@ import os
 
 import requests
 
-from mrtarget.common.Downloader import Downloader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 
