@@ -39,3 +39,4 @@ coverage
 ftputil
 psutil
 textblob
+unidecode
