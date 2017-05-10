@@ -307,7 +307,7 @@ class Publication(JSONSerializable):
                     del a['LastName']
 
     def _split_sentences(self):
-        #todo: use proper sentence detection with spacy
+        #todo: use proper sentence detection with spacy/nltk
         if self.abstract:
             abstract_sentences = Publication.split_sentences(self.abstract)
             self.abstract_sentences = [dict(order=i, value = sentence) for i, sentence in enumerate(abstract_sentences)]
@@ -315,6 +315,13 @@ class Publication(JSONSerializable):
     def _sanitize_abstract(self):
         if isinstance(self.abstract, list):
             self.abstract=' '.join(self.abstract)
+
+    def get_text_to_analyze(self):
+        if self.title and self.abstract:
+            return  unicode(self.title + ' ' + self.abstract)
+        elif self.title:
+            return unicode(self.title)
+        return u''
 
     @staticmethod
     def split_sentences(text):

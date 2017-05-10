@@ -78,15 +78,8 @@ def _get_evidence_string_generic_mapping():
                                         }
                                     },
                                     "noun_chunks": {
-                                        "properties": {
-                                            "count": {
-                                                "type": "long"
-                                            },
-                                            "value": {
-                                                "type": "string",
-                                                "index": "not_analyzed"
-                                            }
-                                        }
+                                        "type": "string",
+                                        "index": "not_analyzed"
                                     },
                                     "chemicals": {
                                         "properties": {

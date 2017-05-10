@@ -18,7 +18,7 @@ from modules.ECO import ECO
 from modules.EFO import EFO, get_ontology_code_from_url
 from modules.GeneData import Gene
 from modules.Literature import Publication, PublicationFetcher
-from modules.LiteratureNLP import PublicationAnalysisSpacy
+from modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
 from settings import Config
 
 logger = logging.getLogger(__name__)
@@ -264,6 +264,7 @@ class EvidenceManager():
         self.available_publications = {}
         if 'available_publications' in lookup_data.__dict__:
             self.available_publications = lookup_data.available_publications
+        self.noun_chuncker = NounChuncker()
 
 
         # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
@@ -600,7 +601,8 @@ class EvidenceManager():
 
 
                 if pubs:
-                    literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
+                    pub, pub_analysis = pubs[pmid][0], pubs[pmid][1]
+                    literature_info = ExtendedInfoLiterature(pub, pub_analysis)
                     extended_evidence['literature']['date'] = literature_info.data['date']
                     extended_evidence['literature']['abstract'] = literature_info.data['abstract']
                     extended_evidence['literature']['journal_data'] = literature_info.data['journal']
@@ -623,8 +625,8 @@ class EvidenceManager():
                         'mesh_headings')
                     # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
                     #     'chemicals')
-                    # extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
-                    #     'noun_chunks')
+                    extended_evidence['private']['facets']['literature']['noun_chunks'] = self.noun_chuncker.digest(
+                        pub.get_text_to_analyze())
 
         return Evidence(extended_evidence)
 

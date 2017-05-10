@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# coding: latin-1
+# coding: UTF-8
 import logging
 import multiprocessing
 import re
@@ -18,9 +18,15 @@ from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisQueue, RedisQueueWorkerProcess
 from modules.Literature import PublicationFetcher
 from settings import Config
+import nltk
+from textblob import TextBlob
+from textblob.base import BaseNPExtractor
+from textblob.decorators import requires_nltk_corpus
+from textblob.en.np_extractors import _normalize_tags
+from unidecode import unidecode
 
 # List of symbols we don't care about
-SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "“", "”", "'ve"]
+SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "â", "â", "'ve"]
 
 LABELS = {
     u'ENT': u'ENT',
@@ -44,6 +50,151 @@ LABELS = {
     u'CARDINAL': u'CARDINAL'
 }
 MAX_CHUNKS =100
+
+
+class AbstractNormalizer(object):
+
+    greek_alphabet = {
+        u'\u0391': 'Alpha',
+        u'\u0392': 'Beta',
+        u'\u0393': 'Gamma',
+        u'\u0394': 'Delta',
+        u'\u0395': 'Epsilon',
+        u'\u0396': 'Zeta',
+        u'\u0397': 'Eta',
+        u'\u0398': 'Theta',
+        u'\u0399': 'Iota',
+        u'\u039A': 'Kappa',
+        u'\u039B': 'Lamda',
+        u'\u039C': 'Mu',
+        u'\u039D': 'Nu',
+        u'\u039E': 'Xi',
+        u'\u039F': 'Omicron',
+        u'\u03A0': 'Pi',
+        u'\u03A1': 'Rho',
+        u'\u03A3': 'Sigma',
+        u'\u03A4': 'Tau',
+        u'\u03A5': 'Upsilon',
+        u'\u03A6': 'Phi',
+        u'\u03A7': 'Chi',
+        u'\u03A8': 'Psi',
+        u'\u03A9': 'Omega',
+        u'\u03B1': 'alpha',
+        u'\u03B2': 'beta',
+        u'\u03B3': 'gamma',
+        u'\u03B4': 'delta',
+        u'\u03B5': 'epsilon',
+        u'\u03B6': 'zeta',
+        u'\u03B7': 'eta',
+        u'\u03B8': 'theta',
+        u'\u03B9': 'iota',
+        u'\u03BA': 'kappa',
+        u'\u03BB': 'lamda',
+        u'\u03BC': 'mu',
+        u'\u03BD': 'nu',
+        u'\u03BE': 'xi',
+        u'\u03BF': 'omicron',
+        u'\u03C0': 'pi',
+        u'\u03C1': 'rho',
+        u'\u03C3': 'sigma',
+        u'\u03C4': 'tau',
+        u'\u03C5': 'upsilon',
+        u'\u03C6': 'phi',
+        u'\u03C7': 'chi',
+        u'\u03C8': 'psi',
+        u'\u03C9': 'omega',
+    }
+
+    def normalize(self, text):
+        for key in self.greek_alphabet:
+            text = text.replace(key, self.greek_alphabet[key])
+        return unidecode(text)
+
+class FastNPExtractor2(BaseNPExtractor):
+    '''A fast and simple noun phrase extractor.
+
+    Credit to Shlomi Babluk. Link to original blog post:
+
+        http://thetokenizer.com/2013/05/09/efficient-way-to-extract-the-main-topics-of-a-sentence/
+    '''
+
+    CFG = {
+        ('NNP', 'NNP'): 'NNP',
+        ('NN', 'NN'): 'NNI',
+        ('NNI', 'NN'): 'NNI',
+        ('JJ', 'JJ'): 'JJ',
+        ('JJ', 'NN'): 'NNI',
+    }
+
+    def __init__(self):
+        self._trained = False
+
+    @requires_nltk_corpus
+    def train(self):
+        train_data = nltk.corpus.brown.tagged_sents(categories=['science_fiction'])
+        regexp_tagger = nltk.RegexpTagger([
+            (r'^-?[0-9]+(.[0-9]+)?$', 'CD'),
+            (r'(-|:|;)$', ':'),
+            (r'\'*$', 'MD'),
+            (r'(The|the|A|a|An|an)$', 'AT'),
+            (r'.*able$', 'JJ'),
+            (r'^[A-Z].*$', 'NNP'),
+            (r'.*ness$', 'NN'),
+            (r'.*ly$', 'RB'),
+            (r".*'s$", 'POS'),
+            (r'.*s$', 'NNS'),
+            (r'.*ing$', 'VBG'),
+            (r'.*ed$', 'VBD'),
+            (r'.*', 'NN'),
+        ])
+        unigram_tagger = nltk.UnigramTagger(train_data, backoff=regexp_tagger)
+        self.tagger = nltk.BigramTagger(train_data, backoff=unigram_tagger)
+        self._trained = True
+        return None
+
+    def _tokenize_sentence(self, sentence):
+        '''Split the sentence into single words/tokens'''
+        tokens = nltk.word_tokenize(sentence)
+        return tokens
+
+    def extract(self, sentence):
+        '''Return a list of noun phrases (strings) for body of text.'''
+        if not self._trained:
+            self.train()
+        tokens = self._tokenize_sentence(sentence)
+        tagged = self.tagger.tag(tokens)
+        tags = _normalize_tags(tagged)
+        merge = True
+        while merge:
+            merge = False
+            for x in range(0, len(tags) - 1):
+                t1 = tags[x]
+                t2 = tags[x + 1]
+                key = t1[1], t2[1]
+                value = self.CFG.get(key, '')
+                if value:
+                    merge = True
+                    tags.pop(x)
+                    tags.pop(x)
+                    match = '%s %s' % (t1[0], t2[0])
+                    pos = value
+                    tags.insert(x, (match, pos))
+                    break
+
+        matches = [t[0] for t in tags if t[1] in ['NNP', 'NNI']]
+        return matches
+
+class NounChuncker(object):
+
+    def __init__(self):
+        self.np_ex = FastNPExtractor2()
+        self.normalizer = AbstractNormalizer()
+
+    def digest(self, text):
+        normalized = self.normalizer.normalize(text)
+        parsed = TextBlob(normalized, np_extractor=self.np_ex)
+        return list(parsed.noun_phrases)
+
 
 class LiteratureNLPActions(Actions):
 
@@ -119,7 +270,7 @@ class LiteratureNLPProcess(object):
         return url.split('/')[-1]
 
 
-class PublicationAnalyserSpacy(object):
+class PublicationAnalysisSpacy(object):
     def __init__(self, fetcher, dry_run=False):
 
         self.fetcher = fetcher
@@ -136,8 +287,8 @@ class PublicationAnalyserSpacy(object):
         if pub is None:
             pub = self.fetcher.get_publication(pub_ids=pub_id)
         analysed_pub = None
-        if pub.title and pub.abstract:
-            text_to_parse = unicode(pub.title + ' ' + ''.join(pub.abstract))
+        if pub.title or pub.abstract:
+            text_to_parse = pub.get_text_to_analyze()
             lemmas, noun_chunks, analysed_sentences_count = self._spacy_analyser(text_to_parse)
             lemmas= tuple({'value':k, "count":v} for k,v in lemmas.items())
             noun_chunks= tuple({'value':k, "count":v} for k,v in noun_chunks.items())
