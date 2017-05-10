@@ -51,6 +51,7 @@ LABELS = {
 }
 MAX_CHUNKS =100
 
+nltk.download()
 
 class AbstractNormalizer(object):
 
