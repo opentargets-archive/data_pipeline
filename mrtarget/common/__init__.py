@@ -6,6 +6,7 @@ import zipfile
 import petl as p
 import tempfile as tmp
 import requests as r
+import urllib2 as u2
 
 
 @contextmanager
@@ -17,8 +18,16 @@ def url_to_tmpfile(url, *args, **kwargs):
     '''
     f = None
 
-    f = r.get(url, *args, stream=True, **kwargs)
-    f.raise_for_status()
+    if url.startswith('ftp'):
+        # TODO unfinished but not necessary at the moment
+        # proxy_support = u2.ProxyHandler({})
+        # opener = u2.build_opener(proxy_support)
+        # req = u2.Request(url, *args, **kwargs)
+        # f = opener.open(req)
+        raise NotImplemented('finish ftp')
+    else:
+        f = r.get(url, *args, stream=True, **kwargs)
+        f.raise_for_status()
 
     with tmp.NamedTemporaryFile(mode='rw+b', delete=True) as fd:
         # write data into file in streaming fashion

@@ -94,7 +94,8 @@ class ChEMBLLookup(object):
         self.mechanisms = {}
         self.target2molecule = {}
         self.disease2molecule = {}
-        self.download = Downloader()
+        # TODO XXX here I need to enable this class
+        # self.download = Downloader()
         self.targets = {}
         self.uni2chembl = {}
         self.molecule2synonyms = {}
