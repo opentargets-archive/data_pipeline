@@ -42,6 +42,7 @@ class OLDUniprotDownloader():
         self.timeout = timeout
         self.pg = pg_session
         self.NS = "{http://uniprot.org/uniprot}"
+        self.logger = logging.getLogger(__name__)
 
 
     def get_entry(self):
@@ -80,7 +81,7 @@ class OLDUniprotDownloader():
         if uniprot_xml:
             return UniprotIterator(StringIO(uniprot_xml), return_raw_comments=True).next()
         else:
-            logging.debug("cannot get uniprot data for uniprot id %s" % uniprotid)
+            self.logger.debug("cannot get uniprot data for uniprot id %s" % uniprotid)
 
     def get_single_entry_xml(self, uniprotid):
         return self.get_single_entry_xml_remote(uniprotid)
@@ -92,10 +93,8 @@ class OLDUniprotDownloader():
         if r.status_code == 200:
             return r.content
         else:
-            logging.debug('cannot get data from remote uniprot.org for uniprotid: %s' % uniprotid)
+            self.logger.debug('cannot get data from remote uniprot.org for uniprotid: %s' % uniprotid)
         return
-
-
 
 
 class UniprotDownloader():
@@ -110,9 +109,10 @@ class UniprotDownloader():
         self.url = "http://www.uniprot.org/uniprot/?query="
         self.chunk_size = chunk_size
         self.timeout = timeout
-        self.loader = Loader(loader.es, chunk_size = 10)
+        self.loader = Loader(loader.es, chunk_size=10,
+                             dry_run=loader.is_dry_run())
         self.NS = "{http://uniprot.org/uniprot}"
-
+        self.logger = logging.getLogger(__name__)
 
     def cache_human_entries(self):
         # self._delete_cache()
@@ -122,6 +122,7 @@ class UniprotDownloader():
         while data.content:
             for xml in self._iterate_xml(StringIO(data.content)):
                 seqrec = Parser(xml, return_raw_comments=True).parse()
+                print seqrec
                 '''sanitise for json'''
                 # seqrec.annotations = sanitise_dict_for_json(seqrec.annotations)
                     # if '.' in k:
@@ -135,9 +136,9 @@ class UniprotDownloader():
                 self._save_to_elasticsearch(seqrec.id, seqrec)
                 c+=1
             offset += self.chunk_size
-            logging.info('downloaded %i entries from uniprot'%c)
+            self.logger.info('downloaded %i entries from uniprot'%c)
             data = self._get_data_from_remote(self.chunk_size, offset)
-        logging.info('downloaded %i entries from uniprot'%c)
+        self.logger.info('downloaded %i entries from uniprot'%c)
 
     def _iterate_xml(self, handle):
         for event, elem in ElementTree.iterparse(handle, events=("start", "end")):
@@ -168,7 +169,7 @@ class UniprotDownloader():
     #         self.session.commit()
     #         self.cached_count+=1
     #         if (self.cached_count%5000)==0:
-    #             logging.info("Cached %i entries from uniprot to local postgres"%self.cached_count)
+    #             self.logger.info("Cached %i entries from uniprot to local postgres"%self.cached_count)
 
     def _save_to_elasticsearch(self, uniprotid, seqrec):
         # seqrec = UniprotIterator(StringIO(uniprot_xml), 'uniprot-xml').next()
@@ -185,13 +186,13 @@ class UniprotDownloader():
         #     self.session.commit()
         #     self.cached_count += 1
         #     if (self.cached_count % 5000) == 0:
-        #         logging.info("Cached %i entries from uniprot to local postgres" % self.cached_count)
+        #         self.logger.info("Cached %i entries from uniprot to local postgres" % self.cached_count)
 
     # def _delete_cache(self):
     #     self.cached_count = 0
     #     rows_deleted= self.session.query(UniprotInfo).delete()
     #     if rows_deleted:
-    #         logging.info('deleted %i rows from uniprot_info'%rows_deleted)
+    #         self.logger.info('deleted %i rows from uniprot_info'%rows_deleted)
 
 
 
