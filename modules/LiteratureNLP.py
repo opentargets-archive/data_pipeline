@@ -131,6 +131,7 @@ class FastNPExtractor2(BaseNPExtractor):
 
     @requires_nltk_corpus
     def train(self):
+        nltk.download('brown')
         train_data = nltk.corpus.brown.tagged_sents(categories=['science_fiction'])
         regexp_tagger = nltk.RegexpTagger([
             (r'^-?[0-9]+(.[0-9]+)?$', 'CD'),
