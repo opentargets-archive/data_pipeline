@@ -21,8 +21,8 @@ build:
     - script:
         name: install nlp corpora
         code: |
-          python -m spacy.en.download
-          python -m nltk.downloader all-corpora
+          python -m spacy download en
+          python -m nltk.downloader brown
     - script:
         name: test empty run to catch import errors
         code: |
