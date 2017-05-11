@@ -23,6 +23,7 @@ build:
         code: |
           python -m spacy download en
           python -m nltk.downloader brown
+          python -m nltk.downloader punkt
     - script:
         name: test empty run to catch import errors
         code: |
