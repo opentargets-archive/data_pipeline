@@ -17,12 +17,12 @@ build:
 #        name: install double conversion dependency
 #        code: |
 #          apt-get update && apt-get install -y --no-install-recommends libdouble-conversion-dev && rm -rf /var/lib/apt/lists/*
+    - pip-install
     - script:
         name: install nlp corpora
         code: |
           python -m spacy.en.download
           python -m nltk.downloader all-corpora
-    - pip-install
     - script:
         name: test empty run to catch import errors
         code: |
