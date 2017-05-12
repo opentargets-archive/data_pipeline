@@ -84,26 +84,6 @@ class Config():
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
-    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
-    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
-    DRY_RUN_OUTPUT_COUNT = os.getenv('DRY_RUN_OUTPUT_COUNT')
-    if DRY_RUN_OUTPUT_COUNT:
-        DRY_RUN_OUTPUT_COUNT = int(DRY_RUN_OUTPUT_COUNT)
-    else:
-        DRY_RUN_OUTPUT_COUNT = 10000
-
-    # This config file is like this and no prefixes or version will be
-    # appended
-    #
-    # [indexes]
-    # gene-data=new-gene-data-index-name
-    # ...
-    #
-    # if no index field or config file is found then a default
-    # composed index name will be returned
-    ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
-    ES_CUSTOM_IDXS = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME)
-
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
@@ -316,5 +296,25 @@ class Config():
     GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
 
     # for developers
+    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
+    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
+    DRY_RUN_OUTPUT_COUNT = os.getenv('DRY_RUN_OUTPUT_COUNT')
+    if DRY_RUN_OUTPUT_COUNT:
+        DRY_RUN_OUTPUT_COUNT = int(DRY_RUN_OUTPUT_COUNT)
+    else:
+        DRY_RUN_OUTPUT_COUNT = 10000
+
+    # This config file is like this and no prefixes or version will be
+    # appended
+    #
+    # [indexes]
+    # gene-data=new-gene-data-index-name
+    # ...
+    #
+    # if no index field or config file is found then a default
+    # composed index name will be returned
+    ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
+    ES_CUSTOM_IDXS = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME)
+
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
     MINIMAL_UNIPROT = file_to_list(file_or_resource('minimal_uniprot.txt'))
