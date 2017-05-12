@@ -1,10 +1,14 @@
+from __future__ import absolute_import
 import csv
 import logging
+import functools as ft
 from StringIO import StringIO
 from zipfile import ZipFile
 from tqdm import tqdm
 
 import requests
+import petl
+from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -14,12 +18,43 @@ from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.Settings import Config
 
 
-
-
 def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
-    return [k for k, _ in hpa.tissues
-            if hpa is not None and type(hpa) == type(HPAExpression)]
+    def _split_tissue(k, v):
+        '''from tissue dict to rna and protein dicts pair'''
+        t2m = Config.TISSUE_TRANSLATION_MAP
+        tid = t2m[k]
+        tlabel = k
+        rna = {'id': tid, 'label': tlabel, 'level': v['rna']['level'],
+               'unit': v['rna']['unit'],
+               'value': v['rna']['value']} if v['rna'] else {}
+
+        protein = {'id': tid, 'label': tlabel,
+                   'level': v['protein']['level']} if v['protein'] else {}
+        return (rna, protein)
+
+    # generate a list with rna, protein pairs per tissue
+    splitted_tissues = [_split_tissue(k, v) for k, v in hpa.tissues.iteritems()
+                        if hpa is not None]
+
+    rnas = [[(l+1, tissue[0]) for l in xrange(tissue[0]['level'])]
+            for tissue in splitted_tissues if tissue[0]]
+
+    proteins = [[(l+1, tissue[1]) for l in xrange(tissue[1]['level'])]
+                for tissue in splitted_tissues if tissue[1]]
+
+    def _reduce_func(x, y):
+        for el in y:
+            k = str(el[0])
+            if k in x:
+                x[k].append(el[1])
+            else:
+                x[k] = [el[1]]
+
+        return x
+
+    return {'rna': ft.reduce(_reduce_func, rnas, {}),
+            'protein': ft.reduce(_reduce_func, proteins, {})}
 
 
 class HPAActions(Actions):
@@ -40,13 +75,6 @@ class HPADataDownloader():
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def retrieve_all(self):
-
-        self.retrieve_normal_tissue_data()
-        self.retrieve_cancer_data()
-        self.retrieve_rna_data()
-        self.retrieve_subcellular_location_data()
-
     def _download_data(self, url):
         r = requests.get(url)
         try:
@@ -60,71 +88,78 @@ class HPADataDownloader():
     def _get_csv_reader(self, csvfile):
         return csv.DictReader(csvfile)
 
-    """
-        Parse 'normal_tissue' csv file,
+    def retrieve_normal_tissue_data(self):
+        """Parse 'normal_tissue' csv file,
         the expression profiles for proteins in human tissues from HPA
 
-    :return: dict
-    """
-    def retrieve_normal_tissue_data(self):
-        reader = self._get_csv_reader(self._download_data(Config.HPA_NORMAL_TISSUE_URL))
-        for c, row in enumerate(reader):
-            yield dict(tissue=row['Tissue'],
-                       cell_type=row['Cell type'],
-                       level=row['Level'],
-                       reliability=row['Reliability'],
-                       gene=row['Gene'],
-                       )
-            if c + 1 % 10000 == 0:
-                logging.debug("%i rows parsed from hpa_normal_tissue" % c)
-        logging.info('parsed %i rows from hpa_normal_tissue' % c)
+        :return: dict
+        """
+        logging.info('get normal tissue rows into dicts')
+        table = (
+            petl.fromcsv(URLZSource(Config.HPA_NORMAL_TISSUE_URL))
+            .rename({'Tissue': 'tissue',
+                     'Cell type': 'cell_type',
+                     'Level': 'level',
+                     'Reliability': 'reliability',
+                     'Gene': 'gene'})
+            .cut('tissue', 'cell_type', 'level', 'reliability', 'gene')
+            )
 
-    """
+        for d in table.dicts():
+            yield d
+
+    def retrieve_rna_data(self):
+        """
         Parse 'rna_tissue' csv file,
         RNA levels in 56 cell lines and 37 tissues based on RNA-seq from HPA.
 
-    :return: dict
-    """
-    def retrieve_rna_data(self):
-        reader = self._get_csv_reader(self._download_data(Config.HPA_RNA_URL))
-        for c, row in enumerate(reader):
-            yield dict(sample=row['Sample'],
-                       unit=row['Unit'],
-                       value=row['Value'],
-                       gene=row['Gene'],
-                       )
+        :return: dict
+        """
+        logging.info('get rna tissue rows into dicts')
+        table = (
+            petl.fromcsv(URLZSource(Config.HPA_RNA_URL))
+            .rename({'Sample': 'sample',
+                     'Unit': 'unit',
+                     'Value': 'value',
+                     'Gene': 'gene'})
+            .cut('sample', 'unit', 'value', 'gene')
+            )
 
-            if c + 1 % 10000 == 0:
-                logging.debug("%i rows uploaded to hpa_rna" % c)
-        logging.info('inserted %i rows in hpa_rna' % c)
+        for d in table.dicts():
+            yield d
 
     def retrieve_cancer_data(self):
         logging.info('retrieve cancer data from HPA')
-        reader = self._get_csv_reader(self._download_data(Config.HPA_CANCER_URL))
-        for c, row in enumerate(reader):
-            yield dict(tumor=row['Tumor'],
-                       level=row['Level'],
-                       count_patients=row['Count patients'],
-                       total_patients=row['Total patients'],
-                       gene=row['Gene'],
-                       expression_type=row['Expression type'],
-                       )
-            if c + 1 % 10000 == 0:
-                logging.debug("%i rows uploaded to hpa_cancer" % c)
-            logging.info('inserted %i rows in hpa_cancer' % c)
+        table = (
+            petl.fromcsv(URLZSource(Config.HPA_CANCER_URL))
+            .rename({'Tumor': 'tumor',
+                     'Level': 'level',
+                     'Count patients': 'count_patients',
+                     'Total patients': 'total_patients',
+                     'Gene': 'gene',
+                     'Expression type': 'expression_type'})
+            .cut('tumor', 'count_patients', 'level', 'total_patients', 'gene',
+                 'expression_type')
+            )
+
+        for d in table.dicts():
+            yield d
 
     def retrieve_subcellular_location_data(self):
-        reader = self._get_csv_reader(self._download_data(Config.HPA_SUBCELLULAR_LOCATION_URL))
-        for c, row in enumerate(reader):
-            yield dict(main_location=row['Main location'],
-                       other_location=row['Other location'],
-                       gene=row['Gene'],
-                       expression_type=row['Expression type'],
-                       reliability=row['Reliability'],
-                       )
-            if c + 1 % 10000 == 0:
-                logging.debug("%i rows uploaded to hpa_subcellular_location" % c)
-        logging.info('inserted %i rows in hpa_subcellular_location' % c)
+        logging.info('retrieve subcellular location data from HPA')
+        table = (
+            petl.fromcsv(URLZSource(Config.HPA_SUBCELLULAR_LOCATION_URL))
+            .rename({'Main location': 'main_location',
+                     'Other location': 'other_location',
+                     'Gene': 'gene',
+                     'Reliability': 'reliability',
+                     'Expression type': 'expression_type'})
+            .cut('main_location', 'other_location', 'gene', 'reliability',
+                 'expression_type')
+            )
+
+        for d in table.dicts():
+            yield d
 
 
 class HPAProcess():
@@ -210,7 +245,7 @@ class HPAProcess():
 
                     'rna': {
                     },
-                    'efo_code': self.tissue_translation[tissue]}
+                    'efo_code': Config.TISSUE_TRANSLATION_MAP[tissue]}
             if row['cell_type'] not in tissue_data[tissue]['protein']['cell_type']:
                 tissue_data[tissue]['protein']['cell_type'][row['cell_type']] = []
             tissue_data[tissue]['protein']['cell_type'][row['cell_type']].append(
@@ -232,7 +267,7 @@ class HPAProcess():
             tissue_data = {}
             for row in self.rna_data[gene]:
                 sample = row['sample']
-                is_cell_line = sample not in self.tissue_translation.keys()
+                is_cell_line = sample not in Config.TISSUE_TRANSLATION_MAP.keys()
                 if is_cell_line:
                     if sample not in cell_line_data:
                         cell_line_data[sample] = {'rna': {},
@@ -249,7 +284,7 @@ class HPAProcess():
 
                             'rna': {
                             },
-                            'efo_code': self.tissue_translation[sample]}
+                            'efo_code': Config.TISSUE_TRANSLATION_MAP[sample]}
                     tissue_data[sample]['rna']['value'] = row['value']
                     tissue_data[sample]['rna']['unit'] = row['unit']
         return tissue_data, cell_line_data
@@ -266,121 +301,6 @@ class HPAProcess():
                                         'Approved' : True,
                                         'Supported': True,
                                         }
-
-        self.tissue_translation = {
-            'adrenal gland': 'CL_0000336',
-            'appendix': 'EFO_0000849',
-            'bone marrow': 'UBERON_0002371',
-            'breast': 'UBERON_0000310',
-            'bronchus': 'UBERON_0002185',
-            'cerebellum': 'UBERON_0002037',
-            'cerebral cortex': 'UBERON_0000956',
-            'cervix, uterine': 'EFO_0000979',
-            'colon': 'UBERON_0001155',
-            'duodenum': 'UBERON_0002114',
-            'endometrium': 'UBERON_0001295',
-            'epididymis': 'UBERON_0001301',
-            'esophagus': 'UBERON_0001043',
-            'fallopian tube': 'UBERON_0003889',
-            'gallbladder': 'UBERON_0002110',
-            'heart muscle': 'UBERON_0002349',
-            'hippocampus': 'EFO_0000530',
-            'kidney': 'UBERON_0002113',
-            'lateral ventricle': 'EFO_0001961',
-            'liver': 'UBERON_0002107',
-            'lung': 'UBERON_0002048',
-            'lymph node': 'UBERON_0000029',
-            'nasopharynx': 'nasopharynx',  # TODO: nothing matching except nasopharynx cancers
-            'oral mucosa': 'UBERON_0003729',
-            'ovary': 'EFO_0000973',
-            'pancreas': 'UBERON_0001264',
-            'parathyroid gland': 'CL_0000446',
-            'placenta': 'UBERON_0001987',
-            'prostate': 'UBERON_0002367',
-            'rectum': 'UBERON_0001052',
-            'salivary gland': 'UBERON_0001044',
-            'seminal vesicle': 'UBERON_0000998',
-            'skeletal muscle': 'CL_0000188',
-            'skin': 'EFO_0000962',
-            'small intestine': 'UBERON_0002108',
-            'smooth muscle': 'EFO_0000889',
-            'soft tissue': 'soft_tissue',
-            # TODO: cannot map automatically to anything except: EFO_0000691 that is sarcoma (and includes soft
-            # tissue tumor)
-            'spleen': 'UBERON_0002106',
-            'stomach': 'UBERON_0000945',
-            'testis': 'UBERON_0000473',
-            'thyroid gland': 'UBERON_0002046',
-            'tonsil': 'UBERON_0002372',
-            'urinary bladder': 'UBERON_0001255',
-            'vagina': 'UBERON_0000996',
-            'adipose tissue': 'adipose tissue',
-            ## new tissue types added for hpa v16
-            'caudate': 'UBERON_0005383',
-            'eye': 'UBERON_0000970',
-            'hair': 'EFO_0007824',
-            'hypothalamus': 'UBERON_0001898',
-            'lactating breast': 'lactating breast',
-            'pituitary gland': 'UBERON_0000007',
-            'retina': 'UBERON_0000966',
-            'skin 1': 'UBERON_0000014',
-            'skin 2': 'UBERON_0000014',
-            'endometrium 1': 'UBERON_0001295',
-            'endometrium 2': 'UBERON_0001295',
-            'soft tissue 1': 'UBERON_0000916',
-            'soft tissue 2': 'UBERON_0000916',
-            'stomach 1': 'UBERON_0000945',
-            'stomach 2': 'UBERON_0000945',
-            ## new tissue types added for atlas baseline rna expression
-            'Brodmann(1909) area 24': 'UBERON_0006101',
-            'Brodmann(1909) area 9': 'UBERON_0013540',
-            'C1 segment of cervical spinal cord': 'UBERON_0006469',
-            'EBV - transformed lymphocyte': 'CL_0000542',
-            'amygdala': 'UBERON_0001876',
-            'aorta': 'UBERON_0000947',
-            'atrial appendage of heart': 'UBERON_0006618',
-            'blood': 'UBERON_0000178',
-            'brain': 'UBERON_0000955',
-            'breast(mammary tissue)': 'UBERON_0000310',
-            'caudate nucleus': 'UBERON_0001873',
-            'cerebellar hemisphere': 'UBERON_0002245',
-            'coronary artery': 'UBERON_0001621',
-            'cortex of kidney': 'UBERON_0001225',
-            'ectocervix': 'UBERON_0012249',
-            'endocervix': 'UBERON_0000458',
-            'esophagus muscularis mucosa': 'UBERON_0004648',
-            'frontal lobe': 'UBERON_0016525',
-            'gall bladder': 'UBERON_0002110',
-            'gastroesophageal junction': 'UBERON_0007650',
-            'heart': 'UBERON_0000948',
-            'heart left ventricle': 'UBERON_0002084',
-            'hippocampus proper': 'UBERON_0001954',
-            'ileum': 'UBERON_0002116',
-            'leukocyte': 'CL_0000738',
-            'minor salivary gland': 'UBERON_0001830',
-            'mucosa of esophagus': 'UBERON_0002469',
-            'nucleus accumbens': 'UBERON_0001882',
-            'omental fat pad': 'UBERON_0010414',
-            'prefrontal cortex': 'UBERON_0000451',
-            'prostate gland': 'UBERON_0002367',
-            'putamen': 'UBERON_0001874',
-            'saliva - secreting gland': 'UBERON_0001044',
-            'sigmoid colon': 'UBERON_0001159',
-            'skeletal muscle tissue': 'UBERON_0001134',
-            'skin of lower leg': 'UBERON_0004264',
-            'skin of suprapubic region': 'UBERON_0013203',
-            'smooth muscle tissue': 'UBERON_0001135',
-            'subcutaneous adipose tissue': 'UBERON_0002190',
-            'substantia nigra': 'UBERON_0002038',
-            'temporal lobe': 'UBERON_0001871',
-            'tibial artery': 'UBERON_0007610',
-            'tibial nerve': 'UBERON_0001323',
-            'transformed skin fibroblast': 'CL_0000057',
-            'transverse colon': 'UBERON_0001157',
-            'uterus': 'UBERON_0000995',
-            'vermiform appendix': 'UBERON_0001154',
-            'zone of skin': 'UBERON_0000014',
-        }
 
 
 class HPALookUpTable(object):

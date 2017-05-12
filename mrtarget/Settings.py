@@ -4,6 +4,8 @@ import os
 import ConfigParser
 import pkg_resources as res
 import mrtarget
+import petl
+from mrtarget.common import URLZSource
 
 
 def ini_from_file_or_resource(filename=None):
@@ -76,6 +78,14 @@ class Config():
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
+    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
+    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
+    DRY_RUN_OUTPUT_COUNT = os.getenv('DRY_RUN_OUTPUT_COUNT')
+    if DRY_RUN_OUTPUT_COUNT:
+        DRY_RUN_OUTPUT_COUNT = int(DRY_RUN_OUTPUT_COUNT)
+    else:
+        DRY_RUN_OUTPUT_COUNT = 10000
+
     # This config file is like this and no prefixes or version will be
     # appended
     #
@@ -139,10 +149,13 @@ class Config():
         '4932':'yeast'
     }
 
+    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
+    TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
+                                                delimiter='|').data().tol())
     HPA_NORMAL_TISSUE_URL = 'http://v16.proteinatlas.org/download/normal_tissue.csv.zip'
     HPA_CANCER_URL = 'http://v16.proteinatlas.org/download/cancer.csv.zip'
     HPA_SUBCELLULAR_LOCATION_URL = 'http://v16.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'http://storage.googleapis.com/atlas_baseline_expression/rna_tissue_atlas.csv.zip'
+    HPA_RNA_URL = 'https://storage.googleapis.com/atlas_baseline_expression/rna_tissue_atlas.csv.zip'
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
@@ -181,7 +194,11 @@ class Config():
 
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
-    WORKERS_NUMBER = None
+    WORKERS_NUMBER = os.getenv('WORKERS_NUMBER')
+    if WORKERS_NUMBER:
+        WORKERS_NUMBER = int(WORKERS_NUMBER)
+    else:
+        WORKERS_NUMBER = None
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'

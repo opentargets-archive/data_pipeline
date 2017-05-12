@@ -29,7 +29,6 @@ import os
 
 import requests
 
-from mrtarget.common.Downloader import Downloader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 
@@ -88,7 +87,6 @@ class ChEMBLQuery(object):
 class ChEMBLLookup(object):
     def __init__(self):
         super(ChEMBLLookup, self).__init__()
-        self.downloader = Downloader()
         self.query = ChEMBLQuery()
         self.es_query = ESQuery()
         self.protein_class = dict()
@@ -96,6 +94,8 @@ class ChEMBLLookup(object):
         self.mechanisms = {}
         self.target2molecule = {}
         self.disease2molecule = {}
+        # TODO XXX here I need to enable this class
+        # self.download = Downloader()
         self.targets = {}
         self.uni2chembl = {}
         self.molecule2synonyms = {}

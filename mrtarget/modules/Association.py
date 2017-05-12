@@ -71,7 +71,8 @@ class Association(JSONSerializable):
         self.private = {}
         self.private['facets'] = dict(datatype=[],
                                       datasource=[],
-                                      free_text_search=[])
+                                      free_text_search=[],
+                                      expression_tissues=[])
 
     def get_scoring_method(self, method):
         if method not in ScoringMethods.__dict__.values():
@@ -465,9 +466,11 @@ class ScoreProducer(RedisQueueWorkerThread):
                         self.lookup_data.available_hpa.get_hpa(gene_data.id))
                     score.set_hpa_data(hpa_data)
 
-                except Exception, e:
+                except KeyError, ke:
                     self.logger.debug('Cannot find HPA code "%s" '
                                       'in lookup table' % target)
+
+                except Exception, e:
                     self.logger.exception(e)
 
                 disease_data = EFO()
@@ -546,8 +549,7 @@ class ScoringProcess():
         overwrite_indices = not dry_run
         if overwrite_indices:
             overwrite_indices = not bool(targets)
-        if not targets:
-            targets = list(self.es_query.get_all_target_ids_with_evidence_data())
+
 
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
@@ -558,7 +560,12 @@ class ScoringProcess():
                                               LookUpDataType.ECO,
                                               LookUpDataType.HPA
                                           ),
-                                          autoload=False).lookup
+                                          autoload=True if not targets
+                                          or len(targets) > 100
+                                          else False).lookup
+
+        if not targets:
+            targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
