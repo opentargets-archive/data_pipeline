@@ -2,6 +2,8 @@ import argparse
 import logging
 import sys
 
+import nltk
+
 from common import Actions
 from common.ElasticsearchLoader import Loader
 from common.connection import PipelineConnectors
@@ -41,6 +43,9 @@ logging.getLogger("redislite.client").setLevel(logging.ERROR)
 '''logger'''
 logger = logging.getLogger(__name__)
 
+
+def load_nlp_corpora():
+    nltk.download(['brown', 'punkt'])
 
 if __name__ == '__main__':
 
@@ -155,6 +160,9 @@ if __name__ == '__main__':
 
     if args.do_nothing:
         sys.exit(0)
+
+    if args.inject_literature or args.lit:
+        load_nlp_corpora()
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,

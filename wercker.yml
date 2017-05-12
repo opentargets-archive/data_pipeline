@@ -19,12 +19,6 @@ build:
 #          apt-get update && apt-get install -y --no-install-recommends libdouble-conversion-dev && rm -rf /var/lib/apt/lists/*
     - pip-install
     - script:
-        name: install nlp corpora
-        code: |
-          python -m spacy download en
-          python -m nltk.downloader brown
-          python -m nltk.downloader punkt
-    - script:
         name: test empty run to catch import errors
         code: |
           python run.py
