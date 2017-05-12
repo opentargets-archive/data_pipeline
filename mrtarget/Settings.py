@@ -317,4 +317,4 @@ class Config():
 
     # for developers
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
-    MINIMAL_UNIPROT = file_to_list(file_or_resource('minimal_uniprot'))
+    MINIMAL_UNIPROT = file_to_list(file_or_resource('minimal_uniprot.txt'))
