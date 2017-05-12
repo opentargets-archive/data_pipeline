@@ -3,6 +3,7 @@ from collections import defaultdict
 import os
 import ConfigParser
 import pkg_resources as res
+from envparse import env
 import mrtarget
 import petl
 from mrtarget.common import URLZSource
