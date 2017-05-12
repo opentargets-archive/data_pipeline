@@ -8,6 +8,20 @@ import petl
 from mrtarget.common import URLZSource
 
 
+def build_uniprot_query(l):
+    return '+or+'.join(l)
+
+
+def build_ensembl_sql(l):
+    return """SELECT stable_id FROM gene where stable_id IN ('{0}')"""\
+        .format("', '".join(l))
+
+
+def parse_bool(var):
+    return True if str(var) in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'] \
+        else False
+
+
 def ini_from_file_or_resource(filename=None):
     '''load the ini file using file_or_resource an
     return the configuration object or None
@@ -296,8 +310,8 @@ class Config():
     GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
 
     # for developers
-    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
-    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
+    DRY_RUN_OUTPUT_ENABLE = parse_bool(os.getenv('DRY_RUN_OUTPUT_ENABLE'))
+    DRY_RUN_OUTPUT_DELETE = parse_bool(os.getenv('DRY_RUN_OUTPUT_DELETE'))
     DRY_RUN_OUTPUT_COUNT = os.getenv('DRY_RUN_OUTPUT_COUNT')
     if DRY_RUN_OUTPUT_COUNT:
         DRY_RUN_OUTPUT_COUNT = int(DRY_RUN_OUTPUT_COUNT)
@@ -316,5 +330,5 @@ class Config():
     ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
     ES_CUSTOM_IDXS = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME)
 
+    MINIMAL = parse_bool(os.getenv('MINIMAL'))
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
-    MINIMAL_UNIPROT = file_to_list(file_or_resource('minimal_uniprot.txt'))

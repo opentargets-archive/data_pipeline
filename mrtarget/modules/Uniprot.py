@@ -8,7 +8,7 @@ from mrtarget.common.UniprotIO import UniprotIterator, Parser
 from requests.exceptions import Timeout, HTTPError, ConnectionError
 import jsonpickle
 
-from mrtarget.Settings import Config
+from mrtarget.Settings import Config, build_uniprot_query
 
 
 
@@ -104,7 +104,7 @@ class UniprotDownloader():
                  format="xml",
                  chunk_size=1000,
                  timeout=300,):
-        self.query = query
+        self.query = build_uniprot_query(MINIMAL_ENSEMBL) if Config.MINIMAL else query
         self.format = "&format=" + format
         self.url = "http://www.uniprot.org/uniprot/?query="
         self.chunk_size = chunk_size
