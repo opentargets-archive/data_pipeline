@@ -38,6 +38,12 @@ def file_or_resource(filename=None):
             else res.resource_filename(resource_package, resource_path)
 
 
+def file_to_list(filename):
+    '''read the whole file and returns a list of lines'''
+    with open(filename) as f:
+        return f.read().splitlines()
+
+
 # loading the ES db ini configuration file
 iniparser = ini_from_file_or_resource('db.ini')
 
@@ -308,3 +314,7 @@ class Config():
     GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
     GE_ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
     GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
+
+    # for developers
+    MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
+    MINIMAL_UNIPROT = file_to_list(file_or_resource('minimal_uniprot'))
