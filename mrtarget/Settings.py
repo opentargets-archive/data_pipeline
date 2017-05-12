@@ -60,9 +60,15 @@ def file_to_list(filename):
 
 # loading the ES db ini configuration file
 iniparser = ini_from_file_or_resource('db.ini')
+uris = ini_from_file_or_resource('uris.ini')
 
 
 class Config():
+    MINIMAL = parse_bool(os.getenv('MINIMAL'))
+    MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
+
+    URIS_SECTION = 'minimal' if MINIMAL else 'default'
+
     HAS_PROXY = iniparser is not None and iniparser.has_section('proxy')
     if HAS_PROXY:
         PROXY = iniparser.get('proxy', 'protocol') + "://" + iniparser.get('proxy', 'username') + ":" + iniparser.get(
@@ -152,15 +158,15 @@ class Config():
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
                                                 delimiter='|').data().tol())
-    HPA_NORMAL_TISSUE_URL = 'http://v16.proteinatlas.org/download/normal_tissue.csv.zip'
-    HPA_CANCER_URL = 'http://v16.proteinatlas.org/download/cancer.csv.zip'
-    HPA_SUBCELLULAR_LOCATION_URL = 'http://v16.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'https://storage.googleapis.com/atlas_baseline_expression/rna_tissue_atlas.csv.zip'
+    HPA_NORMAL_TISSUE_URL = uris.get(URIS_SECTION,'hpa_normal')
+    HPA_CANCER_URL = uris.get(URIS_SECTION, 'hpa_cancer')
+    HPA_SUBCELLULAR_LOCATION_URL = uris.get(URIS_SECTION, 'hpa_subcellular')
+    HPA_RNA_URL = uris.get(URIS_SECTION, 'hpa_baseline')
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
-    REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
+    REACTOME_ENSEMBL_MAPPINGS = uris.get(URIS_SECTION, 'ensembl_reactome')
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
-    REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
-    REACTOME_PATHWAY_RELATION = 'http://www.reactome.org/download/current/ReactomePathwaysRelation.txt'
+    REACTOME_PATHWAY_DATA = uris.get(URIS_SECTION, 'reactome_pathways')
+    REACTOME_PATHWAY_RELATION = uris.get(URIS_SECTION, 'reactome_pathways_rel')
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
     EVIDENCEVALIDATION_SCHEMA = "1.2.5"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
@@ -216,11 +222,11 @@ class Config():
     # put the path to the file where you want to write the SLIM file (turtle format)
     ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
 
-    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
-    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
+    CHEMBL_TARGET_BY_UNIPROT_ID = uris.get(URIS_SECTION, 'chembl_target')
+    CHEMBL_MECHANISM = uris.get(URIS_SECTION, 'chembl_mechanism')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
-    CHEMBL_PROTEIN_CLASS = '''https://www.ebi.ac.uk/chembl/api/data/protein_class.json'''
-    CHEMBL_TARGET_COMPONENT = '''https://www.ebi.ac.uk/chembl/api/data/target_component.json'''
+    CHEMBL_PROTEIN_CLASS = uris.get(URIS_SECTION, 'chembl_protein')
+    CHEMBL_TARGET_COMPONENT = uris.get(URIS_SECTION, 'chembl_component')
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
@@ -329,6 +335,3 @@ class Config():
     # composed index name will be returned
     ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
     ES_CUSTOM_IDXS = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME)
-
-    MINIMAL = parse_bool(os.getenv('MINIMAL'))
-    MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))

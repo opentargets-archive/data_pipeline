@@ -104,7 +104,7 @@ class UniprotDownloader():
                  format="xml",
                  chunk_size=1000,
                  timeout=300,):
-        self.query = build_uniprot_query(MINIMAL_ENSEMBL) if Config.MINIMAL else query
+        self.query = build_uniprot_query(Config.MINIMAL_ENSEMBL) if Config.MINIMAL else query
         self.format = "&format=" + format
         self.url = "http://www.uniprot.org/uniprot/?query="
         self.chunk_size = chunk_size
@@ -122,7 +122,6 @@ class UniprotDownloader():
         while data.content:
             for xml in self._iterate_xml(StringIO(data.content)):
                 seqrec = Parser(xml, return_raw_comments=True).parse()
-                print seqrec
                 '''sanitise for json'''
                 # seqrec.annotations = sanitise_dict_for_json(seqrec.annotations)
                     # if '.' in k:
