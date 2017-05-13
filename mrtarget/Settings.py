@@ -1,9 +1,10 @@
 import uuid
 from collections import defaultdict
 import os
+import json
 import ConfigParser
 import pkg_resources as res
-from envparse import env
+from envparse import env, ConfigurationError
 import mrtarget
 import petl
 from mrtarget.common import URLZSource
@@ -59,25 +60,49 @@ class Config():
 
     RELEASE_VERSION = os.getenv('CTTV_DATA_VERSION') or '17.04'
     ENV = os.getenv('CTTV_EL_LOADER') or 'dev'
-    ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
-    ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST')
-    ELASTICSEARCH_PORT = os.getenv('ELASTICSEARCH_PORT')
 
-    if ELASTICSEARCH_HOST is None and iniparser is not None:
+    # [elasticsearch]
+
+    # each node in the cluster has to be specified to the client, unless we use
+    # Sniffing, but we'd prefer not to do that. The problem arises when you
+    # allow nodes with SSL or not. A simple solution is to force full URLs to be
+    # specified, protocol and port included and passed as a list.
+
+    # The client accepts host lists such as these:
+    # es = Elasticsearch(
+    # [
+    #     'http://user:secret@localhost:9200/',
+    #     'https://user:secret@other_host:443/production'
+    # ],
+    # verify_certs=True
+    # )
+
+    # ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
+    # ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST')
+    # ELASTICSEARCH_PORT = os.getenv('ELASTICSEARCH_PORT')
+    try:
+        ELASTICSEARCH_NODES = env.list('ELASTICSEARCH_NODES')
+    except ConfigurationError:
         try:
-            ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
-            ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+            ELASTICSEARCH_NODES = json.loads(iniparser.get(ENV, 'elnodes'))
         except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
-            pass
-    if ELASTICSEARCH_HOST is not None and ELASTICSEARCH_PORT is not None:
-        if ',' in ELASTICSEARCH_HOST:
-            ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
-            ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
-        else:
-            ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
-        ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
-        if ELASTICSEARCH_PORT:
-            ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
+            ELASTICSEARCH_NODES = []
+
+    # if ELASTICSEARCH_HOST is None and iniparser is not None:
+    #     try:
+    #         ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
+    #         ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+    #     except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
+    #         pass
+    # if ELASTICSEARCH_HOST is not None and ELASTICSEARCH_PORT is not None:
+    #     if ',' in ELASTICSEARCH_HOST:
+    #         ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
+    #         ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
+    #     else:
+    #         ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
+    #     ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
+    #     if ELASTICSEARCH_PORT:
+    #         ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
     DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
     DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
