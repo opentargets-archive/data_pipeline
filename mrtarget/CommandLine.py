@@ -28,7 +28,6 @@ from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.Settings import Config, file_or_resource
 
 
-
 logging.config.fileConfig(file_or_resource('logging.ini'),
                           disable_existing_loggers=False)
 

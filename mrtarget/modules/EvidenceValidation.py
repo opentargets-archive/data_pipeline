@@ -354,29 +354,17 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                              i/EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
                              offset, [line], False))
             if file_type == FileTypes.HTTP:
-                response = requests.get(file_path, stream=True)
-                response.raise_for_status()
-                file_size = int(response.headers['content-length'])
-                t = tqdm(desc='downloading %s via HTTP' % file_version,
-                         total=file_size,
-                         unit='B',
-                         unit_scale=True)
-                for i,line in enumerate(response.iter_lines()):
-                    t.update(len(line))
+                self.logger.debug('streaming into queue the file ' + file_path)
+
+                for i,line in enumerate(c.url_to_stream(file_path)):
                     self.put_into_queue_out(
                         (file_path, file_version, provider_id, data_source_name, md5_hash, logfile,
                          i/EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
                          offset, [line], False))
-                t.close()
-                response.close()
-                try:
-                    self.logger.debug('Downloaded file %s from HTTP at %.2fMB/s' % (
-                        file_version, (file_size / 1e6) / (t.last_print_t - t.start_t)))
-                except ZeroDivisionError:
-                    self.logger.debug('Downloaded file %s from HTTP' % file_path)
+                    if Config.MINIMAL and i > 100000:
+                        break
 
-
-
+                self.logger.debug('streaming done with the file ' + file_path)
 
         else:
             raise AttributeError('File %s is not supported'%file_type)

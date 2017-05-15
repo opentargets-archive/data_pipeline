@@ -34,13 +34,19 @@ do
         CMD="zcat"
     fi
 
-    $CMD data/$src | head -n 1 > $new_source
+    if [[ $src =~ .*\.json.* ]]
+    then
+        $CMD data/$src > $new_source
+    else
+        $CMD data/$src | head -n 1 > $new_source
 
-    for gene in $genes
-    do
-        echo data/$src $gene
-        $CMD data/$src | grep $gene >> $new_source
-    done
+        for gene in $genes
+        do
+            echo data/$src $gene
+            $CMD data/$src | grep $gene >> $new_source
+        done
+    fi
+
 done
 
 echo "uploading new dataset to gcloud"

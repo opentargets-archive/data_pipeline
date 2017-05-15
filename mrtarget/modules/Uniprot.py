@@ -11,7 +11,6 @@ import jsonpickle
 from mrtarget.Settings import Config, build_uniprot_query
 
 
-
 def sanitise_dict_for_json(d):
     for k, v in d.iteritems():
         if isinstance(v, dict):
