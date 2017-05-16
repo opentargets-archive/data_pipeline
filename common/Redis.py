@@ -98,7 +98,7 @@ class RedisQueue(object):
                  ttl = 60*60*24+2,
                  total=None,
                  batch_size=1,
-                 serialiser = 'json'):
+                 serialiser = 'pickle'):
         '''
         :param queue_id: queue id to attach to preconfigured queues
         :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
@@ -136,9 +136,11 @@ class RedisQueue(object):
     def dumps(self, element):
         if self.serialiser == 'json':
             return json.dumps(element, double_precision=32)
-        elif  self.serialiser == 'jsonpickle':
+        elif self.serialiser == 'jsonpickle':
             return jsonpickle.dumps(element)
-        else:
+        elif not self.serialiser:
+            return element
+        else:#default to pickle
             return base64.encodestring(pickle.dumps(element, protocol=pickle.HIGHEST_PROTOCOL))
 
     def loads(self, element):
@@ -146,6 +148,8 @@ class RedisQueue(object):
             return json.loads(element)
         elif  self.serialiser == 'jsonpickle':
             return jsonpickle.loads(element)
+        elif not self.serialiser:
+            return element
         else:
             return pickle.loads(base64.decodestring(element))
 
