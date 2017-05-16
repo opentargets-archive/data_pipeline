@@ -5,6 +5,9 @@ import ConfigParser
 import pkg_resources as res
 import mrtarget
 import petl
+import multiprocessing as mp
+import tempfile
+
 from mrtarget.common import URLZSource
 
 
@@ -37,6 +40,26 @@ def ini_from_file_or_resource(filename=None):
         return None
 
 
+def from_env(var, default_val=None, t=str, parse_func=None):
+    '''it helps to parse correctly the env vars as `var`
+
+    By default is var to str to default type is `t` and default value
+    if `os.getenv` returns None is `default_val`. In case you need
+    to parse the string into another type but the default parsing is
+    not of your taste (by ex. t=bool) then `parse_func` will be used if
+    not None
+
+    returns t(parse_func(var)) else default_val or None
+    '''
+    env_var = os.getenv(var)
+    if env_var:
+        env_var = t(parse_func(env_var)) if parse_func else t(env_var)
+    else:
+        env_var = default_val
+
+    return env_var
+
+
 def file_or_resource(filename=None):
     '''get filename and check if in getcwd then get from
     the package resources folder
@@ -64,7 +87,7 @@ uris = ini_from_file_or_resource('uris.ini')
 
 
 class Config():
-    MINIMAL = parse_bool(os.getenv('MINIMAL'))
+    MINIMAL = from_env('CTTV_MINIMAL', False, t=bool, parse_func=parse_bool)
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
 
     URIS_SECTION = 'minimal' if MINIMAL else 'default'
@@ -82,11 +105,11 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION = os.getenv('CTTV_DATA_VERSION') or '17.04'
-    ENV = os.getenv('CTTV_EL_LOADER') or 'dev'
+    RELEASE_VERSION = from_env('CTTV_DATA_VERSION', '17.04')
+    ENV = from_env('CTTV_EL_LOADER', 'dev')
     ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
-    ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST')
-    ELASTICSEARCH_PORT = os.getenv('ELASTICSEARCH_PORT')
+    ELASTICSEARCH_HOST = from_env('ELASTICSEARCH_HOST')
+    ELASTICSEARCH_PORT = from_env('ELASTICSEARCH_PORT')
 
     if ELASTICSEARCH_HOST is None and iniparser is not None:
         try:
@@ -197,14 +220,10 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
     EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
 
-
-
-    # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
-    WORKERS_NUMBER = os.getenv('WORKERS_NUMBER')
-    if WORKERS_NUMBER:
-        WORKERS_NUMBER = int(WORKERS_NUMBER)
-    else:
-        WORKERS_NUMBER = None
+    # setup the number of workers to use for data processing.
+    # if None defaults to the number of CPUs available
+    WORKERS_NUMBER = from_env('CTTV_WORKERS_NUMBER',
+                              default_val=mp.cpu_count(), t=int)
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
@@ -283,22 +302,23 @@ class Config():
     ENSEMBL_RELEASE_VERSION=88
     ENSEMBL_CHUNK_SIZE=100
 
-    TEMP_DIR = os.path.join(os.path.sep, 'tmp')
+    # see http://stackoverflow.com/a/847866
+    TEMP_DIR = tempfile.gettempdir()
     REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 
 
     #dump file names
-    DUMP_FILE_FOLDER = os.getenv('CTTV_DUMP_FOLDER') or TEMP_DIR
+    DUMP_FILE_FOLDER = from_env('CTTV_DUMP_FOLDER', TEMP_DIR)
     DUMP_FILE_EVIDENCE=RELEASE_VERSION+'_evidence_data.json.gz'
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
-    DUMP_REMOTE_API = os.getenv('DUMP_REMOTE_API_URL') or 'http://beta.opentargets.io'
-    DUMP_REMOTE_API_PORT = os.getenv('DUMP_REMOTE_API_PORT') or '80'
-    DUMP_REMOTE_API_SECRET = os.getenv('DUMP_REMOTE_API_SECRET')
-    DUMP_REMOTE_API_APPNAME = os.getenv('DUMP_REMOTE_API_APPNAME')
+    DUMP_REMOTE_API = from_env('DUMP_REMOTE_API_URL', 'http://beta.opentargets.io')
+    DUMP_REMOTE_API_PORT = from_env('DUMP_REMOTE_API_PORT', 80, t=int)
+    DUMP_REMOTE_API_SECRET = from_env('DUMP_REMOTE_API_SECRET')
+    DUMP_REMOTE_API_APPNAME = from_env('DUMP_REMOTE_API_APPNAME')
 
     #Literature Pipeline -- Pubmed/Medline FTP server
     PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
@@ -316,13 +336,11 @@ class Config():
     GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
 
     # for developers
-    DRY_RUN_OUTPUT_ENABLE = parse_bool(os.getenv('DRY_RUN_OUTPUT_ENABLE'))
-    DRY_RUN_OUTPUT_DELETE = parse_bool(os.getenv('DRY_RUN_OUTPUT_DELETE'))
-    DRY_RUN_OUTPUT_COUNT = os.getenv('DRY_RUN_OUTPUT_COUNT')
-    if DRY_RUN_OUTPUT_COUNT:
-        DRY_RUN_OUTPUT_COUNT = int(DRY_RUN_OUTPUT_COUNT)
-    else:
-        DRY_RUN_OUTPUT_COUNT = 10000
+    DRY_RUN_OUTPUT = from_env('CTTV_DRY_RUN_OUTPUT', False, t=bool,
+                                     parse_func=parse_bool)
+    DRY_RUN_OUTPUT_DELETE = from_env('CTTV_DRY_RUN_OUTPUT_DELETE', False,
+                                     t=bool, parse_func=parse_bool)
+    DRY_RUN_OUTPUT_COUNT = from_env('CTTV_DRY_RUN_OUTPUT_COUNT', 1000, t=int)
 
     # This config file is like this and no prefixes or version will be
     # appended
@@ -334,4 +352,7 @@ class Config():
     # if no index field or config file is found then a default
     # composed index name will be returned
     ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
-    ES_CUSTOM_IDXS = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME)
+    ES_CUSTOM_IDXS = from_env('CTTV_ES_CUSTOM_IDXS', False, t=bool,
+                              parse_func=parse_bool)
+    ES_CUSTOM_IDXS_INI = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME) \
+        if ES_CUSTOM_IDXS else None

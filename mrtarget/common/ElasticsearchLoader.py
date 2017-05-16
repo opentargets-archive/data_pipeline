@@ -48,9 +48,9 @@ class Loader():
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
         self._tmp_fd = None
-        self._tmp_fd_enable = getattr(Config, 'DRY_RUN_OUTPUT_ENABLE', False)
-        self._tmp_fd_delete = getattr(Config, 'DRY_RUN_OUTPUT_DELETE', True)
-        self._tmp_fd_count = getattr(Config, 'DRY_RUN_OUTPUT_COUNT', 10000)
+        self._tmp_fd_enable = Config.DRY_RUN_OUTPUT
+        self._tmp_fd_delete = Config.DRY_RUN_OUTPUT_DELETE
+        self._tmp_fd_count = Config.DRY_RUN_OUTPUT_COUNT
 
     @staticmethod
     def get_versioned_index(index_name, check_custom_idxs=False):
@@ -80,9 +80,10 @@ class Loader():
         suffix = '*' if index_name.endswith('*') else ''
         raw_name = index_name[:-len(suffix)] if len(suffix) > 0 else index_name
 
-        idx_name = Config.ES_CUSTOM_IDXS.get('indexes', raw_name) \
+        idx_name = Config.ES_CUSTOM_IDXS_INI.get('indexes', raw_name) \
             if check_custom_idxs and \
-            Config.ES_CUSTOM_IDXS is not None and \
+            Config.ES_CUSTOM_IDXS and \
+            Config.ES_CUSTOM_IDXS_INI and \
             Config.ES_CUSTOM_IDXS.has_option('indexes', raw_name) \
             else Config.RELEASE_VERSION + '_' + index_name
 
