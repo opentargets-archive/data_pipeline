@@ -32,6 +32,7 @@ class PipelineConnectors():
     def init_services_connections(self, redispersist=False):
         '''init es client'''
         connection_attempt = 1
+        success = False
         hosts = Config.ELASTICSEARCH_NODES
         # if len(Config.ELASTICSEARCH_NODES) > 1 and Config.ELASTICSEARCH_PORT:
         #     hosts = [dict(host=node, port=int(Config.ELASTICSEARCH_PORT))
@@ -70,33 +71,36 @@ class PipelineConnectors():
                                     maxsize=50,
                                     timeout=1800,
                                     # sniff_on_connection_fail=True,
-                                    sniff_on_start=True,
-                                    #sniffer_timeout=60
+                                    #sniff_on_start=True,
+                                    #sniffer_timeout=60,
                                     retry_on_timeout=True,
                                     max_retries=10,
                                     connection_class=RequestsHttpConnection,
                                     verify_certs=True
-                                    )
+                                   )
             try:
                 connection_attempt = 1
                 while not self.es.ping():
                     wait_time = 3*connection_attempt
-                    self.logger.warn('Cannot connect to Elasticsearch retrying in %i'%wait_time)
+                    self.logger.warn('Cannot connect to Elasticsearch retrying in %i', wait_time)
                     time.sleep(wait_time)
-                    if connection_attempt >=3:
+                    if connection_attempt >= 3:
                         raise Exception
                     connection_attempt += 1
-                self.logger.info('Connected to elasticsearch nodes: %s'%Config.ELASTICSEARCH_NODES)
+                self.logger.info('Connected to elasticsearch nodes: %s', Config.ELASTICSEARCH_NODES)
+                success = True
             except:
-                self.logger.error('Elasticsearch is not reachable at %s'%Config.ELASTICSEARCH_NODES)
-            
+                self.logger.error('Elasticsearch is not reachable at %s', Config.ELASTICSEARCH_NODES)
+
         else:
-            self.logger.warn('No valid configuration available for elasticsearch' )
-            self.es=None
+            self.logger.warn('No valid configuration available for elasticsearch')
+            self.es = None
 
         if not redispersist:
             self.clear_redislite_db()
             self.logger.info('Clearing previous instances of redislite db...')
-        self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH), serverconfig={ 'save': [], 'maxclients': 10000} )
-        self.logger.info('Established redislite DB at %s'%Config.REDISLITE_DB_PATH)
+        self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH),
+                              serverconfig={'save': [], 'maxclients': 10000})
+        self.logger.info('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
 
+        return success
