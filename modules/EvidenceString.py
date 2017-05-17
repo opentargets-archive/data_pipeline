@@ -598,7 +598,7 @@ class EvidenceManager():
                                 pubs[pmid] = [pub_dict[pmid], PublicationAnalysisSpacy(pmid)]
                                 # self.available_publications.set_literature(pub_dict[pmid])
                         except KeyError as e:
-                            logger.info('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
+                            logger.warning('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
 
 
                     if pubs:

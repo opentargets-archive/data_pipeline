@@ -419,7 +419,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
 
 
 
-class ScoreProducer(RedisQueueWorkerThread):
+class ScoreProducer(RedisQueueWorkerProcess):
 
     def __init__(self,
                  evidence_data_q,
@@ -456,7 +456,10 @@ class ScoreProducer(RedisQueueWorkerThread):
                     self.logger.error('Cannot find EFO code "%s" in lookup table'%disease)
                 score.set_disease_data(disease_data)
 
-                return (target, disease, score)
+                if score: #bypass associations with overall score=0
+                    return (target, disease, score.to_json())
+                else:
+                    logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
 
 
 
@@ -482,16 +485,14 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
             pass
         target, disease, score = data
         element_id = '%s-%s' % (target, disease)
-        if score: #bypass associations with overall score=0
-            self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+        self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
                                Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                element_id,
-                               score.to_json(),
+                               score,
                                create_index=False,
                                # routing=score.target['id'],
                             )
-        else:
-            logger.warning('Skipped association with score 0: %s'%element_id)
+
 
     def close(self):
         self.loader.close()

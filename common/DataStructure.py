@@ -1,7 +1,7 @@
-import json
+import simplejson as json
 from ConfigParser import NoSectionError
 from UserDict import UserDict
-from json import JSONEncoder
+from simplejson import JSONEncoder
 
 from datetime import datetime, date
 
