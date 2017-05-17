@@ -717,10 +717,11 @@ class GeneLookUpTable(object):
 
 
     def load_gene_data(self, r_server = None, targets = []):
+        data = None
         if targets:
             data = self._es_query.get_targets_by_id(targets)
             total = len(targets)
-        else:
+        if data is None:
             data = self._es_query.get_all_targets()
             total = self._es_query.count_all_targets()
         for target in tqdm(
