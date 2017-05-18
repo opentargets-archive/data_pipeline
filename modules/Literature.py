@@ -267,6 +267,7 @@ class Publication(JSONSerializable):
             self._split_sentences()
         if self.title or self.abstract:
             self._base_nlp()
+        self._text_analyzers = None # to allow for object serialisation
 
     def __str__(self):
         return "id:%s | title:%s | abstract:%s | authors:%s | pub_date:%s | date:%s | journal:%s" \
