@@ -869,7 +869,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
         if pub._delete_pmids:
             for pmid in pub._delete_pmids:
                 '''update parent and analyzed child publication with empty values'''
-                pub = Publication(pub_id=pmid,filename=publication['filename'])
+                pub = Publication(pub_id=pmid,filename=pub.filename)
                 self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                                 Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                                 pmid,
@@ -885,8 +885,8 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                 create_index=False)
             except KeyError as e:
                 logging.exception("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
-                    publication['pmid'],
-                    publication['filename'],
+                    pub.id,
+                    pub.filename,
                     e.message))
 
 
