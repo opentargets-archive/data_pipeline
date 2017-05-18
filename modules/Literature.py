@@ -332,7 +332,7 @@ class Publication(JSONSerializable):
         return text.split('. ')#todo: use spacy here
 
     def _base_nlp(self):
-        for analyzer in self._text_analyzers():
+        for analyzer in self._text_analyzers:
             self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
 
 
