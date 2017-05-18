@@ -43,8 +43,10 @@ logger = logging.getLogger(__name__)
 
 
 def load_nlp_corpora():
-    import nltk
-    nltk.download(['brown', 'punkt'])
+    '''load here all the corpora needed by nlp steps'''
+    # import nltk
+    # nltk.download(['brown', 'punkt'])
+    pass
 
 if __name__ == '__main__':
 
