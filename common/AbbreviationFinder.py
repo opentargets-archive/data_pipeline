@@ -44,8 +44,10 @@ class Candidate(unicode):
 
 
 class AbbreviationsParser(object):
-    def __init__(self):
+    def __init__(self, verbose = False):
         self.encoding = 'UTF8'
+        if verbose:
+            self.verbose = True
         self.logger = logging.getLogger(__name__)
 
     def digest(self, textblob):
@@ -63,18 +65,21 @@ class AbbreviationsParser(object):
                     try:
                         definition = self.getdefinition(candidate, sentence)
                     except ValueError as e:
-                        self.logger.debug(str((i, 'Omitting candidate', candidate.encode(self.encoding), 'Reason:',
+                        if self.verbose:
+                            self.logger.debug(str((i, 'Omitting candidate', candidate.encode(self.encoding), 'Reason:',
                                                e.args[0].encode(self.encoding))))
                         omit += 1
                     else:
                         try:
                             definition = self.definitionselection(definition, candidate)
                         except IndexError:
-                            self.logger.debug(str((i, 'Omitting candidate', definition.encode(
+                            if self.verbose:
+                                self.logger.debug(str((i, 'Omitting candidate', definition.encode(
                                 self.encoding), '||', candidate.encode(self.encoding))))
                             omit += 1
                         except ValueError as e:
-                            self.logger.debug(str((i, 'Omitting candidate', definition.encode(
+                            if self.verbose:
+                                self.logger.debug(str((i, 'Omitting candidate', definition.encode(
                                 self.encoding), '||', candidate.encode(self.encoding), 'Reason:',
                                                    e.args[0].encode(self.encoding))))
                             omit += 1
@@ -91,7 +96,8 @@ class AbbreviationsParser(object):
 
                             written += 1
             except ValueError as e:
-                self.logger.debug(str(('Reason:', e.args[0].encode(self.encoding))))
+                if self.verbose:
+                    self.logger.debug(str(('Reason:', e.args[0].encode(self.encoding))))
 
     def getcandidates(self, sentence):
         '''Yields Candidates'''
