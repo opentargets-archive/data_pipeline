@@ -9,12 +9,14 @@ from collections import Counter
 
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 from spacy.en import English
+from textblob.en.inflect import singularize
 from tqdm import tqdm
 from common import Actions
 from common.DataStructure import JSONSerializable
 from common.ElasticsearchLoader import Loader
 from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisQueue, RedisQueueWorkerProcess
+from common.AbbreviationFinder import AbbreviationsParser
 from modules.Literature import PublicationFetcher
 from settings import Config
 from textblob import TextBlob
@@ -114,16 +116,18 @@ class AbstractNormalizer(object):
             text = text.replace(key, self.greek_alphabet[key])
         return unidecode(text)
 
-class FastNPExtractor2(BaseNPExtractor):
-    '''A fast and simple noun phrase extractor.
+class PerceptronNPExtractor(BaseNPExtractor):
+    '''modified from 
 
-    Credit to Shlomi Babluk. Link to original blog post:
-
-        http://thetokenizer.com/2013/05/09/efficient-way-to-extract-the-main-topics-of-a-sentence/
+    http://thetokenizer.com/2013/05/09/efficient-way-to-extract-the-main-topics-of-a-sentence/
+    
+    To use Perceptron POS Tagger (more accurate)
     '''
 
     CFG = {
         ('NNP', 'NNP'): 'NNP',
+        ('NNP', 'NN'): 'NNP',
+        ('NNP', 'PO'): 'NNP',
         ('NN', 'NN'): 'NNI',
         ('NNI', 'NN'): 'NNI',
         ('JJ', 'JJ'): 'JJ',
@@ -135,24 +139,8 @@ class FastNPExtractor2(BaseNPExtractor):
 
     @requires_nltk_corpus
     def train(self):
-        train_data = nltk.corpus.brown.tagged_sents(categories=['science_fiction'])
-        regexp_tagger = nltk.RegexpTagger([
-            (r'^-?[0-9]+(.[0-9]+)?$', 'CD'),
-            (r'(-|:|;)$', ':'),
-            (r'\'*$', 'MD'),
-            (r'(The|the|A|a|An|an)$', 'AT'),
-            (r'.*able$', 'JJ'),
-            (r'^[A-Z].*$', 'NNP'),
-            (r'.*ness$', 'NN'),
-            (r'.*ly$', 'RB'),
-            (r".*'s$", 'POS'),
-            (r'.*s$', 'NNS'),
-            (r'.*ing$', 'VBG'),
-            (r'.*ed$', 'VBD'),
-            (r'.*', 'NN'),
-        ])
-        unigram_tagger = nltk.UnigramTagger(train_data, backoff=regexp_tagger)
-        self.tagger = nltk.BigramTagger(train_data, backoff=unigram_tagger)
+        # train_data = nltk.corpus.brown.tagged_sents(categories=['news','science_fiction'])
+        self.tagger = nltk.PerceptronTagger()
         self._trained = True
         return None
 
@@ -180,24 +168,65 @@ class FastNPExtractor2(BaseNPExtractor):
                     merge = True
                     tags.pop(x)
                     tags.pop(x)
-                    match = '%s %s' % (t1[0], t2[0])
+                    if t2[0][0].isalnum():
+                        match = '%s %s' % (t1[0], t2[0])
+                    else:
+                        match = '%s%s' % (t1[0], t2[0])
                     pos = value
                     tags.insert(x, (match, pos))
                     break
 
-        matches = [t[0] for t in tags if t[1] in ['NNP', 'NNI']]
+        matches = [t[0] for t in tags if t[1] in ['NNP', 'NNI','NN']]
         return matches
 
 class NounChuncker(object):
 
     def __init__(self):
-        self.np_ex = FastNPExtractor2()
+        self.np_ex = PerceptronNPExtractor()
         self.normalizer = AbstractNormalizer()
+        self.abbreviations_finder = AbbreviationsParser()
 
     def digest(self, text):
+        from pprint import pprint
         normalized = self.normalizer.normalize(text)
         parsed = TextBlob(normalized, np_extractor=self.np_ex)
-        return list(parsed.noun_phrases)
+        counted_noun_phrases = parsed.noun_phrases
+        abbreviations = self.abbreviations_finder.digest(parsed)
+        '''improved singularisation still needs refinement'''
+        # singular_counted_noun_phrases = []
+        # for np in counted_noun_phrases:
+        #     if not (np.endswith('sis') or np.endswith('ess')):
+        #         singular_counted_noun_phrases.append(singularize(np))
+        #     else:
+        #         singular_counted_noun_phrases.append(np)
+        # singular_counted_noun_phrases = Counter(singular_counted_noun_phrases)
+        counted_noun_phrases = Counter(counted_noun_phrases)
+        base_noun_phrases = counted_noun_phrases.keys()
+        '''remove plurals with appended s'''
+        for np in counted_noun_phrases.keys():
+            if np+'s' in counted_noun_phrases:
+                counted_noun_phrases[np]+=counted_noun_phrases[np+'s']
+                del counted_noun_phrases[np+'s']
+        '''increase count of shorter form with longer form'''
+        for abbr in abbreviations:
+            short = abbr['short'].lower()
+            if short in counted_noun_phrases:
+                counted_noun_phrases[abbr['long'].lower()] += counted_noun_phrases[short]
+                del counted_noun_phrases[short]
+
+
+        #count substrings occurrences as well
+        for k in counted_noun_phrases:
+            for s in counted_noun_phrases:
+                if k != s and k in s:
+                    counted_noun_phrases[k] += 1
+        return dict(chunks = base_noun_phrases,
+                    recurring_chunks = [i for i,k in counted_noun_phrases.items() if k >1],
+                    top_chunks = [i[0] for i in counted_noun_phrases.most_common(5) if i[1]>1],
+                    abbreviations = abbreviations)
+
+    def __str__(self):
+        return 'noun_phrases'
 
 
 class LiteratureNLPActions(Actions):

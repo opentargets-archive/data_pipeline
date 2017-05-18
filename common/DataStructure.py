@@ -15,7 +15,8 @@ class PipelineEncoder(JSONEncoder):
             return o.to_json()
         except AttributeError:
             pass
-        return o.__dict__
+        return {key: o.__dict__[key] for key in o.__dict__ if not key.startswith('_')} # remove private properties
+
 
 def json_serialize(obj):
     if isinstance(obj, datetime):
