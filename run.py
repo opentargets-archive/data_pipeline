@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 def load_nlp_corpora():
     '''load here all the corpora needed by nlp steps'''
     import nltk
-    nltk.download([ 'punkt']) #'brown' corpora might be needed
+    nltk.download([ 'punkt', 'averaged_perceptron_tagger']) #'brown' corpora might be needed
 
 
 if __name__ == '__main__':
