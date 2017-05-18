@@ -2,8 +2,6 @@ import argparse
 import logging
 import sys
 
-import nltk
-
 from common import Actions
 from common.ElasticsearchLoader import Loader
 from common.connection import PipelineConnectors
@@ -45,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_nlp_corpora():
+    import nltk
     nltk.download(['brown', 'punkt'])
 
 if __name__ == '__main__':

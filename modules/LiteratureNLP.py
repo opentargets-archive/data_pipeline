@@ -7,7 +7,6 @@ import string
 import time
 from collections import Counter
 
-from nltk.corpus import stopwords
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 from spacy.en import English
 from tqdm import tqdm
@@ -18,12 +17,17 @@ from common.ElasticsearchQuery import ESQuery
 from common.Redis import RedisQueue, RedisQueueWorkerProcess
 from modules.Literature import PublicationFetcher
 from settings import Config
-import nltk
 from textblob import TextBlob
 from textblob.base import BaseNPExtractor
 from textblob.decorators import requires_nltk_corpus
 from textblob.en.np_extractors import _normalize_tags
 from unidecode import unidecode
+
+try:
+    import nltk
+    from nltk.corpus import stopwords
+except ImportError:
+    logging.getLogger(__name__).warning('cannot import nltk or stopwords')
 
 # List of symbols we don't care about
 SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "â", "â", "'ve"]
