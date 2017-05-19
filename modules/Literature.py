@@ -318,7 +318,7 @@ class Publication(JSONSerializable):
         self.abstract_sentences = [dict(order=i, value = sentence) for i, sentence in enumerate(abstract_sentences)]
 
     def _sanitize_abstract(self):
-        if isinstance(self.abstract, list):
+        if self.abstract and isinstance(self.abstract, list):
             self.abstract=' '.join(self.abstract)
 
     def get_text_to_analyze(self):
