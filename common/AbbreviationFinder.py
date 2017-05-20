@@ -46,8 +46,7 @@ class Candidate(unicode):
 class AbbreviationsParser(object):
     def __init__(self, verbose = False):
         self.encoding = 'UTF8'
-        if verbose:
-            self.verbose = True
+        self.verbose = verbose
         self.logger = logging.getLogger(__name__)
 
     def digest(self, textblob):
