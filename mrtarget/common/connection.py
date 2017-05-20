@@ -2,7 +2,7 @@ import logging
 import os
 import time
 import certifi
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, ConnectionTimeout
 from elasticsearch import RequestsHttpConnection
 from redislite import Redis
 
@@ -85,12 +85,12 @@ class PipelineConnectors():
                     self.logger.warn('Cannot connect to Elasticsearch retrying in %i', wait_time)
                     time.sleep(wait_time)
                     if connection_attempt >= 3:
-                        raise Exception
+                        raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % Config.ELASTICSEARCH_NODES)
                     connection_attempt += 1
                 self.logger.info('Connected to elasticsearch nodes: %s', Config.ELASTICSEARCH_NODES)
                 success = True
-            except:
-                self.logger.error('Elasticsearch is not reachable at %s', Config.ELASTICSEARCH_NODES)
+            except ConnectionTimeout as e:
+                self.logger.exception(e)
 
         else:
             self.logger.warn('No valid configuration available for elasticsearch')
