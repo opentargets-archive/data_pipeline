@@ -10,18 +10,19 @@ import petl
 from mrtarget.common import URLZSource
 
 
-def ini_from_file_or_resource(filename=None):
+def ini_from_file_or_resource(filenames=None):
     '''load the ini file using file_or_resource an
     return the configuration object or None
     '''
-    try:
-        # trying to load file from somewhere
-        f = file_or_resource(filename)
-        cfg = ConfigParser.ConfigParser()
-        cfg.read(f)
+    if isinstance(filenames, str): filenames = [filenames]
+    # trying to load file from somewhere
+    f = [file_or_resource(fname) for fname in filenames]
+    cfg = ConfigParser.ConfigParser()
+    if cfg.read(f):
+        # read() returns list of successfully parsed filenames
         return cfg
-    except Exception:
-        # the function return none in case file wasnt found
+    else: 
+        # the function return none in case no file was found
         return None
 
 
@@ -44,6 +45,46 @@ def file_or_resource(filename=None):
 iniparser = ini_from_file_or_resource('db.ini')
 
 
+def read_option(option, cast=None, iniparser=iniparser, section='dev', **kwargs):
+    '''helper method to read value from environmental variable and ini files, in
+    that order. Relies on envparse and accepts its parameters.
+    The goal is to have ENV var > ini files > defaults
+
+    Lists and dict in the ini file are parsed as JSON strings.
+    '''
+    # if passing 'default' as parameter, we don't want envparse to return
+    # succesfully without first check if there is anything in the ini file
+    try:
+        default_value = kwargs.pop('default')
+    except KeyError:
+        default_value = None
+
+    try:
+        # reading the environment variable with envparse
+        return env(option, cast=cast, **kwargs)
+    except ConfigurationError:
+        if not iniparser: return default_value
+        try:
+            # TODO: go through all sections available
+            if cast is bool:
+                return iniparser.getboolean(section, option)
+            elif cast is int:
+                return iniparser.getint(section, option)
+            elif cast is float:
+                return iniparser.getint(section, option)
+            elif cast is dict or cast is list: 
+                # if you want list and dict variables in the ini file, 
+                # this function will accept json formatted lists.
+                return json.loads(iniparser.get(section, option))
+            else:
+                return iniparser.get(section, option)
+
+        except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
+            return default_value
+
+
+
+
 class Config():
     HAS_PROXY = iniparser is not None and iniparser.has_section('proxy')
     if HAS_PROXY:
@@ -58,8 +99,7 @@ class Config():
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION = os.getenv('CTTV_DATA_VERSION') or '17.04'
-    ENV = os.getenv('CTTV_EL_LOADER') or 'dev'
+    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.04')
 
     # [elasticsearch]
 
@@ -77,40 +117,14 @@ class Config():
     # verify_certs=True
     # )
 
-    # ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
-    # ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST')
-    # ELASTICSEARCH_PORT = os.getenv('ELASTICSEARCH_PORT')
-    try:
-        ELASTICSEARCH_NODES = env.list('ELASTICSEARCH_NODES')
-    except ConfigurationError:
-        try:
-            ELASTICSEARCH_NODES = json.loads(iniparser.get(ENV, 'elnodes'))
-        except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
-            ELASTICSEARCH_NODES = []
+    ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES',cast=list, 
+                                          default='http://127.0.0.1:9200')
 
-    # if ELASTICSEARCH_HOST is None and iniparser is not None:
-    #     try:
-    #         ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
-    #         ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
-    #     except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
-    #         pass
-    # if ELASTICSEARCH_HOST is not None and ELASTICSEARCH_PORT is not None:
-    #     if ',' in ELASTICSEARCH_HOST:
-    #         ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
-    #         ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
-    #     else:
-    #         ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
-    #     ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
-    #     if ELASTICSEARCH_PORT:
-    #         ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
-    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
-    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
-    DRY_RUN_OUTPUT_COUNT = os.getenv('DRY_RUN_OUTPUT_COUNT')
-    if DRY_RUN_OUTPUT_COUNT:
-        DRY_RUN_OUTPUT_COUNT = int(DRY_RUN_OUTPUT_COUNT)
-    else:
-        DRY_RUN_OUTPUT_COUNT = 10000
+
+    DRY_RUN_OUTPUT_ENABLE = read_option('DRY_RUN_OUTPUT_ENABLE',cast=bool)
+    DRY_RUN_OUTPUT_DELETE = read_option('DRY_RUN_OUTPUT_DELETE', cast=bool)
+    DRY_RUN_OUTPUT_COUNT = read_option('DRY_RUN_OUTPUT_COUNT',cast=int,defult=10000)
 
     # This config file is like this and no prefixes or version will be
     # appended
@@ -220,11 +234,7 @@ class Config():
 
 
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
-    WORKERS_NUMBER = os.getenv('WORKERS_NUMBER')
-    if WORKERS_NUMBER:
-        WORKERS_NUMBER = int(WORKERS_NUMBER)
-    else:
-        WORKERS_NUMBER = None
+    WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int, default=None)
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
@@ -310,15 +320,15 @@ class Config():
 
 
     #dump file names
-    DUMP_FILE_FOLDER = os.getenv('CTTV_DUMP_FOLDER') or TEMP_DIR
+    DUMP_FILE_FOLDER = read_option('CTTV_DUMP_FOLDER', default=TEMP_DIR)
     DUMP_FILE_EVIDENCE=RELEASE_VERSION+'_evidence_data.json.gz'
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
-    DUMP_REMOTE_API = os.getenv('DUMP_REMOTE_API_URL') or 'http://beta.opentargets.io'
-    DUMP_REMOTE_API_PORT = os.getenv('DUMP_REMOTE_API_PORT') or '80'
-    DUMP_REMOTE_API_SECRET = os.getenv('DUMP_REMOTE_API_SECRET')
-    DUMP_REMOTE_API_APPNAME = os.getenv('DUMP_REMOTE_API_APPNAME')
+    DUMP_REMOTE_API = read_option('DUMP_REMOTE_API_URL', default='http://beta.opentargets.io')
+    DUMP_REMOTE_API_PORT = read_option('DUMP_REMOTE_API_PORT', default='80')
+    DUMP_REMOTE_API_SECRET = read_option('DUMP_REMOTE_API_SECRET')
+    DUMP_REMOTE_API_APPNAME = read_option('DUMP_REMOTE_API_APPNAME')
 
     #Literature Pipeline -- Pubmed/Medline FTP server
     PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
