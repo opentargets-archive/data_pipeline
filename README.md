@@ -21,6 +21,24 @@ $ python -m nltk.downloader all-corpora
 
 ```
 
+### db.ini
+The backend (Elasticsearch configuration) can be exported as the ENV var
+`ELASTICSEARCH_NODES` as a comma separated list of URLs:
+```sh
+export ELASTICSEARCH_NODES=http://host1:9200,https://securehost:9243
+```
+
+or using a configuration file named `db.ini` where a list
+of URL (one for each node if desired) is placed in JSON compatible format:
+
+```sh
+[dev]
+ELASTICSEARCH_NODES = [
+     "https://user:pwd@es.found.io:9200",
+     "http://127.0.0.1:9200/"
+    ]
+```
+
 ### Package developers
 
 Here the recipe to start coding on it:
