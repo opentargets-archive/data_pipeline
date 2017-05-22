@@ -1,8 +1,10 @@
 import uuid
 from collections import defaultdict
 import os
+import json
 import ConfigParser
 import pkg_resources as res
+from envparse import env, ConfigurationError
 import mrtarget
 import petl
 import multiprocessing as mp
@@ -107,25 +109,49 @@ class Config():
 
     RELEASE_VERSION = from_env('CTTV_DATA_VERSION', '17.04')
     ENV = from_env('CTTV_EL_LOADER', 'dev')
-    ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
-    ELASTICSEARCH_HOST = from_env('ELASTICSEARCH_HOST')
-    ELASTICSEARCH_PORT = from_env('ELASTICSEARCH_PORT')
 
-    if ELASTICSEARCH_HOST is None and iniparser is not None:
+    # [elasticsearch]
+
+    # each node in the cluster has to be specified to the client, unless we use
+    # Sniffing, but we'd prefer not to do that. The problem arises when you
+    # allow nodes with SSL or not. A simple solution is to force full URLs to be
+    # specified, protocol and port included and passed as a list.
+
+    # The client accepts host lists such as these:
+    # es = Elasticsearch(
+    # [
+    #     'http://user:secret@localhost:9200/',
+    #     'https://user:secret@other_host:443/production'
+    # ],
+    # verify_certs=True
+    # )
+
+    # ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
+    # ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST')
+    # ELASTICSEARCH_PORT = os.getenv('ELASTICSEARCH_PORT')
+    try:
+        ELASTICSEARCH_NODES = env.list('ELASTICSEARCH_NODES')
+    except ConfigurationError:
         try:
-            ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
-            ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+            ELASTICSEARCH_NODES = json.loads(iniparser.get(ENV, 'elnodes'))
         except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
-            pass
-    if ELASTICSEARCH_HOST is not None and ELASTICSEARCH_PORT is not None:
-        if ',' in ELASTICSEARCH_HOST:
-            ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
-            ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
-        else:
-            ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
-        ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
-        if ELASTICSEARCH_PORT:
-            ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
+            ELASTICSEARCH_NODES = []
+
+    # if ELASTICSEARCH_HOST is None and iniparser is not None:
+    #     try:
+    #         ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
+    #         ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
+    #     except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
+    #         pass
+    # if ELASTICSEARCH_HOST is not None and ELASTICSEARCH_PORT is not None:
+    #     if ',' in ELASTICSEARCH_HOST:
+    #         ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
+    #         ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
+    #     else:
+    #         ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
+    #     ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
+    #     if ELASTICSEARCH_PORT:
+    #         ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
