@@ -97,6 +97,7 @@ class Config():
         PROXY_PORT = int(iniparser.get('proxy', 'port'))
 
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
+    #TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
     RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.04')
@@ -136,6 +137,7 @@ class Config():
     # if no index field or config file is found then a default
     # composed index name will be returned
     ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
+    #TODO an `indices` section in the main db.ini should suffice
     ES_CUSTOM_IDXS = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME)
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
@@ -238,6 +240,7 @@ class Config():
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
+    # TODO remove refs to user directories
     MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
 
     # hardcoded folder of json file to be preprocessed to extract
@@ -250,6 +253,7 @@ class Config():
     ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS = ["cttv008", "cttv012"]
 
     # put the path to the file where you want to write the SLIM file (turtle format)
+    # TODO remove refs to user directories
     ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
 
     CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
@@ -313,6 +317,7 @@ class Config():
     ENSEMBL_RELEASE_VERSION=88
     ENSEMBL_CHUNK_SIZE=100
 
+    # TODO make the following a read_option() one
     TEMP_DIR = os.path.join(os.path.sep, 'tmp')
     REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
 
