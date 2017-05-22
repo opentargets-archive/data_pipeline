@@ -207,7 +207,7 @@ class Config():
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
                                                 delimiter='|').data().tol())
-    HPA_NORMAL_TISSUE_URL = uris.get(URIS_SECTION,'hpa_normal')
+    HPA_NORMAL_TISSUE_URL = uris.get(URIS_SECTION, 'hpa_normal')
     HPA_CANCER_URL = uris.get(URIS_SECTION, 'hpa_cancer')
     HPA_SUBCELLULAR_LOCATION_URL = uris.get(URIS_SECTION, 'hpa_subcellular')
     HPA_RNA_URL = uris.get(URIS_SECTION, 'hpa_baseline')
@@ -363,7 +363,7 @@ class Config():
 
     # for developers
     DRY_RUN_OUTPUT = from_env('CTTV_DRY_RUN_OUTPUT', False, t=bool,
-                                     parse_func=parse_bool)
+                              parse_func=parse_bool)
     DRY_RUN_OUTPUT_DELETE = from_env('CTTV_DRY_RUN_OUTPUT_DELETE', False,
                                      t=bool, parse_func=parse_bool)
     DRY_RUN_OUTPUT_COUNT = from_env('CTTV_DRY_RUN_OUTPUT_COUNT', 1000, t=int)
