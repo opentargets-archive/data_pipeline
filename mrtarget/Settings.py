@@ -118,14 +118,14 @@ class Config():
     # verify_certs=True
     # )
 
-    ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES',cast=list, 
-                                          default='http://127.0.0.1:9200')
+    ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
+                                      default=['http://127.0.0.1:9200'])
 
 
 
-    DRY_RUN_OUTPUT_ENABLE = read_option('DRY_RUN_OUTPUT_ENABLE',cast=bool)
+    DRY_RUN_OUTPUT_ENABLE = read_option('DRY_RUN_OUTPUT_ENABLE', cast=bool)
     DRY_RUN_OUTPUT_DELETE = read_option('DRY_RUN_OUTPUT_DELETE', cast=bool)
-    DRY_RUN_OUTPUT_COUNT = read_option('DRY_RUN_OUTPUT_COUNT',cast=int,default=10000)
+    DRY_RUN_OUTPUT_COUNT = read_option('DRY_RUN_OUTPUT_COUNT', cast=int, default=10000)
 
     # This config file is like this and no prefixes or version will be
     # appended
