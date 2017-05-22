@@ -499,7 +499,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         super(ScoreStorerWorker, self).__init__(score_q, r_path)
         self.q = score_q
         self.chunk_size = chunk_size
-        self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        self.es = Elasticsearch(Config.ELASTICSEARCH_NODES)
         self.loader = Loader(self.es,
                              chunk_size=self.chunk_size,
                              dry_run=dry_run)
