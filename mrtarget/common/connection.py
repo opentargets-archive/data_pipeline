@@ -53,9 +53,9 @@ class PipelineConnectors():
                     self.logger.warn('Cannot connect to Elasticsearch retrying in %i', wait_time)
                     time.sleep(wait_time)
                     if connection_attempt >= 3:
-                        raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % Config.ELASTICSEARCH_NODES)
+                        raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES))
                     connection_attempt += 1
-                self.logger.info('Connected to elasticsearch nodes: %s', Config.ELASTICSEARCH_NODES)
+                self.logger.info('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
                 success = True
             except ConnectionTimeout as e:
                 self.logger.exception(e)
