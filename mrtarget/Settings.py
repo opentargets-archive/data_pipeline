@@ -149,19 +149,6 @@ class Config():
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=['http://127.0.0.1:9200'])
 
-    # This config file is like this and no prefixes or version will be
-    # appended
-    #
-    # [indexes]
-    # gene-data=new-gene-data-index-name
-    # ...
-    #
-    # if no index field or config file is found then a default
-    # composed index name will be returned
-    ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
-    #TODO an `indices` section in the main db.ini should suffice
-    ES_CUSTOM_IDXS = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME)
-
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
