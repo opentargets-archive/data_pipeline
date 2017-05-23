@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import time
 from mrtarget.Settings import file_or_resource
 
 logging.config.fileConfig(file_or_resource('logging.ini'),
@@ -42,6 +43,7 @@ class MouseminePhenotypeETL(object):
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.service = Service("http://www.mousemine.org/mousemine/service")
+        self.genes = dict()
 
     def get_genotype_phenotype(self):
 
@@ -65,12 +67,26 @@ class MouseminePhenotypeETL(object):
             query.add_constraint("ontologyTerm.parents", "LOOKUP", "*%s*"%category, code="A")
 
             for row in query.rows():
+                gene_id = row["subject.primaryIdentifier"]
+                gene_symbol = row["subject.symbol"]
+                if gene_id not in self.genes:
+                    self.genes[gene_id] = dict()
+                if id not in self.genes[gene_id]:
+                    self.genes[gene_id][id] = { "mp_category" : category, "genotype_phenotype" : list() }
+                self.genes[gene_id][id]["genotype_phenotype"].append({
+                    "subject.symbol" : row["evidence.baseAnnotations.subject.symbol"],
+                    "subject_background" : row["evidence.baseAnnotations.subject.background.name"],
+                    "subject_zygosity" : row["evidence.baseAnnotations.subject.zygosity"],
+                    "mp_identifier" : row["ontologyTerm.identifier"],
+                    "mp_label" : row["ontologyTerm.name"] })
+
                 print row["subject.primaryIdentifier"], row["subject.symbol"], \
                     row["evidence.baseAnnotations.subject.symbol"], \
                     row["evidence.baseAnnotations.subject.background.name"], \
                     row["evidence.baseAnnotations.subject.zygosity"], row["ontologyTerm.identifier"], \
                     row["ontologyTerm.name"]
 
+            time.sleep(3)
             #self.logger.debug(row["subject.primaryIdentifier"], row["subject.symbol"], \
             #   row["evidence.baseAnnotations.subject.symbol"], \
             #    row["evidence.baseAnnotations.subject.background.name"], \
