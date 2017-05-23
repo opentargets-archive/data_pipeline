@@ -60,11 +60,13 @@ def file_to_list(filename):
 
 
 # loading the ES db ini configuration file
-iniparser = ini_from_file_or_resource('db.ini')
-uris = ini_from_file_or_resource('uris.ini')
+ini = ini_from_file_or_resource('db.ini', 'ini.ini',
+                                'es_custom_idxs.ini')
+
+# ini = ini_from_file_or_resource('ini.ini')
 
 
-def read_option(option, cast=None, iniparser=iniparser, section='dev',
+def read_option(option, cast=None, ini=ini, section='dev',
                 **kwargs):
     '''helper method to read value from environmental variable and ini files, in
     that order. Relies on envparse and accepts its parameters.
@@ -83,23 +85,23 @@ def read_option(option, cast=None, iniparser=iniparser, section='dev',
         # reading the environment variable with envparse
         return env(option, cast=cast, **kwargs)
     except ConfigurationError:
-        if not iniparser:
+        if not ini:
             return default_value
 
         try:
             # TODO: go through all sections available
             if cast is bool:
-                return iniparser.getboolean(section, option)
+                return ini.getboolean(section, option)
             elif cast is int:
-                return iniparser.getint(section, option)
+                return ini.getint(section, option)
             elif cast is float:
-                return iniparser.getint(section, option)
+                return ini.getint(section, option)
             elif cast is dict or cast is list:
                 # if you want list and dict variables in the ini file,
                 # this function will accept json formatted lists.
-                return json.loads(iniparser.get(section, option))
+                return json.loads(ini.get(section, option))
             else:
-                return iniparser.get(section, option)
+                return ini.get(section, option)
 
         except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
             return default_value
@@ -109,20 +111,20 @@ class Config():
     MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
 
-    URIS_SECTION = 'minimal' if MINIMAL else 'default'
+    INI_SECTION = 'minimal' if MINIMAL else 'default'
 
-    HAS_PROXY = iniparser is not None and iniparser.has_section('proxy')
+    HAS_PROXY = ini is not None and ini.has_section('proxy')
     if HAS_PROXY:
-        PROXY = iniparser.get('proxy', 'protocol') + "://" + iniparser.get('proxy', 'username') + \
-                ":" + iniparser.get('proxy', 'password') + "@" + \
-                iniparser.get('proxy', 'host') + ":" + \
-                iniparser.get('proxy', 'port')
+        PROXY = ini.get('proxy', 'protocol') + "://" + ini.get('proxy', 'username') + \
+                ":" + ini.get('proxy', 'password') + "@" + \
+                ini.get('proxy', 'host') + ":" + \
+                ini.get('proxy', 'port')
 
-        PROXY_PROTOCOL = iniparser.get('proxy', 'protocol')
-        PROXY_USERNAME = iniparser.get('proxy', 'username')
-        PROXY_PASSWORD = iniparser.get('proxy', 'password')
-        PROXY_HOST = iniparser.get('proxy', 'host')
-        PROXY_PORT = int(iniparser.get('proxy', 'port'))
+        PROXY_PROTOCOL = ini.get('proxy', 'protocol')
+        PROXY_USERNAME = ini.get('proxy', 'username')
+        PROXY_PASSWORD = ini.get('proxy', 'password')
+        PROXY_HOST = ini.get('proxy', 'host')
+        PROXY_PORT = int(ini.get('proxy', 'port'))
 
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     # TODO: an ontology section in the main db.ini file should suffice
@@ -204,15 +206,15 @@ class Config():
     TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
                                                delimiter='|').data().tol())
 
-    HPA_NORMAL_TISSUE_URL = uris.get(URIS_SECTION, 'hpa_normal')
-    HPA_CANCER_URL = uris.get(URIS_SECTION, 'hpa_cancer')
-    HPA_SUBCELLULAR_LOCATION_URL = uris.get(URIS_SECTION, 'hpa_subcellular')
-    HPA_RNA_URL = uris.get(URIS_SECTION, 'hpa_baseline')
+    HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
+    HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')
+    HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
+    HPA_RNA_URL = ini.get(INI_SECTION, 'hpa_baseline')
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
-    REACTOME_ENSEMBL_MAPPINGS = uris.get(URIS_SECTION, 'ensembl_reactome')
+    REACTOME_ENSEMBL_MAPPINGS = ini.get(INI_SECTION, 'ensembl_reactome')
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
-    REACTOME_PATHWAY_DATA = uris.get(URIS_SECTION, 'reactome_pathways')
-    REACTOME_PATHWAY_RELATION = uris.get(URIS_SECTION, 'reactome_pathways_rel')
+    REACTOME_PATHWAY_DATA = ini.get(INI_SECTION, 'reactome_pathways')
+    REACTOME_PATHWAY_RELATION = ini.get(INI_SECTION, 'reactome_pathways_rel')
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
     EVIDENCEVALIDATION_SCHEMA = "1.2.5"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
@@ -265,11 +267,11 @@ class Config():
     # TODO remove refs to user directories
     ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
 
-    CHEMBL_TARGET_BY_UNIPROT_ID = uris.get(URIS_SECTION, 'chembl_target')
-    CHEMBL_MECHANISM = uris.get(URIS_SECTION, 'chembl_mechanism')
+    CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
+    CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
-    CHEMBL_PROTEIN_CLASS = uris.get(URIS_SECTION, 'chembl_protein')
-    CHEMBL_TARGET_COMPONENT = uris.get(URIS_SECTION, 'chembl_component')
+    CHEMBL_PROTEIN_CLASS = ini.get(INI_SECTION, 'chembl_protein')
+    CHEMBL_TARGET_COMPONENT = ini.get(INI_SECTION, 'chembl_component')
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
@@ -378,9 +380,7 @@ class Config():
     #
     # if no index field or config file is found then a default
     # composed index name will be returned
-    ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
     ES_CUSTOM_IDXS = read_option('CTTV_ES_CUSTOM_IDXS',
                                  default=False, cast=bool)
 
-    ES_CUSTOM_IDXS_INI = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME) \
-        if ES_CUSTOM_IDXS else None
+    ES_CUSTOM_IDXS_INI = ini if ES_CUSTOM_IDXS else None
