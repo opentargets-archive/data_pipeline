@@ -60,7 +60,7 @@ def file_to_list(filename):
 
 
 # loading all ini files into the same configuration
-ini = ini_from_file_or_resource('db.ini', 'ini.ini',
+ini = ini_from_file_or_resource('db.ini', 'uris.ini',
                                 'es_custom_idxs.ini')
 
 
@@ -109,7 +109,7 @@ class Config():
     MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
 
-    INI_SECTION = 'minimal' if MINIMAL else 'default'
+    INI_SECTION = 'minimal_dataset' if MINIMAL else 'full_dataset'
 
     HAS_PROXY = ini is not None and ini.has_section('proxy')
     if HAS_PROXY:
