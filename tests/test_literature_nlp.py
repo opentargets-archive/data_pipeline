@@ -1,13 +1,13 @@
 #!/usr/local/bin/python
 # encoding: UTF-8
+
 import os
 import unittest
 import spacy
 
-from mrtarget.modules.LiteratureNLP import PublicationFetcher, PublicationAnalysisSpacy, LiteratureNLPProcess, \
+from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, LiteratureNLPProcess, \
     SentenceAnalysisSpacy, DocumentAnalysisSpacy, create_tokenizer
-from run import PipelineConnectors
-
+from mrtarget.common.connection import PipelineConnectors
 import logging
 
 

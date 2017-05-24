@@ -520,26 +520,7 @@ class PublicationAnalysis(JSONSerializable):
         return NotImplementedError()
 
 
-class PublicationAnalysisSpacy(PublicationAnalysis):
-    """
-    Stores results of the analysis done by spacy
-    """
 
-    def __init__(self,
-                 pub_id,
-                 lemmas=(),
-                 noun_chunks=(),
-                 analysed_sentences_count=1,
-                 ):
-        super(PublicationAnalysisSpacy, self).__init__(pub_id)
-        self.lemmas = lemmas
-        self.noun_chunks = noun_chunks
-        self.analysed_sentences_count = analysed_sentences_count
-
-
-    def get_type(self):
-        '''Define the type for elasticsearch here'''
-        return Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME
 
 
 class LiteratureInfoExtractor(object):
