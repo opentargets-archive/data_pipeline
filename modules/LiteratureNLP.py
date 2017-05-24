@@ -791,14 +791,14 @@ class NLPManager(object):
                              infix_re.finditer)
         if nlp is None:
            if nlp is None:
-                    self.nlp = spacy.load('en', create_make_doc=create_tokenizer)
+                    self.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
         else:
             self.nlp = nlp
 
     def tokenizeText(self,text):
 
 
-        custom_tokens = self.nlp(unicode(text))
+        custom_tokens = self.nlp(u''+text)
         return custom_tokens
 
 
