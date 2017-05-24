@@ -6,7 +6,7 @@ import unittest
 import spacy
 
 from modules.LiteratureNLP import PublicationFetcher, PublicationAnalysisSpacy, LiteratureNLPProcess, \
-    SentenceAnalysisSpacy, DocumentAnalysisSpacy
+    SentenceAnalysisSpacy, DocumentAnalysisSpacy, create_tokenizer
 from run import PipelineConnectors
 
 import logging
@@ -102,7 +102,7 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.nlp = spacy.load('en_core_web_md')
+        cls.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
 
     def _concept_exists(self,
                         subject,
@@ -298,7 +298,7 @@ class SpacyDocumentNLPTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.nlp = spacy.load('en_core_web_md')
+        cls.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
 
 
     def test_analyse_all_abstracts(self):

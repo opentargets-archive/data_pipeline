@@ -783,12 +783,13 @@ def load_entity_matches(self, loader, nlp, doc):
     gene_matched_entities = {"litentity": gene_matched_list}
 
 
+def create_tokenizer(nlp):
+    infix_re = spacy.util.compile_infix_regex(tuple(TOKENIZER_INFIXES + ['/', ',']))
+    return Tokenizer(nlp.vocab, {}, nlp.tokenizer.prefix_search, nlp.tokenizer.suffix_search,
+                     infix_re.finditer)
+
 class NLPManager(object):
     def __init__(self, nlp=None):
-        def create_tokenizer(nlp):
-            infix_re = spacy.util.compile_infix_regex(tuple(TOKENIZER_INFIXES + ['/', ',']))
-            return Tokenizer(nlp.vocab, {}, nlp.tokenizer.prefix_search, nlp.tokenizer.suffix_search,
-                             infix_re.finditer)
         if nlp is None:
            if nlp is None:
                     self.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
@@ -879,7 +880,7 @@ class DocumentAnalysisSpacy(object):
 
         self.nlp = nlp
         if self.nlp is None:
-            self.nlp = spacy.load('en_core_web_md')
+            self.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
 
         if isinstance(document, Doc):
             self.doc = document
@@ -945,7 +946,7 @@ class SentenceAnalysisSpacy(object):
             if not sentence.replace('\n','').strip():
                 raise AttributeError('sentence cannot be empty')
             if nlp is None:
-                nlp = spacy.load('en_core_web_md')
+                nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
             if normalize:
                 sentence = u'' + self._normalizer.normalize(sentence)
             if abbreviations is None:
