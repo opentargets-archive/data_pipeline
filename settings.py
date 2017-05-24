@@ -44,7 +44,11 @@ class Config():
             ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
         ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
         if ELASTICSEARCH_PORT:
-            ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
+            ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
+    except ConfigParser.NoOptionError:
+        ELASTICSEARCH_HOST = None
+        ELASTICSEARCH_PORT = None
+        ELASTICSEARCH_URL = None
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -76,6 +80,9 @@ class Config():
     ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
     ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
     DEBUG = True
+    ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME = '!lit-entities-test'
+    ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME = 'litentity'
+    DEBUG = ENV == 'dev'
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
 
@@ -241,6 +248,10 @@ class Config():
     PUBMED_XML_UPDATE_LOCN = os.path.join(PUBMED_TEMP_DIR, 'update')
 
     PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
+    BIOLEXICON_GENE_XML_LOCN = 'geneProt (1).xml'
+    BIOLEXICON_DISEASE_XML_LOCN = 'umlsDisease.xml'
+    GENE_LEXICON_JSON_LOCN = 'gene_lexicon.json'
+    DISEASE_LEXICON_JSON_LOCN = 'disease_lexicon.json'
 
     #GE Pipeline
 

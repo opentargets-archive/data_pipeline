@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!--Generated on: Wed Aug  4 14:51:29 BST 2010-->
+<!DOCTYPE InputData SYSTEM "LexEBI-v1.dtd">
+<InputData>
+<Cluster clsId="UNIPR_UN13C_RAT" semType="geneProt">
+<Entry entryId="UNIPR_UN13C_RAT_1" baseForm="Protein unc-13 homolog C" type="PREFERRED" mlfreq="0">
+
+        <SourceDC sourceName="BioThesaurus" sourceId="Q62770"/>
+        <PosDC posName="POS" pos="N"/>
+        <Variant writtenForm="Unc13c" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="Unc13h3" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="unc-13 homolog C (C. elegans)" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="C. elegans" type="orthographic" mlfreq="13472"/>
+        <Variant writtenForm="Munc13-3" type="orthographic" mlfreq="24"/>
+        <Variant writtenForm="Munc13-3 protein" type="orthographic" mlfreq="4"/>
+        <Variant writtenForm="unc-13 homolog C" type="orthographic" mlfreq="0"/>
+        <DC att="uniprot_ac" val="Q62770"/>
+        <DC att="speciesNameNCBI" val="10116"/>
+
+</Entry>
+</Cluster>
+
+<Cluster clsId="UNIPR_UN13C_MOUSE" semType="geneProt">
+<Entry entryId="UNIPR_UN13C_MOUSE_1" baseForm="Protein unc-13 homolog C" type="PREFERRED" mlfreq="0">
+
+        <SourceDC sourceName="BioThesaurus" sourceId="Q8K0T7"/>
+        <PosDC posName="POS" pos="N"/>
+        <Variant writtenForm="Unc13c" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="Unc13h3" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="unc-13 homolog C (C. elegans)" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="AU019458" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="D9Ertd414e" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="C. elegans" type="orthographic" mlfreq="13472"/>
+        <Variant writtenForm="1500037O19Rik" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="Munc13-3" type="orthographic" mlfreq="24"/>
+        <Variant writtenForm="MGC40770" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="Unc13c protein" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="unc13 homolog 3" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="unc-13 homolog C" type="orthographic" mlfreq="0"/>
+        <DC att="uniprot_ac" val="Q8K0T7"/>
+        <DC att="speciesNameNCBI" val="10090"/>
+
+</Entry>
+</Cluster>
+
+<Cluster clsId="`" semType="geneProt">
+<Entry entryId="UNIPR_UN13C_HUMAN_1" baseForm="Protein unc-13 homolog C" type="PREFERRED" mlfreq="0">
+
+        <SourceDC sourceName="BioThesaurus" sourceId="Q8NB66"/>
+        <PosDC posName="POS" pos="N"/>
+        <Variant writtenForm="unc-13-like 3" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="hypothetical protein" type="orthographic" mlfreq="709"/>
+        <Variant writtenForm="DKFZp547H074" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="UNC13C protein" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="unc-13 homolog C (C. elegans)" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="C. elegans" type="orthographic" mlfreq="13472"/>
+        <Variant writtenForm="Munc13-3" type="orthographic" mlfreq="24"/>
+        <Variant writtenForm="UNC13C" type="orthographic" mlfreq="0"/>
+        <Variant writtenForm="unc-13 homolog C" type="orthographic" mlfreq="0"/>
+        <DC att="uniprot_ac" val="Q8NB66"/>
+        <DC att="speciesNameNCBI" val="9606"/>
+
+</Entry>
+</Cluster>
+</InputData>

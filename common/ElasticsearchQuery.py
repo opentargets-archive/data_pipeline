@@ -497,6 +497,23 @@ class ESQuery(object):
             yield  target['_id']
 
 
+    def get_lit_entities_for_type(self,type):
+        query_body = {"query": {
+            "bool": {
+                "filter": {
+                    "term": {
+                        "ent_type": type
+                    }
+                }
+            }
+        }
+        }
+        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME + '*'),
+                                  body=query_body
+                                  )
+        for hit in res['hits']['hits']:
+            yield hit['_source']
+
     def get_evidence_for_target_simple(self, target, expected = None):
         query_body = {"query": {
                                 "bool": {
@@ -690,6 +707,42 @@ class ESQuery(object):
         if batch:
             for pub in self.get_publications_by_id(batch):
                 yield pub
+
+    def get_all_publications(self,batch_size=1000):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "match_all": {}
+                           },
+                               '_source': True,
+                               'size': batch_size,
+                           },
+                           scroll='1h',
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                           timeout="10m",
+                           )
+        for hit in res:
+            yield hit['_source']
+
+    def get_abstracts_from_val_ev(self,batch_size=1000):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "constant_score" : {
+                                 "filter" : {
+                                    "exists" : {
+                                       "field" : "literature.abstract"
+                                    }
+                                 }
+                              }
+                           },
+                               '_source': True,
+                               'size': batch_size,
+                           },
+                           scroll='1h',
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-generic'),
+                           timeout="10m",
+                           )
+        for hit in res:
+            yield hit['_source']
 
     def count_publications_for_file(self, filename):
         query_body = {
