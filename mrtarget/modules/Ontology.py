@@ -30,7 +30,7 @@ __maintainer__ = "Gautier Koscielny"
 __email__ = "gautierk@opentargets.org"
 __status__ = "Production"
 
-logger = logging.getLogger('Ontology')
+logger = logging.getLogger(__name__)
 
 EFO_TAS = [
     'http://www.ebi.ac.uk/efo/EFO_1000018', # bladder disease

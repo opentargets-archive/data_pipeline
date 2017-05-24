@@ -308,10 +308,9 @@ class IntOGen():
         tp_file.close()
 
 def main():
-
-    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
-
-    logging.info("Load IntOGen data")
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("Load IntOGen data")
     itg = IntOGen()
     itg.read_intogen('')
 
