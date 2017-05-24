@@ -218,8 +218,7 @@ class Publication(JSONSerializable):
                  journal = None,
                  journal_reference=None,
                  full_text = u"",
-                 epmc_text_mined_entities = {},
-                 epmc_keywords = [],
+                 keywords = [],
                  full_text_url=[],
                  doi=u'',
                  cited_by=None,
@@ -231,10 +230,11 @@ class Publication(JSONSerializable):
                  references=[],
                  mesh_headings=[],
                  chemicals=[],
-                 filename=''
-
+                 filename='',
+                 text_analyzers = None,
+                 delete_pmids = None
                  ):
-        self.pub_id = pub_id
+        self.id = pub_id
         self.title = title
         self.abstract = abstract
         self.authors = authors
@@ -243,8 +243,8 @@ class Publication(JSONSerializable):
         self.journal = journal
         self.journal_reference=journal_reference
         self.full_text = full_text
-        self.epmc_text_mined_entities = epmc_text_mined_entities
-        self.epmc_keywords = epmc_keywords
+        self.text_mined_entities = {}
+        self.keywords = keywords
         self.full_text_url = full_text_url
         self.doi = doi
         self.cited_by = cited_by
@@ -257,10 +257,21 @@ class Publication(JSONSerializable):
         self.mesh_headings = mesh_headings
         self.chemicals = chemicals
         self.filename = filename
+        self._text_analyzers = text_analyzers
+        self._delete_pmids = delete_pmids
+
+        if self.authors:
+            self._process_authors()
+        if self.abstract:
+            self._sanitize_abstract()
+            self._split_sentences()
+        if self.title or self.abstract:
+            self._base_nlp()
+        self._text_analyzers = None # to allow for object serialisation
 
     def __str__(self):
         return "id:%s | title:%s | abstract:%s | authors:%s | pub_date:%s | date:%s | journal:%s" \
-               "| journal_reference:%s | full_text:%s | epmc_text_mined_entities:%s | epmc_keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
+               "| journal_reference:%s | full_text:%s | text_mined_entities:%s | keywords:%s | full_text_url:%s | doi:%s | cited_by:%s" \
                "| has_text_mined_entities:%s | is_open_access:%s | pub_type:%s | date_of_revision:%s | has_references:%s | references:%s" \
                "| mesh_headings:%s | chemicals:%s | filename:%s"%(self.pub_id,
                                                    self.title,
@@ -271,8 +282,8 @@ class Publication(JSONSerializable):
                                                     self.journal,
                                                     self.journal_reference,
                                                     self.full_text,
-                                                    self.epmc_text_mined_entities,
-                                                    self.epmc_keywords,
+                                                    self.text_mined_entities,
+                                                    self.keywords,
                                                     self.full_text_url,
                                                     self.doi,
                                                     self.cited_by,
@@ -286,7 +297,44 @@ class Publication(JSONSerializable):
                                                     self.chemicals,
                                                     self.filename
                                                     )
+    def _process_authors(self):
+        for a in self.authors:
+            if 'ForeName' in a and a['LastName']:
+                a['last_name'] = a['LastName']
+                a['short_name'] = a['LastName']
+                a['full_name'] = a['LastName']
+                if 'Initials' in a and a['Initials']:
+                    a['short_name'] += ' ' + a['Initials']
+                    del a['Initials']
+                if 'ForeName' in a and a['ForeName']:
+                    a['full_name'] += ' ' + a['ForeName']
+                    del a['ForeName']
 
+                del a['LastName']
+
+    def _split_sentences(self):
+        #todo: use proper sentence detection with spacy/nltk
+        abstract_sentences = Publication.split_sentences(self.abstract)
+        self.abstract_sentences = [dict(order=i, value = sentence) for i, sentence in enumerate(abstract_sentences)]
+
+    def _sanitize_abstract(self):
+        if self.abstract and isinstance(self.abstract, list):
+            self.abstract=' '.join(self.abstract)
+
+    def get_text_to_analyze(self):
+        if self.title and self.abstract:
+            return  unicode(self.title + ' ' + self.abstract)
+        elif self.title:
+            return unicode(self.title)
+        return u''
+
+    @staticmethod
+    def split_sentences(text):
+        return text.split('. ')#todo: use spacy here
+
+    def _base_nlp(self):
+        for analyzer in self._text_analyzers:
+            self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
 
 
 class LiteratureLookUpTable(object):
@@ -390,14 +438,14 @@ class MedlineRetriever(object):
               local_file_locn = [],
               update=False,
               force = False):
-
-        if not self.loader.es.indices.exists(Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)):
-            self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
-        self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
+        if not self.dry_run:
+            if not self.loader.es.indices.exists(Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)):
+                self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
+            self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         ftp_readers = no_of_workers
-        max_ftp_readers = 16 #avoid too many connections errors
+        max_ftp_readers = 8 #avoid too many connections errors
         if ftp_readers >max_ftp_readers:
             ftp_readers = max_ftp_readers
 
@@ -413,8 +461,9 @@ class MedlineRetriever(object):
 
         # ES-Loader Queue
         loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
-                                         max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                                         job_timeout=120)
+                              serialiser='pickle',
+                              max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
+                              job_timeout=120)
 
 
 
@@ -499,9 +548,9 @@ class MedlineRetriever(object):
                 l.join()
 
         logging.info('flushing data to index')
-
-        self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-            wait_if_ongoing=True)
+        if not self.dry_run:
+            self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+                wait_if_ongoing=True)
 
         logging.info("DONE")
 
@@ -613,8 +662,10 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 yield rec
 
     def skip_file_processing(self, file_name):
-
-        total_docs = self.es_query.count_publications_for_file(file_name)
+        try:
+            total_docs = self.es_query.count_publications_for_file(file_name)
+        except AttributeError:
+            return False #dry run
         if self.update:
             if total_docs > 1:
                 return True
@@ -638,6 +689,8 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
+        from mrtarget.modules.LiteratureNLP import NounChuncker
+        self.analyzers = [NounChuncker()]
 
 
     def process(self,data):
@@ -669,6 +722,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                         for chemical in child.getchildren():
                             chemical_dict = dict()
                             chemical_dict['name'] = chemical.NameOfSubstance.text
+                            chemical_dict['name_id'] = chemical.NameOfSubstance.attrib['UI']
                             chemical_dict['registryNumber'] = chemical.RegistryNumber.text
                             publication['chemicals'].append(chemical_dict)
 
@@ -701,7 +755,31 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                     publication['delete_pmids'].append(deleted_pmid.text)
 
             publication['filename'] = filename
-            return publication
+
+            publication['text_analyzers'] = self.analyzers
+            return  Publication(pub_id=publication['pmid'],
+                                  title=publication.get('title'),
+                                  abstract=publication.get('abstract'),
+                                  authors=publication.get('authors'),
+                                  pub_date=publication.get('pub_date'),
+                                  date=publication.get("first_publication_date"),
+                                  journal=publication.get('journal'),
+                                  journal_reference=publication.get("journal_reference"),
+                                  full_text=u"",
+                                  #full_text_url=publication['fullTextUrlList']['fullTextUrl'],
+                                  keywords=publication.get('keywords'),
+                                  doi=publication.get('doi'),
+                                  #cited_by=publication['citedByCount'],
+                                  #has_text_mined_terms=publication['hasTextMinedTerms'] == u'Y',
+                                  #has_references=publication['hasReferences'] == u'Y',
+                                  #is_open_access=publication['isOpenAccess'] == u'Y',
+                                  pub_type=publication.get('pub_types'),
+                                  filename=publication.get('filename'),
+                                  mesh_headings=publication.get('mesh_terms'),
+                                  chemicals=publication.get('chemicals'),
+                                  text_analyzers = self.analyzers,
+                                  )
+
         except etree.XMLSyntaxError as e:
             self.logger.error("Error parsing XML file {} - medline record {} %s".format(filename,record),e.message)
 
@@ -713,7 +791,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
             if e.tag == 'Abstract':
                 abstracts = []
-                for abstractText in e.getchildren():
+                for abstractText in e.findall('AbstractText'):
                     abstracts.append(abstractText.text)
                 publication['abstract'] = abstracts
 
@@ -787,62 +865,28 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
 
 
     def process(self, data):
-        publication = data
-        if 'delete_pmids' in publication:
-            delete_pmids = publication['delete_pmids']
-            for pmid in delete_pmids:
+        pub = data
+        if pub._delete_pmids:
+            for pmid in pub._delete_pmids:
                 '''update parent and analyzed child publication with empty values'''
-
-                pub = Publication(pub_id=pmid,filename=publication['filename'])
+                pub = Publication(pub_id=pmid,filename=pub.filename)
                 self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                                 Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
                                 pmid,
                                 pub,
                                 create_index=False)
-
         else:
-
             try:
-
-                pub = Publication(pub_id=publication['pmid'],
-                                  title=publication['title'],
-                                  abstract=publication.get('abstract'),
-                                  authors=publication.get('authors'),
-                                  pub_date=publication.get('pub_date'),
-                                  date=publication.get("first_publication_date"),
-                                  journal=publication.get('journal'),
-                                  journal_reference=publication.get("journal_reference"),
-                                  full_text=u"",
-                                  #full_text_url=publication['fullTextUrlList']['fullTextUrl'],
-                                  epmc_keywords=publication.get('keywords'),
-                                  doi=publication.get('doi',''),
-                                  #cited_by=publication['citedByCount'],
-                                  #has_text_mined_terms=publication['hasTextMinedTerms'] == u'Y',
-                                  #has_references=publication['hasReferences'] == u'Y',
-                                  #is_open_access=publication['isOpenAccess'] == u'Y',
-                                  pub_type=publication.get('pub_types'),
-                                  filename=publication.get('filename'),
-                                  mesh_headings=publication.get('mesh_terms'),
-                                  chemicals=publication.get('chemicals')
-                                  )
-
-            # if 'dateOfRevision' in publication:
-            #     pub.date_of_revision = publication["dateOfRevision"]
-            #
-            # if pub.has_text_mined_entities:
-            #     self.get_epmc_text_mined_entities(pub)
-            # if pub.has_references:
-            #     self.get_epmc_ref_list(pub)
 
                 self.loader.put(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
                                 Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                                publication['pmid'],
+                                pub.id,
                                 pub,
                                 create_index=False)
             except KeyError as e:
-                logging.error("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
-                    publication['pmid'],
-                    publication['filename'],
+                logging.exception("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
+                    pub.id,
+                    pub.filename,
                     e.message))
 
 

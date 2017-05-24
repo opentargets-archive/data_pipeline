@@ -1,6 +1,7 @@
 import argparse
 import logging
 import sys
+import itertools as it
 
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
@@ -28,9 +29,14 @@ from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.Settings import Config, file_or_resource
 
 
-
 logging.config.fileConfig(file_or_resource('logging.ini'),
                           disable_existing_loggers=False)
+
+
+def load_nlp_corpora():
+    '''load here all the corpora needed by nlp steps'''
+    import nltk
+    nltk.download([ 'punkt', 'averaged_perceptron_tagger']) #'brown' corpora might be needed
 
 
 def main():
@@ -145,7 +151,7 @@ def main():
 
     logger.info('Attempting to establish connection to the backend...')
     db_connected = connectors.init_services_connections(redispersist=args.redispersist)
-    
+
     if not db_connected and not args.dry_run:
         msg = 'No connection to the backend could be established. Exiting since this is not a dry run'
         logger.info(msg)
@@ -153,6 +159,9 @@ def main():
 
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
+
+    if args.inject_literature or args.lit:
+        load_nlp_corpora()
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
@@ -213,13 +222,15 @@ def main():
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
                 PhenotypeSlim().create_phenotype_slim(args.local_file)
 
+        r_files = list(it.chain.from_iterable([el.split(",") for el in args.remote_file]))
+
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.CHECKFILES in args.val) or do_all:
                 EvidenceValidationFileChecker(connectors.es,
                                               connectors.r_server,
                                               dry_run=args.dry_run).check_all(local_files=args.local_file,
-                                                                              remote_files=args.remote_file,
+                                                                              remote_files=r_files,
                                                                               increment=args.increment)
         if args.valreset:
             EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()

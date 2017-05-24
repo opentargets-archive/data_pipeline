@@ -7,28 +7,41 @@ import pkg_resources as res
 from envparse import env, ConfigurationError
 import mrtarget
 import petl
+import multiprocessing as mp
+import tempfile
+
 from mrtarget.common import URLZSource
 
 
-def ini_from_file_or_resource(filename=None):
-    '''load the ini file using file_or_resource an
+def build_uniprot_query(l):
+    return '+or+'.join(l)
+
+
+def build_ensembl_sql(l):
+    return """SELECT stable_id FROM gene where stable_id IN ('{0}')"""\
+        .format("', '".join(l))
+
+
+def ini_from_file_or_resource(*filenames):
+    '''load the ini files using file_or_resource an
     return the configuration object or None
     '''
-    try:
-        # trying to load file from somewhere
-        f = file_or_resource(filename)
-        cfg = ConfigParser.ConfigParser()
-        cfg.read(f)
+    f = [file_or_resource(fname) for fname in filenames if fname]
+    cfg = ConfigParser.ConfigParser()
+    if cfg.read(f):
+        # read() returns list of successfully parsed filenames
         return cfg
-    except Exception:
-        # the function return none in case file wasnt found
+    else:
+        # the function return none in case no file was found
         return None
 
 
-def file_or_resource(filename=None):
+def file_or_resource(fname=None):
     '''get filename and check if in getcwd then get from
     the package resources folder
     '''
+    filename = os.path.expanduser(fname)
+
     resource_package = mrtarget.__name__
     resource_path = '/'.join(('resources', filename))
 
@@ -40,26 +53,82 @@ def file_or_resource(filename=None):
             else res.resource_filename(resource_package, resource_path)
 
 
-# loading the ES db ini configuration file
-iniparser = ini_from_file_or_resource('db.ini')
+def file_to_list(filename):
+    '''read the whole file and returns a list of lines'''
+    with open(filename) as f:
+        return f.read().splitlines()
+
+
+# loading all ini files into the same configuration
+ini = ini_from_file_or_resource('db.ini', 'uris.ini',
+                                'es_custom_idxs.ini')
+
+
+def read_option(option, cast=None, ini=ini, section='dev',
+                **kwargs):
+    '''helper method to read value from environmental variable and ini files, in
+    that order. Relies on envparse and accepts its parameters.
+    The goal is to have ENV var > ini files > defaults
+
+    Lists and dict in the ini file are parsed as JSON strings.
+    '''
+    # if passing 'default' as parameter, we don't want envparse to return
+    # succesfully without first check if there is anything in the ini file
+    try:
+        default_value = kwargs.pop('default')
+    except KeyError:
+        default_value = None
+
+    try:
+        # reading the environment variable with envparse
+        return env(option, cast=cast, **kwargs)
+    except ConfigurationError:
+        if not ini:
+            return default_value
+
+        try:
+            # TODO: go through all sections available
+            if cast is bool:
+                return ini.getboolean(section, option)
+            elif cast is int:
+                return ini.getint(section, option)
+            elif cast is float:
+                return ini.getint(section, option)
+            elif cast is dict or cast is list:
+                # if you want list and dict variables in the ini file,
+                # this function will accept json formatted lists.
+                return json.loads(ini.get(section, option))
+            else:
+                return ini.get(section, option)
+
+        except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
+            return default_value
 
 
 class Config():
-    HAS_PROXY = iniparser is not None and iniparser.has_section('proxy')
+    MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
+    MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
+
+    INI_SECTION = 'minimal_dataset' if MINIMAL else 'full_dataset'
+
+    HAS_PROXY = ini is not None and ini.has_section('proxy')
     if HAS_PROXY:
-        PROXY = iniparser.get('proxy', 'protocol') + "://" + iniparser.get('proxy', 'username') + ":" + iniparser.get(
-            'proxy', 'password') + "@" + iniparser.get('proxy', 'host') + ":" + iniparser.get('proxy', 'port')
-        PROXY_PROTOCOL = iniparser.get('proxy', 'protocol')
-        PROXY_USERNAME = iniparser.get('proxy', 'username')
-        PROXY_PASSWORD = iniparser.get('proxy', 'password')
-        PROXY_HOST = iniparser.get('proxy', 'host')
-        PROXY_PORT = int(iniparser.get('proxy', 'port'))
+        PROXY = ini.get('proxy', 'protocol') + "://" + ini.get('proxy', 'username') + \
+                ":" + ini.get('proxy', 'password') + "@" + \
+                ini.get('proxy', 'host') + ":" + \
+                ini.get('proxy', 'port')
+
+        PROXY_PROTOCOL = ini.get('proxy', 'protocol')
+        PROXY_USERNAME = ini.get('proxy', 'username')
+        PROXY_PASSWORD = ini.get('proxy', 'password')
+        PROXY_HOST = ini.get('proxy', 'host')
+        PROXY_PORT = int(ini.get('proxy', 'port'))
 
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
+    # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION = os.getenv('CTTV_DATA_VERSION') or '17.04'
-    ENV = os.getenv('CTTV_EL_LOADER') or 'dev'
+    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.04')
 
     # [elasticsearch]
 
@@ -77,52 +146,8 @@ class Config():
     # verify_certs=True
     # )
 
-    # ELASTICSEARCH_URL, ELASTICSEARCH_NODES = None, []
-    # ELASTICSEARCH_HOST = os.getenv('ELASTICSEARCH_HOST')
-    # ELASTICSEARCH_PORT = os.getenv('ELASTICSEARCH_PORT')
-    try:
-        ELASTICSEARCH_NODES = env.list('ELASTICSEARCH_NODES')
-    except ConfigurationError:
-        try:
-            ELASTICSEARCH_NODES = json.loads(iniparser.get(ENV, 'elnodes'))
-        except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
-            ELASTICSEARCH_NODES = []
-
-    # if ELASTICSEARCH_HOST is None and iniparser is not None:
-    #     try:
-    #         ELASTICSEARCH_HOST = iniparser.get(ENV, 'elurl')
-    #         ELASTICSEARCH_PORT = iniparser.get(ENV, 'elport')
-    #     except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
-    #         pass
-    # if ELASTICSEARCH_HOST is not None and ELASTICSEARCH_PORT is not None:
-    #     if ',' in ELASTICSEARCH_HOST:
-    #         ELASTICSEARCH_NODES = ELASTICSEARCH_HOST.split(',')
-    #         ELASTICSEARCH_HOST = ELASTICSEARCH_NODES[0]
-    #     else:
-    #         ELASTICSEARCH_NODES = [ELASTICSEARCH_HOST]
-    #     ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
-    #     if ELASTICSEARCH_PORT:
-    #         ELASTICSEARCH_URL = ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
-
-    DRY_RUN_OUTPUT_ENABLE = bool(os.getenv('DRY_RUN_OUTPUT_ENABLE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
-    DRY_RUN_OUTPUT_DELETE = bool(os.getenv('DRY_RUN_OUTPUT_DELETE') in ['True', 'true', '1', 't', 'y', 'yes', 'Yes'])
-    DRY_RUN_OUTPUT_COUNT = os.getenv('DRY_RUN_OUTPUT_COUNT')
-    if DRY_RUN_OUTPUT_COUNT:
-        DRY_RUN_OUTPUT_COUNT = int(DRY_RUN_OUTPUT_COUNT)
-    else:
-        DRY_RUN_OUTPUT_COUNT = 10000
-
-    # This config file is like this and no prefixes or version will be
-    # appended
-    #
-    # [indexes]
-    # gene-data=new-gene-data-index-name
-    # ...
-    #
-    # if no index field or config file is found then a default
-    # composed index name will be returned
-    ES_CUSTOM_IDXS_FILENAME = 'es_custom_idxs.ini'
-    ES_CUSTOM_IDXS = ini_from_file_or_resource(ES_CUSTOM_IDXS_FILENAME)
+    ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
+                                      default=['http://127.0.0.1:9200'])
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -153,6 +178,8 @@ class Config():
     ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
     ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
     ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
+    ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME = '!lit-entities-test'
+    ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME = 'litentity'
     DEBUG = True
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
@@ -177,16 +204,17 @@ class Config():
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
-                                                delimiter='|').data().tol())
-    HPA_NORMAL_TISSUE_URL = 'http://v16.proteinatlas.org/download/normal_tissue.csv.zip'
-    HPA_CANCER_URL = 'http://v16.proteinatlas.org/download/cancer.csv.zip'
-    HPA_SUBCELLULAR_LOCATION_URL = 'http://v16.proteinatlas.org/download/subcellular_location.csv.zip'
-    HPA_RNA_URL = 'https://storage.googleapis.com/atlas_baseline_expression/rna_tissue_atlas.csv.zip'
+                                               delimiter='|').data().tol())
+
+    HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
+    HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')
+    HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
+    HPA_RNA_URL = ini.get(INI_SECTION, 'hpa_baseline')
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
-    REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome.txt'
+    REACTOME_ENSEMBL_MAPPINGS = ini.get(INI_SECTION, 'ensembl_reactome')
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
-    REACTOME_PATHWAY_DATA = 'http://www.reactome.org/download/current/ReactomePathways.txt'
-    REACTOME_PATHWAY_RELATION = 'http://www.reactome.org/download/current/ReactomePathwaysRelation.txt'
+    REACTOME_PATHWAY_DATA = ini.get(INI_SECTION, 'reactome_pathways')
+    REACTOME_PATHWAY_RELATION = ini.get(INI_SECTION, 'reactome_pathways_rel')
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
     EVIDENCEVALIDATION_SCHEMA = "1.2.5"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
@@ -217,17 +245,13 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
     EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
 
-
-
     # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
-    WORKERS_NUMBER = os.getenv('WORKERS_NUMBER')
-    if WORKERS_NUMBER:
-        WORKERS_NUMBER = int(WORKERS_NUMBER)
-    else:
-        WORKERS_NUMBER = None
+    WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
+                                 default=mp.cpu_count())
 
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
+    # TODO remove refs to user directories
     MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
 
     # hardcoded folder of json file to be preprocessed to extract
@@ -240,13 +264,14 @@ class Config():
     ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS = ["cttv008", "cttv012"]
 
     # put the path to the file where you want to write the SLIM file (turtle format)
+    # TODO remove refs to user directories
     ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
 
-    CHEMBL_TARGET_BY_UNIPROT_ID = '''https://www.ebi.ac.uk/chembl/api/data/target.json'''
-    CHEMBL_MECHANISM = '''https://www.ebi.ac.uk/chembl/api/data/mechanism.json'''
+    CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
+    CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
-    CHEMBL_PROTEIN_CLASS = '''https://www.ebi.ac.uk/chembl/api/data/protein_class.json'''
-    CHEMBL_TARGET_COMPONENT = '''https://www.ebi.ac.uk/chembl/api/data/target_component.json'''
+    CHEMBL_PROTEIN_CLASS = ini.get(INI_SECTION, 'chembl_protein')
+    CHEMBL_TARGET_COMPONENT = ini.get(INI_SECTION, 'chembl_component')
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
@@ -302,37 +327,66 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION=88
-    ENSEMBL_CHUNK_SIZE=100
+    ENSEMBL_RELEASE_VERSION = 88
+    ENSEMBL_CHUNK_SIZE = 100
 
-    TEMP_DIR = os.path.join(os.path.sep, 'tmp')
+    # see http://stackoverflow.com/a/847866
+    TEMP_DIR = tempfile.gettempdir()
+
     REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 
 
-    #dump file names
-    DUMP_FILE_FOLDER = os.getenv('CTTV_DUMP_FOLDER') or TEMP_DIR
-    DUMP_FILE_EVIDENCE=RELEASE_VERSION+'_evidence_data.json.gz'
+    # dump file names
+    DUMP_FILE_FOLDER = read_option('CTTV_DUMP_FOLDER', default=TEMP_DIR)
+    DUMP_FILE_EVIDENCE = RELEASE_VERSION+'_evidence_data.json.gz'
     DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
     DUMP_PAGE_SIZE = 10000
     DUMP_BATCH_SIZE = 10
-    DUMP_REMOTE_API = os.getenv('DUMP_REMOTE_API_URL') or 'http://beta.opentargets.io'
-    DUMP_REMOTE_API_PORT = os.getenv('DUMP_REMOTE_API_PORT') or '80'
-    DUMP_REMOTE_API_SECRET = os.getenv('DUMP_REMOTE_API_SECRET')
-    DUMP_REMOTE_API_APPNAME = os.getenv('DUMP_REMOTE_API_APPNAME')
 
-    #Literature Pipeline -- Pubmed/Medline FTP server
+    DUMP_REMOTE_API = read_option('DUMP_REMOTE_API_URL', default='http://beta.opentargets.io')
+    DUMP_REMOTE_API_PORT = read_option('DUMP_REMOTE_API_PORT', default='80')
+    DUMP_REMOTE_API_SECRET = read_option('DUMP_REMOTE_API_SECRET')
+    DUMP_REMOTE_API_APPNAME = read_option('DUMP_REMOTE_API_APPNAME')
+
+    # Literature Pipeline -- Pubmed/Medline FTP server
     PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
     PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
     PUBMED_XML_LOCN = os.path.join(PUBMED_TEMP_DIR, 'baseline')
     PUBMED_XML_UPDATE_LOCN = os.path.join(PUBMED_TEMP_DIR, 'update')
 
     PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
+    BIOLEXICON_GENE_XML_LOCN = 'geneProt (1).xml'
+    BIOLEXICON_DISEASE_XML_LOCN = 'umlsDisease.xml'
+    GENE_LEXICON_JSON_LOCN = 'gene_lexicon.json'
+    DISEASE_LEXICON_JSON_LOCN = 'disease_lexicon.json'
 
-    #GE Pipeline
+    # GE Pipeline
 
     GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
     GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
     GE_ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
     GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
+
+    # for developers
+    DRY_RUN_OUTPUT = read_option('DRY_RUN_OUTPUT_ENABLE',
+                                 cast=bool, default=False)
+    DRY_RUN_OUTPUT_DELETE = read_option('DRY_RUN_OUTPUT_DELETE',
+                                        cast=bool, default=False)
+    DRY_RUN_OUTPUT_COUNT = read_option('DRY_RUN_OUTPUT_COUNT',
+                                       cast=int, default=10000)
+
+    # This config file is like this and no prefixes or version will be
+    # appended
+    #
+    # [indexes]
+    # gene-data=new-gene-data-index-name
+    # ...
+    #
+    # if no index field or config file is found then a default
+    # composed index name will be returned
+    ES_CUSTOM_IDXS = read_option('CTTV_ES_CUSTOM_IDXS',
+                                 default=False, cast=bool)
+
+    ES_CUSTOM_IDXS_INI = ini if ES_CUSTOM_IDXS else None

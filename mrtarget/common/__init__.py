@@ -6,7 +6,28 @@ import zipfile
 import petl as p
 import tempfile as tmp
 import requests as r
-import urllib2 as u2
+# import urllib2 as u2
+
+
+def url_to_stream(url, *args, **kwargs):
+    '''request a url using requests pkg and pass *args and
+    **kwargs to requests.get function (useful for proxies)
+    and returns the filled file descriptor from a
+    tempfile.NamedTemporaryFile
+
+    If you want to stream a raw uri (and not compressed) use the
+    parameter `enable_stream=True`
+    '''
+    f = r.get(url, *args, stream=True, **kwargs)
+    f.raise_for_status()
+
+    if f.encoding is None:
+        f.encoding = 'utf-8'
+
+    for line in f.iter_lines(decode_unicode=True):
+            yield line
+
+    f.close()
 
 
 @contextmanager
