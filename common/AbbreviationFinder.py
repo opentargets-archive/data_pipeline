@@ -14,6 +14,8 @@ Biocomputing, 2003, pp 451-462.
 import logging
 import re
 
+from textblob import TextBlob
+
 
 class Candidate(unicode):
     def __new__(cls, start, stop, str):
@@ -50,8 +52,17 @@ class AbbreviationsParser(object):
         self.logger = logging.getLogger(__name__)
 
     def digest(self, textblob):
-        '''takes textblob.TextBlob Instance as input'''
+        if isinstance(textblob, (str, unicode)):
+           textblob = TextBlob(textblob)
         return list(self._digest_iterator(textblob))
+
+    def digest_as_dict(self, textblob):
+        digested = self.digest(textblob)
+        d = {}
+        for i in digested:
+            if i['short'] not in d:
+                d[i['short']]=i['long']
+        return d
 
     def _digest_iterator(self, textblob):
         omit = 0

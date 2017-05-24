@@ -8,7 +8,11 @@ import time
 from collections import Counter
 
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
+import spacy
 from spacy.en import English
+from spacy.symbols import *
+from spacy.tokens import Span
+from spacy.tokens.doc import Doc
 from textblob.en.inflect import singularize
 from tqdm import tqdm
 from common import Actions
@@ -27,9 +31,15 @@ from unidecode import unidecode
 
 try:
     import nltk
-    from nltk.corpus import stopwords
+    from nltk.corpus import stopwords as nltk_stopwords
+    from nltk import Tree
 except ImportError:
     logging.getLogger(__name__).warning('cannot import nltk or stopwords')
+
+SUBJECTS = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "meta"]
+OBJECTS = ["dobj", "dative", "attr", "oprd", "pobj", "attr", "conj", "compound"]
+
+ANY_NOUN = SUBJECTS + OBJECTS + ['compound']
 
 # List of symbols we don't care about
 SYMBOLS = " ".join(string.punctuation).split(" ") + ["-----", "---", "...", "â", "â", "'ve"]
@@ -127,11 +137,17 @@ class PerceptronNPExtractor(BaseNPExtractor):
     CFG = {
         ('NNP', 'NNP'): 'NNP',
         ('NNP', 'NN'): 'NNP',
+        ('NN', 'NNS'): 'NNP',
         ('NNP', 'PO'): 'NNP',
+        ('NN', 'IN'): 'NN',
+        ('IN', 'JJ'): 'NN',
+        # ('PO', 'NN'): 'NNP',
         ('NN', 'NN'): 'NNI',
         ('NNI', 'NN'): 'NNI',
         ('JJ', 'JJ'): 'JJ',
         ('JJ', 'NN'): 'NNI',
+        ('NN', 'JJ'): 'NNI',
+
     }
 
     def __init__(self):
@@ -155,7 +171,9 @@ class PerceptronNPExtractor(BaseNPExtractor):
             self.train()
         tokens = self._tokenize_sentence(sentence)
         tagged = self.tagger.tag(tokens)
+        # print tagged
         tags = _normalize_tags(tagged)
+        # print tags
         merge = True
         while merge:
             merge = False
@@ -163,6 +181,7 @@ class PerceptronNPExtractor(BaseNPExtractor):
                 t1 = tags[x]
                 t2 = tags[x + 1]
                 key = t1[1], t2[1]
+                # print t1, t2, key
                 value = self.CFG.get(key, '')
                 if value:
                     merge = True
@@ -177,6 +196,7 @@ class PerceptronNPExtractor(BaseNPExtractor):
                     break
 
         matches = [t[0] for t in tags if t[1] in ['NNP', 'NNI','NN']]
+        # print matches
         return matches
 
 class NounChuncker(object):
@@ -192,6 +212,10 @@ class NounChuncker(object):
         parsed = TextBlob(normalized, np_extractor=self.np_ex)
         counted_noun_phrases = parsed.noun_phrases
         abbreviations = self.abbreviations_finder.digest(parsed)
+        '''make sure defined acronym are used as noun phrases '''
+        for abbr in abbreviations:
+            if abbr['long'].lower() not in counted_noun_phrases:
+                counted_noun_phrases.append(abbr['long'].lower())
         '''improved singularisation still needs refinement'''
         # singular_counted_noun_phrases = []
         # for np in counted_noun_phrases:
@@ -310,7 +334,7 @@ class PublicationAnalysisSpacy(object):
         self.logger = logging.getLogger(__name__)
         self.parser = English()
         # A custom stoplist
-        STOPLIST = set(stopwords.words('english') + ["n't", "'s", "'m", "ca","p","t"] + list(ENGLISH_STOP_WORDS))
+        STOPLIST = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca","p","t"] + list(ENGLISH_STOP_WORDS))
         ALLOWED_STOPLIST=set(('non'))
         self.STOPLIST = STOPLIST - ALLOWED_STOPLIST
 
@@ -446,7 +470,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
         pub_fetcher = PublicationFetcher()
         self.chunk_size = chunk_size
         self.dry_run = dry_run
-        self.pub_analyser = PublicationAnalyserSpacy(pub_fetcher)
+        self.pub_analyser = PublicationAnalysisSpacy(pub_fetcher)
 
     def process(self, data):
         publications = data
@@ -506,4 +530,351 @@ class PublicationAnalysisSpacy(PublicationAnalysis):
         '''Define the type for elasticsearch here'''
         return Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME
 
+
+
+class DocumentAnalysisSpacy(object):
+
+    def __init__(self,
+                 document,
+                 nlp=None,
+                 abbreviations=None,
+                 normalize=True,
+                 stopwords=None
+                 ):
+
+        self.logger = logging.getLogger(__name__)
+        self._normalizer = AbstractNormalizer()
+        self._abbreviations_finder = AbbreviationsParser()
+        if stopwords is None:
+            self.stopwords  = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS))
+
+        self.nlp = nlp
+        if self.nlp is None:
+            self.nlp = spacy.load('en_core_web_md')
+
+        if isinstance(document, Doc):
+            self.doc = document
+        elif isinstance(document, unicode):
+            # if not document.replace('\n','').strip():
+            #     raise AttributeError('document cannot be empty')
+            if normalize:
+                self._normalizer = AbstractNormalizer()
+                document = u''+self._normalizer.normalize(document)
+            if abbreviations is None:
+                self.abbreviations = self._abbreviations_finder.digest_as_dict(document)
+                self.logger.info('abbreviations: ' + str(self.abbreviations))
+
+            if abbreviations:
+                for short, long in abbreviations:
+                    if short in document and not long in document:
+                        document = document.replace(short, long)
+            self.doc = self.nlp(document)
+        else:
+            raise AttributeError('document needs to be unicode or Doc not %s' % document.__class__)
+
+    def digest(self):
+
+        self.concepts = []
+        self.noun_phrases = []
+        for sentence in self.doc.sents:
+            sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
+            sentence.analyse()
+            self.concepts.extend(sentence.concepts)
+            self.noun_phrases.extend(sentence.noun_phrases)
+        # print self.noun_phrases
+        self.noun_phrases = list(set([i.text for i in self.noun_phrases if i.text.lower() not in self.stopwords ]))
+        self.noun_phrase_counter = Counter()
+        lowered_text = self.doc.text.lower()
+        for i in self.noun_phrases:
+            lowered_np = i.lower()
+            self.noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
+        self.noun_phrases_top = [i[0] for i in self.noun_phrase_counter.most_common(5) if i[1] > 1]
+        self.noun_phrases_recurring = [i for i, k in self.noun_phrase_counter.items() if k > 1]
+
+
+
+
+
+class SentenceAnalysisSpacy(object):
+
+    def __init__(self,
+                 sentence,
+                 nlp = None,
+                 abbreviations = None,
+                 normalize = True):
+        self.logger = logging.getLogger(__name__)
+        self._normalizer = AbstractNormalizer()
+        self._abbreviations_finder = AbbreviationsParser()
+
+        if isinstance(sentence, Doc):
+            self.sentence = sentence
+            self.doc = sentence
+        elif isinstance(sentence, Span):
+            self.sentence = sentence
+            self.doc = sentence.doc
+        elif isinstance(sentence, unicode):
+            if not sentence.replace('\n','').strip():
+                raise AttributeError('sentence cannot be empty')
+            if nlp is None:
+                nlp = spacy.load('en_core_web_md')
+            if normalize:
+                sentence = u'' + self._normalizer.normalize(sentence)
+            if abbreviations is None:
+                self.abbreviations = self._abbreviations_finder.digest_as_dict(sentence)
+                self.logger.info('abbreviations: ' + str(self.abbreviations))
+
+            if abbreviations:
+                for short, long in abbreviations:
+                    if short in sentence and not long in sentence:
+                        sentence = sentence.replace(short, long)
+            self.sentence = nlp(sentence)
+            self.doc = self.sentence
+        else:
+            raise AttributeError('sentence needs to be unicode or Doc or Span not %s'%sentence.__class__)
+
+
+
+
+
+    def isNegated(self,tok):
+        negations = {"no", "not", "n't", "never", "none", "false"}
+        for dep in list(tok.lefts) + list(tok.rights):
+            if dep.lower_ in negations:
+                return True
+        return False
+
+    def get_alternative_subjects(self, tok):
+        '''given a token, that is a subject of a verb, extends to other possible subjects in the left part of the relation'''
+
+        '''get objects in subtree of the subject to be related to objects in the right side of the verb #risk'''
+        alt_subjects = [tok]
+        allowed_pos = [NOUN, PROPN]
+        for sibling in tok.head.children:
+            # print sibling, sibling.pos_, sibling.dep_
+            if sibling.pos == allowed_pos:
+                for sub_subj in sibling.subtree:
+                    if sub_subj.dep_ in ANY_NOUN and sub_subj.pos in allowed_pos:  # should check here that there is an association betweej the subj and these
+                        # objects
+                        alt_subjects.append(sub_subj)
+                        # alt_subjects.append(parsed[sub_subj.left_edge.i : sub_subj.right_edge.i + 1].text.lower())
+                '''get other subjects conjuncted to main on to be related to objects in the right side of the verb #risk'''
+                for sub_subj in sibling.conjuncts:
+                    # print sub_subj, sub_subj.pos_, sub_subj.dep_
+                    if sub_subj.dep_ in SUBJECTS and sub_subj.pos in allowed_pos:  # should check here that there is an association betweej the
+                        # subj and these objects
+                        alt_subjects.append(sub_subj)
+        # print alt_subjects
+
+        # sys.exit()
+        return alt_subjects
+
+
+    def get_extended_verb(self, v):
+        '''
+        given a verb build a representative chain of verbs for the sintax tree
+        :param v: 
+        :return: 
+        '''
+        verb_modifiers = [prep,agent]
+        verb_path = [v]
+        verb_text = v.lemma_.lower()
+        allowed_lefts_pos = [NOUN, PROPN]
+        lefts = list([i for i in v.lefts if i.pos in allowed_lefts_pos and i.dep_ in SUBJECTS])
+        '''get anchestor verbs if any'''
+        if not v.dep_ == 'ROOT':
+            for av in [i for i in v.ancestors if i.pos == VERB and i.dep not in (aux, auxpass)]:
+                verb_text = av.lemma_.lower() + ' '+  v.text.lower()
+                verb_path.append(av)
+                lefts.extend([i for i in av.lefts if i.pos in allowed_lefts_pos and i.dep_ in SUBJECTS])
+        for vchild in v.children:
+            if vchild.dep in verb_modifiers:
+                verb_text += ' ' + vchild.text.lower()
+        return 'to '+verb_text, verb_path, lefts
+
+    def get_verb_path_from_ancestors(self, tok):
+        '''
+        given a token return the chain of verbs of his ancestors
+        :param tok: 
+        :return: 
+        '''
+        return [i for i in tok.ancestors if i.pos == VERB and i.dep != aux]
+
+    def get_extended_token(self, tok):
+        '''
+        given a token find a more descriptive string extending it with its chindren
+        :param tok: 
+        :param doc: 
+        :return: 
+        '''
+        allowed_pos = [NOUN, ADJ, PUNCT, PROPN]
+        allowed_dep = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "dobj",  "attr", "oprd", "pobj", "conj",
+                       "compound", "amod", "punct", "meta", "npadvmod", "nmod"]#, add "prep" to extend for "of and "in"
+        extended_tokens = [i for i in tok.subtree if (i.dep_ in allowed_dep and i in tok.children) or (i == tok)]
+        allowed_continous_tokens = []
+        #break the extened token if something not allowed is between the selected tokens in the subtree
+        curr_pos = extended_tokens[0].i -1
+        for ex_t in extended_tokens:
+            if ex_t.i == curr_pos+1:
+                curr_pos = ex_t.i
+                allowed_continous_tokens.append(ex_t)
+            else:
+                break
+        span= Span(self.doc, allowed_continous_tokens[0].i, allowed_continous_tokens[-1].i+1)
+        return span
+
+
+    def traverse_obj_children(self, tok, verb_path):
+        '''
+        iterate over all the children and the conjuncts to return objects within the same chain of verbs
+        :param tok: 
+        :param verb_path: 
+        :return: 
+        '''
+        for i in tok.children:
+            # print i, verb_path, get_verb_path_from_ancestors(i), get_verb_path_from_ancestors(i) ==verb_path
+            if i.dep_ in OBJECTS and (self.get_verb_path_from_ancestors(i) == verb_path):
+                yield i
+            else:
+                self.traverse_obj_children(i, verb_path)
+        for i in tok.conjuncts:
+            # print i, verb_path, get_verb_path_from_ancestors(i), get_verb_path_from_ancestors(i) ==verb_path
+            if i.dep_ in OBJECTS and (self.get_verb_path_from_ancestors(i) == verb_path):
+                yield i
+            else:
+                self.traverse_obj_children(i, verb_path)
+
+
+    def to_nltk_tree(self, node):
+        def tok_format(tok):
+            return " ".join(['"%s"'%tok.orth_, tok.tag_, tok.pos_, tok.dep_])
+
+        if node.n_lefts + node.n_rights > 0:
+            return Tree(tok_format(node), [self.to_nltk_tree(child) for child in node.children])
+        else:
+            return tok_format(node)
+
+    def print_syntax_tree(self):
+        for t in self.sentence:
+            if t.dep_== 'ROOT':
+                tree = self.to_nltk_tree(t)
+                if isinstance(tree, Tree):
+                    tree.pretty_print(stream=self)
+
+    def get_dependent_obj(self, tok, verb_path):
+        '''
+        given a token find related objects for the sape chain of verbs (verb_path
+        :param tok: 
+        :param verb_path: 
+        :return: 
+        '''
+        all_descendants = []
+        if tok.dep_ in OBJECTS and (self.get_verb_path_from_ancestors(tok) == verb_path):
+            all_descendants.append(tok)
+        for i in tok.subtree:
+            all_descendants.extend(list(self.traverse_obj_children(i, verb_path)))
+        descendants = list(set(all_descendants))
+        return_obj = [i for i in descendants]
+        return return_obj
+
+    def print_syntax_list(self):
+        output = [''
+                  ]
+        output.append(' | '.join(('i', 'text','pos', 'dep', 'head')))
+        for k, t in enumerate(self.sentence):
+            output.append(' | '.join((str(t.i), '"'+t.text+'"', t.pos_, t.dep_, t.head.text)))
+        self.logger.debug('\n'.join(output))
+
+
+    def collapse_noun_phrases_by_punctation(self):
+        '''
+        this collapse needs tobe used on a single sentence, otherwise it will ocncatenate different sentences
+        :param sentence: 
+        :return: 
+        '''
+        prev_span = ''
+        for token in self.sentence:
+            try:
+                next_token = None
+                if token.nbor(1).pos is PUNCT and token.whitespace_ == u'':
+                    next_token = token.nbor(2)
+                # elif token.pos is PUNCT :
+                #     next_token = token.nbor(1)
+                if next_token and next_token.pos in [NOUN ,PROPN, ADJ]:
+                    span = Span(self.doc, token.i, next_token.i + 1)
+                    prev_span = span.text
+                    yield span
+            except IndexError: #skip end of sentence
+                pass
+
+
+    def collapse_noun_phrases_by_syntax(self):
+        for token in self.sentence:
+            if token.pos in [NOUN ,PROPN]:
+                extended = self.get_extended_token(token)
+                if extended.text != token.text:
+                    yield extended
+                siblings = list(token.head.children)
+                last_sibling = token
+                for sibling in siblings:
+                    if sibling.i > token.i and sibling.dep == token.dep:
+                        last_sibling = sibling
+                if last_sibling != token:
+                    span = Span(self.doc, token.i, last_sibling.i + 1)
+                    yield span
+
+
+    def analyse(self):
+        '''extract concepts'''
+
+        '''collapse noun phrases separated just with punctation'''
+        noun_phrases = list(self.collapse_noun_phrases_by_punctation())
+        for np in noun_phrases:
+            np.merge()
+        '''collapse noun phrases based on syntax tree'''
+        noun_phrases = list(self.collapse_noun_phrases_by_syntax())
+        for np in noun_phrases:
+            np.merge()
+        self.print_syntax_list()
+        self.print_syntax_tree()
+
+
+        self.concepts = []
+        noun_phrases = []
+        verbs = [tok for tok in self.sentence if tok.pos == VERB and tok.dep not in (aux, auxpass)]
+        for v in verbs:
+            verb_text, verb_path, subjects = self.get_extended_verb(v)
+            rights = list([i for i in v.rights if i.pos != VERB])
+            # print v, subjects, rights
+            for subject in subjects:
+                for any_subject in self.get_alternative_subjects(subject):
+                    noun_phrases.append(any_subject)
+                    for r in rights:
+                        dependend_objects = self.get_dependent_obj(r, verb_path)
+                        for do in dependend_objects:
+                            noun_phrases.append(do)
+                            self.concepts.append(dict(
+                                                    subject=any_subject.text,
+                                                    object=do.text,
+                                                    verb=verb_text,
+                                                    verb_path = verb_path,
+                                                    verb_subtree = self.doc[v.left_edge.i : v.right_edge.i + 1].text,
+                                                    subj_ver= '%s -> %s' %(any_subject.text, verb_text),
+                                                    ver_obj =  '%s -> %s' %(verb_text, do.text),
+                                                    concept= '%s -> %s -> %s'%(any_subject.text, verb_text, do.text),
+                                                    negated = self.isNegated(v) or self.isNegated(any_subject) or \
+                                                              self.isNegated(do)
+                            ))
+        self.noun_phrases=list(set(noun_phrases))
+        self.logger.info(self.noun_phrases)
+        for c in self.concepts:
+            self.logger.info(c['concept'])
+
+
+    def __str__(self):
+        return self.sentence.text
+
+    def write(self, message):
+        '''needed to print nltk graph to logging'''
+        if message != '\n':
+            self.logger.debug(message)
 
