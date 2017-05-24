@@ -45,10 +45,6 @@ class Config():
         ELASTICSEARCH_URL = 'http://' + ELASTICSEARCH_HOST
         if ELASTICSEARCH_PORT:
             ELASTICSEARCH_URL= ELASTICSEARCH_URL+':'+ELASTICSEARCH_PORT+'/'
-    except ConfigParser.NoOptionError:
-        ELASTICSEARCH_HOST = None
-        ELASTICSEARCH_PORT = None
-        ELASTICSEARCH_URL = None
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
