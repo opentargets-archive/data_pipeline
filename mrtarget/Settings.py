@@ -59,11 +59,9 @@ def file_to_list(filename):
         return f.read().splitlines()
 
 
-# loading the ES db ini configuration file
+# loading all ini files into the same configuration
 ini = ini_from_file_or_resource('db.ini', 'ini.ini',
                                 'es_custom_idxs.ini')
-
-# ini = ini_from_file_or_resource('ini.ini')
 
 
 def read_option(option, cast=None, ini=ini, section='dev',
