@@ -32,6 +32,12 @@ logging.config.fileConfig(file_or_resource('logging.ini'),
                           disable_existing_loggers=False)
 
 
+def load_nlp_corpora():
+    '''load here all the corpora needed by nlp steps'''
+    import nltk
+    nltk.download([ 'punkt', 'averaged_perceptron_tagger']) #'brown' corpora might be needed
+
+
 def main():
     logger = logging.getLogger(__name__)
 
@@ -144,7 +150,7 @@ def main():
 
     logger.info('Attempting to establish connection to the backend...')
     db_connected = connectors.init_services_connections(redispersist=args.redispersist)
-    
+
     if not db_connected and not args.dry_run:
         msg = 'No connection to the backend could be established. Exiting since this is not a dry run'
         logger.info(msg)
@@ -152,6 +158,9 @@ def main():
 
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
+
+    if args.inject_literature or args.lit:
+        load_nlp_corpora()
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
