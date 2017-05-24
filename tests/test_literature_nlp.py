@@ -1,6 +1,11 @@
+#!/usr/local/bin/python
+# encoding: UTF-8
+import os
 import unittest
+import spacy
 
-from mrtarget.modules.LiteratureNLP import PublicationFetcher,PublicationAnalyserSpacy, LiteratureNLPProcess
+from mrtarget.modules.LiteratureNLP import PublicationFetcher, PublicationAnalysisSpacy, LiteratureNLPProcess, \
+    SentenceAnalysisSpacy, DocumentAnalysisSpacy, create_tokenizer
 from run import PipelineConnectors
 
 import logging
@@ -23,7 +28,7 @@ class LiteratureNLPTestCase(unittest.TestCase):
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                             level=logging.INFO)
 
-        analyser = PublicationAnalyserSpacy(None)
+        analyser = PublicationAnalysisSpacy(None)
         pmid = '19204725'
         text = 'Chromosome 8p as a potential hub for developmental neuropsychiatric disorders: ' \
                'implications for schizophrenia, autism and cancer. ' \
@@ -88,6 +93,225 @@ class LiteratureNLPTestCase(unittest.TestCase):
         self.assertIn('17q12-q21.3', lemmas)
         self.assertIn('muscular dystrophies', noun_chunks)
         # self.assertIn('E3-ubiquitin ligase', noun_chunks)# failing
+
+
+
+
+class SpacySentenceNLPTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
+
+    def _concept_exists(self,
+                        subject,
+                        verb,
+                        object,
+                        concept_list,
+                        ignore_case = False):
+
+        for c in concept_list:
+            if ignore_case:
+                if c['subject'].lower() == subject.lower() and \
+                    c['verb'].lower() == verb.lower()  and \
+                    c['object'].lower() == object.lower():
+                    return True
+            else:
+                if c['subject'] == subject and \
+                    c['verb'] == verb and \
+                    c['object'] == object:
+                    return True
+        return False
+
+    def test_doc(self):
+        text =  u'Asthma is a chronic disease characterized by airway inflammation, obstruction and hyperresponsiveness.'
+
+        doc = self.nlp(text)
+        sentence =  SentenceAnalysisSpacy(doc)
+        sentence.analyse()
+        self.assertTrue(self._concept_exists(subject=u'Asthma',
+                                             verb=u'to be',
+                                             object=u'chronic disease',
+                                             concept_list=sentence.concepts))
+
+    def test_span(self):
+        text = u'Asthma is a chronic disease characterized by airway inflammation, obstruction and hyperresponsiveness. ' \
+               u'Severe asthma affects a small proportion of subjects but results in most of the morbidity, costs and mortality ' \
+               u'associated with the disease.'
+
+        doc = self.nlp(text)
+        for span in doc.sents:
+            sentence = SentenceAnalysisSpacy(span)
+            sentence.analyse()
+            self.assertTrue(self._concept_exists(subject=u'Asthma',
+                                                 verb=u'to be',
+                                                 object=u'chronic disease',
+                                                 concept_list=sentence.concepts))
+            break
+
+    def test_asthma(self):
+        text =  u'Asthma is a chronic disease characterized by airway inflammation, obstruction and hyperresponsiveness.'
+        expected_noun_phrases = set(['chronic disease', 'airway inflammation, obstruction', 'Asthma', 'hyperresponsiveness'])
+
+        sentence = SentenceAnalysisSpacy(text, self.nlp)
+        sentence.analyse()
+        noun_phrases = set([i.text for i in sentence.noun_phrases])
+
+        self.assertTrue(self._concept_exists(subject=u'Asthma',
+                                             verb=u'to be',
+                                             object=u'chronic disease',
+                                             concept_list=sentence.concepts))
+        self.assertTrue(self._concept_exists(subject=u'Asthma',
+                                             verb=u'to be characterized by',
+                                             object=u'hyperresponsiveness',
+                                             concept_list=sentence.concepts))
+        self.assertTrue(self._concept_exists(subject=u'Asthma',
+                                             verb=u'to be characterized by',
+                                             object=u'airway inflammation, obstruction',
+                                             concept_list=sentence.concepts))
+
+        self.assertEqual(noun_phrases, expected_noun_phrases)
+
+    def test_serum_level(self):
+        '''test verb descriptor to be collected'''
+        text =  u'The serum levels of CA125, CA15.3, and HE4 were significantly higher in the TTF-1-positive group than in the TTF-1-negative group (p<0.05).'
+        expected_noun_phrases = set(['TTF-1-negative group', 'serum levels', 'TTF-1-positive group'])
+        sentence = SentenceAnalysisSpacy(text, self.nlp)
+        sentence.analyse()
+        noun_phrases = set([i.text for i in sentence.noun_phrases])
+        self.assertEqual(noun_phrases, expected_noun_phrases)
+        self.assertTrue(self._concept_exists(subject=u'serum levels',
+                                             verb=u'to be higher',
+                                             object=u'TTF-1-positive group',
+                                             concept_list=sentence.concepts))
+        self.assertTrue(self._concept_exists(subject=u'serum levels',
+                                             verb=u'to be higher than',
+                                             object=u'TTF-1-negative group',
+                                             concept_list=sentence.concepts))
+
+    def test_hyphen_token(self):
+        text =  u'Here we report that the Polo-like kinase PLK1, an essential mitotic kinase regulator, is an important downstream effector of c-ABL in regulating the growth of cervical cancer.'
+
+        sentence = SentenceAnalysisSpacy(text, self.nlp)
+        sentence.analyse()
+        noun_phrases = set([i.text for i in sentence.noun_phrases])
+        self.assertIn(u'Polo-like kinase PLK1', noun_phrases)
+        self.assertIn(u'c-ABL', noun_phrases)
+
+        self.assertTrue(self._concept_exists(subject=u'Polo-like kinase PLK1',
+                                             verb=u'to report is',
+                                             object=u'important downstream effector of cABL',
+                                             concept_list=sentence.concepts)
+                                             )
+
+        self.assertTrue(self._concept_exists(subject=u'Polo-like kinase PLK1',
+                                             verb=u'to report regulating',
+                                             object=u'cervical cancer',
+                                             concept_list=sentence.concepts)
+                        )
+        self.assertTrue(self._concept_exists(subject=u'Polo-like kinase PLK1',
+                                             verb=u'to report regulating',
+                                             object=u'growt',
+                                             concept_list=sentence.concepts)
+                        )
+
+    def test_Schistosoma(self):
+        text =  u'Studies have suggested that Schistosoma mansoni infection reduces the severity of asthma and prevent atopy.'
+
+        sentence = SentenceAnalysisSpacy(text, self.nlp)
+        sentence.analyse()
+        noun_phrases = set([i.text for i in sentence.noun_phrases])
+        self.assertIn(u'Schistosoma mansoni infection', noun_phrases)
+
+        self.assertTrue(self._concept_exists(subject=u'Schistosoma mansoni infection',
+                                             verb=u'to suggest reduces',
+                                             object=u'asthma',
+                                             concept_list=sentence.concepts)
+                                             )
+
+        self.assertTrue(self._concept_exists(subject=u'Schistosoma mansoni infection',
+                                             verb=u'to suggest prevent',
+                                             object=u'atopy',
+                                             concept_list=sentence.concepts)
+                        )
+
+    def test_Fanconi(self):
+        text =  u'Fanconi anemia (FA) is a genetic disease characterized by bone marrow failure and increased cancer risk.'
+        expected_noun_phrases = set(['bone marrow failure', 'Fanconi anemia', 'cancer risk', 'genetic disease',])
+        sentence = SentenceAnalysisSpacy(text, self.nlp)
+        self.assertIn(u'FA', sentence.abbreviations)
+        self.assertEqual(u'Fanconi anemia', sentence.abbreviations[u'FA'])
+        sentence.analyse()
+        noun_phrases = set([i.text for i in sentence.noun_phrases])
+        self.assertEqual(noun_phrases, expected_noun_phrases)
+
+        self.assertTrue(self._concept_exists(subject=u'Fanconi anemia',
+                                             verb=u'to be characterized by',
+                                             object=u'cancer risk',
+                                             concept_list=sentence.concepts)
+                        )
+        self.assertTrue(self._concept_exists(subject=u'genetic disease',
+                                             verb=u'to be characterized by',
+                                             object=u'cancer risk',
+                                             concept_list=sentence.concepts)
+                        )
+
+        self.assertTrue(self._concept_exists(subject=u'Fanconi anemia',
+                                             verb=u'to be characterized by',
+                                             object=u'bone marrow failure',
+                                             concept_list=sentence.concepts)
+                                             )
+        self.assertTrue(self._concept_exists(subject=u'genetic disease',
+                                             verb=u'to be characterized by',
+                                             object=u'bone marrow failure',
+                                             concept_list=sentence.concepts)
+                        )
+    def alpha_syn(self):
+        text =  u'Deubiquitinase Usp8 regulates α-synuclein clearance and modifies its toxicity in Lewy body disease.'
+        expected_noun_phrases = set(['Usp8', 'Lewy body disease', 'alpha-synuclein clearance', 'toxicity'])
+        sentence = SentenceAnalysisSpacy(text, self.nlp)
+        sentence.analyse()
+        noun_phrases = set([i.text for i in sentence.noun_phrases])
+        self.assertEqual(noun_phrases, expected_noun_phrases)
+
+        self.assertTrue(self._concept_exists(subject=u'Usp8',
+                                             verb=u'to regulate',
+                                             object=u'alpha-synuclein clearance',
+                                             concept_list=sentence.concepts)
+                        )
+        self.assertTrue(self._concept_exists(subject=u'Usp8',
+                                             verb=u'to regulate modifies',
+                                             object=u'Lewy body disease',
+                                             concept_list=sentence.concepts)
+                        )
+        self.assertTrue(self._concept_exists(subject=u'Usp8',
+                                             verb=u'to regulate modifies',
+                                             object=u'toxicity',
+                                             concept_list=sentence.concepts)
+                        )
+
+
+
+
+class SpacyDocumentNLPTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
+
+
+    def test_analyse_all_abstracts(self):
+        file_path = 'resources/test_abstract_nlp.txt'
+        filedir = os.path.dirname(__file__)
+        for abstract in file(os.path.join(filedir, file_path)):
+            print abstract.strip()
+            parsed_abstract = DocumentAnalysisSpacy(u''+abstract, nlp = self.nlp)
+            parsed_abstract.digest()
+            # print parsed_abstract.noun_phrase_counter
+            print 'Top Noun Phrases:',len(parsed_abstract.noun_phrases_top), parsed_abstract.noun_phrases_top
+            print 'Noun Phrases:',len(parsed_abstract.noun_phrases)
+            print 'Concepts:',len(parsed_abstract.concepts)
+            self.assertLess(len(parsed_abstract.noun_phrases_top), len(parsed_abstract.noun_phrases))
 
 
 

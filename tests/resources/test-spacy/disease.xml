@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<InputData>
+<Cluster clsId="C0001940" semType="umlsD">
+<Entry entryId="C0001940_6" baseForm="alcohol induced korsakoff syndrome" type="Mental or Behavioral Dysfunction" mlfreq="1">
+	<SourceDC sourceName="umlsD" sourceId="UMLSDisease:C0001940"/>
+	<PosDC posName="POS" pos="N"/>
+	<Variant writtenForm="alcohol-induced Korsakoff syndrome" type="orth1" mlfreq="1"/>
+<DC att="umls_cui" val="C0001940"/>
+</Entry>
+<Entry entryId="C0001940_9" baseForm="alcoholic korsakoff syndrome" type="Mental or Behavioral Dysfunction" mlfreq="34">
+	<SourceDC sourceName="umlsD" sourceId="UMLSDisease:C0001940"/>
+	<PosDC posName="POS" pos="N"/>
+	<Variant writtenForm="Alcoholic Korsakoff syndrome" type="orth1" mlfreq="2"/>
+	<Variant writtenForm="alcoholic Korsakoff syndrome" type="orth1" mlfreq="30"/>
+	<Variant writtenForm="Alcoholic Korsakoff Syndrome" type="orth1" mlfreq="2"/>
+<DC att="umls_cui" val="C0001940"/>
+</Entry>
+<Entry entryId="C0001940_14" baseForm="alcohol induced persisting amnestic disorder" type="Mental or Behavioral Dysfunction" mlfreq="2">
+	<SourceDC sourceName="umlsD" sourceId="UMLSDisease:C0001940"/>
+	<PosDC posName="POS" pos="N"/>
+	<Variant writtenForm="alcohol-induced persisting amnestic disorder" type="orth1" mlfreq="2"/>
+<DC att="umls_cui" val="C0001940"/>
+</Entry>
+<Entry entryId="C0001940_23" baseForm="alcohol amnestic disorder" type="Mental or Behavioral Dysfunction" mlfreq="19">
+	<SourceDC sourceName="umlsD" sourceId="UMLSDisease:C0001940"/>
+	<PosDC posName="POS" pos="N"/>
+	<Variant writtenForm="Alcohol Amnestic Disorder" type="orth1" mlfreq="1"/>
+	<Variant writtenForm="alcohol amnestic disorder" type="orth1" mlfreq="16"/>
+	<Variant writtenForm="Alcohol amnestic disorder" type="orth1" mlfreq="2"/>
+<DC att="umls_cui" val="C0001940"/>
+</Entry>
+<Entry entryId="C0001940_25" baseForm="alcohol induced amnestic syndrome" type="Mental or Behavioral Dysfunction" mlfreq="1">
+	<SourceDC sourceName="umlsD" sourceId="UMLSDisease:C0001940"/>
+	<PosDC posName="POS" pos="N"/>
+	<Variant writtenForm="alcohol-induced amnestic syndrome" type="orth1" mlfreq="1"/>
+<DC att="umls_cui" val="C0001940"/>
+</Entry>
+<Entry entryId="C0001940_37" baseForm="alcohol amnestic syndrome" type="Mental or Behavioral Dysfunction" mlfreq="2">
+	<SourceDC sourceName="umlsD" sourceId="UMLSDisease:C0001940"/>
+	<PosDC posName="POS" pos="N"/>
+	<Variant writtenForm="Alcohol amnestic syndrome" type="orth1" mlfreq="2"/>
+<DC att="umls_cui" val="C0001940"/>
+</Entry>
+</Cluster>
+</InputData>

@@ -1014,6 +1014,61 @@ class ElasticSearchConfiguration():
         }
     }
 
+    literature_ent_mapping = {
+        "settings": {
+            "number_of_shards": publication_shard_number,
+            "number_of_replicas": publication_replicas_number,
+            "refresh_interval": "1s",
+        },
+        "mappings": {
+            Config.ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME: {
+                "properties": {
+
+
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "label": {
+                                    "type": "string",
+                                    "index": "not_analyzed"
+                                },
+                                "ent_type": {
+                                    "type": "string",
+                                    "index": "not_analyzed"
+                                },
+                                "label": {
+                                    "type": "string",
+                                    "index": "not_analyzed"
+                                },
+                                "matched_word": {
+                                    "type": "string",
+                                    "index": "not_analyzed"
+                                },
+                                "start_pos": {
+                                    "type": "integer"
+
+                                },
+                                "end_pos": {
+                                    "type": "integer"
+
+                                },
+                                "doc_id": {
+                                    "type": "integer"
+
+                                }
+
+                            }
+
+
+
+
+                }
+            }
+
+
+    }
+
+
     INDEX_MAPPPINGS = {Config.ELASTICSEARCH_DATA_INDEX_NAME: evidence_data_mapping,
                        Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME: association_data_mapping,
                        Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME: efo_data_mapping,
@@ -1026,4 +1081,5 @@ class ElasticSearchConfiguration():
                        Config.ELASTICSEARCH_UNIPROT_INDEX_NAME: uniprot_data_mapping,
                        Config.ELASTICSEARCH_RELATION_INDEX_NAME: relation_data_mapping,
                        Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME: publication_data_mapping,
+                       Config.ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME: literature_ent_mapping,
                        }
