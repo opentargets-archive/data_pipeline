@@ -1,6 +1,5 @@
-import json
+import simplejson as json
 from UserDict import UserDict
-from json import JSONEncoder
 
 from datetime import datetime, date
 
@@ -8,13 +7,14 @@ from mrtarget.Settings import Config
 
 
 
-class PipelineEncoder(JSONEncoder):
+class PipelineEncoder(json.JSONEncoder):
     def default(self, o):
         try:
             return o.to_json()
         except AttributeError:
             pass
-        return o.__dict__
+        return {key: o.__dict__[key] for key in o.__dict__ if not key.startswith('_')} # remove private properties
+
 
 def json_serialize(obj):
     if isinstance(obj, datetime):

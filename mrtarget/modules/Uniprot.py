@@ -8,8 +8,7 @@ from mrtarget.common.UniprotIO import UniprotIterator, Parser
 from requests.exceptions import Timeout, HTTPError, ConnectionError
 import jsonpickle
 
-from mrtarget.Settings import Config
-
+from mrtarget.Settings import Config, build_uniprot_query
 
 
 def sanitise_dict_for_json(d):
@@ -104,7 +103,7 @@ class UniprotDownloader():
                  format="xml",
                  chunk_size=1000,
                  timeout=300,):
-        self.query = query
+        self.query = build_uniprot_query(Config.MINIMAL_ENSEMBL) if Config.MINIMAL else query
         self.format = "&format=" + format
         self.url = "http://www.uniprot.org/uniprot/?query="
         self.chunk_size = chunk_size
@@ -122,7 +121,6 @@ class UniprotDownloader():
         while data.content:
             for xml in self._iterate_xml(StringIO(data.content)):
                 seqrec = Parser(xml, return_raw_comments=True).parse()
-                print seqrec
                 '''sanitise for json'''
                 # seqrec.annotations = sanitise_dict_for_json(seqrec.annotations)
                     # if '.' in k:
