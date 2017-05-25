@@ -48,7 +48,7 @@ from lxml import etree
 from spacy.attrs import ORTH, TAG, LEMMA
 from spacy.matcher import Matcher
 from spacy.tokenizer import Tokenizer
-from spacy.language_data import TOKENIZER_INFIXES
+from spacy.language_data import TOKENIZER_INFIXES, TOKENIZER_PREFIXES, TOKENIZER_SUFFIXES
 import spacy.util
 
 # List of symbols we don't care about
@@ -767,9 +767,25 @@ def load_entity_matches(self, loader, nlp, doc):
 
 
 def create_tokenizer(nlp):
-    infix_re = spacy.util.compile_infix_regex(tuple(TOKENIZER_INFIXES + ['/', ',']))
+    infix_re = spacy.util.compile_infix_regex(TOKENIZER_INFIXES + [#u'\w*[,-.–_—:;\(\)\[\]\{\}/]{1,3}\S\w*',
+                                                                    # r'\w*[,\-.\-_:;\(\)\[\]\{\}\/]{1,3}\S\w*',
+        r'\w*\S[,.-_:;\(\)\[\]\{\}/]\S*\w',
+        r'\w*\S-\S*\w',
+        u'\w*\S–\S*\w',
+        u'\w*\S—\S*\w',
+                                                                    # u'\w*[,-.–_—:;\(\)\[\]\{\}/]{1,3}\S\w*'
+    ])
+    #TODO: prefix and suffix raise TypeError: '_regex.Pattern' object is not callable
+    # prefix_boundaries_to_keep = [r'\(', r'\[',  r'\{', r'<']
+    # suffix_boundaries_to_keep = [ r'\)', r'\]', r'\}',  r'>']
+    # prefixe_re = spacy.util.compile_prefix_regex([i for i in TOKENIZER_PREFIXES if i not in prefix_boundaries_to_keep])
+    # suffixe_re = spacy.util.compile_suffix_regex([i for i in TOKENIZER_SUFFIXES if i not in suffix_boundaries_to_keep])
+
+    # return Tokenizer(nlp.vocab, {}, prefixe_re.search, suffixe_re.search,
+    #                  infix_re.finditer)
     return Tokenizer(nlp.vocab, {}, nlp.tokenizer.prefix_search, nlp.tokenizer.suffix_search,
                      infix_re.finditer)
+
 
 class NLPManager(object):
     def __init__(self, nlp=None):
@@ -861,9 +877,10 @@ class DocumentAnalysisSpacy(object):
         if stopwords is None:
             self.stopwords  = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS))
 
+        if nlp is None:
+            nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
         self.nlp = nlp
-        if self.nlp is None:
-            self.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
+
 
         if isinstance(document, Doc):
             self.doc = document
@@ -944,7 +961,7 @@ class SentenceAnalysisSpacy(object):
             self.doc = self.sentence
         else:
             raise AttributeError('sentence needs to be unicode or Doc or Span not %s'%sentence.__class__)
-
+        self.logger.debug(u'Sentence to analyse: '+self.sentence.text)
 
 
 
@@ -1020,19 +1037,28 @@ class SentenceAnalysisSpacy(object):
         :return: 
         '''
         allowed_pos = [NOUN, ADJ, PUNCT, PROPN]
-        allowed_dep = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "dobj",  "attr", "oprd", "pobj", "conj",
-                       "compound", "amod", "punct", "meta", "npadvmod", "nmod"]#, add "prep" to extend for "of and "in"
+        allowed_dep = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "dobj",  "attr", "oprd", "pobj",# "conj",
+                       "compound", "amod", "meta", "npadvmod", "nmod", "amod"]#, add "prep" to extend for "of and "in"
         extended_tokens = [i for i in tok.subtree if (i.dep_ in allowed_dep and i in tok.children) or (i == tok)]
-        allowed_continous_tokens = []
-        #break the extened token if something not allowed is between the selected tokens in the subtree
-        curr_pos = extended_tokens[0].i -1
-        for ex_t in extended_tokens:
-            if ex_t.i == curr_pos+1:
-                curr_pos = ex_t.i
-                allowed_continous_tokens.append(ex_t)
-            else:
-                break
-        span= Span(self.doc, allowed_continous_tokens[0].i, allowed_continous_tokens[-1].i+1)
+        # just get continous tokens
+        span_range = [tok.i, tok.i]
+        ext_tokens_i = [i.i for i in extended_tokens]
+        max_bound = max(ext_tokens_i)
+        min_bound = min(ext_tokens_i)
+        curr_pos = tok.i
+        for cursor in range(tok.i, max_bound+1):
+            if cursor in ext_tokens_i:
+                if cursor == curr_pos + 1:
+                    span_range[1] = cursor
+                    curr_pos = cursor
+
+        curr_pos = tok.i
+        for cursor in range(tok.i, min_bound-1, -1):
+            if cursor in ext_tokens_i:
+                if cursor == curr_pos - 1:
+                    span_range[0] = cursor
+                    curr_pos = cursor
+        span= Span(self.doc, span_range[0], span_range[1]+1)
         return span
 
 
@@ -1121,28 +1147,29 @@ class SentenceAnalysisSpacy(object):
 
 
     def collapse_noun_phrases_by_syntax(self):
+        allowed_conjunction_dep = [prep]
         for token in self.sentence:
             if token.pos in [NOUN ,PROPN]:
                 extended = self.get_extended_token(token)
                 if extended.text != token.text:
                     yield extended
                 siblings = list(token.head.children)
-                last_sibling = token
+                span_range = [token.i, token.i]
                 for sibling in siblings:
-                    if sibling.i > token.i and sibling.dep == token.dep:
-                        last_sibling = sibling
-                if last_sibling != token:
-                    span = Span(self.doc, token.i, last_sibling.i + 1)
+                    if sibling.dep == token.dep:# or sibling.dep in allowed_conjunction_dep:
+                        if sibling.i > token.i:
+                            span_range[1]= sibling.i
+                        elif sibling.i < token.i:
+                            span_range[0] = sibling.i
+
+                if span_range != [token.i, token.i]:
+                    span = Span(self.doc, span_range[0], span_range[1] + 1)
                     yield span
 
 
     def analyse(self):
         '''extract concepts'''
 
-        '''collapse noun phrases separated just with punctation'''
-        noun_phrases = list(self.collapse_noun_phrases_by_punctation())
-        for np in noun_phrases:
-            np.merge()
         '''collapse noun phrases based on syntax tree'''
         noun_phrases = list(self.collapse_noun_phrases_by_syntax())
         for np in noun_phrases:
