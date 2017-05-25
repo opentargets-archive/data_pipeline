@@ -957,7 +957,11 @@ class EvidenceProcesser(multiprocessing.Process):
         self.start_time = time.time()  # reset timer start
         self.lock = lock
         self.inject_literature = inject_literature
-        es = Elasticsearch(Config.ELASTICSEARCH_NODES)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
+        # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
         self.pub_fetcher = PublicationFetcher(es)
 
     def run(self):
@@ -1034,7 +1038,11 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.processing_finished = processing_finished
         self.output_generated_count = output_generated_count
         self.total_loaded = submitted_to_storage
-        self.es = Elasticsearch(Config.ELASTICSEARCH_NODES)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
+        self.es = es
         self.lock = lock
         self.dry_run = dry_run
 

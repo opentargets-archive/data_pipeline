@@ -502,7 +502,11 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         super(ScoreStorerWorker, self).__init__(score_q, r_path)
         self.q = score_q
         self.chunk_size = chunk_size
-        self.es = Elasticsearch(Config.ELASTICSEARCH_NODES)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
+        self.es = es
         self.loader = Loader(self.es,
                              chunk_size=self.chunk_size,
                              dry_run=dry_run)
