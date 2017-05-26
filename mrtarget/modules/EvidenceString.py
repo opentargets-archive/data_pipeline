@@ -942,6 +942,7 @@ class EvidenceProcesser(multiprocessing.Process):
                  processing_errors_count,
                  input_processed_count,
                  lock,
+                 es=None,
                  inject_literature):
         super(EvidenceProcesser, self).__init__()
         self.input_q = input_q
@@ -1029,7 +1030,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
                  output_generated_count,
                  lock,
                  chunk_size=1e4,
-                 dry_run=False
+                 dry_run=False,
+                 es=None
                  ):
         super(EvidenceStorerWorker, self).__init__()
         self.q = processing_output_q

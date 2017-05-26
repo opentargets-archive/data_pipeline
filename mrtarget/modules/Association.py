@@ -497,7 +497,8 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
                  score_q,
                  r_path,
                  chunk_size = 1e4,
-                 dry_run = False
+                 dry_run = False,
+                 es = None
                  ):
         super(ScoreStorerWorker, self).__init__(score_q, r_path)
         self.q = score_q
