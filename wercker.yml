@@ -1,4 +1,7 @@
-box: quay.io/opentargets/mrtarget_base
+box:
+  id: quay.ioquay.io/opentargets/mrtarget_base
+  tag: latest
+  registry: quay.io
 #services:
 #  - elasticsearch:2.4
 build:
