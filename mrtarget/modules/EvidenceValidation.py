@@ -369,10 +369,10 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
         return
 
-    def _count_file_lines(self, f):
-        for i,line in enumerate(f.readlines()):
-            pass
-        return i+1
+    @staticmethod
+    def _count_file_lines(file_handle):
+        '''return the number of lines in a text file including empty ones'''
+        return sum(1 for el in file_handle)
 
     def _estimate_file_lines(self, fh, file_size, max_lines = 50000):
         lines = 0
