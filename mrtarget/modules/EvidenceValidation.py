@@ -117,7 +117,7 @@ class FileProcesser():
         self.loader = Loader(dry_run = dry_run)
         self.start_time = time.time()
         self.r_server = r_server
-        self._remote_filenames =dict()
+        self._remote_filenames = {}
         self.local_files = local_files
         self.remote_files = remote_files
         self.logger = logging.getLogger(__name__)
@@ -250,17 +250,12 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
 
         self.logger.info('Starting to parse  file %s' % file_path)
-        ''' parse the file and put evidence in the queue '''
+        # parse the file and put evidence in the queue
         self.parse_file(file_path, file_version, provider_id, data_source_name, md5_hash,
                         logfile=logfile, file_type= file_type)
         self.logger.info("%s finished" % self.name)
 
-
-
     def parse_file(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None, file_type = FileTypes.LOCAL):
-
-
-
         self.logger.info('%s Starting parsing %s' % (self.name, file_path))
 
         line_buffer = []
@@ -273,7 +268,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             if file_type == FileTypes.LOCAL:
                 file_stat = os.stat(file_path)
                 file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
-                '''temprorary get lines total'''
+                # temprorary get lines total
                 lines = 0
                 with open(file_path, mode='rb') as f:
                     with io.BufferedReader(gzip.GzipFile(filename=file_path.split('/')[1],
