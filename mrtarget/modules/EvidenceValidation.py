@@ -23,7 +23,7 @@ from elasticsearch.exceptions import NotFoundError
 from requests.packages.urllib3.exceptions import HTTPError
 from tqdm import tqdm
 
-from mrtarget.common import Actions
+from mrtarget.common import Actions, url_to_stream
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
@@ -352,7 +352,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             if file_type == FileTypes.HTTP:
                 self.logger.debug('streaming into queue the file ' + file_path)
 
-                for i,line in enumerate(c.url_to_stream(file_path)):
+                for i,line in enumerate(url_to_stream(file_path)):
                     self.put_into_queue_out(
                         (file_path, file_version, provider_id, data_source_name, md5_hash, logfile,
                          i/EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
