@@ -942,8 +942,8 @@ class EvidenceProcesser(multiprocessing.Process):
                  processing_errors_count,
                  input_processed_count,
                  lock,
-                 es=None,
-                 inject_literature):
+                 inject_literature,
+                 es=None):
         super(EvidenceProcesser, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
