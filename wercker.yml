@@ -1,6 +1,8 @@
 box: python:2.7-onbuild
 services:
   - elasticsearch:2.4
+command-timeout: 60
+no-response-timeout: 10
 build:
   steps:
     - script:
