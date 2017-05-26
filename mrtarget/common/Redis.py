@@ -49,34 +49,39 @@ def millify(n):
         return str(n)
 
 class RedisQueue(object):
-    '''
-    A simple pickable FIFO queue based on a Redis backend.
+    '''A simple pickable FIFO queue based on a Redis backend.
 
-    Once the queue is initialised, add messages with the :func:`self.put` method.
-    If the maximum size of the queue is reached the queue will block until some elements are picked up from the queue.
-    Once the message submission is done, you can signal it to the queue with the :func:`self.submission_finished`
-    method.
-    Every pickable object is accepted and it will be stored as a pickled string in redis.
-    When a message is put in the queue a key is generated and put in self.main_queue.
-    The pickled string is stored in a different key with the pattern described by self.VALUE_STORE.
+    Once the queue is initialised, add messages with the :func:`self.put`
+    method. If the maximum size of the queue is reached the queue will block
+    until some elements are picked up from the queue. Once the message
+    submission is done, you can signal it to the queue with the
+    :func:`self.submission_finished` method. Every pickable object is accepted
+    and it will be stored as a pickled string in redis. When a message is put
+    in the queue a key is generated and put in self.main_queue. The pickled
+    string is stored in a different key with the pattern described by
+    self.VALUE_STORE.
 
-    Once a client request a message with the :func:`self.get` method a the message key is taken from self.main_queue and
-    put in the self.processing_queue with a timestamp.
-    If the client is able to process the message it should signal it with the :func:`self.done` method, eventually
-    flagging if there was a processing error.
+    Once a client request a message with the :func:`self.get` method a the
+    message key is taken from self.main_queue and put in the
+    self.processing_queue with a timestamp. If the client is able to process
+    the message it should signal it with the :func:`self.done` method,
+    eventually flagging if there was a processing error.
 
-    It is possible to detect jobs that were picked up but not completed in time with the :func:`self.get_timedout_jobs`
-    and resubmit them in the queue with the :func:`self.put_back_timedout_jobs` method.
+    It is possible to detect jobs that were picked up but not completed in time
+    with the :func:`self.get_timedout_jobs` and resubmit them in the queue with
+    the :func:`self.put_back_timedout_jobs` method.
 
 
-    Once done (completely or partially) the :func:`self.close` method must be called to clean up data stored in redis.
+    Once done (completely or partially) the :func:`self.close` method must be
+    called to clean up data stored in redis.
 
-    It is safe to pass the object to a worker if a redis server :param r_server: is not passed when the RedisQueue
-    Object is initialised.
-    In this case a :param r_server: (typically instantiated in the worker process) needs to be passed when calling
-    the methods.
+    It is safe to pass the object to a worker if a redis server :param
+    r_server: is not passed when the RedisQueue Object is initialised. In this
+    case a :param r_server: (typically instantiated in the worker process)
+    needs to be passed when calling the methods.
 
-    Given the job-process oriented design by default keys stored in redis will expire in 2 days
+    Given the job-process oriented design by default keys stored in redis will
+    expire in 2 days
 
     '''
 
