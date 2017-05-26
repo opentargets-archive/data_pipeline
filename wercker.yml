@@ -1,5 +1,5 @@
 box:
-  id: quay.ioquay.io/opentargets/mrtarget_base
+  id: quay.io/opentargets/mrtarget_base
   tag: latest
   registry: quay.io
 #services:
