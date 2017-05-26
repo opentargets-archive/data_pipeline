@@ -12,7 +12,8 @@ import ftputil as ftputil
 import requests
 from dateutil.parser import parse
 from lxml import etree,objectify
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -23,6 +24,7 @@ from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 
 logger = logging.getLogger(__name__)
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 MAX_PUBLICATION_CHUNKS =100
 
@@ -103,12 +105,12 @@ class PublicationFetcher(object):
             pub_ids = [pub_ids]
 
         '''get from elasticsearch cache'''
-        logging.debug( "getting pub id {}".format( pub_ids))
+        self.logger.debug( "getting pub id {}".format( pub_ids))
         pubs ={}
         try:
 
             for pub_source in self.es_query.get_publications_by_id(pub_ids):
-                logging.debug( 'got pub %s from cache'%pub_source['pub_id'])
+                self.logger.debug( 'got pub %s from cache'%pub_source['pub_id'])
                 pub = Publication()
                 pub.load_json(pub_source)
                 pubs[pub.pub_id] = pub
@@ -158,12 +160,12 @@ class PublicationFetcher(object):
             #     self.loader.flush()
         except Exception, error:
 
-            logging.error("Error in retrieving publication data for pmid {} ".format(pub_ids))
+            self.logger.error("Error in retrieving publication data for pmid {} ".format(pub_ids))
             pubs = None
             if error:
-                logging.info(str(error))
+                self.logger.info(str(error))
             else:
-                logging.info(Exception.message)
+                self.logger.info(Exception.message)
 
         return pubs
 
@@ -433,6 +435,7 @@ class MedlineRetriever(object):
         self.dry_run = dry_run
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
     def fetch(self,
               local_file_locn = [],
@@ -529,7 +532,8 @@ class MedlineRetriever(object):
         #filter for update files
         gzip_files = [i for i in files if i.endswith('.xml.gz')]
         for file_ in tqdm(gzip_files,
-                  desc='enqueuing remote files'):
+                  desc='enqueuing remote files',
+                  file=tqdm_out):
             if host.path.isfile(file_):
                 # Remote name, local name, binary mode
                 file_path = os.path.join(pubmed_xml_locn, file_)
@@ -547,12 +551,12 @@ class MedlineRetriever(object):
         for l in loaders:
                 l.join()
 
-        logging.info('flushing data to index')
+        self.logger.info('flushing data to index')
         if not self.dry_run:
             self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
                 wait_if_ongoing=True)
 
-        logging.info("DONE")
+        self.logger.info("DONE")
 
 
 
@@ -571,6 +575,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
         self.update = update
         self.es_query = ESQuery()
         if update:
@@ -594,7 +599,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 entries_in_file += 1
 
         if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE and not self.update:
-            logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
+            self.logger.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
 
     def fetch_file(self,file_path):
         if not os.path.isfile(file_path):
@@ -614,7 +619,8 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 t = tqdm(desc = 'downloading %s via HTTP' % os.path.basename(file_path),
                          total = file_size,
                          unit = 'B',
-                         unit_scale = True)
+                         unit_scale = True,
+                         file=tqdm_out)
                 for chunk in response.iter_content(chunk_size=128):
                     file_handler.write(chunk)
                     t.update(len(chunk))
@@ -884,7 +890,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                 pub,
                                 create_index=False)
             except KeyError as e:
-                logging.exception("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
+                self.logger.exception("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
                     pub.id,
                     pub.filename,
                     e.message))

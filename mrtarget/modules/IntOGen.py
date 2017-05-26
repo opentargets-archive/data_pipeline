@@ -126,6 +126,7 @@ class IntOGen():
         self.evidence_strings = list()
         self.ensembl_current = {}
         self.symbols = {}
+        self.logger = logging.getLogger(__name__)
 
     def load_Ensembl(self):
 
@@ -176,7 +177,7 @@ class IntOGen():
         )
         error = provenance_type.validate(logging)
         if error > 0:
-            logging.error(provenance_type.to_JSON(indentation=4))
+            self.logger.error(provenance_type.to_JSON(indentation=4))
             sys.exit(1)
 
         with open(filename, 'r') as intogen_file:
@@ -228,10 +229,10 @@ class IntOGen():
                         elif "ensembl_secondary_ids" in record:
                             ensembl_gene_id = record["ensembl_secondary_ids"][0]
                         else:
-                            logging.error("%s is in Ensembl but could not find it"%Symbol)
+                            self.logger.error("%s is in Ensembl but could not find it"%Symbol)
                             continue
                     else:
-                        logging.error("%s is not found in Ensembl" % Symbol)
+                        self.logger.error("%s is not found in Ensembl" % Symbol)
                         continue
 
                     evidenceString.target = bioentity.Target(
@@ -279,7 +280,7 @@ class IntOGen():
 
                     error = evidenceString.validate(logging)
                     if error > 0:
-                        logging.error(evidenceString.to_JSON())
+                        self.logger.error(evidenceString.to_JSON())
                         sys.exit(1)
 
                     self.evidence_strings.append(evidenceString)
@@ -302,8 +303,8 @@ class IntOGen():
                 if error == 0:
                     tp_file.write(evidence_string.to_JSON(indentation=None)+"\n")
                 else:
-                    logging.error("REPORTING ERROR %i" % n)
-                    logging.error(evidence_string.to_JSON(indentation=4))
+                    self.logger.error("REPORTING ERROR %i" % n)
+                    self.logger.error(evidence_string.to_JSON(indentation=4))
                     #sys.exit(1)
         tp_file.close()
 
