@@ -23,7 +23,7 @@ from elasticsearch.exceptions import NotFoundError
 from requests.packages.urllib3.exceptions import HTTPError
 from tqdm import tqdm
 
-from mrtarget.common import Actions
+from mrtarget.common import Actions, url_to_stream
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
@@ -356,7 +356,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             if file_type == FileTypes.HTTP:
                 self.logger.debug('streaming into queue the file ' + file_path)
 
-                for i,line in enumerate(c.url_to_stream(file_path)):
+                for i,line in enumerate(url_to_stream(file_path)):
                     self.put_into_queue_out(
                         (file_path, file_version, provider_id, data_source_name, md5_hash, logfile,
                          i/EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
@@ -373,10 +373,10 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
         return
 
-    def _count_file_lines(self, f):
-        for i,line in enumerate(f.readlines()):
-            pass
-        return i+1
+    @staticmethod
+    def _count_file_lines(file_handle):
+        '''return the number of lines in a text file including empty ones'''
+        return sum(1 for el in file_handle)
 
     def _estimate_file_lines(self, fh, file_size, max_lines = 50000):
         lines = 0
