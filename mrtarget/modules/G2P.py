@@ -19,6 +19,7 @@ class G2P():
 
     def __init__(self):
         self.evidence_strings = list()
+        self.logger = logging.getLogger(__name__)
 
     def read_file(self, source_file):
 
@@ -73,7 +74,7 @@ class G2P():
             obj.evidence.urls = [linkout]
             error = obj.validate(logging)
             if error > 0:
-                logging.error(obj.to_JSON())
+                self.logger.error(obj.to_JSON())
                 sys.exit(1)
             else:
                 self.evidence_strings.append(obj)
@@ -91,8 +92,8 @@ class G2P():
                 if error == 0:
                     tp_file.write(evidence_string.to_JSON(indentation=None) + "\n")
                 else:
-                    logging.error("REPORTING ERROR %i" % n)
-                    logging.error(evidence_string.to_JSON(indentation=4))
+                    self.logger.error("REPORTING ERROR %i" % n)
+                    self.logger.error(evidence_string.to_JSON(indentation=4))
                     # sys.exit(1)
         tp_file.close()
 

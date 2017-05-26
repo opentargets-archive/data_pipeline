@@ -21,7 +21,8 @@ import requests
 from elasticsearch import helpers
 from elasticsearch.exceptions import NotFoundError
 from requests.packages.urllib3.exceptions import HTTPError
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
@@ -246,6 +247,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         self.loader = Loader(self.es)
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
 
     def process(self, data):
@@ -307,6 +309,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                 t = tqdm(desc='downloading %s via HTTP' % file_version,
                          total=file_size,
                          unit='B',
+                         file=tqdm_out,
                          unit_scale=True)
                 for remote_file_chunk in response.iter_content(chunk_size=512):
                     file_handler.write(remote_file_chunk)
