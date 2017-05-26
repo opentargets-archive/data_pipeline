@@ -12,7 +12,8 @@ import scipy.sparse as sp
 from redislite import Redis
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable, RelationType
@@ -29,6 +30,7 @@ from mrtarget.Settings import Config
 
 
 logger = logging.getLogger(__name__)
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 
 class Relation(JSONSerializable):
@@ -475,7 +477,8 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
             buckets[i]=[]
         vector_hashes = {}
         for i in tqdm(range(len(subject_ids[:limit])),
-                      desc='hashing vectors'):
+                      desc='hashing vectors',
+                      file=tqdm_out):
             vector = transformed_data[i].toarray()[0]
             digested = self.digest_in_buckets(vector, buckets_number)
             for bucket in digested:
@@ -499,7 +502,8 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
         for w in pair_producers:
             w.start()
         for i in tqdm(range(len(subject_ids[:limit])),
-                      desc='getting neighbors'):
+                      desc='getting neighbors',
+                      file=tqdm_out):
             subject_analysis_queue.put(i, r_server=redis_path)
         subject_analysis_queue.set_submission_finished(r_server=redis_path)
 
@@ -554,7 +558,8 @@ class RelationHandlerProduceAll(RelationHandler):
         data_vector = vectorizer.fit_transform([subject_data[i] for i in subject_ids])
         limit = -1
         for i in tqdm(range(len(subject_ids[:limit])),
-                      desc='producing all pairs'):
+                      desc='producing all pairs',
+                      file=tqdm_out):
             for j in range(len(subject_ids[:limit])):
                 if i>j:
                     yield (i, data_vector[i],  j, data_vector[j])

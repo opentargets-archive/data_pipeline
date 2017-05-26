@@ -15,6 +15,8 @@ import psutil
 
 np.seterr(divide='warn', invalid='warn')
 from tqdm import tqdm
+from mrtarget.common import TqdmToLogger
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -26,7 +28,7 @@ from mrtarget.Settings import Config
 from colorama import Fore, Back, Style
 
 logger = logging.getLogger(__name__)
-
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 import signal
 
@@ -396,12 +398,14 @@ class RedisQueueStatusReporter(Process):
             self.bars[q.queue_id] = dict(
                                          submitted_counter=tqdm(desc='%s received jobs [batch size: %i]'%(queue_id,q.batch_size),
                                                                 unit=' jobs',
+                                                                file=tqdm_out,
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
                                                                 # position=queue_position+0,
                                                                 ),
                                          processed_counter=tqdm(desc='%s processed jobs [batch size: %i]'%(queue_id,q.batch_size),
                                                                 unit=' jobs',
+                                                                file=tqdm_out,
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
                                                                 # position=queue_position+1,

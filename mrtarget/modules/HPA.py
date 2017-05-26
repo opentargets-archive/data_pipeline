@@ -4,7 +4,8 @@ import logging
 import functools as ft
 from StringIO import StringIO
 from zipfile import ZipFile
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 import requests
 import petl
@@ -322,6 +323,8 @@ class HPALookUpTable(object):
         self.r_server = r_server
         if r_server is not None:
             self._load_hpa_data(r_server)
+        self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
     def _load_hpa_data(self, r_server=None):
         for el in tqdm(self._es_query.get_all_hpa(),
@@ -329,6 +332,7 @@ class HPALookUpTable(object):
                        unit=' hpa',
                        unit_scale=True,
                        total=self._es_query.count_all_hpa(),
+                       file=tqdm_out,
                        leave=False):
             self._table.set(el['gene'], el,
                             r_server=self._get_r_server(r_server))

@@ -4,7 +4,8 @@ import logging
 import json
 from collections import OrderedDict
 
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -17,6 +18,7 @@ from mrtarget.Settings import Config
 from logging.config import fileConfig
 
 logger = logging.getLogger(__name__)
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 
 '''
@@ -153,6 +155,7 @@ class ECOLookUpTable(object):
                         desc='loading eco',
                         unit=' eco',
                         unit_scale=True,
+                        file=tqdm_out,
                         total=self._es_query.count_all_eco(),
                         leave=False,
                        ):

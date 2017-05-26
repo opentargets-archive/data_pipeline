@@ -6,7 +6,8 @@ import multiprocessing
 import time
 
 from elasticsearch import Elasticsearch
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
@@ -23,6 +24,7 @@ from mrtarget.Settings import Config, file_or_resource
 
 
 logger = logging.getLogger(__name__)
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 # logger = multiprocessing.get_logger()
 
 
@@ -1182,6 +1184,7 @@ class EvidenceStringProcess():
                         desc='Reading available evidence_strings',
                         total=self.es_query.count_validated_evidence_strings(datasources=datasources),
                         unit=' evidence',
+                        file=tqdm_out,
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name'])
             idev = row['uniq_assoc_fields_hashdig']

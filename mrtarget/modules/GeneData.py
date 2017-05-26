@@ -8,7 +8,8 @@ from StringIO import StringIO
 from collections import OrderedDict
 
 import requests
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -500,13 +501,15 @@ class GeneManager():
         self.reactome_retriever=ReactomeRetriever(loader.es)
         self.chembl_handler = ChEMBLLookup()
         self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
 
 
     def merge_all(self, dry_run = False):
         bar = tqdm(desc='Merging data from available databases',
                    total = 6,
-                   unit= 'steps')
+                   unit= 'steps',
+                   file=tqdm_out)
         self._get_hgnc_data_from_json()
         bar.update()
         self._get_ortholog_data()
@@ -537,6 +540,7 @@ class GeneManager():
                         desc='loading genes from HGNC',
                         unit_scale=True,
                         unit='genes',
+                        file=tqdm_out,
                         leave=False):
             gene = Gene()
             gene.load_hgnc_data_from_json(row)
@@ -556,6 +560,7 @@ class GeneManager():
                         desc='loading orthologues genes from HGNC',
                         unit_scale=True,
                         unit='genes',
+                        file=tqdm_out,
                         leave=False):
             if row['human_ensembl_gene'] in self.genes:
                 self.genes[row['human_ensembl_gene']].load_ortholog_data(row)
@@ -572,6 +577,7 @@ class GeneManager():
                         desc='loading genes from Ensembl',
                         unit_scale=True,
                         unit='genes',
+                        file=tqdm_out,
                         leave=False,
                         total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
             if row['id'] in self.genes:
@@ -600,6 +606,7 @@ class GeneManager():
                            unit_scale=True,
                            unit='genes',
                            leave=False,
+                           file=tqdm_out,
                            total= self.esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
             c += 1
             if c % 1000 == 0:
@@ -663,7 +670,8 @@ class GeneManager():
         self._logger.info("Adding Chembl data to genes ")
         for gene_id, gene in tqdm(self.genes.iterate(),
                                   desc='Getting drug data from chembl',
-                                  unit=' gene'):
+                                  unit=' gene',
+                                  file=tqdm_out):
             target_drugnames = []
             ''' extend gene with related drug names '''
             if gene.uniprot_accessions:
@@ -713,6 +721,7 @@ class GeneLookUpTable(object):
         if (r_server is not None) and autoload:
             self.load_gene_data(r_server, targets)
         self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
 
 
@@ -730,6 +739,7 @@ class GeneLookUpTable(object):
                 unit = ' gene',
                 unit_scale = True,
                 total = total,
+                file=tqdm_out,
                 leave=False):
             self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
             if target['uniprot_id']:
@@ -750,6 +760,7 @@ class GeneLookUpTable(object):
                            desc='loading mappings from uniprot to ensembl',
                            unit=' gene mapping',
                            unit_scale=True,
+                           file=tqdm_out,
                            total=total,
                            leave=False,
                            ):

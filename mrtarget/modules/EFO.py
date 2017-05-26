@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import logging
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -8,6 +9,9 @@ from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.modules.Ontology import OntologyClassReader, DiseaseUtils
 from rdflib import URIRef
 from mrtarget.Settings import Config
+
+logger = logging.getLogger(__name__)
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 '''
 Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 
@@ -168,6 +172,7 @@ class EFOLookUpTable(object):
                         desc='loading diseases',
                         unit=' diseases',
                         unit_scale=True,
+                        file=tqdm_out,
                         total=self._es_query.count_all_diseases(),
                         leave=False,
                         ):
