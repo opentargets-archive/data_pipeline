@@ -16,7 +16,8 @@ from spacy.symbols import *
 from spacy.tokens import Span
 from spacy.tokens.doc import Doc
 from textblob.en.inflect import singularize
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -284,6 +285,7 @@ class LiteratureNLPProcess(object):
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
         if not self.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
@@ -317,6 +319,7 @@ class LiteratureNLPProcess(object):
                     desc='Reading available evidence_strings to analyse publications',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                     unit=' evidence',
+                    file=tqdm_out,
                     unit_scale=True):
             pubs = pub_fetcher.get_publication(pub_id)
             if pubs:
@@ -537,6 +540,7 @@ class LiteratureInfoExtractor(object):
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
 
     def process(self,
@@ -580,6 +584,7 @@ class LiteratureInfoExtractor(object):
                     desc='Reading available publications for nlp information extraction',
                     total = self.es_query.count_validated_evidence_strings(),
                     unit=' evidence',
+                    file=tqdm_out,
                     unit_scale=True):
 
             j=j+1

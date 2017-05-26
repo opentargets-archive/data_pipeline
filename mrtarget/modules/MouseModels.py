@@ -2,7 +2,8 @@ import sys
 import httplib
 import time
 import optparse
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 import logging
 import os
 import json
@@ -58,6 +59,8 @@ class Phenodigm():
         self.mouse_models = {}
         self.diseases = {}
         self.hashkeys = {}
+        self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
 
     def list_files(self, path):
@@ -78,7 +81,7 @@ class Phenodigm():
             self.mmGenes = json.loads(content)
         mmGenesFile.close()
 
-        logging.info("Loaded {0} mm genes".format(len(self.mmGenes)))
+        self._logger.info("Loaded {0} mm genes".format(len(self.mmGenes)))
 
     def load_human_genes(self, path):
 
@@ -87,7 +90,7 @@ class Phenodigm():
             self.hsGenes = json.loads(content)
         hsGenesFile.close()
 
-        logging.info("Loaded {0} hs genes".format(len(self.mmGenes)))
+        self._logger.info("Loaded {0} hs genes".format(len(self.mmGenes)))
 
     def update_cache(self):
         hdr = { 'User-Agent' : 'cttv bot by /center/for/therapeutic/target/validation' }
@@ -106,7 +109,7 @@ class Phenodigm():
             counter+=1
             #print start
             uri = '/solr/phenodigm/select?q=*:*&wt=python&indent=true&start=%i&rows=%i' %(start,rows)
-            logging.info("REQUEST {0}. {1}".format(counter, uri))
+            self._logger.info("REQUEST {0}. {1}".format(counter, uri))
             conn.request('GET', uri, headers=hdr)
             raw = conn.getresponse().read()
             rsp = eval (raw)
@@ -120,7 +123,7 @@ class Phenodigm():
 
     def update_genes(self):
 
-        logging.info("Get all human and mouse genes")
+        self._logger.info("Get all human and mouse genes")
 
         conn = httplib.HTTPConnection('rest.ensembl.org')
         mm_buffer = []
@@ -130,7 +133,7 @@ class Phenodigm():
         parts.sort()
         tick = 0
         for part in parts:
-            logging.info("processing {0}\n".format(part))
+            self._logger.info("processing {0}\n".format(part))
             with open(part, "r") as myfile:
                 rsp = eval(myfile.read())
                 for doc in rsp['response']['docs']:
@@ -159,12 +162,12 @@ class Phenodigm():
             myfile.close()
             conn.close()
 
-        logging.info("writing {0}".format(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "mmGenes.json")))
+        self._logger.info("writing {0}".format(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "mmGenes.json")))
         with open(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "mmGenes.json"), "w") as mmGenesFile:
             json.dump(self.mmGenes, mmGenesFile, sort_keys=True, indent=2)
             mmGenesFile.flush()
             mmGenesFile.close()
-        logging.info("writing {0}".format(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "hsGenes.json")))
+        self._logger.info("writing {0}".format(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "hsGenes.json")))
         with open(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "hsGenes.json"), "w") as hsGenesFile:
             json.dump(self.hsGenes, hsGenesFile, sort_keys=True, indent=2)
             hsGenesFile.flush()
@@ -173,41 +176,41 @@ class Phenodigm():
     def request_human_genes(self, conn, buffer):
         hdr = {"Content-Type": "application/json", "Accept": "application/json",
                "User-Agent": "open_targets bot by /open/targets"}
-        logging.info('hs Request "%s"...' % '","'.join(buffer))
+        self._logger.info('hs Request "%s"...' % '","'.join(buffer))
         body = '{ "symbols": ["%s"] }' % '","'.join(buffer)
         conn.request('POST', '/lookup/symbol/homo_sapiens/', headers=hdr, body=body)
         ensemblMap = json.loads(conn.getresponse().read())
-        # logging.info( json.dumps(ensemblMap, indent=4) )
+        # self._logger.info( json.dumps(ensemblMap, indent=4) )
         for hs_symbol, value in ensemblMap.items():
             if value["object_type"] == "Gene":
                 self.hsGenes[hs_symbol] = value['id']
             else:
                 self.hsGenes[hs_symbol] = None
             ensemblId = self.hsGenes[hs_symbol]
-            logging.info("hs {0} {1}".format(hs_symbol, ensemblId))
-        logging.info(json.dumps(self.hsGenes, indent=2))
+            self._logger.info("hs {0} {1}".format(hs_symbol, ensemblId))
+        self._logger.info(json.dumps(self.hsGenes, indent=2))
 
     def request_mouse_genes(self, conn, buffer):
         hdr = { "Content-Type" : "application/json", "Accept" : "application/json", "User-Agent" : "cttv bot by /center/for/therapeutic/target/validation" }
-        logging.info('mm Request "%s"...'%'","'.join(buffer))
+        self._logger.info('mm Request "%s"...'%'","'.join(buffer))
         body = '{ "symbols": ["%s"] }'%'","'.join(buffer)
     #conn.request('GET', '/xrefs/symbol/mus_musculus/%s?content-type=application/json;external_db=MGI' %(marker_symbol), headers=hdr)
         conn.request('POST', '/lookup/symbol/mus_musculus/', headers=hdr, body= body)
         ensemblMap = json.loads(conn.getresponse().read())
-        #logging.info( json.dumps(ensemblMap, indent=4) )
+        #self._logger.info( json.dumps(ensemblMap, indent=4) )
         for marker_symbol, value in ensemblMap.iteritems():
             if value["object_type"] == "Gene":
                 self.mmGenes[marker_symbol] = value['id']
             else:
                 self.mmGenes[marker_symbol] = None
             ensemblId = self.mmGenes[marker_symbol]
-            logging.info("mm {0} {1}".format(marker_symbol, ensemblId))
+            self._logger.info("mm {0} {1}".format(marker_symbol, ensemblId))
 
     def parse_phenodigm_files(self):
         parts = self.list_files(Config.MOUSEMODELS_CACHE_DIRECTORY)
         parts.sort()
         for part in parts:
-            logging.info("Processing PhenoDigm chunk {0}".format(part))
+            self._logger.info("Processing PhenoDigm chunk {0}".format(part))
             with open (part, "r") as myfile:
                 rsp = eval(myfile.read())
                 for doc in rsp['response']['docs']:
@@ -243,8 +246,8 @@ class Phenodigm():
                         except Exception, error:
 
                             if isinstance(error, KeyError):
-                                logging.error("Error checking disease in document: %s" % (str(error)))
-                                logging.error(json.dumps(doc, indent=4))
+                                self._logger.error("Error checking disease in document: %s" % (str(error)))
+                                self._logger.error(json.dumps(doc, indent=4))
                                 raise Exception()
                         if not disease_id in self.disease_gene_locus:
                             self.disease_gene_locus[disease_id] = { hgnc_id: [ marker_symbol ] }
@@ -262,7 +265,7 @@ class Phenodigm():
                         #    if terms == None:
                         #        terms = OMIMmap[disease_id]
                         #    if terms == None:
-                        #        logging.error("{0} '{1}' not in EFO".format(disease_id, doc['disease_term']))
+                        #        self._logger.error("{0} '{1}' not in EFO".format(disease_id, doc['disease_term']))
             myfile.close()    
 
     def generate_phenodigm_evidence_strings(self):
@@ -280,7 +283,7 @@ class Phenodigm():
 
             if hgnc_id and hs_ensembl_gene_id and re.match('^ENSG.*', hs_ensembl_gene_id) and hgnc_id in self.hgnc2mgis:
 
-                logging.info("processing human gene {0} {1} {2} {3}".format(index_g, hs_symbol, hs_ensembl_gene_id, hgnc_id ))
+                self._logger.info("processing human gene {0} {1} {2} {3}".format(index_g, hs_symbol, hs_ensembl_gene_id, hgnc_id ))
 
                 '''
                  Retrieve mouse models
@@ -310,7 +313,7 @@ class Phenodigm():
                                 mouse_model = self.mouse_models[model_id]
                                 marker_accession = mouse_model['marker_accession']
                                 allelic_composition = mouse_model['allelic_composition']
-                                logging.info("Mouse model {0} for {1}".format(model_id, marker_accession))
+                                self._logger.info("Mouse model {0} for {1}".format(model_id, marker_accession))
                                 '''
                                  Check the model_id is in the dictionary containing all the models 
                                 '''
@@ -338,7 +341,7 @@ class Phenodigm():
                                         disease = None
                                         if disease_id in self.diseases:
                                             disease = self.diseases[disease_id]
-                                        logging.info("disease: {0}".format(disease_id))
+                                        self._logger.info("disease: {0}".format(disease_id))
                                         
                                         '''
                                         Map the disease ID to EFO
@@ -358,9 +361,9 @@ class Phenodigm():
                                                 if len(terms) > 0:
                                                     for efo_uri in terms:
                                                         if efo_uri in self.efo.current_classes:
-                                                            logging.info("{0} => {1} {2}".format(disease_id, efo_uri, self.efo.current_classes[efo_uri]))
+                                                            self._logger.info("{0} => {1} {2}".format(disease_id, efo_uri, self.efo.current_classes[efo_uri]))
                                                         else:
-                                                            logging.info("{0} => {1} (no EFO mapping)".format(disease_id, efo_uri))
+                                                            self._logger.info("{0} => {1} (no EFO mapping)".format(disease_id, efo_uri))
                                                     disease_term_uris = terms
                                                     efoMapping[disease_id] = terms
                                                         
@@ -485,7 +488,7 @@ class Phenodigm():
                                                 mpheno = {}
                                                 for raw_mp in mouse_model['phenotypes']:
                                                     a = raw_mp.split("_")
-                                                    #logging.info("Add MP term to mouse model {0} {1}".format(a[0], a[1]))
+                                                    #self._logger.info("Add MP term to mouse model {0} {1}".format(a[0], a[1]))
                                                     evidenceString.evidence.biological_model.phenotypes.append(
                                                         bioentity.Phenotype(
                                                             id = a[0],
@@ -504,8 +507,8 @@ class Phenodigm():
                                                             term_name = self.hpo.current_classes[term_id]
                                                         else:
                                                             term_name = 'NOT FOUND'
-                                                        #logging.info("HPO term is {0} {1}".format(hp, hp in hpo.terms))
-                                                        #logging.info("HPO term retrieved is {0} {1}".format( termId, termName ))
+                                                        #self._logger.info("HPO term is {0} {1}".format(hp, hp in hpo.terms))
+                                                        #self._logger.info("HPO term retrieved is {0} {1}".format( termId, termName ))
                                                         human_phenotypes.append(
                                                             bioentity.Phenotype(
                                                                 id = hp,
@@ -530,7 +533,7 @@ class Phenodigm():
 
                                                         #termId = mp
                                                         #termName = "TO BE DERTERMINED"
-                                                        #logging.info("MP term is {0}".format(mp))
+                                                        #self._logger.info("MP term is {0}".format(mp))
                                                         #term = mpo.getTermById(mp)
                                                         #termId = term['tags']['id'][0]
                                                         #termName = term['tags']['name'][0]
@@ -550,7 +553,7 @@ class Phenodigm():
                                                 if 'model_to_disease_score' in mouse_model2disease:
                                                     score = (mouse_model2disease['model_to_disease_score'])/100
                                                     method = 'phenodigm_model_to_disease_score'
-                                                logging.info("score: {0}\n".format(score))
+                                                self._logger.info("score: {0}\n".format(score))
                                                 evidenceString.unique_association_fields['score'] = score
 
                                                 evidenceString.evidence.disease_model_association = evidence_phenotype.Disease_Model_Association(
@@ -573,16 +576,16 @@ class Phenodigm():
                                                 if not hashkey in self.hashkeys:
                                                     self.hashkeys[hashkey] = evidenceString
                                                 else:
-                                                    logging.warn("Doc {0} - Duplicated mouse model {1} to disease {2} URI: {3}".format(mouse_model2disease['id'],model_id, disease_id, disease_uri))
+                                                    self._logger.warn("Doc {0} - Duplicated mouse model {1} to disease {2} URI: {3}".format(mouse_model2disease['id'],model_id, disease_id, disease_uri))
                                                     if self.hashkeys[hashkey].unique_association_fields['score'] > evidenceString.unique_association_fields['score']:
                                                         self.hashkeys[hashkey] = evidenceString
                                         else:
-                                            logging.error("Unable to incorpate this strain for this disease: {0}".format(disease_id))
-                                            logging.error("No disease id {0}".format(disease_term_uris == None))
-                                            logging.error("model_to_disease_score in mouse_model2disease: {0}".format( 'model_to_disease_score' in mouse_model2disease) )    
-                                            logging.error("disease_id in disease_gene_locus: {0}".format(disease_id in self.disease_gene_locus))
-                                            logging.error("hs_symbol in disease_gene_locus[disease_id]: {0}".format(not disease_term_uris == None and disease_id in self.disease_gene_locus and hgnc_id in self.disease_gene_locus[disease_id]))
-                                            logging.error("marker_symbol in disease_gene_locus[disease_id][hgnc_id]): {0}".format(disease_term_uris is not None and disease_id in self.disease_gene_locus and marker_symbol in self.disease_gene_locus[disease_id][hgnc_id]))
+                                            self._logger.error("Unable to incorpate this strain for this disease: {0}".format(disease_id))
+                                            self._logger.error("No disease id {0}".format(disease_term_uris == None))
+                                            self._logger.error("model_to_disease_score in mouse_model2disease: {0}".format( 'model_to_disease_score' in mouse_model2disease) )    
+                                            self._logger.error("disease_id in disease_gene_locus: {0}".format(disease_id in self.disease_gene_locus))
+                                            self._logger.error("hs_symbol in disease_gene_locus[disease_id]: {0}".format(not disease_term_uris == None and disease_id in self.disease_gene_locus and hgnc_id in self.disease_gene_locus[disease_id]))
+                                            self._logger.error("marker_symbol in disease_gene_locus[disease_id][hgnc_id]): {0}".format(disease_term_uris is not None and disease_id in self.disease_gene_locus and marker_symbol in self.disease_gene_locus[disease_id][hgnc_id]))
 
     def write_phenodigm_evidence_strings(self, path):
         cttvFile = open(path + "/cttv_external_mousemodels.json", "w")
@@ -592,7 +595,7 @@ class Phenodigm():
         
             evidenceString = self.hashkeys[hashkey]
             
-            error = evidenceString.validate(logging)
+            error = evidenceString.validate(self._logger)
             
             if error == 0:
     #        and (evidenceString.evidence.association_score.probability.value >= 0.5 || evidenceString.evidence.in_locus):
@@ -609,18 +612,19 @@ class Phenodigm():
 
         bar = tqdm(desc='Generate PhenoDigm evidence strings',
                    total=8,
-                   unit='steps')
+                   unit='steps'
+                   file=tqdm_out)
 
-        logging.info("Load MP classes")
+        self._logger.info("Load MP classes")
         self.mp.load_mp_classes()
         bar.update()
-        logging.info("Load HP classes")
+        self._logger.info("Load HP classes")
         self.hpo.load_hpo_classes()
         bar.update()
-        logging.info("Load EFO classes")
+        self._logger.info("Load EFO classes")
         self.efo.load_efo_classes()
         bar.update()
-        logging.info("Get all OMIM x-refs")
+        self._logger.info("Get all OMIM x-refs")
         self.OMIMmap = self.efo.load_efo_omim_xrefs()
 
         self.OMIMmap["OMIM:191390"] = ["http://www.ebi.ac.uk/efo/EFO_0003767"]
@@ -629,17 +633,17 @@ class Phenodigm():
         self.OMIMmap["OMIM:608049"] = ["http://www.ebi.ac.uk/efo/EFO_0003756"]
         self.OMIMmap["OMIM:300494"] = ["http://www.ebi.ac.uk/efo/EFO_0003757"]
         bar.update()
-        logging.info("Load all mouse and human")
+        self._logger.info("Load all mouse and human")
         self.load_mouse_genes(Config.MOUSEMODELS_CACHE_DIRECTORY)
         self.load_human_genes(Config.MOUSEMODELS_CACHE_DIRECTORY)
         bar.update()
-        logging.info("Parse phenodigm files")
+        self._logger.info("Parse phenodigm files")
         self.parse_phenodigm_files()
         bar.update()
-        logging.info("Build evidence")
+        self._logger.info("Build evidence")
         self.generate_phenodigm_evidence_strings()
         bar.update()
-        logging.info("write evidence")
+        self._logger.info("write evidence")
         self.write_phenodigm_evidence_strings(Config.MOUSEMODELS_CACHE_DIRECTORY)
         bar.update()
         return

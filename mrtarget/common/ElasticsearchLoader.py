@@ -237,7 +237,7 @@ class Loader():
                                          )
             if not self._check_is_aknowledge(res):
                 if res['error']['root_cause'][0]['reason']== 'already exists':
-                    logging.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
+                    self.logger.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
                     return
                 else:
                     raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
