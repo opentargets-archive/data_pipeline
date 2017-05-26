@@ -2,8 +2,8 @@ box:
   id: quay.io/opentargets/mrtarget_base
   tag: latest
   registry: quay.io
-#services:
-#  - elasticsearch:2.4
+services:
+  - elasticsearch:2.4
 build:
   steps:
     - script:
@@ -37,10 +37,6 @@ build:
         name: test empty run to catch import errors
         code: |
           echo will be using the ES available at $ELASTICSEARCH_NODES
-          mrtarget --dry-run
-    - script:
-        name: test minimal data set (TODO)
-        code: |
           mrtarget --dry-run
     - script:
         name: log status in github
