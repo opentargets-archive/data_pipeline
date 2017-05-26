@@ -129,19 +129,15 @@ class FileProcesser():
         self.logger.debug("skipped "+path)
 
     def run(self):
-        '''
-        create index for"
-         the evidence if it does not exists
-         if the evidence index exists, the index
-         the submitted files if it does not exists
+        '''create index for" the evidence if it does not exists if the evidence index
+        exists, the index the submitted files if it does not exists
         '''
 
         self.logger.info("%s started" % self.__class__.__name__)
 
 
 
-        '''scroll through remote  user directories and find the latest files'''
-
+        # scroll through remote  user directories and find the latest files
         processed_datasources = []
         if self.remote_files:
             for url in self.remote_files:
@@ -427,11 +423,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                           offset,
                           line_buffer,
                           logfile=None):
-        '''
-        validate evidence strings from a chunk
-        cumulate the logs, acquire a lock,
-        write the logs
-        write the data to the database
+        '''validate evidence strings from a chunk cumulate the logs, acquire a lock,
+        write the logs write the data to the database
+
         '''
 
         line_counter = offset
@@ -441,7 +435,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             is_valid = False
             explanation = {}
 
-            '''parse line'''
+            # parse line
             parsed_line = None
             try:
                 parsed_line = json.loads(line)
@@ -451,7 +445,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 json_doc_hashdig = hashlib.md5(line).hexdigest()
                 explanation['unparsable_json'] = True
 
-            '''validate'''
+            # validate
             disease_failed = False
             gene_failed = False
             target_id = None
@@ -598,9 +592,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                 if target_id is None:
                                     self.logger.info("Found no target id for %s" % (uniprot_id))
 
-                    '''
-                    If there is no target id after the processing step
-                    '''
+                    # If there is no target id after the processing step
                     if  target_id is None:
                         explanation['missing_target_id'] = True
                         gene_failed = True
@@ -609,7 +601,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
 
 
-            '''flag as valid or not'''
+            # flag as valid or not
             if evidence_obj_validation_error_count == 0 and not disease_failed and not gene_failed:
                 is_valid = True
             else:
