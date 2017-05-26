@@ -106,12 +106,13 @@ class RedisQueue(object):
                  serialiser = 'pickle'):
         '''
         :param queue_id: queue id to attach to preconfigured queues
-        :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
-                             will not be pickable
-        :param max_size: maximum size of the queue. queue will block if full, and allow put only if smaller than the
-                         maximum size.
-        :param serialiser: choose the serialiser backend: json (use ujson, default) jsonpickle (use ujson) else will
-                           use pickle
+        :param r_server: a redis.Redis instance to be used in methods. If
+                             supplied the RedisQueue object will not be
+                             pickable
+        :param max_size: maximum size of the queue. queue will block if full,
+                         and allow put only if smaller than the maximum size.
+        :param serialiser: choose the serialiser backend: json (use ujson,
+                           default) jsonpickle (use ujson) else will use pickle
         :return:
         '''
         if not queue_id:
@@ -722,18 +723,20 @@ def get_redis_worker(base = Process):
 
     return RedisQueueWorkerBase
 
+
 RedisQueueWorkerProcess = get_redis_worker()
 RedisQueueWorkerThread = get_redis_worker(base=Thread)
 
 
-
 class RedisLookupTable(object):
     '''
-    Simple Redis-based key value store for string-based objects.
-    Faster than its subclasses since it does not serialise and unseriliase strings.
-    By default keys will expire in 2 days.
+    Simple Redis-based key value store for string-based objects. Faster than
+    its subclasses since it does not serialise and unseriliase strings. By
+    default keys will expire in 2 days.
 
-    Allows to store a lookup table (key/value store) in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
+    Allows to store a lookup table (key/value store) in memory/redis so that it
+    can be accessed quickly from multiple processes, reducing memory usage by
+    sharing.
     '''
 
     LOOK_UPTABLE_NAMESPACE = 'lookuptable:%(namespace)s'
@@ -745,10 +748,9 @@ class RedisLookupTable(object):
                  ttl = 60*60*24+2):
         if namespace is None:
             namespace = uuid.uuid4()
-        self.namespace = self.LOOK_UPTABLE_NAMESPACE % dict(namespace = namespace)
+        self.namespace = self.LOOK_UPTABLE_NAMESPACE % {'namespace': namespace}
         self.r_server = r_server
         self.default_ttl = ttl
-
 
     def set(self, key, obj, r_server = None, ttl = None):
         # if not (isinstance(obj, str) or isinstance(obj, unicode)):
@@ -780,7 +782,7 @@ class RedisLookupTable(object):
         return r_server
 
     def _get_key_namespace(self, key):
-        return self.KEY_NAMESPACE % dict(namespace = self.namespace, key = key)
+        return self.KEY_NAMESPACE % {'namespace': self.namespace, 'key': key}
 
     def _encode(self, obj):
         return obj
