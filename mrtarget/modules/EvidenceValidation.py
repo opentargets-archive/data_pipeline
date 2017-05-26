@@ -23,7 +23,7 @@ from elasticsearch.exceptions import NotFoundError
 from requests.packages.urllib3.exceptions import HTTPError
 from tqdm import tqdm
 
-from mrtarget.common import Actions, url_to_stream
+from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
@@ -117,7 +117,7 @@ class FileProcesser():
         self.loader = Loader(dry_run = dry_run)
         self.start_time = time.time()
         self.r_server = r_server
-        self._remote_filenames = {}
+        self._remote_filenames =dict()
         self.local_files = local_files
         self.remote_files = remote_files
         self.logger = logging.getLogger(__name__)
@@ -129,15 +129,19 @@ class FileProcesser():
         self.logger.debug("skipped "+path)
 
     def run(self):
-        '''create index for" the evidence if it does not exists if the evidence index
-        exists, the index the submitted files if it does not exists
+        '''
+        create index for"
+         the evidence if it does not exists
+         if the evidence index exists, the index
+         the submitted files if it does not exists
         '''
 
         self.logger.info("%s started" % self.__class__.__name__)
 
 
 
-        # scroll through remote  user directories and find the latest files
+        '''scroll through remote  user directories and find the latest files'''
+
         processed_datasources = []
         if self.remote_files:
             for url in self.remote_files:
@@ -250,12 +254,17 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
 
         self.logger.info('Starting to parse  file %s' % file_path)
-        # parse the file and put evidence in the queue
+        ''' parse the file and put evidence in the queue '''
         self.parse_file(file_path, file_version, provider_id, data_source_name, md5_hash,
                         logfile=logfile, file_type= file_type)
         self.logger.info("%s finished" % self.name)
 
+
+
     def parse_file(self, file_path, file_version, provider_id, data_source_name, md5_hash, logfile=None, file_type = FileTypes.LOCAL):
+
+
+
         self.logger.info('%s Starting parsing %s' % (self.name, file_path))
 
         line_buffer = []
@@ -268,7 +277,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             if file_type == FileTypes.LOCAL:
                 file_stat = os.stat(file_path)
                 file_size, file_mod_time = file_stat.st_size, file_stat.st_mtime
-                # temprorary get lines total
+                '''temprorary get lines total'''
                 lines = 0
                 with open(file_path, mode='rb') as f:
                     with io.BufferedReader(gzip.GzipFile(filename=file_path.split('/')[1],
@@ -347,7 +356,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             if file_type == FileTypes.HTTP:
                 self.logger.debug('streaming into queue the file ' + file_path)
 
-                for i,line in enumerate(url_to_stream(file_path)):
+                for i,line in enumerate(c.url_to_stream(file_path)):
                     self.put_into_queue_out(
                         (file_path, file_version, provider_id, data_source_name, md5_hash, logfile,
                          i/EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
@@ -364,10 +373,10 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
         return
 
-    @staticmethod
-    def _count_file_lines(file_handle):
-        '''return the number of lines in a text file including empty ones'''
-        return sum(1 for el in file_handle)
+    def _count_file_lines(self, f):
+        for i,line in enumerate(f.readlines()):
+            pass
+        return i+1
 
     def _estimate_file_lines(self, fh, file_size, max_lines = 50000):
         lines = 0
@@ -418,9 +427,11 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                           offset,
                           line_buffer,
                           logfile=None):
-        '''validate evidence strings from a chunk cumulate the logs, acquire a lock,
-        write the logs write the data to the database
-
+        '''
+        validate evidence strings from a chunk
+        cumulate the logs, acquire a lock,
+        write the logs
+        write the data to the database
         '''
 
         line_counter = offset
@@ -430,7 +441,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             is_valid = False
             explanation = {}
 
-            # parse line
+            '''parse line'''
             parsed_line = None
             try:
                 parsed_line = json.loads(line)
@@ -440,7 +451,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 json_doc_hashdig = hashlib.md5(line).hexdigest()
                 explanation['unparsable_json'] = True
 
-            # validate
+            '''validate'''
             disease_failed = False
             gene_failed = False
             target_id = None
@@ -587,7 +598,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                 if target_id is None:
                                     self.logger.info("Found no target id for %s" % (uniprot_id))
 
-                    # If there is no target id after the processing step
+                    '''
+                    If there is no target id after the processing step
+                    '''
                     if  target_id is None:
                         explanation['missing_target_id'] = True
                         gene_failed = True
@@ -596,7 +609,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
 
 
-            # flag as valid or not
+            '''flag as valid or not'''
             if evidence_obj_validation_error_count == 0 and not disease_failed and not gene_failed:
                 is_valid = True
             else:
