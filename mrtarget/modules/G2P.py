@@ -81,12 +81,12 @@ class G2P():
 
 
     def write_evidence_strings(self, filename):
-        logging.info("Writing IntOGen evidence strings")
+        self.logger.info("Writing IntOGen evidence strings")
         with open(filename, 'w') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
                 n += 1
-                logging.info(evidence_string.disease.id[0])
+                self.logger.info(evidence_string.disease.id[0])
                 # get max_phase_for_all_diseases
                 error = evidence_string.validate(logging)
                 if error == 0:
