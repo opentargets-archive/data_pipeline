@@ -42,7 +42,6 @@ rdflib
 colorama
 ftputil
 psutil
-data-model
 textblob
 unidecode
 coverage
