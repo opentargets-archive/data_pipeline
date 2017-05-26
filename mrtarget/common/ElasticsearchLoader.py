@@ -295,8 +295,8 @@ class Loader():
 
             if not index_created:
                 self._safe_create_index(index_name)
-                logging.warning('Index %s created without explicit mappings' % index_name)
-            logging.info("%s index created" % index_name)
+                self.logger.warning('Index %s created without explicit mappings' % index_name)
+            self.logger.info("%s index created" % index_name)
             return
 
     def _enforce_mapping(self, index_name):

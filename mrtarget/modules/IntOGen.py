@@ -130,7 +130,7 @@ class IntOGen():
 
     def load_Ensembl(self):
 
-        logging.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
+        self.logger.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
             Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
 
         for row in self.esquery.get_all_ensembl_genes():
@@ -152,7 +152,7 @@ class IntOGen():
                     self.symbols[display_name]["ensembl_secondary_ids"] = []
                 self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
 
-        logging.debug("Loading ES Ensembl finished")
+        self.logger.debug("Loading ES Ensembl finished")
 
     def process_intogen(self, infile=INTOGEN_FILENAME, outfile=INTOGEN_EVIDENCE_FILENAME):
         self.load_Ensembl()
@@ -286,18 +286,18 @@ class IntOGen():
                     self.evidence_strings.append(evidenceString)
 
 
-            logging.info("%s evidence parsed"%(n-1))
-            logging.info("%s evidence created"%len(self.evidence_strings))
+            self.logger.info("%s evidence parsed"%(n-1))
+            self.logger.info("%s evidence created"%len(self.evidence_strings))
 
         intogen_file.close()
 
     def write_evidence_strings(self, filename=INTOGEN_EVIDENCE_FILENAME):
-        logging.info("Writing IntOGen evidence strings")
+        self.logger.info("Writing IntOGen evidence strings")
         with open(filename, 'w') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
                 n+=1
-                logging.info(evidence_string.disease.id[0])
+                self.logger.info(evidence_string.disease.id[0])
                 # get max_phase_for_all_diseases
                 error = evidence_string.validate(logging)
                 if error == 0:

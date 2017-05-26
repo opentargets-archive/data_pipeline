@@ -916,7 +916,7 @@ class PhenotypeSlim():
                            fileobj=fileobj,
                            mtime=mtime) as fh:
 
-            logging.info('Starting parsing %s' % filename)
+            self.logger.info('Starting parsing %s' % filename)
 
             line_buffer = []
             offset = 0

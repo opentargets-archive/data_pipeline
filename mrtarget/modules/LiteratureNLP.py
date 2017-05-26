@@ -488,7 +488,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
 
     def process(self, data):
         publications = data
-        logging.debug("In LiteratureAnalyzerProcess- {} ".format(self.name))
+        self.logger.debug("In LiteratureAnalyzerProcess- {} ".format(self.name))
         try:
 
             for pub_id, pub in publications.items():

@@ -117,11 +117,11 @@ class PublicationFetcher(object):
             # if len(pubs)<pub_ids:
             #     for pub_id in pub_ids:
             #         if pub_id not in pubs:
-            #             logging.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
+            #             self.logger.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
             #             r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
             #             r.raise_for_status()
             #             result = r.json()['resultList']['result'][0]
-            #             logging.debug("Publication data --- {}" .format(result))
+            #             self.logger.debug("Publication data --- {}" .format(result))
             #             pub = Publication(pub_id=pub_id,
             #                           title=result['title'],
             #                           abstract=result['abstractText'],
@@ -188,7 +188,7 @@ class PublicationFetcher(object):
         return pub
 
     # def get_publication_with_analyzed_data(self, pub_ids):
-    #     # logging.debug("getting publication/analyzed data for id {}".format(pub_ids))
+    #     # self.logger.debug("getting publication/analyzed data for id {}".format(pub_ids))
     #     pubs = {}
     #     for parent_publication,analyzed_publication in self.es_query.get_publications_with_analyzed_data(ids=pub_ids):
     #         pub = Publication()
