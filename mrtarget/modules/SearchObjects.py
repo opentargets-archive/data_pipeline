@@ -270,6 +270,7 @@ class SearchObjectProcess(object):
         self.loader = loader
         self.esquery = ESQuery(loader.es)
         self.r_server = r_server
+        self.logger = logging.getLogger(__name__)
 
     def process_all(self, dry_run = False):
         ''' process all the objects that needs to be returned by the search method
@@ -308,5 +309,5 @@ class SearchObjectProcess(object):
         for w in workers:
             w.join()
 
-        logging.info(queue.get_status(r_server=self.r_server))
-        logging.info('ALL DONE! Execution time: %s'%(datetime.now()-start_time))
+        self.logger.info(queue.get_status(r_server=self.r_server))
+        self.logger.info('ALL DONE! Execution time: %s'%(datetime.now()-start_time))

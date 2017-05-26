@@ -1084,6 +1084,7 @@ class EvidenceStringProcess():
         self.es = es
         self.es_query = ESQuery(es)
         self.r_server = r_server
+        self.logger = logging.getLogger(__name__)
 
     def process_all(self, datasources=[], dry_run=False, inject_literature=False):
         return self._process_evidence_string_data(datasources=datasources,
