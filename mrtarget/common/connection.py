@@ -57,8 +57,8 @@ class PipelineConnectors():
                     connection_attempt += 1
                 self.logger.info('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
                 success = True
-            except ConnectionTimeout as e:
-                self.logger.exception(e)
+            except ConnectionTimeout:
+                self.logger.exception("Elasticsearch connection timeout")
 
         else:
             self.logger.warn('No valid configuration available for elasticsearch')

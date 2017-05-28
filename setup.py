@@ -14,10 +14,8 @@ setup(name=p.__pkgname__, version=p.__version__,
       packages=['mrtarget', 'mrtarget.common', 'mrtarget.modules'],
       license=p.__license__,
       platforms=['any'],
-      install_requires=[
-      ],
-      dependency_links=[
-      ],
+      install_requires=[],
+      dependency_links=[],
       include_package_data=True,
       entry_points={
           'console_scripts': ['mrtarget=mrtarget.CommandLine:main'],
