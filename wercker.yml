@@ -1,6 +1,11 @@
-box: python:2.7-onbuild
+box:
+  id: quay.io/opentargets/mrtarget_base
+  tag: latest
+  registry: quay.io
 services:
   - elasticsearch:2.4
+command-timeout: 60
+no-response-timeout: 10
 build:
   steps:
     - script:
@@ -20,11 +25,11 @@ build:
 #        code: |
 #          apt-get update && apt-get install -y --no-install-recommends libdouble-conversion-dev && rm -rf /var/lib/apt/lists/*
     - pip-install
-    - script:
-        name: manually install the current package mrtarget
-        code: |
-          sudo pip install --process-dependency-links -r requirements.txt
-          # sudo python setup.py install
+#    - script:
+#        name: manually install the current package mrtarget
+#        code: |
+#          sudo pip install --process-dependency-links -r requirements.txt
+#          # sudo python setup.py install
     - script: 
         name: export variables for pipeline
         code: |
@@ -34,10 +39,6 @@ build:
         name: test empty run to catch import errors
         code: |
           echo will be using the ES available at $ELASTICSEARCH_NODES
-          mrtarget --dry-run
-    - script:
-        name: test minimal data set (TODO)
-        code: |
           mrtarget --dry-run
     - script:
         name: log status in github
