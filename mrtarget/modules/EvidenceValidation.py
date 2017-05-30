@@ -14,17 +14,16 @@ import time
 import uuid
 import jsonschema as jss
 from cStringIO import StringIO
-from datetime import datetime, date
+from datetime import datetime
 
-import opentargets.model.core as opentargets
-import pysftp
 import requests
 from elasticsearch import helpers
 from elasticsearch.exceptions import NotFoundError
 from requests.packages.urllib3.exceptions import HTTPError
 from tqdm import tqdm
+from addict import Dict
 
-from mrtarget.common import Actions, url_to_stream, URLZSource, generate_validators_from_schemas
+from mrtarget.common import Actions, url_to_stream, generate_validators_from_schemas
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
@@ -264,8 +263,6 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         offset = 0
         chunk = 1
 
-        cnopts = pysftp.CnOpts()
-        cnopts.hostkeys = None  # disable host key checking.
         if file_path.endswith('.gz'):
             if file_type == FileTypes.LOCAL:
                 file_stat = os.stat(file_path)
@@ -428,7 +425,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         # generate all validators once
         validators = \
             generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
-
         # going per line inside buffer
         for line in line_buffer:
             is_valid = False
@@ -439,7 +435,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             target_id = None
             efo_id = None
             data_type = None
-            evidence_obj_validation_error_count = 1
             uniq_elements_flat_hexdig = None #uuid.uuid4().hex
             parsed_line = None
 
@@ -453,9 +448,11 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
             if all(parsed_line is not None,
                    (any(k in parsed_line for k in ('label', 'type')))):
-                    if 'label' in parsed_line:
-                        parsed_line['type'] = parsed_line.pop('label', None)
-                    data_type = parsed_line['type']
+                # setting type from label in case we have label??
+                if 'label' in parsed_line:
+                    parsed_line['type'] = parsed_line.pop('label', None)
+
+                data_type = parsed_line['type']
 
             else:
                 explanation['key_fields_missing'] = True
@@ -468,40 +465,34 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
             if data_type is None:
                 explanation['missing_datatype'] = True
-                self.logger.error(
-                    "Line %i: Not a valid %s evidence string - please add the mandatory 'type' attribute" % (
-                        line_counter, Config.EVIDENCEVALIDATION_SCHEMA))
+                self.logger.error("Line %i: Not a valid %s evidence string - "
+                                  "please add the mandatory 'type' attribute",
+                                  line_counter, Config.EVIDENCEVALIDATION_SCHEMA)
 
             elif data_type not in Config.EVIDENCEVALIDATION_DATATYPES:
                 explanation['unsupported_datatype'] = data_type
 
             else:
-                evidence_obj = None
                 # TODO XXX still unfinished
                 validation_errors = [str(e) for e in validators[data_type].iter_errors(line)]
 
-                if not validation_errors:
+                if validation_errors:
+                    # here I have to log all fails to logger and elastic
                     explanation['unsupported_datatype'] = True
                 else:
+                    # generate fantabulous dict from addict
+                    evidence_obj = Dict(line)
+
                     if evidence_obj.target.id:
                         target_id = evidence_obj.target.id
                     if evidence_obj.disease.id:
                         efo_id = evidence_obj.disease.id
 
-
-                    # flatten
+                    # flatten but is it always valid unique_association_fields?
                     uniq_elements = evidence_obj.unique_association_fields
                     uniq_elements_flat = DatatStructureFlattener(uniq_elements)
                     uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
 
-
-                    # VALIDATE EVIDENCE STRING This will return errors and will log the errors in
-                    # the chosen logger
-                    # TODO it is not correct to pass a logger here. We should use the correct logging namespace
-                    evidence_obj_validation_error_count = evidence_obj.validate(self.logger)
-
-                    # CHECK DISEASE IDENTIFIER Now check that the disease IRI is a valid disease
-                    #term There is only one disease to look at
                     if efo_id:
                         # Check disease term or phenotype term
                         #if (short_disease_id not in self.lookup_data.available_efos) and \
@@ -524,9 +515,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                     # and UniProt ID mapping to a Gene ID
                     # http://identifiers.org/ensembl/ENSG00000178573
                     if target_id:
-                        ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', target_id)
-                        uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', target_id)
-                        if ensemblMatch:
+                        if 'ensembl' in target_id:
                             # ensembl_id = ensemblMatch.groups()[0].rstrip("\s")
                             ensembl_id = target_id.split('/')[-1]
                             if not ensembl_id in self.lookup_data.available_genes:
@@ -536,7 +525,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                 explanation['nonref_ensembl_gene'] = ensembl_id
                                 gene_mapping_failed = True
 
-                        elif uniprotMatch:
+                        elif 'uniprot' in target_id:
                             uniprot_id =  target_id.split('/')[-1]
                             if uniprot_id not in self.lookup_data.uni2ens:
                                 gene_failed = True
@@ -558,8 +547,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                 except KeyError:
                                     reference_target_list = []
                                 if reference_target_list:
-                                    target_id = 'http://identifiers.org/ensembl/%s' % reference_target_list[
-                                        0]
+                                    target_id = 'http://identifiers.org/ensembl/%s' % reference_target_list[0]
                                 else:
                                     # get the first one, needs a better way
                                     target_id = self.lookup_data.uni2ens[uniprot_id]
@@ -574,15 +562,12 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                         gene_failed = True
 
             # flag as valid or not
-            if evidence_obj_validation_error_count == 0 and not disease_failed and not gene_failed:
+            if not disease_failed and not gene_failed:
                 is_valid = True
             else:
-                if disease_failed:
-                    explanation['disease_error'] = True
-                if gene_failed:
-                    explanation['gene_error'] = True
-                if gene_mapping_failed:
-                    explanation['gene_mapping_failed'] = True
+                explanation['disease_error'] = True
+                explanation['gene_error'] = True
+                explanation['gene_mapping_failed'] = True
 
 
             loader_args = (Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + data_source_name,
@@ -1372,4 +1357,3 @@ class EvidenceValidationFileChecker():
         data_indices = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
         self.es.indices.delete(data_indices)
         self.logger.info('Validation data deleted')
-
