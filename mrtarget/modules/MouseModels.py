@@ -612,7 +612,7 @@ class Phenodigm():
 
         bar = tqdm(desc='Generate PhenoDigm evidence strings',
                    total=8,
-                   unit='steps'
+                   unit='steps',
                    file=tqdm_out)
 
         self._logger.info("Load MP classes")
