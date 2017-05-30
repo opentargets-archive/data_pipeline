@@ -152,10 +152,6 @@ def main():
     logger.info('Attempting to establish connection to the backend...')
     db_connected = connectors.init_services_connections(redispersist=args.redispersist)
 
-    if not db_connected and not args.dry_run:
-        msg = 'No connection to the backend could be established. Exiting since this is not a dry run'
-        logger.info(msg)
-        sys.exit(msg)
 
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
