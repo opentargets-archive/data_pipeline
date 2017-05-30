@@ -6,6 +6,8 @@ import zipfile
 import petl as p
 import tempfile as tmp
 import requests as r
+import jsonschema as jss
+import json
 # import urllib2 as u2
 
 
@@ -104,9 +106,10 @@ class URLZSource():
         if not mode.startswith('r'):
             raise p.errors.ArgumentError('source is read-only')
 
+        zf = None
+
         with url_to_tmpfile(*self.args, **self.kwargs) as f:
             buf = f
-            zf = None
 
             if self.args[0].endswith('.gz'):
                 zf = gzip.GzipFile(fileobj=buf)
@@ -118,10 +121,25 @@ class URLZSource():
             else:
                 zf = buf
 
-            try:
-                yield zf
-            finally:
-                zf.close()
+            yield zf
+        zf.close()
+
+
+def generate_validator_from_schema(schema):
+    return jss.validators.validator_for(schema=schema)
+
+
+def generate_validators_from_schemas(schemas_map):
+    validators = {}
+    for k, v in schemas_map.iteritems():
+        # per kv we create the validator and instantiate it
+        with URLZSource(v).open() as r_file:
+            js_schema = json.load(r_file)
+
+        validator = jss.validators.validator_for(js_schema)
+        validators[k] = validator(schema=js_schema)
+
+    return validators
 
 
 class Actions():

@@ -216,8 +216,20 @@ class Config():
     REACTOME_PATHWAY_DATA = ini.get(INI_SECTION, 'reactome_pathways')
     REACTOME_PATHWAY_RELATION = ini.get(INI_SECTION, 'reactome_pathways_rel')
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
-    EVIDENCEVALIDATION_SCHEMA = "1.2.5"
+    EVIDENCEVALIDATION_SCHEMA = "1.2.6"
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
+
+    EVIDENCEVALIDATION_VALIDATOR_SCHEMAS = {
+        'genetic_association': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/genetics.json',
+        'rna_expression': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/expression.json',
+        'genetic_literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'affected_pathway': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'somatic_mutation': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'drug': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
+        'literature_mining': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'animal_model': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
+    }
+
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20

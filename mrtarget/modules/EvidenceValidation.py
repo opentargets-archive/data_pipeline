@@ -12,6 +12,7 @@ import re
 import sys
 import time
 import uuid
+import jsonschema as jss
 from cStringIO import StringIO
 from datetime import datetime, date
 
@@ -23,18 +24,13 @@ from elasticsearch.exceptions import NotFoundError
 from requests.packages.urllib3.exceptions import HTTPError
 from tqdm import tqdm
 
-from mrtarget.common import Actions, url_to_stream
+from mrtarget.common import Actions, url_to_stream, URLZSource, generate_validators_from_schemas
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from mrtarget.Settings import Config
-
-# This bit is necessary for text mining data
-reload(sys)
-sys.setdefaultencoding("utf8")
-
 
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
@@ -409,8 +405,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.logger = logging.getLogger(__name__)
 
     def process(self, data):
-        #TODO: remove =unused params from  endpoint feeding this queue
-        file_path, file_version, provider_id, data_source_name, md5_hash, logfile, chunk, offset, line_buffer, end_of_transmission = data
+        file_path, data_source_name, logfile, offset, line_buffer = data
         return self.validate_evidence(file_path,
                                       data_source_name,
                                       offset,
@@ -424,27 +419,20 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                           offset,
                           line_buffer,
                           logfile=None):
-        ''' validate evidence strings from a chunk cumulate the logs, acquire a
-        lock, write the logs write the data to the database '''
+        '''validate evidence strings from a chunk cumulate the logs, acquire a lock,
+        write the logs write the data to the database
 
-        line_counter = offset
+        '''
+        line_counter = (offset + 1)
 
+        # generate all validators once
+        validators = \
+            generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
 
+        # going per line inside buffer
         for line in line_buffer:
             is_valid = False
             explanation = {}
-
-            '''parse line'''
-            parsed_line = None
-            try:
-                parsed_line = json.loads(line)
-                json_doc_hashdig = DatatStructureFlattener(parsed_line).get_hexdigest()
-            except Exception as e:
-                self.logger.error('cannot parse line %i: %s'%(line_counter, e))
-                json_doc_hashdig = hashlib.md5(line).hexdigest()
-                explanation['unparsable_json'] = True
-
-            '''validate'''
             disease_failed = False
             gene_failed = False
             gene_mapping_failed = False
@@ -453,55 +441,46 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             data_type = None
             evidence_obj_validation_error_count = 1
             uniq_elements_flat_hexdig = None #uuid.uuid4().hex
+            parsed_line = None
 
-            if parsed_line is not None:
-                # schema validation of the line
-                if all((any(k in parsed_line for k in ('label', 'type')),
-                        parsed_line.get('validated_against_schema_version', '') == \
-                        Config.EVIDENCEVALIDATION_SCHEMA)):
+            try:
+                parsed_line = json.loads(line)
+                json_doc_hashdig = DatatStructureFlattener(parsed_line).get_hexdigest()
+            except Exception as e:
+                self.logger.error('cannot parse line %i: %s', line_counter, e)
+                json_doc_hashdig = hashlib.md5(line).hexdigest()
+                explanation['unparsable_json'] = True
 
+            if all(parsed_line is not None,
+                   (any(k in parsed_line for k in ('label', 'type')))):
                     if 'label' in parsed_line:
                         parsed_line['type'] = parsed_line.pop('label', None)
                     data_type = parsed_line['type']
 
-                elif parsed_line.get('validated_against_schema_version', '') == \
-                     Config.EVIDENCEVALIDATION_SCHEMA:
-                    explanation['invalid_schema'] = True
-                    self.logger.error(
-                        "Line %i: Not a valid %s evidence string - please check the 'validated_against_schema_version' "
-                        "mandatory attribute" % (
-                        line_counter + 1, Config.EVIDENCEVALIDATION_SCHEMA))
+            else:
+                explanation['key_fields_missing'] = True
+                self.logger.error("Line %i: Not a valid %s evidence string"
+                                  " - missing label and type mandatory attributes",
+                                  line_counter,
+                                  Config.EVIDENCEVALIDATION_SCHEMA)
+
+
 
             if data_type is None:
                 explanation['missing_datatype'] = True
                 self.logger.error(
                     "Line %i: Not a valid %s evidence string - please add the mandatory 'type' attribute" % (
-                        line_counter + 1, Config.EVIDENCEVALIDATION_SCHEMA))
+                        line_counter, Config.EVIDENCEVALIDATION_SCHEMA))
 
             elif data_type not in Config.EVIDENCEVALIDATION_DATATYPES:
                 explanation['unsupported_datatype'] = data_type
 
             else:
                 evidence_obj = None
-                if data_type == 'genetic_association':
-                    evidence_obj = opentargets.Genetics.fromMap(parsed_line)
-                elif data_type == 'rna_expression':
-                    evidence_obj = opentargets.Expression.fromMap(parsed_line)
-                elif data_type in ['genetic_literature', 'affected_pathway', 'somatic_mutation']:
-                    evidence_obj = opentargets.Literature_Curated.fromMap(parsed_line)
-                    if data_type == 'somatic_mutation' and not isinstance(parsed_line['evidence']['known_mutations'], list):
-                        mutations = copy.deepcopy(parsed_line['evidence']['known_mutations'])
-                        parsed_line['evidence']['known_mutations'] = [ mutations ]
-                        evidence_obj = opentargets.Literature_Curated.fromMap(parsed_line)
-                elif data_type == 'known_drug':
-                    evidence_obj = opentargets.Drug.fromMap(parsed_line)
-                elif data_type == 'literature':
-                    evidence_obj = opentargets.Literature_Mining.fromMap(parsed_line)
-                elif data_type == 'animal_model':
-                    evidence_obj = opentargets.Animal_Models.fromMap(parsed_line)
+                # TODO XXX still unfinished
+                validation_errors = [str(e) for e in validators[data_type].iter_errors(line)]
 
-
-                if evidence_obj is None:
+                if not validation_errors:
                     explanation['unsupported_datatype'] = True
                 else:
                     if evidence_obj.target.id:
@@ -621,7 +600,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                release_date=VALIDATION_DATE,
                                is_valid=is_valid,
                                explanation=explanation,
-                               line = line_counter+1,
+                               line = line_counter,
                                file_name = file_path))
             loader_kwargs = dict(create_index=False)
             return loader_args, loader_kwargs
