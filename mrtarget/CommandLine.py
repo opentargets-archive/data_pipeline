@@ -59,7 +59,7 @@ def main():
                         action="append_const", const = EcoActions.ALL)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EvidenceStringActions.ALL)
-    parser.add_argument("--ass", dest='ass', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--as", dest='ass', help="precompute association scores, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = AssociationActions.ALL)
     parser.add_argument("--valck", dest='val', help="check new json files submitted to ftp site and store the evidence strings to ElasticSearch",
                         action="append_const", const = ValidationActions.CHECKFILES)
@@ -152,10 +152,6 @@ def main():
     logger.info('Attempting to establish connection to the backend...')
     db_connected = connectors.init_services_connections(redispersist=args.redispersist)
 
-    if not db_connected and not args.dry_run:
-        msg = 'No connection to the backend could be established. Exiting since this is not a dry run'
-        logger.info(msg)
-        sys.exit(msg)
 
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)

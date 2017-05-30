@@ -123,6 +123,19 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
                     return True
         return False
 
+    def test_custom_tokenizer(self):
+        text = u'This is a test, for a complex entity name: th:is.{e}nt/ity-is,very/co_m[p]lex(to)par;se ' \
+               u'this_is-simpler. but this is an other sentence\nand this is after a new line'
+        doc = self.nlp(text)
+        tokens = [i.text for i in doc]
+        self.assertIn(u'th:is.{e}nt/ity-is,very/co_m[p]lex(to)par;se', tokens)
+        self.assertIn(u'this_is-simpler', tokens)
+        self.assertNotIn(u'sentence\nand', tokens)
+        self.assertNotIn(u'name:', tokens)
+        self.assertNotIn(u'this_is-simpler.', tokens)
+
+
+
     def test_doc(self):
         text =  u'Asthma is a chronic disease characterized by airway inflammation, obstruction and hyperresponsiveness.'
 

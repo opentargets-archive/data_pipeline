@@ -617,6 +617,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                     explanation['disease_error'] = True
                 if gene_failed:
                     explanation['gene_error'] = True
+                if gene_mapping_failed:
+                    explanation['gene_mapping_failed'] = True
+
 
             loader_args = (Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + data_source_name,
                            data_source_name,
