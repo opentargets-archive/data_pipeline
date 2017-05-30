@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import gzip
 import zipfile
 import petl as p
+import io
 import tempfile as tmp
 import requests as r
 # import urllib2 as u2
