@@ -41,31 +41,29 @@ def url_to_tmpfile(url, *args, **kwargs):
     '''
     f = None
 
-    if url.startswith('ftp'):
-        # TODO unfinished but not necessary at the moment
-        # proxy_support = u2.ProxyHandler({})
-        # opener = u2.build_opener(proxy_support)
-        # req = u2.Request(url, *args, **kwargs)
-        # f = opener.open(req)
-        raise NotImplemented('finish ftp')
+    if url.startswith('ftp://'):
+        raise NotImplementedError('finish ftp')
+
+    elif url.startswith('file://'):
+        with open(url[len('file://'):],mode="r+b") as f:
+            yield f
+
     else:
         f = r.get(url, *args, stream=True, **kwargs)
         f.raise_for_status()
 
-    with tmp.NamedTemporaryFile(mode='r+w+b', delete=True) as fd:
-        # write data into file in streaming fashion
-        for block in f.iter_content(1024):
-            fd.write(block)
+        with tmp.NamedTemporaryFile(mode='r+w+b', delete=True) as fd:
+            # write data into file in streaming fashion
+            for block in f.iter_content(1024):
+                fd.write(block)
 
-        fd.seek(0)
-        try:
+            fd.seek(0)
             yield fd
-        finally:
-            fd.close()
-            f.close()
+
+        f.close()
 
 
-class URLZSource():
+class URLZSource(object):
     def __init__(self, *args, **kwargs):
         '''A source extension for petl python package
         Just in case you need to use proxies for url use it as normal
@@ -125,19 +123,22 @@ class URLZSource():
         zf.close()
 
 
-def generate_validator_from_schema(schema):
-    return jss.validators.validator_for(schema=schema)
+def generate_validator_from_schema(schema_uri):
+    '''load a uri, build and return a jsonschema validator'''
+    with URLZSource(schema_uri).open() as r_file:
+        js_schema = json.load(r_file)
+
+    validator = jss.validators.validator_for(js_schema)
+    return validator(schema=js_schema)
 
 
 def generate_validators_from_schemas(schemas_map):
+    '''return a dict of schema names and validators using the function
+    `generate_validator_from_schema`'''
     validators = {}
-    for k, v in schemas_map.iteritems():
+    for schema_name, schema_uri in schemas_map.iteritems():
         # per kv we create the validator and instantiate it
-        with URLZSource(v).open() as r_file:
-            js_schema = json.load(r_file)
-
-        validator = jss.validators.validator_for(js_schema)
-        validators[k] = validator(schema=js_schema)
+        validators[schema_name] = generate_validator_from_schema(schema_uri)
 
     return validators
 

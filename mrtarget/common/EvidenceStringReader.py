@@ -1,9 +1,8 @@
-import gzip
 import logging
 import json
+from addict import Dict
 from mrtarget.Settings import Config
-import opentargets.model.core as opentargets
-import opentargets.model.evidence.association_score as evidence_association_score
+from mrtarget.common import generate_validator_from_schema, URLZSource
 
 
 __copyright__ = "Copyright 2014-2016, Open Targets"
@@ -23,19 +22,13 @@ class EvidenceStringReader(object):
     def __init__(self):
         pass
 
-    def parse_gzipfile(self, filename, mode, out_file):
+    def parse_gzipfile(self, filename, out_file):
 
         out_fh = open(out_file, 'w')
 
-        with gzip.GzipFile(filename=filename,
-                           mode=mode) as fh:
+        with URLZSource(filename).open() as fh:
 
             logging.info('Starting parsing %s' % filename)
-
-            line_buffer = []
-            offset = 0
-            chunk = 1
-            line_number = 0
 
             for line in fh:
                 out_line = line.rstrip()
@@ -44,23 +37,26 @@ class EvidenceStringReader(object):
                 data_type = python_raw['type']
                 if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
                     if data_type == 'genetic_association':
-                        obj = opentargets.Genetics.fromMap(python_raw)
+                        uri = Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[data_type]
+                        validator = generate_validator_from_schema(uri)
+                        validation_errors = [str(e) for e in \
+                                             validator.iter_errors(python_raw)]
 
-                        '''
-                        check the evidence string
-                        '''
-                        if obj.evidence.gene2variant.resource_score is None:
-                            resource_score = evidence_association_score.Probability(
-                                type="probability",
-                                method=evidence_association_score.Method(
-                                    description="NA",
-                                    reference="NA",
-                                    url="NA"),
-                                value=1)
-                            obj.evidence.gene2variant.resource_score = resource_score
-                            out_line = obj.to_JSON(indentation=None)
+                        # check evidence after is validation_errors
+                        if not validation_errors:
+                            obj = Dict(python_raw)
+                            if obj.evidence.gene2variant.resource_score is None:
+                                obj.evidence.gene2variant.resource_score.type = "probability"
+                                obj.evidence.gene2variant.resource_score.method.description = "NA"
+                                obj.evidence.gene2variant.resource_score.method.reference = "NA"
+                                obj.evidence.gene2variant.resource_score.method.url = "NA"
+                                obj.evidence.gene2variant.resource_score.vaue = 1.
+                                # from addict to python dict
+                                out_line = json.dumps(obj.to_dict())
+                            else:
+                                print obj.evidence.gene2variant.resource_score.value
                         else:
-                            print obj.evidence.gene2variant.resource_score.value
+                            print "error: " + '\n'.join(validation_errors)
                 out_fh.write(out_line + "\n")
         fh.close()
         out_fh.close()
@@ -68,7 +64,7 @@ class EvidenceStringReader(object):
 def main():
 
     obj = EvidenceStringReader()
-    obj.parse_gzipfile(filename='/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-22-11-2016.json.gz', mode='rb', out_file='/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-28-11-2016.json')
+    obj.parse_gzipfile(filename='file:///Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-22-11-2016.json.gz', out_file='/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-28-11-2016.json')
 
 
 if __name__ == "__main__":
