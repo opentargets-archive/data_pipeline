@@ -565,9 +565,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             if not disease_failed and not gene_failed:
                 is_valid = True
             else:
-                explanation['disease_error'] = True
-                explanation['gene_error'] = True
-                explanation['gene_mapping_failed'] = True
+                explanation['disease_error'] = disease_failed
+                explanation['gene_error'] = gene_failed
+                explanation['gene_mapping_failed'] = gene_mapping_failed
 
 
             loader_args = (Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + data_source_name,
