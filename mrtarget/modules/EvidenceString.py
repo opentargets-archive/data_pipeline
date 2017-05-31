@@ -20,6 +20,7 @@ from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
 from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common.connection import PipelineConnectors
 
 
 logger = logging.getLogger(__name__)
