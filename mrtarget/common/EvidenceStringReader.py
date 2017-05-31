@@ -45,12 +45,14 @@ class EvidenceStringReader(object):
                         # check evidence after is validation_errors
                         if not validation_errors:
                             obj = Dict(python_raw)
-                            if obj.evidence.gene2variant.resource_score is None:
-                                obj.evidence.gene2variant.resource_score.type = "probability"
-                                obj.evidence.gene2variant.resource_score.method.description = "NA"
-                                obj.evidence.gene2variant.resource_score.method.reference = "NA"
-                                obj.evidence.gene2variant.resource_score.method.url = "NA"
-                                obj.evidence.gene2variant.resource_score.vaue = 1.
+                            if not obj.evidence.gene2variant.resource_score:
+                                obj.evidence.gene2variant.resource_score = Dict({'type': 'probability',
+                                                                                 'value': 1.,
+                                                                                 'method': {
+                                                                                     'description': 'NA',
+                                                                                     'reference': 'NA',
+                                                                                     'url': 'NA'
+                                                                                 }})
                                 # from addict to python dict
                                 out_line = json.dumps(obj.to_dict())
                             else:
@@ -64,7 +66,8 @@ class EvidenceStringReader(object):
 def main():
 
     obj = EvidenceStringReader()
-    obj.parse_gzipfile(filename='file:///Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-22-11-2016.json.gz', out_file='/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-28-11-2016.json')
+    # obj.parse_gzipfile(filename='file:///Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-22-11-2016.json.gz', out_file='/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-28-11-2016.json')
+    obj.parse_gzipfile(filename='https://storage.googleapis.com/otar012-eva/17.06/cttv012-25-05-2017.json.gz', out_file='cttv012.out.json')
 
 
 if __name__ == "__main__":

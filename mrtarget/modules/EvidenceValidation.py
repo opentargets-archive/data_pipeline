@@ -473,12 +473,15 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 explanation['unsupported_datatype'] = data_type
 
             else:
-                # TODO XXX still unfinished
-                validation_errors = [str(e) for e in validators[data_type].iter_errors(line)]
+                validation_errors = [e for e in validators[data_type].iter_errors(line)]
 
                 if validation_errors:
                     # here I have to log all fails to logger and elastic
-                    explanation['unsupported_datatype'] = True
+                    error_messages = ' '.join((el.message for el in e))
+                    explanation['validation_errors'] = error_messages
+                    self.logger.error('validation_errors failed to validate line %i with these errors %s',
+                                      line_counter, error_messages)
+
                 else:
                     # generate fantabulous dict from addict
                     evidence_obj = Dict(line)
@@ -565,6 +568,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             if not disease_failed and not gene_failed:
                 is_valid = True
             else:
+                self.logger.error('evidence validation step failed at the end with an explanation')
                 explanation['disease_error'] = disease_failed
                 explanation['gene_error'] = gene_failed
                 explanation['gene_mapping_failed'] = gene_mapping_failed
