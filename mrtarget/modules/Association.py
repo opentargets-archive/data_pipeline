@@ -16,6 +16,7 @@ from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
+from mrtarget.common.connection import PipelineConnectors
 
 
 
