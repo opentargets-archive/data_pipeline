@@ -477,7 +477,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
                 if validation_errors:
                     # here I have to log all fails to logger and elastic
-                    error_messages = ' '.join((el.message for el in e))
+                    error_messages = ' '.join((el.message for el in validation_errors))
                     explanation['validation_errors'] = error_messages
                     self.logger.error('validation_errors failed to validate line %i with these errors %s',
                                       line_counter, error_messages)
