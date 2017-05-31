@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export MINIMAL=true
+export CTTV_MINIMAL=true
 export CTTV_DATA_VERSION=minimaltest
 
 cd ..
