@@ -23,7 +23,7 @@ from elasticsearch.exceptions import NotFoundError
 from requests.packages.urllib3.exceptions import HTTPError
 from tqdm import tqdm
 
-from mrtarget.common import Actions
+from mrtarget.common import Actions, url_to_stream
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
@@ -137,10 +137,7 @@ class FileProcesser():
         '''
 
         self.logger.info("%s started" % self.__class__.__name__)
-
-
-
-        '''scroll through remote  user directories and find the latest files'''
+        # scroll through remote  user directories and find the latest files
 
         processed_datasources = []
         if self.remote_files:
@@ -356,7 +353,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             if file_type == FileTypes.HTTP:
                 self.logger.debug('streaming into queue the file ' + file_path)
 
-                for i,line in enumerate(c.url_to_stream(file_path)):
+                for i,line in enumerate(url_to_stream(file_path)):
                     self.put_into_queue_out(
                         (file_path, file_version, provider_id, data_source_name, md5_hash, logfile,
                          i/EVIDENCESTRING_VALIDATION_CHUNK_SIZE,
@@ -373,10 +370,10 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
         return
 
-    def _count_file_lines(self, f):
-        for i,line in enumerate(f.readlines()):
-            pass
-        return i+1
+    @staticmethod
+    def _count_file_lines(file_handle):
+        '''return the number of lines in a text file including empty ones'''
+        return sum(1 for el in file_handle)
 
     def _estimate_file_lines(self, fh, file_size, max_lines = 50000):
         lines = 0
@@ -427,12 +424,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                           offset,
                           line_buffer,
                           logfile=None):
-        '''
-        validate evidence strings from a chunk
-        cumulate the logs, acquire a lock,
-        write the logs
-        write the data to the database
-        '''
+        ''' validate evidence strings from a chunk cumulate the logs, acquire a
+        lock, write the logs write the data to the database '''
 
         line_counter = offset
 
@@ -454,6 +447,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             '''validate'''
             disease_failed = False
             gene_failed = False
+            gene_mapping_failed = False
             target_id = None
             efo_id = None
             data_type = None
@@ -461,30 +455,32 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             uniq_elements_flat_hexdig = None #uuid.uuid4().hex
 
             if parsed_line is not None:
-                if (('label' in parsed_line or
-                             'type' in parsed_line) and
-                            'validated_against_schema_version' in parsed_line and
-                            parsed_line['validated_against_schema_version'] == Config.EVIDENCEVALIDATION_SCHEMA):
+                # schema validation of the line
+                if all((any(k in parsed_line for k in ('label', 'type')),
+                        parsed_line.get('validated_against_schema_version', '') == \
+                        Config.EVIDENCEVALIDATION_SCHEMA)):
+
                     if 'label' in parsed_line:
                         parsed_line['type'] = parsed_line.pop('label', None)
                     data_type = parsed_line['type']
-                elif (not 'validated_against_schema_version' in parsed_line or
-                          ('validated_against_schema_version' in parsed_line and
-                                   parsed_line['validated_against_schema_version'] != Config.EVIDENCEVALIDATION_SCHEMA)):
+
+                elif parsed_line.get('validated_against_schema_version', '') == \
+                     Config.EVIDENCEVALIDATION_SCHEMA:
                     explanation['invalid_schema'] = True
                     self.logger.error(
                         "Line %i: Not a valid %s evidence string - please check the 'validated_against_schema_version' "
                         "mandatory attribute" % (
                         line_counter + 1, Config.EVIDENCEVALIDATION_SCHEMA))
 
-
             if data_type is None:
                 explanation['missing_datatype'] = True
                 self.logger.error(
                     "Line %i: Not a valid %s evidence string - please add the mandatory 'type' attribute" % (
                         line_counter + 1, Config.EVIDENCEVALIDATION_SCHEMA))
+
             elif data_type not in Config.EVIDENCEVALIDATION_DATATYPES:
                 explanation['unsupported_datatype'] = data_type
+
             else:
                 evidence_obj = None
                 if data_type == 'genetic_association':
@@ -519,20 +515,16 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                     uniq_elements_flat = DatatStructureFlattener(uniq_elements)
                     uniq_elements_flat_hexdig = uniq_elements_flat.get_hexdigest()
 
-                    '''
-                    VALIDATE EVIDENCE STRING
-                    This will return errors and
-                    will log the errors in the chosen logger
-                    '''
-                    evidence_obj_validation_error_count = evidence_obj.validate(self.logger)#TODO it is not correct to pass a logger here. We should use the correct logging namespace
 
-                    '''
-                    CHECK DISEASE IDENTIFIER
-                    Now check that the disease IRI is a valid disease term
-                    There is only one disease to look at
-                    '''
+                    # VALIDATE EVIDENCE STRING This will return errors and will log the errors in
+                    # the chosen logger
+                    # TODO it is not correct to pass a logger here. We should use the correct logging namespace
+                    evidence_obj_validation_error_count = evidence_obj.validate(self.logger)
+
+                    # CHECK DISEASE IDENTIFIER Now check that the disease IRI is a valid disease
+                    #term There is only one disease to look at
                     if efo_id:
-                        ' Check disease term or phenotype term '
+                        # Check disease term or phenotype term
                         #if (short_disease_id not in self.lookup_data.available_efos) and \
                         if (efo_id not in self.lookup_data.efo_ontology.current_classes) and \
                                 (efo_id not in self.lookup_data.hpo_ontology.current_classes) and \
@@ -549,11 +541,9 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                         explanation['missing_disease'] = True
                         disease_failed = True
 
-                    '''
-                    CHECK GENE/PROTEIN IDENTIFIER
-                    Check Ensembl ID, UniProt ID and UniProt ID mapping to a Gene ID
-                    http://identifiers.org/ensembl/ENSG00000178573
-                    '''
+                    # CHECK GENE/PROTEIN IDENTIFIER Check Ensembl ID, UniProt ID
+                    # and UniProt ID mapping to a Gene ID
+                    # http://identifiers.org/ensembl/ENSG00000178573
                     if target_id:
                         ensemblMatch = re.match('http://identifiers.org/ensembl/(ENSG\d+)', target_id)
                         uniprotMatch = re.match('http://identifiers.org/uniprot/(.{4,})$', target_id)
@@ -598,18 +588,13 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                 if target_id is None:
                                     self.logger.info("Found no target id for %s" % (uniprot_id))
 
-                    '''
-                    If there is no target id after the processing step
-                    '''
-                    if  target_id is None:
+
+                    # If there is no target id after the processing step
+                    if target_id is None:
                         explanation['missing_target_id'] = True
                         gene_failed = True
 
-
-
-
-
-            '''flag as valid or not'''
+            # flag as valid or not
             if evidence_obj_validation_error_count == 0 and not disease_failed and not gene_failed:
                 is_valid = True
             else:
@@ -640,11 +625,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                file_name = file_path))
             loader_kwargs = dict(create_index=False)
             return loader_args, loader_kwargs
-
-
-
-
-
 
 
 #
