@@ -225,7 +225,7 @@ class Config():
         'genetic_literature': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/literature_curated.json',
         'affected_pathway': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/literature_curated.json',
         'somatic_mutation': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/literature_curated.json',
-        'drug': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/drug.json',
+        'known_drug': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/drug.json',
         'literature_mining': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/literature_mining.json',
         'animal_model': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/animal_models.json'
     }
