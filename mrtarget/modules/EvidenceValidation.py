@@ -474,6 +474,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                   line_counter, Config.EVIDENCEVALIDATION_SCHEMA)
 
             elif data_type not in Config.EVIDENCEVALIDATION_DATATYPES:
+                self.logger.error('unsupported_datatype with data type %s and line %s', data_type, parsed_line)
                 explanation['unsupported_datatype'] = data_type
 
             else:
@@ -572,7 +573,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             if not disease_failed and not gene_failed:
                 is_valid = True
             else:
-                self.logger.error('evidence validation step failed at the end with an explanation')
+                self.logger.error('evidence validation step failed at the end with an explanation %s', str(explanation))
                 explanation['disease_error'] = disease_failed
                 explanation['gene_error'] = gene_failed
                 explanation['gene_mapping_failed'] = gene_mapping_failed
