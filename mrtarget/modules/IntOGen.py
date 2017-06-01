@@ -3,6 +3,7 @@ import logging
 import datetime
 from mrtarget.common import Actions
 from mrtarget.Settings import Config, file_or_resource
+#from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 import opentargets.model.core as opentargets
 import opentargets.model.bioentity as bioentity
 import opentargets.model.evidence.core as evidence_core
@@ -119,13 +120,14 @@ class IntOGenActions(Actions):
 
 class IntOGen():
 
-    def __init__(self, es, sparql):
+    def __init__(self, es=None, r_server=None):
         self.es = es
+        self.r_server=r_server
         self.esquery = ESQuery(self.es)
-        self.sparql = sparql
         self.evidence_strings = list()
         self.ensembl_current = {}
         self.symbols = {}
+
 
     def load_Ensembl(self):
 
@@ -313,7 +315,9 @@ def main():
 
     logging.info("Load IntOGen data")
     itg = IntOGen()
-    itg.read_intogen('')
+    itg.load_Ensembl()
+    itg.read_intogen('/Users/otvisitor/Documents/work/github/data_pipeline/mrtarget/resources/intogen_opentargets.tsv')
+    itg.write_evidence_strings('/Users/otvisitor/Documents/work/github/data_pipeline/mrtarget/resources/intogen_01062017.json')
 
 if __name__ == "__main__":
     main()
