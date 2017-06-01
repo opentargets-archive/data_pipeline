@@ -84,7 +84,7 @@ class Loader():
             if check_custom_idxs and \
             Config.ES_CUSTOM_IDXS and \
             Config.ES_CUSTOM_IDXS_INI and \
-            Config.ES_CUSTOM_IDXS.has_option('indexes', raw_name) \
+            Config.ES_CUSTOM_IDXS_INI.has_option('indexes', raw_name) \
             else Config.RELEASE_VERSION + '_' + index_name
 
         return idx_name + suffix
