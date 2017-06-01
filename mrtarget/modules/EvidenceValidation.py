@@ -402,7 +402,10 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.logger = logging.getLogger(__name__)
 
     def process(self, data):
-        file_path, data_source_name, logfile, offset, line_buffer = data
+        # file_path, file_version, provider_id, data_source_name, md5_hash,
+        # logfile, chunk, offset, line_buffer, end_of_transmission = data
+        file_path, file_version, provider_id, data_source_name, md5_hash, \
+            logfile, chunk, offset, line_buffer, end_of_transmission = data
         return self.validate_evidence(file_path,
                                       data_source_name,
                                       offset,
@@ -426,7 +429,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         validators = \
             generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
         # going per line inside buffer
-        for line in line_buffer:
+        for i, line in enumerate(line_buffer):
+            line_counter = line_counter + i
             is_valid = False
             explanation = {}
             disease_failed = False
@@ -446,8 +450,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 json_doc_hashdig = hashlib.md5(line).hexdigest()
                 explanation['unparsable_json'] = True
 
-            if all(parsed_line is not None,
-                   (any(k in parsed_line for k in ('label', 'type')))):
+            if all([parsed_line is not None,
+                    (any(k in parsed_line for k in ('label', 'type')))]):
                 # setting type from label in case we have label??
                 if 'label' in parsed_line:
                     parsed_line['type'] = parsed_line.pop('label', None)
@@ -473,18 +477,18 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 explanation['unsupported_datatype'] = data_type
 
             else:
-                validation_errors = [e for e in validators[data_type].iter_errors(line)]
+                validation_errors = [str(e) for e in validators[data_type].iter_errors(parsed_line)]
 
                 if validation_errors:
                     # here I have to log all fails to logger and elastic
-                    error_messages = ' '.join((el.message for el in validation_errors))
+                    error_messages = ' '.join(validation_errors)
                     explanation['validation_errors'] = error_messages
                     self.logger.error('validation_errors failed to validate line %i with these errors %s',
                                       line_counter, error_messages)
 
                 else:
                     # generate fantabulous dict from addict
-                    evidence_obj = Dict(line)
+                    evidence_obj = Dict(parsed_line)
 
                     if evidence_obj.target.id:
                         target_id = evidence_obj.target.id
