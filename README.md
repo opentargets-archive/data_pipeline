@@ -13,12 +13,6 @@ Just install via pip `pip install mrtarget` and then you will have a pretty
 ready to use application. Just call `mrtarget -h` and it will work as usual
 previous data_pipeline commands.
 
-*Do not forget to install this once after `mrtarget` installation:
-
-```bash
-$ python -m spacy.en.download
-$ python -m nltk.downloader all-corpora
-
 ```
 
 ### db.ini

@@ -20,6 +20,7 @@ from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
 from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common.connection import PipelineConnectors
 
 
 logger = logging.getLogger(__name__)
@@ -958,7 +959,8 @@ class EvidenceProcesser(multiprocessing.Process):
                  processing_errors_count,
                  input_processed_count,
                  lock,
-                 inject_literature):
+                 inject_literature,
+                 es=None):
         super(EvidenceProcesser, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
@@ -973,7 +975,11 @@ class EvidenceProcesser(multiprocessing.Process):
         self.start_time = time.time()  # reset timer start
         self.lock = lock
         self.inject_literature = inject_literature
-        es = Elasticsearch(Config.ELASTICSEARCH_NODES)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
+        # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
         self.pub_fetcher = PublicationFetcher(es)
 
     def run(self):
@@ -1041,7 +1047,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
                  output_generated_count,
                  lock,
                  chunk_size=1e4,
-                 dry_run=False
+                 dry_run=False,
+                 es=None
                  ):
         super(EvidenceStorerWorker, self).__init__()
         self.q = processing_output_q
@@ -1050,7 +1057,11 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.processing_finished = processing_finished
         self.output_generated_count = output_generated_count
         self.total_loaded = submitted_to_storage
-        self.es = Elasticsearch(Config.ELASTICSEARCH_NODES)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
+        self.es = es
         self.lock = lock
         self.dry_run = dry_run
 
