@@ -94,7 +94,7 @@ class HPADataDownloader():
 
         :return: dict
         """
-        logging.info('get normal tissue rows into dicts')
+        self.logger.info('get normal tissue rows into dicts')
         table = (
             petl.fromcsv(URLZSource(Config.HPA_NORMAL_TISSUE_URL))
             .rename({'Tissue': 'tissue',
@@ -115,7 +115,7 @@ class HPADataDownloader():
 
         :return: dict
         """
-        logging.info('get rna tissue rows into dicts')
+        self.logger.info('get rna tissue rows into dicts')
         table = (
             petl.fromcsv(URLZSource(Config.HPA_RNA_URL))
             .rename({'Sample': 'sample',
@@ -129,7 +129,7 @@ class HPADataDownloader():
             yield d
 
     def retrieve_cancer_data(self):
-        logging.info('retrieve cancer data from HPA')
+        self.logger.info('retrieve cancer data from HPA')
         table = (
             petl.fromcsv(URLZSource(Config.HPA_CANCER_URL))
             .rename({'Tumor': 'tumor',
@@ -146,7 +146,7 @@ class HPADataDownloader():
             yield d
 
     def retrieve_subcellular_location_data(self):
-        logging.info('retrieve subcellular location data from HPA')
+        self.logger.info('retrieve subcellular location data from HPA')
         table = (
             petl.fromcsv(URLZSource(Config.HPA_SUBCELLULAR_LOCATION_URL))
             .rename({'Main location': 'main_location',
@@ -208,11 +208,11 @@ class HPAProcess():
         for gene in self.available_genes:
             self.data[gene]['expression'].tissues, \
             self.data[gene]['expression'].cell_lines = self.get_rna_data_for_gene(gene)
-        logging.info('process_rna completed')
+        self.logger.info('process_rna completed')
         return
 
     def store_data(self):
-        logging.info('store_data called')
+        self.logger.info('store_data called')
         if self.data.values()[0]['expression']:  # if there is expression data
 
             for gene, data in self.data.items():

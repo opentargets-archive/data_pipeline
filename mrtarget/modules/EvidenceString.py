@@ -18,12 +18,13 @@ from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
-from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy
+from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common.connection import PipelineConnectors
+
 
 logger = logging.getLogger(__name__)
 # logger = multiprocessing.get_logger()
-
 
 
 '''line profiler code'''
@@ -254,7 +255,7 @@ class EvidenceManager():
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
         self._get_eco_scoring_values()
-        # logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
+        #logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
         # self.gene_retriever = GeneLookUpTable(self.es)
@@ -264,6 +265,7 @@ class EvidenceManager():
         self.available_publications = {}
         if 'available_publications' in lookup_data.__dict__:
             self.available_publications = lookup_data.available_publications
+        self.noun_chuncker = NounChuncker()
 
 
         # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
@@ -332,6 +334,7 @@ class EvidenceManager():
             except KeyError:
                 if 'evidence_codes' in evidence['evidence']:
                     eco_uri = evidence['evidence']['evidence_codes'][0]
+                    eco_uri.rstrip()
 
 
             if eco_uri in self.eco_scores:
@@ -581,50 +584,53 @@ class EvidenceManager():
             if 'literature' in extended_evidence and \
                     'references' in extended_evidence['literature'] and \
                     extended_evidence['literature']['references']:
-                pmid_url = extended_evidence['literature']['references'][0]['lit_id']
-                pmid = pmid_url.split('/')[-1]
-                pubs={}
-                if pmid in self.available_publications:
-                    pub = self.available_publications[pmid]
-                    pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
-                else:
-                    # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
-                    try:
-                        pub_dict = pub_fetcher.get_publications(pmid)
-                        if pub_dict:
-                            pubs[pmid] = [pub_dict[pmid], PublicationAnalysisSpacy(pmid)]
-                            # self.available_publications.set_literature(pub_dict[pmid])
-                    except KeyError as e:
-                        print e
-                        logger.error('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
+                try:
+                    pmid_url = extended_evidence['literature']['references'][0]['lit_id']
+                    pmid = pmid_url.split('/')[-1]
+                    pubs={}
+                    if pmid in self.available_publications:
+                        pub = self.available_publications[pmid]
+                        pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
+                    else:
+                        # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
+                        try:
+                            pub_dict = pub_fetcher.get_publications(pmid)
+                            if pub_dict:
+                                pubs[pmid] = [pub_dict[pmid], PublicationAnalysisSpacy(pmid)]
+                                # self.available_publications.set_literature(pub_dict[pmid])
+                        except KeyError as e:
+                            logger.warning('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
 
 
-                if pubs:
-                    literature_info = ExtendedInfoLiterature(pubs[pmid][0], pubs[pmid][1])
-                    extended_evidence['literature']['date'] = literature_info.data['date']
-                    extended_evidence['literature']['abstract'] = literature_info.data['abstract']
-                    extended_evidence['literature']['journal_data'] = literature_info.data['journal']
-                    extended_evidence['literature']['title'] = literature_info.data['title']
-                    journal_reference = ''
-                    if 'volume' in literature_info.data['journal_reference']:
-                        journal_reference += literature_info.data['journal_reference']['volume']
-                    if 'issue' in literature_info.data['journal_reference']:
-                        journal_reference += "(%s)" % literature_info.data['journal_reference']['issue']
-                    if 'pgn' in literature_info.data['journal_reference']:
-                        journal_reference += ":%s" % literature_info.data['journal_reference']['pgn']
-                    extended_evidence['literature']['journal_reference'] = journal_reference
-                    extended_evidence['literature']['authors'] = literature_info.data['authors']
-                    extended_evidence['private']['facets']['literature'] = {}
-                    # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
-                    #     'abstract_lemmas')
-                    extended_evidence['literature']['doi'] = literature_info.data.get('doi')
-                    extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
-                    extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
-                        'mesh_headings')
-                    # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
-                    #     'chemicals')
-                    # extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
-                    #     'noun_chunks')
+                    if pubs:
+                        pub, pub_analysis = pubs[pmid][0], pubs[pmid][1]
+                        literature_info = ExtendedInfoLiterature(pub, pub_analysis)
+                        extended_evidence['literature']['date'] = literature_info.data['date']
+                        extended_evidence['literature']['abstract'] = literature_info.data['abstract']
+                        extended_evidence['literature']['journal_data'] = literature_info.data['journal']
+                        extended_evidence['literature']['title'] = literature_info.data['title']
+                        journal_reference = ''
+                        if 'volume' in literature_info.data['journal_reference']:
+                            journal_reference += literature_info.data['journal_reference']['volume']
+                        if 'issue' in literature_info.data['journal_reference']:
+                            journal_reference += "(%s)" % literature_info.data['journal_reference']['issue']
+                        if 'pgn' in literature_info.data['journal_reference']:
+                            journal_reference += ":%s" % literature_info.data['journal_reference']['pgn']
+                        extended_evidence['literature']['journal_reference'] = journal_reference
+                        extended_evidence['literature']['authors'] = literature_info.data['authors']
+                        extended_evidence['private']['facets']['literature'] = {}
+                        # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
+                        #     'abstract_lemmas')
+                        extended_evidence['literature']['doi'] = literature_info.data.get('doi')
+                        extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
+                        extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
+                            'mesh_headings')
+                        # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
+                        #     'chemicals')
+                        extended_evidence['private']['facets']['literature']['noun_chunks'] = self.noun_chuncker.digest(
+                            pub.get_text_to_analyze())
+                except Exception:
+                    logger.exception('Error in publication data injection - skipped for evidence id: '+extended_evidence['id'])
 
         return Evidence(extended_evidence)
 
@@ -678,6 +684,7 @@ class EvidenceManager():
         for line in file(file_or_resource('eco_scores.tsv')):
             try:
                 uri, label, score = line.strip().split('\t')
+                uri.rstrip()
                 self.eco_scores[uri] = float(score)
             except:
                 logger.error("cannot parse line in eco_scores.tsv: %s" % (line.strip()))
@@ -936,7 +943,8 @@ class EvidenceProcesser(multiprocessing.Process):
                  processing_errors_count,
                  input_processed_count,
                  lock,
-                 inject_literature):
+                 inject_literature,
+                 es=None):
         super(EvidenceProcesser, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
@@ -951,7 +959,11 @@ class EvidenceProcesser(multiprocessing.Process):
         self.start_time = time.time()  # reset timer start
         self.lock = lock
         self.inject_literature = inject_literature
-        es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
+        # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
         self.pub_fetcher = PublicationFetcher(es)
 
     def run(self):
@@ -1019,7 +1031,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
                  output_generated_count,
                  lock,
                  chunk_size=1e4,
-                 dry_run=False
+                 dry_run=False,
+                 es=None
                  ):
         super(EvidenceStorerWorker, self).__init__()
         self.q = processing_output_q
@@ -1028,7 +1041,11 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.processing_finished = processing_finished
         self.output_generated_count = output_generated_count
         self.total_loaded = submitted_to_storage
-        self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
+        self.es = es
         self.lock = lock
         self.dry_run = dry_run
 

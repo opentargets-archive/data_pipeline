@@ -16,6 +16,7 @@ from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
+from mrtarget.common.connection import PipelineConnectors
 
 
 
@@ -426,7 +427,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
 
 
 
-class ScoreProducer(RedisQueueWorkerThread):
+class ScoreProducer(RedisQueueWorkerProcess):
 
     def __init__(self,
                  evidence_data_q,
@@ -485,7 +486,10 @@ class ScoreProducer(RedisQueueWorkerThread):
 
                 score.set_disease_data(disease_data)
 
-                return (target, disease, score)
+                if score: #bypass associations with overall score=0
+                    return (target, disease, score.to_json())
+                else:
+                    logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
 
 
 
@@ -494,12 +498,17 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
                  score_q,
                  r_path,
                  chunk_size = 1e4,
-                 dry_run = False
+                 dry_run = False,
+                 es = None
                  ):
         super(ScoreStorerWorker, self).__init__(score_q, r_path)
         self.q = score_q
         self.chunk_size = chunk_size
-        self.es = Elasticsearch(Config.ELASTICSEARCH_URL)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
+        self.es = es
         self.loader = Loader(self.es,
                              chunk_size=self.chunk_size,
                              dry_run=dry_run)
@@ -511,16 +520,14 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
             pass
         target, disease, score = data
         element_id = '%s-%s' % (target, disease)
-        if score: #bypass associations with overall score=0
-            self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+        self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
                                Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                element_id,
-                               score.to_json(),
+                               score,
                                create_index=False,
                                # routing=score.target['id'],
                             )
-        else:
-            logger.warning('Skipped association with score 0: %s'%element_id)
+
 
     def close(self):
         self.loader.close()
@@ -583,13 +590,13 @@ class ScoringProcess():
                                            job_timeout=1200,
                                            batch_size=10,
                                            r_server=self.r_server,
-                                           serialiser='jsonpickle')
+                                           serialiser='pickle')
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
                                   max_size=queue_per_worker * number_of_storers,
                                   job_timeout=1200,
                                   batch_size=10,
                                   r_server=self.r_server,
-                                  serialiser='jsonpickle')
+                                  serialiser='pickle')
 
         q_reporter = RedisQueueStatusReporter([target_q,
                                                target_disease_pair_q,
@@ -614,7 +621,7 @@ class ScoringProcess():
                                  self.r_server.db,
                                  score_data_q,
                                  lookup_data,
-                                 ) for i in range(1)]
+                                 ) for i in range(number_of_workers)]
         for w in scorers:
             w.start()
 

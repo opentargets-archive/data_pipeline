@@ -5,7 +5,7 @@ import requests
 import time
 
 from mrtarget.common import Actions
-from mrtarget.Settings import Config
+from mrtarget.Settings import Config, build_ensembl_sql
 
 '''
 
@@ -36,7 +36,9 @@ class EnsemblMysqlGene(object):
         Execute an SQL statement, process its output and return a list of Ensembl stable IDs.
         :return: list
         '''
-        sql = 'SELECT stable_id FROM gene'
+        sql = build_ensembl_sql(Config.MINIMAL_ENSEMBL) \
+              if Config.MINIMAL else 'SELECT stable_id FROM gene'
+
         cursor = self.conn.cursor()
         cursor.execute(sql)
         ensembl_gene_ids = [element[0] for element in cursor.fetchall()]

@@ -24,13 +24,13 @@ __status__ = "Production"
 INTOGEN_RELEASE_DATE = ''
 #INTOGEN_FILENAME = 'C:\Users\gk680303\github\data_pipeline\resources\intogen_opentargets.tsv'
 INTOGEN_FILENAME = file_or_resource('intogen_opentargets.tsv')
-INTOGEN_EVIDENCE_FILENAME = '/Users/koscieln/Documents/data/ftp/cttv001/upload/submissions/cttv001_intogen-29-07-2016.json'
+INTOGEN_EVIDENCE_FILENAME = '/Users/otvisitor/Documents/work/github/data_pipeline/mrtarget/resources/cttv001_intogen-01-06-2017.json'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {
     'A' : 'the gene exhibits several signals of positive selection in the tumor type',
     'B' : 'the gene is already described as a cancer gene and exhibits a signal of positive selection in the tumor type',
     'C' : 'the gene exhibits a signal of positive selection and is functionally connected to the genes with evidence A or B in the tumor type'
-}
+}q
 INTOGEN_ROLE_MAP = {
     'Act' : 'http://identifiers.org/cttv.activity/gain_of_function',
     'LoF' : 'http://identifiers.org/cttv.activity/loss_of_function',
@@ -198,7 +198,7 @@ class IntOGen():
                         value=INTOGEN_SCORE_MAP[Evidence])
 
                     evidenceString = opentargets.Literature_Curated()
-                    evidenceString.validated_against_schema_version = '1.2.3'
+                    evidenceString.validated_against_schema_version = '1.2.5'
                     evidenceString.access_level = "public"
                     evidenceString.type = "somatic_mutation"
                     evidenceString.sourceID = "intogen"
@@ -236,8 +236,9 @@ class IntOGen():
                         logging.error("%s is not found in Ensembl" % Symbol)
                         continue
 
+                    logging.error(ensembl_gene_id)
                     evidenceString.target = bioentity.Target(
-                                            id = [ "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id) ], #["http://identifiers.org/ensembl/{0}".format(Ensg)],
+                                            id = "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id), #["http://identifiers.org/ensembl/{0}".format(Ensg)],
                                             target_name = Symbol,
                                             activity=INTOGEN_ROLE_MAP[Role],
                                             target_type='http://identifiers.org/cttv.target/gene_evidence'
@@ -245,8 +246,8 @@ class IntOGen():
 
                     ''' disease information '''
                     evidenceString.disease = bioentity.Disease(
-                                            id = [INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['uri']],
-                                            name=[INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['label']]
+                                            id = INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['uri'],
+                                            name=INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['label']
                                             )
 
                     ''' evidence '''
@@ -310,10 +311,9 @@ class IntOGen():
         tp_file.close()
 
 def main():
-
-    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
-
-    logging.info("Load IntOGen data")
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("Load IntOGen data")
     itg = IntOGen()
     itg.load_Ensembl()
     itg.read_intogen('/Users/otvisitor/Documents/work/github/data_pipeline/mrtarget/resources/intogen_opentargets.tsv')

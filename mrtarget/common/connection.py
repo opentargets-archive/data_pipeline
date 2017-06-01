@@ -34,38 +34,6 @@ class PipelineConnectors():
         connection_attempt = 1
         success = False
         hosts = Config.ELASTICSEARCH_NODES
-        # if len(Config.ELASTICSEARCH_NODES) > 1 and Config.ELASTICSEARCH_PORT:
-        #     hosts = [dict(host=node, port=int(Config.ELASTICSEARCH_PORT))
-        #              for node in Config.ELASTICSEARCH_NODES]
-
-        # elif Config.ELASTICSEARCH_HOST and Config.ELASTICSEARCH_PORT:
-        #     while 1:
-        #         import socket
-
-        #         # is a valid ip
-        #         try:
-        #             socket.inet_aton(Config.ELASTICSEARCH_HOST)
-        #             hosts = [dict(host=Config.ELASTICSEARCH_HOST,
-        #                           port=int(Config.ELASTICSEARCH_PORT))]
-        #             break
-
-        #         # resolve nameserver to list of ips
-        #         except socket.error:
-        #             try:
-        #                 socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)
-        #                 nr_host = set([i[4][0] for i in socket.getaddrinfo(Config.ELASTICSEARCH_HOST, Config.ELASTICSEARCH_PORT)])
-        #                 hosts = [dict(host=h, port=int(Config.ELASTICSEARCH_PORT)) for h in nr_host ]
-        #                 self.logger.info('Elasticsearch resolved to %i hosts: %s' %(len(hosts), hosts))
-        #                 break
-        #             except socket.gaierror:
-        #                 wait_time = 5 * connection_attempt
-        #                 self.logger.warn('Cannot resolve Elasticsearch to ip list. retrying in %i' % wait_time)
-        #                 self.logger.warn('/etc/resolv.conf file: content: \n%s'%file('/etc/resolv.conf').read())
-        #                 time.sleep(wait_time)
-        #                 if connection_attempt >= 3:
-        #                     self.logger.error('Elasticsearch is not resolvable at %s' % Config.ELASTICSEARCH_URL)
-        #                     break
-        #                 connection_attempt+=1
         if hosts:
             self.es = Elasticsearch(hosts=hosts,
                                     maxsize=50,
@@ -85,12 +53,12 @@ class PipelineConnectors():
                     self.logger.warn('Cannot connect to Elasticsearch retrying in %i', wait_time)
                     time.sleep(wait_time)
                     if connection_attempt >= 3:
-                        raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % Config.ELASTICSEARCH_NODES)
+                        raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES))
                     connection_attempt += 1
-                self.logger.info('Connected to elasticsearch nodes: %s', Config.ELASTICSEARCH_NODES)
+                self.logger.info('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
                 success = True
-            except ConnectionTimeout as e:
-                self.logger.exception(e)
+            except ConnectionTimeout:
+                self.logger.exception("Elasticsearch connection timeout")
 
         else:
             self.logger.warn('No valid configuration available for elasticsearch')
