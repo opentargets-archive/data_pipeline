@@ -575,7 +575,7 @@ class ScoringProcess():
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
         '''create queues'''
-        number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        number_of_workers = Config.WORKERS_NUMBER
         number_of_storers = number_of_workers
         queue_per_worker = 250
         if targets and len(targets) <number_of_workers:

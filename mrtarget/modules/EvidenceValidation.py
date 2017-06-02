@@ -116,7 +116,7 @@ class FileProcesser():
         self.local_files = local_files
         self.remote_files = remote_files
         self.logger = logging.getLogger(__name__)
-        self.dry_run = dry_run,
+        self.dry_run = dry_run
         self.increment = increment
 
 
@@ -124,11 +124,9 @@ class FileProcesser():
         self.logger.debug("skipped "+path)
 
     def run(self):
-        '''
-        create index for"
-         the evidence if it does not exists
-         if the evidence index exists, the index
-         the submitted files if it does not exists
+        ''' create index for" the evidence if it does not exists if the
+        evidence index exists, the index the submitted files if it does not
+        exists
         '''
 
         self.logger.info("%s started" % self.__class__.__name__)
@@ -238,7 +236,6 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         self.loader = Loader(self.es)
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
-
 
     def process(self, data):
         file_path, file_version, provider_id, data_source_name, md5_hash, logfile, file_type = data
@@ -1227,10 +1224,7 @@ class EvidenceValidationFileChecker():
                   remote_files = [],
                   increment = False,
                   dry_run = False):
-        '''
-        Check every given evidence string
-        :return:
-        '''
+        '''Check every given evidence string'''
 
         #self.load_mp()
         #return;
@@ -1250,7 +1244,7 @@ class EvidenceValidationFileChecker():
 
         # lookup_data.available_genes.load_uniprot2ensembl()
 
-        workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        workers_number = Config.WORKERS_NUMBER
         loaders_number = int(workers_number/2+1)
         readers_number = min([3, len(local_files)+len(remote_files)])
         max_loader_chunk_size = 1000
@@ -1291,11 +1285,7 @@ class EvidenceValidationFileChecker():
         for w in readers:
             w.start()
 
-
-
-
-        'Start validating the evidence in chunks on the evidence queuei'
-
+        # Start validating the evidence in chunks on the evidence queue
         validators = [ValidatorProcess(evidence_q,
                                        self.r_server.db,
                                        store_q,

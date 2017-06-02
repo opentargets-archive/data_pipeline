@@ -495,7 +495,7 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
                                                                                sums_vector,
                                                                                data_vector
                                                                                )
-                          for i in range(multiprocessing.cpu_count()*2)]
+                          for i in range(Config.WORKERS_NUMBER)]
         for w in pair_producers:
             w.start()
         for i in tqdm(range(len(subject_ids[:limit])),
@@ -612,7 +612,7 @@ class DataDrivenRelationProcess(object):
         disease_keys = disease_data.keys()
         target_keys = target_data.keys()
 
-        number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        number_of_workers = Config.WORKERS_NUMBER
         number_of_storers = number_of_workers / 2
         queue_per_worker =150
 

@@ -295,7 +295,7 @@ class LiteratureNLPProcess(object):
         #todo, add method to process all cached publications??
 
         # Literature Queue
-        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        no_of_workers = Config.WORKERS_NUMBER
 
         literature_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_analyzer_q',
                                   max_size=MAX_CHUNKS*no_of_workers,

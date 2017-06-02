@@ -288,7 +288,7 @@ class SearchObjectProcess(object):
         workers = [SearchObjectAnalyserWorker(queue,
                                               self.r_server.db,
                                               lookup=lookup_data,
-                                              dry_run=dry_run) for i in range(multiprocessing.cpu_count())]
+                                              dry_run=dry_run) for i in range(Config.WORKERS_NUMBER)]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()

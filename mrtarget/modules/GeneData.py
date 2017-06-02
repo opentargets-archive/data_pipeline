@@ -640,7 +640,7 @@ class GeneManager():
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
-        workers = [GeneObjectStorer(self.loader.es,self.r_server,queue, dry_run=dry_run) for i in range(multiprocessing.cpu_count())]
+        workers = [GeneObjectStorer(self.loader.es,self.r_server,queue, dry_run=dry_run) for i in range(Config.WORKERS_NUMBER)]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()

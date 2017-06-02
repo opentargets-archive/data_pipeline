@@ -443,7 +443,7 @@ class MedlineRetriever(object):
                 self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
             self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
-        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        no_of_workers = Config.WORKERS_NUMBER
         ftp_readers = no_of_workers
         max_ftp_readers = 8 #avoid too many connections errors
         if ftp_readers >max_ftp_readers:
