@@ -29,7 +29,7 @@ class EvidenceStringReader(object):
         with URLZSource(filename).open() as fh:
 
             logging.info('Starting parsing %s' % filename)
-            validator = generate_validator_from_schema(uri)
+            validator = None
 
             for line in fh:
                 out_line = line.rstrip()
@@ -39,6 +39,9 @@ class EvidenceStringReader(object):
                 if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
                     if data_type == 'genetic_association':
                         uri = Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[data_type]
+                        if not validator:
+                            validator = generate_validator_from_schema(uri)
+
                         validation_errors = [str(e) for e in \
                                              validator.iter_errors(python_raw)]
 
@@ -55,14 +58,15 @@ class EvidenceStringReader(object):
                                                                                  }})
                                 # from addict to python dict
 
+                                composed_dict = obj.to_dict()
                                 validation_errors = [str(e) for e in \
-                                                    validator.iter_errors(python_raw)]
+                                                    validator.iter_errors(composed_dict)]
                                 if validation_errors:
                                     print "error: second pass when added resource_score with errors %s" + \
                                         '\n'.join(validation_errors)
                                 else:
                                     # adding to file because is ok
-                                    out_line = json.dumps(obj.to_dict())
+                                    out_line = json.dumps(composed_dict)
                             else:
                                 print obj.evidence.gene2variant.resource_score.value
                         else:
