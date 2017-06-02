@@ -12,13 +12,12 @@ import json
 
 
 def url_to_stream(url, *args, **kwargs):
-    '''request a url using requests pkg and pass *args and
-    **kwargs to requests.get function (useful for proxies)
-    and returns the filled file descriptor from a
-    tempfile.NamedTemporaryFile
+    '''request a url using requests pkg and pass *args and **kwargs to
+    requests.get function (useful for proxies) and returns the filled file
+    descriptor from a tempfile.NamedTemporaryFile
 
-    If you want to stream a raw uri (and not compressed) use the
-    parameter `enable_stream=True`
+    If you want to stream a raw uri (and not compressed) use the parameter
+    `enable_stream=True`
     '''
     f = r.get(url, *args, stream=True, **kwargs)
     f.raise_for_status()
@@ -34,18 +33,18 @@ def url_to_stream(url, *args, **kwargs):
 
 @contextmanager
 def url_to_tmpfile(url, *args, **kwargs):
-    '''request a url using requests pkg and pass *args and
-    **kwargs to requests.get function (useful for proxies)
-    and returns the filled file descriptor from a
-    tempfile.NamedTemporaryFile
+    '''request a url using requests pkg and pass *args and **kwargs to
+    requests.get function (useful for proxies) and returns the filled file
+    descriptor from a tempfile.NamedTemporaryFile
     '''
     f = None
 
     if url.startswith('ftp://'):
         raise NotImplementedError('finish ftp')
 
-    elif url.startswith('file://'):
-        with open(url[len('file://'):],mode="r+b") as f:
+    elif url.startswith('file://') or ('://' not in url):
+        filename = url[len('file://'):] if '://' in url else url
+        with open(filename, mode="r+b") as f:
             yield f
 
     else:
@@ -73,7 +72,7 @@ class URLZSource(object):
         >>> # if Config.HAS_PROXY:
         ...    # self.proxies = {"http": Config.PROXY,
         ...                      # "https": Config.PROXY}
-        >>> # with URLZSource('http://var.foo/noname.csv',proxies=proxies) as f:
+        >>> # with URLZSource('http://var.foo/noname.csv',proxies=proxies).open() as f:
         >>> from __futures__ import absolute_import
         >>> import petl as p
         >>> t = p.fromcsv(mpetl.URLZSource('https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'), delimiter='|')

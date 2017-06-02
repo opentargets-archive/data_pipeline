@@ -218,6 +218,7 @@ def main():
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
                 PhenotypeSlim().create_phenotype_slim(args.local_file)
 
+        l_files = list(it.chain.from_iterable([el.split(",") for el in args.local_file]))
         r_files = list(it.chain.from_iterable([el.split(",") for el in args.remote_file]))
 
         if args.val or run_full_pipeline:
@@ -225,8 +226,7 @@ def main():
             if (ValidationActions.CHECKFILES in args.val) or do_all:
                 EvidenceValidationFileChecker(connectors.es,
                                               connectors.r_server,
-                                              dry_run=args.dry_run).check_all(local_files=args.local_file,
-                                                                              remote_files=r_files,
+                                              dry_run=args.dry_run).check_all(input_files=l_files + r_files,
                                                                               increment=args.increment)
         if args.valreset:
             EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()

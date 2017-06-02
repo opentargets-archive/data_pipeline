@@ -1,6 +1,7 @@
 import uuid
 from collections import defaultdict
 import os
+import re
 import json
 import ConfigParser
 import pkg_resources as res
@@ -255,9 +256,16 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk', 'bpalka@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk', 'cyenyxe@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
+    EVIDENCEVALIDATION_FILENAME_REGEX = re.compile(r""".*
+    (?P<name>cttv[0-9]{3})
+    (_(?P<datasource>[a-zA-Z0-9]*))?.*\-
+    (?P<d1>\d{2})\-
+    (?P<d2>\d{2})\-
+    (?P<d3>\d{4})
+    (?P<suffix>\.json\.gz|\.json)$""", re.VERBOSE)
 
-    # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
+    # setup the number of workers to use for data processing. if None defaults
+    # to the number of CPUs available
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
 
