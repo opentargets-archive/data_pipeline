@@ -515,7 +515,7 @@ class EvidenceValidationFileChecker():
 
         workers_number = Config.WORKERS_NUMBER
         loaders_number = int(workers_number/2+1)
-        readers_number = max([workers_number, len(input_files)])
+        readers_number = min([workers_number, len(input_files)])
         max_loader_chunk_size = 1000
         if (MAX_NB_EVIDENCE_CHUNKS / loaders_number) < max_loader_chunk_size:
             max_loader_chunk_size = int(MAX_NB_EVIDENCE_CHUNKS / loaders_number)

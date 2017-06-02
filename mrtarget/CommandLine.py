@@ -117,11 +117,8 @@ def main():
     parser.add_argument("--increment", dest='increment',
                         help="add new evidence from a data source but does not delete existing evidence. Works only for the validation step",
                         action='store_true', default=False)
-    parser.add_argument("--local-file", dest='local_file',
+    parser.add_argument("--input-file", dest='input_file',
                         help="pass the path to a local gzipped file to use as input for the data validation step",
-                        action='append', default=[])
-    parser.add_argument("--remote-file", dest='remote_file',
-                        help="pass the url to a remote gzipped file to use as input for the data validation step",
                         action='append', default=[])
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
@@ -204,7 +201,7 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
         if args.lit or run_full_pipeline:
             if LiteratureActions.FETCH in args.lit :
-                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.local_file)
+                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.input_file)
             if LiteratureActions.UPDATE in args.lit:
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(update=True)
             if LiteratureNLPActions.PROCESS in args.lit :
@@ -216,17 +213,16 @@ def main():
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
-                PhenotypeSlim().create_phenotype_slim(args.local_file)
+                PhenotypeSlim().create_phenotype_slim(args.input_file)
 
-        l_files = list(it.chain.from_iterable([el.split(",") for el in args.local_file]))
-        r_files = list(it.chain.from_iterable([el.split(",") for el in args.remote_file]))
+        input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
 
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.CHECKFILES in args.val) or do_all:
                 EvidenceValidationFileChecker(connectors.es,
                                               connectors.r_server,
-                                              dry_run=args.dry_run).check_all(input_files=l_files + r_files,
+                                              dry_run=args.dry_run).check_all(input_files=input_files,
                                                                               increment=args.increment)
         if args.valreset:
             EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
