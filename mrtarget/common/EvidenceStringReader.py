@@ -29,6 +29,7 @@ class EvidenceStringReader(object):
         with URLZSource(filename).open() as fh:
 
             logging.info('Starting parsing %s' % filename)
+            validator = generate_validator_from_schema(uri)
 
             for line in fh:
                 out_line = line.rstrip()
@@ -38,7 +39,6 @@ class EvidenceStringReader(object):
                 if data_type in Config.EVIDENCEVALIDATION_DATATYPES:
                     if data_type == 'genetic_association':
                         uri = Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[data_type]
-                        validator = generate_validator_from_schema(uri)
                         validation_errors = [str(e) for e in \
                                              validator.iter_errors(python_raw)]
 
@@ -54,7 +54,15 @@ class EvidenceStringReader(object):
                                                                                      'url': 'NA'
                                                                                  }})
                                 # from addict to python dict
-                                out_line = json.dumps(obj.to_dict())
+
+                                validation_errors = [str(e) for e in \
+                                                    validator.iter_errors(python_raw)]
+                                if validation_errors:
+                                    print "error: second pass when added resource_score with errors %s" + \
+                                        '\n'.join(validation_errors)
+                                else:
+                                    # adding to file because is ok
+                                    out_line = json.dumps(obj.to_dict())
                             else:
                                 print obj.evidence.gene2variant.resource_score.value
                         else:
@@ -67,7 +75,7 @@ def main():
 
     obj = EvidenceStringReader()
     # obj.parse_gzipfile(filename='file:///Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-22-11-2016.json.gz', out_file='/Users/koscieln/Documents/data/ftp/cttv012/upload/submissions/cttv012-28-11-2016.json')
-    obj.parse_gzipfile(filename='https://storage.googleapis.com/otar012-eva/17.06/cttv012-25-05-2017.json.gz', out_file='cttv012.out.json')
+    obj.parse_gzipfile(filename='https://storage.googleapis.com/otar012-eva/17.04/cttv012-02-05-2017.json.gz', out_file='cttv012.out.json')
 
 
 if __name__ == "__main__":
