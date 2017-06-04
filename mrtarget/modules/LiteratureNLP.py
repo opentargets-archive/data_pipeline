@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# coding: UTF-8
+# -*- coding: UTF-8 -*-
 import logging
 import multiprocessing
 import re
@@ -9,6 +9,7 @@ import json
 from collections import Counter
 import os
 
+from mrtarget.common.NLP import init_spacy_english_language, DOMAIN_STOP_WORDS
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 import spacy
 from spacy.en import English
@@ -47,8 +48,7 @@ ANY_NOUN = SUBJECTS + OBJECTS + ['compound']
 from lxml import etree
 from spacy.attrs import ORTH, TAG, LEMMA
 from spacy.matcher import Matcher
-from spacy.tokenizer import Tokenizer
-from spacy.language_data import TOKENIZER_INFIXES, TOKENIZER_PREFIXES, TOKENIZER_SUFFIXES
+
 import spacy.util
 
 # List of symbols we don't care about
@@ -537,6 +537,7 @@ class LiteratureInfoExtractor(object):
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        self.nlp = init_spacy_english_language()
 
 
     def process(self,
@@ -556,7 +557,7 @@ class LiteratureInfoExtractor(object):
 
         i = 1
         j = 0
-        spacyManager = NLPManager()
+        spacyManager = NLPManager(self.nlp)
         logging.info('Loading lexicon json')
         disease_patterns = json.load(open(Config.DISEASE_LEXICON_JSON_LOCN))
         gene_patterns = json.load(open(Config.GENE_LEXICON_JSON_LOCN))
@@ -766,34 +767,12 @@ def load_entity_matches(self, loader, nlp, doc):
     gene_matched_entities = {"litentity": gene_matched_list}
 
 
-def create_tokenizer(nlp):
-    infix_re = spacy.util.compile_infix_regex(TOKENIZER_INFIXES + [#u'\w*[,-.–_—:;\(\)\[\]\{\}/]{1,3}\S\w*',
-                                                                    # r'\w*[,\-.\-_:;\(\)\[\]\{\}\/]{1,3}\S\w*',
-        r'\w*\S[,.-_:;\(\)\[\]\{\}/]\S*\w',
-        r'\w*\S-\S*\w',
-        u'\w*\S–\S*\w',
-        u'\w*\S—\S*\w',
-                                                                    # u'\w*[,-.–_—:;\(\)\[\]\{\}/]{1,3}\S\w*'
-    ])
-    #TODO: prefix and suffix raise TypeError: '_regex.Pattern' object is not callable
-    # prefix_boundaries_to_keep = [r'\(', r'\[',  r'\{', r'<']
-    # suffix_boundaries_to_keep = [ r'\)', r'\]', r'\}',  r'>']
-    # prefixe_re = spacy.util.compile_prefix_regex([i for i in TOKENIZER_PREFIXES if i not in prefix_boundaries_to_keep])
-    # suffixe_re = spacy.util.compile_suffix_regex([i for i in TOKENIZER_SUFFIXES if i not in suffix_boundaries_to_keep])
-
-    # return Tokenizer(nlp.vocab, {}, prefixe_re.search, suffixe_re.search,
-    #                  infix_re.finditer)
-    return Tokenizer(nlp.vocab, {}, nlp.tokenizer.prefix_search, nlp.tokenizer.suffix_search,
-                     infix_re.finditer)
 
 
+#####TEMPRORARY KEEPING THIS FOR REFERENCE IF NEEDED##################
 class NLPManager(object):
-    def __init__(self, nlp=None):
-        if nlp is None:
-           if nlp is None:
-                    self.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
-        else:
-            self.nlp = nlp
+    def __init__(self, nlp):
+        self.nlp = nlp
 
     def tokenizeText(self,text):
 
@@ -864,9 +843,7 @@ class NLPManager(object):
 class DocumentAnalysisSpacy(object):
 
     def __init__(self,
-                 document,
-                 nlp=None,
-                 abbreviations=None,
+                 nlp,
                  normalize=True,
                  stopwords=None
                  ):
@@ -874,53 +851,65 @@ class DocumentAnalysisSpacy(object):
         self.logger = logging.getLogger(__name__)
         self._normalizer = AbstractNormalizer()
         self._abbreviations_finder = AbbreviationsParser()
-        if stopwords is None:
-            self.stopwords  = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS))
 
-        if nlp is None:
-            nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
+        self.normalize = normalize
+        if self.normalize:
+            self._normalizer = AbstractNormalizer()
+        if stopwords is None:
+            self.stopwords  = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS) + DOMAIN_STOP_WORDS + list(string.punctuation))
+
         self.nlp = nlp
 
 
+
+    def process(self, document):
+
         if isinstance(document, Doc):
-            self.doc = document
+            doc = document
+            abbreviations = self._abbreviations_finder.digest_as_dict(doc.text)
         elif isinstance(document, unicode):
-            # if not document.replace('\n','').strip():
-            #     raise AttributeError('document cannot be empty')
-            if normalize:
-                self._normalizer = AbstractNormalizer()
+            if self.normalize:
                 document = u''+self._normalizer.normalize(document)
-            if abbreviations is None:
-                self.abbreviations = self._abbreviations_finder.digest_as_dict(document)
-                self.logger.info('abbreviations: ' + str(self.abbreviations))
+            abbreviations = self._abbreviations_finder.digest_as_dict(document)
+            self.logger.debug('abbreviations: ' + str(abbreviations))
 
             if abbreviations:
-                for short, long in abbreviations:
+                for short, long in abbreviations.items():
                     if short in document and not long in document:
                         document = document.replace(short, long)
-            self.doc = self.nlp(document)
+            doc = self.nlp(document)
         else:
             raise AttributeError('document needs to be unicode or Doc not %s' % document.__class__)
 
-    def digest(self):
-
-        self.concepts = []
-        self.noun_phrases = []
-        for sentence in self.doc.sents:
+        concepts = []
+        noun_phrases = []
+        for sentence in doc.sents:
             sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
             sentence.analyse()
-            self.concepts.extend(sentence.concepts)
-            self.noun_phrases.extend(sentence.noun_phrases)
+            concepts.extend(sentence.concepts)
+            noun_phrases.extend(sentence.noun_phrases)
         # print self.noun_phrases
-        self.noun_phrases = list(set([i.text for i in self.noun_phrases if i.text.lower() not in self.stopwords ]))
-        self.noun_phrase_counter = Counter()
-        lowered_text = self.doc.text.lower()
-        for i in self.noun_phrases:
+        noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
+        noun_phrase_counter = Counter()
+        lowered_text = doc.text.lower()
+        for i in noun_phrases:
             lowered_np = i.lower()
-            self.noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
-        self.noun_phrases_top = [i[0] for i in self.noun_phrase_counter.most_common(5) if i[1] > 1]
-        self.noun_phrases_recurring = [i for i, k in self.noun_phrase_counter.items() if k > 1]
+            noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
+        noun_phrases_top = [i[0] for i in noun_phrase_counter.most_common(5) if i[1] > 1]
+        noun_phrases_recurring = [i for i, k in noun_phrase_counter.items() if k > 1]
 
+        return doc, \
+               dict(chunks = noun_phrases,
+                    recurring_chunks = noun_phrases_recurring,
+                    top_chunks = noun_phrases_top,
+                    abbreviations = abbreviations,
+                    concepts = concepts)
+
+    def digest(self, document):
+        return self.process(document)[1]
+
+    def __str__(self):
+        return 'nlp'
 
 
 
@@ -929,7 +918,7 @@ class SentenceAnalysisSpacy(object):
 
     def __init__(self,
                  sentence,
-                 nlp = None,
+                 nlp,
                  abbreviations = None,
                  normalize = True):
         self.logger = logging.getLogger(__name__)
@@ -945,8 +934,6 @@ class SentenceAnalysisSpacy(object):
         elif isinstance(sentence, unicode):
             if not sentence.replace('\n','').strip():
                 raise AttributeError('sentence cannot be empty')
-            if nlp is None:
-                nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
             if normalize:
                 sentence = u'' + self._normalizer.normalize(sentence)
             if abbreviations is None:
@@ -971,6 +958,11 @@ class SentenceAnalysisSpacy(object):
         for dep in list(tok.lefts) + list(tok.rights):
             if dep.lower_ in negations:
                 return True
+
+        # alternatively look for
+        #     for child in predicate.children:
+        #       if child.dep_ == 'neg':
+        #            context = 'Negative'
         return False
 
     def get_alternative_subjects(self, tok):

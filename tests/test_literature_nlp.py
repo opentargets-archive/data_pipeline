@@ -1,15 +1,14 @@
 #!/usr/local/bin/python
-# encoding: UTF-8
+# -*- coding: UTF-8 -*-
 
 import logging
 import os
 import unittest
 
-import spacy
-
+from mrtarget.common.NLP import init_spacy_english_language
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, LiteratureNLPProcess, \
-    SentenceAnalysisSpacy, DocumentAnalysisSpacy, create_tokenizer
+    SentenceAnalysisSpacy, DocumentAnalysisSpacy
 
 
 class LiteratureNLPTestCase(unittest.TestCase):
@@ -102,7 +101,7 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
+        cls.nlp = init_spacy_english_language()
 
     def _concept_exists(self,
                         subject,
@@ -124,29 +123,13 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
                     return True
         return False
 
-    def test_custom_tokenizer(self):
-        text = u'This is a test, for a complex entity name: th:is.{e}nt/ity-is,ver-y/co_m[p]lex(to)par;se ' \
-               u'this_is-simpler. but this is an other sentence\nand this is after a new line'
-
-        doc_analysis = DocumentAnalysisSpacy(text, nlp=self.nlp)
-        sentences = list(doc_analysis.doc.sents)
-        self.assertEqual(len(sentences), 2)
-        tokens = [i.text for i in sentences[0]]
-        self.assertIn(u'th:is.{e}nt/ity-is,ver-y/co_m[p]lex(to)par;se', tokens)
-        self.assertIn(u'this_is-simpler', tokens)
-        self.assertNotIn(u'sentence\nand', tokens)
-        self.assertNotIn(u'name:', tokens)
-        self.assertNotIn(u'this_is-simpler.', tokens)
-        self.assertNotIn(u'sentence', tokens)
-        self.assertNotIn(u'line', tokens)
-
 
 
     def test_doc(self):
         text =  u'Asthma is a chronic disease characterized by airway inflammation, obstruction and hyperresponsiveness.'
 
         doc = self.nlp(text)
-        sentence =  SentenceAnalysisSpacy(doc)
+        sentence =  SentenceAnalysisSpacy(doc,  self.nlp)
         sentence.analyse()
         self.assertTrue(self._concept_exists(subject=u'Asthma',
                                              verb=u'to be',
@@ -160,7 +143,7 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
 
         doc = self.nlp(text)
         for span in doc.sents:
-            sentence = SentenceAnalysisSpacy(span)
+            sentence = SentenceAnalysisSpacy(span, self.nlp)
             sentence.analyse()
             self.assertTrue(self._concept_exists(subject=u'Asthma',
                                                  verb=u'to be',
@@ -375,22 +358,37 @@ class SpacyDocumentNLPTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
+        cls.nlp = init_spacy_english_language()
 
 
     def test_analyse_all_abstracts(self):
         file_path = 'resources/test_abstract_nlp.txt'
         filedir = os.path.dirname(__file__)
+        abstracts_analyzer= DocumentAnalysisSpacy( nlp = self.nlp)
         for abstract in file(os.path.join(filedir, file_path)):
-            print abstract.strip()
-            parsed_abstract = DocumentAnalysisSpacy(u''+abstract, nlp = self.nlp)
-            parsed_abstract.digest()
+            digested_abstract = abstracts_analyzer.digest(unicode(abstract, encoding='UTF-8'))
             # print parsed_abstract.noun_phrase_counter
-            print 'Top Noun Phrases:',len(parsed_abstract.noun_phrases_top), parsed_abstract.noun_phrases_top
-            print 'Noun Phrases:',len(parsed_abstract.noun_phrases)
-            print 'Concepts:',len(parsed_abstract.concepts)
-            self.assertLess(len(parsed_abstract.noun_phrases_top), len(parsed_abstract.noun_phrases))
+            print 'Top Noun Phrases:',len(digested_abstract['top_chunks']), digested_abstract['top_chunks']
+            print 'Noun Phrases:',len(digested_abstract['chunks'])
+            print 'Concepts:',len(digested_abstract['concepts'])
+            self.assertLess(len(digested_abstract['top_chunks']), len(digested_abstract['chunks']))
 
+    def test_custom_tokenizer(self):
+        text = u'This is a test, for a complex entity name: th:is.{e}nt/ity-is,ver-y/co_m[p]lex(to)par;se ' \
+               u'this_is-simpler. but this is an other sentence\nand this is after a new line'
+
+        doc_analysis = DocumentAnalysisSpacy(self.nlp)
+        doc, digest = doc_analysis.process(text)
+        sentences = list(doc.sents)
+        self.assertEqual(len(sentences), 2)
+        tokens = [i.text for i in sentences[0]]
+        self.assertIn(u'th:is.{e}nt/ity-is,ver-y/co_m[p]lex(to)par;se', tokens)
+        self.assertIn(u'this_is-simpler', tokens)
+        self.assertNotIn(u'sentence\nand', tokens)
+        self.assertNotIn(u'name:', tokens)
+        self.assertNotIn(u'this_is-simpler.', tokens)
+        self.assertNotIn(u'sentence', tokens)
+        self.assertNotIn(u'line', tokens)
 
 
 if __name__ == '__main__':
