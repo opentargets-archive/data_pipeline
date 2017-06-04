@@ -5,7 +5,7 @@
 import spacy
 from spacy.language_data import TOKENIZER_INFIXES
 from spacy.tokenizer import Tokenizer
-
+import en_core_web_md
 
 def create_tokenizer(nlp):
     infix_re = spacy.util.compile_infix_regex(TOKENIZER_INFIXES + [  # u'\w*[,-.–_—:;\(\)\[\]\{\}/]{1,3}\S\w*',
@@ -31,7 +31,8 @@ def create_tokenizer(nlp):
 
 
 def init_spacy_english_language():
-    return spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
+    nlp = en_core_web_md.load(create_make_doc=create_tokenizer)
+    return nlp
 
 
 DOMAIN_STOP_WORDS = [
