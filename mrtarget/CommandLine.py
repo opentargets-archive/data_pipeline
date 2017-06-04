@@ -36,7 +36,7 @@ logging.config.fileConfig(file_or_resource('logging.ini'),
 def load_nlp_corpora():
     '''load here all the corpora needed by nlp steps'''
     import nltk
-    nltk.download([ 'punkt', 'averaged_perceptron_tagger']) #'brown' corpora might be needed
+    nltk.download([ 'punkt', 'averaged_perceptron_tagger', 'stopwords']) #'brown' corpora might be needed
 
 
 def main():
