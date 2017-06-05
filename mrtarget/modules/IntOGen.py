@@ -21,7 +21,7 @@ __status__     = "Production"
 
 INTOGEN_RELEASE_DATE = ''
 INTOGEN_FILENAME = file_or_resource('intogen_opentargets.tsv')
-INTOGEN_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_intogen-29-07-2016.json'
+INTOGEN_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_intogen-01-06-2017.json'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {
     'A' : 'the gene exhibits several signals of positive selection in the tumor type',
