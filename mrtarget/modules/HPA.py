@@ -105,7 +105,7 @@ class HPADataDownloader():
             .cut('tissue', 'cell_type', 'level', 'reliability', 'gene')
             )
 
-        for d in table.dicts():
+        for d in petl.dicts(table):
             yield d
 
     def retrieve_rna_data(self):
@@ -125,7 +125,7 @@ class HPADataDownloader():
             .cut('sample', 'unit', 'value', 'gene')
             )
 
-        for d in table.dicts():
+        for d in petl.dicts(table):
             yield d
 
     def retrieve_cancer_data(self):
@@ -142,7 +142,7 @@ class HPADataDownloader():
                  'expression_type')
             )
 
-        for d in table.dicts():
+        for d in petl.dicts(table):
             yield d
 
     def retrieve_subcellular_location_data(self):
