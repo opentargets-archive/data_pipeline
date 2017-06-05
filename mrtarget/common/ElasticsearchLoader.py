@@ -332,10 +332,11 @@ class LoaderWorker(RedisQueueWorkerProcess):
     def __init__(self,
                  queue_in,
                  redis_path,
+                 queue_out = None,
                  chunk_size = 1000,
                  dry_run = False
                  ):
-        super(LoaderWorker, self).__init__(queue_in, redis_path)
+        super(LoaderWorker, self).__init__(queue_in, redis_path, queue_out)
         self.chunk_size = chunk_size
         self.loader = Loader(chunk_size=chunk_size,
                              dry_run=dry_run)

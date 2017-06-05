@@ -68,7 +68,15 @@ class PipelineConnectors():
             self.clear_redislite_db()
             self.logger.info('Clearing previous instances of redislite db...')
         self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH),
-                              serverconfig={'save': [], 'maxclients': 10000})
+                              serverconfig={'save': [],
+                                            'maxclients': 10000,
+                                            'port': '35000'})
         self.logger.info('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
 
         return success
+
+    def close(self):
+        try:
+            self.r_server.shutdown()
+        except:
+            self.logger.exception('Could not shutdown redislite erver')
