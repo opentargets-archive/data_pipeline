@@ -41,7 +41,7 @@ toml
 tqdm==4.8.1
 ujson==1.35
 unidecode
-urllib3==1.10.3
+urllib3>=1.21.1<1.22
 git+https://github.com/opentargets/data_model.git@v1.2.6#egg=data-model
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.0.12.tar.gz
 https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
