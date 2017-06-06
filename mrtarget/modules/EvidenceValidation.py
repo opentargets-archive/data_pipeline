@@ -488,6 +488,7 @@ class EvidenceValidationFileChecker():
                   dry_run = False):
         '''Check every given evidence string'''
 
+        self.logger.info('check_all() start and loading lookup data')
         #self.load_mp()
         #return;
         dry_run = dry_run or self.dry_run
@@ -506,6 +507,7 @@ class EvidenceValidationFileChecker():
 
         # lookup_data.available_genes.load_uniprot2ensembl()
 
+        self.logger.info('check_all() starting queue reporter')
         workers_number = Config.WORKERS_NUMBER
         loaders_number = int(workers_number/2+1)
         readers_number = min([workers_number, len(input_files)])
@@ -536,6 +538,7 @@ class EvidenceValidationFileChecker():
         q_reporter.start()
 
 
+        self.logger.info('file reader process with %d processes', readers_number)
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
                                      self.r_server.db,
@@ -547,6 +550,7 @@ class EvidenceValidationFileChecker():
         for w in readers:
             w.start()
 
+        self.logger.info('validator process with %d processes', workers_number)
         # Start validating the evidence in chunks on the evidence queue
         validators = [ValidatorProcess(evidence_q,
                                        self.r_server.db,
@@ -559,6 +563,7 @@ class EvidenceValidationFileChecker():
         for w in validators:
             w.start()
 
+        self.logger.info('loader worker process with %d processes', loaders_number)
         loaders = [LoaderWorker(store_q,
                                 self.r_server.db,
                                 chunk_size=max_loader_chunk_size,
@@ -578,6 +583,7 @@ class EvidenceValidationFileChecker():
         #
         # auditor.start()
 
+        self.logger.info('file processer started')
         'Start crawling the files'
         file_processer = FileProcesser(file_q,
                                        self.es,
@@ -590,12 +596,17 @@ class EvidenceValidationFileChecker():
 
         '''wait for the validator workers to finish'''
 
-        for w in validators:
-            w.join()
-
+        self.logger.info('collecting loaders')
         for w in loaders:
             w.join()
 
+        self.logger.info('collecting validators')
+        for w in validators:
+            w.join()
+
+        self.logger.info('collecting readers')
+        for w in readers:
+            w.join()
         # audit_q.set_submission_finished(self.r_server)
 
         # auditor.join()
@@ -606,6 +617,9 @@ class EvidenceValidationFileChecker():
             #     self.logger.debug('flushing index for dataource %s'%datasource)
             #     self.es.indices.flush(self.es_loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+datasource),
             #                           wait_if_ongoing=True)
+            
+        self.logger.info('collecting reporter')
+        q_reporter.join()
         return
 
     def reset(self):
