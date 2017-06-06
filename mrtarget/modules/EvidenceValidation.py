@@ -346,10 +346,10 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
                 if validation_errors:
                     # here I have to log all fails to logger and elastic
-                    error_messages = ' '.join(validation_errors)
+                    error_messages = ' '.join(validation_errors).replace('\n', ' ; ').replace('\r', '')
                     explanation['validation_errors'] = error_messages
-                    self.logger.error('validation_errors failed to validate line %i with these errors %s',
-                                      line_counter, error_messages)
+                    self.logger.error('validation_errors failed to validate %s:%i with these errors %s',
+                                      file_path, line_counter, error_messages)
 
                 else:
                     # generate fantabulous dict from addict
