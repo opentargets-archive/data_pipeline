@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# coding: latin-1
+# -*- coding: UTF-8 -*-
 import gzip
 import io
 import logging
@@ -12,6 +12,7 @@ import ftputil as ftputil
 import requests
 from dateutil.parser import parse
 from lxml import etree,objectify
+from mrtarget.common.NLP import init_spacy_english_language
 from tqdm import tqdm
 
 from mrtarget.common import Actions
@@ -264,7 +265,7 @@ class Publication(JSONSerializable):
             self._process_authors()
         if self.abstract:
             self._sanitize_abstract()
-            self._split_sentences()
+            # self._split_sentences()
         if self.title or self.abstract:
             self._base_nlp()
         self._text_analyzers = None # to allow for object serialisation
@@ -689,8 +690,9 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
-        from mrtarget.modules.LiteratureNLP import NounChuncker
-        self.analyzers = [NounChuncker()]
+        from mrtarget.modules.LiteratureNLP import NounChuncker, DocumentAnalysisSpacy
+
+        self.analyzers = [NounChuncker(), DocumentAnalysisSpacy(init_spacy_english_language())]
 
 
     def process(self,data):

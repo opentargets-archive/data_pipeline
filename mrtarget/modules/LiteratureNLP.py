@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# coding: UTF-8
+# -*- coding: UTF-8 -*-
 import logging
 import multiprocessing
 import re
@@ -9,6 +9,7 @@ import json
 from collections import Counter
 import os
 
+from mrtarget.common.NLP import init_spacy_english_language, DOMAIN_STOP_WORDS
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 import spacy
 from spacy.en import English
@@ -47,8 +48,7 @@ ANY_NOUN = SUBJECTS + OBJECTS + ['compound']
 from lxml import etree
 from spacy.attrs import ORTH, TAG, LEMMA
 from spacy.matcher import Matcher
-from spacy.tokenizer import Tokenizer
-from spacy.language_data import TOKENIZER_INFIXES
+
 import spacy.util
 
 # List of symbols we don't care about
@@ -537,6 +537,7 @@ class LiteratureInfoExtractor(object):
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        self.nlp = init_spacy_english_language()
 
 
     def process(self,
@@ -556,7 +557,7 @@ class LiteratureInfoExtractor(object):
 
         i = 1
         j = 0
-        spacyManager = NLPManager()
+        spacyManager = NLPManager(self.nlp)
         logging.info('Loading lexicon json')
         disease_patterns = json.load(open(Config.DISEASE_LEXICON_JSON_LOCN))
         gene_patterns = json.load(open(Config.GENE_LEXICON_JSON_LOCN))
@@ -766,18 +767,12 @@ def load_entity_matches(self, loader, nlp, doc):
     gene_matched_entities = {"litentity": gene_matched_list}
 
 
-def create_tokenizer(nlp):
-    infix_re = spacy.util.compile_infix_regex(tuple(TOKENIZER_INFIXES + ['/', ',']))
-    return Tokenizer(nlp.vocab, {}, nlp.tokenizer.prefix_search, nlp.tokenizer.suffix_search,
-                     infix_re.finditer)
 
+
+#####TEMPRORARY KEEPING THIS FOR REFERENCE IF NEEDED##################
 class NLPManager(object):
-    def __init__(self, nlp=None):
-        if nlp is None:
-           if nlp is None:
-                    self.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
-        else:
-            self.nlp = nlp
+    def __init__(self, nlp):
+        self.nlp = nlp
 
     def tokenizeText(self,text):
 
@@ -848,9 +843,7 @@ class NLPManager(object):
 class DocumentAnalysisSpacy(object):
 
     def __init__(self,
-                 document,
-                 nlp=None,
-                 abbreviations=None,
+                 nlp,
                  normalize=True,
                  stopwords=None
                  ):
@@ -858,52 +851,65 @@ class DocumentAnalysisSpacy(object):
         self.logger = logging.getLogger(__name__)
         self._normalizer = AbstractNormalizer()
         self._abbreviations_finder = AbbreviationsParser()
+
+        self.normalize = normalize
+        if self.normalize:
+            self._normalizer = AbstractNormalizer()
         if stopwords is None:
-            self.stopwords  = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS))
+            self.stopwords  = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS) + DOMAIN_STOP_WORDS + list(string.punctuation))
 
         self.nlp = nlp
-        if self.nlp is None:
-            self.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
+
+
+
+    def process(self, document):
 
         if isinstance(document, Doc):
-            self.doc = document
+            doc = document
+            abbreviations = self._abbreviations_finder.digest_as_dict(doc.text)
         elif isinstance(document, unicode):
-            # if not document.replace('\n','').strip():
-            #     raise AttributeError('document cannot be empty')
-            if normalize:
-                self._normalizer = AbstractNormalizer()
+            if self.normalize:
                 document = u''+self._normalizer.normalize(document)
-            if abbreviations is None:
-                self.abbreviations = self._abbreviations_finder.digest_as_dict(document)
-                self.logger.info('abbreviations: ' + str(self.abbreviations))
+            abbreviations = self._abbreviations_finder.digest_as_dict(document)
+            self.logger.debug('abbreviations: ' + str(abbreviations))
 
             if abbreviations:
-                for short, long in abbreviations:
+                for short, long in abbreviations.items():
                     if short in document and not long in document:
                         document = document.replace(short, long)
-            self.doc = self.nlp(document)
+            doc = self.nlp(document)
         else:
             raise AttributeError('document needs to be unicode or Doc not %s' % document.__class__)
 
-    def digest(self):
-
-        self.concepts = []
-        self.noun_phrases = []
-        for sentence in self.doc.sents:
+        concepts = []
+        noun_phrases = []
+        for sentence in doc.sents:
             sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
             sentence.analyse()
-            self.concepts.extend(sentence.concepts)
-            self.noun_phrases.extend(sentence.noun_phrases)
+            concepts.extend(sentence.concepts)
+            noun_phrases.extend(sentence.noun_phrases)
         # print self.noun_phrases
-        self.noun_phrases = list(set([i.text for i in self.noun_phrases if i.text.lower() not in self.stopwords ]))
-        self.noun_phrase_counter = Counter()
-        lowered_text = self.doc.text.lower()
-        for i in self.noun_phrases:
+        noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
+        noun_phrase_counter = Counter()
+        lowered_text = doc.text.lower()
+        for i in noun_phrases:
             lowered_np = i.lower()
-            self.noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
-        self.noun_phrases_top = [i[0] for i in self.noun_phrase_counter.most_common(5) if i[1] > 1]
-        self.noun_phrases_recurring = [i for i, k in self.noun_phrase_counter.items() if k > 1]
+            noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
+        noun_phrases_top = [i[0] for i in noun_phrase_counter.most_common(5) if i[1] > 1]
+        noun_phrases_recurring = [i for i, k in noun_phrase_counter.items() if k > 1]
 
+        return doc, \
+               dict(chunks = noun_phrases,
+                    recurring_chunks = noun_phrases_recurring,
+                    top_chunks = noun_phrases_top,
+                    abbreviations = abbreviations,
+                    concepts = concepts)
+
+    def digest(self, document):
+        return self.process(document)[1]
+
+    def __str__(self):
+        return 'nlp'
 
 
 
@@ -912,7 +918,7 @@ class SentenceAnalysisSpacy(object):
 
     def __init__(self,
                  sentence,
-                 nlp = None,
+                 nlp,
                  abbreviations = None,
                  normalize = True):
         self.logger = logging.getLogger(__name__)
@@ -928,8 +934,6 @@ class SentenceAnalysisSpacy(object):
         elif isinstance(sentence, unicode):
             if not sentence.replace('\n','').strip():
                 raise AttributeError('sentence cannot be empty')
-            if nlp is None:
-                nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
             if normalize:
                 sentence = u'' + self._normalizer.normalize(sentence)
             if abbreviations is None:
@@ -944,7 +948,7 @@ class SentenceAnalysisSpacy(object):
             self.doc = self.sentence
         else:
             raise AttributeError('sentence needs to be unicode or Doc or Span not %s'%sentence.__class__)
-
+        self.logger.debug(u'Sentence to analyse: '+self.sentence.text)
 
 
 
@@ -954,6 +958,11 @@ class SentenceAnalysisSpacy(object):
         for dep in list(tok.lefts) + list(tok.rights):
             if dep.lower_ in negations:
                 return True
+
+        # alternatively look for
+        #     for child in predicate.children:
+        #       if child.dep_ == 'neg':
+        #            context = 'Negative'
         return False
 
     def get_alternative_subjects(self, tok):
@@ -1020,19 +1029,28 @@ class SentenceAnalysisSpacy(object):
         :return: 
         '''
         allowed_pos = [NOUN, ADJ, PUNCT, PROPN]
-        allowed_dep = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "dobj",  "attr", "oprd", "pobj", "conj",
-                       "compound", "amod", "punct", "meta", "npadvmod", "nmod"]#, add "prep" to extend for "of and "in"
+        allowed_dep = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "dobj",  "attr", "oprd", "pobj",# "conj",
+                       "compound", "amod", "meta", "npadvmod", "nmod", "amod"]#, add "prep" to extend for "of and "in"
         extended_tokens = [i for i in tok.subtree if (i.dep_ in allowed_dep and i in tok.children) or (i == tok)]
-        allowed_continous_tokens = []
-        #break the extened token if something not allowed is between the selected tokens in the subtree
-        curr_pos = extended_tokens[0].i -1
-        for ex_t in extended_tokens:
-            if ex_t.i == curr_pos+1:
-                curr_pos = ex_t.i
-                allowed_continous_tokens.append(ex_t)
-            else:
-                break
-        span= Span(self.doc, allowed_continous_tokens[0].i, allowed_continous_tokens[-1].i+1)
+        # just get continous tokens
+        span_range = [tok.i, tok.i]
+        ext_tokens_i = [i.i for i in extended_tokens]
+        max_bound = max(ext_tokens_i)
+        min_bound = min(ext_tokens_i)
+        curr_pos = tok.i
+        for cursor in range(tok.i, max_bound+1):
+            if cursor in ext_tokens_i:
+                if cursor == curr_pos + 1:
+                    span_range[1] = cursor
+                    curr_pos = cursor
+
+        curr_pos = tok.i
+        for cursor in range(tok.i, min_bound-1, -1):
+            if cursor in ext_tokens_i:
+                if cursor == curr_pos - 1:
+                    span_range[0] = cursor
+                    curr_pos = cursor
+        span= Span(self.doc, span_range[0], span_range[1]+1)
         return span
 
 
@@ -1121,28 +1139,29 @@ class SentenceAnalysisSpacy(object):
 
 
     def collapse_noun_phrases_by_syntax(self):
+        allowed_conjunction_dep = [prep]
         for token in self.sentence:
             if token.pos in [NOUN ,PROPN]:
                 extended = self.get_extended_token(token)
                 if extended.text != token.text:
                     yield extended
                 siblings = list(token.head.children)
-                last_sibling = token
+                span_range = [token.i, token.i]
                 for sibling in siblings:
-                    if sibling.i > token.i and sibling.dep == token.dep:
-                        last_sibling = sibling
-                if last_sibling != token:
-                    span = Span(self.doc, token.i, last_sibling.i + 1)
+                    if sibling.dep == token.dep:# or sibling.dep in allowed_conjunction_dep:
+                        if sibling.i > token.i:
+                            span_range[1]= sibling.i
+                        elif sibling.i < token.i:
+                            span_range[0] = sibling.i
+
+                if span_range != [token.i, token.i]:
+                    span = Span(self.doc, span_range[0], span_range[1] + 1)
                     yield span
 
 
     def analyse(self):
         '''extract concepts'''
 
-        '''collapse noun phrases separated just with punctation'''
-        noun_phrases = list(self.collapse_noun_phrases_by_punctation())
-        for np in noun_phrases:
-            np.merge()
         '''collapse noun phrases based on syntax tree'''
         noun_phrases = list(self.collapse_noun_phrases_by_syntax())
         for np in noun_phrases:
