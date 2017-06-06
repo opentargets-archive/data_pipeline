@@ -12,9 +12,9 @@ import re
 import sys
 import time
 import uuid
+import datetime
 import jsonschema as jss
 from cStringIO import StringIO
-from datetime import datetime
 
 import requests
 from elasticsearch import helpers
@@ -129,6 +129,13 @@ class FileProcesser():
         if valid_rres and valid_rres['datasource'] is None:
             valid_rres['datasource'] = Config.\
                 DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[valid_rres['name']]
+
+        # if not valid date get from now()
+        if valid_rres and valid_rres['d3'] is None:
+            now = datetime.datetime.now()
+            valid_rres['d1'] = str(now.day)
+            valid_rres['d2'] = str(now.month)
+            valid_rres['d3'] = str(now.year)
 
         return valid_rres
 
