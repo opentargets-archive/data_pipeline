@@ -1,26 +1,12 @@
 from __future__ import division
 
-import copy
-import gzip
-import hashlib
-import io
 import ujson as json
 import logging
-import multiprocessing
-import os
 import re
-import sys
 import time
-import uuid
 import datetime
-import jsonschema as jss
-from cStringIO import StringIO
+import hashlib
 
-import requests
-from elasticsearch import helpers
-from elasticsearch.exceptions import NotFoundError
-from requests.packages.urllib3.exceptions import HTTPError
-from tqdm import tqdm
 from addict import Dict
 
 from mrtarget.common import Actions, URLZSource, generate_validators_from_schemas
