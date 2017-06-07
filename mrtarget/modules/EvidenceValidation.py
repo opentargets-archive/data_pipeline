@@ -342,14 +342,25 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 explanation['unsupported_datatype'] = data_type
 
             else:
+                t1 = time.time()
                 validation_errors = [str(e) for e in validators[data_type].iter_errors(parsed_line)]
+                t2 = time.time()
 
                 if validation_errors:
                     # here I have to log all fails to logger and elastic
                     error_messages = ' '.join(validation_errors).replace('\n', ' ; ').replace('\r', '')
+                    
+                    error_messages_len = len(error_messages)
+                    
+                    # capping error message to 2048
+                    error_messages = error_messages if error_messages_len <= 2048 \
+                        else error_messages[:2048] + ' ; ...'
+                        
                     explanation['validation_errors'] = error_messages
-                    self.logger.error('validation_errors failed to validate %s:%i with these errors %s',
-                                      file_path, line_counter, error_messages)
+                    self.logger.error('validation_errors failed to validate %s:%i '
+                                      'eval %s secs with these errors %s',
+                                      file_path, line_counter, str(t2 - t1),
+                                      error_messages)
 
                 else:
                     # generate fantabulous dict from addict
