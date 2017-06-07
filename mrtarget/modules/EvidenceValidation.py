@@ -2,14 +2,16 @@ from __future__ import division
 
 import ujson as json
 import logging
+import logging as l
 import re
 import time
 import datetime
 import hashlib
+import itertools
 
 from addict import Dict
 
-from mrtarget.common import Actions, URLZSource, generate_validators_from_schemas
+from mrtarget.common import Actions, URLZSource, generate_validators_from_schemas, LogAccum
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
@@ -263,6 +265,13 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()
         self.audit = list()
         self.logger = logging.getLogger(__name__)
+        # generate all validators once
+        self.validators = \
+            generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
+
+        # log accumulator
+        self.la = LogAccum(self.logger)
+
 
     def process(self, data):
         # file_path, file_version, provider_id, data_source_name, md5_hash,
@@ -287,11 +296,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
         '''
         line_counter = (offset + 1)
-
-        # generate all validators once
-        validators = \
-            generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
-
+        
         # going per line inside buffer
         for i, line in enumerate(line_buffer):
             line_counter = line_counter + i
@@ -310,7 +315,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 parsed_line = json.loads(line)
                 json_doc_hashdig = DatatStructureFlattener(parsed_line).get_hexdigest()
             except Exception as e:
-                self.logger.error('cannot parse line %i: %s', line_counter, e)
+                self.la.log(l.ERROR, 'cannot parse line %i: %s', line_counter, e)
                 json_doc_hashdig = hashlib.md5(line).hexdigest()
                 explanation['unparsable_json'] = True
 
@@ -324,7 +329,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
             else:
                 explanation['key_fields_missing'] = True
-                self.logger.error("Line %i: Not a valid %s evidence string"
+                self.la.log(l.ERROR, "Line %i: Not a valid %s evidence string"
                                   " - missing label and type mandatory attributes",
                                   line_counter,
                                   Config.EVIDENCEVALIDATION_SCHEMA)
@@ -333,17 +338,17 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
             if data_type is None:
                 explanation['missing_datatype'] = True
-                self.logger.error("Line %i: Not a valid %s evidence string - "
+                self.la.log(l.ERROR, "Line %i: Not a valid %s evidence string - "
                                   "please add the mandatory 'type' attribute",
                                   line_counter, Config.EVIDENCEVALIDATION_SCHEMA)
 
             elif data_type not in Config.EVIDENCEVALIDATION_DATATYPES:
-                self.logger.error('unsupported_datatype with data type %s and line %s', data_type, parsed_line)
+                self.la.log(l.ERROR, 'unsupported_datatype with data type %s and line %s', data_type, parsed_line)
                 explanation['unsupported_datatype'] = data_type
 
             else:
                 t1 = time.time()
-                validation_errors = [str(e) for e in validators[data_type].iter_errors(parsed_line)]
+                validation_errors = [str(e) for e in self.validators[data_type].iter_errors(parsed_line)]
                 t2 = time.time()
 
                 if validation_errors:
@@ -357,7 +362,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                         else error_messages[:2048] + ' ; ...'
                         
                     explanation['validation_errors'] = error_messages
-                    self.logger.error('validation_errors failed to validate %s:%i '
+                    self.la.log(l.ERROR, 'validation_errors failed to validate %s:%i '
                                       'eval %s secs with these errors %s',
                                       file_path, line_counter, str(t2 - t1),
                                       error_messages)

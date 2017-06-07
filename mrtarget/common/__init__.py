@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from contextlib import contextmanager
 import gzip
 import zipfile
+import logging
 import petl as p
 import tempfile as tmp
 import requests as r
@@ -142,5 +143,37 @@ def generate_validators_from_schemas(schemas_map):
     return validators
 
 
+class LogAccum(object):
+    def __init__(self, logger_o, elem_limit=1024):
+        self._logger = logger_o
+        self._accum = {'counter': 0}
+        self._limit = elem_limit
+    
+    def _flush(self, force=False):
+        if force or self._accum['counter'] >= self._limit:
+            keys = set(self._accum.iterkeys()) - set(['counter'])
+            
+            for k in keys:
+                for msg in self._accum[k]:
+                    self._logger.log(k, msg[0], *msg[1])
+            # reset the accum
+            self._accum = {'counter': 0}
+            
+    def flush(self, force=True):
+        self._flush(force)
+    
+    def log(self, level, message, *args):
+        if level in self._accum:
+            self._accum[level].append((message, args))
+        else:
+            self._accum[level] = [(message, args)]
+        
+        self._accum['counter'] += 1
+        self._flush()
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.flush(True)
+    
+    
 class Actions():
     ALL = 'all'
