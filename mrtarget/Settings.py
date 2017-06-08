@@ -107,6 +107,7 @@ def read_option(option, cast=None, ini=ini, section='dev',
 
 
 class Config():
+    EV_LIMIT = read_option('CTTV_EV_LIMIT', cast=bool, default=False)
     MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
 
@@ -228,6 +229,7 @@ class Config():
         'somatic_mutation': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/literature_curated.json',
         'known_drug': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/drug.json',
         'literature_mining': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/literature_mining.json',
+        'literature': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/literature_mining.json',
         'animal_model': 'https://raw.githubusercontent.com/opentargets/json_schema/1.2.5/src/animal_models.json'
     }
 
