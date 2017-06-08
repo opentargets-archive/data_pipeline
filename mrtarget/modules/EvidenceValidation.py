@@ -1,23 +1,24 @@
 from __future__ import division
 
-import ujson as json
-import logging
-import logging as l
-import re
-import time
 import datetime
 import hashlib
-import itertools
+import logging
+import re
+from time import strftime
+import time
 
 from addict import Dict
 
+import logging as l
+from mrtarget.Settings import Config
 from mrtarget.common import Actions, URLZSource, generate_validators_from_schemas, LogAccum
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from mrtarget.Settings import Config
+import ujson as json
+
 
 BLOCKSIZE = 65536
 NB_JSON_FILES = 3
@@ -58,7 +59,6 @@ SUBMISSION_FILTER_MD5_QUERY = '''
 
 
 
-from time import strftime
 
 # yyyyMMdd'T'HHmmssZ
 VALIDATION_DATE = strftime("%Y%m%dT%H%M%SZ")
@@ -206,12 +206,11 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         self.logger.info('Starting to parse  file %s and putting evidences'
                          ' in the queue', file_path)
         self.parse_file(file_path, file_version, provider_id, data_source_name,
-                        md5_hash, logfile=logfile, file_type=file_type)
+                        md5_hash, logfile=logfile)
         self.logger.info("%s finished", self.name)
 
     def parse_file(self, file_path, file_version, provider_id,
-                   data_source_name, md5_hash=None, logfile=None,
-                   file_type=None):
+                   data_source_name, md5_hash=None, logfile=None):
         self.logger.info('%s Starting parsing %s' % (self.name, file_path))
 
         with URLZSource(file_path).open() as f_handler:
@@ -281,16 +280,14 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         return self.validate_evidence(file_path,
                                       data_source_name,
                                       offset,
-                                      line_buffer,
-                                      logfile=logfile)
+                                      line_buffer)
 
     # @profile
     def validate_evidence(self,
                           file_path,
                           data_source_name,
                           offset,
-                          line_buffer,
-                          logfile=None):
+                          line_buffer):
         '''validate evidence strings from a chunk cumulate the logs, acquire a lock,
         write the logs write the data to the database
 
@@ -348,7 +345,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
             else:
                 t1 = time.time()
-                validation_errors = [str(e) for e in self.validators[data_type].iter_errors(parsed_line)]
+                # validation_errors = [str(e) for e in self.validators[data_type].iter_errors(parsed_line)]
+                validation_errors = [e.message() for e in self.validators[data_type].iter_errors(parsed_line)]
                 t2 = time.time()
 
                 if validation_errors:
@@ -610,7 +608,7 @@ class EvidenceValidationFileChecker():
 
         processed_datasources = file_processer.run()
 
-        '''wait for the validator workers to finish'''
+        # wait for the validator workers to finish
 
         self.logger.info('collecting loaders')
         for w in loaders:
