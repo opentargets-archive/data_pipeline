@@ -439,7 +439,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                     target_id = self.lookup_data.uni2ens[uniprot_id]
                                 # self.logger.info("Found target id being: %s for %s" %(target_id, uniprot_id))
                                 if target_id is None:
-                                    self.logger.info("Found no target id for %s" % (uniprot_id))
+                                    self.la.log(l.INFO, "Found no target id for %s", uniprot_id)
 
 
                     # If there is no target id after the processing step
@@ -454,7 +454,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 explanation['disease_error'] = disease_failed
                 explanation['gene_error'] = gene_failed
                 explanation['gene_mapping_failed'] = gene_mapping_failed
-                self.logger.error('evidence validation step failed at the end with an explanation %s', str(explanation))
+                self.la.log(l.ERROR, 'evidence validation step failed at the end with an '
+                            'explanation %s', str(explanation))
 
 
             loader_args = (Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + data_source_name,
