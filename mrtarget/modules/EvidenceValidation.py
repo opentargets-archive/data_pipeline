@@ -271,6 +271,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         # log accumulator
         self.la = LogAccum(self.logger)
 
+    def close(self):
+        self.la.flush(True)
 
     def process(self, data):
         # file_path, file_version, provider_id, data_source_name, md5_hash,
