@@ -114,9 +114,6 @@ class FileProcesser():
         '''return a dict with all needed tokens based on a filename format'''
         rres = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename)
         valid_rres = rres.groupdict() if rres else None
-        if valid_rres and valid_rres['datasource'] is None:
-            valid_rres['datasource'] = Config.\
-                DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED[valid_rres['name']]
 
         # if not valid date get from now()
         if valid_rres and valid_rres['d3'] is None:
@@ -152,12 +149,12 @@ class FileProcesser():
 
                 try:
                     v_name = ''.join([tokens[k] for k in ('d3', 'd2', 'd1')])
-                    self.submit_file(uri, v_name, tokens['name'],
+                    self.submit_file(uri, v_name, 'datasourcefile',
                                      tokens['datasource'], None, None, None)
 
                     self.logger.debug('submitted filename %s with version %s '
                                       'and these tokens from uri %s',
-                                      uri, v_name, tokens)
+                                      uri, v_name, str(tokens))
                 except Exception as e:
                     self.logger.exception(e)
 
