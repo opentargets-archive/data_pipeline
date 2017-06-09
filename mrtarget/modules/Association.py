@@ -300,9 +300,9 @@ class Scorer():
         # set evidence counts
         for e in evidence_scores:
             # make sure datatype is constrained
-            if Config.DATASOURCE_TO_DATATYPE_MAPPING[e.datatype] != 'other':
+            if all([e.datatype in ass.evidence_count['datatypes'],
+                    e.datasource in ass.evidence_count['datasources']]):
                 ass.evidence_count['total']+=1
-                # XXX fix mkarmona
                 ass.evidence_count['datatypes'][e.datatype]+=1
                 ass.evidence_count['datasources'][e.datasource]+=1
         
