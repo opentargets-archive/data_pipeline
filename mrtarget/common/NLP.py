@@ -809,6 +809,8 @@ DOMAIN_STOP_WORDS = [
     "expression",
     "patient",
     "patients",
+    "person",
+    "people",
     "study",
     "studies",
     "protein",
