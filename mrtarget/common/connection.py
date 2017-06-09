@@ -29,7 +29,7 @@ class PipelineConnectors():
             os.remove(Config.REDISLITE_DB_PATH)
         time.sleep(2)
 
-    def init_services_connections(self, redispersist=False):
+    def init_services_connections(self, redispersist=True):
         '''init es client'''
         connection_attempt = 1
         success = False
@@ -64,9 +64,9 @@ class PipelineConnectors():
             self.logger.warn('No valid configuration available for elasticsearch')
             self.es = None
 
-        if not redispersist:
+        if redispersist:
             self.clear_redislite_db()
-            self.logger.info('Clearing previous instances of redislite db...')
+            self.logger.debug('Clearing previous instances of redislite db...')
         self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH),
                               serverconfig={'save': [],
                                             'maxclients': 10000,
