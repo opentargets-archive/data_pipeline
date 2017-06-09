@@ -325,7 +325,7 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION = 88
+    ENSEMBL_RELEASE_VERSION = 89
     ENSEMBL_CHUNK_SIZE = 100
 
     # see http://stackoverflow.com/a/847866

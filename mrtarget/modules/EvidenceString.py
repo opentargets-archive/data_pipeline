@@ -809,7 +809,7 @@ class Evidence(JSONSerializable):
                     sample_total_coverage = 1.
                     max_sample_size = 1.
                     for mutation in self.evidence['evidence']['known_mutations']:
-                        if 'l' in mutation:
+                        if 'number_samples_with_mutation_type' in mutation:
                             sample_total_coverage += int(mutation['number_samples_with_mutation_type'])
                             if int(mutation['number_mutated_samples']) >  max_sample_size:
                                 max_sample_size = int(mutation['number_mutated_samples'])
