@@ -6,7 +6,7 @@ from elasticsearch import Elasticsearch
 from tqdm import tqdm
 
 from mrtarget.common import Actions
-from mrtarget.common.DataStructure import JSONSerializable, denormDict
+from mrtarget.common.DataStructure import JSONSerializable, denormDict, JSONAddict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
@@ -295,19 +295,19 @@ class Scorer():
 
     def score(self,target, disease, evidence_scores, is_direct, method  = None):
 
-        ass = Association(target,disease, is_direct)
+        ass = Association(target, disease, is_direct)
 
+        # set evidence counts
         for e in evidence_scores:
-            "set evidence counts"
             ass.evidence_count['total']+=1
             ass.evidence_count['datatypes'][e.datatype]+=1
             ass.evidence_count['datasources'][e.datasource]+=1
 
-            "set facet data"
+            # set facet data
             ass.set_available_datatype(e.datatype)
             ass.set_available_datasource(e.datasource)
 
-        "compute scores"
+        # compute scores
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
             self._harmonic_sum(evidence_scores, ass, scale_factor=2)
         if (method == ScoringMethods.SUM) or (method is None):
