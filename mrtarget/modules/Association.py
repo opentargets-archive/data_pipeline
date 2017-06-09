@@ -299,13 +299,16 @@ class Scorer():
 
         # set evidence counts
         for e in evidence_scores:
-            ass.evidence_count['total']+=1
-            ass.evidence_count['datatypes'][e.datatype]+=1
-            ass.evidence_count['datasources'][e.datasource]+=1
-
-            # set facet data
-            ass.set_available_datatype(e.datatype)
-            ass.set_available_datasource(e.datasource)
+            # make sure datatype is constrained
+            if Config.DATASOURCE_TO_DATATYPE_MAPPING[e.datatype] != 'other':
+                ass.evidence_count['total']+=1
+                # XXX fix mkarmona
+                ass.evidence_count['datatypes'][e.datatype]+=1
+                ass.evidence_count['datasources'][e.datasource]+=1
+        
+                # set facet data
+                ass.set_available_datatype(e.datatype)
+                ass.set_available_datasource(e.datasource)
 
         # compute scores
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
