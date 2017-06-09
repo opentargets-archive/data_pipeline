@@ -807,8 +807,8 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'somatic_mutation':
                 frequency = 1.
                 if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
-                    sample_total_coverage =  0.
-                    max_sample_size = 0.
+                    sample_total_coverage = 1.
+                    max_sample_size = 1.
                     for mutation in self.evidence['evidence']['known_mutations']:
                         if 'number_samples_with_mutation_type' in mutation:
                             sample_total_coverage += int(mutation['number_samples_with_mutation_type'])
