@@ -705,13 +705,16 @@ class GeneLookUpTable(object):
         if es is None:
             connector = PipelineConnectors()
             connector.init_services_connections()
-            es = connector.es
-        self._es = es
-        self._es_query = ESQuery(es)
-        self.r_server = r_server
+            self._es = connector.es
+            self.r_server = r_server if r_server else connector.r_server
+        else:
+            self._es = es
+            self.r_server = r_server
+            
+        self._es_query = ESQuery(self._es)
         self.uniprot2ensembl = {}
-        if (r_server is not None) and autoload:
-            self.load_gene_data(r_server, targets)
+        if self.r_server and autoload:
+            self.load_gene_data(self.r_server, targets)
         self._logger = logging.getLogger(__name__)
 
 

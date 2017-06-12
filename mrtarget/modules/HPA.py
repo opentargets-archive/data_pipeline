@@ -321,12 +321,15 @@ class HPALookUpTable(object):
         if es is None:
             connector = PipelineConnectors()
             connector.init_services_connections()
-            es = connector.es
-        self._es = es
-        self._es_query = ESQuery(es)
-        self.r_server = r_server
-        if r_server is not None:
-            self._load_hpa_data(r_server)
+            self._es = connector.es
+            self.r_server = r_server if r_server else connector.r_server
+        else:
+            self._es = es
+            self.r_server = r_server
+
+        self._es_query = ESQuery(self._es)
+        if self.r_server:
+            self._load_hpa_data(self.r_server)
 
     def _load_hpa_data(self, r_server=None):
         for el in tqdm(self._es_query.get_all_hpa(),
