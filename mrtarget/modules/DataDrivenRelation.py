@@ -426,7 +426,7 @@ class OverlapDistance(object):
         0 if no match, 1 if perfect match
         """
 
-        if scipy.sparse.issparse(x):
+        if sp.issparse(x):
             x = x.toarray().ravel()
             y = y.toarray().ravel()
 

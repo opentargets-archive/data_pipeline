@@ -11,6 +11,7 @@ import petl
 from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
+from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
@@ -310,13 +311,17 @@ class HPALookUpTable(object):
     """
 
     def __init__(self,
-                 es,
+                 es=None,
                  namespace=None,
                  r_server=None,
                  ttl=(60*60*24+7)):
         self._table = RedisLookupTablePickle(namespace=namespace,
                                              r_server=r_server,
                                              ttl=ttl)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            es = connector.es
         self._es = es
         self._es_query = ESQuery(es)
         self.r_server = r_server

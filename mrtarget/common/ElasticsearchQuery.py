@@ -134,10 +134,10 @@ class ESQuery(object):
         res = helpers.scan(client=self.handler,
                            query={"query": {
                                "match_all": {}
+                            },
+                            '_source': source,
                            },
-                                  '_source': source,
-                                  'size': 1000,
-                           },
+                           size=50,
                            scroll='12h',
                            doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
                            index=Loader.get_versioned_index(
