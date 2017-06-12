@@ -5,6 +5,7 @@ import time
 import pickle
 from tqdm import tqdm
 from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.modules.ECO import ECOLookUpTable
 from mrtarget.modules.EFO import EFOLookUpTable
@@ -51,10 +52,19 @@ class LookUpDataRetriever(object):
                              LookUpDataType.ECO),
                  autoload=True):
 
-        self.es = es
-        self.r_server = r_server
-        if es is not None:
-            self.esquery = ESQuery(es)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections()
+            self.es = connector.es
+            self.r_server = r_server if r_server else connector.r_server
+        else:
+            self.es = es
+            self.r_server = r_server
+
+        self.esquery = ESQuery(self.es)
+        if self.r_server is None:
+            print "ERROR r_server"
+            
         self.lookup = LookUpData()
         self.logger = logging.getLogger(__name__)
 
