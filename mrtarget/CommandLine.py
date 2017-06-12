@@ -2,7 +2,7 @@ import argparse
 import logging
 import sys
 import itertools as it
-
+import atexit
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import PipelineConnectors
@@ -255,6 +255,12 @@ def main():
             if (DumpActions.DUMP in args.dump) or do_all:
                 DumpGenerator().dump()
 
+    connectors.close()
+
+
+@atexit.register
+def shutdown_connections():
+    PipelineConnectors().close()
 
 if __name__ == '__main__':
     main()

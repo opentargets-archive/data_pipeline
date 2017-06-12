@@ -19,7 +19,8 @@ from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle, \
+    WhiteCollarWorker
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 
@@ -486,40 +487,35 @@ class MedlineRetriever(object):
             os.makedirs(pubmed_xml_locn)
 
         '''Start file-reader workers'''
-        retrievers = [PubmedFTPReaderProcess(retriever_q,
-                                          self.r_server.db,
-                                          parser_q,
-                                          self.dry_run,
-                                          update=update
-                                          )
-                      for i in range(ftp_readers)]
-
-        for w in retrievers:
-            w.start()
-
-
+        retrievers = WhiteCollarWorker(target=PubmedFTPReaderProcess,
+                                       pool_size=ftp_readers,
+                                       queue_in=retriever_q,
+                                       redis_path=self.r_server.db,
+                                       queue_out=parser_q,
+                                       kwargs=dict(dry_run=self.dry_run)
+                                       )
+        retrievers.start()
 
         'Start xml file parser workers'
-        parsers = [PubmedXMLParserProcess(parser_q,
-                                     self.r_server.db,
-                                     loader_q,
-                                     self.dry_run
-                                     )
-                   for i in range(no_of_workers)]
-
-        for w in parsers:
-            w.start()
+        parsers = WhiteCollarWorker(target=PubmedXMLParserProcess,
+                                    pool_size=no_of_workers,
+                                    queue_in=parser_q,
+                                    redis_path=self.r_server.db,
+                                    queue_out=loader_q,
+                                    kwargs = dict(dry_run=self.dry_run)
+                                    )
+        parsers.start()
 
         '''Start es-loader workers'''
         '''Fixed number of workers to reduce the overhead of creating ES connections for each worker process'''
-        loaders = [LiteratureLoaderProcess(loader_q,
-                                          self.r_server.db,
-                                          self.dry_run
-                                          )
-                   for i in range(no_of_workers/2 +1)]
+        loaders = WhiteCollarWorker(target=LiteratureLoaderProcess,
+                                    pool_size=no_of_workers/2 +1,
+                                    queue_in=loader_q,
+                                    redis_path=self.r_server.db,
+                                    kwargs=dict(dry_run=self.dry_run))
 
-        for w in loaders:
-            w.start()
+
+        loaders.start()
 
         # shift_downloading = 2
         if update:
@@ -539,14 +535,11 @@ class MedlineRetriever(object):
         host.close()
         retriever_q.set_submission_finished(r_server=self.r_server)
 
-        for r in retrievers:
-                r.join()
+        retrievers.join()
 
-        for p in parsers:
-                p.join()
+        parsers.join()
 
-        for l in loaders:
-                l.join()
+        loaders.join()
 
         logging.info('flushing data to index')
         if not self.dry_run:
@@ -857,12 +850,12 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
     def __init__(self,
                  queue_in,
                  redis_path,
+                 queue_out = None,
                  dry_run=False):
-        super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path)
+        super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.loader = Loader(chunk_size=10000, dry_run=dry_run)
         self.es = self.loader.es
         self.es_query = ESQuery(self.es)
-        self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
 
 

@@ -3,6 +3,8 @@
 
 import base64
 import ujson as json
+from collections import Counter
+
 import jsonpickle
 jsonpickle.set_preferred_backend('ujson')
 import logging
@@ -45,7 +47,7 @@ def millify(n):
         millidx=max(0, min(len(millnames) - 1,
                            int(np.math.floor(np.math.log10(abs(n)) / 3))))
         return '%.1f%s'%(n/10**(3*millidx),millnames[millidx])
-    except Exception, e:
+    except Exception:
         return str(n)
 
 class RedisQueue(object):
@@ -348,7 +350,7 @@ class RedisQueue(object):
             r_server = self.r_server
         if r_server is None:
             try:
-               r_server = Redis(Config.REDISLITE_DB_PATH)
+                r_server = Redis(Config.REDISLITE_DB_PATH)
             except:
                 raise AttributeError('A redis server is required either at class instantiation or at the method level')
         return r_server
@@ -397,7 +399,7 @@ class RedisQueueStatusReporter(Process):
         self.logger.info("reporter worker started")
 
         self.bars = {}
-        for i,q in enumerate(self.queues):
+        for _, q in enumerate(self.queues):
             queue_id = self._simplify_queue_id(q.queue_id)
             self.bars[q.queue_id] = dict(
                                          submitted_counter=tqdm(desc='%s received jobs [batch size: %i]'%(queue_id,q.batch_size),
@@ -427,8 +429,7 @@ class RedisQueueStatusReporter(Process):
             self.historical_data['machine_status']['memory_use'].append(round(memory_load.used / (1024 * 1024 * 1024), 2))  # Gb of used memory
             self.log_machine_status()
             ''' get queue(s) data'''
-            for i,q in enumerate(self.queues):
-                queue_position = i * 3
+            for _, q in enumerate(self.queues):
                 data = q.get_status(self.r_server)
                 self.log(data)
                 last_data = self.bars[q.queue_id]['last_status']
@@ -639,10 +640,11 @@ def get_redis_worker(base = Process):
             self.logger = logging.getLogger(__name__)
             self.logger.info('%s started' % self.name)
             self.job_result_cache = []
+            self.kill_switch = False
 
 
         def run(self):
-            while not self.queue_in.is_done(r_server=self.r_server):
+            while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
                 job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
                 if job is not None:
@@ -679,9 +681,9 @@ def get_redis_worker(base = Process):
 
             self.close()
 
-        def _split_iterable(self, input, size):
-                for i in range(0, len(input), size):
-                    yield input[i:i + size]
+        def _split_iterable(self, item_list, size):
+                for i in range(0, len(item_list), size):
+                    yield item_list[i:i + size]
 
         def put_into_queue_out(self, result, aggregated_input = False ):
             if result is not None:
@@ -707,7 +709,7 @@ def get_redis_worker(base = Process):
 
         def close(self):
             '''
-            implement in subclass to clean up loaders and other trailing elements when the processer is done
+            implement in subclass to clean up loaders and other trailing elements when the processer is done if needed
             :return:
             '''
             pass
@@ -726,6 +728,79 @@ def get_redis_worker(base = Process):
 
 RedisQueueWorkerProcess = get_redis_worker()
 RedisQueueWorkerThread = get_redis_worker(base=Thread)
+
+
+class WhiteCollarWorker(Thread):
+    '''
+    spawns and monitors a set of workers
+    '''
+
+    def __init__(self,
+                 target,
+                 pool_size,
+                 queue_in,
+                 redis_path,
+                 queue_out=None,
+                 args = [],
+                 kwargs = {},
+                 max_restart = 3):
+        super(WhiteCollarWorker, self).__init__()
+        self.daemon = True
+        self.target = target
+        self.workers_instances = {}
+        self.pool_size = pool_size
+        self.queue_in = queue_in
+        self.queue_out = queue_out
+        self.redis_path = redis_path
+        self.args = args
+        self.kwargs = kwargs
+        self.max_restarts=max_restart
+        self.restart_log = Counter()
+        self.logger = logging.getLogger(__name__)
+
+
+
+    def run(self):
+        '''
+        starts the pool of workers, monitor the registered instances, tries to restart them if needed, 
+        and wait for all the workers to be finished before returning
+        :return: 
+        '''
+
+        for i in range(self.pool_size):
+            self.workers_instances[i]=self.target(self.queue_in,
+                                                  self.redis_path,
+                                                  self.queue_out,
+                                                  *self.args,
+                                                  **self.kwargs)
+
+        while self.workers_instances:
+            for n,p in self.workers_instances.items():
+                time.sleep(0.1)
+                if p.exitcode is None and not p.is_alive():
+                    self.logger.error('%s is not finished and not running as if it was never born'%p.name)
+                elif p.exitcode < 0:
+                    self.logger.error('Worker %s ended with an error or a terminate'%p.name)
+                    if self.restart_log[n] < self.max_restarts:
+                        self.logger.info('Restarting failed worker instance number %i'%n)
+                        self.workers_instances[n] = self.target(*self.args, **self.kwargs)
+                        self.restart_log[n]+=1
+                    else:
+                        self.logger.error('Gave up on restarting worker instance number %i'%n)
+                        del self.workers_instances[n]
+                    # Handle this either by restarting or delete the entry so it is removed from list as for else
+                else:
+                    p.join()  # wait for completion
+                    del self.workers_instances[n]
+    def kill_all(self):
+        '''
+        send a kill signal to all the workers nicely
+        
+        :return: 
+        '''
+        for _, p in self.workers_instances.items():
+            self.logger.debug('setting kill switch on for worker %s'%p.name)
+            p.kill_switch = True
 
 
 class RedisLookupTable(object):
