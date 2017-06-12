@@ -64,7 +64,7 @@ class PipelineConnectors():
             self.logger.warn('No valid configuration available for elasticsearch')
             self.es = None
 
-        if redispersist:
+        if not redispersist:
             self.clear_redislite_db()
             self.logger.debug('Clearing previous instances of redislite db...')
         self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH),
