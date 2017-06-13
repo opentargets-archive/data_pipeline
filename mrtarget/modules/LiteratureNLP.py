@@ -893,12 +893,24 @@ class DocumentAnalysisSpacy(object):
                 self.logger.exception('Error parsing a sentence')
         # print self.noun_phrases
         noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
+
         # clustered_np = self.cluster_np(noun_phrases)
         noun_phrase_counter = Counter()
         lowered_text = doc.text.lower()
         for i in noun_phrases:
             lowered_np = i.lower()
             noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
+        '''remove plurals with appended s'''
+        for np in noun_phrase_counter.keys():
+            if np + 's' in noun_phrase_counter:
+                noun_phrase_counter[np] += noun_phrase_counter[np + 's']
+                del noun_phrase_counter[np + 's']
+        '''increase count of shorter form with longer form'''
+        for abbr in abbreviations:
+            short = abbr['short'].lower()
+            if short in noun_phrase_counter:
+                noun_phrase_counter[abbr['long'].lower()] += noun_phrase_counter[short]
+                del noun_phrase_counter[short]
         noun_phrases_top = [i[0] for i in noun_phrase_counter.most_common(5) if i[1] > 1]
         noun_phrases_recurring = [i for i, k in noun_phrase_counter.items() if k > 1]
 
