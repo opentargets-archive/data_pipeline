@@ -202,6 +202,8 @@ class Config():
         '4932':'yeast'
     }
 
+    OMIM_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/xref_mappings/omim_to_efo.txt'
+
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
                                                delimiter='|').data().tol())
