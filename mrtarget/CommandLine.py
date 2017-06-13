@@ -32,6 +32,7 @@ from mrtarget.Settings import Config, file_or_resource
 logging.config.fileConfig(file_or_resource('logging.ini'),
                           disable_existing_loggers=False)
 
+connectors = None
 
 def load_nlp_corpora():
     '''load here all the corpora needed by nlp steps'''
@@ -260,7 +261,8 @@ def main():
 
 @atexit.register
 def shutdown_connections():
-    PipelineConnectors().close()
+    if connectors:
+        connectors.close()
 
 if __name__ == '__main__':
     main()
