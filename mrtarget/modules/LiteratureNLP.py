@@ -903,7 +903,7 @@ class DocumentAnalysisSpacy(object):
                dict(chunks = noun_phrases,
                     recurring_chunks = noun_phrases_recurring,
                     top_chunks = noun_phrases_top,
-                    abbreviations = abbreviations,
+                    abbreviations = [dict(short=k, long=v) for k,v in abbreviations.items()],
                     concepts = concepts)
 
     def digest(self, document):

@@ -459,13 +459,13 @@ class MedlineRetriever(object):
         # Parser Queue
         parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_parser',
                                   max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                                  job_timeout=120)
+                                  job_timeout=300)
 
         # ES-Loader Queue
         loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
                               serialiser='pickle',
                               max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                              job_timeout=120)
+                              job_timeout=300)
 
 
 
