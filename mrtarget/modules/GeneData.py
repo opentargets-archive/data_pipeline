@@ -699,9 +699,6 @@ class GeneLookUpTable(object):
                  ttl = 60*60*24+7,
                  targets = [],
                  autoload=True):
-        self._table = RedisLookupTablePickle(namespace = namespace,
-                                            r_server = r_server,
-                                            ttl = ttl)
         if es is None:
             connector = PipelineConnectors()
             connector.init_services_connections()
@@ -712,6 +709,11 @@ class GeneLookUpTable(object):
             self.r_server = r_server
             
         self._es_query = ESQuery(self._es)
+
+        self._table = RedisLookupTablePickle(namespace = namespace,
+                                            r_server = self.r_server,
+                                            ttl = ttl)
+
         self.uniprot2ensembl = {}
         if self.r_server and autoload:
             self.load_gene_data(self.r_server, targets)
@@ -734,7 +736,7 @@ class GeneLookUpTable(object):
                 unit_scale = True,
                 total = total,
                 leave=False):
-            self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
+            self._table.set(target['id'],target, r_server=self.r_server)#TODO can be improved by sending elements in batches
             if target['uniprot_id']:
                 self.uniprot2ensembl[target['uniprot_id']] = target['id']
             for accession in target['uniprot_accessions']:
@@ -763,7 +765,7 @@ class GeneLookUpTable(object):
 
     def get_gene(self, target_id, r_server = None):
         try:
-            return self._table.get(target_id, r_server=self._get_r_server(r_server))
+            return self._table.get(target_id, r_server=self.r_server)
         except KeyError:
             try:
                 target = self._es_query.get_objects_by_id(target_id,
@@ -778,13 +780,13 @@ class GeneLookUpTable(object):
             return target
 
     def set_gene(self, target, r_server = None):
-        self._table.set(target['id'],target, r_server=self._get_r_server(r_server))
+        self._table.set(target['id'],target, r_server=self.r_server)
 
     def get_available_gene_ids(self, r_server = None):
-        return self._table.keys(r_server = self._get_r_server(r_server))
+        return self._table.keys(r_server = self.r_server)
 
     def __contains__(self, key, r_server=None):
-        redis_contain = self._table.__contains__(key, r_server=self._get_r_server(r_server))
+        redis_contain = self._table.__contains__(key, r_server=self.r_server)
         if redis_contain:
             return True
         if not redis_contain:
@@ -797,18 +799,13 @@ class GeneLookUpTable(object):
         return self.get_gene(key, r_server)
 
     def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
+        self._table.set(key, value, r_server=self.r_server)
 
     def __missing__(self, key):
         print key
 
-
     def _get_r_server(self, r_server=None):
-        if not r_server:
-            r_server = self.r_server
-        if r_server is None:
-            raise AttributeError('A redis server is required either at class instantation or at the method level')
-        return r_server
+        return r_server if r_server else self.r_server
 
     def keys(self):
         return self._table.keys()

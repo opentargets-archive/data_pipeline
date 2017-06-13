@@ -14,6 +14,7 @@ from mrtarget.modules.GeneData import GeneLookUpTable
 from mrtarget.modules.Literature import LiteratureLookUpTable
 from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common import require_all
 
 
 class LookUpData():
@@ -62,9 +63,9 @@ class LookUpDataRetriever(object):
             self.r_server = r_server
 
         self.esquery = ESQuery(self.es)
-        if self.r_server is None:
-            print "ERROR r_server"
-            
+        
+        require_all(self.es is not None, self.r_server is not None)
+        
         self.lookup = LookUpData()
         self.logger = logging.getLogger(__name__)
 

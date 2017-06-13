@@ -11,6 +11,7 @@ import jsonschema as jss
 import json
 # import urllib2 as u2
 
+_l = logging.getLogger(__name__)
 
 def url_to_stream(url, *args, **kwargs):
     '''request a url using requests pkg and pass *args and **kwargs to
@@ -174,6 +175,18 @@ class LogAccum(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.flush(True)
     
-    
+
+def require_all(*predicates):
+    r_all = all(predicates)
+    if not r_all:
+        print 'ERROR require_all failed checking all predicates true'
+        _l.error('require_all failed checking all predicates true')
+        
+def require_any(*predicates):
+    r_any = any(predicates)
+    if not r_any:
+        _l.error('requre_any failed checking at least one predicate true')
+
+
 class Actions():
     ALL = 'all'
