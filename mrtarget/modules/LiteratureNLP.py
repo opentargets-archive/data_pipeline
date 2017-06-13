@@ -1213,7 +1213,7 @@ class SentenceAnalysisSpacy(object):
                                                     subject=any_subject.text,
                                                     object=do.text,
                                                     verb=verb_text,
-                                                    verb_path = verb_path,
+                                                    verb_path = [i.text for i in verb_path],
                                                     verb_subtree = self.doc[v.left_edge.i : v.right_edge.i + 1].text,
                                                     subj_ver= '%s -> %s' %(any_subject.text, verb_text),
                                                     ver_obj =  '%s -> %s' %(verb_text, do.text),
