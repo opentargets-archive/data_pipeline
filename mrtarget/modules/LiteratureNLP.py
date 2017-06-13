@@ -890,7 +890,7 @@ class DocumentAnalysisSpacy(object):
             noun_phrases.extend(sentence.noun_phrases)
         # print self.noun_phrases
         noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
-        clustered_np = self.cluster_np(noun_phrases)
+        clustered_np = self.clusterself.r_server.shutdown_np(noun_phrases)
         noun_phrase_counter = Counter()
         lowered_text = doc.text.lower()
         for i in clustered_np:
@@ -919,7 +919,7 @@ class DocumentAnalysisSpacy(object):
         for i in noun_phrases:
             for j in noun_phrases:
                 if i!=j and i in j.split(' '):
-                    print '%s -> %s'%(i,j)
+                    # print '%s -> %s'%(i,j)
                     clusters[j].extend(clusters[i])
                     del clusters[i]
                     # elif i != j and j in i:
@@ -1183,15 +1183,16 @@ class SentenceAnalysisSpacy(object):
                     yield span
 
 
-    def analyse(self):
+    def analyse(self, verbose = False):
         '''extract concepts'''
 
         '''collapse noun phrases based on syntax tree'''
         noun_phrases = list(self.collapse_noun_phrases_by_syntax())
         for np in noun_phrases:
             np.merge()
-        self.print_syntax_list()
-        self.print_syntax_tree()
+        if verbose:
+            self.print_syntax_list()
+            self.print_syntax_tree()
 
 
         self.concepts = []
