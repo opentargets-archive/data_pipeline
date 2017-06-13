@@ -890,7 +890,7 @@ class DocumentAnalysisSpacy(object):
             noun_phrases.extend(sentence.noun_phrases)
         # print self.noun_phrases
         noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
-        clustered_np = self.clusterself.r_server.shutdown_np(noun_phrases)
+        clustered_np = self.cluster_np(noun_phrases)
         noun_phrase_counter = Counter()
         lowered_text = doc.text.lower()
         for i in clustered_np:
@@ -962,7 +962,7 @@ class SentenceAnalysisSpacy(object):
                 sentence = u'' + self._normalizer.normalize(sentence)
             if abbreviations is None:
                 self.abbreviations = self._abbreviations_finder.digest_as_dict(sentence)
-                self.logger.info('abbreviations: ' + str(self.abbreviations))
+                # self.logger.info('abbreviations: ' + str(self.abbreviations))
 
             if abbreviations:
                 for short, long in abbreviations:
@@ -1222,9 +1222,9 @@ class SentenceAnalysisSpacy(object):
                                                               self.isNegated(do)
                             ))
         self.noun_phrases=list(set(noun_phrases))
-        self.logger.info(self.noun_phrases)
-        for c in self.concepts:
-            self.logger.info(c['concept'])
+        # self.logger.info(self.noun_phrases)
+        # for c in self.concepts:
+        #     self.logger.info(c['concept'])
 
 
     def __str__(self):
