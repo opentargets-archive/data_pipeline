@@ -890,10 +890,10 @@ class DocumentAnalysisSpacy(object):
             noun_phrases.extend(sentence.noun_phrases)
         # print self.noun_phrases
         noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
-        clustered_np = self.cluster_np(noun_phrases)
+        # clustered_np = self.cluster_np(noun_phrases)
         noun_phrase_counter = Counter()
         lowered_text = doc.text.lower()
-        for i in clustered_np:
+        for i in noun_phrases:
             lowered_np = i.lower()
             noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
         noun_phrases_top = [i[0] for i in noun_phrase_counter.most_common(5) if i[1] > 1]
