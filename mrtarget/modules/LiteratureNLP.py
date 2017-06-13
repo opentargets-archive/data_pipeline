@@ -884,10 +884,13 @@ class DocumentAnalysisSpacy(object):
         concepts = []
         noun_phrases = []
         for sentence in doc.sents:
-            sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
-            sentence.analyse()
-            concepts.extend(sentence.concepts)
-            noun_phrases.extend(sentence.noun_phrases)
+            try:
+                sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
+                sentence.analyse()
+                concepts.extend(sentence.concepts)
+                noun_phrases.extend(sentence.noun_phrases)
+            except:
+                self.logger.exception('Error parsing a sentence')
         # print self.noun_phrases
         noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
         # clustered_np = self.cluster_np(noun_phrases)
