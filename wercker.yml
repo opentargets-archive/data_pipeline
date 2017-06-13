@@ -75,6 +75,16 @@ build:
 
     #push to registries
     - internal/docker-push:
+        username: _json_key
+        password: $GCR_JSON_KEY_FILE
+        working-dir: /usr/src/app
+        tag: $WERCKER_GIT_COMMIT, $WERCKER_GIT_BRANCH, $LATEST_FLAG
+        repository: $GCR_REPO
+        registry: $GCR_HOST
+        cmd: mrtarget
+        disable-sync: true
+
+    - internal/docker-push:
         username: $QUAY_USERNAME
         password: $QUAY_PASSWORD
         tag: $WERCKER_GIT_COMMIT, $WERCKER_GIT_BRANCH, $LATEST_FLAG
@@ -84,15 +94,6 @@ build:
         cmd: mrtarget
         disable-sync: true
 
-    - internal/docker-push:
-        username: _json_key
-        password: $GCR_JSON_KEY_FILE
-        working-dir: /usr/src/app
-        tag: $WERCKER_GIT_COMMIT, $WERCKER_GIT_BRANCH, $LATEST_FLAG
-        repository: $GCR_REPO
-        registry: $GCR_HOST
-        cmd: mrtarget
-        disable-sync: true
   after-steps:
     - script:
         name: log status in github
