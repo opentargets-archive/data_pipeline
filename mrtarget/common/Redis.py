@@ -771,26 +771,27 @@ class WhiteCollarWorker(Thread):
 
         while self.workers_instances:
             for n, p in self.workers_instances.items():
-                time.sleep(0.1)
-                if p.exitcode is None and not p.is_alive():
-                    self.logger.error('%s is not finished and not running as if it was never started' % p.name)
-                elif p.exitcode is not None and p.exitcode < 0:
-                    self.logger.error('Worker %s ended with an error or terminated. exitcode: %s' % (p.name, str(p.exitcode)))
-                    if self.restart_log[n] < self.max_restarts:
-                        self.logger.info('Restarting failed worker instance number %i' % n)
-                        self.workers_instances[n] = self.target(self.queue_in,
-                                                                self.redis_path,
-                                                                self.queue_out,
-                                                                *self.args,
-                                                                **self.kwargs)
-                        self.restart_log[n] += 1
-                    else:
-                        self.logger.error('Gave up on restarting worker instance number %i' % n)
-                        del self.workers_instances[n]
-                        # Handle this either by restarting or delete the entry so it is removed from list as for else
+                if  p.is_alive():
+                    continue #worker still running
                 else:
-                    p.join()  # wait for completion
-                    del self.workers_instances[n]
+                    if p.exitcode is None:
+                        self.logger.error('%s is not finished and not running as if it was never started' % p.name)
+                    elif p.exitcode != 0: #worker exted with error
+                        self.logger.error('Worker %s ended with an error or terminated. exitcode: %s' % (p.name, str(p.exitcode)))
+                        if self.restart_log[n] < self.max_restarts:
+                            self.logger.info('Restarting failed worker instance number %i' % n)
+                            self.workers_instances[n] = self.target(self.queue_in,
+                                                                    self.redis_path,
+                                                                    self.queue_out,
+                                                                    *self.args,
+                                                                    **self.kwargs)
+                            self.restart_log[n] += 1
+                        else:
+                            self.logger.error('Gave up on restarting worker instance number %i' % n)
+                            del self.workers_instances[n]
+                    elif p.exitcode == 0:  #worker completed fine
+                        del self.workers_instances[n]
+            time.sleep(0.2)
 
     def kill_all(self):
         '''
