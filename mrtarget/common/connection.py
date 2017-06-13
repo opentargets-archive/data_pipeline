@@ -70,7 +70,8 @@ class PipelineConnectors():
         self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH),
                               serverconfig={'save': [],
                                             'maxclients': 10000,
-                                            'port': '35000'})
+                                            'port': '35000'
+                                            })
         self.logger.info('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
 
         return success
@@ -79,4 +80,4 @@ class PipelineConnectors():
         try:
             self.r_server.shutdown()
         except:
-            self.logger.exception('Could not shutdown redislite erver')
+            self.logger.exception('Could not shutdown redislite server')

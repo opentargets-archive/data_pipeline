@@ -37,7 +37,7 @@ from unidecode import unidecode
 try:
     import nltk
     from nltk.corpus import stopwords as nltk_stopwords
-    from nltk import Tree
+    from nltk import Tree, pprint
 except ImportError:
     logging.getLogger(__name__).warning('cannot import nltk or stopwords')
 
@@ -890,9 +890,10 @@ class DocumentAnalysisSpacy(object):
             noun_phrases.extend(sentence.noun_phrases)
         # print self.noun_phrases
         noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
+        clustered_np = self.cluster_np(noun_phrases)
         noun_phrase_counter = Counter()
         lowered_text = doc.text.lower()
-        for i in noun_phrases:
+        for i in clustered_np:
             lowered_np = i.lower()
             noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
         noun_phrases_top = [i[0] for i in noun_phrase_counter.most_common(5) if i[1] > 1]
@@ -910,6 +911,29 @@ class DocumentAnalysisSpacy(object):
 
     def __str__(self):
         return 'nlp'
+
+    def cluster_np(self,noun_phrases):
+        '''todo: optimise for speed'''
+
+        clusters = {i:[i] for i in noun_phrases}
+        for i in noun_phrases:
+            for j in noun_phrases:
+                if i!=j and i in j.split(' '):
+                    print '%s -> %s'%(i,j)
+                    clusters[j].extend(clusters[i])
+                    del clusters[i]
+                    # elif i != j and j in i:
+                    #     print '%s <- %s'%(j,i)
+        # pprint(clusters)
+        filtered_noun_phrases = []
+        for k,v in clusters.items():
+            if len(v)>1:
+                longest = sorted(v, key=lambda x: len(x), reverse=True)[0]
+                filtered_noun_phrases.append(longest)
+            else:
+                filtered_noun_phrases.append(v[0])
+        # print filtered_noun_phrases
+        return filtered_noun_phrases
 
 
 

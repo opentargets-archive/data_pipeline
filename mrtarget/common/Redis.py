@@ -6,6 +6,7 @@ import ujson as json
 from collections import Counter
 
 import jsonpickle
+
 jsonpickle.set_preferred_backend('ujson')
 import logging
 import uuid
@@ -735,9 +736,9 @@ class WhiteCollarWorker(Thread):
                  queue_in,
                  redis_path,
                  queue_out=None,
-                 args = [],
-                 kwargs = {},
-                 max_restart = 3):
+                 args=[],
+                 kwargs={},
+                 max_restart=3):
         super(WhiteCollarWorker, self).__init__()
         self.daemon = True
         self.target = target
@@ -748,11 +749,9 @@ class WhiteCollarWorker(Thread):
         self.redis_path = redis_path
         self.args = args
         self.kwargs = kwargs
-        self.max_restarts=max_restart
+        self.max_restarts = max_restart
         self.restart_log = Counter()
         self.logger = logging.getLogger(__name__)
-
-
 
     def run(self):
         '''
@@ -762,30 +761,37 @@ class WhiteCollarWorker(Thread):
         '''
 
         for i in range(self.pool_size):
-            self.workers_instances[i]=self.target(self.queue_in,
-                                                  self.redis_path,
-                                                  self.queue_out,
-                                                  *self.args,
-                                                  **self.kwargs)
+            worker = self.target(self.queue_in,
+                                 self.redis_path,
+                                 self.queue_out,
+                                 *self.args,
+                                 **self.kwargs)
+            worker.start()
+            self.workers_instances[i] = worker
 
         while self.workers_instances:
-            for n,p in self.workers_instances.items():
+            for n, p in self.workers_instances.items():
                 time.sleep(0.1)
                 if p.exitcode is None and not p.is_alive():
-                    self.logger.error('%s is not finished and not running as if it was never born'%p.name)
-                elif p.exitcode < 0:
-                    self.logger.error('Worker %s ended with an error or a terminate'%p.name)
+                    self.logger.error('%s is not finished and not running as if it was never started' % p.name)
+                elif p.exitcode is not None and p.exitcode < 0:
+                    self.logger.error('Worker %s ended with an error or terminated. exitcode: %s' % (p.name, str(p.exitcode)))
                     if self.restart_log[n] < self.max_restarts:
-                        self.logger.info('Restarting failed worker instance number %i'%n)
-                        self.workers_instances[n] = self.target(*self.args, **self.kwargs)
-                        self.restart_log[n]+=1
+                        self.logger.info('Restarting failed worker instance number %i' % n)
+                        self.workers_instances[n] = self.target(self.queue_in,
+                                                                self.redis_path,
+                                                                self.queue_out,
+                                                                *self.args,
+                                                                **self.kwargs)
+                        self.restart_log[n] += 1
                     else:
-                        self.logger.error('Gave up on restarting worker instance number %i'%n)
+                        self.logger.error('Gave up on restarting worker instance number %i' % n)
                         del self.workers_instances[n]
-                    # Handle this either by restarting or delete the entry so it is removed from list as for else
+                        # Handle this either by restarting or delete the entry so it is removed from list as for else
                 else:
                     p.join()  # wait for completion
                     del self.workers_instances[n]
+
     def kill_all(self):
         '''
         send a kill signal to all the workers nicely
@@ -793,7 +799,7 @@ class WhiteCollarWorker(Thread):
         :return: 
         '''
         for n, p in self.workers_instances.items():
-            self.logger.debug('setting kill switch on for worker %s'%p.name)
+            self.logger.debug('setting kill switch on for worker %s' % p.name)
             p.kill_switch = True
 
 
