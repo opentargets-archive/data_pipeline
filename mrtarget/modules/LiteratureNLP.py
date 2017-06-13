@@ -906,11 +906,10 @@ class DocumentAnalysisSpacy(object):
                 noun_phrase_counter[np] += noun_phrase_counter[np + 's']
                 del noun_phrase_counter[np + 's']
         '''increase count of shorter form with longer form'''
-        for abbr in abbreviations:
-            short = abbr['short'].lower()
-            if short in noun_phrase_counter:
-                noun_phrase_counter[abbr['long'].lower()] += noun_phrase_counter[short]
-                del noun_phrase_counter[short]
+        for short, long in abbreviations.items():
+            if short.lower() in noun_phrase_counter:
+                noun_phrase_counter[long.lower()] += noun_phrase_counter[short.lower()]
+                del noun_phrase_counter[short.lower()]
         noun_phrases_top = [i[0] for i in noun_phrase_counter.most_common(5) if i[1] > 1]
         noun_phrases_recurring = [i for i, k in noun_phrase_counter.items() if k > 1]
 
