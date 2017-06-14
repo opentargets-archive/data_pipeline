@@ -90,7 +90,7 @@ class Phenodigm():
         logging.info("Loaded {0} hs genes".format(len(self.mmGenes)))
 
     def update_cache(self):
-        hdr = { 'User-Agent' : 'cttv bot by /center/for/therapeutic/target/validation' }
+        hdr = { 'User-Agent' : 'open targets bot @ targetvalidation.org' }
         conn = httplib.HTTPConnection(Config.MOUSEMODELS_PHENODIGM_SOLR)
 
         for dir in [Config.MOUSEMODELS_CACHE_DIRECTORY]:
