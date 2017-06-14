@@ -112,7 +112,7 @@ class FileProcesser():
     @staticmethod
     def _tokens_from_filename(filename):
         '''return a dict with all needed tokens based on a filename format'''
-        rres = re.match(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename)
+        rres = re.search(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename)
         valid_rres = rres.groupdict() if rres else None
 
         # if not valid date get from now()
