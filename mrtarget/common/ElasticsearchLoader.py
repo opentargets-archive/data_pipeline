@@ -162,11 +162,13 @@ class Loader():
             # create a temporal file if necessary
             if self._tmp_fd_enable and self._tmp_fd_count > 0:
                 if self._tmp_fd is None:
-                    self.logger.info('create temporary file to output '
-                                     'generated index docs while dry_run '
-                                     'is activated')
                     self._tmp_fd = tempfile.NamedTemporaryFile(
                         delete=self._tmp_fd_delete)
+                    self.logger.info('create temporary file to output '
+                                     'generated index docs while dry_run '
+                                     'is activated with file %s',
+                                     self._tmp_fd.name)
+                    
 
                 # flush self.cache into temp file converted as text lines
                 self._tmp_fd.writelines([json.dumps(el) + '\n'
