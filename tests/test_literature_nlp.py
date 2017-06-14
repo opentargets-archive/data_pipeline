@@ -393,10 +393,8 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
                u'how changes in cation transport might be related to alterations in cell growth. This is a test, ' \
                u'for a complex entity name: th:is.{e}nt/ity-is,ver-y/co_m[p]lex(to)par;se'
         sentence = SentenceAnalysisSpacy(text, self.nlp)
-        sentence.analyse()
+        sentence.analyse(merge_with_syntax=False)
         tokens = [i.text for i in sentence.doc]
-        for t in tokens:
-            print t
         self.assertIn(u'10(-7)', tokens)
         self.assertIn(u'(Na++K+)-ATPase', tokens)
         self.assertIn(u'2.7-fold', tokens)

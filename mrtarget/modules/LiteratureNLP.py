@@ -1207,7 +1207,7 @@ class SentenceAnalysisSpacy(object):
                     yield span
 
 
-    def analyse(self, verbose = False):
+    def analyse(self, merge_with_syntax = True,verbose = False):
         '''extract concepts'''
 
         '''collapse noun phrases based on syntax tree'''
@@ -1215,8 +1215,9 @@ class SentenceAnalysisSpacy(object):
         for np in noun_phrases:
             np.merge()
         noun_phrases = list(self.collapse_noun_phrases_by_syntax())
-        for np in noun_phrases:
-            np.merge()
+        if merge_with_syntax:
+            for np in noun_phrases:
+                np.merge()
         if verbose:
             self.print_syntax_list()
             self.print_syntax_tree()
