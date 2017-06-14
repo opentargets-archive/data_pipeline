@@ -344,8 +344,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
             else:
                 t1 = time.time()
-                # validation_errors = [str(e) for e in self.validators[data_type].iter_errors(parsed_line)]
-                validation_errors = [e.message() for e in self.validators[data_type].iter_errors(parsed_line)]
+                validation_errors = [str(e) for e in self.validators[data_type].iter_errors(parsed_line)]
                 t2 = time.time()
 
                 if validation_errors:
