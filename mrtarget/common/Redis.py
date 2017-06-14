@@ -853,7 +853,7 @@ class RedisLookupTable(object):
     def _get_r_server(self, r_server = None):
         return r_server if r_server else self.r_server
 
-    def _get_key_namespace(self, key):
+    def _get_key_namespace(self, key, r_server=None):
         return self.KEY_NAMESPACE % {'namespace': self.namespace, 'key': key}
 
     def _encode(self, obj):
@@ -862,13 +862,13 @@ class RedisLookupTable(object):
     def _decode(self, obj):
         return obj
 
-    def __contains__(self, key):
+    def __contains__(self, key, r_server=None):
         return self.r_server.exists(self._get_key_namespace(key))
 
-    def __getitem__(self, key):
+    def __getitem__(self, key, r_server=None):
         self.get(self._get_key_namespace(key), self.r_server)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value,  r_server=None):
         self.set(self._get_key_namespace(key), value, self.r_server)
 
 
