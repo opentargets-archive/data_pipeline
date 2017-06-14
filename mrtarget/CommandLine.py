@@ -28,6 +28,7 @@ from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProc
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.Settings import Config, file_or_resource
 
+from mrtarget.modules.G2P import G2PActions, G2P
 
 logging.config.fileConfig(file_or_resource('logging.ini'),
                           disable_existing_loggers=False)
@@ -87,6 +88,8 @@ def main():
                         action="append_const", const = MouseModelsActions.ALL)
     parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
                         action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
+    parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
+                        action="append_const", const=G2PActions.GENERATE_EVIDENCE)
     parser.add_argument("--ontos", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.PHENOTYPESLIM)
     parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
@@ -213,6 +216,10 @@ def main():
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(update=True)
             if LiteratureNLPActions.PROCESS in args.lit :
                 LiteratureNLPProcess(connectors.es, loader, connectors.r_server).process()
+        if args.g2p or run_full_pipeline:
+            do_all = (G2PActions.ALL in args.g2p) or run_full_pipeline
+            if (G2PActions.GENERATE_EVIDENCE in args.g2p) or do_all:
+                G2P(connectors.es).process_g2p()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:

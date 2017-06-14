@@ -1,3 +1,9 @@
+from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common import Actions
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from tqdm import tqdm
+from elasticsearch.exceptions import NotFoundError
+
 import opentargets.model.core as opentargets
 import opentargets.model.bioentity as bioentity
 import opentargets.model.evidence.phenotype as evidence_phenotype
@@ -5,27 +11,53 @@ import opentargets.model.evidence.core as evidence_core
 import opentargets.model.evidence.linkout as evidence_linkout
 import opentargets.model.evidence.association_score as association_score
 import opentargets.model.evidence.mutation as evidence_mutation
-import json
+
 import sys
 import gzip
 import logging
 import urllib2
 import csv
-from mrtarget.Settings import Config
 
-'''
-Extracted input JSONs from Postgres with the following command
-psql -h localhost -d cttv_core_test -p 5432 -U tvdev -A -F $'\t' -X -t -c "SELECT JSON_BUILD_OBJECT('disease', disease, 'target', target, 'disease_label', disease_label, 'gene_symbol', gene_symbol) FROM gene2phenotype.final_data_for_evstrs_jul2016" >final_data_for_evstrs_jul2016.json
-This is a skeleton only, need to add fields for score and evidence codes.
-'''
+__copyright__  = "Copyright 2014-2017, Open Targets"
+__credits__    = ["Gautier Koscielny", "ChuangKee Ong"]
+__license__    = "Apache 2.0"
+__version__    = "1.2.6"
+__maintainer__ = "ChuangKee Ong"
+__email__      = ["gautierk@targetvalidation.org", "ckong@ebi.ac.uk"]
+__status__     = "Production"
+
+G2P_FILENAME = file_or_resource('DDG2P_14_5_2017.csv.gz')
+G2P_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_gene2phenotype-14-06-2017.json'
+
+class G2PActions(Actions):
+    GENERATE_EVIDENCE = 'generateevidence'
 
 class G2P():
-
-    def __init__(self):
-        self.omim_to_efo_map = dict()
+    def __init__(self, es=None):
+        self.es = es
+        self.esquery  = ESQuery(self.es)
         self.evidence_strings = list()
+        self.symbol2ensembl   = dict()
+        self.omim_to_efo_map  = dict()
         self._logger = logging.getLogger(__name__)
 
+    def process_g2p(self):
+        try:
+            self._get_ensembl_data()
+        except NotFoundError:
+            self._logger.error('no ensembl index in ES. Skipping. Has the --ensembl step been run?')
+
+        self.generate_evidence_strings(G2P_FILENAME)
+
+    def _get_ensembl_data(self):
+        for row in tqdm(self.esquery.get_all_ensembl_genes(),
+                        desc='loading Ensembl genes',
+                        unit_scale=True,
+                        unit='genes',
+                        leave=False,
+                        total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
+
+            self.symbol2ensembl[row['display_name']] = row['id']
 
     def get_omim_to_efo_mappings(self):
         self._logger.info("OMIM to EFO parsing - requesting from URL %s" % Config.OMIM_TO_EFO_MAP_URL)
@@ -43,12 +75,12 @@ class G2P():
                 self.omim_to_efo_map[omim] = []
             self.omim_to_efo_map[omim].append({'efo_uri': efo_uri, 'efo_label': efo_label})
 
-    def generate_evidence_strings(self, source_file):
+    def generate_evidence_strings(self, G2P_FILENAME):
 
         total_efo = 0
         self.get_omim_to_efo_mappings()
 
-        with gzip.open(source_file, mode='r') as zf:
+        with gzip.open(G2P_FILENAME, mode='r') as zf:
             reader = csv.reader(zf, delimiter=',', quotechar='"')
             c = 0
             for row in reader:
@@ -59,13 +91,16 @@ class G2P():
                     "gene symbol","gene mim","disease name","disease mim","DDD category","allelic requirement","mutation consequence",phenotypes,"organ specificity list",pmids,panel,"prev symbols","hgnc id"
                     '''
                     (gene_symbol, gene_mim, disease_name, disease_mim, DDD_category, allelic_requirement, mutation_consequence, phenotypes, organ_specificity_list,pmids,panel, prev_symbols, hgnc_id) = row
-                    ''' map gene to ensembl '''
-                    target = "ENSG00000215612"
+                    ''' map gene symbol to ensembl '''
+                    target = self.symbol2ensembl[gene_symbol]
+                    #target = "ENSG00000215612"
 
                     ''' Map disease to EFO or Orphanet '''
                     if disease_mim in self.omim_to_efo_map:
                         total_efo +=1
                         disease = self.omim_to_efo_map[disease_mim]
+
+                        print gene_symbol, target, disease
 
                         obj = opentargets.Literature_Curated(type='genetic_literature')
                         provenance_type = evidence_core.BaseProvenance_Type(
@@ -81,7 +116,7 @@ class G2P():
                         )
                         obj.access_level = "public"
                         obj.sourceID = "gene2phenotype"
-                        obj.validated_against_schema_version = "1.2.5"
+                        obj.validated_against_schema_version = "1.2.6"
                         obj.unique_association_fields = {"target": target, "disease_uri": disease['efo_uri'], "source_id": "gene2phenotype"}
                         obj.target = bioentity.Target(id=target,
                                                       activity="http://identifiers.org/cttv.activity/unknown",
@@ -119,7 +154,7 @@ class G2P():
             print "%i %i" % (total_efo, c)
 
     def write_evidence_strings(self, filename):
-        logging.info("Writing IntOGen evidence strings")
+        logging.info("Writing G2P evidence strings")
         with open(filename, 'w') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
@@ -136,16 +171,8 @@ class G2P():
         tp_file.close()
 
 def main():
-
-
     g2p = G2P()
-    source_file = "/Users/otvisitor/Downloads/DDG2P_13_5_2017.csv.gz"
-    g2p.generate_evidence_strings(source_file)
-
-    #source_file = sys.argv[1]
-    #g2p = G2P()
-    #g2p.read_file(source_file)
-    #g2p.write_evidence_strings('/Users/koscieln/Documents/data/ftp/cttv001/upload/submissions/cttv001_gene2phenotype-29-07-2016.json')
+    #g2p.generate_evidence_strings(G2P_FILENAME)
 
 if __name__ == "__main__":
     main()
