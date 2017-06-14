@@ -258,8 +258,8 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk', 'bpalka@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk', 'cyenyxe@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_FILENAME_REGEX = re.compile(r""".*
-    (?P<datasource>[a-zA-Z0-9_]*).*(\-
+    EVIDENCEVALIDATION_FILENAME_REGEX = re.compile(r"""
+    (?P<datasource>[a-zA-Z0-9_]+)(\-
     (?P<d1>\d{2})\-
     (?P<d2>\d{2})\-
     (?P<d3>\d{4}))?
