@@ -447,7 +447,7 @@ class MedlineRetriever(object):
 
         no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
         ftp_readers = no_of_workers
-        max_ftp_readers = 8 #avoid too many connections errors
+        max_ftp_readers = no_of_workers/4 #avoid too many connections errors
         if ftp_readers >max_ftp_readers:
             ftp_readers = max_ftp_readers
 
@@ -458,11 +458,13 @@ class MedlineRetriever(object):
 
         # Parser Queue
         parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_parser',
-                                  max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                                  job_timeout=1200)
+                              max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
+                              batch_size=10,
+                              job_timeout=1200)
 
         # ES-Loader Queue
         loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
+                              batch_size=10,
                               serialiser='pickle',
                               max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
                               job_timeout=1200)
@@ -509,7 +511,7 @@ class MedlineRetriever(object):
         '''Start es-loader workers'''
         '''Fixed number of workers to reduce the overhead of creating ES connections for each worker process'''
         loaders = WhiteCollarWorker(target=LiteratureLoaderProcess,
-                                    pool_size=1,#no_of_workers/2 +1,
+                                    pool_size=no_of_workers/2 +1,
                                     queue_in=loader_q,
                                     redis_path=self.r_server.db,
                                     kwargs=dict(dry_run=self.dry_run))
