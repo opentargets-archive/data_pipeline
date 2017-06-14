@@ -871,13 +871,17 @@ class DocumentAnalysisSpacy(object):
             if self.normalize:
                 document = u''+self._normalizer.normalize(document)
             abbreviations = self._abbreviations_finder.digest_as_dict(document)
-            self.logger.debug('abbreviations: ' + str(abbreviations))
+            # self.logger.debug('abbreviations: ' + str(abbreviations))
 
             if abbreviations:
                 for short, long in abbreviations.items():
                     if short in document and not long in document:
                         document = document.replace(short, long)
-            doc = self.nlp(document)
+            try:
+                doc = self.nlp(document)
+            except:
+                self.logger.exception('Error parsing the document: %s' % document)
+                return [None, {}]
         else:
             raise AttributeError('document needs to be unicode or Doc not %s' % document.__class__)
 
@@ -885,12 +889,12 @@ class DocumentAnalysisSpacy(object):
         noun_phrases = []
         for sentence in doc.sents:
             try:
-                sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
-                sentence.analyse()
-                concepts.extend(sentence.concepts)
-                noun_phrases.extend(sentence.noun_phrases)
+                analysed_sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
+                analysed_sentence.analyse()
+                concepts.extend(analysed_sentence.concepts)
+                noun_phrases.extend(analysed_sentence.noun_phrases)
             except:
-                self.logger.exception('Error parsing a sentence')
+                self.logger.exception('Error parsing the sentence: %s'%sentence.text)
         # print self.noun_phrases
         noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
 
@@ -1161,17 +1165,23 @@ class SentenceAnalysisSpacy(object):
         :return: 
         '''
         prev_span = ''
+        open_brackets = u'( { [ <'.split()
+        closed_brackets = u') } ] >'.split()
         for token in self.sentence:
             try:
-                next_token = None
-                if token.nbor(1).pos is PUNCT and token.whitespace_ == u'':
-                    next_token = token.nbor(2)
-                # elif token.pos is PUNCT :
-                #     next_token = token.nbor(1)
-                if next_token and next_token.pos in [NOUN ,PROPN, ADJ]:
-                    span = Span(self.doc, token.i, next_token.i + 1)
-                    prev_span = span.text
-                    yield span
+                if token.text in open_brackets and token.whitespace_ ==u'' :
+                    next_token = token.nbor(1)
+                    if any([i in next_token.text for i in closed_brackets]):
+                        span = Span(self.doc, token.i, next_token.i +1)
+                        # prev_span = span.text
+                        yield span
+                elif any([i in token.text for i in open_brackets]):
+                    next_token = token.nbor(1)
+                    if next_token.text in closed_brackets:
+                        span = Span(self.doc, token.i, next_token.i + 1)
+                        # prev_span = span.text
+                        yield span
+
             except IndexError: #skip end of sentence
                 pass
 
@@ -1201,6 +1211,9 @@ class SentenceAnalysisSpacy(object):
         '''extract concepts'''
 
         '''collapse noun phrases based on syntax tree'''
+        noun_phrases = list(self.collapse_noun_phrases_by_punctation())
+        for np in noun_phrases:
+            np.merge()
         noun_phrases = list(self.collapse_noun_phrases_by_syntax())
         for np in noun_phrases:
             np.merge()

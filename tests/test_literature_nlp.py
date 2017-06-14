@@ -37,10 +37,14 @@ class LiteratureNLPTestCase(unittest.TestCase):
                'annotated genes located on 8p; many are most likely oncogenes and tumor-suppressor genes. Molecular ' \
                'genetics and developmental studies have identified 21 genes in this region (ADRA1A, ARHGEF10, CHRNA2, ' \
                '' \
+               '' \
+               '' \
                'CHRNA6, CHRNB3, DKK4, DPYSL2, EGR3, FGF17, FGF20, FGFR1, FZD3, LDL, NAT2, NEF3, NRG1, PCM1, PLAT, ' \
                'PPP3CC, SFRP1 and VMAT1/SLC18A1) that are most likely to contribute to neuropsychiatric disorders ' \
                '(schizophrenia, autism, bipolar disorder and depression), neurodegenerative disorders (Parkinson\'s' \
                ' and Alzheimer\'s disease) and cancer. Furthermore, at least seven nonprotein-coding RNAs (microRNAs) ' \
+               '' \
+               '' \
                '' \
                'are located at 8p. Structural variants on 8p, such as copy number variants, microdeletions or ' \
                'microduplications, might also contribute to autism, schizophrenia and other human diseases including' \
@@ -75,6 +79,8 @@ class LiteratureNLPTestCase(unittest.TestCase):
                'LGMD1B), ' \
                'caveolin-3 (3p25, LGMD1C), unknown proteins (7q, LGMD1D, 6q23, LGMD1E, 7q32.1-32.2., LGMD1F), ' \
                'calpain-3 (15q15.1-21.1, LGMD2A), dysferlin (2p13.3-13.1, LGMD2B), gamma-sarcoglycan (13q12, LGMD2C), ' \
+               '' \
+               '' \
                '' \
                'alpha-sarcoglycan, also known as adhalin (17q12-q21.3, LGMD2D), beta-sarcoglycan (4q12, LGMD2E), ' \
                'delta-sarcoglycan (5q33-q34, LGMD2F), telethonin (17q11-q12, LGMD2G), E3-ubiquitin ligase (' \
@@ -261,6 +267,8 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
 
     def test_Schistosoma(self):
         text = u'Studies have suggested that Schistosoma mansoni infection reduces the severity of asthma and prevent ' \
+               u'' \
+               u'' \
                u'atopy.'
 
         sentence = SentenceAnalysisSpacy(text, self.nlp)
@@ -362,6 +370,48 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
         for i in minimal_expected_noun_phrases:
             self.assertIn(i, noun_phrases)
 
+    def testManyPunctations(self):
+        text = u'In ' \
+               u'addition, the antagonistic action of propranolol (1 X 10(-7) M) in a Ca++-containing or ' \
+               u'Sr++-containing medium was determined. '
+
+        sentence = SentenceAnalysisSpacy(text, self.nlp)
+        sentence.analyse()
+
+    def test_custom_tokenizer(self):
+        text = u'the antagonistic action of propranolol (1 X 10(-7) M) in a Ca++-containing or. Cell growth and ' \
+               u'quabain-sensitive 86Rg+ uptake and (Na++K+)-ATPase activity in 3T3 and SV40 transformed 3T3 ' \
+               u'fibroblasts. The uptake of ouabain-sensitive 86Rb+ uptake measured at 5 min and the uptake measured ' \
+               u'at 60 min was 4.5- and 2.7-fold greater respectively for SV40 transformed 3T3 cells compared to 3T3 ' \
+               u'cells during the late log phase of growth. This uptake, however, varied markedly with cell growth. ' \
+               u'Ouabain-sensitive 86Rb+ uptake was found to be a sensitive indicator of protein synthesis as ' \
+               u'measured by total protein content. Cessation of cell growth as measured by total protein content was ' \
+               u'associated with a decline in ouabain-sensitive 86Rb+ uptake in both cell types. This increase ' \
+               u'ouabain-sensitive cation transport was reflected in increased levels of (Na++K)-ATPase activity for ' \
+               u'SV40 3T3 cells, which showed a 2.5-fold increase V but the same Km as 3T3 cells. These results are ' \
+               u'compared with the results of related work. Possible mechanisms for these effects are discussed and ' \
+               u'how changes in cation transport might be related to alterations in cell growth. This is a test, ' \
+               u'for a complex entity name: th:is.{e}nt/ity-is,ver-y/co_m[p]lex(to)par;se'
+        sentence = SentenceAnalysisSpacy(text, self.nlp)
+        sentence.analyse()
+        tokens = [i.text for i in sentence.doc]
+        for t in tokens:
+            print t
+        self.assertIn(u'10(-7)', tokens)
+        self.assertIn(u'(Na++K+)-ATPase', tokens)
+        self.assertIn(u'2.7-fold', tokens)
+        self.assertIn(u'4.5-', tokens)
+        self.assertIn(u'86Rb+', tokens)
+        self.assertIn(u'Ca++-containing', tokens)
+        self.assertIn(u'(Na++K)-ATPase', tokens)
+        self.assertIn(u'Ouabain-sensitive', tokens)
+        self.assertIn(u'th:is.{e}nt/ity-is,ver-y/co_m[p]lex(to)par;se', tokens)
+        self.assertNotIn(u'cells,', tokens)
+        self.assertNotIn(u'(1', tokens)
+        self.assertNotIn(u'fibroblasts.', tokens)
+
+
+
 
 class SpacyDocumentNLPTestCase(unittest.TestCase):
     @classmethod
@@ -397,8 +447,11 @@ class SpacyDocumentNLPTestCase(unittest.TestCase):
         self.assertNotIn(u'sentence', tokens)
         self.assertNotIn(u'line', tokens)
 
+
+
     def test_obama(self):
-        '''compare with https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/language/syntax_triples'''
+        '''compare with https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/language
+        /syntax_triples'''
 
         text = u'In 2004, Obama received national attention during his campaign to represent Illinois in the United ' \
                u'States Senate with his victory in the March Democratic Party primary, his keynote address at the ' \

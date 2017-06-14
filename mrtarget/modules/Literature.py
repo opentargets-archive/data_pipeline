@@ -20,7 +20,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle, \
-    WhiteCollarWorker
+    WhiteCollarWorker, RedisQueueWorkerThread
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 
@@ -459,13 +459,13 @@ class MedlineRetriever(object):
         # Parser Queue
         parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_parser',
                                   max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                                  job_timeout=300)
+                                  job_timeout=1200)
 
         # ES-Loader Queue
         loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
                               serialiser='pickle',
                               max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                              job_timeout=300)
+                              job_timeout=1200)
 
 
 
@@ -509,7 +509,7 @@ class MedlineRetriever(object):
         '''Start es-loader workers'''
         '''Fixed number of workers to reduce the overhead of creating ES connections for each worker process'''
         loaders = WhiteCollarWorker(target=LiteratureLoaderProcess,
-                                    pool_size=no_of_workers/2 +1,
+                                    pool_size=1,#no_of_workers/2 +1,
                                     queue_in=loader_q,
                                     redis_path=self.r_server.db,
                                     kwargs=dict(dry_run=self.dry_run))
@@ -853,7 +853,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                  queue_out = None,
                  dry_run=False):
         super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path, queue_out)
-        self.loader = Loader(chunk_size=10000, dry_run=dry_run)
+        self.loader = Loader(chunk_size=100, dry_run=dry_run)
         self.es = self.loader.es
         self.es_query = ESQuery(self.es)
         self.logger = logging.getLogger(__name__)

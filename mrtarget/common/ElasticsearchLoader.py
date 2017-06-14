@@ -24,7 +24,7 @@ class Loader():
                  es = None,
                  chunk_size=1000,
                  dry_run = False,
-                 max_flush_interval = random.choice(range(8,16))):
+                 max_flush_interval = random.choice(range(60,120))):
 
         self.logger = logging.getLogger(__name__)
 

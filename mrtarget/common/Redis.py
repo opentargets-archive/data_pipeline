@@ -760,6 +760,7 @@ class WhiteCollarWorker(Thread):
         :return: 
         '''
 
+        #TODO: create just one
         for i in range(self.pool_size):
             worker = self.target(self.queue_in,
                                  self.redis_path,
@@ -769,6 +770,7 @@ class WhiteCollarWorker(Thread):
             worker.start()
             self.workers_instances[i] = worker
 
+        #TODO: check queue and scale up workers if needed
         while self.workers_instances:
             for n, p in self.workers_instances.items():
                 if  p.is_alive():
