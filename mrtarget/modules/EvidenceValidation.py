@@ -115,6 +115,11 @@ class FileProcesser():
         rres = re.search(Config.EVIDENCEVALIDATION_FILENAME_REGEX, filename)
         valid_rres = rres.groupdict() if rres else None
 
+        if valid_rres and valid_rres['datasource'] is None:
+            # 'datasource' field is a really required one so I cannot be
+            # missed
+            valid_rres = None
+            
         # if not valid date get from now()
         if valid_rres and valid_rres['d3'] is None:
             now = datetime.datetime.now()

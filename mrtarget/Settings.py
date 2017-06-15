@@ -263,7 +263,7 @@ class Config():
     (?P<d1>\d{2})\-
     (?P<d2>\d{2})\-
     (?P<d3>\d{4}))?
-    (?P<suffix>\.json\.gz|\.json)$""", re.VERBOSE)
+    (?P<suffix>\.json\.gz|\.json|\.json\.zip)$""", re.VERBOSE)
 
     # setup the number of workers to use for data processing. if None defaults
     # to the number of CPUs available
