@@ -33,6 +33,7 @@ def create_tokenizer(nlp):
 
 def init_spacy_english_language():
     nlp = en_core_web_md.load(create_make_doc=create_tokenizer)
+    nlp.vocab.strings.set_frozen(True)
     return nlp
 
 
