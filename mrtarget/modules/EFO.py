@@ -180,32 +180,32 @@ class EFOLookUpTable(object):
                         total=self._es_query.count_all_diseases(),
                         leave=False,
                         ):
-            self.set_efo(efo, r_server=self.r_server)#TODO can be improved by sending elements in batches
+            self.set_efo(efo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
-    def get_efo(self, efo_id, r_server = None):
-        return self._table.get(efo_id, r_server=self.r_server)
+    def get_efo(self, efo_id, r_server=None):
+        return self._table.get(efo_id, r_server=self._get_r_server(r_server))
 
-    def set_efo(self, efo, r_server = None):
+    def set_efo(self, efo, r_server=None):
         efo_key = efo['path_codes'][0][-1]
-        self._table.set(efo_key,efo, r_server=self.r_server)
+        self._table.set(efo_key,efo, r_server=self._get_r_server(r_server))
 
-    def get_available_gefo_ids(self, r_server = None):
-        return self._table.keys(r_server = self.r_server)
+    def get_available_gefo_ids(self, r_server=None):
+        return self._table.keys(r_server=self._get_r_server(r_server))
 
     def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key, r_server=self.r_server)
+        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
 
     def __getitem__(self, key, r_server=None):
-        return self.get_efo(key, r_server=self.r_server)
+        return self.get_efo(key, r_server=self._get_r_server(r_server))
 
     def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self.r_server)
+        self._table.set(key, value, r_server=self._get_r_server(r_server))
 
-    def _get_r_server(self, r_server=None):
+    def keys(self, r_server=None):
+        return self._table.keys(r_server=self._get_r_server(r_server))
+
+    def _get_r_server(self, r_server = None):
         return r_server if r_server else self.r_server
-
-    def keys(self):
-        return self._table.keys()
 
 
 class DiseaseGraph:

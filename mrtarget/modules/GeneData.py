@@ -736,7 +736,7 @@ class GeneLookUpTable(object):
                 unit_scale = True,
                 total = total,
                 leave=False):
-            self._table.set(target['id'],target, r_server=self.r_server)#TODO can be improved by sending elements in batches
+            self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
             if target['uniprot_id']:
                 self.uniprot2ensembl[target['uniprot_id']] = target['id']
             for accession in target['uniprot_accessions']:
@@ -765,7 +765,7 @@ class GeneLookUpTable(object):
 
     def get_gene(self, target_id, r_server = None):
         try:
-            return self._table.get(target_id, r_server=self.r_server)
+            return self._table.get(target_id, r_server=self._get_r_server(r_server))
         except KeyError:
             try:
                 target = self._es_query.get_objects_by_id(target_id,
@@ -780,13 +780,13 @@ class GeneLookUpTable(object):
             return target
 
     def set_gene(self, target, r_server = None):
-        self._table.set(target['id'],target, r_server=self.r_server)
+        self._table.set(target['id'],target, r_server=self._get_r_server(r_server))
 
     def get_available_gene_ids(self, r_server = None):
-        return self._table.keys(r_server = self.r_server)
+        return self._table.keys(r_server = self._get_r_server(r_server))
 
     def __contains__(self, key, r_server=None):
-        redis_contain = self._table.__contains__(key, r_server=self.r_server)
+        redis_contain = self._table.__contains__(key, r_server=self._get_r_server(r_server))
         if redis_contain:
             return True
         if not redis_contain:
@@ -796,16 +796,16 @@ class GeneLookUpTable(object):
                                          )
 
     def __getitem__(self, key, r_server = None):
-        return self.get_gene(key, self.r_server)
+        return self.get_gene(key, self._get_r_server(r_server))
 
     def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self.r_server)
+        self._table.set(key, value, self._get_r_server(r_server))
 
     def __missing__(self, key):
         print key
 
-    def _get_r_server(self, r_server=None):
+    def keys(self, r_server=None):
+        return self._table.keys(self._get_r_server(r_server))
+    
+    def _get_r_server(self, r_server = None):
         return r_server if r_server else self.r_server
-
-    def keys(self):
-        return self._table.keys()
