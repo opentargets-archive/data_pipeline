@@ -144,12 +144,12 @@ class G2P():
                                 gene_symbol,),
                                 nice_name='Gene2Phenotype%s' % (gene_symbol))
                             obj.evidence.urls = [linkout]
-                            error = obj.validate(logging)
-                            if error > 0:
-                                logging.error(obj.to_JSON())
-                                sys.exit(1)
-                            else:
-                                self.evidence_strings.append(obj)
+                            #error = obj.validate(logging)
+                            #if error > 0:
+                            #    logging.error(obj.to_JSON())
+                            #    sys.exit(1)
+                            #else:
+                            #    self.evidence_strings.append(obj)
                     else:
                         self._logger.error("%s\t%s not mapped: please check manually"%(disease_name, disease_mim))
 
