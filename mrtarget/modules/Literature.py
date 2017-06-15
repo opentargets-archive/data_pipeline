@@ -689,10 +689,13 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
+        self._init_analyzers()
+        self.processed_counter = 0
+
+    def _init_analyzers(self):
         from mrtarget.modules.LiteratureNLP import NounChuncker, DocumentAnalysisSpacy
-
-        self.analyzers = [NounChuncker(), DocumentAnalysisSpacy(init_spacy_english_language())]
-
+        self.nlp = init_spacy_english_language() #store it as class instance to make sure it is deleted if called again
+        self.analyzers = [NounChuncker(), DocumentAnalysisSpacy(self.nlp)]
 
     def process(self,data):
         record, filename = data
@@ -783,6 +786,11 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
         except etree.XMLSyntaxError as e:
             self.logger.error("Error parsing XML file {} - medline record {} %s".format(filename,record),e.message)
+        self.processed_counter+=1
+        if self.processed_counter%10000 == 0:
+            #restart spacy from scratch to free up memory
+            self._init_analyzers()
+
 
     def parse_article_info(self, article, publication):
 

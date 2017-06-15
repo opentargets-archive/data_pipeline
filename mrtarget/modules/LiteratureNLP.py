@@ -918,9 +918,10 @@ class DocumentAnalysisSpacy(object):
         noun_phrases_top = [i[0] for i in noun_phrase_counter.most_common(5) if i[1] > 1]
         noun_phrases_recurring = [i for i, k in noun_phrase_counter.items() if k > 1]
 
-        self.processed_counter+=1
-        if self.processed_counter%100 == 0:
-            self.nlp.vocab.strings.flush_oov()
+        # bug https://github.com/explosion/spaCy/issues/589
+        # self.processed_counter+=1
+        # if self.processed_counter%100 == 0:
+            # self.nlp.vocab.strings.flush_oov()
         return doc, \
                dict(chunks = noun_phrases,
                     recurring_chunks = noun_phrases_recurring,
