@@ -814,6 +814,7 @@ class WhiteCollarWorker(Thread):
         if psutil.virtual_memory().percent < self.MAX_MEMORY_LEVEL:
             self.logger.debug('Spawning a new worker of type: %s, index %i' % (self.target, i))
             worker.start()
+            time.sleep(0.2)#or worker.join(1)
             self.workers_instances[i] = worker
         else:
             self.logger.warning('Not enough memory to spawn a new worker of type: %s, index %i' % (self.target, i))
