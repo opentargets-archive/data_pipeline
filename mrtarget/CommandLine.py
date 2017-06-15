@@ -26,11 +26,8 @@ from mrtarget.modules.QC import QCActions, QCRunner
 from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
-from mrtarget.Settings import Config, file_or_resource
+from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
-
-logging.config.fileConfig(file_or_resource('logging.ini'),
-                          disable_existing_loggers=False)
 
 connectors = None
 
@@ -41,6 +38,9 @@ def load_nlp_corpora():
 
 
 def main():
+    
+    logging.config.fileConfig(file_or_resource('logging.ini'),
+                              disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
@@ -130,6 +130,9 @@ def main():
     parser.add_argument("--inject-literature", dest='inject_literature',
                         help="inject literature data in the evidence-string, default set to False",
                         action='store_true', default=False)
+    parser.add_argument("--schema-version", dest='schema_version',
+                        help="set the schema version aka 'branch' name",
+                        action='store', default='master')
 
     args = parser.parse_args()
 
@@ -139,10 +142,11 @@ def main():
 
     if args.loglevel:
         try:
-            logger = logging.getLogger()
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.getLevelName(args.loglevel))
             logger.setLevel(logging.getLevelName(args.loglevel))
         except Exception, e:
-            logger.exception(e)
+            root_logger.exception(e)
 
     if args.do_nothing:
         sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
@@ -161,6 +165,11 @@ def main():
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
                 dry_run = args.dry_run) as loader:
         run_full_pipeline = False
+        
+        # get the schema version and change all needed resources
+        update_schema_version(Config,args.schema_version)
+        logger.info('setting schema version string to %s', args.schema_version)
+        
         if args.all and (Actions.ALL in args.all):
             run_full_pipeline = True
         if args.hpa or run_full_pipeline:
