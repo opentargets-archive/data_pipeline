@@ -336,7 +336,11 @@ class Publication(JSONSerializable):
 
     def _base_nlp(self):
         for analyzer in self._text_analyzers:
-            self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
+            try:
+                self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
+            except:
+                logger.exception("error in nlp analysis with %s analyser for text: %s"%(str(analyzer), self.get_text_to_analyze()))
+                self.text_mined_entities[str(analyzer)] = {}
 
 
 class LiteratureLookUpTable(object):
