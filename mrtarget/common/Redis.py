@@ -731,7 +731,7 @@ class WhiteCollarWorker(Thread):
     '''
     spawns and monitors a set of workers
     '''
-    MAX_MEMORY_LEVEL = 90
+    MAX_MEMORY_LEVEL = 80
 
     def __init__(self,
                  target,
@@ -776,27 +776,28 @@ class WhiteCollarWorker(Thread):
         #TODO: check queue and scale up workers if needed
         while self.workers_instances:
             for n, p in self.workers_instances.items():
-                if  p.is_alive():
-                    continue #worker still running
-                else:
-                    if p.exitcode is None:
-                        self.logger.error('%s is not finished and not running as if it was never started' % p.name)
-                    elif p.exitcode != 0: #worker exted with error
-                        self.logger.error('Worker %s ended with an error or terminated. exitcode: %s' % (p.name, str(p.exitcode)))
-                        if self.restart_log[n] < self.max_restarts:
-                            self.logger.info('Restarting failed worker instance number %i' % n)
-                            worker= self.target(self.queue_in,
-                                                self.redis_path,
-                                                self.queue_out,
-                                                *self.args,
-                                                **self.kwargs)
-                            self.start_worker(worker, n)
-                            self.restart_log[n] += 1
-                        else:
-                            self.logger.error('Gave up on restarting worker instance number %i' % n)
+                if p is not None:
+                    if  p.is_alive():
+                        continue #worker still running
+                    else:
+                        if p.exitcode is None:
+                            self.logger.error('%s is not finished and not running as if it was never started' % p.name)
+                        elif p.exitcode != 0: #worker exted with error
+                            self.logger.error('Worker %s ended with an error or terminated. exitcode: %s' % (p.name, str(p.exitcode)))
+                            if self.restart_log[n] < self.max_restarts:
+                                self.logger.info('Restarting failed worker instance number %i' % n)
+                                worker= self.target(self.queue_in,
+                                                    self.redis_path,
+                                                    self.queue_out,
+                                                    *self.args,
+                                                    **self.kwargs)
+                                self.start_worker(worker, n)
+                                self.restart_log[n] += 1
+                            else:
+                                self.logger.error('Gave up on restarting worker instance number %i' % n)
+                                del self.workers_instances[n]
+                        elif p.exitcode == 0:  #worker completed fine
                             del self.workers_instances[n]
-                    elif p.exitcode == 0:  #worker completed fine
-                        del self.workers_instances[n]
             time.sleep(0.2)
 
     def kill_all(self):
@@ -811,10 +812,12 @@ class WhiteCollarWorker(Thread):
 
     def start_worker(self, worker, i):
         if psutil.virtual_memory().percent < self.MAX_MEMORY_LEVEL:
+            self.logger.debug('Spawning a new worker of type: %s, index %i' % (self.target, i))
             worker.start()
             self.workers_instances[i] = worker
         else:
-            self.logger.warning('Not enough memory to spawn a new worker of type: %s' % self.target)
+            self.logger.warning('Not enough memory to spawn a new worker of type: %s, index %i' % (self.target, i))
+            self.workers_instances[i] = None
 
 
 class RedisLookupTable(object):
