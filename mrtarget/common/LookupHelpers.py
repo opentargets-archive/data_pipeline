@@ -31,15 +31,16 @@ class LookUpData():
         self.available_efo_objects = None
         self.available_eco_objects = None
         self.chembl = None
+        self.available_publications = None
         
     def set_r_server(self, r_server):
         self.logger.debug('setting r_server to all lookup tables from external r_server')
-        for el in self.__dict__.iterkeys():
-            att = getattr(self, el)
-            if getattr(att,'r_server'):
-                setattr(att, 'r_server', r_server)
-
-
+        self.available_ecos.r_server = r_server
+        self.available_efos.r_server = r_server
+        self.available_hpa.r_server = r_server
+        self.available_genes.r_server = r_server
+        self.available_publications.r_server = r_server
+        
 class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
