@@ -796,7 +796,7 @@ class GeneLookUpTable(object):
                                          )
 
     def __getitem__(self, key, r_server = None):
-        return self.get_gene(key, r_server)
+        return self.get_gene(key, self.r_server)
 
     def __setitem__(self, key, value, r_server=None):
         self._table.set(key, value, r_server=self.r_server)
