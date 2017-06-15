@@ -990,7 +990,7 @@ class SentenceAnalysisSpacy(object):
             self.doc = self.sentence
         else:
             raise AttributeError('sentence needs to be unicode or Doc or Span not %s'%sentence.__class__)
-        self.logger.debug(u'Sentence to analyse: '+self.sentence.text)
+        # self.logger.debug(u'Sentence to analyse: '+self.sentence.text)
 
 
 
