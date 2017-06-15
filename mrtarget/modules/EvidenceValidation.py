@@ -263,6 +263,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.es = es
         self.loader= Loader(dry_run=dry_run, chunk_size=1000)
         self.lookup_data = lookup_data
+        self.lookup_data.set_r_server(self.r_server)
+        
         self.start_time = time.time()
         self.audit = list()
         self.logger = logging.getLogger(__name__)

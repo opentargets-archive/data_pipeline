@@ -19,6 +19,8 @@ from mrtarget.common import require_all
 
 class LookUpData():
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
@@ -29,6 +31,13 @@ class LookUpData():
         self.available_efo_objects = None
         self.available_eco_objects = None
         self.chembl = None
+        
+    def set_r_server(self, r_server):
+        self.logger.debug('setting r_server to all lookup tables from external r_server')
+        for el in self.__dict__.iterkeys():
+            att = getattr(self, el)
+            if getattr(att,'r_server'):
+                setattr(att, 'r_server', r_server)
 
 
 class LookUpDataType(object):

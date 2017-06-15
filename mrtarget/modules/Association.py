@@ -445,6 +445,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
         self.score_q = score_q
         self.scorer = Scorer()
         self.lookup_data = lookup_data
+        self.lookup_data.set_r_server(self.r_server)
 
     def process(self, data):
         target, disease, evidence, is_direct = data
