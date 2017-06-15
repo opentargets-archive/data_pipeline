@@ -731,6 +731,7 @@ class WhiteCollarWorker(Thread):
     '''
     spawns and monitors a set of workers
     '''
+    MAX_MEMORY_LEVEL = 90
 
     def __init__(self,
                  target,
@@ -769,8 +770,8 @@ class WhiteCollarWorker(Thread):
                                  self.queue_out,
                                  *self.args,
                                  **self.kwargs)
-            worker.start()
-            self.workers_instances[i] = worker
+            self.start_worker(worker,i)
+            
 
         #TODO: check queue and scale up workers if needed
         while self.workers_instances:
@@ -784,11 +785,12 @@ class WhiteCollarWorker(Thread):
                         self.logger.error('Worker %s ended with an error or terminated. exitcode: %s' % (p.name, str(p.exitcode)))
                         if self.restart_log[n] < self.max_restarts:
                             self.logger.info('Restarting failed worker instance number %i' % n)
-                            self.workers_instances[n] = self.target(self.queue_in,
-                                                                    self.redis_path,
-                                                                    self.queue_out,
-                                                                    *self.args,
-                                                                    **self.kwargs)
+                            worker= self.target(self.queue_in,
+                                                self.redis_path,
+                                                self.queue_out,
+                                                *self.args,
+                                                **self.kwargs)
+                            self.start_worker(worker, n)
                             self.restart_log[n] += 1
                         else:
                             self.logger.error('Gave up on restarting worker instance number %i' % n)
@@ -807,6 +809,12 @@ class WhiteCollarWorker(Thread):
             self.logger.debug('setting kill switch on for worker %s' % p.name)
             p.kill_switch = True
 
+    def start_worker(self, worker, i):
+        if psutil.virtual_memory().percent < self.MAX_MEMORY_LEVEL:
+            worker.start()
+            self.workers_instances[i] = worker
+        else:
+            self.logger.warning('Not enough memory to spawn a new worker of type: %s' % self.target)
 
 
 class RedisLookupTable(object):
