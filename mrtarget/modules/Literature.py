@@ -614,7 +614,8 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 t = tqdm(desc = 'downloading %s via HTTP' % os.path.basename(file_path),
                          total = file_size,
                          unit = 'B',
-                         unit_scale = True)
+                         unit_scale = True,
+                         disable=self.logger.level == logging.DEBUG)
                 for chunk in response.iter_content(chunk_size=128):
                     file_handler.write(chunk)
                     t.update(len(chunk))

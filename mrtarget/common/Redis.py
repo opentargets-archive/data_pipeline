@@ -402,12 +402,14 @@ class RedisQueueStatusReporter(Process):
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
                                                                 # position=queue_position+0,
+                                                                disable=self.logger.level == logging.DEBUG
                                                                 ),
                                          processed_counter=tqdm(desc='%s processed jobs [batch size: %i]'%(queue_id,q.batch_size),
                                                                 unit=' jobs',
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
                                                                 # position=queue_position+1,
+                                                                disable=self.logger.level == logging.DEBUG
                                                                 ),
                                          last_status = None
                                         )
