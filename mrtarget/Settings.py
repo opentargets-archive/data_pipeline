@@ -108,7 +108,7 @@ def read_option(option, cast=None, ini=ini, section='dev',
 def update_schema_version(config, schema_version_string):
     config.EVIDENCEVALIDATION_SCHEMA = schema_version_string
     for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS.iterkeys():
-        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('<version>',
+        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
                                                               schema_version_string)
 
 
@@ -224,19 +224,19 @@ class Config():
     REACTOME_PATHWAY_DATA = ini.get(INI_SECTION, 'reactome_pathways')
     REACTOME_PATHWAY_RELATION = ini.get(INI_SECTION, 'reactome_pathways_rel')
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
-    EVIDENCEVALIDATION_SCHEMA = "<version>"
+    EVIDENCEVALIDATION_SCHEMA = 'master'
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
 
     EVIDENCEVALIDATION_VALIDATOR_SCHEMAS = {
-        'genetic_association': 'https://raw.githubusercontent.com/opentargets/json_schema/<version>/src/genetics.json',
-        'rna_expression': 'https://raw.githubusercontent.com/opentargets/json_schema/<version>/src/expression.json',
-        'genetic_literature': 'https://raw.githubusercontent.com/opentargets/json_schema/<version>/src/literature_curated.json',
-        'affected_pathway': 'https://raw.githubusercontent.com/opentargets/json_schema/<version>/src/literature_curated.json',
-        'somatic_mutation': 'https://raw.githubusercontent.com/opentargets/json_schema/<version>/src/literature_curated.json',
-        'known_drug': 'https://raw.githubusercontent.com/opentargets/json_schema/<version>/src/drug.json',
-        'literature_mining': 'https://raw.githubusercontent.com/opentargets/json_schema/<version>/src/literature_mining.json',
-        'literature': 'https://raw.githubusercontent.com/opentargets/json_schema/<version>/src/literature_mining.json',
-        'animal_model': 'https://raw.githubusercontent.com/opentargets/json_schema/<version>/src/animal_models.json'
+        'genetic_association': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/genetics.json',
+        'rna_expression': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/expression.json',
+        'genetic_literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'affected_pathway': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'somatic_mutation': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'known_drug': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
+        'literature_mining': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'animal_model': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
     }
 
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
