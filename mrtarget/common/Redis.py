@@ -866,10 +866,12 @@ class RedisLookupTable(object):
         return self._get_r_server(r_server).exists(self._get_key_namespace(key))
 
     def __getitem__(self, key, r_server=None):
-        self.get(self._get_key_namespace(key), self._get_r_server(r_server))
+        self.get(self._get_key_namespace(key),
+                 r_server=self._get_r_server(r_server))
 
     def __setitem__(self, key, value,  r_server=None):
-        self.set(self._get_key_namespace(key), value, self._get_r_server(r_server))
+        self.set(self._get_key_namespace(key), value,
+                 r_server=self._get_r_server(r_server))
 
 
 class RedisLookupTableJson(RedisLookupTable):
