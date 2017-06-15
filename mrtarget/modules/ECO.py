@@ -179,6 +179,6 @@ class ECOLookUpTable(object):
     def _get_r_server(self, r_server = None):
         return r_server if r_server else self.r_server
 
-    def keys(self):
-        return self._table.keys()
+    def keys(self, r_server=None):
+        return self._table.keys(r_server=self._get_r_server(r_server))
 
