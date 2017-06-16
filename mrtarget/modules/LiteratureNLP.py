@@ -213,12 +213,17 @@ class PerceptronNPExtractor(BaseNPExtractor):
 class NounChuncker(object):
 
     def __init__(self):
+        import nltk
+        try:
+            from nltk.corpus import stopwords as nltk_stopwords
+        except ImportError:
+            nltk.download(['punkt', 'averaged_perceptron_tagger', 'stopwords'])  # 'brown' corpora might be needed
+            from nltk.corpus import stopwords as nltk_stopwords
         self.np_ex = PerceptronNPExtractor()
         self.normalizer = AbstractNormalizer()
         self.abbreviations_finder = AbbreviationsParser()
 
     def digest(self, text):
-        from pprint import pprint
         normalized = self.normalizer.normalize(text)
         parsed = TextBlob(normalized, np_extractor=self.np_ex)
         counted_noun_phrases = parsed.noun_phrases
