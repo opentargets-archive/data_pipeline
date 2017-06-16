@@ -561,7 +561,7 @@ class EvidenceValidationFileChecker():
         self.logger.info('file reader process with %d processes', readers_number)
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
-                                     self.r_server.db,
+                                     self.r_server,
                                      evidence_q,
                                      self.es,
                                      )
@@ -573,7 +573,7 @@ class EvidenceValidationFileChecker():
         self.logger.info('validator process with %d processes', workers_number)
         # Start validating the evidence in chunks on the evidence queue
         validators = [ValidatorProcess(evidence_q,
-                                       self.r_server.db,
+                                       self.r_server,
                                        store_q,
                                        self.es,
                                        lookup_data = lookup_data,
@@ -585,7 +585,7 @@ class EvidenceValidationFileChecker():
 
         self.logger.info('loader worker process with %d processes', loaders_number)
         loaders = [LoaderWorker(store_q,
-                                self.r_server.db,
+                                self.r_server,
                                 chunk_size=max_loader_chunk_size,
                                 dry_run=dry_run
                                 ) for i in range(loaders_number)]
