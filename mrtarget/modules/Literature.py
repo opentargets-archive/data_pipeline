@@ -23,6 +23,7 @@ from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQue
     WhiteCollarWorker, RedisQueueWorkerThread
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
+from mrtarget.modules.LiteratureNLP import NounChuncker, DocumentAnalysisSpacy
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class LiteratureActions(Actions):
 MEDLINE_BASE_PATH = 'pubmed/baseline'
 MEDLINE_UPDATE_PATH = 'pubmed/updatefiles'
 EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE = 30000
+
 
 def ftp_connect(dir=MEDLINE_BASE_PATH):
     host = ftputil.FTPHost(Config.PUBMED_FTP_SERVER, 'anonymous', 'support@targetvalidation.org')
@@ -693,8 +695,11 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         self._init_analyzers()
         self.processed_counter = 0
 
+    def init(self):
+        self._init_analyzers()
+
+
     def _init_analyzers(self):
-        from mrtarget.modules.LiteratureNLP import NounChuncker, DocumentAnalysisSpacy
         self.nlp = init_spacy_english_language() #store it as class instance to make sure it is deleted if called again
         self.analyzers = [NounChuncker(), DocumentAnalysisSpacy(self.nlp)]
 
@@ -791,6 +796,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         if self.processed_counter%10000 == 0:
             #restart spacy from scratch to free up memory
             self._init_analyzers()
+            logger.debug('restarting analyzers after %i docs processed in worker %s'%(self.processed_counter, self.name))
 
 
     def parse_article_info(self, article, publication):

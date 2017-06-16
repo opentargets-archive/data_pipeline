@@ -630,7 +630,7 @@ def get_redis_worker(base = Process):
             super(RedisQueueWorkerBase, self).__init__()
             self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
             self.queue_out = queue_out
-            self.r_server = Redis(redis_path, serverconfig={'save': []})
+            self.redis_path = redis_path
             self.auto_signal = auto_signal_submission_finished
             self.queue_in_as_batch = queue_in.batch_size >1
             if self.queue_out:
@@ -642,6 +642,7 @@ def get_redis_worker(base = Process):
 
 
         def run(self):
+            self._init()
             while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
                 job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
@@ -678,6 +679,17 @@ def get_redis_worker(base = Process):
                 self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
 
             self.close()
+
+        def _init(self):
+            '''starts all connections in forked process'''
+            self.r_server = Redis(self.redis_path, serverconfig={'save': []})
+            self.init()
+
+        def init(self):
+            '''to be overriden'''
+            return
+
+
 
         def _split_iterable(self, input, size):
                 for i in range(0, len(input), size):
@@ -817,6 +829,7 @@ class WhiteCollarWorker(Thread):
             time.sleep(0.2)#or worker.join(1)
             self.workers_instances[i] = worker
         else:
+            worker.terminate()
             self.logger.warning('Not enough memory to spawn a new worker of type: %s, index %i' % (self.target, i))
             self.workers_instances[i] = None
 
