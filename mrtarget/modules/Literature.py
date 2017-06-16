@@ -874,10 +874,11 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                  queue_out = None,
                  dry_run=False):
         super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path, queue_out)
+        self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 
     def init(self):
-        self.loader = Loader(chunk_size=1000, dry_run=dry_run)
+        self.loader = Loader(chunk_size=1000, dry_run=self.dry_run)
         self.es = self.loader.es
         self.es_query = ESQuery(self.es)
 
