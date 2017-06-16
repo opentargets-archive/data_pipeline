@@ -6,13 +6,15 @@ jobs:
       - image: quay.io/opentargets/mrtarget_base:latest
     steps:
       - checkout
-      #- restore_cache:
-      #   key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
+      - restore_cache:
+         key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
       - run:
           command: |
             pip install -r requirements.txt
-      #- save_cache:
-      #    key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
+      - save_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          paths:
+            - "/usr/local/lib/python2.7/site-packages"
       - run:
           command: |
             python -m mrtarget.CommandLine --dry-run
