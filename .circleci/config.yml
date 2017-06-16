@@ -1,12 +1,12 @@
 version: 2
- jobs:
-   build:
-     working_directory: ~/
-     docker:
-       - image: circleci/python:2
-     steps:
-       - checkout
-       - run: echo "hello world"
+jobs:
+  build:
+    working_directory: ~/
+    docker:
+      - image: circleci/python:2
+    steps:
+      - checkout
+      - run: echo "hello world"
 
 
 # version: 2
