@@ -4,6 +4,8 @@ jobs:
     working_directory: ~/mrtarget
     docker:
       - image: quay.io/opentargets/mrtarget_base:latest
+    environment:
+      - CTTV_MINIMAL=True
     steps:
       - checkout
       - restore_cache:
