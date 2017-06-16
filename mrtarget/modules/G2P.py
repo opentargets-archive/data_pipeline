@@ -28,6 +28,7 @@ __status__     = "Production"
 
 G2P_FILENAME = file_or_resource('DDG2P_14_5_2017.csv.gz')
 G2P_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_gene2phenotype-14-06-2017.json'
+G2P_EVIDENCE_FILENAME = '/Users/otvisitor/Documents/data/cttv001_gene2phenotype-16-06-2017.json'
 
 class G2PActions(Actions):
     GENERATE_EVIDENCE = 'generateevidence'
@@ -35,21 +36,22 @@ class G2PActions(Actions):
 class G2P():
     def __init__(self, es=None):
         self.es = es
-        self.esquery  = ESQuery(self.es)
+        self.esquery = ESQuery(self.es)
+        self.symbol2ensembl = dict()
+        self.omim_to_efo_map = dict()
         self.evidence_strings = list()
-        self.symbol2ensembl   = dict()
-        self.omim_to_efo_map  = dict()
         self._logger = logging.getLogger(__name__)
 
     def process_g2p(self):
         try:
             self._get_ensembl_data()
         except NotFoundError:
-            self._logger.error('no ensembl index in ES. Skipping. Has the --ensembl step been run?')
+            self._logger.error('no ensembl index found in ES. Skipping. Has the --ensembl step been run?')
 
         self.generate_evidence_strings(G2P_FILENAME)
 
     def _get_ensembl_data(self):
+
         for row in tqdm(self.esquery.get_all_ensembl_genes(),
                         desc='loading Ensembl genes',
                         unit_scale=True,
@@ -57,7 +59,10 @@ class G2P():
                         leave=False,
                         total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
 
-            self.symbol2ensembl[row['display_name']] = row['id']
+            ensg_id = row['id']
+            display_name = row['display_name']
+            display_name.rstrip()
+            self.symbol2ensembl[display_name] = ensg_id
 
     def get_omim_to_efo_mappings(self):
         self._logger.info("OMIM to EFO parsing - requesting from URL %s" % Config.OMIM_TO_EFO_MAP_URL)
@@ -65,6 +70,7 @@ class G2P():
         response = urllib2.urlopen(req)
         self._logger.info("OMIM to EFO parsing - response code %s" % response.code)
         lines = response.readlines()
+
         for line in lines:
             '''
             omim	efo_uri	efo_label	source	status
@@ -75,49 +81,53 @@ class G2P():
                 self.omim_to_efo_map[omim] = []
             self.omim_to_efo_map[omim].append({'efo_uri': efo_uri, 'efo_label': efo_label})
 
-    def generate_evidence_strings(self, G2P_FILENAME):
-
+    def generate_evidence_strings(self, filename):
         total_efo = 0
         self.get_omim_to_efo_mappings()
 
-        with gzip.open(G2P_FILENAME, mode='r') as zf:
+        with gzip.open(filename, mode='r') as zf:
             reader = csv.reader(zf, delimiter=',', quotechar='"')
             c = 0
             for row in reader:
+
                 c += 1
                 if c > 1:
-
                     '''
                     "gene symbol","gene mim","disease name","disease mim","DDD category","allelic requirement","mutation consequence",phenotypes,"organ specificity list",pmids,panel,"prev symbols","hgnc id"
                     '''
                     (gene_symbol, gene_mim, disease_name, disease_mim, DDD_category, allelic_requirement, mutation_consequence, phenotypes, organ_specificity_list,pmids,panel, prev_symbols, hgnc_id) = row
-                    ''' map gene symbol to ensembl '''
-                    target = self.symbol2ensembl[gene_symbol]
-                    ensembl_iri = "^http://identifiers.org/ensembl/" + target
-                    #target = "ENSG00000215612"
+                    gene_symbol.rstrip()
 
-                    ''' Map disease to EFO or Orphanet '''
-                    if disease_mim in self.omim_to_efo_map:
-                        total_efo +=1
-                        diseases = self.omim_to_efo_map[disease_mim]
+                    if gene_symbol in self.symbol2ensembl:
+                        ''' map gene symbol to ensembl '''
+                        target = self.symbol2ensembl[gene_symbol]
+                        ensembl_iri = "http://identifiers.org/ensembl/" + target
 
-                        for disease in diseases:
+                        ''' Map disease to EFO or Orphanet '''
+                        if disease_mim in self.omim_to_efo_map:
+                            total_efo +=1
+                            diseases = self.omim_to_efo_map[disease_mim]
 
-                            self._logger.info(gene_symbol, target, disease_name, disease['efo_uri'])
+                            for disease in diseases:
+                                self._logger.info(gene_symbol)
+                                self._logger.info(target)
+                                self._logger.info(disease_name)
+                                self._logger.info(disease['efo_uri'])
+                                #self._logger.info("%s %s %s %s"%(gene_symbol, target, disease_name, disease['efo_uri']))
 
-
-                            obj = opentargets.Literature_Curated(type='genetic_literature')
-                            provenance_type = evidence_core.BaseProvenance_Type(
-                                database=evidence_core.BaseDatabase(
-                                    id="Gene2Phenotype",
-                                    version='v0.2',
-                                    dbxref=evidence_core.BaseDbxref(
-                                        url="http://www.ebi.ac.uk/gene2phenotype",
-                                        id="Gene2Phenotype", version="v0.2")),
-                                literature=evidence_core.BaseLiterature(
-                                    references=[evidence_core.Single_Lit_Reference(lit_id="http://europepmc.org/abstract/MED/25529582")]
+                                obj = opentargets.Literature_Curated(type='genetic_literature')
+                                provenance_type = evidence_core.BaseProvenance_Type(
+                                    database=evidence_core.BaseDatabase(
+                                        id="Gene2Phenotype",
+                                        version='v0.2',
+                                        dbxref=evidence_core.BaseDbxref(
+                                            url="http://www.ebi.ac.uk/gene2phenotype",
+                                            id="Gene2Phenotype", version="v0.2")),
+                                    literature=evidence_core.BaseLiterature(
+                                        references=[evidence_core.Single_Lit_Reference(lit_id="http://europepmc.org/abstract/MED/25529582")]
+                                    )
                                 )
-                            )
+
                             obj.access_level = "public"
                             obj.sourceID = "gene2phenotype"
                             obj.validated_against_schema_version = "1.2.6"
@@ -140,23 +150,25 @@ class G2P():
                             obj.evidence.provenance_type = provenance_type
                             obj.evidence.resource_score = resource_score
                             linkout = evidence_linkout.Linkout(
-                                url='http://www.ebi.ac.uk/gene2phenotype/gene2phenotype-webcode/cgi-bin/handler.cgi?panel=ALL&search_term=%s' % (
+                                url='http://www.ebi.ac.uk/gene2phenotype/search?panel=ALL&search_term=%s' % (
                                 gene_symbol,),
                                 nice_name='Gene2Phenotype%s' % (gene_symbol))
                             obj.evidence.urls = [linkout]
-                            #error = obj.validate(logging)
-                            #if error > 0:
-                            #    logging.error(obj.to_JSON())
-                            #    sys.exit(1)
-                            #else:
-                            #    self.evidence_strings.append(obj)
+                            error = obj.validate(logging)
+
+                            if error > 0:
+                                logging.error(obj.to_JSON())
+                                sys.exit(1)
+                            else:
+                                self.evidence_strings.append(obj)
                     else:
                         self._logger.error("%s\t%s not mapped: please check manually"%(disease_name, disease_mim))
 
             print "%i %i" % (total_efo, c)
 
     def write_evidence_strings(self, filename):
-        logging.info("Writing G2P evidence strings")
+        logging.info("Writing G2P evidence strings to ")
+
         with open(filename, 'w') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
@@ -175,7 +187,7 @@ class G2P():
 def main():
     g2p = G2P()
     g2p.process_g2p()
-    #g2p.generate_evidence_strings(G2P_FILENAME)
+    g2p.write_evidence_strings(G2P_EVIDENCE_FILENAME)
 
 if __name__ == "__main__":
     main()
