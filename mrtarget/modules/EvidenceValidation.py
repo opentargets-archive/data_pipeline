@@ -247,6 +247,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         return sum(1 for el in file_handle)
 
     def close(self):
+        super(FileReaderProcess, self).close()
         self.loader.close()
 
 
@@ -263,7 +264,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.es = es
         self.loader= Loader(dry_run=dry_run, chunk_size=1000)
         self.lookup_data = lookup_data
-        self.lookup_data.set_r_server(self.r_server)
+        # self.lookup_data.set_r_server(self.r_server)
         
         self.start_time = time.time()
         self.audit = list()
@@ -272,12 +273,16 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.validators = \
             generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
 
+    def init(self):
+        super(ValidatorProcess, self).init()
+        self.lookup_data.set_r_server(self.get_r_server())
         # log accumulator
         self.la = LogAccum(self.logger)
 
     def close(self):
+        super(ValidatorProcess, self).close()
         self.la.flush(True)
-
+        
     def process(self, data):
         # file_path, file_version, provider_id, data_source_name, md5_hash,
         # logfile, chunk, offset, line_buffer, end_of_transmission = data
@@ -561,31 +566,35 @@ class EvidenceValidationFileChecker():
         self.logger.info('file reader process with %d processes', readers_number)
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,
-                                     self.r_server,
+                                     self.r_server.db,
                                      evidence_q,
                                      self.es,
                                      )
                                      for i in range(readers_number)
                                      ]
+        
+        self.logger.info('calling start to all file readers')
         for w in readers:
             w.start()
 
         self.logger.info('validator process with %d processes', workers_number)
         # Start validating the evidence in chunks on the evidence queue
         validators = [ValidatorProcess(evidence_q,
-                                       self.r_server,
+                                       self.r_server.db,
                                        store_q,
                                        self.es,
                                        lookup_data = lookup_data,
                                        dry_run=dry_run,
                                        ) for i in range(workers_number)]
                                         # ) for i in range(1)]
+
+        self.logger.info('calling start to all validators')
         for w in validators:
             w.start()
 
         self.logger.info('loader worker process with %d processes', loaders_number)
         loaders = [LoaderWorker(store_q,
-                                self.r_server,
+                                self.r_server.db,
                                 chunk_size=max_loader_chunk_size,
                                 dry_run=dry_run
                                 ) for i in range(loaders_number)]

@@ -633,6 +633,7 @@ def get_redis_worker(base = Process):
             super(RedisQueueWorkerBase, self).__init__()
             self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
             self.queue_out = queue_out
+            self.redis_path = redis_path
             self.r_server = Redis(redis_path, serverconfig={'save': []})
             self.auto_signal = auto_signal_submission_finished
             self.queue_in_as_batch = queue_in.batch_size >1
@@ -645,6 +646,10 @@ def get_redis_worker(base = Process):
 
 
         def run(self):
+            # here we are inside the new process
+            self._tear_up()
+            self.init()
+            
             while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
                 job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
@@ -680,7 +685,9 @@ def get_redis_worker(base = Process):
             if (self.queue_out is not None) and self.auto_signal:
                 self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
 
+            # closing everything properly before exiting the spawned process/thread
             self.close()
+            self._tear_down()
 
         def _split_iterable(self, item_list, size):
                 for i in range(0, len(item_list), size):
@@ -708,6 +715,9 @@ def get_redis_worker(base = Process):
             self.queue_out.put(self.job_result_cache, self.r_server)
             self.job_result_cache = []
 
+        def init(self):
+            pass
+            
         def close(self):
             '''
             implement in subclass to clean up loaders and other trailing elements when the processer is done if needed
@@ -718,11 +728,20 @@ def get_redis_worker(base = Process):
         def process(self, data):
             raise NotImplementedError('please add an implementation to process the data')
 
+        def _tear_up(self):
+            self.r_server = Redis(self.redis_path, serverconfig={'save': []})
+        
+        def _tear_down(self):
+            self.r_server.close()
+
         def __enter__(self):
             pass
 
         def __exit__(self, *args):
-            self.close()
+            pass
+            
+        def get_r_server(self):
+            return self.r_server
 
     return RedisQueueWorkerBase
 
