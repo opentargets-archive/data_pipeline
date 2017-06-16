@@ -443,8 +443,11 @@ class ScoreProducer(RedisQueueWorkerProcess):
                                             queue_out=score_q)
         self.evidence_data_q = evidence_data_q
         self.score_q = score_q
-        self.scorer = Scorer()
         self.lookup_data = lookup_data
+
+    def init(self):
+        self.scorer = Scorer()
+        super(ScoreProducer, self).init()
         self.lookup_data.set_r_server(self.r_server)
 
     def process(self, data):
@@ -455,7 +458,11 @@ class ScoreProducer(RedisQueueWorkerProcess):
                     ScoringMethods.HARMONIC_SUM).overall != 0:  # skip associations only with data with score 0
                 gene_data = Gene()
                 try:
-                    gene_data.load_json(self.lookup_data.available_genes.get_gene(target))
+                    gene_data.load_json(
+                        self.lookup_data.available_genes.get_gene(target,
+                                                                  self.r_server))
+                    self.logger.debug('printing gene id %s and target %s',
+                                      gene_data.id, target)
                 except KeyError, e:
                     self.logger.debug('Cannot find gene code "%s" '
                                       'in lookup table' % target)
@@ -468,7 +475,8 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 hpa_data = HPAExpression()
                 try:
                     hpa_data.load_json(
-                        self.lookup_data.available_hpa.get_hpa(gene_data.id))
+                        self.lookup_data.available_hpa.get_hpa(target,
+                                                               self.r_server))
                     score.set_hpa_data(hpa_data)
 
                 except KeyError, ke:
@@ -508,20 +516,16 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         super(ScoreStorerWorker, self).__init__(score_q, r_path)
         self.q = score_q
         self.chunk_size = chunk_size
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
-        self.es = es
-        self.loader = Loader(self.es,
-                             chunk_size=self.chunk_size,
-                             dry_run=dry_run)
         self.dry_run = dry_run
+        self.es = es
+        self.loader = None
+ 
 
 
     def process(self, data):
         if data is None:
             pass
+
         target, disease, score = data
         element_id = '%s-%s' % (target, disease)
         self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
@@ -532,8 +536,14 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
                                # routing=score.target['id'],
                             )
 
-
+    def init(self):
+        super(ScoreStorerWorker, self).init()
+        self.loader = Loader(self.es,
+                             chunk_size=self.chunk_size,
+                             dry_run=self.dry_run)
+               
     def close(self):
+        super(ScoreStorerWorker, self).close()
         self.loader.close()
 
 

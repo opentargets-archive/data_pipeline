@@ -340,8 +340,8 @@ class LoaderWorker(RedisQueueWorkerProcess):
                  ):
         super(LoaderWorker, self).__init__(queue_in, redis_path, queue_out)
         self.chunk_size = chunk_size
-        self.loader = Loader(chunk_size=chunk_size,
-                             dry_run=dry_run)
+        self.es = None
+        self.loader = None
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 
@@ -358,6 +358,12 @@ class LoaderWorker(RedisQueueWorkerProcess):
                             **kwargs
                             )
 
+    def init(self):
+        super(LoaderWorker, self).init()
+        self.loader = Loader(self.es,
+                             chunk_size=self.chunk_size,
+                             dry_run=self.dry_run)
 
     def close(self):
+        super(LoaderWorker, self).close()
         self.loader.close()

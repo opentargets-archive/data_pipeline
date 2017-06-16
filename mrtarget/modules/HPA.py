@@ -340,7 +340,7 @@ class HPALookUpTable(object):
                        unit_scale=True,
                        total=self._es_query.count_all_hpa(),
                        leave=False):
-            self._table.set(el['gene'], el, r_server=self._get_r_server(r_server))
+            self.set_hpa(el, r_server=self._get_r_server(r_server))
 
     def get_hpa(self, idx, r_server=None):
         return self._table.get(idx, r_server=self._get_r_server(r_server))

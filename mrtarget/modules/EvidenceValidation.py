@@ -196,8 +196,8 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                  queue_out=None,
                  es=None):
         super(FileReaderProcess, self).__init__(queue_in, redis_path, queue_out)
-        self.es = es
-        self.loader = Loader(self.es)
+        self.es = None
+        self.loader = None
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
 
@@ -246,6 +246,10 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         '''return the number of lines in a text file including empty ones'''
         return sum(1 for el in file_handle)
 
+    def init(self):
+        super(FileReaderProcess, self).init()
+        self.loader = Loader(dry_run=self.dry_run, chunk_size=1000)
+
     def close(self):
         super(FileReaderProcess, self).close()
         self.loader.close()
@@ -262,7 +266,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                  ):
         super(ValidatorProcess, self).__init__(queue_in, redis_path, queue_out)
         self.es = es
-        self.loader= Loader(dry_run=dry_run, chunk_size=1000)
+        self.dry_run = dry_run
+        self.loader = None
         self.lookup_data = lookup_data
         # self.lookup_data.set_r_server(self.r_server)
         
@@ -276,12 +281,14 @@ class ValidatorProcess(RedisQueueWorkerProcess):
     def init(self):
         super(ValidatorProcess, self).init()
         self.lookup_data.set_r_server(self.get_r_server())
+        self.loader = Loader(dry_run=self.dry_run, chunk_size=1000)
         # log accumulator
         self.la = LogAccum(self.logger)
 
     def close(self):
         super(ValidatorProcess, self).close()
         self.la.flush(True)
+        self.loader.close()
         
     def process(self, data):
         # file_path, file_version, provider_id, data_source_name, md5_hash,

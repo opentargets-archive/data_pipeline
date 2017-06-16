@@ -634,7 +634,6 @@ def get_redis_worker(base = Process):
             self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
             self.queue_out = queue_out
             self.redis_path = redis_path
-            self.r_server = Redis(redis_path, serverconfig={'save': []})
             self.auto_signal = auto_signal_submission_finished
             self.queue_in_as_batch = queue_in.batch_size >1
             if self.queue_out:
@@ -647,8 +646,7 @@ def get_redis_worker(base = Process):
 
         def run(self):
             # here we are inside the new process
-            self._tear_up()
-            self.init()
+            self._init()
             
             while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
                 job = self.queue_in.get(r_server=self.r_server, timeout=1)
@@ -686,8 +684,7 @@ def get_redis_worker(base = Process):
                 self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
 
             # closing everything properly before exiting the spawned process/thread
-            self.close()
-            self._tear_down()
+            self._close()
 
         def _split_iterable(self, item_list, size):
                 for i in range(0, len(item_list), size):
@@ -728,10 +725,12 @@ def get_redis_worker(base = Process):
         def process(self, data):
             raise NotImplementedError('please add an implementation to process the data')
 
-        def _tear_up(self):
+        def _init(self):
             self.r_server = Redis(self.redis_path, serverconfig={'save': []})
+            self.init()
         
-        def _tear_down(self):
+        def _close(self):
+            self.close()
             self.r_server.close()
 
         def __enter__(self):
@@ -858,7 +857,8 @@ class RedisLookupTable(object):
                               ttl or self.default_ttl)
 
     def get(self, key, r_server = None):
-        value = self._get_r_server(r_server).get(self._get_key_namespace(key))
+        server = self._get_r_server(r_server)
+        value = server.get(self._get_key_namespace(key))
         if value is not None:
             return self._decode(value)
         raise KeyError(key)
@@ -868,6 +868,8 @@ class RedisLookupTable(object):
         return [key.replace(self.namespace+':','') \
                 for key in self._get_r_server(r_server).keys(self.namespace+'*')]
 
+    def set_r_server(self, r_server):
+        self.r_server = r_server
 
     def _get_r_server(self, r_server = None):
         return r_server if r_server else self.r_server
@@ -882,7 +884,8 @@ class RedisLookupTable(object):
         return obj
 
     def __contains__(self, key, r_server=None):
-        return self._get_r_server(r_server).exists(self._get_key_namespace(key))
+        server = self._get_r_server(r_server)
+        return server.exists(self._get_key_namespace(key))
 
     def __getitem__(self, key, r_server=None):
         self.get(self._get_key_namespace(key),
