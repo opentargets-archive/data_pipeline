@@ -823,8 +823,9 @@ class WhiteCollarWorker(Thread):
             p.kill_switch = True
 
     def start_worker(self, worker, i):
-        if psutil.virtual_memory().percent < self.MAX_MEMORY_LEVEL:
-            self.logger.debug('Spawning a new worker of type: %s, index %i' % (self.target, i))
+        memory_load = psutil.virtual_memory().percent
+        if memory_load < self.MAX_MEMORY_LEVEL:
+            self.logger.debug('Spawning a new worker of type: %s, index %i. Memory level: %s' % (self.target, i, str(memory_load)))
             worker.start()
             time.sleep(0.2)#or worker.join(1)
             self.workers_instances[i] = worker

@@ -793,10 +793,10 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         except etree.XMLSyntaxError as e:
             self.logger.error("Error parsing XML file {} - medline record {} %s".format(filename,record),e.message)
         self.processed_counter+=1
-        # if self.processed_counter%10000 == 0:
-        #     #restart spacy from scratch to free up memory
-        #     self._init_analyzers()
-        #     logger.debug('restarting analyzers after %i docs processed in worker %s'%(self.processed_counter, self.name))
+        if self.processed_counter%10000 == 0:
+            #restart spacy from scratch to free up memory
+            self._init_analyzers()
+            logger.debug('restarting analyzers after %i docs processed in worker %s'%(self.processed_counter, self.name))
 
 
     def parse_article_info(self, article, publication):
@@ -874,10 +874,12 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                  queue_out = None,
                  dry_run=False):
         super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path, queue_out)
+        self.logger = logging.getLogger(__name__)
+
+    def init(self):
         self.loader = Loader(chunk_size=1000, dry_run=dry_run)
         self.es = self.loader.es
         self.es_query = ESQuery(self.es)
-        self.logger = logging.getLogger(__name__)
 
 
     def process(self, data):
