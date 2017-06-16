@@ -360,8 +360,7 @@ class LoaderWorker(RedisQueueWorkerProcess):
 
     def init(self):
         super(LoaderWorker, self).init()
-        self.loader = Loader(self.es,
-                             chunk_size=self.chunk_size,
+        self.loader = Loader(chunk_size=self.chunk_size,
                              dry_run=self.dry_run)
 
     def close(self):

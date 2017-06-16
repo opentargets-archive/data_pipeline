@@ -461,8 +461,6 @@ class ScoreProducer(RedisQueueWorkerProcess):
                     gene_data.load_json(
                         self.lookup_data.available_genes.get_gene(target,
                                                                   self.r_server))
-                    self.logger.debug('printing gene id %s and target %s',
-                                      gene_data.id, target)
                 except KeyError, e:
                     self.logger.debug('Cannot find gene code "%s" '
                                       'in lookup table' % target)

@@ -136,8 +136,8 @@ class ESQuery(object):
                                "match_all": {}
                             },
                             '_source': source,
+                            'size': 100,
                            },
-                           size=100,
                            scroll='12h',
                            doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
                            index=Loader.get_versioned_index(

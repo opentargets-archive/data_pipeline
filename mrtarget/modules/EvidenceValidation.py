@@ -194,10 +194,12 @@ class FileReaderProcess(RedisQueueWorkerProcess):
                  queue_in,
                  redis_path,
                  queue_out=None,
-                 es=None):
+                 es=None,
+                 dry_run=False):
         super(FileReaderProcess, self).__init__(queue_in, redis_path, queue_out)
         self.es = None
         self.loader = None
+        self.dry_run = dry_run
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
 
@@ -269,14 +271,10 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.dry_run = dry_run
         self.loader = None
         self.lookup_data = lookup_data
-        # self.lookup_data.set_r_server(self.r_server)
         
         self.start_time = time.time()
         self.audit = list()
         self.logger = logging.getLogger(__name__)
-        # generate all validators once
-        self.validators = \
-            generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
 
     def init(self):
         super(ValidatorProcess, self).init()
@@ -284,6 +282,10 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.loader = Loader(dry_run=self.dry_run, chunk_size=1000)
         # log accumulator
         self.la = LogAccum(self.logger)
+        # generate all validators once
+        self.validators = \
+            generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
+
 
     def close(self):
         super(ValidatorProcess, self).close()
