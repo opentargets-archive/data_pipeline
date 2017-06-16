@@ -23,7 +23,6 @@ from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQue
     WhiteCollarWorker, RedisQueueWorkerThread
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
-from mrtarget.modules.LiteratureNLP import NounChuncker, DocumentAnalysisSpacy
 
 logger = logging.getLogger(__name__)
 
@@ -688,6 +687,7 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
                  redis_path,
                  queue_out,
                  dry_run=False):
+        from mrtarget.modules.LiteratureNLP import NounChuncker, DocumentAnalysisSpacy
         super(PubmedXMLParserProcess, self).__init__(queue_in, redis_path,queue_out)
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
