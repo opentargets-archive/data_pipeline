@@ -246,8 +246,6 @@ class RedisQueue(object):
         r_server = self._get_r_server(r_server)
         if timeout is None:
             timeout = self.job_timeout
-        if not r_server:
-            r_server = self.r_server
         timedout_jobs = [i[0] for i in r_server.zrange(self.processing_key, 0, -1, withscores=True) if time.time() - i[1] > timeout]
         if timedout_jobs:
             logger.debug('%i jobs timedout jobs in queue %s'%(len(timedout_jobs), self.queue_id))
@@ -332,7 +330,7 @@ class RedisQueue(object):
         return r_server.getbit(self.submission_done, 1)
 
     def is_empty(self, r_server=None):
-        return self.get_size(r_server) == 0
+        return self.get_size(self._get_r_server(r_server)) == 0
 
     def is_done(self, r_server=None):
         r_server = self._get_r_server(r_server)
@@ -347,14 +345,15 @@ class RedisQueue(object):
         return False
 
     def _get_r_server(self, r_server=None):
-        if not r_server:
-            r_server = self.r_server
-        if r_server is None:
-            try:
-                r_server = Redis(Config.REDISLITE_DB_PATH)
-            except:
-                raise AttributeError('A redis server is required either at class instantiation or at the method level')
-        return r_server
+        return r_server if r_server else self.r_server
+#         if not r_server:
+#             r_server = self.r_server
+#         if r_server is None:
+#             try:
+#                 r_server = Redis(Config.REDISLITE_DB_PATH)
+#             except:
+#                 raise AttributeError('A redis server is required either at class instantiation or at the method level')
+#         return r_server
 
 
 class RedisQueueStatusReporter(Process):
