@@ -1,9 +1,3 @@
-# # this needs to:
-# - run tests
-# - build docker container
-# - push to quay
-# - push to GCR
-
 version: 2
  jobs:
    build:
