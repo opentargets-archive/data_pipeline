@@ -269,19 +269,22 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         super(ValidatorProcess, self).__init__(queue_in, redis_path, queue_out)
         self.es = es
         self.dry_run = dry_run
+        self.la = None
         self.loader = None
         self.lookup_data = lookup_data
         
         self.start_time = time.time()
         self.audit = list()
-        self.logger = logging.getLogger(__name__)
+        self.logger = None
+        self.validators = None
 
     def init(self):
         super(ValidatorProcess, self).init()
+        self.logger = logging.getLogger(__name__)
         self.lookup_data.set_r_server(self.get_r_server())
         self.loader = Loader(dry_run=self.dry_run, chunk_size=1000)
         # log accumulator
-        self.la = LogAccum(self.logger)
+        self.la = LogAccum(self.logger, 128)
         # generate all validators once
         self.validators = \
             generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
