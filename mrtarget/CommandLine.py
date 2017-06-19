@@ -77,7 +77,7 @@ def main():
     parser.add_argument("--ddr", dest='ddr', help="precompute data driven t2t and d2d relations",
                         action="append_const", const=DataDrivenRelationActions.PROCESS)
     parser.add_argument("--persist-redis", dest='redispersist', help="use a fresh redislite db",
-                        action='store_true', default=False)
+                        action='store_true', default=True)
     parser.add_argument("--musu", dest='mus', help="update mouse model data",
                         action="append_const", const = MouseModelsActions.UPDATE_CACHE)
     parser.add_argument("--musg", dest='mus', help="update mus musculus and home sapiens gene list",

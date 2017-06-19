@@ -74,14 +74,8 @@ class LookUpDataRetriever(object):
                              LookUpDataType.ECO),
                  autoload=True):
 
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            self.es = connector.es
-            self.r_server = r_server if r_server else connector.r_server
-        else:
-            self.es = es
-            self.r_server = r_server
+        self.es = es
+        self.r_server = r_server
 
         self.esquery = ESQuery(self.es)
         
@@ -120,6 +114,7 @@ class LookUpDataRetriever(object):
     def set_r_server(self, r_server):
         self.r_server = r_server
         self.lookup.set_r_server(r_server)
+        self.esquery = ESQuery()
 
     def _get_available_efos(self):
         self.logger.info('getting efos')

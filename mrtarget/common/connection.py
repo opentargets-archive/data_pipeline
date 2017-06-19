@@ -67,7 +67,7 @@ class PipelineConnectors():
         if not redispersist:
             self.clear_redislite_db()
             self.logger.debug('Clearing previous instances of redislite db...')
-        self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH),
+        self.r_server = Redis(dbfilename=Config.REDISLITE_DB_PATH,
                               serverconfig={'save': [],
                                             'maxclients': 10000,
                                             'port': '35000'})

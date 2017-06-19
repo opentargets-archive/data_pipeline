@@ -355,8 +355,7 @@ class Config():
     ENSEMBL_RELEASE_VERSION = 88
     ENSEMBL_CHUNK_SIZE = 100
 
-    # see http://stackoverflow.com/a/847866
-    TEMP_DIR = tempfile.gettempdir()
+    TEMP_DIR = os.path.sep + 'tmp'
 
     REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
 

@@ -526,10 +526,7 @@ class EvidenceValidationFileChecker():
         '''Check every given evidence string'''
 
         self.logger.info('check_all() start and loading lookup data')
-        #self.load_mp()
-        #return;
         dry_run = dry_run or self.dry_run
-
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=(LookUpDataType.TARGET,
@@ -537,7 +534,7 @@ class EvidenceValidationFileChecker():
                                                       LookUpDataType.ECO,
                                                       LookUpDataType.HPO,
                                                       LookUpDataType.MP,
-                                                      LookUpDataType.HPA
+                                                      # LookUpDataType.HPA
                                                      ),
                                           autoload=True,
                                           ).lookup
@@ -574,7 +571,7 @@ class EvidenceValidationFileChecker():
                                               interval=30)
         q_reporter.start()
 
-
+        # TODO XXX CHECK VALUE OF R_SERVER.DB
         self.logger.info('file reader process with %d processes', readers_number)
         'Start file reader workers'
         readers = [FileReaderProcess(file_q,

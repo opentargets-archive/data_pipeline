@@ -315,17 +315,9 @@ class HPALookUpTable(object):
                  namespace=None,
                  r_server=None,
                  ttl=(60*60*24+7)):
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            self._es = connector.es
-            self.r_server = r_server if r_server else connector.r_server
-        else:
-            self._es = es
-            self.r_server = r_server
-
+        self._es = es
+        self.r_server = r_server
         self._es_query = ESQuery(self._es)
-
         self._table = RedisLookupTablePickle(namespace=namespace,
                                              r_server=self.r_server,
                                              ttl=ttl)
