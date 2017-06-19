@@ -346,16 +346,8 @@ class RedisQueue(object):
 
     def _get_r_server(self, r_server=None):
         return r_server if r_server else self.r_server
-#         if not r_server:
-#             r_server = self.r_server
-#         if r_server is None:
-#             try:
-#                 r_server = Redis(Config.REDISLITE_DB_PATH)
-#             except:
-#                 raise AttributeError('A redis server is required either at class instantiation or at the method level')
-#         return r_server
-
-
+    
+    
 class RedisQueueStatusReporter(Process):
     '''
     Cyclically logs the status of a list RedisQueue objects
@@ -373,7 +365,9 @@ class RedisQueueStatusReporter(Process):
                  ):
         super(RedisQueueStatusReporter, self).__init__()
         self.queues = queues
-        self.r_server = Redis(Config.REDISLITE_DB_PATH)
+        # self.r_server = Redis(Config.REDISLITE_DB_PATH)
+        self.r_server = Redis(host=Config.REDISLITE_DB_HOST,
+                              port=Config.REDISLITE_DB_PORT)
         self.interval = interval
         self.logger = logging.getLogger(__name__)
         self.history = history
@@ -844,7 +838,8 @@ class RedisLookupTable(object):
         if namespace is None:
             namespace = uuid.uuid4()
         self.namespace = self.LOOK_UPTABLE_NAMESPACE % {'namespace': namespace}
-        self.r_server = r_server
+        self.r_server = Redis(host=Config.REDISLITE_DB_HOST,
+                              port=Config.REDISLITE_DB_PORT)
         self.default_ttl = ttl
         
         require_all(self.r_server is not None)

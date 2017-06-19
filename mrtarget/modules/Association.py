@@ -477,11 +477,10 @@ class ScoreProducer(RedisQueueWorkerProcess):
                                                                self.r_server))
                     score.set_hpa_data(hpa_data)
 
-                except KeyError, ke:
-                    self.logger.debug('Cannot find HPA code "%s" '
-                                      'in lookup table' % target)
+                except KeyError as ke:
+                    self.logger.exception('hpa code %s with %s', target, str(ke))
 
-                except Exception, e:
+                except Exception as e:
                     self.logger.exception(e)
 
                 disease_data = EFO()
