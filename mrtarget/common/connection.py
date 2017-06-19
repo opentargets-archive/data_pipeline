@@ -70,7 +70,7 @@ class PipelineConnectors():
         self.r_server = Redis(dbfilename=Config.REDISLITE_DB_PATH,
                               serverconfig={'save': [],
                                             'maxclients': 10000,
-                                            'port': '35000'})
+                                            'port': str(Config.REDISLITE_DB_PORT)})
         self.logger.info('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
 
         return success

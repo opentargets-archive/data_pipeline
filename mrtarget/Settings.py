@@ -358,6 +358,8 @@ class Config():
     TEMP_DIR = os.path.sep + 'tmp'
 
     REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
+    REDISLITE_DB_HOST = '127.0.0.1'
+    REDISLITE_DB_PORT = 35000
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 

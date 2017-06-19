@@ -725,7 +725,9 @@ def get_redis_worker(base = Process):
             raise NotImplementedError('please add an implementation to process the data')
 
         def _init(self):
-            self.r_server = Redis(self.redis_path, serverconfig={'save': []})
+            # self.r_server = Redis(self.redis_path, serverconfig={'save': []})
+            self.r_server = Redis(host=Config.REDISLITE_DB_HOST,
+                                  port=Config.REDISLITE_DB_PORT)
             self.init()
         
         def _close(self):
