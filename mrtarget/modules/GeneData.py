@@ -467,6 +467,7 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
         self.es = None
         self.r_server = None
         self.loader = None
+        self.dry_run = dry_run
 
     def process(self, data):
         geneid, gene = data
@@ -480,8 +481,7 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
         
     def init(self):
         super(GeneObjectStorer, self).init()
-        self.loader = Loader(chunk_size=self.chunk_size,
-                             dry_run=self.dry_run)
+        self.loader = Loader(dry_run=self.dry_run)
                
     def close(self):
         super(GeneObjectStorer, self).close()
