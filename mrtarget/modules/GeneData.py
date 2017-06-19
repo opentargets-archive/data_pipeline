@@ -671,7 +671,7 @@ class GeneManager():
         self._logger.info("Retrieving Chembl Target Class ")
         self.chembl_handler.download_protein_classification()
         self._logger.info("Adding Chembl data to genes ")
-        for gene_id, gene in tqdm(self.genes.iteritems(),
+        for gene_id, gene in tqdm(self.genes.genes.iteritems(),
                                   desc='Getting drug data from chembl',
                                   unit=' gene'):
             target_drugnames = []
