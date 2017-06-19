@@ -464,10 +464,10 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
 
     def __init__(self, es, r_server, queue, dry_run=False):
         super(GeneObjectStorer, self).__init__(queue, r_server.db)
-        self.es = es
-        self.r_server = r_server
+        self.es = None
+        self.r_server = None
         self.queue = queue
-        self.loader = Loader(self.es, chunk_size=100, dry_run=dry_run)
+        self.loader = None
 
     def process(self, data):
         geneid, gene = data
@@ -478,7 +478,14 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
                        geneid,
                        gene.to_json(),
                        create_index=False)
+        
+    def init(self):
+        super(GeneObjectStorer, self).init()
+        self.loader = Loader(chunk_size=self.chunk_size,
+                             dry_run=self.dry_run)
+               
     def close(self):
+        super(GeneObjectStorer, self).close()
         self.loader.close()
 
 
@@ -588,7 +595,7 @@ class GeneManager():
         self._logger.info("STATS AFTER ENSEMBL PARSING:\n" + self.genes.get_stats())
 
     def _clean_non_reference_genes(self):
-        for geneid, gene in self.genes.iterate():
+        for geneid, gene in self.genes.genes.iteritems():
             if not gene.is_ensembl_reference:
                 self.genes.remove_gene(geneid)
 
@@ -640,12 +647,15 @@ class GeneManager():
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
-        workers = [GeneObjectStorer(self.loader.es,self.r_server,queue, dry_run=dry_run) for i in range(Config.WORKERS_NUMBER)]
+        workers = [GeneObjectStorer(self.loader.es,
+                                    self.r_server,
+                                    queue,
+                                    dry_run=dry_run) for i in range(4)]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()
 
-        for geneid, gene in self.genes.iterate():
+        for geneid, gene in self.genes.genes.iteritems():
             queue.put((geneid, gene), self.r_server)
 
         queue.set_submission_finished(r_server=self.r_server)
@@ -661,7 +671,7 @@ class GeneManager():
         self._logger.info("Retrieving Chembl Target Class ")
         self.chembl_handler.download_protein_classification()
         self._logger.info("Adding Chembl data to genes ")
-        for gene_id, gene in tqdm(self.genes.iterate(),
+        for gene_id, gene in tqdm(self.genes.iteritems(),
                                   desc='Getting drug data from chembl',
                                   unit=' gene'):
             target_drugnames = []
