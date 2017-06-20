@@ -181,8 +181,6 @@ class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
     def process(self, data):
         geneid, gene = data
-        '''process objects to simple search object'''
-        gene.preprocess()
         self.loader.put(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
                        Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
                        ID=geneid,
