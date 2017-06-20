@@ -15,7 +15,7 @@ jobs:
             pip install virtualenv
             virtualenv venv
             . venv/bin/activate
-            pip install -U -r requirements.txt
+            pip install -U --no-cache-dir -r requirements.txt
       - save_cache:
           key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
