@@ -117,16 +117,23 @@ class HPADataDownloader():
         :return: dict
         """
         self.logger.info('get rna tissue rows into dicts')
-        table = (
-            petl.fromcsv(URLZSource(Config.HPA_RNA_URL))
-            .rename({'Sample': 'sample',
-                     'Unit': 'unit',
-                     'Value': 'value',
-                     'Gene': 'gene'})
-            .cut('sample', 'unit', 'value', 'gene')
-            )
+        self.logger.debug('melting rna level table into geneid tissue level')
+        t_level = (
+            petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL),
+                        delimiter='\t')
+                .melt(key='ID', variablefield='sample', valuefield='level')
+                .rename({'ID': 'gene'}))
+        
+        t_value = (
+            petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL),
+                        delimiter='\t')
+                .melt(key='ID', variablefield='sample', valuefield='value')
+                .rename({'ID': 'gene'})
+                .addfield('unit','TPM'))
+        
+        t_join = petl.join(t_level, t_value, presorted=True)
 
-        for d in petl.dicts(table):
+        for d in petl.dicts(t_join):
             yield d
 
     def retrieve_cancer_data(self):

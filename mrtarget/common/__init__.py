@@ -34,7 +34,7 @@ def url_to_stream(url, *args, **kwargs):
 
 
 @contextmanager
-def url_to_tmpfile(url, *args, **kwargs):
+def url_to_tmpfile(url, delete=True, *args, **kwargs):
     '''request a url using requests pkg and pass *args and **kwargs to
     requests.get function (useful for proxies) and returns the filled file
     descriptor from a tempfile.NamedTemporaryFile
@@ -53,7 +53,7 @@ def url_to_tmpfile(url, *args, **kwargs):
         f = r.get(url, *args, stream=True, **kwargs)
         f.raise_for_status()
 
-        with tmp.NamedTemporaryFile(mode='r+w+b', delete=True) as fd:
+        with tmp.NamedTemporaryFile(mode='r+w+b', delete=delete) as fd:
             # write data into file in streaming fashion
             for block in f.iter_content(1024):
                 fd.write(block)
