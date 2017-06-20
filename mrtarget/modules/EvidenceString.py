@@ -1147,7 +1147,7 @@ class EvidenceStringProcess():
         data_processing_lock = multiprocessing.Lock()
         data_storage_lock = multiprocessing.Lock()
 
-        workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        workers_number = Config.WORKERS_NUMBER
 
         '''create workers'''
         scorers = [EvidenceProcesser(input_q,

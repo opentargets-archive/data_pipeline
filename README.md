@@ -55,6 +55,7 @@ the folder `mrtarget/resources/`.
 
 Here the list to change, enable or disable functionality:
 
+* `CTTV_EV_LIMIT` string `true` to enable otherwise `false` or delete (WIP)
 * `CTTV_MINIMAL` string `true` to enable otherwise `false` or delete
 * `CTTV_DATA_VERSION` indexes prefix a name to enable otherwise `17.04`
 * `CTTV_EL_LOADER` the name of the section of the ES config file db.ini default `dev`
@@ -71,6 +72,11 @@ Here the list to change, enable or disable functionality:
 * `CTTV_ES_CUSTOM_IDXS` `true` to enable it and by default is `false`
 
 ## Internal features for developers
+
+### Evidence Validation (--val step) limit (WIP)
+
+It will give up if too many evidences were failed under schema validation. 1000 docs will be a 
+rasonable upper bound limit per launched process.
 
 ### Minimal dataset
 

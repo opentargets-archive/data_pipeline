@@ -37,7 +37,7 @@ from unidecode import unidecode
 try:
     import nltk
     from nltk.corpus import stopwords as nltk_stopwords
-    from nltk import Tree
+    from nltk import Tree, pprint
 except ImportError:
     logging.getLogger(__name__).warning('cannot import nltk or stopwords')
 
@@ -213,12 +213,17 @@ class PerceptronNPExtractor(BaseNPExtractor):
 class NounChuncker(object):
 
     def __init__(self):
+        import nltk
+        try:
+            from nltk.corpus import stopwords as nltk_stopwords
+        except ImportError:
+            nltk.download(['punkt', 'averaged_perceptron_tagger', 'stopwords'])  # 'brown' corpora might be needed
+            from nltk.corpus import stopwords as nltk_stopwords
         self.np_ex = PerceptronNPExtractor()
         self.normalizer = AbstractNormalizer()
         self.abbreviations_finder = AbbreviationsParser()
 
     def digest(self, text):
-        from pprint import pprint
         normalized = self.normalizer.normalize(text)
         parsed = TextBlob(normalized, np_extractor=self.np_ex)
         counted_noun_phrases = parsed.noun_phrases
@@ -295,7 +300,7 @@ class LiteratureNLPProcess(object):
         #todo, add method to process all cached publications??
 
         # Literature Queue
-        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        no_of_workers = Config.WORKERS_NUMBER
 
         literature_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_analyzer_q',
                                   max_size=MAX_CHUNKS*no_of_workers,
@@ -859,6 +864,7 @@ class DocumentAnalysisSpacy(object):
             self.stopwords  = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS) + DOMAIN_STOP_WORDS + list(string.punctuation))
 
         self.nlp = nlp
+        self.processed_counter = 0
 
 
 
@@ -871,38 +877,61 @@ class DocumentAnalysisSpacy(object):
             if self.normalize:
                 document = u''+self._normalizer.normalize(document)
             abbreviations = self._abbreviations_finder.digest_as_dict(document)
-            self.logger.debug('abbreviations: ' + str(abbreviations))
+            # self.logger.debug('abbreviations: ' + str(abbreviations))
 
             if abbreviations:
                 for short, long in abbreviations.items():
                     if short in document and not long in document:
                         document = document.replace(short, long)
-            doc = self.nlp(document)
+            try:
+                doc = self.nlp(document)
+            except:
+                self.logger.exception('Error parsing the document: %s' % document)
+                return [None, {}]
         else:
             raise AttributeError('document needs to be unicode or Doc not %s' % document.__class__)
 
         concepts = []
         noun_phrases = []
         for sentence in doc.sents:
-            sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
-            sentence.analyse()
-            concepts.extend(sentence.concepts)
-            noun_phrases.extend(sentence.noun_phrases)
+            try:
+                analysed_sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
+                analysed_sentence.analyse()
+                concepts.extend(analysed_sentence.concepts)
+                noun_phrases.extend(analysed_sentence.noun_phrases)
+            except:
+                self.logger.exception('Error parsing the sentence: %s'%sentence.text)
         # print self.noun_phrases
         noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
+
+        # clustered_np = self.cluster_np(noun_phrases)
         noun_phrase_counter = Counter()
         lowered_text = doc.text.lower()
         for i in noun_phrases:
             lowered_np = i.lower()
             noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
+        '''remove plurals with appended s'''
+        for np in noun_phrase_counter.keys():
+            if np + 's' in noun_phrase_counter:
+                noun_phrase_counter[np] += noun_phrase_counter[np + 's']
+                del noun_phrase_counter[np + 's']
+        '''increase count of shorter form with longer form'''
+        for short, long in abbreviations.items():
+            if short.lower() in noun_phrase_counter:
+                noun_phrase_counter[long.lower()] += noun_phrase_counter[short.lower()]
+                del noun_phrase_counter[short.lower()]
         noun_phrases_top = [i[0] for i in noun_phrase_counter.most_common(5) if i[1] > 1]
         noun_phrases_recurring = [i for i, k in noun_phrase_counter.items() if k > 1]
 
+        # bug https://github.com/explosion/spaCy/issues/589
+        # self.processed_counter+=1
+        # if self.processed_counter%100 == 0:
+            # self.nlp.vocab.strings.flush_oov()
         return doc, \
                dict(chunks = noun_phrases,
                     recurring_chunks = noun_phrases_recurring,
                     top_chunks = noun_phrases_top,
-                    abbreviations = abbreviations,
+                    abbreviations = [dict(short=k, long=v) for k,v in abbreviations.items()],
                     concepts = concepts)
 
     def digest(self, document):
@@ -910,6 +939,29 @@ class DocumentAnalysisSpacy(object):
 
     def __str__(self):
         return 'nlp'
+
+    def cluster_np(self,noun_phrases):
+        '''todo: optimise for speed'''
+
+        clusters = {i:[i] for i in noun_phrases}
+        for i in noun_phrases:
+            for j in noun_phrases:
+                if i!=j and i in j.split(' '):
+                    # print '%s -> %s'%(i,j)
+                    clusters[j].extend(clusters[i])
+                    del clusters[i]
+                    # elif i != j and j in i:
+                    #     print '%s <- %s'%(j,i)
+        # pprint(clusters)
+        filtered_noun_phrases = []
+        for k,v in clusters.items():
+            if len(v)>1:
+                longest = sorted(v, key=lambda x: len(x), reverse=True)[0]
+                filtered_noun_phrases.append(longest)
+            else:
+                filtered_noun_phrases.append(v[0])
+        # print filtered_noun_phrases
+        return filtered_noun_phrases
 
 
 
@@ -938,7 +990,7 @@ class SentenceAnalysisSpacy(object):
                 sentence = u'' + self._normalizer.normalize(sentence)
             if abbreviations is None:
                 self.abbreviations = self._abbreviations_finder.digest_as_dict(sentence)
-                self.logger.info('abbreviations: ' + str(self.abbreviations))
+                # self.logger.info('abbreviations: ' + str(self.abbreviations))
 
             if abbreviations:
                 for short, long in abbreviations:
@@ -948,7 +1000,7 @@ class SentenceAnalysisSpacy(object):
             self.doc = self.sentence
         else:
             raise AttributeError('sentence needs to be unicode or Doc or Span not %s'%sentence.__class__)
-        self.logger.debug(u'Sentence to analyse: '+self.sentence.text)
+        # self.logger.debug(u'Sentence to analyse: '+self.sentence.text)
 
 
 
@@ -1123,17 +1175,23 @@ class SentenceAnalysisSpacy(object):
         :return: 
         '''
         prev_span = ''
+        open_brackets = u'( { [ <'.split()
+        closed_brackets = u') } ] >'.split()
         for token in self.sentence:
             try:
-                next_token = None
-                if token.nbor(1).pos is PUNCT and token.whitespace_ == u'':
-                    next_token = token.nbor(2)
-                # elif token.pos is PUNCT :
-                #     next_token = token.nbor(1)
-                if next_token and next_token.pos in [NOUN ,PROPN, ADJ]:
-                    span = Span(self.doc, token.i, next_token.i + 1)
-                    prev_span = span.text
-                    yield span
+                if token.text in open_brackets and token.whitespace_ ==u'' :
+                    next_token = token.nbor(1)
+                    if any([i in next_token.text for i in closed_brackets]):
+                        span = Span(self.doc, token.i, next_token.i +1)
+                        # prev_span = span.text
+                        yield span
+                elif any([i in token.text for i in open_brackets]):
+                    next_token = token.nbor(1)
+                    if next_token.text in closed_brackets:
+                        span = Span(self.doc, token.i, next_token.i + 1)
+                        # prev_span = span.text
+                        yield span
+
             except IndexError: #skip end of sentence
                 pass
 
@@ -1159,15 +1217,20 @@ class SentenceAnalysisSpacy(object):
                     yield span
 
 
-    def analyse(self):
+    def analyse(self, merge_with_syntax = True,verbose = False):
         '''extract concepts'''
 
         '''collapse noun phrases based on syntax tree'''
-        noun_phrases = list(self.collapse_noun_phrases_by_syntax())
+        noun_phrases = list(self.collapse_noun_phrases_by_punctation())
         for np in noun_phrases:
             np.merge()
-        self.print_syntax_list()
-        self.print_syntax_tree()
+        noun_phrases = list(self.collapse_noun_phrases_by_syntax())
+        if merge_with_syntax:
+            for np in noun_phrases:
+                np.merge()
+        if verbose:
+            self.print_syntax_list()
+            self.print_syntax_tree()
 
 
         self.concepts = []
@@ -1188,7 +1251,7 @@ class SentenceAnalysisSpacy(object):
                                                     subject=any_subject.text,
                                                     object=do.text,
                                                     verb=verb_text,
-                                                    verb_path = verb_path,
+                                                    verb_path = [i.text for i in verb_path],
                                                     verb_subtree = self.doc[v.left_edge.i : v.right_edge.i + 1].text,
                                                     subj_ver= '%s -> %s' %(any_subject.text, verb_text),
                                                     ver_obj =  '%s -> %s' %(verb_text, do.text),
@@ -1197,9 +1260,9 @@ class SentenceAnalysisSpacy(object):
                                                               self.isNegated(do)
                             ))
         self.noun_phrases=list(set(noun_phrases))
-        self.logger.info(self.noun_phrases)
-        for c in self.concepts:
-            self.logger.info(c['concept'])
+        # self.logger.info(self.noun_phrases)
+        # for c in self.concepts:
+        #     self.logger.info(c['concept'])
 
 
     def __str__(self):

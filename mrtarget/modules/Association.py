@@ -6,7 +6,7 @@ from elasticsearch import Elasticsearch
 from tqdm import tqdm
 
 from mrtarget.common import Actions
-from mrtarget.common.DataStructure import JSONSerializable, denormDict
+from mrtarget.common.DataStructure import JSONSerializable, denormDict, JSONAddict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
@@ -295,19 +295,22 @@ class Scorer():
 
     def score(self,target, disease, evidence_scores, is_direct, method  = None):
 
-        ass = Association(target,disease, is_direct)
+        ass = Association(target, disease, is_direct)
 
+        # set evidence counts
         for e in evidence_scores:
-            "set evidence counts"
-            ass.evidence_count['total']+=1
-            ass.evidence_count['datatypes'][e.datatype]+=1
-            ass.evidence_count['datasources'][e.datasource]+=1
+            # make sure datatype is constrained
+            if all([e.datatype in ass.evidence_count['datatypes'],
+                    e.datasource in ass.evidence_count['datasources']]):
+                ass.evidence_count['total']+=1
+                ass.evidence_count['datatypes'][e.datatype]+=1
+                ass.evidence_count['datasources'][e.datasource]+=1
+        
+                # set facet data
+                ass.set_available_datatype(e.datatype)
+                ass.set_available_datasource(e.datasource)
 
-            "set facet data"
-            ass.set_available_datatype(e.datatype)
-            ass.set_available_datasource(e.datasource)
-
-        "compute scores"
+        # compute scores
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
             self._harmonic_sum(evidence_scores, ass, scale_factor=2)
         if (method == ScoringMethods.SUM) or (method is None):
@@ -440,8 +443,12 @@ class ScoreProducer(RedisQueueWorkerProcess):
                                             queue_out=score_q)
         self.evidence_data_q = evidence_data_q
         self.score_q = score_q
-        self.scorer = Scorer()
         self.lookup_data = lookup_data
+
+    def init(self):
+        self.scorer = Scorer()
+        super(ScoreProducer, self).init()
+        self.lookup_data.set_r_server(self.r_server)
 
     def process(self, data):
         target, disease, evidence, is_direct = data
@@ -451,7 +458,9 @@ class ScoreProducer(RedisQueueWorkerProcess):
                     ScoringMethods.HARMONIC_SUM).overall != 0:  # skip associations only with data with score 0
                 gene_data = Gene()
                 try:
-                    gene_data.load_json(self.lookup_data.available_genes.get_gene(target))
+                    gene_data.load_json(
+                        self.lookup_data.available_genes.get_gene(target,
+                                                                  self.r_server))
                 except KeyError, e:
                     self.logger.debug('Cannot find gene code "%s" '
                                       'in lookup table' % target)
@@ -464,14 +473,14 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 hpa_data = HPAExpression()
                 try:
                     hpa_data.load_json(
-                        self.lookup_data.available_hpa.get_hpa(gene_data.id))
+                        self.lookup_data.available_hpa.get_hpa(target,
+                                                               self.r_server))
                     score.set_hpa_data(hpa_data)
 
-                except KeyError, ke:
-                    self.logger.debug('Cannot find HPA code "%s" '
-                                      'in lookup table' % target)
+                except KeyError as ke:
+                    self.logger.exception('hpa code %s with %s', target, str(ke))
 
-                except Exception, e:
+                except Exception as e:
                     self.logger.exception(e)
 
                 disease_data = EFO()
@@ -504,20 +513,16 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         super(ScoreStorerWorker, self).__init__(score_q, r_path)
         self.q = score_q
         self.chunk_size = chunk_size
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
-        self.es = es
-        self.loader = Loader(self.es,
-                             chunk_size=self.chunk_size,
-                             dry_run=dry_run)
         self.dry_run = dry_run
+        self.es = es
+        self.loader = None
+ 
 
 
     def process(self, data):
         if data is None:
             pass
+
         target, disease, score = data
         element_id = '%s-%s' % (target, disease)
         self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
@@ -528,8 +533,14 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
                                # routing=score.target['id'],
                             )
 
-
+    def init(self):
+        super(ScoreStorerWorker, self).init()
+        self.loader = Loader(self.es,
+                             chunk_size=self.chunk_size,
+                             dry_run=self.dry_run)
+               
     def close(self):
+        super(ScoreStorerWorker, self).close()
         self.loader.close()
 
 
@@ -575,7 +586,7 @@ class ScoringProcess():
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
         '''create queues'''
-        number_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        number_of_workers = Config.WORKERS_NUMBER
         number_of_storers = number_of_workers
         queue_per_worker = 250
         if targets and len(targets) <number_of_workers:

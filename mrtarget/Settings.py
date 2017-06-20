@@ -1,6 +1,7 @@
 import uuid
 from collections import defaultdict
 import os
+import re
 import json
 import ConfigParser
 import pkg_resources as res
@@ -104,8 +105,15 @@ def read_option(option, cast=None, ini=ini, section='dev',
         except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
             return default_value
 
+def update_schema_version(config, schema_version_string):
+    config.EVIDENCEVALIDATION_SCHEMA = schema_version_string
+    for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS.iterkeys():
+        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
+                                                              schema_version_string)
 
-class Config():
+
+class Config():  
+    EV_LIMIT = read_option('CTTV_EV_LIMIT', cast=bool, default=False)
     MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
 
@@ -147,7 +155,7 @@ class Config():
     # )
 
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
-                                      default=['http://127.0.0.1:9200'])
+                                      default=[])
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -216,8 +224,21 @@ class Config():
     REACTOME_PATHWAY_DATA = ini.get(INI_SECTION, 'reactome_pathways')
     REACTOME_PATHWAY_RELATION = ini.get(INI_SECTION, 'reactome_pathways_rel')
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
-    EVIDENCEVALIDATION_SCHEMA = "1.2.5"
+    EVIDENCEVALIDATION_SCHEMA = 'master'
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
+
+    EVIDENCEVALIDATION_VALIDATOR_SCHEMAS = {
+        'genetic_association': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/genetics.json',
+        'rna_expression': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/expression.json',
+        'genetic_literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'affected_pathway': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'somatic_mutation': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'known_drug': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
+        'literature_mining': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'animal_model': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
+    }
+
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
@@ -243,9 +264,15 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk', 'bpalka@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk', 'cyenyxe@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
+    EVIDENCEVALIDATION_FILENAME_REGEX = re.compile(r"""
+    (?P<datasource>[a-zA-Z0-9_]+)(\-
+    (?P<d1>\d{2})\-
+    (?P<d2>\d{2})\-
+    (?P<d3>\d{4}))?
+    (?P<suffix>\.json\.gz|\.json|\.json\.zip)$""", re.VERBOSE)
 
-    # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
+    # setup the number of workers to use for data processing. if None defaults
+    # to the number of CPUs available
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
 
@@ -328,10 +355,13 @@ class Config():
     ENSEMBL_RELEASE_VERSION = 88
     ENSEMBL_CHUNK_SIZE = 100
 
-    # see http://stackoverflow.com/a/847866
-    TEMP_DIR = tempfile.gettempdir()
+    TEMP_DIR = os.path.sep + 'tmp'
 
     REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
+    
+    # 
+    REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
+        read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 
