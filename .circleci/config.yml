@@ -17,7 +17,7 @@ jobs:
             virtualenv venv
             . venv/bin/activate
             pip install -U --no-cache-dir -r requirements.txt
-            pip uninstall requests
+            pip uninstall -y requests
             pip install requests
       - save_cache:
           key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
