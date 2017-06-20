@@ -20,7 +20,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle, \
-    WhiteCollarWorker
+    WhiteCollarWorker, RedisQueueWorkerThread
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 
@@ -36,6 +36,7 @@ class LiteratureActions(Actions):
 MEDLINE_BASE_PATH = 'pubmed/baseline'
 MEDLINE_UPDATE_PATH = 'pubmed/updatefiles'
 EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE = 30000
+
 
 def ftp_connect(dir=MEDLINE_BASE_PATH):
     host = ftputil.FTPHost(Config.PUBMED_FTP_SERVER, 'anonymous', 'support@targetvalidation.org')
@@ -336,7 +337,11 @@ class Publication(JSONSerializable):
 
     def _base_nlp(self):
         for analyzer in self._text_analyzers:
-            self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
+            try:
+                self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
+            except:
+                logger.exception("error in nlp analysis with %s analyser for text: %s"%(str(analyzer), self.get_text_to_analyze()))
+                self.text_mined_entities[str(analyzer)] = {}
 
 
 class LiteratureLookUpTable(object):
@@ -447,7 +452,7 @@ class MedlineRetriever(object):
 
         no_of_workers = Config.WORKERS_NUMBER
         ftp_readers = no_of_workers
-        max_ftp_readers = 8 #avoid too many connections errors
+        max_ftp_readers = no_of_workers/4 #avoid too many connections errors
         if ftp_readers >max_ftp_readers:
             ftp_readers = max_ftp_readers
 
@@ -458,14 +463,16 @@ class MedlineRetriever(object):
 
         # Parser Queue
         parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_parser',
-                                  max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                                  job_timeout=120)
+                              max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
+                              batch_size=1,
+                              job_timeout=1200)
 
         # ES-Loader Queue
         loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
+                              batch_size=1,
                               serialiser='pickle',
                               max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                              job_timeout=120)
+                              job_timeout=1200)
 
 
 
@@ -608,7 +615,8 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 t = tqdm(desc = 'downloading %s via HTTP' % os.path.basename(file_path),
                          total = file_size,
                          unit = 'B',
-                         unit_scale = True)
+                         unit_scale = True,
+                         disable=self.logger.level == logging.DEBUG)
                 for chunk in response.iter_content(chunk_size=128):
                     file_handler.write(chunk)
                     t.update(len(chunk))
@@ -683,10 +691,17 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
+        self._init_analyzers()
+        self.processed_counter = 0
+
+    def init(self):
+        self._init_analyzers()
+
+
+    def _init_analyzers(self):
         from mrtarget.modules.LiteratureNLP import NounChuncker, DocumentAnalysisSpacy
-
-        self.analyzers = [NounChuncker(), DocumentAnalysisSpacy(init_spacy_english_language())]
-
+        self.nlp = init_spacy_english_language() #store it as class instance to make sure it is deleted if called again
+        self.analyzers = [NounChuncker(), DocumentAnalysisSpacy(self.nlp)]
 
     def process(self,data):
         record, filename = data
@@ -777,6 +792,12 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
         except etree.XMLSyntaxError as e:
             self.logger.error("Error parsing XML file {} - medline record {} %s".format(filename,record),e.message)
+        self.processed_counter+=1
+        if self.processed_counter%10000 == 0:
+            #restart spacy from scratch to free up memory
+            self._init_analyzers()
+            logger.debug('restarting analyzers after %i docs processed in worker %s'%(self.processed_counter, self.name))
+
 
     def parse_article_info(self, article, publication):
 
@@ -853,10 +874,13 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                  queue_out = None,
                  dry_run=False):
         super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path, queue_out)
-        self.loader = Loader(chunk_size=10000, dry_run=dry_run)
+        self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
+
+    def init(self):
+        self.loader = Loader(chunk_size=1000, dry_run=self.dry_run)
         self.es = self.loader.es
         self.es_query = ESQuery(self.es)
-        self.logger = logging.getLogger(__name__)
 
 
     def process(self, data):

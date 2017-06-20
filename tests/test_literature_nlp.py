@@ -37,10 +37,16 @@ class LiteratureNLPTestCase(unittest.TestCase):
                'annotated genes located on 8p; many are most likely oncogenes and tumor-suppressor genes. Molecular ' \
                'genetics and developmental studies have identified 21 genes in this region (ADRA1A, ARHGEF10, CHRNA2, ' \
                '' \
+               '' \
+               '' \
+               '' \
                'CHRNA6, CHRNB3, DKK4, DPYSL2, EGR3, FGF17, FGF20, FGFR1, FZD3, LDL, NAT2, NEF3, NRG1, PCM1, PLAT, ' \
                'PPP3CC, SFRP1 and VMAT1/SLC18A1) that are most likely to contribute to neuropsychiatric disorders ' \
                '(schizophrenia, autism, bipolar disorder and depression), neurodegenerative disorders (Parkinson\'s' \
                ' and Alzheimer\'s disease) and cancer. Furthermore, at least seven nonprotein-coding RNAs (microRNAs) ' \
+               '' \
+               '' \
+               '' \
                '' \
                'are located at 8p. Structural variants on 8p, such as copy number variants, microdeletions or ' \
                'microduplications, might also contribute to autism, schizophrenia and other human diseases including' \
@@ -75,6 +81,9 @@ class LiteratureNLPTestCase(unittest.TestCase):
                'LGMD1B), ' \
                'caveolin-3 (3p25, LGMD1C), unknown proteins (7q, LGMD1D, 6q23, LGMD1E, 7q32.1-32.2., LGMD1F), ' \
                'calpain-3 (15q15.1-21.1, LGMD2A), dysferlin (2p13.3-13.1, LGMD2B), gamma-sarcoglycan (13q12, LGMD2C), ' \
+               '' \
+               '' \
+               '' \
                '' \
                'alpha-sarcoglycan, also known as adhalin (17q12-q21.3, LGMD2D), beta-sarcoglycan (4q12, LGMD2E), ' \
                'delta-sarcoglycan (5q33-q34, LGMD2F), telethonin (17q11-q12, LGMD2G), E3-ubiquitin ligase (' \
@@ -261,6 +270,9 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
 
     def test_Schistosoma(self):
         text = u'Studies have suggested that Schistosoma mansoni infection reduces the severity of asthma and prevent ' \
+               u'' \
+               u'' \
+               u'' \
                u'atopy.'
 
         sentence = SentenceAnalysisSpacy(text, self.nlp)
@@ -362,6 +374,58 @@ class SpacySentenceNLPTestCase(unittest.TestCase):
         for i in minimal_expected_noun_phrases:
             self.assertIn(i, noun_phrases)
 
+    def testManyPunctations(self):
+        text = u'In ' \
+               u'addition, the antagonistic action of propranolol (1 X 10(-7) M) in a Ca++-containing or ' \
+               u'Sr++-containing medium was determined. '
+
+        sentence = SentenceAnalysisSpacy(text, self.nlp)
+        sentence.analyse()
+
+    def test_custom_tokenizer(self):
+        text = u'the antagonistic action of propranolol (1 X 10(-7) M) in a Ca++-containing or. Cell growth and ' \
+               u'quabain-sensitive 86Rg+ uptake and (Na++K+)-ATPase activity in 3T3 and SV40 transformed 3T3 ' \
+               u'fibroblasts. The uptake of ouabain-sensitive 86Rb+ uptake measured at 5 min and the uptake measured ' \
+               u'at 60 min was 4.5- and 2.7-fold greater respectively for SV40 transformed 3T3 cells compared to 3T3 ' \
+               u'cells during the late log phase of growth. This uptake, however, varied markedly with cell growth. ' \
+               u'Ouabain-sensitive 86Rb+ uptake was found to be a sensitive indicator of protein synthesis as ' \
+               u'measured by total protein content. Cessation of cell growth as measured by total protein content was ' \
+               u'' \
+               u'associated with a decline in ouabain-sensitive 86Rb+ uptake in both cell types. This increase ' \
+               u'ouabain-sensitive cation transport was reflected in increased levels of (Na++K)-ATPase activity for ' \
+               u'SV40 3T3 cells, which showed a 2.5-fold increase V but the same Km as 3T3 cells. These results are ' \
+               u'compared with the results of related work. Possible mechanisms for these effects are discussed and ' \
+               u'how changes in cation transport might be related to alterations in cell growth. This is a test, ' \
+               u'for a complex entity name: th:is.{e}nt/ity-is,ver-y/co_m[p]lex(to)par;se . '
+
+               # u'Derivatives of 1,2,3,11a-tetrahydro-5H-pyrrolo[2,1-c][1,4]benzodiazepine-5,11(10H)-dione as ' \
+               # u'anxiolytic agents. A study of the pharmacological properties of pyrrolo[2,1-c][1,4]benzodiazepine ' \
+               # u'derivatives led to the choice of (+)-1,2,3,11a-tetrahydro-10-methyl-5H-pyrrolol[2,1-c][1,' \
+               # u'4]benzodiazepine-5,11)10H)-dione as a candidate for anxiolytic evaluation in a limited clinical ' \
+               # u'trial in man. Metabolism studies in laboratory animals have pointed to rapid hydroxylation, ' \
+               # u'possibly in the 3 and 11a positions. A series of compouds containing methyl groups in one or more of ' \
+               # u'these positions has been prepared in an effort to block metabolism and thereby obtain more active or ' \
+               # u'longer acting compounds. All of these derivatives were less active than the parent compound.'
+
+                # u'Inversion of optical configuration of alpha-methylfluorene-2-acetic acid (cicloprofen) in rats and monkeys. A simple and sensitive radiometric method to determine the individual enantiomers of cicloprofen has been developed. 14C-Cicloprofen was converted to its L-leucine diastereoisomers, which were separated by thin-layer chromatography and quantified by measuring the radioactivity in the area corresponding to each individual diastereoisomer. This technique has also been used to measure the enantiomers of unlabeled cicloprofen by condensing with 14C-labeled L-leucine. By using the radiometric method, a unique biotransformation process, the inversion of the (-)-enantiomer of alpha-methylfluorene-2-acetic acid to its (+)-enantiomer, has been demonstrated in the rat and monkey. The rate of (-)- to (+)-inversion was found to be faster in the rat than in the monkey. After single or repeated oral adminstration of the racemic modification or the (-)-enantiomer of cicloprofen to both species, the ratio of (+)- to (-)-enantiomers of cicloprofen in plasma, urine, or bile increased with time. At 5, 22, and 48 hr after oral administration of a single 50-mg/kg dose of the (-)-enantiomer, 14C-cicloprofen in rat plasma contained 20, 50, and 79%, respectively, of the (+)-enantiomer. After receiving the same dose of (-)-enantiomer, monkey plasma contained 16.5% and 32% of (+)-enantiomer at 8 and 24 hr, respectively. After oral administration of a single 50-mg/kg dose of the (+)-enantiomer of 14C-cicloprofen to rats and monkeys, the percentage of (-)-enantiomer in plasma varied from 2 to 15%. Since the administered (+)-enantiomer contained 4% of (-)-enantiomer and the (+)-enantiomer was excreted at a faster rate than its (-)-antipode by rats or monkeys, it is not known whether an occasional small percentage increase of (-)-enantiomer in plasma resulted from the (+)-to-(-) inversion, or from faster elimination of the (+)-enantiomer. Nevertheless, if (+)-to-(-) inversion does occur in these two species, the rate is much slower than for the (-)-to-(+) inversion.'
+
+                #u' Properties of common wheat ferredoxin, and a comparison with ferredoxins from related species of triticum and aegilops. Wheat ferredoxin was purified from the leaves of common wheat (Triticum aestivum). The absorption spectrum showed maxima at 465, 425, 332, and 278 nm. The absorbance ratio, A425 nm/A278 nm was 0.49, and the millimolar extinction coefficient at 425 nm was 10.8 mM-1. cm-1. The amino acid composition was determined to be Lys5, His2, Arg1, Asp11, Thr5, Ser7, Glu18, Pro5, Gly6, Ala7, Cys5, Val7, Met1, Ile4, Leu7, Tyr4, Phe1, and Trp1. The total number of amino acid residues was 97. The molecular weight was calculated from the amino acid composition to be 10,829, including iron and sulfur atoms. This value was confirmed by other methods, which were based on the contents of non-heme iron and of terminal amino acid. The N-terminal amino acid was alanine, and the C-terminal amino acid sequence was -Glu-Leu-Thr-AlaCOOH. Comparative studies were performed between T. aestivum ferredoxin and ferredoxins isolated from closely related species; these were T. aegilopoides, T. durum, Ae. squarrosa, and Ae. ovata. No significant differences in the properties of these ferredoxins were detected. It was also shown that these ferredoxins are immunologically homologous. It is, therefore, likely that one molecular species of ferredoxin is distributed through two genera of Triticum and Aegilops.'
+sentence = SentenceAnalysisSpacy(text, self.nlp)
+sentence.analyse(merge_with_syntax=False)
+tokens = [i.text for i in sentence.doc]
+self.assertIn(u'10(-7)', tokens)
+self.assertIn(u'(Na++K+)-ATPase', tokens)
+self.assertIn(u'2.7-fold', tokens)
+self.assertIn(u'4.5-', tokens)
+self.assertIn(u'86Rb+', tokens)
+self.assertIn(u'Ca++-containing', tokens)
+self.assertIn(u'(Na++K)-ATPase', tokens)
+self.assertIn(u'Ouabain-sensitive', tokens)
+self.assertIn(u'th:is.{e}nt/ity-is,ver-y/co_m[p]lex(to)par;se', tokens)
+self.assertNotIn(u'cells,', tokens)
+self.assertNotIn(u'(1', tokens)
+self.assertNotIn(u'fibroblasts.', tokens)
+
 
 class SpacyDocumentNLPTestCase(unittest.TestCase):
     @classmethod
@@ -398,7 +462,8 @@ class SpacyDocumentNLPTestCase(unittest.TestCase):
         self.assertNotIn(u'line', tokens)
 
     def test_obama(self):
-        '''compare with https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/language/syntax_triples'''
+        '''compare with https://github.com/GoogleCloudPlatform/python-docs-samples/tree/master/language
+        /syntax_triples'''
 
         text = u'In 2004, Obama received national attention during his campaign to represent Illinois in the United ' \
                u'States Senate with his victory in the March Democratic Party primary, his keynote address at the ' \

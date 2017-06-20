@@ -3,27 +3,28 @@
 
 
 import spacy
-from spacy.language_data import TOKENIZER_INFIXES
+from spacy.language_data import TOKENIZER_INFIXES, TOKENIZER_PREFIXES, TOKENIZER_SUFFIXES
 from spacy.tokenizer import Tokenizer
 import en_core_web_md
 
 def create_tokenizer(nlp):
     infix_re = spacy.util.compile_infix_regex(TOKENIZER_INFIXES + [  # u'\w*[,-.–_—:;\(\)\[\]\{\}/]{1,3}\S\w*',
         # r'\w*[,\-.\-_:;\(\)\[\]\{\}\/]{1,3}\S\w*',
-        r'\w*\S[,.-_:;\(\)\[\]\{\}/]\S*\w',
-        r'\w*\S-\S*\w',
-        u'\w*\S–\S*\w',
-        u'\w*\S—\S*\w',
+        # r'((?P<start_with_non_whitespace_and_one_or_more_punctation>\b\S+|[,.-_:;\(\)\[\]\{\}/\+])(?P<has_1_or_more_punctation>[,.-_:;\(\)\[\]\{\}/\+])+(?P<ends_with_non_whitespace_or_non_terminating_punctation>\S+\b[,.-_:;\(\)\[\]\{\}/\+]|[,.-_:;\(\)\[\]\{\}/\+|\-]|\S+\b))',
+        # r'\w*\S-\S*\w',
+        # u'\w*\S–\S*\w',
+        # u'\w*\S—\S*\w',
         # u'\w*[,-.–_—:;\(\)\[\]\{\}/]{1,3}\S\w*'
+        ur'(?P<start_with_non_whitespace_and_one_or_more_punctation>\b\S*|[,.-_-:–;—\(\[\{/\+]?)(?P<has_1_or_more_punctation>[,.-_-:–;—\(\)\[\]\{\}/\+])+(?P<ends_with_non_whitespace_or_non_terminating_punctation>\S+\b[,.-_-:–;—\)\]\}/\+]|[,.-_-:–;—\)\]\}/\+}]|\S+\b)'
     ])
-    # TODO: prefix and suffix raise TypeError: '_regex.Pattern' object is not callable
-    # prefix_boundaries_to_keep = [r'\(', r'\[',  r'\{', r'<']
-    # suffix_boundaries_to_keep = [ r'\)', r'\]', r'\}',  r'>']
+    #TODO: prefix and suffix raise TypeError: '_regex.Pattern' object is not callable
+    # prefix_boundaries_to_keep =  ur'\) \] \} \> , . - _ - : – ; — \+ -'.split()
+    # suffix_boundaries_to_keep = ur'\( \[ \{ \< , . - _ - : – ; — \+ -'.split()
     # prefixe_re = spacy.util.compile_prefix_regex([i for i in TOKENIZER_PREFIXES if i not in
     # prefix_boundaries_to_keep])
     # suffixe_re = spacy.util.compile_suffix_regex([i for i in TOKENIZER_SUFFIXES if i not in
     # suffix_boundaries_to_keep])
-
+    #
     # return Tokenizer(nlp.vocab, {}, prefixe_re.search, suffixe_re.search,
     #                  infix_re.finditer)
     return Tokenizer(nlp.vocab, {}, nlp.tokenizer.prefix_search, nlp.tokenizer.suffix_search,
@@ -32,6 +33,7 @@ def create_tokenizer(nlp):
 
 def init_spacy_english_language():
     nlp = en_core_web_md.load(create_make_doc=create_tokenizer)
+    # nlp.vocab.strings.set_frozen(True)
     return nlp
 
 

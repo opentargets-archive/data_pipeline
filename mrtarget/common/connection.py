@@ -55,7 +55,7 @@ class PipelineConnectors():
                     if connection_attempt >= 3:
                         raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES))
                     connection_attempt += 1
-                self.logger.info('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
+                self.logger.debug('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
                 success = True
             except ConnectionTimeout:
                 self.logger.exception("Elasticsearch connection timeout")
@@ -71,7 +71,7 @@ class PipelineConnectors():
                               serverconfig={'save': [],
                                             'maxclients': 10000,
                                             'port': str(Config.REDISLITE_DB_PORT)})
-        self.logger.info('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
+        self.logger.debug('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
 
         return success
 
@@ -79,4 +79,4 @@ class PipelineConnectors():
         try:
             self.r_server.shutdown()
         except:
-            self.logger.exception('Could not shutdown redislite erver')
+            self.logger.exception('Could not shutdown redislite server')

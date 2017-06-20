@@ -401,12 +401,14 @@ class RedisQueueStatusReporter(Process):
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
                                                                 # position=queue_position+0,
+                                                                disable=self.logger.level == logging.DEBUG
                                                                 ),
                                          processed_counter=tqdm(desc='%s processed jobs [batch size: %i]'%(queue_id,q.batch_size),
                                                                 unit=' jobs',
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
                                                                 # position=queue_position+1,
+                                                                disable=self.logger.level == logging.DEBUG
                                                                 ),
                                          last_status = None
                                         )
@@ -755,9 +757,9 @@ class WhiteCollarWorker(Thread):
                  queue_in,
                  redis_path,
                  queue_out=None,
-                 args = [],
-                 kwargs = {},
-                 max_restart = 3):
+                 args=[],
+                 kwargs={},
+                 max_restart=3):
         super(WhiteCollarWorker, self).__init__()
         self.daemon = True
         self.target = target
@@ -781,31 +783,43 @@ class WhiteCollarWorker(Thread):
         :return: 
         '''
 
+        #TODO: create just one
         for i in range(self.pool_size):
-            self.workers_instances[i]=self.target(self.queue_in,
-                                                  self.redis_path,
-                                                  self.queue_out,
-                                                  *self.args,
-                                                  **self.kwargs)
+            worker = self.target(self.queue_in,
+                                 self.redis_path,
+                                 self.queue_out,
+                                 *self.args,
+                                 **self.kwargs)
+            self.start_worker(worker,i)
+            
 
+        #TODO: check queue and scale up workers if needed
         while self.workers_instances:
-            for n,p in self.workers_instances.items():
-                time.sleep(0.1)
-                if p.exitcode is None and not p.is_alive():
-                    self.logger.error('%s is not finished and not running as if it was never born'%p.name)
-                elif p.exitcode < 0:
-                    self.logger.error('Worker %s ended with an error or a terminate'%p.name)
-                    if self.restart_log[n] < self.max_restarts:
-                        self.logger.info('Restarting failed worker instance number %i'%n)
-                        self.workers_instances[n] = self.target(*self.args, **self.kwargs)
-                        self.restart_log[n]+=1
+            for n, p in self.workers_instances.items():
+                if p is not None:
+                    if  p.is_alive():
+                        continue #worker still running
                     else:
-                        self.logger.error('Gave up on restarting worker instance number %i'%n)
-                        del self.workers_instances[n]
-                    # Handle this either by restarting or delete the entry so it is removed from list as for else
-                else:
-                    p.join()  # wait for completion
-                    del self.workers_instances[n]
+                        if p.exitcode is None:
+                            self.logger.error('%s is not finished and not running as if it was never started' % p.name)
+                        elif p.exitcode != 0: #worker exted with error
+                            self.logger.error('Worker %s ended with an error or terminated. exitcode: %s' % (p.name, str(p.exitcode)))
+                            if self.restart_log[n] < self.max_restarts:
+                                self.logger.info('Restarting failed worker instance number %i' % n)
+                                worker= self.target(self.queue_in,
+                                                    self.redis_path,
+                                                    self.queue_out,
+                                                    *self.args,
+                                                    **self.kwargs)
+                                self.start_worker(worker, n)
+                                self.restart_log[n] += 1
+                            else:
+                                self.logger.error('Gave up on restarting worker instance number %i' % n)
+                                del self.workers_instances[n]
+                        elif p.exitcode == 0:  #worker completed fine
+                            del self.workers_instances[n]
+            time.sleep(0.2)
+
     def kill_all(self):
         '''
         send a kill signal to all the workers nicely
@@ -813,9 +827,20 @@ class WhiteCollarWorker(Thread):
         :return: 
         '''
         for _, p in self.workers_instances.items():
-            self.logger.debug('setting kill switch on for worker %s'%p.name)
+            self.logger.debug('setting kill switch on for worker %s', p.name)
             p.kill_switch = True
 
+    def start_worker(self, worker, i):
+        memory_load = psutil.virtual_memory().percent
+        if memory_load < self.MAX_MEMORY_LEVEL:
+            self.logger.debug('Spawning a new worker of type: %s, index %i. Memory level: %s' % (self.target, i, str(memory_load)))
+            worker.start()
+            time.sleep(0.2)#or worker.join(1)
+            self.workers_instances[i] = worker
+        else:
+            worker.terminate()
+            self.logger.warning('Not enough memory to spawn a new worker of type: %s, index %i' % (self.target, i))
+            self.workers_instances[i] = None
 
 class RedisLookupTable(object):
     '''
