@@ -11,6 +11,7 @@ import petl
 from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
+from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
@@ -105,7 +106,7 @@ class HPADataDownloader():
             .cut('tissue', 'cell_type', 'level', 'reliability', 'gene')
             )
 
-        for d in table.dicts():
+        for d in petl.dicts(table):
             yield d
 
     def retrieve_rna_data(self):
@@ -125,7 +126,7 @@ class HPADataDownloader():
             .cut('sample', 'unit', 'value', 'gene')
             )
 
-        for d in table.dicts():
+        for d in petl.dicts(table):
             yield d
 
     def retrieve_cancer_data(self):
@@ -142,7 +143,7 @@ class HPADataDownloader():
                  'expression_type')
             )
 
-        for d in table.dicts():
+        for d in petl.dicts(table):
             yield d
 
     def retrieve_subcellular_location_data(self):
@@ -310,18 +311,19 @@ class HPALookUpTable(object):
     """
 
     def __init__(self,
-                 es,
+                 es=None,
                  namespace=None,
                  r_server=None,
                  ttl=(60*60*24+7)):
-        self._table = RedisLookupTablePickle(namespace=namespace,
-                                             r_server=r_server,
-                                             ttl=ttl)
         self._es = es
-        self._es_query = ESQuery(es)
         self.r_server = r_server
-        if r_server is not None:
-            self._load_hpa_data(r_server)
+        self._es_query = ESQuery(self._es)
+        self._table = RedisLookupTablePickle(namespace=namespace,
+                                             r_server=self.r_server,
+                                             ttl=ttl)
+
+        if self.r_server:
+            self._load_hpa_data(self.r_server)
 
     def _load_hpa_data(self, r_server=None):
         for el in tqdm(self._es_query.get_all_hpa(),
@@ -330,36 +332,30 @@ class HPALookUpTable(object):
                        unit_scale=True,
                        total=self._es_query.count_all_hpa(),
                        leave=False):
-            self._table.set(el['gene'], el,
-                            r_server=self._get_r_server(r_server))
+            self.set_hpa(el, r_server=self._get_r_server(r_server))
 
     def get_hpa(self, idx, r_server=None):
-        return self._table.get(idx, r_server=r_server)
+        return self._table.get(idx, r_server=self._get_r_server(r_server))
 
     def set_hpa(self, hpa, r_server=None):
         self._table.set(hpa['gene'], hpa,
                         r_server=self._get_r_server(r_server))
 
     def get_available_hpa_ids(self, r_server=None):
-        return self._table.keys()
+        return self._table.keys(self._get_r_server(r_server))
 
     def __contains__(self, key, r_server=None):
         return self._table.__contains__(key,
                                         r_server=self._get_r_server(r_server))
 
     def __getitem__(self, key, r_server=None):
-        return self.get_hpa(key, r_server)
+        return self.get_hpa(key, r_server=self._get_r_server(r_server))
 
     def __setitem__(self, key, value, r_server=None):
         self._table.set(key, value, r_server=self._get_r_server(r_server))
 
-    def _get_r_server(self, r_server=None):
-        if not r_server:
-            r_server = self.r_server
-        if r_server is None:
-            raise AttributeError('A redis server is required either at class'
-                                 ' instantation or at the method level')
-        return r_server
+    def keys(self, r_server=None):
+        return self._table.keys(self._get_r_server(r_server))
 
-    def keys(self):
-        return self._table.keys()
+    def _get_r_server(self, r_server = None):
+        return r_server if r_server else self.r_server
