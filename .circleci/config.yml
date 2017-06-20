@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: ~/mrtarget
     docker:
-      - image: quay.io/opentargets/mrtarget_base:latest
+      - image: python:2.7
     environment:
       - CTTV_MINIMAL=True
     steps:
@@ -11,6 +11,7 @@ jobs:
       - restore_cache:
          key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
       - run:
+          name: Install requirements.txt
           command: |
             pip install virtualenv
             virtualenv venv
@@ -23,27 +24,27 @@ jobs:
           paths:
             - "venv"
       - run:
+          name: Dry run to check imports
           command: |
             . venv/bin/activate
             mrtarget --dry-run
       - setup_remote_docker
-       # This should go into custom primary image, here's only for the sake of explanation
+      #  # This should go into custom primary image, here's only for the sake of explanation
+      # - run:
+      #     name: Install Docker client
+      #     command: |
+      #        set -x
+      #        VER="17.03.0-ce"
+      #        curl -L -o /tmp/docker-$VER.tgz https://get.docker.com/builds/Linux/x86_64/docker-$VER.tgz
+      #        tar -xz -C /tmp -f /tmp/docker-$VER.tgz
+      #        mv /tmp/docker/* /usr/bin
       - run:
-          name: Install Docker client
+          name: Build and push Docker image
           command: |
-             set -x
-             VER="17.03.0-ce"
-             curl -L -o /tmp/docker-$VER.tgz https://get.docker.com/builds/Linux/x86_64/docker-$VER.tgz
-             tar -xz -C /tmp -f /tmp/docker-$VER.tgz
-             mv /tmp/docker/* /usr/bin
-
-#       - run:
-#           name: Build and push Docker image
-#           command: |
-#             TAG="0.1.${CIRCLE_BUILD_NUM}"
-#             docker build -t circleci/cci-demo-docker:$TAG .
-#             docker login -u $DOCKER_LOGIN -p $DOCKER_PASSWORD
-#             docker push circleci/cci-demo-docker:$TAG
+            TAG="0.1.${CIRCLE_BUILD_NUM}"
+            docker build -t circleci/cci-demo-docker:$TAG .
+            docker login -u $DOCKER_LOGIN -p $DOCKER_PASSWORD
+            docker push circleci/cci-demo-docker:$TAG
 
 #       - store_artifacts:
 #           path: /tmp/test-results
