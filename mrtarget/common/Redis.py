@@ -728,7 +728,6 @@ def get_redis_worker(base = Process):
         
         def _close(self):
             self.close()
-            self.r_server.close()
 
         def __enter__(self):
             pass

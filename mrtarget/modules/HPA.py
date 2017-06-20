@@ -195,6 +195,7 @@ class ExpressionObjectStorer(RedisQueueWorkerProcess):
         super(ExpressionObjectStorer, self).close()
         self.loader.close()
 
+
 class HPAProcess():
     def __init__(self, loader, r_server):
         self.loader = loader
@@ -278,7 +279,7 @@ class HPAProcess():
                 
             q_reporter.join()
         
-            self._logger.info('all expressions objects pushed to elasticsearch')
+            self.logger.info('all expressions objects pushed to elasticsearch')
 
         if self.data.values()[0]['cancer']:  # if there is cancer data
             pass
