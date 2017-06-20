@@ -13,8 +13,8 @@ from mrtarget.common import URLZSource
 from mrtarget.common import Actions
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisLookupTablePickle
+from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
+from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 
 from mrtarget.Settings import Config
 
@@ -170,20 +170,49 @@ class HPADataDownloader():
             yield d
 
 
+class ExpressionObjectStorer(RedisQueueWorkerProcess):
+
+    def __init__(self, es, r_server, queue, dry_run=False):
+        super(ExpressionObjectStorer, self).__init__(queue, None)
+        self.es = None
+        self.r_server = None
+        self.loader = None
+        self.dry_run = dry_run
+
+    def process(self, data):
+        geneid, gene = data
+        '''process objects to simple search object'''
+        gene.preprocess()
+        self.loader.put(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                       Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+                       ID=geneid,
+                       body=gene['expression'].to_json(),
+                       create_index=False)
+        
+    def init(self):
+        super(ExpressionObjectStorer, self).init()
+        self.loader = Loader(dry_run=self.dry_run)
+               
+    def close(self):
+        super(ExpressionObjectStorer, self).close()
+        self.loader.close()
+
 class HPAProcess():
-    def __init__(self, loader):
+    def __init__(self, loader, r_server):
         self.loader = loader
+        self.esquery = ESQuery(loader.es)
+        self.r_server = r_server
         self.data = {}
         self.available_genes = set()
         self.set_translations()
         self.downloader = HPADataDownloader()
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self):
+    def process_all(self, dry_run=False):
 
         self.process_normal_tissue()
         self.process_rna()
-        self.store_data()
+        self.store_data(dry_run=dry_run)
         self.loader.close()
 
     def _get_available_genes(self, ):
@@ -219,21 +248,45 @@ class HPAProcess():
         self.logger.info('process_rna completed')
         return
 
-    def store_data(self):
+    def store_data(self, dry_run=False):
         self.logger.info('store_data called')
         if self.data.values()[0]['expression']:  # if there is expression data
-
+            self.logger.debug('calling to create new expression index')
+            self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+            queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
+                               r_server=self.r_server,
+                               serialiser='jsonpickle',
+                               max_size=10000,
+                               job_timeout=600)
+            
+            q_reporter = RedisQueueStatusReporter([queue])
+            q_reporter.start()
+        
+            workers = [ExpressionObjectStorer(self.loader.es,
+                                        None,
+                                        queue,
+                                        dry_run=dry_run) for i in range(4)]
+            
+            for w in workers:
+                w.start()
+        
             for gene, data in self.data.items():
-                self.loader.put(index_name=Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                                doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                                ID=gene,
-                                body=data['expression'].to_json(),
-                                )
+                queue.put((gene, data), self.r_server)
+        
+            queue.set_submission_finished(r_server=self.r_server)
+        
+            for w in workers:
+                w.join()
+                
+            q_reporter.join()
+        
+            self._logger.info('all expressions objects pushed to elasticsearch')
+
         if self.data.values()[0]['cancer']:  # if there is cancer data
             pass
         if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
             pass
-
+        
     def init_gene(self, gene):
         self.data[gene] = dict(expression=HPAExpression(gene),
                                cancer={},  # TODO
