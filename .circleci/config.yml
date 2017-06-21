@@ -10,7 +10,7 @@ jobs:
       - checkout
       - run:
           command: |
-            apt-get install -y gzip
+            sudo apt-get install -y gzip
       - restore_cache:
          key: mrt-py27-{{ .Branch }}-{{ checksum "requirements.txt" }}
       - run:
