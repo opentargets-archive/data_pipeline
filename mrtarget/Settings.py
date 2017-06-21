@@ -10,8 +10,34 @@ import mrtarget
 import petl
 import multiprocessing as mp
 import tempfile
+import logging
 
 from mrtarget.common import URLZSource
+
+logger = logging.getLogger(__name__)
+
+
+def from_expression_to_map(filename):
+    '''return a dict with 2 dicts and organ and tissue called as said'''
+    ret = {}
+    try:
+        agg = {}
+        agg['tissues'] = ('tissue_name','tissue_id'), dict
+        t = petl.fromcsv(URLZSource(filename),delimiter='|')
+        t_agg = petl.aggregate(t, key=['organ_name','organ_id'], aggregation=agg)
+        
+        ret['organ'] = dict(t_agg.cut('organ_name','organ_id').data().tol())
+        ret['tissue'] = {}
+        
+        for e in t_agg.cut('tissues').data():
+            ret['tissue'].update(e[0])
+    
+    except Exception:
+        logger.error('impossible to generate the inverse mapping dict for uberon'
+                     ' mapping file so either the url or content is not correct')
+        
+    finally:
+        return ret
 
 
 def build_uniprot_query(l):
@@ -210,9 +236,9 @@ class Config():
         '4932':'yeast'
     }
 
-    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
-    TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
-                                               delimiter='|').data().tol())
+    # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
+    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
+    TISSUE_TRANSLATION_MAP = from_expression_to_map(TISSUE_TRANSLATION_MAP_URL)
 
     HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
     HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')

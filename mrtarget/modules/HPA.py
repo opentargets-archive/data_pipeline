@@ -19,13 +19,27 @@ from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReport
 from mrtarget.Settings import Config
 
 
+def code_from_tissue(tissue_name):
+    t2m = Config.TISSUE_TRANSLATION_MAP['tissue']
+    tid = None
+    try:
+        tid = t2m[tissue_name]
+    except KeyError:
+        logger = logging.getLogger(__name__)
+        logger.error('the tissue name %s was not found in the mapping', 
+                     tissue_name)
+        tid = tissue_name
+        
+    return tid
+
+
 def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     def _split_tissue(k, v):
         '''from tissue dict to rna and protein dicts pair'''
-        t2m = Config.TISSUE_TRANSLATION_MAP
-        tid = t2m[k]
+        tid = code_from_tissue(k)            
         tlabel = k
+        
         rna = {'id': tid, 'label': tlabel, 'level': v['rna']['level'],
                'unit': v['rna']['unit'],
                'value': v['rna']['value']} if v['rna'] else {}
@@ -66,7 +80,6 @@ class HPAExpression(JSONSerializable):
     def __init__(self, gene=None):
         self.gene = gene
         self.tissues = {}
-        self.cell_lines = {}
 
     def get_id(self):
         return self.gene
@@ -118,18 +131,27 @@ class HPADataDownloader():
         """
         self.logger.info('get rna tissue rows into dicts')
         self.logger.debug('melting rna level table into geneid tissue level')
-        t_level = (
-            petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL),
-                        delimiter='\t')
-                .melt(key='ID', variablefield='sample', valuefield='level')
-                .rename({'ID': 'gene'}))
+        t_level = petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL),
+                               delimiter='\t')
+        headers = t_level.header()
+        t_level = petl.setheader(t_level, 
+                                ['ID'] + [e.split('_')[1] \
+                                    for e in headers if e != 'ID'])
+        t_level = petl.melt(t_level, key='ID', 
+                            variablefield='sample', 
+                            valuefield='level')
+        t_level = petl.rename(t_level, {'ID': 'gene'})
         
-        t_value = (
-            petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL),
-                        delimiter='\t')
-                .melt(key='ID', variablefield='sample', valuefield='value')
-                .rename({'ID': 'gene'})
-                .addfield('unit','TPM'))
+        t_value = petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL),
+                               delimiter='\t')
+        t_value = petl.setheader(t_value, 
+                                ['ID'] + [e.split('_')[1] \
+                                    for e in t_value.header() if e != 'ID'])
+        t_value = petl.melt(t_value, key='ID', 
+                            variablefield='sample', 
+                            valuefield='value')
+        t_value = petl.rename(t_value, {'ID': 'gene'})
+        t_value = petl.addfield(t_value, 'unit', 'TPM')
         
         t_join = petl.join(t_level, t_value, presorted=True)
 
@@ -242,8 +264,7 @@ class HPAProcess():
             self.rna_data[gene].append(row)
 
         for gene in self.available_genes:
-            self.data[gene]['expression'].tissues, \
-            self.data[gene]['expression'].cell_lines = self.get_rna_data_for_gene(gene)
+            self.data[gene]['expression'].tissues = self.get_rna_data_for_gene(gene)
         self.logger.info('process_rna completed')
         return
 
@@ -295,17 +316,23 @@ class HPAProcess():
     def get_normal_tissue_data_for_gene(self, gene):
         tissue_data = {}
         for row in self.normal_tissue_data[gene]:
+            # XXX why do I have to replace on a curated list of tissues
             tissue = row['tissue'].replace('1', '').replace('2', '').strip()
+            # tissue = row['tissue']
+            code = code_from_tissue(tissue)
+            
             if tissue not in tissue_data:
                 tissue_data[tissue] = {'protein': {
-                    'cell_type': {},
-                    'level': 0,
-                    'reliability': False,
-                },
-
-                    'rna': {
+                        'cell_type': {},
+                        'level': 0,
+                        'reliability': False,
                     },
-                    'efo_code': Config.TISSUE_TRANSLATION_MAP[tissue]}
+        
+                        'rna': {
+                        },
+                        'efo_code': code
+                    }
+
             if row['cell_type'] not in tissue_data[tissue]['protein']['cell_type']:
                 tissue_data[tissue]['protein']['cell_type'][row['cell_type']] = []
             tissue_data[tissue]['protein']['cell_type'][row['cell_type']].append(
@@ -322,32 +349,32 @@ class HPAProcess():
 
     def get_rna_data_for_gene(self, gene):
         tissue_data = self.data[gene]['expression'].tissues
-        cell_line_data = {}
+
         if not tissue_data:
             tissue_data = {}
+        
+        if gene in self.rna_data:
             for row in self.rna_data[gene]:
-                sample = row['sample']
-                is_cell_line = sample not in Config.TISSUE_TRANSLATION_MAP.keys()
-                if is_cell_line:
-                    if sample not in cell_line_data:
-                        cell_line_data[sample] = {'rna': {},
-                                                  }
-                    cell_line_data[sample]['rna']['value'] = row['value']
-                    cell_line_data[sample]['rna']['unit'] = row['unit']
-                else:
-                    if sample not in tissue_data:
-                        tissue_data[sample] = {'protein': {
+                sample = row['sample'].replace('1', '').replace('2', '').strip()
+                code = code_from_tissue(sample)
+                
+                if sample not in tissue_data:
+                    tissue_data[sample] = {'protein': {
                             'cell_type': {},
                             'level': 0,
                             'reliability': False,
                         },
-
+        
                             'rna': {
                             },
-                            'efo_code': Config.TISSUE_TRANSLATION_MAP[sample]}
-                    tissue_data[sample]['rna']['value'] = row['value']
-                    tissue_data[sample]['rna']['unit'] = row['unit']
-        return tissue_data, cell_line_data
+                            'efo_code': code
+                        }
+        
+                tissue_data[sample]['rna']['value'] = row['value']
+                tissue_data[sample]['rna']['unit'] = row['unit']
+                tissue_data[sample]['rna']['level'] = row['level']
+        
+        return tissue_data
 
     def set_translations(self):
         self.level_translation = {'Not detected': 0,
