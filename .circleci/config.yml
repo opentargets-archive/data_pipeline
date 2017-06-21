@@ -5,8 +5,8 @@ jobs:
     docker:
       - image: circleci/python:2.7
     environment:
-      - CTTV_MINIMAL=True
-      - IMAGE_NAME="mrtarget-circle-${CIRCLE_SHA1}"
+      CTTV_MINIMAL: True
+      IMAGE_NAME: "mrtarget-circle-${CIRCLE_SHA1}"
     steps:
       - checkout
       - restore_cache:
