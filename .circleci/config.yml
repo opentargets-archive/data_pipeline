@@ -41,6 +41,7 @@ jobs:
       - run:
           name: Build Docker image
           command: |
+            echo building image $IMAGE_NAME ...
             docker build -t $IMAGE_NAME .
       - run:
           name: Push to Quay
