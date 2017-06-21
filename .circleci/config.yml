@@ -6,19 +6,17 @@ jobs:
       - image: circleci/python:2.7
     environment:
       - CTTV_MINIMAL=True
+      - IMAGE_NAME="mrtarget-circle-${CIRCLE_SHA1}"
     steps:
       - checkout
-      - run:
-          command: |
-            sudo apt-get install -y gzip tar untar
       - restore_cache:
          keys: 
           # Find a cache corresponding to this specific requirements.txt checksum
           # when this file is changed, this key will fail
-          - mrt-py27-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          - mrt-py27-a-{{ .Branch }}-{{ checksum "requirements.txt" }}
           # Find a cache corresponding to any build in this branch, regardless of package.json
           # checksum.  The most recent one will be used.
-          - mrt-py27-{{ .Branch }}
+          - mrt-py27-a-{{ .Branch }}
       - run:
           name: Install requirements.txt
           command: |
@@ -29,7 +27,7 @@ jobs:
             pip uninstall -y requests
             pip install requests
       - save_cache:
-          key: mrt-py27-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          key: mrt-py27-a-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
             - "venv"
       - run:
@@ -43,24 +41,23 @@ jobs:
       - run:
           name: Build Docker image
           command: |
-            export NAME="mrtarget-circle-${CIRCLE_SHA1}"
-            docker build -t $NAME .
+            docker build -t $IMAGE_NAME .
       - run:
           name: Push to Quay
           command: |
             docker login -u="opentargets+quaybot" -p="${QUAYBOT_PASSWORD}" quay.io
-            docker tag $NAME ${QUAY_REPO}:${CIRCLE_BRANCH}
-            [ "$CIRCLE_BRANCH" = "master" ] && docker tag $NAME ${QUAY_REPO}:latest
-            docker tag $NAME ${QUAY_REPO}:$NAME
-            docker push ${QUAY_REPO}:$NAME
+            docker tag $IMAGE_NAME ${QUAY_REPO}:${CIRCLE_BRANCH}
+            [ "$CIRCLE_BRANCH" = "master" ] && docker tag $IMAGE_NAME ${QUAY_REPO}:latest
+            docker tag $IMAGE_NAME ${QUAY_REPO}:$IMAGE_NAME
+            docker push ${QUAY_REPO}:$IMAGE_NAME
       - run:
           name: Push to GCR
           command: |
             docker login -u _json_key -p $GCR_JSON_KEY_FILE https://eu.gcr.io
-            docker tag $NAME ${GCR_REPO}:${CIRCLE_BRANCH}
-            [ "$CIRCLE_BRANCH" = "master" ] && docker tag $NAME ${GCR_REPO}:latest
-            docker tag $NAME ${GCR_REPO}:$NAME
-            docker push ${GCR_REPO}:$NAME
+            docker tag $IMAGE_NAME ${GCR_REPO}:${CIRCLE_BRANCH}
+            [ "$CIRCLE_BRANCH" = "master" ] && docker tag $IMAGE_NAME ${GCR_REPO}:latest
+            docker tag $IMAGE_NAME ${GCR_REPO}:$IMAGE_NAME
+            docker push ${GCR_REPO}:$IMAGE_NAME
 
 # this could in theory work, but we need to persist the image somewhere
 # also we need to pay for > 1 container at the same time
