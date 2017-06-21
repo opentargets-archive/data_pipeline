@@ -28,14 +28,25 @@ jobs:
           command: |
             . venv/bin/activate
             mrtarget --dry-run
-      - setup_remote_docker
+      - setup_remote_docker:
+        reusable: true    # this allows caching, but may become a premium feature
+        exclusive: true
       - run:
-          name: Build and push Docker image
+          name: Build and tag Docker image
           command: |
             TAG="circle-${CIRCLE_BUILD_NUM}"
-            docker build -t eu.gcr.io/open-targets/mrtarget:$TAG .
+            [ "$CIRCLE_BRANCH" = "master" ] \
+              && export LATEST_FLAG=latest \
+              || export LATEST_FLAG=dev-latest
+            docker build -t ${GCR_REPO}:$TAG \
+              -t ${GCR_REPO}:${CIRCLE_BRANCH} \
+              -t ${GCR_REPO}:${LATEST_FLAG} .
+      - run:
+          name: Push to GCR
+          command: |
             docker login -u _json_key -p $GCR_JSON_KEY_FILE https://eu.gcr.io
-            docker push eu.gcr.io/open-targets/mrtarget:$TAG
+            docker push ${GCR_REPO}:$TAG
+
 
 #       - store_artifacts:
 #           path: /tmp/test-results
