@@ -22,7 +22,7 @@ jobs:
             pip install virtualenv
             virtualenv venv
             . venv/bin/activate
-            pip install -U --no-cache-dir -r requirements.txt
+            pip install -U -r requirements.txt
             pip uninstall -y requests
             pip install requests
       - save_cache:
@@ -42,14 +42,14 @@ jobs:
           command: |
             echo building image $IMAGE_NAME ...
             docker build -t mrtarget-circle-${CIRCLE_SHA1} .
-      - run:
-          name: Push to Quay
-          command: |
-            docker login -u="opentargets+quaybot" -p="${QUAYBOT_PASSWORD}" quay.io
-            docker tag mrtarget-circle-${CIRCLE_SHA1} ${QUAY_REPO}:${CIRCLE_BRANCH}
-            [ "$CIRCLE_BRANCH" = "master" ] && docker tag mrtarget-circle-${CIRCLE_SHA1} ${QUAY_REPO}:latest
-            docker tag mrtarget-circle-${CIRCLE_SHA1} ${QUAY_REPO}:mrtarget-circle-${CIRCLE_SHA1}
-            docker push ${QUAY_REPO}:mrtarget-circle-${CIRCLE_SHA1}
+      # - run:
+      #     name: Push to Quay
+      #     command: |
+      #       docker login -u="opentargets+quaybot" -p="${QUAYBOT_PASSWORD}" quay.io
+      #       docker tag mrtarget-circle-${CIRCLE_SHA1} ${QUAY_REPO}:${CIRCLE_BRANCH}
+      #       [ "$CIRCLE_BRANCH" = "master" ] && docker tag mrtarget-circle-${CIRCLE_SHA1} ${QUAY_REPO}:latest
+      #       docker tag mrtarget-circle-${CIRCLE_SHA1} ${QUAY_REPO}:mrtarget-circle-${CIRCLE_SHA1}
+      #       docker push ${QUAY_REPO}:mrtarget-circle-${CIRCLE_SHA1}
       - run:
           name: Push to GCR
           command: |
