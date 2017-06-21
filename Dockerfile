@@ -1,4 +1,5 @@
-FROM python:2.7-alpine
+FROM quay.io/opentargets/mrtarget_base
+# which is just python2.7 plus the spacy model
 
 WORKDIR /usr/src/app
 
