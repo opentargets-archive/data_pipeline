@@ -1,12 +1,12 @@
-FROM python:2.7
+FROM python:2.7-alpine
 
-RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
-# this should also copy the venv created by circleCI
-ADD . /usr/src/app/
+COPY requirements.txt ./
+# install fresh these requirements.
+RUN pip install --no-cache-dir -r requirements.txt
 
-# use the virtualenv 
-# a COMPLETE overkill in docker, but I am doing it to leverage the CircleCI
-# caching system
-CMD venv/bin/python -m mrtarget.CommandLine
+COPY . .
+
+CMD [ "python", "-m", "mrtarget.CommandLine" ]
+
