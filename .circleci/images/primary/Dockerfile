@@ -1,7 +1,7 @@
 FROM python:2.7
 
 # install docker client - necessary for docker in docker
-RUN apt-get install \
+RUN apt-get update && apt-get install \
      apt-transport-https \
      ca-certificates \
      curl \
