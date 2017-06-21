@@ -10,9 +10,15 @@ jobs:
       - checkout
       - run:
           command: |
-            sudo apt-get install -y gzip
+            sudo apt-get install -y gzip tar untar
       - restore_cache:
-         key: mrt-py27-{{ .Branch }}-{{ checksum "requirements.txt" }}
+         keys: 
+          # Find a cache corresponding to this specific requirements.txt checksum
+          # when this file is changed, this key will fail
+          - mrt-py27-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          # Find a cache corresponding to any build in this branch, regardless of package.json
+          # checksum.  The most recent one will be used.
+          - mrt-py27-{{ .Branch }}
       - run:
           name: Install requirements.txt
           command: |
