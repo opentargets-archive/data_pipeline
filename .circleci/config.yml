@@ -34,7 +34,7 @@ jobs:
           command: |
             TAG="circle-${CIRCLE_BUILD_NUM}"
             docker build -t eu.gcr.io/open-targets/mrtarget:$TAG .
-            docker login -u _json_key -p $GCR_JSON_KEY https://eu.gcr.io
+            docker login -u _json_key -p $GCR_JSON_KEY_FILE https://eu.gcr.io
             docker push eu.gcr.io/open-targets/mrtarget:$TAG
 
 #       - store_artifacts:
