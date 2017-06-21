@@ -9,4 +9,4 @@ ADD . /usr/src/app/
 # use the virtualenv 
 # a COMPLETE overkill in docker, but I am doing it to leverage the CircleCI
 # caching system
-CMD venv/bin/python
+CMD venv/bin/python -m mrtarget.CommandLine
