@@ -54,6 +54,7 @@ jobs:
             docker push ${GCR_REPO}:$NAME
 
 # this could in theory work, but we need to persist the image somewhere
+# also we need to pay for > 1 container at the same time
 # workflows:
 #   version: 2
 #   build_and_push:
