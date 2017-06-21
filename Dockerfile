@@ -3,11 +3,10 @@ FROM quay.io/opentargets/mrtarget_base
 
 WORKDIR /usr/src/app
 
-COPY requirements.txt ./
+COPY requirements.txt /usr/src/app
 # install fresh these requirements.
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY . /usr/src/app
 
 CMD [ "python", "-m", "mrtarget.CommandLine" ]
-
