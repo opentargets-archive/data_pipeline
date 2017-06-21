@@ -8,8 +8,11 @@ jobs:
       - CTTV_MINIMAL=True
     steps:
       - checkout
+      - run:
+          command: |
+            apt-get install -y gzip
       - restore_cache:
-         key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
+         key: mrt-py27-{{ .Branch }}-{{ checksum "requirements.txt" }}
       - run:
           name: Install requirements.txt
           command: |
@@ -20,7 +23,7 @@ jobs:
             pip uninstall -y requests
             pip install requests
       - save_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          key: mrt-py27-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
             - "venv"
       - run:
