@@ -29,23 +29,29 @@ jobs:
             . venv/bin/activate
             mrtarget --dry-run
       - setup_remote_docker:
-        reusable: true    # this allows caching, but may become a premium feature
-        exclusive: true
+          reusable: true    # this allows caching, but may become a premium feature
+          exclusive: true
       - run:
-          name: Build and tag Docker image
+          name: Build Docker image
           command: |
-            TAG="circle-${CIRCLE_BUILD_NUM}"
-            [ "$CIRCLE_BRANCH" = "master" ] \
-              && export LATEST_FLAG=latest \
-              || export LATEST_FLAG=dev-latest
-            docker build -t ${GCR_REPO}:$TAG \
-              -t ${GCR_REPO}:${CIRCLE_BRANCH} \
-              -t ${GCR_REPO}:${LATEST_FLAG} .
+            export NAME="mrtarget-circle-${CIRCLE_SHA1}"
+            docker build -t $NAME .
+      - run:
+          name: Push to Quay
+          command: |
+            docker login -u="opentargets+quaybot" -p="${QUAYBOT_PASSWORD}" quay.io
+            docker tag $NAME ${QUAY_REPO}:${CIRCLE_BRANCH}
+            [ "$CIRCLE_BRANCH" = "master" ] && docker tag $NAME ${QUAY_REPO}:latest
+            docker tag $NAME ${QUAY_REPO}:$NAME
+            docker push ${QUAY_REPO}:$NAME
       - run:
           name: Push to GCR
           command: |
             docker login -u _json_key -p $GCR_JSON_KEY_FILE https://eu.gcr.io
-            docker push ${GCR_REPO}:$TAG
+            docker tag $NAME ${GCR_REPO}:${CIRCLE_BRANCH}
+            [ "$CIRCLE_BRANCH" = "master" ] && docker tag $NAME ${GCR_REPO}:latest
+            docker tag $NAME ${QUAY_REPO}:$NAME
+            docker push ${GCR_REPO}:$NAME
 
 
 #       - store_artifacts:
