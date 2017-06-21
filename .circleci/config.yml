@@ -53,7 +53,7 @@ jobs:
       - run:
           name: Push to GCR
           command: |
-            docker login -u _json_key -p $GCR_JSON_KEY_FILE https://eu.gcr.io
+            docker login -u _json_key -p "${GCR_JSON_KEY_FILE}" https://eu.gcr.io
             docker tag $IMAGE_NAME ${GCR_REPO}:${CIRCLE_BRANCH}
             [ "$CIRCLE_BRANCH" = "master" ] && docker tag $IMAGE_NAME ${GCR_REPO}:latest
             docker tag $IMAGE_NAME ${GCR_REPO}:$IMAGE_NAME
