@@ -1,9 +1,9 @@
 version: 2
 jobs:
   build:
-    working_directory: ~/mrtarget
+    working_directory: /usr/src/app
     docker:
-      - image: circleci/python:2.7
+      - image: quay.io/opentargets/mrtarget_build_base:0.0.1
     environment:
       CTTV_MINIMAL: True
     steps:
@@ -19,20 +19,16 @@ jobs:
       - run:
           name: Install requirements.txt
           command: |
-            pip install virtualenv
-            virtualenv venv
-            . venv/bin/activate
             pip install -U -r requirements.txt
             pip uninstall -y requests
             pip install requests
       - save_cache:
           key: mrt-py27-a-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
-            - "venv"
+            - "/usr/local/lib/python2.7/site-packages"
       - run:
           name: Dry run to check imports
           command: |
-            . venv/bin/activate
             mrtarget --dry-run
       - setup_remote_docker:
           reusable: true    # this allows caching, but may become a premium feature
@@ -40,7 +36,6 @@ jobs:
       - run:
           name: Build Docker image
           command: |
-            echo building image $IMAGE_NAME ...
             docker build -t mrtarget-circle-${CIRCLE_SHA1} .
       # - run:
       #     name: Push to Quay
