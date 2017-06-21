@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /usr/src/app
     docker:
-      - image: quay.io/opentargets/mrtarget_build_base:0.0.1
+      - image: quay.io/opentargets/mrtarget_build_base:ep-circleci
     environment:
       CTTV_MINIMAL: True
     steps:
