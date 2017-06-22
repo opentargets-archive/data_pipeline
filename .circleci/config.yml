@@ -36,23 +36,29 @@ jobs:
       - run:
           name: Build Docker image
           command: |
-            docker build -t mrtarget-circle-${CIRCLE_SHA1} .
-      # - run:
-      #     name: Push to Quay
-      #     command: |
-      #       docker login -u="opentargets+quaybot" -p="${QUAYBOT_PASSWORD}" quay.io
-      #       docker tag mrtarget-circle-${CIRCLE_SHA1} ${QUAY_REPO}:${CIRCLE_BRANCH}
-      #       [ "$CIRCLE_BRANCH" = "master" ] && docker tag mrtarget-circle-${CIRCLE_SHA1} ${QUAY_REPO}:latest
-      #       docker tag mrtarget-circle-${CIRCLE_SHA1} ${QUAY_REPO}:mrtarget-circle-${CIRCLE_SHA1}
-      #       docker push ${QUAY_REPO}:mrtarget-circle-${CIRCLE_SHA1}
+            docker build -t circle-${CIRCLE_SHA1} .
       - run:
           name: Push to GCR
           command: |
             docker login -u _json_key -p "${GCR_JSON_KEY_FILE}" https://eu.gcr.io
-            docker tag mrtarget-circle-${CIRCLE_SHA1} ${GCR_REPO}:${CIRCLE_BRANCH}
-            [ "$CIRCLE_BRANCH" = "master" ] && docker tag mrtarget-circle-${CIRCLE_SHA1} ${GCR_REPO}:latest
-            docker tag mrtarget-circle-${CIRCLE_SHA1} ${GCR_REPO}:mrtarget-circle-${CIRCLE_SHA1}
-            docker push ${GCR_REPO}:mrtarget-circle-${CIRCLE_SHA1}
+            ## branch tag and push
+            docker tag circle-${CIRCLE_SHA1} ${GCR_REPO}:${CIRCLE_BRANCH}
+            docker push ${GCR_REPO}:${CIRCLE_BRANCH}
+            ## push latest if master
+            [ "$CIRCLE_BRANCH" = "master" ] \
+              && docker tag circle-${CIRCLE_SHA1} ${GCR_REPO}:latest \
+              && docker push ${GCR_REPO}:latest
+            ## circle SHA commit push
+            docker tag circle-${CIRCLE_SHA1} ${GCR_REPO}:circle-${CIRCLE_SHA1}
+            docker push ${GCR_REPO}:circle-${CIRCLE_SHA1}
+      - run:
+          name: Push to Quay
+          command: |
+            docker login -u="opentargets+quaybot" -p="${QUAYBOT_PASSWORD}" quay.io
+            docker tag circle-${CIRCLE_SHA1} ${QUAY_REPO}:${CIRCLE_BRANCH}
+            [ "$CIRCLE_BRANCH" = "master" ] && docker tag circle-${CIRCLE_SHA1} ${QUAY_REPO}:latest
+            docker tag circle-${CIRCLE_SHA1} ${QUAY_REPO}:circle-${CIRCLE_SHA1}
+            docker push ${QUAY_REPO}:circle-${CIRCLE_SHA1}
 
 # this could in theory work, but we need to persist the image somewhere
 # also we need to pay for > 1 container at the same time
