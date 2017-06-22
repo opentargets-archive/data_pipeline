@@ -33,7 +33,7 @@ jobs:
       - run:
           name: Run Scoring tests
           command: |
-            nosetests tests/test_score.py
+            pytest tests/test_score.py
   # uncomment this to use workflows (see below)
   # push_containers:
   #   working_directory: /usr/src/app
