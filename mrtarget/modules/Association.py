@@ -381,9 +381,6 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                                                             redis_path=r_path,
                                                             queue_out=target_disease_pair_q)
 
-        self.target_disease_pair_q = target_disease_pair_q
-
-
     def process(self, data):
         target = data
 
@@ -454,7 +451,6 @@ class ScoreProducer(RedisQueueWorkerProcess):
     def init(self):
         super(ScoreProducer, self).init()
         self.scorer = Scorer()
-        super(ScoreProducer, self).init()
         self.lookup_data.set_r_server(self.r_server)
 
     def process(self, data):
@@ -493,7 +489,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 disease_data = EFO()
                 try:
                     disease_data.load_json(
-                        self.lookup_data.available_efos.get_efo(disease))
+                        self.lookup_data.available_efos.get_efo(disease, self.r_server))
 
                 except KeyError, e:
                     self.logger.debug('Cannot find EFO code "%s" '
