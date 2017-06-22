@@ -48,15 +48,18 @@ jobs:
             [ "$CIRCLE_BRANCH" = "master" ] \
               && docker tag circle-${CIRCLE_SHA1} ${GCR_REPO}:latest \
               && docker push ${GCR_REPO}:latest
-            ## circle SHA commit push
-            docker tag circle-${CIRCLE_SHA1} ${GCR_REPO}:circle-${CIRCLE_SHA1}
+            ## SHA commit push
+            docker tag ${GCR_REPO}:${CIRCLE_BRANCH} ${GCR_REPO}:circle-${CIRCLE_SHA1}
             docker push ${GCR_REPO}:circle-${CIRCLE_SHA1}
       - run:
           name: Push to Quay
           command: |
             docker login -u="opentargets+quaybot" -p="${QUAYBOT_PASSWORD}" quay.io
+            ## branch tag and push
             docker tag circle-${CIRCLE_SHA1} ${QUAY_REPO}:${CIRCLE_BRANCH}
+            docker push ${QUAY_REPO}:${CIRCLE_BRANCH}
             [ "$CIRCLE_BRANCH" = "master" ] && docker tag circle-${CIRCLE_SHA1} ${QUAY_REPO}:latest
+            ## sha commit push
             docker tag circle-${CIRCLE_SHA1} ${QUAY_REPO}:circle-${CIRCLE_SHA1}
             docker push ${QUAY_REPO}:circle-${CIRCLE_SHA1}
 
