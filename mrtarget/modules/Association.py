@@ -381,7 +381,6 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                                                             redis_path=r_path,
                                                             queue_out=target_disease_pair_q)
 
-        self.es_query = ESQuery()
         self.target_disease_pair_q = target_disease_pair_q
 
 
@@ -426,6 +425,13 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                     break
             self.put_into_queue_out((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
+        
+    def init(self):
+        super(TargetDiseaseEvidenceProducer, self).init()
+        self.es_query = ESQuery()
+
+    def close(self):
+        super(TargetDiseaseEvidenceProducer, self).close()
 
 
 
@@ -446,6 +452,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
         self.lookup_data = lookup_data
 
     def init(self):
+        super(ScoreProducer, self).init()
         self.scorer = Scorer()
         super(ScoreProducer, self).init()
         self.lookup_data.set_r_server(self.r_server)
@@ -514,7 +521,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         self.q = score_q
         self.chunk_size = chunk_size
         self.dry_run = dry_run
-        self.es = es
+        self.es = None
         self.loader = None
  
 
@@ -535,8 +542,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 
     def init(self):
         super(ScoreStorerWorker, self).init()
-        self.loader = Loader(self.es,
-                             chunk_size=self.chunk_size,
+        self.loader = Loader(chunk_size=self.chunk_size,
                              dry_run=self.dry_run)
                
     def close(self):
