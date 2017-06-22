@@ -21,6 +21,7 @@ from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
 from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common.connection import PipelineConnectors
 
 
 logger = logging.getLogger(__name__)
@@ -808,8 +809,8 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'somatic_mutation':
                 frequency = 1.
                 if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
-                    sample_total_coverage =  0.
-                    max_sample_size = 0.
+                    sample_total_coverage = 1.
+                    max_sample_size = 1.
                     for mutation in self.evidence['evidence']['known_mutations']:
                         if 'number_samples_with_mutation_type' in mutation:
                             sample_total_coverage += int(mutation['number_samples_with_mutation_type'])
@@ -1149,7 +1150,7 @@ class EvidenceStringProcess():
         data_processing_lock = multiprocessing.Lock()
         data_storage_lock = multiprocessing.Lock()
 
-        workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        workers_number = Config.WORKERS_NUMBER
 
         '''create workers'''
         scorers = [EvidenceProcesser(input_q,

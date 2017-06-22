@@ -3,21 +3,24 @@ from __future__ import absolute_import
 from contextlib import contextmanager
 import gzip
 import zipfile
+import logging
 import petl as p
 import io
 import tempfile as tmp
 import requests as r
+import jsonschema as jss
+import json
 # import urllib2 as u2
 
+_l = logging.getLogger(__name__)
 
 def url_to_stream(url, *args, **kwargs):
-    '''request a url using requests pkg and pass *args and
-    **kwargs to requests.get function (useful for proxies)
-    and returns the filled file descriptor from a
-    tempfile.NamedTemporaryFile
+    '''request a url using requests pkg and pass *args and **kwargs to
+    requests.get function (useful for proxies) and returns the filled file
+    descriptor from a tempfile.NamedTemporaryFile
 
-    If you want to stream a raw uri (and not compressed) use the
-    parameter `enable_stream=True`
+    If you want to stream a raw uri (and not compressed) use the parameter
+    `enable_stream=True`
     '''
     f = r.get(url, *args, stream=True, **kwargs)
     f.raise_for_status()
@@ -32,39 +35,37 @@ def url_to_stream(url, *args, **kwargs):
 
 
 @contextmanager
-def url_to_tmpfile(url, *args, **kwargs):
-    '''request a url using requests pkg and pass *args and
-    **kwargs to requests.get function (useful for proxies)
-    and returns the filled file descriptor from a
-    tempfile.NamedTemporaryFile
+def url_to_tmpfile(url, delete=True, *args, **kwargs):
+    '''request a url using requests pkg and pass *args and **kwargs to
+    requests.get function (useful for proxies) and returns the filled file
+    descriptor from a tempfile.NamedTemporaryFile
     '''
     f = None
 
-    if url.startswith('ftp'):
-        # TODO unfinished but not necessary at the moment
-        # proxy_support = u2.ProxyHandler({})
-        # opener = u2.build_opener(proxy_support)
-        # req = u2.Request(url, *args, **kwargs)
-        # f = opener.open(req)
-        raise NotImplemented('finish ftp')
+    if url.startswith('ftp://'):
+        raise NotImplementedError('finish ftp')
+
+    elif url.startswith('file://') or ('://' not in url):
+        filename = url[len('file://'):] if '://' in url else url
+        with open(filename, mode="r+b") as f:
+            yield f
+
     else:
         f = r.get(url, *args, stream=True, **kwargs)
         f.raise_for_status()
 
-    with tmp.NamedTemporaryFile(mode='r+w+b', delete=True) as fd:
-        # write data into file in streaming fashion
-        for block in f.iter_content(1024):
-            fd.write(block)
+        with tmp.NamedTemporaryFile(mode='r+w+b', delete=delete) as fd:
+            # write data into file in streaming fashion
+            for block in f.iter_content(1024):
+                fd.write(block)
 
-        fd.seek(0)
-        try:
+            fd.seek(0)
             yield fd
-        finally:
-            fd.close()
-            f.close()
+
+        f.close()
 
 
-class URLZSource():
+class URLZSource(object):
     def __init__(self, *args, **kwargs):
         '''A source extension for petl python package
         Just in case you need to use proxies for url use it as normal
@@ -74,7 +75,7 @@ class URLZSource():
         >>> # if Config.HAS_PROXY:
         ...    # self.proxies = {"http": Config.PROXY,
         ...                      # "https": Config.PROXY}
-        >>> # with URLZSource('http://var.foo/noname.csv',proxies=proxies) as f:
+        >>> # with URLZSource('http://var.foo/noname.csv',proxies=proxies).open() as f:
         >>> from __futures__ import absolute_import
         >>> import petl as p
         >>> t = p.fromcsv(mpetl.URLZSource('https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'), delimiter='|')
@@ -105,9 +106,10 @@ class URLZSource():
         if not mode.startswith('r'):
             raise p.errors.ArgumentError('source is read-only')
 
+        zf = None
+
         with url_to_tmpfile(*self.args, **self.kwargs) as f:
             buf = f
-            zf = None
 
             if self.args[0].endswith('.gz'):
                 zf = gzip.GzipFile(fileobj=buf)
@@ -119,10 +121,72 @@ class URLZSource():
             else:
                 zf = buf
 
-            try:
-                yield zf
-            finally:
-                zf.close()
+            yield zf
+        zf.close()
+
+
+def generate_validator_from_schema(schema_uri):
+    '''load a uri, build and return a jsonschema validator'''
+    with URLZSource(schema_uri).open() as r_file:
+        js_schema = json.load(r_file)
+
+    validator = jss.validators.validator_for(js_schema)
+    return validator(schema=js_schema)
+
+
+def generate_validators_from_schemas(schemas_map):
+    '''return a dict of schema names and validators using the function
+    `generate_validator_from_schema`'''
+    validators = {}
+    for schema_name, schema_uri in schemas_map.iteritems():
+        # per kv we create the validator and instantiate it
+        validators[schema_name] = generate_validator_from_schema(schema_uri)
+
+    return validators
+
+
+class LogAccum(object):
+    def __init__(self, logger_o, elem_limit=1024):
+        self._logger = logger_o
+        self._accum = {'counter': 0}
+        self._limit = elem_limit
+    
+    def _flush(self, force=False):
+        if force or self._accum['counter'] >= self._limit:
+            keys = set(self._accum.iterkeys()) - set(['counter'])
+            
+            for k in keys:
+                for msg in self._accum[k]:
+                    self._logger.log(k, msg[0], *msg[1])
+            # reset the accum
+            self._accum = {'counter': 0}
+            
+    def flush(self, force=True):
+        self._flush(force)
+    
+    def log(self, level, message, *args):
+        if level in self._accum:
+            self._accum[level].append((message, args))
+        else:
+            self._accum[level] = [(message, args)]
+        
+        self._accum['counter'] += 1
+        self._flush()
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.flush(True)
+    
+
+def require_all(*predicates):
+    r_all = all(predicates)
+    if not r_all:
+        print 'ERROR require_all failed checking all predicates true'
+        _l.error('require_all failed checking all predicates true')
+        
+def require_any(*predicates):
+    r_any = any(predicates)
+    if not r_any:
+        _l.error('requre_any failed checking at least one predicate true')
 
 
 class Actions():

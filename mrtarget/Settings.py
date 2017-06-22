@@ -1,6 +1,7 @@
 import uuid
 from collections import defaultdict
 import os
+import re
 import json
 import ConfigParser
 import pkg_resources as res
@@ -9,8 +10,34 @@ import mrtarget
 import petl
 import multiprocessing as mp
 import tempfile
+import logging
 
 from mrtarget.common import URLZSource
+
+logger = logging.getLogger(__name__)
+
+
+def from_expression_to_map(filename):
+    '''return a dict with 2 dicts and organ and tissue called as said'''
+    ret = {}
+    try:
+        agg = {}
+        agg['tissues'] = ('tissue_name','tissue_id'), dict
+        t = petl.fromcsv(URLZSource(filename),delimiter='|')
+        t_agg = petl.aggregate(t, key=['organ_name','organ_id'], aggregation=agg)
+        
+        ret['organ'] = dict(t_agg.cut('organ_name','organ_id').data().tol())
+        ret['tissue'] = {}
+        
+        for e in t_agg.cut('tissues').data():
+            ret['tissue'].update(e[0])
+    
+    except Exception:
+        logger.error('impossible to generate the inverse mapping dict for uberon'
+                     ' mapping file so either the url or content is not correct')
+        
+    finally:
+        return ret
 
 
 def build_uniprot_query(l):
@@ -104,8 +131,15 @@ def read_option(option, cast=None, ini=ini, section='dev',
         except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
             return default_value
 
+def update_schema_version(config, schema_version_string):
+    config.EVIDENCEVALIDATION_SCHEMA = schema_version_string
+    for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS.iterkeys():
+        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
+                                                              schema_version_string)
 
-class Config():
+
+class Config():  
+    EV_LIMIT = read_option('CTTV_EV_LIMIT', cast=bool, default=False)
     MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
 
@@ -128,7 +162,7 @@ class Config():
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.04')
+    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.06')
 
     # [elasticsearch]
 
@@ -147,7 +181,7 @@ class Config():
     # )
 
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
-                                      default=['http://127.0.0.1:9200'])
+                                      default=[])
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -202,22 +236,36 @@ class Config():
         '4932':'yeast'
     }
 
-    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
-    TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
-                                               delimiter='|').data().tol())
+    # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
+    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
+    TISSUE_TRANSLATION_MAP = from_expression_to_map(TISSUE_TRANSLATION_MAP_URL)
 
     HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
     HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')
     HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
-    HPA_RNA_URL = ini.get(INI_SECTION, 'hpa_baseline')
+    HPA_RNA_LEVEL_URL = ini.get(INI_SECTION, 'hpa_rna_level')
+    HPA_RNA_VALUE_URL = ini.get(INI_SECTION, 'hpa_rna_value')
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = ini.get(INI_SECTION, 'ensembl_reactome')
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
     REACTOME_PATHWAY_DATA = ini.get(INI_SECTION, 'reactome_pathways')
     REACTOME_PATHWAY_RELATION = ini.get(INI_SECTION, 'reactome_pathways_rel')
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
-    EVIDENCEVALIDATION_SCHEMA = "1.2.5"
+    EVIDENCEVALIDATION_SCHEMA = 'master'
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
+
+    EVIDENCEVALIDATION_VALIDATOR_SCHEMAS = {
+        'genetic_association': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/genetics.json',
+        'rna_expression': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/expression.json',
+        'genetic_literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'affected_pathway': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'somatic_mutation': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'known_drug': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
+        'literature_mining': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'animal_model': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
+    }
+
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
     EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
     EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
@@ -243,9 +291,15 @@ class Config():
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk', 'bpalka@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk', 'cyenyxe@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_FILENAME_REGEX = r".*cttv[0-9]{3}.*\-\d{2}\-\d{2}\-\d{4}(\.json\.gz|\.json)$"
+    EVIDENCEVALIDATION_FILENAME_REGEX = re.compile(r"""
+    (?P<datasource>[a-zA-Z0-9_]+)(\-
+    (?P<d1>\d{2})\-
+    (?P<d2>\d{2})\-
+    (?P<d3>\d{4}))?
+    (?P<suffix>\.json\.gz|\.json|\.json\.zip)$""", re.VERBOSE)
 
-    # setup the number of workers to use for data processing. if None defaults to the number of CPUs available
+    # setup the number of workers to use for data processing. if None defaults
+    # to the number of CPUs available
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
 
@@ -325,13 +379,16 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION = 88
+    ENSEMBL_RELEASE_VERSION = 89
     ENSEMBL_CHUNK_SIZE = 100
 
-    # see http://stackoverflow.com/a/847866
-    TEMP_DIR = tempfile.gettempdir()
+    TEMP_DIR = os.path.sep + 'tmp'
 
     REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
+    
+    # 
+    REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
+        read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 

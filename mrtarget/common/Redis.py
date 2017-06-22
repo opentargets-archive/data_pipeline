@@ -3,7 +3,10 @@
 
 import base64
 import ujson as json
+from collections import Counter
+
 import jsonpickle
+from mrtarget.common import require_all
 jsonpickle.set_preferred_backend('ujson')
 import logging
 import uuid
@@ -47,38 +50,43 @@ def millify(n):
         millidx=max(0, min(len(millnames) - 1,
                            int(np.math.floor(np.math.log10(abs(n)) / 3))))
         return '%.1f%s'%(n/10**(3*millidx),millnames[millidx])
-    except Exception, e:
+    except Exception:
         return str(n)
 
 class RedisQueue(object):
-    '''
-    A simple pickable FIFO queue based on a Redis backend.
+    '''A simple pickable FIFO queue based on a Redis backend.
 
-    Once the queue is initialised, add messages with the :func:`self.put` method.
-    If the maximum size of the queue is reached the queue will block until some elements are picked up from the queue.
-    Once the message submission is done, you can signal it to the queue with the :func:`self.submission_finished`
-    method.
-    Every pickable object is accepted and it will be stored as a pickled string in redis.
-    When a message is put in the queue a key is generated and put in self.main_queue.
-    The pickled string is stored in a different key with the pattern described by self.VALUE_STORE.
+    Once the queue is initialised, add messages with the :func:`self.put`
+    method. If the maximum size of the queue is reached the queue will block
+    until some elements are picked up from the queue. Once the message
+    submission is done, you can signal it to the queue with the
+    :func:`self.submission_finished` method. Every pickable object is accepted
+    and it will be stored as a pickled string in redis. When a message is put
+    in the queue a key is generated and put in self.main_queue. The pickled
+    string is stored in a different key with the pattern described by
+    self.VALUE_STORE.
 
-    Once a client request a message with the :func:`self.get` method a the message key is taken from self.main_queue and
-    put in the self.processing_queue with a timestamp.
-    If the client is able to process the message it should signal it with the :func:`self.done` method, eventually
-    flagging if there was a processing error.
+    Once a client request a message with the :func:`self.get` method a the
+    message key is taken from self.main_queue and put in the
+    self.processing_queue with a timestamp. If the client is able to process
+    the message it should signal it with the :func:`self.done` method,
+    eventually flagging if there was a processing error.
 
-    It is possible to detect jobs that were picked up but not completed in time with the :func:`self.get_timedout_jobs`
-    and resubmit them in the queue with the :func:`self.put_back_timedout_jobs` method.
+    It is possible to detect jobs that were picked up but not completed in time
+    with the :func:`self.get_timedout_jobs` and resubmit them in the queue with
+    the :func:`self.put_back_timedout_jobs` method.
 
 
-    Once done (completely or partially) the :func:`self.close` method must be called to clean up data stored in redis.
+    Once done (completely or partially) the :func:`self.close` method must be
+    called to clean up data stored in redis.
 
-    It is safe to pass the object to a worker if a redis server :param r_server: is not passed when the RedisQueue
-    Object is initialised.
-    In this case a :param r_server: (typically instantiated in the worker process) needs to be passed when calling
-    the methods.
+    It is safe to pass the object to a worker if a redis server :param
+    r_server: is not passed when the RedisQueue Object is initialised. In this
+    case a :param r_server: (typically instantiated in the worker process)
+    needs to be passed when calling the methods.
 
-    Given the job-process oriented design by default keys stored in redis will expire in 2 days
+    Given the job-process oriented design by default keys stored in redis will
+    expire in 2 days
 
     '''
 
@@ -103,12 +111,13 @@ class RedisQueue(object):
                  serialiser = 'pickle'):
         '''
         :param queue_id: queue id to attach to preconfigured queues
-        :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
-                             will not be pickable
-        :param max_size: maximum size of the queue. queue will block if full, and allow put only if smaller than the
-                         maximum size.
-        :param serialiser: choose the serialiser backend: json (use ujson, default) jsonpickle (use ujson) else will
-                           use pickle
+        :param r_server: a redis.Redis instance to be used in methods. If
+                             supplied the RedisQueue object will not be
+                             pickable
+        :param max_size: maximum size of the queue. queue will block if full,
+                         and allow put only if smaller than the maximum size.
+        :param serialiser: choose the serialiser backend: json (use ujson,
+                           default) jsonpickle (use ujson) else will use pickle
         :return:
         '''
         if not queue_id:
@@ -239,8 +248,6 @@ class RedisQueue(object):
         r_server = self._get_r_server(r_server)
         if timeout is None:
             timeout = self.job_timeout
-        if not r_server:
-            r_server = self.r_server
         timedout_jobs = [i[0] for i in r_server.zrange(self.processing_key, 0, -1, withscores=True) if time.time() - i[1] > timeout]
         if timedout_jobs:
             logger.debug('%i jobs timedout jobs in queue %s'%(len(timedout_jobs), self.queue_id))
@@ -325,7 +332,7 @@ class RedisQueue(object):
         return r_server.getbit(self.submission_done, 1)
 
     def is_empty(self, r_server=None):
-        return self.get_size(r_server) == 0
+        return self.get_size(self._get_r_server(r_server)) == 0
 
     def is_done(self, r_server=None):
         r_server = self._get_r_server(r_server)
@@ -340,16 +347,9 @@ class RedisQueue(object):
         return False
 
     def _get_r_server(self, r_server=None):
-        if not r_server:
-            r_server = self.r_server
-        if r_server is None:
-            try:
-               r_server = Redis(Config.REDISLITE_DB_PATH)
-            except:
-                raise AttributeError('A redis server is required either at class instantiation or at the method level')
-        return r_server
-
-
+        return r_server if r_server else self.r_server
+    
+    
 class RedisQueueStatusReporter(Process):
     '''
     Cyclically logs the status of a list RedisQueue objects
@@ -367,7 +367,9 @@ class RedisQueueStatusReporter(Process):
                  ):
         super(RedisQueueStatusReporter, self).__init__()
         self.queues = queues
-        self.r_server = Redis(Config.REDISLITE_DB_PATH)
+        # self.r_server = Redis(Config.REDISLITE_DB_PATH)
+        self.r_server = Redis(host=Config.REDISLITE_DB_HOST,
+                              port=Config.REDISLITE_DB_PORT)
         self.interval = interval
         self.logger = logging.getLogger(__name__)
         self.history = history
@@ -393,7 +395,7 @@ class RedisQueueStatusReporter(Process):
         self.logger.info("reporter worker started")
 
         self.bars = {}
-        for i,q in enumerate(self.queues):
+        for _, q in enumerate(self.queues):
             queue_id = self._simplify_queue_id(q.queue_id)
             self.bars[q.queue_id] = dict(
                                          submitted_counter=tqdm(desc='%s received jobs [batch size: %i]'%(queue_id,q.batch_size),
@@ -402,6 +404,7 @@ class RedisQueueStatusReporter(Process):
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
                                                                 # position=queue_position+0,
+                                                                disable=self.logger.level == logging.DEBUG
                                                                 ),
                                          processed_counter=tqdm(desc='%s processed jobs [batch size: %i]'%(queue_id,q.batch_size),
                                                                 unit=' jobs',
@@ -409,6 +412,7 @@ class RedisQueueStatusReporter(Process):
                                                                 total=q.get_total(self.r_server),
                                                                 dynamic_ncols=True,
                                                                 # position=queue_position+1,
+                                                                disable=self.logger.level == logging.DEBUG
                                                                 ),
                                          last_status = None
                                         )
@@ -425,8 +429,7 @@ class RedisQueueStatusReporter(Process):
             self.historical_data['machine_status']['memory_use'].append(round(memory_load.used / (1024 * 1024 * 1024), 2))  # Gb of used memory
             self.log_machine_status()
             ''' get queue(s) data'''
-            for i,q in enumerate(self.queues):
-                queue_position = i * 3
+            for _, q in enumerate(self.queues):
                 data = q.get_status(self.r_server)
                 self.log(data)
                 last_data = self.bars[q.queue_id]['last_status']
@@ -629,7 +632,7 @@ def get_redis_worker(base = Process):
             super(RedisQueueWorkerBase, self).__init__()
             self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
             self.queue_out = queue_out
-            self.r_server = Redis(redis_path, serverconfig={'save': []})
+            self.redis_path = redis_path
             self.auto_signal = auto_signal_submission_finished
             self.queue_in_as_batch = queue_in.batch_size >1
             if self.queue_out:
@@ -637,10 +640,14 @@ def get_redis_worker(base = Process):
             self.logger = logging.getLogger(__name__)
             self.logger.info('%s started' % self.name)
             self.job_result_cache = []
+            self.kill_switch = False
 
 
         def run(self):
-            while not self.queue_in.is_done(r_server=self.r_server):
+            # here we are inside the new process
+            self._init()
+            
+            while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
                 job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
                 if job is not None:
@@ -675,11 +682,12 @@ def get_redis_worker(base = Process):
             if (self.queue_out is not None) and self.auto_signal:
                 self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
 
-            self.close()
+            # closing everything properly before exiting the spawned process/thread
+            self._close()
 
-        def _split_iterable(self, input, size):
-                for i in range(0, len(input), size):
-                    yield input[i:i + size]
+        def _split_iterable(self, item_list, size):
+                for i in range(0, len(item_list), size):
+                    yield item_list[i:i + size]
 
         def put_into_queue_out(self, result, aggregated_input = False ):
             if result is not None:
@@ -703,9 +711,12 @@ def get_redis_worker(base = Process):
             self.queue_out.put(self.job_result_cache, self.r_server)
             self.job_result_cache = []
 
+        def init(self):
+            pass
+            
         def close(self):
             '''
-            implement in subclass to clean up loaders and other trailing elements when the processer is done
+            implement in subclass to clean up loaders and other trailing elements when the processer is done if needed
             :return:
             '''
             pass
@@ -713,26 +724,136 @@ def get_redis_worker(base = Process):
         def process(self, data):
             raise NotImplementedError('please add an implementation to process the data')
 
+        def _init(self):
+            # self.r_server = Redis(self.redis_path, serverconfig={'save': []})
+            self.r_server = Redis(host=Config.REDISLITE_DB_HOST,
+                                  port=Config.REDISLITE_DB_PORT)
+            self.init()
+        
+        def _close(self):
+            self.close()
+
         def __enter__(self):
             pass
 
         def __exit__(self, *args):
-            self.close()
+            pass
+            
+        def get_r_server(self):
+            return self.r_server
 
     return RedisQueueWorkerBase
+
 
 RedisQueueWorkerProcess = get_redis_worker()
 RedisQueueWorkerThread = get_redis_worker(base=Thread)
 
 
+class WhiteCollarWorker(Thread):
+    '''
+    spawns and monitors a set of workers
+    '''
+
+    def __init__(self,
+                 target,
+                 pool_size,
+                 queue_in,
+                 redis_path,
+                 queue_out=None,
+                 args=[],
+                 kwargs={},
+                 max_restart=3):
+        super(WhiteCollarWorker, self).__init__()
+        self.daemon = True
+        self.target = target
+        self.workers_instances = {}
+        self.pool_size = pool_size
+        self.queue_in = queue_in
+        self.queue_out = queue_out
+        self.redis_path = redis_path
+        self.args = args
+        self.kwargs = kwargs
+        self.max_restarts=max_restart
+        self.restart_log = Counter()
+        self.logger = logging.getLogger(__name__)
+
+
+
+    def run(self):
+        '''
+        starts the pool of workers, monitor the registered instances, tries to restart them if needed, 
+        and wait for all the workers to be finished before returning
+        :return: 
+        '''
+
+        #TODO: create just one
+        for i in range(self.pool_size):
+            worker = self.target(self.queue_in,
+                                 self.redis_path,
+                                 self.queue_out,
+                                 *self.args,
+                                 **self.kwargs)
+            self.start_worker(worker,i)
+            
+
+        #TODO: check queue and scale up workers if needed
+        while self.workers_instances:
+            for n, p in self.workers_instances.items():
+                if p is not None:
+                    if  p.is_alive():
+                        continue #worker still running
+                    else:
+                        if p.exitcode is None:
+                            self.logger.error('%s is not finished and not running as if it was never started' % p.name)
+                        elif p.exitcode != 0: #worker exted with error
+                            self.logger.error('Worker %s ended with an error or terminated. exitcode: %s' % (p.name, str(p.exitcode)))
+                            if self.restart_log[n] < self.max_restarts:
+                                self.logger.info('Restarting failed worker instance number %i' % n)
+                                worker= self.target(self.queue_in,
+                                                    self.redis_path,
+                                                    self.queue_out,
+                                                    *self.args,
+                                                    **self.kwargs)
+                                self.start_worker(worker, n)
+                                self.restart_log[n] += 1
+                            else:
+                                self.logger.error('Gave up on restarting worker instance number %i' % n)
+                                del self.workers_instances[n]
+                        elif p.exitcode == 0:  #worker completed fine
+                            del self.workers_instances[n]
+            time.sleep(0.2)
+
+    def kill_all(self):
+        '''
+        send a kill signal to all the workers nicely
+        
+        :return: 
+        '''
+        for _, p in self.workers_instances.items():
+            self.logger.debug('setting kill switch on for worker %s', p.name)
+            p.kill_switch = True
+
+    def start_worker(self, worker, i):
+        memory_load = psutil.virtual_memory().percent
+        if memory_load < self.MAX_MEMORY_LEVEL:
+            self.logger.debug('Spawning a new worker of type: %s, index %i. Memory level: %s' % (self.target, i, str(memory_load)))
+            worker.start()
+            time.sleep(0.2)#or worker.join(1)
+            self.workers_instances[i] = worker
+        else:
+            worker.terminate()
+            self.logger.warning('Not enough memory to spawn a new worker of type: %s, index %i' % (self.target, i))
+            self.workers_instances[i] = None
 
 class RedisLookupTable(object):
     '''
-    Simple Redis-based key value store for string-based objects.
-    Faster than its subclasses since it does not serialise and unseriliase strings.
-    By default keys will expire in 2 days.
+    Simple Redis-based key value store for string-based objects. Faster than
+    its subclasses since it does not serialise and unseriliase strings. By
+    default keys will expire in 2 days.
 
-    Allows to store a lookup table (key/value store) in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
+    Allows to store a lookup table (key/value store) in memory/redis so that it
+    can be accessed quickly from multiple processes, reducing memory usage by
+    sharing.
     '''
 
     LOOK_UPTABLE_NAMESPACE = 'lookuptable:%(namespace)s'
@@ -744,42 +865,41 @@ class RedisLookupTable(object):
                  ttl = 60*60*24+2):
         if namespace is None:
             namespace = uuid.uuid4()
-        self.namespace = self.LOOK_UPTABLE_NAMESPACE % dict(namespace = namespace)
-        self.r_server = r_server
+        self.namespace = self.LOOK_UPTABLE_NAMESPACE % {'namespace': namespace}
+        self.r_server = Redis(host=Config.REDISLITE_DB_HOST,
+                              port=Config.REDISLITE_DB_PORT)
         self.default_ttl = ttl
-
+        
+        require_all(self.r_server is not None)
 
     def set(self, key, obj, r_server = None, ttl = None):
         # if not (isinstance(obj, str) or isinstance(obj, unicode)):
         #     raise AttributeError('Only str and unicode types are accepted as object value. Use the \
         #     RedisLookupTablePickle subclass for generic objects.')
-        r_server = self._get_r_server(r_server)
-        r_server.setex(self._get_key_namespace(key),
+        self._get_r_server(r_server).setex(self._get_key_namespace(key),
                               self._encode(obj),
                               ttl or self.default_ttl)
 
     def get(self, key, r_server = None):
-        r_server = self._get_r_server(r_server)
-        value = r_server.get(self._get_key_namespace(key))
+        server = self._get_r_server(r_server)
+        value = server.get(self._get_key_namespace(key))
         if value is not None:
             return self._decode(value)
         raise KeyError(key)
 
 
     def keys(self, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return [key.replace(self.namespace+':','') for key in r_server.keys(self.namespace+'*')]
+        return [key.replace(self.namespace+':','') \
+                for key in self._get_r_server(r_server).keys(self.namespace+'*')]
 
+    def set_r_server(self, r_server):
+        self.r_server = r_server
 
     def _get_r_server(self, r_server = None):
-        if not r_server:
-            r_server = self.r_server
-        if r_server is None:
-            raise AttributeError('A redis server is required either at class instantation or at the method level')
-        return r_server
+        return r_server if r_server else self.r_server
 
-    def _get_key_namespace(self, key):
-        return self.KEY_NAMESPACE % dict(namespace = self.namespace, key = key)
+    def _get_key_namespace(self, key, r_server=None):
+        return self.KEY_NAMESPACE % {'namespace': self.namespace, 'key': key}
 
     def _encode(self, obj):
         return obj
@@ -787,16 +907,17 @@ class RedisLookupTable(object):
     def _decode(self, obj):
         return obj
 
-    def __contains__(self, key, r_server = None):
-        if not r_server:
-            r_server = self.r_server
-        return r_server.exists(self._get_key_namespace(key))
+    def __contains__(self, key, r_server=None):
+        server = self._get_r_server(r_server)
+        return server.exists(self._get_key_namespace(key))
 
-    def __getitem__(self, key,r_server=None):
-        self.get(self._get_key_namespace(key), r_server)
+    def __getitem__(self, key, r_server=None):
+        self.get(self._get_key_namespace(key),
+                 r_server=self._get_r_server(r_server))
 
-    def __setitem__(self, key, value, r_server=None):
-        self.set(self._get_key_namespace(key), value, r_server)
+    def __setitem__(self, key, value,  r_server=None):
+        self.set(self._get_key_namespace(key), value,
+                 r_server=self._get_r_server(r_server))
 
 
 class RedisLookupTableJson(RedisLookupTable):
