@@ -381,10 +381,6 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                                                             redis_path=r_path,
                                                             queue_out=target_disease_pair_q)
 
-        self.es_query = ESQuery()
-        self.target_disease_pair_q = target_disease_pair_q
-
-
     def process(self, data):
         target = data
 
@@ -426,6 +422,13 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                     break
             self.put_into_queue_out((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
+        
+    def init(self):
+        super(TargetDiseaseEvidenceProducer, self).init()
+        self.es_query = ESQuery()
+
+    def close(self):
+        super(TargetDiseaseEvidenceProducer, self).close()
 
 
 
@@ -446,8 +449,8 @@ class ScoreProducer(RedisQueueWorkerProcess):
         self.lookup_data = lookup_data
 
     def init(self):
-        self.scorer = Scorer()
         super(ScoreProducer, self).init()
+        self.scorer = Scorer()
         self.lookup_data.set_r_server(self.r_server)
 
     def process(self, data):
@@ -477,8 +480,9 @@ class ScoreProducer(RedisQueueWorkerProcess):
                                                                self.r_server))
                     score.set_hpa_data(hpa_data)
 
-                except KeyError as ke:
-                    self.logger.exception('hpa code %s with %s', target, str(ke))
+                except KeyError:
+                    self.logger.error('hpa code %s was not found in hpa',
+                                      target)
 
                 except Exception as e:
                     self.logger.exception(e)
@@ -486,7 +490,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 disease_data = EFO()
                 try:
                     disease_data.load_json(
-                        self.lookup_data.available_efos.get_efo(disease))
+                        self.lookup_data.available_efos.get_efo(disease, self.r_server))
 
                 except KeyError, e:
                     self.logger.debug('Cannot find EFO code "%s" '
@@ -514,7 +518,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         self.q = score_q
         self.chunk_size = chunk_size
         self.dry_run = dry_run
-        self.es = es
+        self.es = None
         self.loader = None
  
 
@@ -535,8 +539,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 
     def init(self):
         super(ScoreStorerWorker, self).init()
-        self.loader = Loader(self.es,
-                             chunk_size=self.chunk_size,
+        self.loader = Loader(chunk_size=self.chunk_size,
                              dry_run=self.dry_run)
                
     def close(self):
@@ -587,9 +590,10 @@ class ScoringProcess():
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER
-        number_of_storers = number_of_workers
+        # too many storers
+        number_of_storers = min(4, number_of_workers)
         queue_per_worker = 250
-        if targets and len(targets) <number_of_workers:
+        if targets and len(targets) < number_of_workers:
             number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
                               max_size=number_of_workers*5,

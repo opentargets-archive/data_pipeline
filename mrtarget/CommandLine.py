@@ -175,7 +175,7 @@ def main():
         if args.hpa or run_full_pipeline:
             do_all = (HPAActions.ALL in args.hpa) or run_full_pipeline
             if (HPAActions.PROCESS in args.hpa) or do_all:
-                HPAProcess(loader).process_all()
+                HPAProcess(loader,connectors.r_server).process_all(dry_run=args.dry_run)
         if args.rea or run_full_pipeline:
             do_all = (ReactomeActions.ALL in args.rea) or run_full_pipeline
             if (ReactomeActions.PROCESS in args.rea) or do_all:

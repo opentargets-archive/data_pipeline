@@ -10,8 +10,34 @@ import mrtarget
 import petl
 import multiprocessing as mp
 import tempfile
+import logging
 
 from mrtarget.common import URLZSource
+
+logger = logging.getLogger(__name__)
+
+
+def from_expression_to_map(filename):
+    '''return a dict with 2 dicts and organ and tissue called as said'''
+    ret = {}
+    try:
+        agg = {}
+        agg['tissues'] = ('tissue_name','tissue_id'), dict
+        t = petl.fromcsv(URLZSource(filename),delimiter='|')
+        t_agg = petl.aggregate(t, key=['organ_name','organ_id'], aggregation=agg)
+        
+        ret['organ'] = dict(t_agg.cut('organ_name','organ_id').data().tol())
+        ret['tissue'] = {}
+        
+        for e in t_agg.cut('tissues').data():
+            ret['tissue'].update(e[0])
+    
+    except Exception:
+        logger.error('impossible to generate the inverse mapping dict for uberon'
+                     ' mapping file so either the url or content is not correct')
+        
+    finally:
+        return ret
 
 
 def build_uniprot_query(l):
@@ -136,7 +162,7 @@ class Config():
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.04')
+    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.06')
 
     # [elasticsearch]
 
@@ -210,14 +236,15 @@ class Config():
         '4932':'yeast'
     }
 
-    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
-    TISSUE_TRANSLATION_MAP = dict(petl.fromcsv(URLZSource(TISSUE_TRANSLATION_MAP_URL),
-                                               delimiter='|').data().tol())
+    # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
+    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
+    TISSUE_TRANSLATION_MAP = from_expression_to_map(TISSUE_TRANSLATION_MAP_URL)
 
     HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
     HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')
     HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
-    HPA_RNA_URL = ini.get(INI_SECTION, 'hpa_baseline')
+    HPA_RNA_LEVEL_URL = ini.get(INI_SECTION, 'hpa_rna_level')
+    HPA_RNA_VALUE_URL = ini.get(INI_SECTION, 'hpa_rna_value')
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = ini.get(INI_SECTION, 'ensembl_reactome')
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
@@ -352,7 +379,7 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION = 88
+    ENSEMBL_RELEASE_VERSION = 89
     ENSEMBL_CHUNK_SIZE = 100
 
     TEMP_DIR = os.path.sep + 'tmp'
