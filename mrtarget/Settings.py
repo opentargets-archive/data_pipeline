@@ -162,7 +162,7 @@ class Config():
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.04')
+    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.06')
 
     # [elasticsearch]
 
@@ -379,7 +379,7 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION = 88
+    ENSEMBL_RELEASE_VERSION = 89
     ENSEMBL_CHUNK_SIZE = 100
 
     TEMP_DIR = os.path.sep + 'tmp'
