@@ -41,6 +41,7 @@ jobs:
   #     - image: quay.io/opentargets/mrtarget_build_base:ep-circleci
   #   steps:
   #     - checkout
+      - setup_remote_docker
       - run:
           name: Build Docker image
           command: |
