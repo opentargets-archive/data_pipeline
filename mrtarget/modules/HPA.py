@@ -26,7 +26,7 @@ def code_from_tissue(tissue_name):
         tid = t2m[tissue_name]
     except KeyError:
         logger = logging.getLogger(__name__)
-        logger.error('the tissue name %s was not found in the mapping', 
+        logger.debug('the tissue name %s was not found in the mapping', 
                      tissue_name)
         tid = tissue_name
         
@@ -370,9 +370,9 @@ class HPAProcess():
                             'efo_code': code
                         }
         
-                tissue_data[sample]['rna']['value'] = row['value']
+                tissue_data[sample]['rna']['value'] = float(row['value'])
                 tissue_data[sample]['rna']['unit'] = row['unit']
-                tissue_data[sample]['rna']['level'] = row['level']
+                tissue_data[sample]['rna']['level'] = int(row['level'])
         
         return tissue_data
 
