@@ -1,4 +1,4 @@
-[![wercker status](https://app.wercker.com/status/e2b4ec985b6d6f6945fe9dd54441bca6/m/master "wercker status")](https://app.wercker.com/project/byKey/e2b4ec985b6d6f6945fe9dd54441bca6)
+[![CircleCI](https://circleci.com/gh/opentargets/data_pipeline.svg?style=svg&circle-token=e368180959ed512016dbfe75ec65814e896e0aea)](https://circleci.com/gh/opentargets/data_pipeline)
 
 ## This package is called MrT-arget
 
