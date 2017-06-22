@@ -30,15 +30,13 @@ jobs:
           name: Dry run to check imports
           command: |
             mrtarget --dry-run
-  push_containers:
-    working_directory: /usr/src/app
-    docker:
-      - image: quay.io/opentargets/mrtarget_build_base:ep-circleci
-    steps:
-      - checkout
-      - setup_remote_docker:
-          reusable: true    # this allows caching, but may become a premium feature
-          exclusive: true
+  # uncomment this to use workflows (see below)
+  # push_containers:
+  #   working_directory: /usr/src/app
+  #   docker:
+  #     - image: quay.io/opentargets/mrtarget_build_base:ep-circleci
+  #   steps:
+  #     - checkout
       - run:
           name: Build Docker image
           command: |
@@ -75,18 +73,17 @@ jobs:
                 docker tag ${QUAY_REPO}:${CIRCLE_BRANCH} ${QUAY_REPO}:latest
                 docker push ${QUAY_REPO}:latest
             fi
-            
 
-# using a workflow allows better separation of steps and rerunning them
-
-workflows:
-  version: 2
-  build_and_push:
-    jobs:
-      - build
-      - push_containers:
-          requires:
-            - build
+# using a workflow allows better separation of steps and rerunning them,
+# however it was slower when i tested it (Jun 2017)
+# workflows:
+#   version: 2
+#   build_and_push:
+#     jobs:
+#       - build
+#       - push_containers:
+#           requires:
+#             - build
 
 
 # Ideally, we would fan these out, but we would need to persist the docker image
