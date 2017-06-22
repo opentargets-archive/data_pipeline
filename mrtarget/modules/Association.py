@@ -480,8 +480,9 @@ class ScoreProducer(RedisQueueWorkerProcess):
                                                                self.r_server))
                     score.set_hpa_data(hpa_data)
 
-                except KeyError as ke:
-                    self.logger.exception('hpa code %s with %s', target, str(ke))
+                except KeyError:
+                    self.logger.error('hpa code %s was not found in hpa',
+                                      target)
 
                 except Exception as e:
                     self.logger.exception(e)
@@ -589,9 +590,10 @@ class ScoringProcess():
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER
-        number_of_storers = number_of_workers
+        # too many storers
+        number_of_storers = min(4, number_of_workers)
         queue_per_worker = 250
-        if targets and len(targets) <number_of_workers:
+        if targets and len(targets) < number_of_workers:
             number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
                               max_size=number_of_workers*5,
