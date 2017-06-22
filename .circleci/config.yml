@@ -12,10 +12,10 @@ jobs:
          keys: 
           # Find a cache corresponding to this specific requirements.txt checksum
           # when this file is changed, this key will fail
-          - mrt-py27-a-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          - mrt-py27-b-{{ .Branch }}-{{ checksum "requirements.txt" }}
           # Find a cache corresponding to any build in this branch, regardless of package.json
           # checksum.  The most recent one will be used.
-          - mrt-py27-a-{{ .Branch }}
+          - mrt-py27-b-{{ .Branch }}
       - run:
           name: Install requirements.txt
           command: |
@@ -23,9 +23,11 @@ jobs:
             pip uninstall -y requests
             pip install requests
       - save_cache:
-          key: mrt-py27-a-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          key: mrt-py27-b-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
             - "/usr/local/lib/python2.7/site-packages"
+            - "/usr/local/bin"
+            - "/usr/local/include/python2.7"
       - run:
           name: Dry run to check imports
           command: |
