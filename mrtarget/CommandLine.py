@@ -44,6 +44,9 @@ def main():
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
+    parser.add_argument('release-tag', nargs='?', default=Config.RELEASE_VERSION,
+                        help='The prefix to prepend default: %s' % \
+                        Config.RELEASE_VERSION)
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
                         action="append_const", const = Actions.ALL)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",

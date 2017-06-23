@@ -591,7 +591,7 @@ class ScoringProcess():
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER
         # too many storers
-        number_of_storers = min(4, number_of_workers)
+        number_of_storers = min(16, number_of_workers)
         queue_per_worker = 250
         if targets and len(targets) < number_of_workers:
             number_of_workers = len(targets)
