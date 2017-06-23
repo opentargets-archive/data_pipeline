@@ -162,7 +162,7 @@ def main():
     if args.do_nothing:
         sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
 
-    logger.info('Attempting to establish connection to the backend...')
+    logger.debug('Attempting to establish connection to the backend...')
     db_connected = connectors.init_services_connections(redispersist=args.redispersist)
 
 
