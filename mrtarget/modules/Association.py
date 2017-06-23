@@ -422,7 +422,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                     break
             self.put_into_queue_out((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
-        
+
     def init(self):
         super(TargetDiseaseEvidenceProducer, self).init()
         self.es_query = ESQuery()
