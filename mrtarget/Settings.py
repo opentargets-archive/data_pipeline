@@ -236,6 +236,8 @@ class Config():
         '4932':'yeast'
     }
 
+    OMIM_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/xref_mappings/omim_to_efo.txt'
+
     # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP = from_expression_to_map(TISSUE_TRANSLATION_MAP_URL)
@@ -306,7 +308,7 @@ class Config():
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
     # TODO remove refs to user directories
-    MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
+    MOUSEMODELS_CACHE_DIRECTORY = '/Users/otvisitor/.phenodigmcache'
 
     # hardcoded folder of json file to be preprocessed to extract
     # HP and MP terms not in EFO but that will be combined in a SLIM
