@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 import logging
 import sys
@@ -45,6 +46,9 @@ def main():
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
+    parser.add_argument('release_tag', nargs='?', default=Config.RELEASE_VERSION,
+                        help='The prefix to prepend default: %s' % \
+                        Config.RELEASE_VERSION)
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
                         action="append_const", const = Actions.ALL)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",
@@ -139,6 +143,13 @@ def main():
 
     args = parser.parse_args()
 
+    if not args.release_tag:
+        logger.error('A [release-tag] has to be specified.')
+        print('A [release-tag] has to be specified.', file=sys.stderr)
+        return 1
+    else:
+        Config.RELEASE_VERSION = args.release_tag
+
     targets = args.targets
 
     connectors = PipelineConnectors()
@@ -154,7 +165,7 @@ def main():
     if args.do_nothing:
         sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
 
-    logger.info('Attempting to establish connection to the backend...')
+    logger.debug('Attempting to establish connection to the backend...')
     db_connected = connectors.init_services_connections(redispersist=args.redispersist)
 
 
@@ -273,6 +284,7 @@ def main():
                 DumpGenerator().dump()
 
     connectors.close()
+    return 0
 
 
 @atexit.register
@@ -281,4 +293,4 @@ def shutdown_connections():
         connectors.close()
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

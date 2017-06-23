@@ -162,7 +162,7 @@ class Config():
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.06')
+    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='')
 
     # [elasticsearch]
 

@@ -422,7 +422,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                     break
             self.put_into_queue_out((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
-        
+
     def init(self):
         super(TargetDiseaseEvidenceProducer, self).init()
         self.es_query = ESQuery()
@@ -591,7 +591,7 @@ class ScoringProcess():
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER
         # too many storers
-        number_of_storers = min(4, number_of_workers)
+        number_of_storers = min(16, number_of_workers)
         queue_per_worker = 250
         if targets and len(targets) < number_of_workers:
             number_of_workers = len(targets)

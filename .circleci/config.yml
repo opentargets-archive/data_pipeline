@@ -31,7 +31,7 @@ jobs:
       - run:
           name: Dry run to check imports
           command: |
-            mrtarget --dry-run
+            mrtarget --dry-run citest
       - run:
           name: Run Scoring tests
           command: |
