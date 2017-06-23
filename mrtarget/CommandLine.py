@@ -145,7 +145,7 @@ def main():
         print('A [release-tag] has to be specified.', file=sys.stderr)
         return 1
     else:
-        logger.info('using the release tag %s', args.release_tag)
+        Config.RELEASE_VERSION = args.release_tag
 
     targets = args.targets
 
