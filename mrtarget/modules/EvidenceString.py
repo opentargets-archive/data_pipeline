@@ -775,7 +775,7 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'genetic_association':
                 score=0.
                 if 'gene2variant' in self.evidence['evidence']:
-                    if self.evidence['sourceID'] == 'phewas_catalog':
+                    if self.evidence['sourceID'] == 'phewascatalog':
                         no_of_cases = self.evidence['unique_association_fields']['cases']
                         score = self._score_phewascatalog(
                             self.evidence['evidence']['variant2disease']['resource_score']['value'],
