@@ -1,6 +1,11 @@
-[![wercker status](https://app.wercker.com/status/e2b4ec985b6d6f6945fe9dd54441bca6/m/master "wercker status")](https://app.wercker.com/project/byKey/e2b4ec985b6d6f6945fe9dd54441bca6)
+[![CircleCI](https://circleci.com/gh/opentargets/data_pipeline.svg?style=svg&circle-token=e368180959ed512016dbfe75ec65814e896e0aea)](https://circleci.com/gh/opentargets/data_pipeline)
 
-## This package is called MrT-arget
+Docker containers are saved on [quay.io](https://quay.io/repository/opentargets/mrtarget?tab=tags): 
+[![Docker Repository on Quay](https://quay.io/repository/opentargets/mrtarget/status?token=7cd783a9-247c-4625-ae97-e0933192b2f4 "Docker Repository on Quay")](https://quay.io/repository/opentargets/mrtarget)
+
+and [eu.gcr.io](https://console.cloud.google.com/gcr/images/open-targets/EU/mrtarget?project=open-targets)  (which has no badge sadly).
+
+## MrT-arget
 
 Practically, all code related with the computation of the process needed to
 complete the pipeline are here refactored into a proper package.
@@ -33,6 +38,32 @@ ELASTICSEARCH_NODES = [
     ]
 ```
 
+### Container users
+
+```sh
+docker run eu.gcr.io/open-targets/mrtarget:master mrtarget --dry-run
+## or using quay.io
+docker run quay.io/opentargets/mrtarget:master mrtarget --dry-run
+```
+You probably want to mount log files, etc like we do in our [backend machine](https://github.com/opentargets/infrastructure/blob/master/gcp/cloud-config/be-worker-cos.yaml):
+
+```sh
+docker run -d --name mrtarget_master \
+        -e TERM=xterm-256color \
+        -v `pwd`/data:/tmp/data \
+        -v `pwd`/output_master.log:/usr/src/app/output.log \
+        -v `pwd`/third_party_master.log:/usr/src/app/thirdparty.log \
+        -v `pwd`/db.ini:/usr/src/app/db.ini \
+        -v `pwd`/es_custom_idxs.ini:/usr/src/app/es_custom_idxs.ini \
+        -e CTTV_EL_LOADER=dev \
+        -e CTTV_DATA_VERSION=<dataversion> \
+        -e CTTV_DUMP_FOLDER=/tmp/data \
+        -e CTTV_ES_CUSTOM_IDXS=true \
+        eu.gcr.io/open-targets/mrtarget:master \
+        mrtarget --dry-run
+```
+
+
 ### Package developers
 
 Here the recipe to start coding on it:
@@ -51,10 +82,18 @@ $ mrtarget -h
 Now you are ready to contribute to this project. As note, the **resource files** are located in
 the folder `mrtarget/resources/`.
 
+Tests are run using pytest. For eg:
+```sh
+pytest tests/test_score.py
+```
+
+To skip running tests in the CI when pushing append `[skip ci]` to the commit message.
+
 ### Environment variables and howto use them
 
 Here the list to change, enable or disable functionality:
 
+* `CTTV_EV_LIMIT` string `true` to enable otherwise `false` or delete (WIP)
 * `CTTV_MINIMAL` string `true` to enable otherwise `false` or delete
 * `CTTV_DATA_VERSION` indexes prefix a name to enable otherwise `17.04`
 * `CTTV_EL_LOADER` the name of the section of the ES config file db.ini default `dev`
@@ -71,6 +110,11 @@ Here the list to change, enable or disable functionality:
 * `CTTV_ES_CUSTOM_IDXS` `true` to enable it and by default is `false`
 
 ## Internal features for developers
+
+### Evidence Validation (--val step) limit (WIP)
+
+It will give up if too many evidences were failed under schema validation. 1000 docs will be a 
+rasonable upper bound limit per launched process.
 
 ### Minimal dataset
 

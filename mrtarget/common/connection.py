@@ -29,7 +29,7 @@ class PipelineConnectors():
             os.remove(Config.REDISLITE_DB_PATH)
         time.sleep(2)
 
-    def init_services_connections(self, redispersist=False):
+    def init_services_connections(self, redispersist=True):
         '''init es client'''
         connection_attempt = 1
         success = False
@@ -55,7 +55,7 @@ class PipelineConnectors():
                     if connection_attempt >= 3:
                         raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES))
                     connection_attempt += 1
-                self.logger.info('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
+                self.logger.debug('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
                 success = True
             except ConnectionTimeout:
                 self.logger.exception("Elasticsearch connection timeout")
@@ -66,9 +66,17 @@ class PipelineConnectors():
 
         if not redispersist:
             self.clear_redislite_db()
-            self.logger.info('Clearing previous instances of redislite db...')
-        self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH),
-                              serverconfig={'save': [], 'maxclients': 10000})
-        self.logger.info('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
+            self.logger.debug('Clearing previous instances of redislite db...')
+        self.r_server = Redis(dbfilename=Config.REDISLITE_DB_PATH,
+                              serverconfig={'save': [],
+                                            'maxclients': 10000,
+                                            'port': str(Config.REDISLITE_DB_PORT)})
+        self.logger.debug('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
 
         return success
+
+    def close(self):
+        try:
+            self.r_server.shutdown()
+        except:
+            self.logger.exception('Could not shutdown redislite server')

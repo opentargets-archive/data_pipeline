@@ -1,7 +1,10 @@
-FROM python:2.7
+FROM quay.io/opentargets/mrtarget_base
+# which is just python2.7 plus the spacy model
 
-RUN apt-get update && apt-get install -y --no-install-recommends double-conversion && rm -rf /var/lib/apt/lists/*
-RUN pip install mrtarget
-RUN python -m spacy.en.download
+WORKDIR /usr/src/app
+COPY . /usr/src/app
 
-CMD [ "mrtarget", "--help" ]
+# install fresh these requirements.
+RUN pip install --no-cache-dir -r requirements.txt
+
+CMD [ "python", "-m", "mrtarget.CommandLine" ]

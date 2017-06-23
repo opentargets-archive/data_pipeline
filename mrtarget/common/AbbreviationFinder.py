@@ -1,3 +1,6 @@
+#!/usr/local/bin/python
+# -*- coding: UTF-8 -*-
+
 '''Link abbreviations to their full names | Optimised to find the longest definition
 
 
