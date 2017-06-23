@@ -43,14 +43,9 @@ def main():
     logging.config.fileConfig(file_or_resource('logging.ini'),
                               disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
-    
-    if not Config.RELEASE_VERSION:
-        logger.error('A [release-tag] has to be specified.')
-        print('A [release-tag] has to be specified.', file=sys.stderr)
-        return 1
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
-    parser.add_argument('release-tag', nargs='?', default=Config.RELEASE_VERSION,
+    parser.add_argument('release_tag', nargs='?', default=Config.RELEASE_VERSION,
                         help='The prefix to prepend default: %s' % \
                         Config.RELEASE_VERSION)
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
@@ -144,6 +139,13 @@ def main():
                         action='store', default='master')
 
     args = parser.parse_args()
+
+    if not args.release_tag:
+        logger.error('A [release-tag] has to be specified.')
+        print('A [release-tag] has to be specified.', file=sys.stderr)
+        return 1
+    else:
+        logger.info('using the release tag %s', args.release_tag)
 
     targets = args.targets
 
