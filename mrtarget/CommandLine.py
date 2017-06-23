@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 import logging
 import sys
@@ -42,6 +43,11 @@ def main():
     logging.config.fileConfig(file_or_resource('logging.ini'),
                               disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
+    
+    if not Config.RELEASE_VERSION:
+        logger.error('A [release-tag] has to be specified.')
+        print('A [release-tag] has to be specified.', file=sys.stderr)
+        return 1
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
     parser.add_argument('release-tag', nargs='?', default=Config.RELEASE_VERSION,
@@ -269,6 +275,7 @@ def main():
                 DumpGenerator().dump()
 
     connectors.close()
+    return 0
 
 
 @atexit.register
@@ -277,4 +284,4 @@ def shutdown_connections():
         connectors.close()
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
