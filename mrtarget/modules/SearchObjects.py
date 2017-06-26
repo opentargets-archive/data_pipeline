@@ -201,6 +201,8 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
         super(SearchObjectAnalyserWorker, self).__init__(queue,redis_path)
         self.queue = queue
         self.lookup = lookup
+        self.lookup.set_r_server(self.r_server)
+        
         self.loader = Loader(dry_run = dry_run)
         self.es_query = ESQuery(self.loader.es)
         # logging.info('%s started'%self.name)
@@ -288,7 +290,7 @@ class SearchObjectProcess(object):
         workers = [SearchObjectAnalyserWorker(queue,
                                               self.r_server.db,
                                               lookup=lookup_data,
-                                              dry_run=dry_run) for i in range(multiprocessing.cpu_count())]
+                                              dry_run=dry_run) for i in range(Config.WORKERS_NUMBER)]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()

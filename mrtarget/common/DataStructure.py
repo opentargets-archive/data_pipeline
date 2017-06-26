@@ -4,6 +4,7 @@ from UserDict import UserDict
 from datetime import datetime, date
 
 from mrtarget.Settings import Config
+from addict import Dict
 
 
 
@@ -26,6 +27,25 @@ def json_serialize(obj):
             return obj.__dict__
         except AttributeError:
             raise TypeError('Type not serializable')
+
+
+class JSONAddict(Dict):
+    def load_json(self, data):
+        self.update(json.loads(data))
+    
+    def to_json(self):
+        return json.dumps(self.__timestamp(self).to_dict(),
+                          default=json_serialize,
+                          sort_keys=True,
+                          # indent=4,
+                          cls=PipelineEncoder)
+    
+    @staticmethod
+    def __timestamp(data):
+        '''this method add the data_release key to the addict.Dict'''
+        data.data_release = Config.RELEASE_VERSION
+        return data
+
 
 class JSONSerializable(object):
     def to_json(self):

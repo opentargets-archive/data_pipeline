@@ -27,8 +27,8 @@ __email__      = ["gautierk@targetvalidation.org", "ckong@ebi.ac.uk"]
 __status__     = "Production"
 
 G2P_FILENAME = file_or_resource('DDG2P_14_5_2017.csv.gz')
-G2P_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_gene2phenotype-14-06-2017.json'
-G2P_EVIDENCE_FILENAME = '/Users/otvisitor/Documents/data/cttv001_gene2phenotype-16-06-2017.json'
+G2P_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_gene2phenotype-16-06-2017.json'
+#G2P_EVIDENCE_FILENAME = '/Users/otvisitor/Documents/data/cttv001_gene2phenotype-16-06-2017.json'
 
 class G2PActions(Actions):
     GENERATE_EVIDENCE = 'generateevidence'
@@ -49,6 +49,7 @@ class G2P():
             self._logger.error('no ensembl index found in ES. Skipping. Has the --ensembl step been run?')
 
         self.generate_evidence_strings(G2P_FILENAME)
+        self.write_evidence_strings(G2P_EVIDENCE_FILENAME)
 
     def _get_ensembl_data(self):
 
@@ -59,10 +60,14 @@ class G2P():
                         leave=False,
                         total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
 
-            ensg_id = row['id']
-            display_name = row['display_name']
-            display_name.rstrip()
-            self.symbol2ensembl[display_name] = ensg_id
+            '''
+                Ensure genes of other biotype i.e LRG_gene will not be included
+            '''
+            if row['biotype'] == 'protein_coding':
+                ensg_id = row['id']
+                display_name = row['display_name']
+                display_name.rstrip()
+                self.symbol2ensembl[display_name] = ensg_id
 
     def get_omim_to_efo_mappings(self):
         self._logger.info("OMIM to EFO parsing - requesting from URL %s" % Config.OMIM_TO_EFO_MAP_URL)
@@ -109,11 +114,7 @@ class G2P():
                             diseases = self.omim_to_efo_map[disease_mim]
 
                             for disease in diseases:
-                                self._logger.info(gene_symbol)
-                                self._logger.info(target)
-                                self._logger.info(disease_name)
-                                self._logger.info(disease['efo_uri'])
-                                #self._logger.info("%s %s %s %s"%(gene_symbol, target, disease_name, disease['efo_uri']))
+                                self._logger.info("%s %s %s %s"%(gene_symbol, target, disease_name, disease['efo_uri']))
 
                                 obj = opentargets.Literature_Curated(type='genetic_literature')
                                 provenance_type = evidence_core.BaseProvenance_Type(
@@ -186,8 +187,6 @@ class G2P():
 
 def main():
     g2p = G2P()
-    g2p.process_g2p()
-    g2p.write_evidence_strings(G2P_EVIDENCE_FILENAME)
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# coding: latin-1
+# -*- coding: UTF-8 -*-
 import gzip
 import io
 import logging
@@ -12,13 +12,15 @@ import ftputil as ftputil
 import requests
 from dateutil.parser import parse
 from lxml import etree,objectify
+from mrtarget.common.NLP import init_spacy_english_language
 from tqdm import tqdm
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle, \
+    WhiteCollarWorker, RedisQueueWorkerThread
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 
@@ -34,6 +36,7 @@ class LiteratureActions(Actions):
 MEDLINE_BASE_PATH = 'pubmed/baseline'
 MEDLINE_UPDATE_PATH = 'pubmed/updatefiles'
 EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE = 30000
+
 
 def ftp_connect(dir=MEDLINE_BASE_PATH):
     host = ftputil.FTPHost(Config.PUBMED_FTP_SERVER, 'anonymous', 'support@targetvalidation.org')
@@ -264,7 +267,7 @@ class Publication(JSONSerializable):
             self._process_authors()
         if self.abstract:
             self._sanitize_abstract()
-            self._split_sentences()
+            # self._split_sentences()
         if self.title or self.abstract:
             self._base_nlp()
         self._text_analyzers = None # to allow for object serialisation
@@ -334,7 +337,11 @@ class Publication(JSONSerializable):
 
     def _base_nlp(self):
         for analyzer in self._text_analyzers:
-            self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
+            try:
+                self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
+            except:
+                logger.exception("error in nlp analysis with %s analyser for text: %s"%(str(analyzer), self.get_text_to_analyze()))
+                self.text_mined_entities[str(analyzer)] = {}
 
 
 class LiteratureLookUpTable(object):
@@ -443,9 +450,9 @@ class MedlineRetriever(object):
                 self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
             self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
-        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        no_of_workers = Config.WORKERS_NUMBER
         ftp_readers = no_of_workers
-        max_ftp_readers = 8 #avoid too many connections errors
+        max_ftp_readers = no_of_workers/4 #avoid too many connections errors
         if ftp_readers >max_ftp_readers:
             ftp_readers = max_ftp_readers
 
@@ -456,14 +463,16 @@ class MedlineRetriever(object):
 
         # Parser Queue
         parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_parser',
-                                  max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                                  job_timeout=120)
+                              max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
+                              batch_size=1,
+                              job_timeout=1200)
 
         # ES-Loader Queue
         loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
+                              batch_size=1,
                               serialiser='pickle',
                               max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                              job_timeout=120)
+                              job_timeout=1200)
 
 
 
@@ -485,40 +494,35 @@ class MedlineRetriever(object):
             os.makedirs(pubmed_xml_locn)
 
         '''Start file-reader workers'''
-        retrievers = [PubmedFTPReaderProcess(retriever_q,
-                                          self.r_server.db,
-                                          parser_q,
-                                          self.dry_run,
-                                          update=update
-                                          )
-                      for i in range(ftp_readers)]
-
-        for w in retrievers:
-            w.start()
-
-
+        retrievers = WhiteCollarWorker(target=PubmedFTPReaderProcess,
+                                       pool_size=ftp_readers,
+                                       queue_in=retriever_q,
+                                       redis_path=self.r_server.db,
+                                       queue_out=parser_q,
+                                       kwargs=dict(dry_run=self.dry_run)
+                                       )
+        retrievers.start()
 
         'Start xml file parser workers'
-        parsers = [PubmedXMLParserProcess(parser_q,
-                                     self.r_server.db,
-                                     loader_q,
-                                     self.dry_run
-                                     )
-                   for i in range(no_of_workers)]
-
-        for w in parsers:
-            w.start()
+        parsers = WhiteCollarWorker(target=PubmedXMLParserProcess,
+                                    pool_size=no_of_workers,
+                                    queue_in=parser_q,
+                                    redis_path=self.r_server.db,
+                                    queue_out=loader_q,
+                                    kwargs = dict(dry_run=self.dry_run)
+                                    )
+        parsers.start()
 
         '''Start es-loader workers'''
         '''Fixed number of workers to reduce the overhead of creating ES connections for each worker process'''
-        loaders = [LiteratureLoaderProcess(loader_q,
-                                          self.r_server.db,
-                                          self.dry_run
-                                          )
-                   for i in range(no_of_workers/2 +1)]
+        loaders = WhiteCollarWorker(target=LiteratureLoaderProcess,
+                                    pool_size=no_of_workers/2 +1,
+                                    queue_in=loader_q,
+                                    redis_path=self.r_server.db,
+                                    kwargs=dict(dry_run=self.dry_run))
 
-        for w in loaders:
-            w.start()
+
+        loaders.start()
 
         # shift_downloading = 2
         if update:
@@ -538,14 +542,11 @@ class MedlineRetriever(object):
         host.close()
         retriever_q.set_submission_finished(r_server=self.r_server)
 
-        for r in retrievers:
-                r.join()
+        retrievers.join()
 
-        for p in parsers:
-                p.join()
+        parsers.join()
 
-        for l in loaders:
-                l.join()
+        loaders.join()
 
         logging.info('flushing data to index')
         if not self.dry_run:
@@ -614,7 +615,8 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 t = tqdm(desc = 'downloading %s via HTTP' % os.path.basename(file_path),
                          total = file_size,
                          unit = 'B',
-                         unit_scale = True)
+                         unit_scale = True,
+                         disable=self.logger.level == logging.DEBUG)
                 for chunk in response.iter_content(chunk_size=128):
                     file_handler.write(chunk)
                     t.update(len(chunk))
@@ -689,9 +691,17 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
-        from mrtarget.modules.LiteratureNLP import NounChuncker
-        self.analyzers = [NounChuncker()]
+        self._init_analyzers()
+        self.processed_counter = 0
 
+    def init(self):
+        self._init_analyzers()
+
+
+    def _init_analyzers(self):
+        from mrtarget.modules.LiteratureNLP import NounChuncker, DocumentAnalysisSpacy
+        self.nlp = init_spacy_english_language() #store it as class instance to make sure it is deleted if called again
+        self.analyzers = [NounChuncker(), DocumentAnalysisSpacy(self.nlp)]
 
     def process(self,data):
         record, filename = data
@@ -782,6 +792,12 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
         except etree.XMLSyntaxError as e:
             self.logger.error("Error parsing XML file {} - medline record {} %s".format(filename,record),e.message)
+        self.processed_counter+=1
+        if self.processed_counter%10000 == 0:
+            #restart spacy from scratch to free up memory
+            self._init_analyzers()
+            logger.debug('restarting analyzers after %i docs processed in worker %s'%(self.processed_counter, self.name))
+
 
     def parse_article_info(self, article, publication):
 
@@ -855,13 +871,16 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
     def __init__(self,
                  queue_in,
                  redis_path,
+                 queue_out = None,
                  dry_run=False):
-        super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path)
-        self.loader = Loader(chunk_size=10000, dry_run=dry_run)
+        super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path, queue_out)
+        self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
+
+    def init(self):
+        self.loader = Loader(chunk_size=1000, dry_run=self.dry_run)
         self.es = self.loader.es
         self.es_query = ESQuery(self.es)
-        self.start_time = time.time()  # reset timer start
-        self.logger = logging.getLogger(__name__)
 
 
     def process(self, data):
