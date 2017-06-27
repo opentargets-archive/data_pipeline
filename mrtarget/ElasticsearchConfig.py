@@ -857,9 +857,19 @@ class ElasticSearchConfiguration():
                                                 }
                                             },
                                         },
+                                        "dynamic_templates": [{
+                                            "label_not_indexed": {
+                                                "match_mapping_type": "string",
+                                                "path_match": "private.facets.expression_tissues.*.label",
+                                                "mapping": {
+                                                    "type": "string",
+                                                    "index": "not_analyzed"
+                                                }
+                                            }
+                                        }]
                                     }
                                 }
-                                }
+                            }
     search_obj_data_mapping = {
         "settings": {
             "number_of_shards": generic_shard_number,
