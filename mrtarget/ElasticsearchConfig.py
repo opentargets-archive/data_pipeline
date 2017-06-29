@@ -863,13 +863,13 @@ class ElasticSearchConfiguration():
                                                 "path_match": "private.facets.expression_tissues.*.label",
                                                 "mapping": {
                                                     "type": "string",
-                                                    "index": "analyzed",
-                                                    "fields": {
-                                                        "raw": {
-                                                            "type": "string",
-                                                            "index": "not_analyzed"
-                                                        }
-                                                    }
+                                                    "index": "not_analyzed"
+#                                                     "fields": {
+#                                                         "raw": {
+#                                                             "type": "string",
+#                                                             "index": "not_analyzed"
+#                                                         }
+#                                                     }
                                                 }
                                             }
                                         }]
