@@ -32,7 +32,7 @@ def code_from_tissue(tissue_name):
         # TODO the id has to be one word to not get splitted by the analyser
         # this is a temporal fix by the time we get all items mapped
         tid = tissue_name.strip().replace(' ', '_')
-        tid = re.sub('[^0-9a-zA-Z_]+', '_',tid)
+        tid = re.sub('[^0-9a-zA-Z_]+', '',tid)
 
     return tid
 
