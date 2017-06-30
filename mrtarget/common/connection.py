@@ -28,7 +28,7 @@ class PipelineConnectors():
         self.es = None
         self.r_server = None
         self.logger = logging.getLogger(__name__)
-        self.r_instance
+        self.r_instance = r_instance['instance']
 
     def init_services_connections(self, redispersist=False):
         '''init es client'''
