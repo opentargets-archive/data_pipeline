@@ -52,7 +52,8 @@ class GE(object):
     def process_all(self):
         self._logger.warning("Process all")
         #try:
-        lookup_data_types = (LookUpDataType.TARGET)
+
+        lookup_data_types = (LookUpDataType.TARGET,)
         self.lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=lookup_data_types,
