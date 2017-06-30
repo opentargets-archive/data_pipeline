@@ -385,6 +385,8 @@ class Config():
 
     TEMP_DIR = os.path.sep + 'tmp'
 
+    REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
+                                   cast=bool, default=False)
     REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
         read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
 
