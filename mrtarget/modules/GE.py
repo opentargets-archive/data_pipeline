@@ -4,11 +4,16 @@ import opentargets.model.evidence.core as evidence_core
 import opentargets.model.evidence.linkout as evidence_linkout
 import opentargets.model.evidence.association_score as association_score
 from mrtarget.common import Actions
+from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from tqdm import tqdm
+from elasticsearch.exceptions import NotFoundError
 import logging
+import datetime
 import csv
 import re
 import requests
 import urllib2
+import json
 #import requests_cache
 import urlparse
 from mrtarget.Settings import Config
@@ -25,11 +30,15 @@ class GenomicsEnglandActions(Actions):
 
 class GE(object):
 
-    def __init__(self):
+    def __init__(self, es=None, r_server=None):
+        self.es = es
+        self.r_server = r_server
+        self.lookup_data = None
         self.panel_app_info = list()
         self.high_confidence_mappings = dict()
         self.other_zooma_mappings = dict()
         self.omim_to_efo_map = dict()
+        self.symbol2ensembl = dict()
         self.zooma_to_efo_map = dict()
         self.phenotype_set = set()
         self.evidence_strings = list()
@@ -42,12 +51,44 @@ class GE(object):
 
     def process_all(self):
         self._logger.warning("Process all")
+        #try:
+        lookup_data_types = (LookUpDataType.TARGET)
+        self.lookup_data = LookUpDataRetriever(self.es,
+                                          self.r_server,
+                                          data_types=lookup_data_types,
+                                          autoload=True
+                                          ).lookup
+        for ensembl_id in self.lookup_data.available_genes.get_available_gene_ids():
+            gene = self.lookup_data.available_genes.get_gene(ensembl_id,
+                                                      self.r_server)
+            self.symbol2ensembl[gene["approved_symbol"]] = gene["ensembl_gene_id"]
+        #except NotFoundError:
+        #    self._logger.error('no ensembl index found in ES. Skipping. Has the --ensembl step been run?')
+        #    sys.exit(1)
         self.get_omim_to_efo_mappings()
         self.get_opentargets_zooma_to_efo_mappings()
         self.execute_ge_request()
         self.use_zooma()
         self.process_panel_app_file()
         self.write_evidence_strings(Config.GE_EVIDENCE_STRING)
+
+    def _get_ensembl_data(self):
+
+        for row in tqdm(self.esquery.get_all_ensembl_genes(),
+                        desc='loading Ensembl genes',
+                        unit_scale=True,
+                        unit='genes',
+                        leave=False,
+                        total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
+
+            '''
+                Ensure genes of other biotype i.e LRG_gene will not be included
+            '''
+            if row['biotype'] == 'protein_coding':
+                ensg_id = row['id']
+                display_name = row['display_name']
+                display_name.rstrip()
+                self.symbol2ensembl[display_name] = ensg_id
 
     def get_omim_to_efo_mappings(self):
         self._logger.info("OMIM to EFO parsing - requesting from URL %s" % Config.OMIM_TO_EFO_MAP_URL)
@@ -79,7 +120,7 @@ class GE(object):
             '''
             n +=1
             if n > 1:
-                self._logger.info("[%s]"%line)
+                #self._logger.info("[%s]"%line)
                 (study, bioentity, property_type, property_value, semantic_tag, annotator, annotation_date) = line.split("\t")
                 if property_value not in self.omim_to_efo_map:
                     self.zooma_to_efo_map[property_value] = []
@@ -105,12 +146,21 @@ class GE(object):
         '''
         self._logger.warning("execute_ge_request...")
         phenotype_list = []
+        nb_panels = 0
         for panel_name, panel_id in self.request_to_panel_app():
+            nb_panels +=1
             self._logger.warning("reading panel %s %s" % (panel_name, panel_id))
             url = 'https://bioinfo.extge.co.uk/crowdsourcing/WebServices/search_genes/all/'
             r = requests.get(url, params={"panel_name": panel_name})
             results = r.json()
             for item in results['results']:
+
+                ensembl_iri = None
+
+                if item['GeneSymbol'] in self.symbol2ensembl:
+                    ''' map gene symbol to ensembl '''
+                    target = self.symbol2ensembl[item['GeneSymbol']]
+                    ensembl_iri = "http://identifiers.org/ensembl/" + target
 
                 if item['EnsembleGeneIds'] and item['Phenotypes'] and item['LevelOfConfidence'] == 'HighEvidence':
                     for element in item['Phenotypes']:
@@ -120,7 +170,7 @@ class GE(object):
                             '''
                             First check whether it's an OMIM identifier
                             '''
-                            match_omim = re.match('^(\d+)$', element)
+                            match_omim = re.match('^(\d{6,})$', element)
                             if match_omim:
                                 omim_id = match_omim.groups()[0]
                                 self._logger.info("Found OMIM ID: %s" % (omim_id))
@@ -128,28 +178,48 @@ class GE(object):
                                     self._logger.info("Maps to EFO")
                                     for mapping in self.omim_to_efo_map[omim_id]:
                                         disease_label = mapping['efo_label']
+                                        disease_uri = mapping['efo_uri']
                                         self.panel_app_info.append([panel_name,
                                                                     panel_id,
                                                                     item['GeneSymbol'],
                                                                     item['EnsembleGeneIds'][0],
+                                                                    ensembl_iri,
                                                                     item['LevelOfConfidence'],
-                                                                    disease_label,
+                                                                    omim_id,
                                                                     item['Publications'],
                                                                     item['Evidences'],
-                                                                    [omim_id]
+                                                                    [omim_id],
+                                                                    disease_uri,
+                                                                    disease_label
                                                                     ])
                             else:
-                                omim_id = []
+                                omim_ids = []
                                 match_curly_brackets_omim = re.match('^{([^\}]+)},\s+(\d+)', element)
+                                match_no_curly_brackets_omim = re.match('^(.+),\s+(\d{6,})$', element)
+                                match_no_curly_brackets_omim_continued = re.match('^(.+),\s+(\d{6,})\s+.*$', element)
+                                # Myopathy, early-onset, with fatal cardiomyopathy 611705
+                                match_no_curly_brackets_no_comma_omim = re.match('^(.+)\s+(\d{6,})\s*$', element)
                                 if match_curly_brackets_omim:
                                     #[{Pancreatitis, idiopathic}, 167800]
                                     new_element = match_curly_brackets_omim.groups()[0]
-                                    omim_id.append(match_curly_brackets_omim.groups()[1])
+                                    omim_ids.append(match_curly_brackets_omim.groups()[1])
+                                elif match_no_curly_brackets_omim:
+                                    #[{Pancreatitis, idiopathic}, 167800]
+                                    new_element = match_no_curly_brackets_omim.groups()[0]
+                                    omim_ids.append(match_no_curly_brackets_omim.groups()[1])
+                                elif match_no_curly_brackets_omim_continued:
+                                    #[{Pancreatitis, idiopathic}, 167800]
+                                    new_element = match_no_curly_brackets_omim_continued.groups()[0]
+                                    omim_ids.append(match_no_curly_brackets_omim_continued.groups()[1])
+                                elif match_no_curly_brackets_no_comma_omim:
+                                    #[{Pancreatitis, idiopathic}, 167800]
+                                    new_element = match_no_curly_brackets_no_comma_omim.groups()[0]
+                                    omim_ids.append(match_no_curly_brackets_no_comma_omim.groups()[1])
                                 else:
                                     new_element = element.decode('iso-8859-1').encode('utf-8').strip()
                                     new_element = re.sub(r"\#", "", new_element)
                                     new_element = re.sub(r"\t", "", new_element)
-                                    omim_id = re.findall(r"\d{5}",new_element)
+                                    omim_ids = re.findall(r"\d{5}",new_element)
                                     new_element = re.sub(r"\d{5}", "", new_element)
                                     new_element = re.sub(r"\{", "", new_element)
                                     new_element = re.sub(r"\}", "", new_element)
@@ -158,24 +228,32 @@ class GE(object):
                                 '''
                                 if there is already an OMIM xref to EFO/Orphanet, no need to map
                                 '''
-                                if omim_id and all(l not in self.omim_to_efo_map for l in omim_id) and new_element not in self.zooma_to_efo_map:
-                                    self._logger.info("Unknown term: %s"%(new_element))
+                                disease_uri = None
+                                disease_label = None
+                                if omim_ids and all(l not in self.omim_to_efo_map for l in omim_ids) and new_element not in self.zooma_to_efo_map:
+                                    self._logger.info("Unknown term '%s' with unknown OMIM ID(s): %s"%(new_element, ";".join(omim_ids)))
                                     phenotype_list.append(new_element)
                                 else:
-                                    self._logger.info("IT S A MATCH")
-                                if omim_id is None:
-                                    omim_id = []
-                                self.map_omim[new_element] = omim_id
+                                    self._logger.info("THERE IS A MATCH")
+                                if omim_ids is None:
+                                    omim_ids = []
+                                self.map_omim[new_element] = omim_ids
                                 self.panel_app_info.append([panel_name,
                                                             panel_id,
                                                             item['GeneSymbol'],
                                                             item['EnsembleGeneIds'][0],
+                                                            ensembl_iri,
                                                             item['LevelOfConfidence'],
                                                             new_element,
                                                             item['Publications'],
                                                             item['Evidences'],
-                                                            omim_id
+                                                            omim_ids,
+                                                            disease_uri,
+                                                            disease_label
                                                             ])
+            #if nb_panels > 2:
+            #    break
+
             self.phenotype_set = set(phenotype_list)
         return self.phenotype_set
 
@@ -237,19 +315,23 @@ class GE(object):
         :return: None
         '''
         logger.info("Process panel app file")
+        now = datetime.datetime.now()
         for row in self.panel_app_info:
-            panel_name, panel_id, gene_symbol, ensemble_gene_ids, level_of_confidence, phenotype, publications, evidences = row
-            if phenotype in self.high_confidence_mappings:
-                disease_label = self.high_confidence_mappings[phenotype][phenotype]['label']
+            panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, phenotype, publications, evidences, omim_ids, disease_uri, disease_label = row
+            if len(omim_ids) > 0 and disease_uri:
+                self.generate_single_evidence(panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence,
+                                              phenotype, publications, evidences, omim_ids, disease_uri, disease_label, now)
+            elif phenotype in self.high_confidence_mappings:
+                disease_label = self.high_confidence_mappings[phenotype]['label']
                 disease_uri = self.high_confidence_mappings[phenotype]['uri']
-                self.generate_single_evidence(disease_uri, disease_label, publications=publications)
+                self.generate_single_evidence(panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, phenotype, publications, evidences, omim_ids, disease_uri , disease_label, now)
             elif phenotype in self.zooma_to_efo_map:
                 for item in self.zooma_to_efo_map[phenotype]:
                     disease_uri = item['efo_uri']
                     disease_label = "N/A"
-                    self.generate_single_evidence(disease_uri, disease_label, publications=publications)
+                    self.generate_single_evidence(panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, phenotype, publications, evidences, omim_ids, disease_uri , disease_label, now)
 
-    def generate_single_evidence(self, disease_uri, disease_label, publications):
+    def generate_single_evidence(self, panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, phenotype, publications, evidences, omim_ids, disease_uri , disease_label, now):
 
         single_lit_ref_list = []
         if publications is not None:
@@ -277,8 +359,8 @@ class GE(object):
         obj.sourceID = "genomics_england"
         obj.validated_against_schema_version = "1.2.6"
 
-        obj.unique_association_fields = {"panel_name": panel_name, "original_disease_name": disease_label, "panel_id": panel_id }
-        obj.target = bioentity.Target(id=target,
+        obj.unique_association_fields = {"panel_name": panel_name, "original_disease_name": disease_label, "panel_id": panel_id, "target_id": ensembl_iri }
+        obj.target = bioentity.Target(id=ensembl_iri,
                                       activity="http://identifiers.org/cttv.activity/predicted_damaging",
                                       target_type='http://identifiers.org/cttv.target/gene_evidence',
                                       target_name=gene_symbol)
@@ -312,7 +394,7 @@ class GE(object):
         obj.evidence.is_associated = True
         obj.evidence.evidence_codes = ["http://purl.obolibrary.org/obo/ECO_0000205"]
         obj.evidence.provenance_type = provenance_type
-        obj.evidence.date_asserted = '2016-11-25'
+        obj.evidence.date_asserted = now.isoformat()
         obj.evidence.provenance_type = provenance_type
         obj.evidence.resource_score = resource_score
         #specific

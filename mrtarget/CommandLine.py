@@ -231,7 +231,7 @@ def main():
             do_all = (GenomicsEnglandActions.ALL in args.gel) or run_full_pipeline
             if (GenomicsEnglandActions.GENERATE_EVIDENCE in args.gel) or do_all:
                 logger.warning("GenomicsEnglandActions...")
-                GE().process_all()
+                GE(es=connectors.es, r_server=connectors.r_server).process_all()
 
         if args.lit or run_full_pipeline:
             if LiteratureActions.FETCH in args.lit :
