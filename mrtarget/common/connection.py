@@ -1,13 +1,17 @@
 import logging
-import os
 import time
 import certifi
+import tempfile as tmp
 from elasticsearch import Elasticsearch, ConnectionTimeout
 from elasticsearch import RequestsHttpConnection
 from redislite import Redis
 
 from mrtarget.Settings import Config
 
+
+def new_redis_client():
+    return Redis(host=Config.REDISLITE_DB_HOST,
+                 port=Config.REDISLITE_DB_PORT)
 
 class PipelineConnectors():
 
@@ -21,15 +25,11 @@ class PipelineConnectors():
 
         ''' Redis '''
         self.r_server = None
+        self.r_instance = None
 
         self.logger = logging.getLogger(__name__)
 
-    def clear_redislite_db(self):
-        if os.path.exists(Config.REDISLITE_DB_PATH):
-            os.remove(Config.REDISLITE_DB_PATH)
-        time.sleep(2)
-
-    def init_services_connections(self, redispersist=True):
+    def init_services_connections(self, redispersist=False):
         '''init es client'''
         connection_attempt = 1
         success = False
@@ -64,19 +64,23 @@ class PipelineConnectors():
             self.logger.warn('No valid configuration available for elasticsearch')
             self.es = None
 
-        if not redispersist:
-            self.clear_redislite_db()
-            self.logger.debug('Clearing previous instances of redislite db...')
-        self.r_server = Redis(dbfilename=Config.REDISLITE_DB_PATH,
+        redis_db_file = tmp.NamedTemporaryFile(mode='r+w+b',
+                                               suffix='.rdb',
+                                               delete=(not redispersist))
+        self.logger.debug('new named temp file for redis %s with persist %s',
+                          redis_db_file.name, str(redispersist))
+
+        self.r_instance = Redis(dbfilename=redis_db_file,
                               serverconfig={'save': [],
                                             'maxclients': 10000,
                                             'port': str(Config.REDISLITE_DB_PORT)})
-        self.logger.debug('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
+        self.r_server = new_redis_client()
+        self.logger.debug('Established redislite at port %d', Config.REDISLITE_DB_PORT)
 
         return success
 
     def close(self):
         try:
-            self.r_server.shutdown()
+            self.r_instance.shutdown()
         except:
             self.logger.exception('Could not shutdown redislite server')

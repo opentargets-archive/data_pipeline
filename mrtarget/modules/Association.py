@@ -1,24 +1,17 @@
 import logging
-import multiprocessing
-from elasticsearch import Elasticsearch
-
 
 from tqdm import tqdm
-
 from mrtarget.common import Actions
-from mrtarget.common.DataStructure import JSONSerializable, denormDict, JSONAddict
+from mrtarget.common.DataStructure import JSONSerializable, denormDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter, RedisQueueWorkerThread
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter
 from mrtarget.modules.EFO import EFO
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
-from mrtarget.common.connection import PipelineConnectors
-
-
 
 
 global_reporting_step = 5e5
@@ -305,7 +298,7 @@ class Scorer():
                 ass.evidence_count['total']+=1
                 ass.evidence_count['datatypes'][e.datatype]+=1
                 ass.evidence_count['datasources'][e.datasource]+=1
-        
+
                 # set facet data
                 ass.set_available_datatype(e.datatype)
                 ass.set_available_datasource(e.datasource)
@@ -520,7 +513,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         self.dry_run = dry_run
         self.es = None
         self.loader = None
- 
+
 
 
     def process(self, data):
@@ -541,7 +534,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         super(ScoreStorerWorker, self).init()
         self.loader = Loader(chunk_size=self.chunk_size,
                              dry_run=self.dry_run)
-               
+
     def close(self):
         super(ScoreStorerWorker, self).close()
         self.loader.close()
@@ -627,7 +620,7 @@ class ScoringProcess():
                                      self.r_server.db,
                                      chunk_size=1000,
                                      dry_run = dry_run,
-                                     ) for i in range(number_of_storers)]
+                                     ) for _ in range(number_of_storers)]
 
         for w in storers:
             w.start()
@@ -636,7 +629,7 @@ class ScoringProcess():
                                  self.r_server.db,
                                  score_data_q,
                                  lookup_data,
-                                 ) for i in range(number_of_workers)]
+                                 ) for _ in range(number_of_workers)]
         for w in scorers:
             w.start()
 
@@ -645,7 +638,7 @@ class ScoringProcess():
         readers = [TargetDiseaseEvidenceProducer(target_q,
                                                  self.r_server.db,
                                                  target_disease_pair_q,
-                                                ) for i in range(number_of_workers*2)]
+                                                ) for _ in range(number_of_workers*2)]
         for w in readers:
             w.start()
 
