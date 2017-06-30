@@ -140,6 +140,7 @@ class HPADataDownloader():
         headers = t_level.header()
         t_level = petl.setheader(t_level,
                                 ['ID'] + [e.split('_')[1] \
+                                          if '_' in e else e \
                                     for e in headers if e != 'ID'])
         t_level = petl.melt(t_level, key='ID',
                             variablefield='sample',
@@ -150,6 +151,7 @@ class HPADataDownloader():
                                delimiter='\t')
         t_value = petl.setheader(t_value,
                                 ['ID'] + [e.split('_')[1] \
+                                          if '_' in e else e \
                                     for e in t_value.header() if e != 'ID'])
         t_value = petl.melt(t_value, key='ID',
                             variablefield='sample',
