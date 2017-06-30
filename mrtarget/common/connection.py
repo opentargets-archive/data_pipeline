@@ -71,9 +71,9 @@ class PipelineConnectors():
                           self.redis_db_file, str(redispersist))
 
         self.r_instance = Redis(dbfilename=self.redis_db_file,
-                              serverconfig={'save': [],
-                                            'maxclients': 10000,
-                                            'port': str(Config.REDISLITE_DB_PORT)})
+                                serverconfig={'save': [],
+                                              'maxclients': 10000,
+                                              'port': str(Config.REDISLITE_DB_PORT)})
 
         self.r_server = new_redis_client()
         self.logger.debug('Established redislite at port %s', str(Config.REDISLITE_DB_PORT))

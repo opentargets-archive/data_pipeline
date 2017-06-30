@@ -166,8 +166,9 @@ def main():
     if args.do_nothing:
         sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
 
-    logger.debug('Attempting to establish connection to the backend...')
-    _ = connectors.init_services_connections(redispersist=args.redispersist)
+    connected = connectors.init_services_connections(redispersist=args.redispersist)
+    logger.debug('Attempting to establish connection to the backend... %s',
+                 str(connected))
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
