@@ -1,6 +1,7 @@
 import logging
 import time
 import certifi
+import os
 import tempfile as tmp
 from elasticsearch import Elasticsearch, ConnectionTimeout
 from elasticsearch import RequestsHttpConnection
@@ -33,6 +34,7 @@ class PipelineConnectors():
         '''init es client'''
         connection_attempt = 1
         success = False
+        self.persist = redispersist
         hosts = Config.ELASTICSEARCH_NODES
         if hosts:
             self.es = Elasticsearch(hosts=hosts,
@@ -64,23 +66,23 @@ class PipelineConnectors():
             self.logger.warn('No valid configuration available for elasticsearch')
             self.es = None
 
-        redis_db_file = tmp.NamedTemporaryFile(mode='r+w+b',
-                                               suffix='.rdb',
-                                               delete=(not redispersist))
+        self.redis_db_file = tmp.mktemp(suffix='.rdb')
         self.logger.debug('new named temp file for redis %s with persist %s',
-                          redis_db_file.name, str(redispersist))
+                          self.redis_db_file, str(redispersist))
 
-        self.r_instance = Redis(dbfilename=redis_db_file,
+        self.r_instance = Redis(dbfilename=self.redis_db_file,
                               serverconfig={'save': [],
                                             'maxclients': 10000,
                                             'port': str(Config.REDISLITE_DB_PORT)})
+
         self.r_server = new_redis_client()
-        self.logger.debug('Established redislite at port %d', Config.REDISLITE_DB_PORT)
+        self.logger.debug('Established redislite at port %s', str(Config.REDISLITE_DB_PORT))
 
         return success
 
     def close(self):
         try:
             self.r_instance.shutdown()
+            os.remove(self.redis_db_file + '.settings')
         except:
             self.logger.exception('Could not shutdown redislite server')
