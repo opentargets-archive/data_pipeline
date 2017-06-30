@@ -75,7 +75,8 @@ class PipelineConnectors():
                                               'maxclients': 10000,
                                               'port': str(Config.REDISLITE_DB_PORT)})
 
-        self.r_server = new_redis_client()
+#         self.r_server = new_redis_client()
+        self.r_server = self.r_instance
         self.logger.debug('Established redislite at port %s', str(Config.REDISLITE_DB_PORT))
 
         return success
