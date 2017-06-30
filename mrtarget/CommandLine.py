@@ -40,7 +40,7 @@ def load_nlp_corpora():
 
 
 def main():
-    
+
     logging.config.fileConfig(file_or_resource('logging.ini'),
                               disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
@@ -81,8 +81,9 @@ def main():
                         action="append_const", const = SearchObjectActions.PROCESS)
     parser.add_argument("--ddr", dest='ddr', help="precompute data driven t2t and d2d relations",
                         action="append_const", const=DataDrivenRelationActions.PROCESS)
-    parser.add_argument("--persist-redis", dest='redispersist', help="use a fresh redislite db",
-                        action='store_true', default=True)
+    parser.add_argument("--persist-redis", dest='redispersist',
+                        help="the temporary file wont be deleted if True default: False",
+                        action='store_true', default=False)
     parser.add_argument("--musu", dest='mus', help="update mouse model data",
                         action="append_const", const = MouseModelsActions.UPDATE_CACHE)
     parser.add_argument("--musg", dest='mus', help="update mus musculus and home sapiens gene list",
@@ -165,10 +166,9 @@ def main():
     if args.do_nothing:
         sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
 
-    logger.debug('Attempting to establish connection to the backend...')
-    db_connected = connectors.init_services_connections(redispersist=args.redispersist)
-
-
+    connected = connectors.init_services_connections(redispersist=args.redispersist)
+    logger.debug('Attempting to establish connection to the backend... %s',
+                 str(connected))
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
@@ -179,11 +179,11 @@ def main():
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
                 dry_run = args.dry_run) as loader:
         run_full_pipeline = False
-        
+
         # get the schema version and change all needed resources
         update_schema_version(Config,args.schema_version)
         logger.info('setting schema version string to %s', args.schema_version)
-        
+
         if args.all and (Actions.ALL in args.all):
             run_full_pipeline = True
         if args.hpa or run_full_pipeline:

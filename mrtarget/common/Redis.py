@@ -7,6 +7,7 @@ from collections import Counter
 
 import jsonpickle
 from mrtarget.common import require_all
+from mrtarget.common.connection import new_redis_client
 jsonpickle.set_preferred_backend('ujson')
 import logging
 import uuid
@@ -24,8 +25,6 @@ except ImportError:
     import pickle
 import time
 from multiprocessing import Process
-from redislite import Redis
-from mrtarget.Settings import Config
 from colorama import Fore, Back, Style
 
 logger = logging.getLogger(__name__)
@@ -346,8 +345,8 @@ class RedisQueue(object):
 
     def _get_r_server(self, r_server=None):
         return r_server if r_server else self.r_server
-    
-    
+
+
 class RedisQueueStatusReporter(Process):
     '''
     Cyclically logs the status of a list RedisQueue objects
@@ -365,9 +364,7 @@ class RedisQueueStatusReporter(Process):
                  ):
         super(RedisQueueStatusReporter, self).__init__()
         self.queues = queues
-        # self.r_server = Redis(Config.REDISLITE_DB_PATH)
-        self.r_server = Redis(host=Config.REDISLITE_DB_HOST,
-                              port=Config.REDISLITE_DB_PORT)
+        self.r_server = new_redis_client()
         self.interval = interval
         self.logger = logging.getLogger(__name__)
         self.history = history
@@ -625,7 +622,7 @@ def get_redis_worker(base = Process):
                      ):
 
 
-            super(RedisQueueWorkerBase, self).__init__()
+            super(RedisQueueWorkerBase, self).__init__(**kwargs)
             self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
             self.queue_out = queue_out
             self.redis_path = redis_path
@@ -642,7 +639,7 @@ def get_redis_worker(base = Process):
         def run(self):
             # here we are inside the new process
             self._init()
-            
+
             while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
                 job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
@@ -709,7 +706,7 @@ def get_redis_worker(base = Process):
 
         def init(self):
             pass
-            
+
         def close(self):
             '''
             implement in subclass to clean up loaders and other trailing elements when the processer is done if needed
@@ -721,11 +718,9 @@ def get_redis_worker(base = Process):
             raise NotImplementedError('please add an implementation to process the data')
 
         def _init(self):
-            # self.r_server = Redis(self.redis_path, serverconfig={'save': []})
-            self.r_server = Redis(host=Config.REDISLITE_DB_HOST,
-                                  port=Config.REDISLITE_DB_PORT)
+            self.r_server = new_redis_client()
             self.init()
-        
+
         def _close(self):
             self.close()
 
@@ -734,7 +729,7 @@ def get_redis_worker(base = Process):
 
         def __exit__(self, *args):
             pass
-            
+
         def get_r_server(self):
             return self.r_server
 
@@ -777,9 +772,9 @@ class WhiteCollarWorker(Thread):
 
     def run(self):
         '''
-        starts the pool of workers, monitor the registered instances, tries to restart them if needed, 
+        starts the pool of workers, monitor the registered instances, tries to restart them if needed,
         and wait for all the workers to be finished before returning
-        :return: 
+        :return:
         '''
 
         #TODO: create just one
@@ -790,7 +785,7 @@ class WhiteCollarWorker(Thread):
                                  *self.args,
                                  **self.kwargs)
             self.start_worker(worker,i)
-            
+
 
         #TODO: check queue and scale up workers if needed
         while self.workers_instances:
@@ -822,8 +817,8 @@ class WhiteCollarWorker(Thread):
     def kill_all(self):
         '''
         send a kill signal to all the workers nicely
-        
-        :return: 
+
+        :return:
         '''
         for _, p in self.workers_instances.items():
             self.logger.debug('setting kill switch on for worker %s', p.name)
@@ -862,10 +857,9 @@ class RedisLookupTable(object):
         if namespace is None:
             namespace = uuid.uuid4()
         self.namespace = self.LOOK_UPTABLE_NAMESPACE % {'namespace': namespace}
-        self.r_server = Redis(host=Config.REDISLITE_DB_HOST,
-                              port=Config.REDISLITE_DB_PORT)
+        self.r_server = new_redis_client() if not r_server else r_server
         self.default_ttl = ttl
-        
+
         require_all(self.r_server is not None)
 
     def set(self, key, obj, r_server = None, ttl = None):

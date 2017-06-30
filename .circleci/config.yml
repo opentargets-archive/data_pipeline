@@ -35,7 +35,7 @@ jobs:
       - run:
           name: Run Scoring tests
           command: |
-            pytest tests/test_score.py
+            pytest tests/
   # uncomment this to use workflows (see below)
   # push_containers:
   #   working_directory: /usr/src/app
