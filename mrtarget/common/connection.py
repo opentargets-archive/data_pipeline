@@ -66,7 +66,7 @@ class PipelineConnectors():
             self.logger.warn('No valid configuration available for elasticsearch')
             self.es = None
 
-        self.redis_db_file = tmp.mktemp(suffix='.rdb')
+        self.redis_db_file = tmp.mktemp(suffix='.rdb', dir='/tmp')
         self.logger.debug('new named temp file for redis %s with persist %s',
                           self.redis_db_file, str(redispersist))
 
@@ -75,8 +75,7 @@ class PipelineConnectors():
                                               'maxclients': 10000,
                                               'port': str(Config.REDISLITE_DB_PORT)})
 
-#         self.r_server = new_redis_client()
-        self.r_server = self.r_instance
+        self.r_server = new_redis_client()
         self.logger.debug('Established redislite at port %s', str(Config.REDISLITE_DB_PORT))
 
         return success
