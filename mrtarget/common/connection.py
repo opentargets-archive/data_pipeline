@@ -28,6 +28,7 @@ class PipelineConnectors():
         self.es = None
         self.r_server = None
         self.logger = logging.getLogger(__name__)
+        self.r_instance
 
     def init_services_connections(self, redispersist=False):
         '''init es client'''
@@ -80,6 +81,7 @@ class PipelineConnectors():
                                                'maxclients': 10000,
                                                'bind': r_host,
                                                'port': str(r_port)})
+            self.r_instance = r_instance['instance']
 
         self.r_server = new_redis_client()
         self.logger.debug('Established redislite at %s port %s',
@@ -94,5 +96,6 @@ class PipelineConnectors():
                 r_instance['instance'].shutdown()
                 r_instance['instance'] = None
                 os.remove(self.redis_db_file + '.settings')
+                self.r_instance = None
         except:
             self.logger.exception('Could not shutdown redislite server')
