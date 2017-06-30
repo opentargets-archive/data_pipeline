@@ -9,10 +9,14 @@ from redislite import Redis
 
 from mrtarget.Settings import Config
 
+# just one redis instance per app
+R_instance = None
+
 
 def new_redis_client():
     return Redis(host=Config.REDISLITE_DB_HOST,
                  port=Config.REDISLITE_DB_PORT)
+
 
 class PipelineConnectors():
 
@@ -21,13 +25,9 @@ class PipelineConnectors():
 
         Declares the connector parts
         """
-        ''' Elastic Search connection'''
         self.es = None
-
-        ''' Redis '''
         self.r_server = None
         self.r_instance = None
-
         self.logger = logging.getLogger(__name__)
 
     def init_services_connections(self, redispersist=False):
@@ -35,7 +35,11 @@ class PipelineConnectors():
         connection_attempt = 1
         success = False
         self.persist = redispersist
+        r_host = Config.REDISLITE_DB_HOST
+        r_port = Config.REDISLITE_DB_PORT
+
         hosts = Config.ELASTICSEARCH_NODES
+
         if hosts:
             self.es = Elasticsearch(hosts=hosts,
                                     maxsize=50,
@@ -70,19 +74,28 @@ class PipelineConnectors():
         self.logger.debug('new named temp file for redis %s with persist %s',
                           self.redis_db_file, str(redispersist))
 
-        self.r_instance = Redis(dbfilename=self.redis_db_file,
-                                serverconfig={'save': [],
-                                              'maxclients': 10000,
-                                              'port': str(Config.REDISLITE_DB_PORT)})
+        global R_instance
+        if not R_instance:
+            R_instance = Redis(dbfilename=self.redis_db_file,
+                                 serverconfig={'save': [],
+                                               'maxclients': 10000,
+                                               'bind': r_host,
+                                               'port': str(r_port)})
+
+        # get from module level
+        self.r_instance = R_instance
 
         self.r_server = new_redis_client()
-        self.logger.debug('Established redislite at port %s', str(Config.REDISLITE_DB_PORT))
+        self.logger.debug('Established redislite at %s port %s',
+                          r_host,
+                          str(r_port))
 
         return success
 
     def close(self):
         try:
-            self.r_instance.shutdown()
+            global R_instance
+            R_instance.shutdown()
             os.remove(self.redis_db_file + '.settings')
         except:
             self.logger.exception('Could not shutdown redislite server')
