@@ -543,7 +543,7 @@ class EvidenceValidationFileChecker():
 
         self.logger.info('check_all() starting queue reporter')
         workers_number = Config.WORKERS_NUMBER
-        loaders_number = int(workers_number/2+1)
+        loaders_number = min([16, int(workers_number/2+1)])
         readers_number = min([workers_number, len(input_files)])
         max_loader_chunk_size = 1000
         if (MAX_NB_EVIDENCE_CHUNKS / loaders_number) < max_loader_chunk_size:
