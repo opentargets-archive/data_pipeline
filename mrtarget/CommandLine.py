@@ -169,7 +169,7 @@ def main():
         Config.REDISLITE_DB_PORT = args.redis_port
 
     logger.debug('redis remote %s and host %s port %s',
-                 Config.REDISLITE_REMOTE,
+                 str(Config.REDISLITE_REMOTE),
                  Config.REDISLITE_DB_HOST,
                  Config.REDISLITE_DB_PORT)
 
