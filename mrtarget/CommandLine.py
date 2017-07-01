@@ -150,7 +150,7 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.release_tag:
+    if not args.release_tag and not args.do_nothing:
         logger.error('A [release-tag] has to be specified.')
         print('A [release-tag] has to be specified.', file=sys.stderr)
         return 1
@@ -184,7 +184,9 @@ def main():
             root_logger.exception(e)
 
     if args.do_nothing:
-        sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
+        print("Exiting. I pity the fool that tells me to 'do nothing'",
+              file=sys.stdout)
+        return 0
 
     connected = connectors.init_services_connections(redispersist=args.redispersist)
     logger.debug('Attempting to establish connection to the backend... %s',
