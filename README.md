@@ -1,6 +1,6 @@
 [![CircleCI](https://circleci.com/gh/opentargets/data_pipeline.svg?style=svg&circle-token=e368180959ed512016dbfe75ec65814e896e0aea)](https://circleci.com/gh/opentargets/data_pipeline)
 
-Docker containers are saved on [quay.io](https://quay.io/repository/opentargets/mrtarget?tab=tags): 
+Docker containers are saved on [quay.io](https://quay.io/repository/opentargets/mrtarget?tab=tags):
 [![Docker Repository on Quay](https://quay.io/repository/opentargets/mrtarget/status?token=7cd783a9-247c-4625-ae97-e0933192b2f4 "Docker Repository on Quay")](https://quay.io/repository/opentargets/mrtarget)
 
 and [eu.gcr.io](https://console.cloud.google.com/gcr/images/open-targets/EU/mrtarget?project=open-targets)  (which has no badge sadly).
@@ -113,7 +113,7 @@ Here the list to change, enable or disable functionality:
 
 ### Evidence Validation (--val step) limit (WIP)
 
-It will give up if too many evidences were failed under schema validation. 1000 docs will be a 
+It will give up if too many evidences were failed under schema validation. 1000 docs will be a
 rasonable upper bound limit per launched process.
 
 ### Minimal dataset
@@ -136,4 +136,16 @@ TBD
 ### Custom read indexes
 
 TBD
+
+### Redislite and/or remote redis
+
+--redis-remote 'enable remote'
+--redis-host 'by example 127.0.0.1'
+--redis-port 'by example 8888'
+
+CTTV_REDIS_REMOTE=true
+CTTV_REDIS_SERVER=127.0.0.1:8888
+
+if you dont specify remote then it will try to bind to that host and port and the
+overwrite rule is env var then arguments overwrite
 
