@@ -594,7 +594,7 @@ class EvidenceValidationFileChecker():
                                        self.es,
                                        lookup_data = lookup_data,
                                        dry_run=dry_run,
-                                       ) for i in range(workers_number)]
+                                       ) for _ in range(workers_number)]
                                         # ) for i in range(1)]
 
         self.logger.info('calling start to all validators')
@@ -606,7 +606,7 @@ class EvidenceValidationFileChecker():
                                 None,
                                 chunk_size=max_loader_chunk_size,
                                 dry_run=dry_run
-                                ) for i in range(loaders_number)]
+                                ) for _ in range(loaders_number)]
         for w in loaders:
             w.start()
         #
