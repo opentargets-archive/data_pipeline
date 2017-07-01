@@ -38,6 +38,21 @@ ELASTICSEARCH_NODES = [
     ]
 ```
 
+Normally mrT-arget uses a local instance of redis, thanks to redislite. 
+To make it connect to any given redis you can specify the parameter `--redis-remote`
+and point to the right host and port:
+```sh
+mrtarget --redis-remote --redis-host '127.0.0.1'--redis-port '8888'
+```
+
+This can also be done with environment variables:
+```sh
+CTTV_REDIS_REMOTE=true
+CTTV_REDIS_SERVER=127.0.0.1:8888
+```
+
+
+
 ### Container users
 
 ```sh
