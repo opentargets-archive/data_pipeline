@@ -965,9 +965,9 @@ class EvidenceProcesser(multiprocessing.Process):
         connector = PipelineConnectors()
         connector.init_services_connections()
         es = connector.es
-        self.evidence_manager.available_ecos.set_r_server(connector.r_server)
-        self.evidence_manager.available_efos.set_r_server(connector.r_server)
-        self.evidence_manager.available_genes.set_r_server(connector.r_server)
+        self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
+        self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
+        self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
 
         # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
         self.pub_fetcher = PublicationFetcher(es)
