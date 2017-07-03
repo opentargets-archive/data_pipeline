@@ -61,7 +61,7 @@ class ESQuery(object):
                                       "match_all": {}
                                     },
                                    '_source': source,
-                                   'size': 20,
+                                   'size': 100,
                                    },
                             scroll='12h',
                             doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
@@ -134,9 +134,9 @@ class ESQuery(object):
         res = helpers.scan(client=self.handler,
                            query={"query": {
                                "match_all": {}
-                           },
-                                  '_source': source,
-                                  'size': 1000,
+                            },
+                            '_source': source,
+                            'size': 100,
                            },
                            scroll='12h',
                            doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,

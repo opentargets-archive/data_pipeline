@@ -20,6 +20,7 @@ from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
 from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common.connection import PipelineConnectors
 
 
 logger = logging.getLogger(__name__)
@@ -806,8 +807,8 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'somatic_mutation':
                 frequency = 1.
                 if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
-                    sample_total_coverage =  0.
-                    max_sample_size = 0.
+                    sample_total_coverage = 1.
+                    max_sample_size = 1.
                     for mutation in self.evidence['evidence']['known_mutations']:
                         if 'number_samples_with_mutation_type' in mutation:
                             sample_total_coverage += int(mutation['number_samples_with_mutation_type'])
@@ -958,14 +959,19 @@ class EvidenceProcesser(multiprocessing.Process):
         self.start_time = time.time()  # reset timer start
         self.lock = lock
         self.inject_literature = inject_literature
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
+        self.pub_fetcher = None
+
+    def run(self):
+        connector = PipelineConnectors()
+        connector.init_services_connections()
+        es = connector.es
+        self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
+        self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
+        self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
+
         # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
         self.pub_fetcher = PublicationFetcher(es)
 
-    def run(self):
         logger.info("%s started" % self.name)
         # TODO : for testing
         process_name = self.name
@@ -1040,15 +1046,15 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.processing_finished = processing_finished
         self.output_generated_count = output_generated_count
         self.total_loaded = submitted_to_storage
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
-        self.es = es
+        self.es = None
         self.lock = lock
         self.dry_run = dry_run
 
     def run(self):
+        connector = PipelineConnectors()
+        connector.init_services_connections()
+        self.es = connector.es
+
         logger.info("worker %s started" % self.name)
         with Loader(self.es, chunk_size=self.chunk_size, dry_run=self.dry_run) as es_loader:
             with ProcessedEvidenceStorer(es_loader, chunk_size=self.chunk_size, quiet=False) as storer:
@@ -1146,7 +1152,7 @@ class EvidenceStringProcess():
         data_processing_lock = multiprocessing.Lock()
         data_storage_lock = multiprocessing.Lock()
 
-        workers_number = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        workers_number = Config.WORKERS_NUMBER
 
         '''create workers'''
         scorers = [EvidenceProcesser(input_q,

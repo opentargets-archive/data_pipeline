@@ -14,10 +14,10 @@ genes=$(cat ../mrtarget/resources/minimal_ensembl.txt)
 url_file="urls.txt"
 
 cat ../mrtarget/resources/uris.ini | \
-    grep -E "(proteinatlas\.org|reactome\.org|ebi\.ac\.uk\/chembl|\.zip)" | \
+    grep -E "(atlas_baseline_expression|proteinatlas\.org|reactome\.org|ebi\.ac\.uk\/chembl|\.zip)" | \
     sed -e 's/.*\=//g' > $url_file
 
-wget -P data/ -i urls.txt
+wget -P data/ -i $url_file
 wait $!
 
 rm -f $url_file

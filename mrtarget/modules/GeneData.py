@@ -463,11 +463,11 @@ class GeneSet():
 class GeneObjectStorer(RedisQueueWorkerProcess):
 
     def __init__(self, es, r_server, queue, dry_run=False):
-        super(GeneObjectStorer, self).__init__(queue, r_server.db)
-        self.es = es
-        self.r_server = r_server
-        self.queue = queue
-        self.loader = Loader(self.es, chunk_size=100, dry_run=dry_run)
+        super(GeneObjectStorer, self).__init__(queue, None)
+        self.es = None
+        self.r_server = None
+        self.loader = None
+        self.dry_run = dry_run
 
     def process(self, data):
         geneid, gene = data
@@ -478,7 +478,13 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
                        geneid,
                        gene.to_json(),
                        create_index=False)
+        
+    def init(self):
+        super(GeneObjectStorer, self).init()
+        self.loader = Loader(dry_run=self.dry_run)
+               
     def close(self):
+        super(GeneObjectStorer, self).close()
         self.loader.close()
 
 
@@ -640,7 +646,10 @@ class GeneManager():
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
 
-        workers = [GeneObjectStorer(self.loader.es,self.r_server,queue, dry_run=dry_run) for i in range(multiprocessing.cpu_count())]
+        workers = [GeneObjectStorer(self.loader.es,
+                                    None,
+                                    queue,
+                                    dry_run=dry_run) for i in range(4)]
         # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()
@@ -699,22 +708,17 @@ class GeneLookUpTable(object):
                  ttl = 60*60*24+7,
                  targets = [],
                  autoload=True):
-        self._table = RedisLookupTablePickle(namespace = namespace,
-                                            r_server = r_server,
-                                            ttl = ttl)
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
-        self._es = es
-        self._es_query = ESQuery(es)
-        self.r_server = r_server
-        self.uniprot2ensembl = {}
-        if (r_server is not None) and autoload:
-            self.load_gene_data(r_server, targets)
         self._logger = logging.getLogger(__name__)
+        self._es = es
+        self.r_server = r_server            
+        self._es_query = ESQuery(self._es)
+        self._table = RedisLookupTablePickle(namespace = namespace,
+                                            r_server = self.r_server,
+                                            ttl = ttl)
 
-
+        self.uniprot2ensembl = {}
+        if self.r_server and autoload:
+            self.load_gene_data(self.r_server, targets)
 
     def load_gene_data(self, r_server = None, targets = []):
         data = None
@@ -791,21 +795,16 @@ class GeneLookUpTable(object):
                                          )
 
     def __getitem__(self, key, r_server = None):
-        return self.get_gene(key, r_server)
+        return self.get_gene(key, self._get_r_server(r_server))
 
     def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
+        self._table.set(key, value, self._get_r_server(r_server))
 
     def __missing__(self, key):
         print key
 
-
-    def _get_r_server(self, r_server=None):
-        if not r_server:
-            r_server = self.r_server
-        if r_server is None:
-            raise AttributeError('A redis server is required either at class instantation or at the method level')
-        return r_server
-
-    def keys(self):
-        return self._table.keys()
+    def keys(self, r_server=None):
+        return self._table.keys(self._get_r_server(r_server))
+    
+    def _get_r_server(self, r_server = None):
+        return r_server if r_server else self.r_server

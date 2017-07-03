@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import csv
 import logging
+import re
 import functools as ft
 from StringIO import StringIO
 from zipfile import ZipFile
@@ -11,20 +12,38 @@ import petl
 from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
+from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisLookupTablePickle
+from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
+from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 
 from mrtarget.Settings import Config
+
+
+def code_from_tissue(tissue_name):
+    t2m = Config.TISSUE_TRANSLATION_MAP['tissue']
+    tid = None
+    try:
+        tid = t2m[tissue_name]
+    except KeyError:
+        logger = logging.getLogger(__name__)
+        logger.debug('the tissue name %s was not found in the mapping',
+                     tissue_name)
+        # TODO the id has to be one word to not get splitted by the analyser
+        # this is a temporal fix by the time we get all items mapped
+        tid = tissue_name.strip().replace(' ', '_')
+        tid = re.sub('[^0-9a-zA-Z_]+', '',tid)
+
+    return tid
 
 
 def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     def _split_tissue(k, v):
         '''from tissue dict to rna and protein dicts pair'''
-        t2m = Config.TISSUE_TRANSLATION_MAP
-        tid = t2m[k]
+        tid = code_from_tissue(k)
         tlabel = k
+
         rna = {'id': tid, 'label': tlabel, 'level': v['rna']['level'],
                'unit': v['rna']['unit'],
                'value': v['rna']['value']} if v['rna'] else {}
@@ -65,7 +84,6 @@ class HPAExpression(JSONSerializable):
     def __init__(self, gene=None):
         self.gene = gene
         self.tissues = {}
-        self.cell_lines = {}
 
     def get_id(self):
         return self.gene
@@ -105,7 +123,7 @@ class HPADataDownloader():
             .cut('tissue', 'cell_type', 'level', 'reliability', 'gene')
             )
 
-        for d in table.dicts():
+        for d in petl.dicts(table):
             yield d
 
     def retrieve_rna_data(self):
@@ -116,16 +134,34 @@ class HPADataDownloader():
         :return: dict
         """
         self.logger.info('get rna tissue rows into dicts')
-        table = (
-            petl.fromcsv(URLZSource(Config.HPA_RNA_URL))
-            .rename({'Sample': 'sample',
-                     'Unit': 'unit',
-                     'Value': 'value',
-                     'Gene': 'gene'})
-            .cut('sample', 'unit', 'value', 'gene')
-            )
+        self.logger.debug('melting rna level table into geneid tissue level')
+        t_level = petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL),
+                               delimiter='\t')
+        headers = t_level.header()
+        t_level = petl.setheader(t_level,
+                                ['ID'] + [e.split('_')[1] \
+                                          if '_' in e else e \
+                                    for e in headers if e != 'ID'])
+        t_level = petl.melt(t_level, key='ID',
+                            variablefield='sample',
+                            valuefield='level')
+        t_level = petl.rename(t_level, {'ID': 'gene'})
 
-        for d in table.dicts():
+        t_value = petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL),
+                               delimiter='\t')
+        t_value = petl.setheader(t_value,
+                                ['ID'] + [e.split('_')[1] \
+                                          if '_' in e else e \
+                                    for e in t_value.header() if e != 'ID'])
+        t_value = petl.melt(t_value, key='ID',
+                            variablefield='sample',
+                            valuefield='value')
+        t_value = petl.rename(t_value, {'ID': 'gene'})
+        t_value = petl.addfield(t_value, 'unit', 'TPM')
+
+        t_join = petl.join(t_level, t_value, presorted=True)
+
+        for d in petl.dicts(t_join):
             yield d
 
     def retrieve_cancer_data(self):
@@ -142,7 +178,7 @@ class HPADataDownloader():
                  'expression_type')
             )
 
-        for d in table.dicts():
+        for d in petl.dicts(table):
             yield d
 
     def retrieve_subcellular_location_data(self):
@@ -162,20 +198,48 @@ class HPADataDownloader():
             yield d
 
 
+class ExpressionObjectStorer(RedisQueueWorkerProcess):
+
+    def __init__(self, es, r_server, queue, dry_run=False):
+        super(ExpressionObjectStorer, self).__init__(queue, None)
+        self.es = None
+        self.r_server = None
+        self.loader = None
+        self.dry_run = dry_run
+
+    def process(self, data):
+        geneid, gene = data
+        self.loader.put(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                       Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+                       ID=geneid,
+                       body=gene['expression'].to_json(),
+                       create_index=False)
+
+    def init(self):
+        super(ExpressionObjectStorer, self).init()
+        self.loader = Loader(dry_run=self.dry_run)
+
+    def close(self):
+        super(ExpressionObjectStorer, self).close()
+        self.loader.close()
+
+
 class HPAProcess():
-    def __init__(self, loader):
+    def __init__(self, loader, r_server):
         self.loader = loader
+        self.esquery = ESQuery(loader.es)
+        self.r_server = r_server
         self.data = {}
         self.available_genes = set()
         self.set_translations()
         self.downloader = HPADataDownloader()
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self):
+    def process_all(self, dry_run=False):
 
         self.process_normal_tissue()
         self.process_rna()
-        self.store_data()
+        self.store_data(dry_run=dry_run)
         self.loader.close()
 
     def _get_available_genes(self, ):
@@ -206,21 +270,44 @@ class HPAProcess():
             self.rna_data[gene].append(row)
 
         for gene in self.available_genes:
-            self.data[gene]['expression'].tissues, \
-            self.data[gene]['expression'].cell_lines = self.get_rna_data_for_gene(gene)
+            self.data[gene]['expression'].tissues = self.get_rna_data_for_gene(gene)
         self.logger.info('process_rna completed')
         return
 
-    def store_data(self):
+    def store_data(self, dry_run=False):
         self.logger.info('store_data called')
         if self.data.values()[0]['expression']:  # if there is expression data
+            self.logger.debug('calling to create new expression index')
+            self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+            queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
+                               r_server=self.r_server,
+                               serialiser='jsonpickle',
+                               max_size=10000,
+                               job_timeout=600)
+
+            q_reporter = RedisQueueStatusReporter([queue])
+            q_reporter.start()
+
+            workers = [ExpressionObjectStorer(self.loader.es,
+                                        None,
+                                        queue,
+                                        dry_run=dry_run) for i in range(4)]
+
+            for w in workers:
+                w.start()
 
             for gene, data in self.data.items():
-                self.loader.put(index_name=Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                                doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                                ID=gene,
-                                body=data['expression'].to_json(),
-                                )
+                queue.put((gene, data), self.r_server)
+
+            queue.set_submission_finished(r_server=self.r_server)
+
+            for w in workers:
+                w.join()
+
+            q_reporter.join()
+
+            self.logger.info('all expressions objects pushed to elasticsearch')
+
         if self.data.values()[0]['cancer']:  # if there is cancer data
             pass
         if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
@@ -235,17 +322,23 @@ class HPAProcess():
     def get_normal_tissue_data_for_gene(self, gene):
         tissue_data = {}
         for row in self.normal_tissue_data[gene]:
+            # XXX why do I have to replace on a curated list of tissues
             tissue = row['tissue'].replace('1', '').replace('2', '').strip()
+            # tissue = row['tissue']
+            code = code_from_tissue(tissue)
+
             if tissue not in tissue_data:
                 tissue_data[tissue] = {'protein': {
-                    'cell_type': {},
-                    'level': 0,
-                    'reliability': False,
-                },
-
-                    'rna': {
+                        'cell_type': {},
+                        'level': 0,
+                        'reliability': False,
                     },
-                    'efo_code': Config.TISSUE_TRANSLATION_MAP[tissue]}
+
+                        'rna': {
+                        },
+                        'efo_code': code
+                    }
+
             if row['cell_type'] not in tissue_data[tissue]['protein']['cell_type']:
                 tissue_data[tissue]['protein']['cell_type'][row['cell_type']] = []
             tissue_data[tissue]['protein']['cell_type'][row['cell_type']].append(
@@ -262,21 +355,17 @@ class HPAProcess():
 
     def get_rna_data_for_gene(self, gene):
         tissue_data = self.data[gene]['expression'].tissues
-        cell_line_data = {}
+
         if not tissue_data:
             tissue_data = {}
+
+        if gene in self.rna_data:
             for row in self.rna_data[gene]:
-                sample = row['sample']
-                is_cell_line = sample not in Config.TISSUE_TRANSLATION_MAP.keys()
-                if is_cell_line:
-                    if sample not in cell_line_data:
-                        cell_line_data[sample] = {'rna': {},
-                                                  }
-                    cell_line_data[sample]['rna']['value'] = row['value']
-                    cell_line_data[sample]['rna']['unit'] = row['unit']
-                else:
-                    if sample not in tissue_data:
-                        tissue_data[sample] = {'protein': {
+                sample = row['sample'].replace('1', '').replace('2', '').strip()
+                code = code_from_tissue(sample)
+
+                if sample not in tissue_data:
+                    tissue_data[sample] = {'protein': {
                             'cell_type': {},
                             'level': 0,
                             'reliability': False,
@@ -284,10 +373,14 @@ class HPAProcess():
 
                             'rna': {
                             },
-                            'efo_code': Config.TISSUE_TRANSLATION_MAP[sample]}
-                    tissue_data[sample]['rna']['value'] = row['value']
-                    tissue_data[sample]['rna']['unit'] = row['unit']
-        return tissue_data, cell_line_data
+                            'efo_code': code
+                        }
+
+                tissue_data[sample]['rna']['value'] = float(row['value'])
+                tissue_data[sample]['rna']['unit'] = row['unit']
+                tissue_data[sample]['rna']['level'] = int(row['level'])
+
+        return tissue_data
 
     def set_translations(self):
         self.level_translation = {'Not detected': 0,
@@ -310,18 +403,19 @@ class HPALookUpTable(object):
     """
 
     def __init__(self,
-                 es,
+                 es=None,
                  namespace=None,
                  r_server=None,
                  ttl=(60*60*24+7)):
-        self._table = RedisLookupTablePickle(namespace=namespace,
-                                             r_server=r_server,
-                                             ttl=ttl)
         self._es = es
-        self._es_query = ESQuery(es)
         self.r_server = r_server
-        if r_server is not None:
-            self._load_hpa_data(r_server)
+        self._es_query = ESQuery(self._es)
+        self._table = RedisLookupTablePickle(namespace=namespace,
+                                             r_server=self.r_server,
+                                             ttl=ttl)
+
+        if self.r_server:
+            self._load_hpa_data(self.r_server)
 
     def _load_hpa_data(self, r_server=None):
         for el in tqdm(self._es_query.get_all_hpa(),
@@ -330,36 +424,30 @@ class HPALookUpTable(object):
                        unit_scale=True,
                        total=self._es_query.count_all_hpa(),
                        leave=False):
-            self._table.set(el['gene'], el,
-                            r_server=self._get_r_server(r_server))
+            self.set_hpa(el, r_server=self._get_r_server(r_server))
 
     def get_hpa(self, idx, r_server=None):
-        return self._table.get(idx, r_server=r_server)
+        return self._table.get(idx, r_server=self._get_r_server(r_server))
 
     def set_hpa(self, hpa, r_server=None):
         self._table.set(hpa['gene'], hpa,
                         r_server=self._get_r_server(r_server))
 
     def get_available_hpa_ids(self, r_server=None):
-        return self._table.keys()
+        return self._table.keys(self._get_r_server(r_server))
 
     def __contains__(self, key, r_server=None):
         return self._table.__contains__(key,
                                         r_server=self._get_r_server(r_server))
 
     def __getitem__(self, key, r_server=None):
-        return self.get_hpa(key, r_server)
+        return self.get_hpa(key, r_server=self._get_r_server(r_server))
 
     def __setitem__(self, key, value, r_server=None):
         self._table.set(key, value, r_server=self._get_r_server(r_server))
 
-    def _get_r_server(self, r_server=None):
-        if not r_server:
-            r_server = self.r_server
-        if r_server is None:
-            raise AttributeError('A redis server is required either at class'
-                                 ' instantation or at the method level')
-        return r_server
+    def keys(self, r_server=None):
+        return self._table.keys(self._get_r_server(r_server))
 
-    def keys(self):
-        return self._table.keys()
+    def _get_r_server(self, r_server = None):
+        return r_server if r_server else self.r_server
