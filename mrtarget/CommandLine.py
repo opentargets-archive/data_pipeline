@@ -1,8 +1,9 @@
+from __future__ import print_function
 import argparse
 import logging
 import sys
 import itertools as it
-
+import atexit
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import PipelineConnectors
@@ -26,23 +27,28 @@ from mrtarget.modules.QC import QCActions, QCRunner
 from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
-from mrtarget.Settings import Config, file_or_resource
+from mrtarget.modules.G2P import G2PActions, G2P
+from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 
-logging.config.fileConfig(file_or_resource('logging.ini'),
-                          disable_existing_loggers=False)
-
+connectors = None
 
 def load_nlp_corpora():
     '''load here all the corpora needed by nlp steps'''
     import nltk
-    nltk.download([ 'punkt', 'averaged_perceptron_tagger']) #'brown' corpora might be needed
+    nltk.download([ 'punkt', 'averaged_perceptron_tagger', 'stopwords']) #'brown' corpora might be needed
 
 
 def main():
+
+    logging.config.fileConfig(file_or_resource('logging.ini'),
+                              disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
+    parser.add_argument('release_tag', nargs='?', default=Config.RELEASE_VERSION,
+                        help='The prefix to prepend default: %s' % \
+                        Config.RELEASE_VERSION)
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
                         action="append_const", const = Actions.ALL)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",
@@ -75,7 +81,8 @@ def main():
                         action="append_const", const = SearchObjectActions.PROCESS)
     parser.add_argument("--ddr", dest='ddr', help="precompute data driven t2t and d2d relations",
                         action="append_const", const=DataDrivenRelationActions.PROCESS)
-    parser.add_argument("--persist-redis", dest='redispersist', help="use a fresh redislite db",
+    parser.add_argument("--persist-redis", dest='redispersist',
+                        help="the temporary file wont be deleted if True default: False",
                         action='store_true', default=False)
     parser.add_argument("--musu", dest='mus', help="update mouse model data",
                         action="append_const", const = MouseModelsActions.UPDATE_CACHE)
@@ -86,7 +93,9 @@ def main():
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
     parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
-                        action="append_const", const = IntOGenActions.ALL)
+                        action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
+    parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
+                        action="append_const", const=G2PActions.GENERATE_EVIDENCE)
     parser.add_argument("--ontos", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.PHENOTYPESLIM)
     parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
@@ -117,11 +126,8 @@ def main():
     parser.add_argument("--increment", dest='increment',
                         help="add new evidence from a data source but does not delete existing evidence. Works only for the validation step",
                         action='store_true', default=False)
-    parser.add_argument("--local-file", dest='local_file',
+    parser.add_argument("--input-file", dest='input_file',
                         help="pass the path to a local gzipped file to use as input for the data validation step",
-                        action='append', default=[])
-    parser.add_argument("--remote-file", dest='remote_file',
-                        help="pass the url to a remote gzipped file to use as input for the data validation step",
                         action='append', default=[])
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
@@ -132,8 +138,18 @@ def main():
     parser.add_argument("--inject-literature", dest='inject_literature',
                         help="inject literature data in the evidence-string, default set to False",
                         action='store_true', default=False)
+    parser.add_argument("--schema-version", dest='schema_version',
+                        help="set the schema version aka 'branch' name",
+                        action='store', default='master')
 
     args = parser.parse_args()
+
+    if not args.release_tag:
+        logger.error('A [release-tag] has to be specified.')
+        print('A [release-tag] has to be specified.', file=sys.stderr)
+        return 1
+    else:
+        Config.RELEASE_VERSION = args.release_tag
 
     targets = args.targets
 
@@ -141,18 +157,18 @@ def main():
 
     if args.loglevel:
         try:
-            logger = logging.getLogger()
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.getLevelName(args.loglevel))
             logger.setLevel(logging.getLevelName(args.loglevel))
         except Exception, e:
-            logger.exception(e)
+            root_logger.exception(e)
 
     if args.do_nothing:
         sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
 
-    logger.info('Attempting to establish connection to the backend...')
-    db_connected = connectors.init_services_connections(redispersist=args.redispersist)
-
-
+    connected = connectors.init_services_connections(redispersist=args.redispersist)
+    logger.debug('Attempting to establish connection to the backend... %s',
+                 str(connected))
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
@@ -163,12 +179,17 @@ def main():
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
                 dry_run = args.dry_run) as loader:
         run_full_pipeline = False
+
+        # get the schema version and change all needed resources
+        update_schema_version(Config,args.schema_version)
+        logger.info('setting schema version string to %s', args.schema_version)
+
         if args.all and (Actions.ALL in args.all):
             run_full_pipeline = True
         if args.hpa or run_full_pipeline:
             do_all = (HPAActions.ALL in args.hpa) or run_full_pipeline
             if (HPAActions.PROCESS in args.hpa) or do_all:
-                HPAProcess(loader).process_all()
+                HPAProcess(loader,connectors.r_server).process_all(dry_run=args.dry_run)
         if args.rea or run_full_pipeline:
             do_all = (ReactomeActions.ALL in args.rea) or run_full_pipeline
             if (ReactomeActions.PROCESS in args.rea) or do_all:
@@ -204,29 +225,32 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
         if args.lit or run_full_pipeline:
             if LiteratureActions.FETCH in args.lit :
-                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.local_file)
+                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.input_file)
             if LiteratureActions.UPDATE in args.lit:
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(update=True)
             if LiteratureNLPActions.PROCESS in args.lit :
                 LiteratureNLPProcess(connectors.es, loader, connectors.r_server).process()
+        if args.g2p or run_full_pipeline:
+            do_all = (G2PActions.ALL in args.g2p) or run_full_pipeline
+            if (G2PActions.GENERATE_EVIDENCE in args.g2p) or do_all:
+                G2P(connectors.es).process_g2p()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
-                IntOGen(connectors.es, connectors.sparql).process_intogen()
+                IntOGen(connectors.es, connectors.r_server).process_intogen()
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
-                PhenotypeSlim().create_phenotype_slim(args.local_file)
+                PhenotypeSlim().create_phenotype_slim(args.input_file)
 
-        r_files = list(it.chain.from_iterable([el.split(",") for el in args.remote_file]))
+        input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
 
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.CHECKFILES in args.val) or do_all:
                 EvidenceValidationFileChecker(connectors.es,
                                               connectors.r_server,
-                                              dry_run=args.dry_run).check_all(local_files=args.local_file,
-                                                                              remote_files=r_files,
+                                              dry_run=args.dry_run).check_all(input_files=input_files,
                                                                               increment=args.increment)
         if args.valreset:
             EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
@@ -259,6 +283,14 @@ def main():
             if (DumpActions.DUMP in args.dump) or do_all:
                 DumpGenerator().dump()
 
+    connectors.close()
+    return 0
+
+
+@atexit.register
+def shutdown_connections():
+    if connectors:
+        connectors.close()
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

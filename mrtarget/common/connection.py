@@ -1,12 +1,21 @@
 import logging
-import os
 import time
 import certifi
+import os
+import tempfile as tmp
 from elasticsearch import Elasticsearch, ConnectionTimeout
 from elasticsearch import RequestsHttpConnection
 from redislite import Redis
 
 from mrtarget.Settings import Config
+
+# just one redis instance per app
+R_instance = None
+
+
+def new_redis_client():
+    return Redis(host=Config.REDISLITE_DB_HOST,
+                 port=Config.REDISLITE_DB_PORT)
 
 
 class PipelineConnectors():
@@ -16,24 +25,21 @@ class PipelineConnectors():
 
         Declares the connector parts
         """
-        ''' Elastic Search connection'''
         self.es = None
-
-        ''' Redis '''
         self.r_server = None
-
+        self.r_instance = None
         self.logger = logging.getLogger(__name__)
-
-    def clear_redislite_db(self):
-        if os.path.exists(Config.REDISLITE_DB_PATH):
-            os.remove(Config.REDISLITE_DB_PATH)
-        time.sleep(2)
 
     def init_services_connections(self, redispersist=False):
         '''init es client'''
         connection_attempt = 1
         success = False
+        self.persist = redispersist
+        r_host = Config.REDISLITE_DB_HOST
+        r_port = Config.REDISLITE_DB_PORT
+
         hosts = Config.ELASTICSEARCH_NODES
+
         if hosts:
             self.es = Elasticsearch(hosts=hosts,
                                     maxsize=50,
@@ -55,7 +61,7 @@ class PipelineConnectors():
                     if connection_attempt >= 3:
                         raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES))
                     connection_attempt += 1
-                self.logger.info('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
+                self.logger.debug('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
                 success = True
             except ConnectionTimeout:
                 self.logger.exception("Elasticsearch connection timeout")
@@ -64,11 +70,32 @@ class PipelineConnectors():
             self.logger.warn('No valid configuration available for elasticsearch')
             self.es = None
 
-        if not redispersist:
-            self.clear_redislite_db()
-            self.logger.info('Clearing previous instances of redislite db...')
-        self.r_server = Redis(dbfilename=str(Config.REDISLITE_DB_PATH),
-                              serverconfig={'save': [], 'maxclients': 10000})
-        self.logger.info('Established redislite DB at %s', Config.REDISLITE_DB_PATH)
+        self.redis_db_file = tmp.mktemp(suffix='.rdb', dir='/tmp')
+        self.logger.debug('new named temp file for redis %s with persist %s',
+                          self.redis_db_file, str(redispersist))
+
+        global R_instance
+        if not R_instance:
+            R_instance = Redis(dbfilename=self.redis_db_file,
+                                 serverconfig={'save': [],
+                                               'maxclients': 10000,
+                                               'bind': r_host,
+                                               'port': str(r_port)})
+
+        # get from module level
+        self.r_instance = R_instance
+
+        self.r_server = new_redis_client()
+        self.logger.debug('Established redislite at %s port %s',
+                          r_host,
+                          str(r_port))
 
         return success
+
+    def close(self):
+        try:
+            global R_instance
+            R_instance.shutdown()
+            os.remove(self.redis_db_file + '.settings')
+        except:
+            self.logger.exception('Could not shutdown redislite server')
