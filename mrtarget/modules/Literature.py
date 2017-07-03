@@ -497,7 +497,7 @@ class MedlineRetriever(object):
         retrievers = WhiteCollarWorker(target=PubmedFTPReaderProcess,
                                        pool_size=ftp_readers,
                                        queue_in=retriever_q,
-                                       redis_path=self.r_server.db,
+                                       redis_path=None,
                                        queue_out=parser_q,
                                        kwargs=dict(dry_run=self.dry_run)
                                        )
@@ -507,7 +507,7 @@ class MedlineRetriever(object):
         parsers = WhiteCollarWorker(target=PubmedXMLParserProcess,
                                     pool_size=no_of_workers,
                                     queue_in=parser_q,
-                                    redis_path=self.r_server.db,
+                                    redis_path=None,
                                     queue_out=loader_q,
                                     kwargs = dict(dry_run=self.dry_run)
                                     )
@@ -518,7 +518,7 @@ class MedlineRetriever(object):
         loaders = WhiteCollarWorker(target=LiteratureLoaderProcess,
                                     pool_size=no_of_workers/2 +1,
                                     queue_in=loader_q,
-                                    redis_path=self.r_server.db,
+                                    redis_path=None,
                                     kwargs=dict(dry_run=self.dry_run))
 
 

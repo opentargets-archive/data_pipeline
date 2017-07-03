@@ -31,8 +31,6 @@ from mrtarget.modules.G2P import G2PActions, G2P
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 
-connectors = None
-
 def load_nlp_corpora():
     '''load here all the corpora needed by nlp steps'''
     import nltk
@@ -121,6 +119,14 @@ def main():
                         action='append', default=[])
     parser.add_argument("--targets", dest='targets', help="just process data for this target. Does not work with all the steps!!",
                         action='append', default=[])
+    parser.add_argument("--redis-remote", dest='redis_remote', help="connect to a remote redis",
+                        action='store_true', default=False)
+    parser.add_argument("--redis-host", dest='redis_host',
+                        help="redis host",
+                        action='store', default='')
+    parser.add_argument("--redis-port", dest='redis_port',
+                        help="redis port",
+                        action='store', default='')
     parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
                         action='store_true', default=False)
     parser.add_argument("--increment", dest='increment',
@@ -144,7 +150,7 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.release_tag:
+    if not args.release_tag and not args.do_nothing:
         logger.error('A [release-tag] has to be specified.')
         print('A [release-tag] has to be specified.', file=sys.stderr)
         return 1
@@ -152,6 +158,20 @@ def main():
         Config.RELEASE_VERSION = args.release_tag
 
     targets = args.targets
+
+    if args.redis_remote:
+        Config.REDISLITE_REMOTE = args.redis_remote
+
+    if args.redis_host:
+        Config.REDISLITE_DB_HOST = args.redis_host
+
+    if args.redis_port:
+        Config.REDISLITE_DB_PORT = args.redis_port
+
+    logger.debug('redis remote %s and host %s port %s',
+                 str(Config.REDISLITE_REMOTE),
+                 Config.REDISLITE_DB_HOST,
+                 Config.REDISLITE_DB_PORT)
 
     connectors = PipelineConnectors()
 
@@ -164,7 +184,9 @@ def main():
             root_logger.exception(e)
 
     if args.do_nothing:
-        sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
+        print("Exiting. I pity the fool that tells me to 'do nothing'",
+              file=sys.stdout)
+        return 0
 
     connected = connectors.init_services_connections(redispersist=args.redispersist)
     logger.debug('Attempting to establish connection to the backend... %s',
@@ -286,11 +308,6 @@ def main():
     connectors.close()
     return 0
 
-
-@atexit.register
-def shutdown_connections():
-    if connectors:
-        connectors.close()
 
 if __name__ == '__main__':
     sys.exit(main())

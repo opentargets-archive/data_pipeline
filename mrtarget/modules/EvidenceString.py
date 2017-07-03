@@ -975,14 +975,19 @@ class EvidenceProcesser(multiprocessing.Process):
         self.start_time = time.time()  # reset timer start
         self.lock = lock
         self.inject_literature = inject_literature
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
+        self.pub_fetcher = None
+
+    def run(self):
+        connector = PipelineConnectors()
+        connector.init_services_connections()
+        es = connector.es
+        self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
+        self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
+        self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
+
         # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
         self.pub_fetcher = PublicationFetcher(es)
 
-    def run(self):
         logger.info("%s started" % self.name)
         # TODO : for testing
         process_name = self.name
@@ -1057,15 +1062,15 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.processing_finished = processing_finished
         self.output_generated_count = output_generated_count
         self.total_loaded = submitted_to_storage
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
-        self.es = es
+        self.es = None
         self.lock = lock
         self.dry_run = dry_run
 
     def run(self):
+        connector = PipelineConnectors()
+        connector.init_services_connections()
+        self.es = connector.es
+
         logger.info("worker %s started" % self.name)
         with Loader(self.es, chunk_size=self.chunk_size, dry_run=self.dry_run) as es_loader:
             with ProcessedEvidenceStorer(es_loader, chunk_size=self.chunk_size, quiet=False) as storer:

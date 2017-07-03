@@ -119,7 +119,7 @@ class FileProcesser():
             # 'datasource' field is a really required one so I cannot be
             # missed
             valid_rres = None
-            
+
         # if not valid date get from now()
         if valid_rres and valid_rres['d3'] is None:
             now = datetime.datetime.now()
@@ -272,7 +272,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.la = None
         self.loader = None
         self.lookup_data = lookup_data
-        
+
         self.start_time = time.time()
         self.audit = list()
         self.logger = None
@@ -294,7 +294,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         super(ValidatorProcess, self).close()
         self.la.flush(True)
         self.loader.close()
-        
+
     def process(self, data):
         # file_path, file_version, provider_id, data_source_name, md5_hash,
         # logfile, chunk, offset, line_buffer, end_of_transmission = data
@@ -316,7 +316,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
         '''
         line_counter = (offset + 1)
-        
+
         # going per line inside buffer
         for i, line in enumerate(line_buffer):
             line_counter = line_counter + i
@@ -374,13 +374,13 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 if validation_errors:
                     # here I have to log all fails to logger and elastic
                     error_messages = ' '.join(validation_errors).replace('\n', ' ; ').replace('\r', '')
-                    
+
                     error_messages_len = len(error_messages)
-                    
+
                     # capping error message to 2048
                     error_messages = error_messages if error_messages_len <= 2048 \
                         else error_messages[:2048] + ' ; ...'
-                        
+
                     explanation['validation_errors'] = error_messages
                     self.la.log(l.ERROR, 'validation_errors failed to validate %s:%i '
                                       'eval %s secs with these errors %s',
@@ -543,7 +543,7 @@ class EvidenceValidationFileChecker():
 
         self.logger.info('check_all() starting queue reporter')
         workers_number = Config.WORKERS_NUMBER
-        loaders_number = int(workers_number/2+1)
+        loaders_number = min([16, int(workers_number/2+1)])
         readers_number = min([workers_number, len(input_files)])
         max_loader_chunk_size = 1000
         if (MAX_NB_EVIDENCE_CHUNKS / loaders_number) < max_loader_chunk_size:
@@ -573,15 +573,15 @@ class EvidenceValidationFileChecker():
 
         # TODO XXX CHECK VALUE OF R_SERVER.DB
         self.logger.info('file reader process with %d processes', readers_number)
-        'Start file reader workers'
+
         readers = [FileReaderProcess(file_q,
-                                     self.r_server.db,
+                                     None,
                                      evidence_q,
                                      self.es,
                                      )
                                      for i in range(readers_number)
                                      ]
-        
+
         self.logger.info('calling start to all file readers')
         for w in readers:
             w.start()
@@ -589,12 +589,12 @@ class EvidenceValidationFileChecker():
         self.logger.info('validator process with %d processes', workers_number)
         # Start validating the evidence in chunks on the evidence queue
         validators = [ValidatorProcess(evidence_q,
-                                       self.r_server.db,
+                                       None,
                                        store_q,
                                        self.es,
                                        lookup_data = lookup_data,
                                        dry_run=dry_run,
-                                       ) for i in range(workers_number)]
+                                       ) for _ in range(workers_number)]
                                         # ) for i in range(1)]
 
         self.logger.info('calling start to all validators')
@@ -603,17 +603,17 @@ class EvidenceValidationFileChecker():
 
         self.logger.info('loader worker process with %d processes', loaders_number)
         loaders = [LoaderWorker(store_q,
-                                self.r_server.db,
+                                None,
                                 chunk_size=max_loader_chunk_size,
                                 dry_run=dry_run
-                                ) for i in range(loaders_number)]
+                                ) for _ in range(loaders_number)]
         for w in loaders:
             w.start()
         #
         # 'Audit the whole process and send e-mails'
         # auditor = AuditTrailProcess(
         #     audit_q,
-        #     self.r_server.db,
+        #     None,
         #     self.es,
         #     lookup_data=lookup_data,
         #     dry_run=dry_run,
@@ -655,7 +655,7 @@ class EvidenceValidationFileChecker():
             #     self.logger.debug('flushing index for dataource %s'%datasource)
             #     self.es.indices.flush(self.es_loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+datasource),
             #                           wait_if_ongoing=True)
-            
+
         self.logger.info('collecting reporter')
         q_reporter.join()
         return
