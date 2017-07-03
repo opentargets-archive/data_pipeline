@@ -382,7 +382,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                         else error_messages[:2048] + ' ; ...'
 
                     explanation['validation_errors'] = error_messages
-                    self.la.log(l.ERROR, 'validation_errors failed to validate %s:%i '
+                    self.la.log(l.DEBUG, 'validation_errors failed to validate %s:%i '
                                       'eval %s secs with these errors %s',
                                       file_path, line_counter, str(t2 - t1),
                                       error_messages)
