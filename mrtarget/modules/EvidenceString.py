@@ -1112,7 +1112,8 @@ class EvidenceStringProcess():
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=lookup_data_types,
-                                          autoload=True
+                                          autoload=True,
+                                          es_pub = self.es_pub,
                                           ).lookup
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
