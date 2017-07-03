@@ -4,6 +4,7 @@ import time
 
 import pickle
 from tqdm import tqdm
+from mrtarget.common import TqdmToLogger
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.ChEMBL import ChEMBLLookup
@@ -83,11 +84,13 @@ class LookUpDataRetriever(object):
         
         self.lookup = LookUpData()
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
         # TODO: run the steps in parallel to speedup loading times
         for dt in tqdm(data_types,
                        desc='loading lookup data',
                        unit=' steps',
+                       file=tqdm_out,
                        leave=False):
             start_time = time.time()
             if dt == LookUpDataType.TARGET:
