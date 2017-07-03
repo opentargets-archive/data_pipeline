@@ -1,3 +1,4 @@
+import logging
 from collections import OrderedDict
 from tqdm import tqdm 
 from mrtarget.common import TqdmToLogger
