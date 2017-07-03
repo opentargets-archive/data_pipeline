@@ -12,8 +12,9 @@ import ftputil as ftputil
 import requests
 from dateutil.parser import parse
 from lxml import etree,objectify
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 from mrtarget.common.NLP import init_spacy_english_language
-from tqdm import tqdm
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -25,6 +26,7 @@ from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 
 logger = logging.getLogger(__name__)
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 MAX_PUBLICATION_CHUNKS =100
 
@@ -106,23 +108,23 @@ class PublicationFetcher(object):
             pub_ids = [pub_ids]
 
         '''get from elasticsearch cache'''
-        logging.debug( "getting pub id {}".format( pub_ids))
+        self.logger.debug( "getting pub id {}".format( pub_ids))
         pubs ={}
         try:
 
             for pub_source in self.es_query.get_publications_by_id(pub_ids):
-                logging.debug( 'got pub %s from cache'%pub_source['pub_id'])
+                self.logger.debug( 'got pub %s from cache'%pub_source['pub_id'])
                 pub = Publication()
                 pub.load_json(pub_source)
                 pubs[pub.pub_id] = pub
             # if len(pubs)<pub_ids:
             #     for pub_id in pub_ids:
             #         if pub_id not in pubs:
-            #             logging.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
+            #             self.logger.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
             #             r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
             #             r.raise_for_status()
             #             result = r.json()['resultList']['result'][0]
-            #             logging.debug("Publication data --- {}" .format(result))
+            #             self.logger.debug("Publication data --- {}" .format(result))
             #             pub = Publication(pub_id=pub_id,
             #                           title=result['title'],
             #                           abstract=result['abstractText'],
@@ -161,12 +163,12 @@ class PublicationFetcher(object):
             #     self.loader.flush()
         except Exception, error:
 
-            logging.error("Error in retrieving publication data for pmid {} ".format(pub_ids))
+            self.logger.error("Error in retrieving publication data for pmid {} ".format(pub_ids))
             pubs = None
             if error:
-                logging.info(str(error))
+                self.logger.info(str(error))
             else:
-                logging.info(Exception.message)
+                self.logger.info(Exception.message)
 
         return pubs
 
@@ -189,7 +191,7 @@ class PublicationFetcher(object):
         return pub
 
     # def get_publication_with_analyzed_data(self, pub_ids):
-    #     # logging.debug("getting publication/analyzed data for id {}".format(pub_ids))
+    #     # self.logger.debug("getting publication/analyzed data for id {}".format(pub_ids))
     #     pubs = {}
     #     for parent_publication,analyzed_publication in self.es_query.get_publications_with_analyzed_data(ids=pub_ids):
     #         pub = Publication()
@@ -440,6 +442,7 @@ class MedlineRetriever(object):
         self.dry_run = dry_run
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
     def fetch(self,
               local_file_locn = [],
@@ -533,7 +536,8 @@ class MedlineRetriever(object):
         #filter for update files
         gzip_files = [i for i in files if i.endswith('.xml.gz')]
         for file_ in tqdm(gzip_files,
-                  desc='enqueuing remote files'):
+                  desc='enqueuing remote files',
+                  file=tqdm_out):
             if host.path.isfile(file_):
                 # Remote name, local name, binary mode
                 file_path = os.path.join(pubmed_xml_locn, file_)
@@ -548,12 +552,12 @@ class MedlineRetriever(object):
 
         loaders.join()
 
-        logging.info('flushing data to index')
+        self.logger.info('flushing data to index')
         if not self.dry_run:
             self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
                 wait_if_ongoing=True)
 
-        logging.info("DONE")
+        self.logger.info("DONE")
 
 
 
@@ -572,6 +576,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
         self.update = update
         self.es_query = ESQuery()
         if update:
@@ -595,7 +600,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 entries_in_file += 1
 
         if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE and not self.update:
-            logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
+            self.logger.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
 
     def fetch_file(self,file_path):
         if not os.path.isfile(file_path):
@@ -616,6 +621,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                          total = file_size,
                          unit = 'B',
                          unit_scale = True,
+                         file=tqdm_out,
                          disable=self.logger.level == logging.DEBUG)
                 for chunk in response.iter_content(chunk_size=128):
                     file_handler.write(chunk)
@@ -903,7 +909,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                 pub,
                                 create_index=False)
             except KeyError as e:
-                logging.exception("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
+                self.logger.exception("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
                     pub.id,
                     pub.filename,
                     e.message))

@@ -17,6 +17,8 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 import ujson as json
 
 
@@ -202,6 +204,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         self.dry_run = dry_run
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
     def process(self, data):
         file_path, file_version, provider_id, data_source_name, md5_hash,\
@@ -382,7 +385,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                         else error_messages[:2048] + ' ; ...'
 
                     explanation['validation_errors'] = error_messages
-                    self.la.log(l.ERROR, 'validation_errors failed to validate %s:%i '
+                    self.la.log(l.DEBUG, 'validation_errors failed to validate %s:%i '
                                       'eval %s secs with these errors %s',
                                       file_path, line_counter, str(t2 - t1),
                                       error_messages)
