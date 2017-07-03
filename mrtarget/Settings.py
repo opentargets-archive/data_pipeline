@@ -9,7 +9,6 @@ from envparse import env, ConfigurationError
 import mrtarget
 import petl
 import multiprocessing as mp
-import tempfile
 import logging
 
 from mrtarget.common import URLZSource
@@ -25,17 +24,17 @@ def from_expression_to_map(filename):
         agg['tissues'] = ('tissue_name','tissue_id'), dict
         t = petl.fromcsv(URLZSource(filename),delimiter='|')
         t_agg = petl.aggregate(t, key=['organ_name','organ_id'], aggregation=agg)
-        
+
         ret['organ'] = dict(t_agg.cut('organ_name','organ_id').data().tol())
         ret['tissue'] = {}
-        
+
         for e in t_agg.cut('tissues').data():
             ret['tissue'].update(e[0])
-    
+
     except Exception:
         logger.error('impossible to generate the inverse mapping dict for uberon'
                      ' mapping file so either the url or content is not correct')
-        
+
     finally:
         return ret
 
@@ -138,7 +137,7 @@ def update_schema_version(config, schema_version_string):
                                                               schema_version_string)
 
 
-class Config():  
+class Config():
     EV_LIMIT = read_option('CTTV_EV_LIMIT', cast=bool, default=False)
     MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
@@ -162,7 +161,7 @@ class Config():
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.06')
+    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='')
 
     # [elasticsearch]
 
@@ -236,6 +235,8 @@ class Config():
         '4932':'yeast'
     }
 
+    OMIM_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/xref_mappings/omim_to_efo.txt'
+
     # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP = from_expression_to_map(TISSUE_TRANSLATION_MAP_URL)
@@ -306,7 +307,7 @@ class Config():
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
     # TODO remove refs to user directories
-    MOUSEMODELS_CACHE_DIRECTORY = '/Users/koscieln/.phenodigmcache'
+    MOUSEMODELS_CACHE_DIRECTORY = '/Users/otvisitor/.phenodigmcache'
 
     # hardcoded folder of json file to be preprocessed to extract
     # HP and MP terms not in EFO but that will be combined in a SLIM
@@ -384,9 +385,8 @@ class Config():
 
     TEMP_DIR = os.path.sep + 'tmp'
 
-    REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
-    
-    # 
+    REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
+                                   cast=bool, default=False)
     REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
         read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
 

@@ -11,19 +11,17 @@ import opentargets.model.evidence.association_score as association_score
 import opentargets.model.evidence.mutation as evidence_mutation
 from mrtarget.common.ElasticsearchQuery import ESQuery
 
-
-__copyright__ = "Copyright 2014-2016, Open Targets"
-__credits__ = ["Gautier Koscielny", "David Tamborero"]
-__license__ = "Apache 2.0"
-__version__ = "1.2.2"
-__maintainer__ = "Gautier Koscielny"
-__email__ = "gautierk@targetvalidation.org"
-__status__ = "Production"
+__copyright__  = "Copyright 2014-2017, Open Targets"
+__credits__    = ["Gautier Koscielny", "David Tamborero"]
+__license__    = "Apache 2.0"
+__version__    = "1.2.6"
+__maintainer__ = "ChuangKee Ong"
+__email__      = ["gautierk@targetvalidation.org", "ckong@ebi.ac.uk"]
+__status__     = "Production"
 
 INTOGEN_RELEASE_DATE = ''
-#INTOGEN_FILENAME = 'C:\Users\gk680303\github\data_pipeline\resources\intogen_opentargets.tsv'
 INTOGEN_FILENAME = file_or_resource('intogen_opentargets.tsv')
-INTOGEN_EVIDENCE_FILENAME = '/Users/koscieln/Documents/data/ftp/cttv001/upload/submissions/cttv001_intogen-29-07-2016.json'
+INTOGEN_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_intogen-01-06-2017.json'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {
     'A' : 'the gene exhibits several signals of positive selection in the tumor type',
@@ -119,10 +117,10 @@ class IntOGenActions(Actions):
 
 class IntOGen():
 
-    def __init__(self, es, sparql):
+    def __init__(self, es=None, r_server=None):
         self.es = es
-        self.esquery = ESQuery(self.es)
-        self.sparql = sparql
+        self.r_server = r_server
+        self.esquery  = ESQuery(self.es)
         self.evidence_strings = list()
         self.ensembl_current = {}
         self.symbols = {}
@@ -197,7 +195,7 @@ class IntOGen():
                         value=INTOGEN_SCORE_MAP[Evidence])
 
                     evidenceString = opentargets.Literature_Curated()
-                    evidenceString.validated_against_schema_version = '1.2.3'
+                    evidenceString.validated_against_schema_version = '1.2.6'
                     evidenceString.access_level = "public"
                     evidenceString.type = "somatic_mutation"
                     evidenceString.sourceID = "intogen"
@@ -235,17 +233,20 @@ class IntOGen():
                         self.logger.error("%s is not found in Ensembl" % Symbol)
                         continue
 
+                    # id = [ "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id) ], #["http://identifiers.org/ensembl/{0}".format(Ensg)],
                     evidenceString.target = bioentity.Target(
-                                            id = [ "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id) ], #["http://identifiers.org/ensembl/{0}".format(Ensg)],
+                        id= "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id),
                                             target_name = Symbol,
                                             activity=INTOGEN_ROLE_MAP[Role],
                                             target_type='http://identifiers.org/cttv.target/gene_evidence'
                                             )
 
+#                    id = [INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['uri']],
+#                    name = [INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['label']]
                     ''' disease information '''
                     evidenceString.disease = bioentity.Disease(
-                                            id = [INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['uri']],
-                                            name=[INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['label']]
+                                            id = INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['uri'],
+                                            name=INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['label']
                                             )
 
                     ''' evidence '''
@@ -312,8 +313,6 @@ def main():
     import logging
     logger = logging.getLogger(__name__)
     logger.info("Load IntOGen data")
-    itg = IntOGen()
-    itg.read_intogen('')
 
 if __name__ == "__main__":
     main()

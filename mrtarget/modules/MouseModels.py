@@ -25,12 +25,12 @@ import opentargets.model.evidence.core as evidence_core
 import opentargets.model.evidence.association_score as association_score
 
 
-__copyright__ = "Copyright 2014-2016, The Centre for Therapeutic Target Validation (CTTV)"
+__copyright__ = "Copyright 2014-2017, The Centre for Therapeutic Target Validation (CTTV)"
 __credits__ = ["Gautier Koscielny", "Damian Smedley"]
 __license__ = "Apache 2.0"
-__version__ = "1.2.3"
+__version__ = "1.2.6"
 __maintainer__ = "Gautier Koscielny"
-__email__ = "gautierk@targetvalidation.org"
+__email__ = "gautierk@opentargets.org"
 __status__ = "Production"
 
 class MouseModelsActions(Actions):
@@ -93,7 +93,7 @@ class Phenodigm():
         self._logger.info("Loaded {0} hs genes".format(len(self.mmGenes)))
 
     def update_cache(self):
-        hdr = { 'User-Agent' : 'cttv bot by /center/for/therapeutic/target/validation' }
+        hdr = { 'User-Agent' : 'open targets bot @ targetvalidation.org' }
         conn = httplib.HTTPConnection(Config.MOUSEMODELS_PHENODIGM_SOLR)
 
         for dir in [Config.MOUSEMODELS_CACHE_DIRECTORY]:
@@ -135,9 +135,10 @@ class Phenodigm():
         for part in parts:
             self._logger.info("processing {0}\n".format(part))
             with open(part, "r") as myfile:
-                rsp = eval(myfile.read())
-                for doc in rsp['response']['docs']:
-                    if doc['type'] == 'gene' and 'hgnc_id' in doc:
+                print "Load array from file %s"%part
+                rsp = json.loads(myfile.read())
+                for doc in rsp:
+                    if doc['type'] == 'gene' and 'hgnc_gene_id' in doc:
                         hgnc_gene_symbol = doc['hgnc_gene_symbol']
                         if hgnc_gene_symbol and not hgnc_gene_symbol in self.hsGenes and hgnc_gene_symbol not in hs_buffer:
                             hs_buffer.append(hgnc_gene_symbol)
@@ -209,19 +210,20 @@ class Phenodigm():
     def parse_phenodigm_files(self):
         parts = self.list_files(Config.MOUSEMODELS_CACHE_DIRECTORY)
         parts.sort()
+        parts.append(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "disease_model_association.json"))
         for part in parts:
             self._logger.info("Processing PhenoDigm chunk {0}".format(part))
             with open (part, "r") as myfile:
-                rsp = eval(myfile.read())
-                for doc in rsp['response']['docs']:
-                    if doc['type'] == 'gene' and 'hgnc_id' in doc:
-                        hgnc_id = doc['hgnc_id']
+                rsp = json.loads(myfile.read())
+                for doc in rsp:
+                    if doc['type'] == 'gene' and 'hgnc_gene_id' in doc:
+                        hgnc_gene_id = doc['hgnc_gene_id']
                         hgnc_gene_symbol = doc['hgnc_gene_symbol']
-                        self.symbol2hgncids[hgnc_gene_symbol] = hgnc_id
+                        self.symbol2hgncids[hgnc_gene_symbol] = hgnc_gene_id
                         marker_symbol = doc['marker_symbol']
-                        if hgnc_id and not hgnc_id in self.hgnc2mgis:
-                            self.hgnc2mgis[hgnc_id] = []
-                        self.hgnc2mgis[hgnc_id].append(marker_symbol)
+                        if hgnc_gene_id and not hgnc_gene_id in self.hgnc2mgis:
+                            self.hgnc2mgis[hgnc_gene_id] = []
+                        self.hgnc2mgis[hgnc_gene_id].append(marker_symbol)
                     elif doc['type'] == 'mouse_model':
                         marker_symbol = doc['marker_symbol']
                         model_id = doc['model_id']
@@ -236,7 +238,7 @@ class Phenodigm():
                             self.mouse_model2diseases[model_id] = []
                         self.mouse_model2diseases[model_id].append(doc)
                     elif doc['type'] == 'disease_gene_summary' and doc['in_locus'] is True and 'disease_id' in doc:
-                        hgnc_id = doc['hgnc_id']
+                        hgnc_gene_id = doc['hgnc_gene_id']
                         hgnc_gene_symbol = doc['hgnc_gene_symbol']
                         marker_symbol = doc['marker_symbol']
                         try:
@@ -250,11 +252,11 @@ class Phenodigm():
                                 self._logger.error(json.dumps(doc, indent=4))
                                 raise Exception()
                         if not disease_id in self.disease_gene_locus:
-                            self.disease_gene_locus[disease_id] = { hgnc_id: [ marker_symbol ] }
-                        elif not hgnc_id in self.disease_gene_locus[disease_id]:
-                            self.disease_gene_locus[disease_id][hgnc_id] = [ marker_symbol ]
+                            self.disease_gene_locus[disease_id] = { hgnc_gene_id: [ marker_symbol ] }
+                        elif not hgnc_gene_id in self.disease_gene_locus[disease_id]:
+                            self.disease_gene_locus[disease_id][hgnc_gene_id] = [ marker_symbol ]
                         else:
-                            self.disease_gene_locus[disease_id][hgnc_id].append(marker_symbol)
+                            self.disease_gene_locus[disease_id][hgnc_gene_id].append(marker_symbol)
                     elif doc['type'] == 'disease' or (doc['type'] == 'disease_gene_summary' and 'disease_id' in doc and not doc['disease_id'] in self.diseases):
                         '''and doc['disease_id'].startswith('ORPHANET')):'''
                         disease_id = doc['disease_id']
@@ -266,6 +268,9 @@ class Phenodigm():
                         #        terms = OMIMmap[disease_id]
                         #    if terms == None:
                         #        self._logger.error("{0} '{1}' not in EFO".format(disease_id, doc['disease_term']))
+                    #else:
+                    #    self._logger.error("Never heard of this '%s' type of documents in PhenoDigm. Exiting..."%(doc['type']))
+                    #    sys.exit(1)
             myfile.close()    
 
     def generate_phenodigm_evidence_strings(self):
@@ -278,21 +283,24 @@ class Phenodigm():
         index_g = 0
         for hs_symbol in self.hsGenes:
             index_g +=1
-            hgnc_id = self.symbol2hgncids[hs_symbol]
+            hgnc_gene_id = self.symbol2hgncids[hs_symbol]
             hs_ensembl_gene_id = self.hsGenes[hs_symbol]
 
-            if hgnc_id and hs_ensembl_gene_id and re.match('^ENSG.*', hs_ensembl_gene_id) and hgnc_id in self.hgnc2mgis:
 
-                self._logger.info("processing human gene {0} {1} {2} {3}".format(index_g, hs_symbol, hs_ensembl_gene_id, hgnc_id ))
+
+            if hgnc_gene_id and hs_ensembl_gene_id and re.match('^ENSG.*', hs_ensembl_gene_id) and hgnc_gene_id in self.hgnc2mgis:
+
+                self._logger.info("processing human gene {0} {1} {2} {3}".format(index_g, hs_symbol, hs_ensembl_gene_id, hgnc_gene_id ))
 
                 '''
                  Retrieve mouse models
                 '''
-                for marker_symbol in self.hgnc2mgis[hgnc_id]:
+                for marker_symbol in self.hgnc2mgis[hgnc_gene_id]:
                 
                     #if not marker_symbol == "Il13":
                     #    continue;
                     print marker_symbol;
+                    self._logger.info("\tProcessing mouse gene symbol %s" % (marker_symbol))
                     
                     '''
                     Some mouse symbol are not mapped in Ensembl
@@ -303,6 +311,9 @@ class Phenodigm():
                          Some genes don't have any mouse models...
                         '''
                         if marker_symbol in self.mgi2mouse_models:
+
+                            self._logger.info("\tFound %i mouse models for this marker" % (len(self.mgi2mouse_models[marker_symbol])))
+
                             '''
                              if the marker is associated to mouse models
                             '''
@@ -313,11 +324,14 @@ class Phenodigm():
                                 mouse_model = self.mouse_models[model_id]
                                 marker_accession = mouse_model['marker_accession']
                                 allelic_composition = mouse_model['allelic_composition']
-                                self._logger.info("Mouse model {0} for {1}".format(model_id, marker_accession))
+                                self._logger.info("\t\tMouse model {0} for {1}".format(model_id, marker_accession))
                                 '''
                                  Check the model_id is in the dictionary containing all the models 
                                 '''
                                 if model_id in self.mouse_model2diseases:
+
+                                    self._logger.info("\t\tMouse model {0} is in the dictionary containing all the models".format(model_id))
+
                                     for mouse_model2disease in self.mouse_model2diseases[model_id]:
                                         '''
                                          get the disease identifier
@@ -386,7 +400,7 @@ class Phenodigm():
                                         and mouse_model2disease['model_to_disease_score'] >= 50
                                         '''
                                         if disease_term_uris is not None and (('model_to_disease_score' in mouse_model2disease ) or
-                                            (disease_id in self.disease_gene_locus and hgnc_id in self.disease_gene_locus[disease_id] and marker_symbol in self.disease_gene_locus[disease_id][hgnc_id])):
+                                            (disease_id in self.disease_gene_locus and hgnc_gene_id in self.disease_gene_locus[disease_id] and marker_symbol in self.disease_gene_locus[disease_id][hgnc_gene_id])):
 
                                             for disease_uri in disease_term_uris:
 
@@ -396,14 +410,14 @@ class Phenodigm():
                                             
 
                                             
-                                                # 1.2.3 create an Animal_Models class
+                                                # 1.2.6 create an Animal_Models class
                                                 evidenceString = cttv.Animal_Models()
-                                                evidenceString.validated_against_schema_version = '1.2.3'
+                                                evidenceString.validated_against_schema_version = '1.2.6'
                                                 evidenceString.access_level = "public"
                                                 evidenceString.type = "animal_model"
                                                 evidenceString.sourceID = "phenodigm"
                                                 evidenceString.unique_association_fields = {}
-                                                evidenceString.unique_association_fields['projectName'] = 'cttv_external_mousemodels'
+                                                evidenceString.unique_association_fields['projectName'] = 'otar_external_mousemodels'
                                                 evidenceString.evidence = cttv.Animal_ModelsEvidence()
                                                 evidenceString.evidence.date_asserted = now.isoformat()
                                                 evidenceString.evidence.is_associated = True
@@ -412,7 +426,7 @@ class Phenodigm():
                                                 Target
                                                 '''
                                                 evidenceString.target = bioentity.Target(
-                                                    id=["http://identifiers.org/ensembl/{0}".format(hs_ensembl_gene_id)],
+                                                    id="http://identifiers.org/ensembl/{0}".format(hs_ensembl_gene_id),
                                                     activity="http://identifiers.org/cttv.activity/predicted_damaging",
                                                     target_type="http://identifiers.org/cttv.target/gene_evidence"
                                                     )
@@ -425,8 +439,8 @@ class Phenodigm():
                                                     name = self.efo.current_classes[disease_uri]
 
                                                 evidenceString.disease = bioentity.Disease(
-                                                    id = [disease_uri],
-                                                    name=[name]
+                                                    id = disease_uri,
+                                                    name=name
                                                     )
 
                                                 '''
@@ -584,15 +598,15 @@ class Phenodigm():
                                             self._logger.error("No disease id {0}".format(disease_term_uris == None))
                                             self._logger.error("model_to_disease_score in mouse_model2disease: {0}".format( 'model_to_disease_score' in mouse_model2disease) )    
                                             self._logger.error("disease_id in disease_gene_locus: {0}".format(disease_id in self.disease_gene_locus))
-                                            self._logger.error("hs_symbol in disease_gene_locus[disease_id]: {0}".format(not disease_term_uris == None and disease_id in self.disease_gene_locus and hgnc_id in self.disease_gene_locus[disease_id]))
-                                            self._logger.error("marker_symbol in disease_gene_locus[disease_id][hgnc_id]): {0}".format(disease_term_uris is not None and disease_id in self.disease_gene_locus and marker_symbol in self.disease_gene_locus[disease_id][hgnc_id]))
+                                            self._logger.error("hs_symbol in disease_gene_locus[disease_id]: {0}".format(not disease_term_uris == None and disease_id in self.disease_gene_locus and hgnc_gene_id in self.disease_gene_locus[disease_id]))
+                                            self._logger.error("marker_symbol in disease_gene_locus[disease_id][hgnc_gene_id]): {0}".format(disease_term_uris is not None and disease_id in self.disease_gene_locus and marker_symbol in self.disease_gene_locus[disease_id][hgnc_gene_id]))
 
     def write_phenodigm_evidence_strings(self, path):
-        cttvFile = open(path + "/cttv_external_mousemodels.json", "w")
+        cttvFile = open(path + "/otar_external_mousemodels.json", "w")
         #cttvFile.write("[\n")
         countExported = 0
         for hashkey in self.hashkeys:
-        
+            self._logger("Processing key %s"%(hashkey))
             evidenceString = self.hashkeys[hashkey]
             
             error = evidenceString.validate(self._logger)
@@ -643,7 +657,16 @@ class Phenodigm():
         self._logger.info("Build evidence")
         self.generate_phenodigm_evidence_strings()
         bar.update()
-        self._logger.info("write evidence")
+        self._logger.info("write evidence strings")
         self.write_phenodigm_evidence_strings(Config.MOUSEMODELS_CACHE_DIRECTORY)
         bar.update()
         return
+
+def main():
+
+    ph = Phenodigm()
+    ph.generate_evidence()
+    #g2p.generate_evidence_strings(G2P_FILENAME)
+
+if __name__ == "__main__":
+    main()

@@ -26,6 +26,7 @@ import math
 
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from mrtarget.Settings import Config
+from mrtarget.common.connection import new_redis_client
 
 
 
@@ -234,7 +235,14 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
                            r.to_json(),
                            create_index=False,
                            routing=r.subject['id'])
+
+        def init(self):
+            super(DistanceStorageWorker, self).init()
+            self.loader = Loader(chunk_size=self.chunk_size,
+                                 dry_run=self.dry_run)
+
         def close(self):
+            super(DistanceStorageWorker, self).close()
             self.loader.close()
 
 
@@ -322,7 +330,7 @@ class RedisRelationHandler(object):
 
         self.r_server = r_server
         if self.r_server is None:
-            self.r_server = Redis( serverconfig={'save': []})
+            self.r_server = new_redis_client()
         self.target_data = target_data
         self.disease_data = disease_data
         self.available_targets = target_data.keys()
@@ -372,7 +380,7 @@ class RelationHandler(object):
 
         self.r_server = r_server
         if self.r_server is None:
-            self.r_server = Redis( serverconfig={'save': []})
+            self.r_server = new_redis_client()
         self.target_data = target_data
         self.disease_data = disease_data
         self.available_targets = ordered_target_keys
@@ -490,7 +498,7 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
 
 
         pair_producers = [RelationHandlerEuristicOverlapEstimationPairProducer(subject_analysis_queue,
-                                                                               redis_path.db,
+                                                                               None,
                                                                                produced_pairs_queue,
                                                                                vector_hashes,
                                                                                buckets,
@@ -504,8 +512,8 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
         for i in tqdm(range(len(subject_ids[:limit])),
                       desc='getting neighbors',
                       file=tqdm_out):
-            subject_analysis_queue.put(i, r_server=redis_path)
-        subject_analysis_queue.set_submission_finished(r_server=redis_path)
+            subject_analysis_queue.put(i, r_server=self.r_server)
+        subject_analysis_queue.set_submission_finished(r_server=self.r_server)
 
         for w in pair_producers:
             w.join()
@@ -684,11 +692,11 @@ class DataDrivenRelationProcess(object):
         q_reporter.start()
 
         storage_workers = [DistanceStorageWorker(queue_storage,
-                                                 self.r_server.db,
+                                                 None,
                                                  dry_run=dry_run,
                                                  chunk_size=queue_per_worker,
                                                  # ) for i in range(multiprocessing.cpu_count())]
-                                                 ) for i in range(number_of_storers)]
+                                                 ) for _ in range(number_of_storers)]
 
         for w in storage_workers:
             w.start()
@@ -696,7 +704,7 @@ class DataDrivenRelationProcess(object):
         '''start workers for d2d'''
 
         d2d_workers = [DistanceComputationWorker(d2d_queue_processing,
-                                                 self.r_server.db,
+                                                 None,
                                                  queue_storage,
                                                  RelationType.SHARED_TARGET,
                                                  disease_labels,
@@ -704,7 +712,7 @@ class DataDrivenRelationProcess(object):
                                                  target_keys,
                                                  0.2,
                                                  auto_signal_submission_finished = False,# don't signal submission is done until t2t workers are done
-                                                 ) for i in range(number_of_workers*2)]
+                                                 ) for _ in range(number_of_workers*2)]
         for w in d2d_workers:
             w.start()
 
@@ -718,14 +726,14 @@ class DataDrivenRelationProcess(object):
         '''start workers for t2t'''
 
         t2t_workers = [DistanceComputationWorker(t2t_queue_processing,
-                                                 self.r_server.db,
+                                                 None,
                                                  queue_storage,
                                                  RelationType.SHARED_DISEASE,
                                                  target_labels,
                                                  target_keys,
                                                  disease_keys,
                                                  0.4,
-                                                 ) for i in range(number_of_workers*2)]
+                                                 ) for _ in range(number_of_workers*2)]
         for w in t2t_workers:
             w.start()
 

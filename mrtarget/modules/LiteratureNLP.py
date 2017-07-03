@@ -139,10 +139,10 @@ class AbstractNormalizer(object):
         return unidecode(text)
 
 class PerceptronNPExtractor(BaseNPExtractor):
-    '''modified from 
+    '''modified from
 
     http://thetokenizer.com/2013/05/09/efficient-way-to-extract-the-main-topics-of-a-sentence/
-    
+
     To use Perceptron POS Tagger (more accurate)
     '''
 
@@ -311,7 +311,7 @@ class LiteratureNLPProcess(object):
 
         # Start literature-analyser-worker processes
         analyzers = [LiteratureAnalyzerProcess(literature_q,
-                                               self.r_server.db,
+                                               None,
                                                dry_run,
                                                ) for i in range(no_of_workers)]
 
@@ -1052,8 +1052,8 @@ class SentenceAnalysisSpacy(object):
     def get_extended_verb(self, v):
         '''
         given a verb build a representative chain of verbs for the sintax tree
-        :param v: 
-        :return: 
+        :param v:
+        :return:
         '''
         verb_modifiers = [prep,agent]
         verb_path = [v]
@@ -1074,17 +1074,17 @@ class SentenceAnalysisSpacy(object):
     def get_verb_path_from_ancestors(self, tok):
         '''
         given a token return the chain of verbs of his ancestors
-        :param tok: 
-        :return: 
+        :param tok:
+        :return:
         '''
         return [i for i in tok.ancestors if i.pos == VERB and i.dep != aux]
 
     def get_extended_token(self, tok):
         '''
         given a token find a more descriptive string extending it with its chindren
-        :param tok: 
-        :param doc: 
-        :return: 
+        :param tok:
+        :param doc:
+        :return:
         '''
         allowed_pos = [NOUN, ADJ, PUNCT, PROPN]
         allowed_dep = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "dobj",  "attr", "oprd", "pobj",# "conj",
@@ -1115,9 +1115,9 @@ class SentenceAnalysisSpacy(object):
     def traverse_obj_children(self, tok, verb_path):
         '''
         iterate over all the children and the conjuncts to return objects within the same chain of verbs
-        :param tok: 
-        :param verb_path: 
-        :return: 
+        :param tok:
+        :param verb_path:
+        :return:
         '''
         for i in tok.children:
             # print i, verb_path, get_verb_path_from_ancestors(i), get_verb_path_from_ancestors(i) ==verb_path
@@ -1152,9 +1152,9 @@ class SentenceAnalysisSpacy(object):
     def get_dependent_obj(self, tok, verb_path):
         '''
         given a token find related objects for the sape chain of verbs (verb_path
-        :param tok: 
-        :param verb_path: 
-        :return: 
+        :param tok:
+        :param verb_path:
+        :return:
         '''
         all_descendants = []
         if tok.dep_ in OBJECTS and (self.get_verb_path_from_ancestors(tok) == verb_path):
@@ -1177,8 +1177,8 @@ class SentenceAnalysisSpacy(object):
     def collapse_noun_phrases_by_punctation(self):
         '''
         this collapse needs tobe used on a single sentence, otherwise it will ocncatenate different sentences
-        :param sentence: 
-        :return: 
+        :param sentence:
+        :return:
         '''
         prev_span = ''
         open_brackets = u'( { [ <'.split()
