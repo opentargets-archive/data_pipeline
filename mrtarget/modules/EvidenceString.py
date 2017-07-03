@@ -775,26 +775,34 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'genetic_association':
                 score=0.
                 if 'gene2variant' in self.evidence['evidence']:
-                    g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
-                    if self.evidence['evidence']['variant2disease']['resource_score']['type'] == 'pvalue':
-                        # if self.evidence['sourceID']=='gwas_catalog':#temporary fix
-                        #     v2d_score = self._get_score_from_pvalue_linear(float(self.evidence[
-                        # 'unique_association_fields']['pvalue']))
-                        # else:
-                        v2d_score = self._get_score_from_pvalue_linear(
-                            self.evidence['evidence']['variant2disease']['resource_score']['value'])
-                    elif self.evidence['evidence']['variant2disease']['resource_score']['type'] == 'probability':
-                        v2d_score = self.evidence['evidence']['variant2disease']['resource_score']['value']
-                    else:
-                        v2d_score = 0.
-                    if self.evidence['sourceID'] == 'gwas_catalog':
-                        sample_size = self.evidence['evidence']['variant2disease']['gwas_sample_size']
-                        score = self._score_gwascatalog(
+                    if self.evidence['sourceID'] == 'phewascatalog':
+                        no_of_cases = self.evidence['unique_association_fields']['cases']
+                        score = self._score_phewascatalog(
                             self.evidence['evidence']['variant2disease']['resource_score']['value'],
-                            sample_size,
-                            g2v_score)
+                            no_of_cases)
+
                     else:
-                        score = g2v_score * v2d_score
+
+                        g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
+                        if self.evidence['evidence']['variant2disease']['resource_score']['type'] == 'pvalue':
+                            # if self.evidence['sourceID']=='gwas_catalog':#temporary fix
+                            #     v2d_score = self._get_score_from_pvalue_linear(float(self.evidence[
+                            # 'unique_association_fields']['pvalue']))
+                            # else:
+                            v2d_score = self._get_score_from_pvalue_linear(
+                                self.evidence['evidence']['variant2disease']['resource_score']['value'])
+                        elif self.evidence['evidence']['variant2disease']['resource_score']['type'] == 'probability':
+                            v2d_score = self.evidence['evidence']['variant2disease']['resource_score']['value']
+                        else:
+                            v2d_score = 0.
+                        if self.evidence['sourceID'] == 'gwas_catalog':
+                            sample_size = self.evidence['evidence']['variant2disease']['gwas_sample_size']
+                            score = self._score_gwascatalog(
+                                self.evidence['evidence']['variant2disease']['resource_score']['value'],
+                                sample_size,
+                                g2v_score)
+                        else:
+                            score = g2v_score * v2d_score
                 else:
                     if self.evidence['evidence']['resource_score']['type'] == 'probability':
                         score = self.evidence['evidence']['resource_score']['value']
@@ -901,6 +909,14 @@ class Evidence(JSONSerializable):
         # logger.debug("gwas score: %f | pvalue %f %f | sample size%f %f |severity %f" % (score, pvalue,
         # normalised_pvalue, sample_size,normalised_sample_size, severity))
         return score
+
+    def _score_phewascatalog(self, pvalue, no_of_cases):
+        normalised_pvalue = self._get_score_from_pvalue_linear(float(pvalue), range_min=1, range_max=1e-15)
+        normalised_no_of_cases = DataNormaliser.renormalize(no_of_cases, [0, 5000], [0, 1])
+        score = normalised_pvalue * normalised_no_of_cases
+        return score
+
+
 
 
 class UploadError():
