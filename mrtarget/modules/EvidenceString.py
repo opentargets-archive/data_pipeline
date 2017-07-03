@@ -6,7 +6,7 @@ import multiprocessing
 import time
 
 from elasticsearch import Elasticsearch
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
@@ -1015,7 +1015,7 @@ class EvidenceProcesser(multiprocessing.Process):
                         # logger.info('%s processed'%idev)
                     else:
                         # traceback.print_exc(limit=1, file=sys.stdout)
-                        raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
+                        raise AttributeError("Invalid %s Evidence String" % fixed_ev.datasource)
                     # if fixed:
                     #     fix+=1
                     self.output_q.put((idev, ev_string_to_load))
