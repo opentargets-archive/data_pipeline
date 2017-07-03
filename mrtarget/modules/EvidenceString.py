@@ -1083,11 +1083,13 @@ class EvidenceStorerWorker(multiprocessing.Process):
 class EvidenceStringProcess():
     def __init__(self,
                  es,
-                 r_server):
+                 r_server,
+                 es_pub):
         self.loaded_entries_to_pg = 0
         self.es = es
         self.es_query = ESQuery(es)
         self.r_server = r_server
+        self.es_pub = es_pub
 
     def process_all(self, datasources=[], dry_run=False, inject_literature=False):
         return self._process_evidence_string_data(datasources=datasources,
