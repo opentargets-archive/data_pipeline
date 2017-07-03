@@ -1099,9 +1099,12 @@ class EvidenceStringProcess():
 
         logger.debug("Starting Evidence Manager")
 
-        lookup_data_types = [LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
+        lookup_data_types = [LookUpDataType.TARGET,
+                             LookUpDataType.DISEASE,
+                             LookUpDataType.ECO]
         if inject_literature:
-            lookup_data_types = [LookUpDataType.PUBLICATION,LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
+            lookup_data_types.append(LookUpDataType.PUBLICATION)
+
             # lookup_data_types.append(LookUpDataType.PUBLICATION)
 
         lookup_data = LookUpDataRetriever(self.es,
@@ -1111,17 +1114,21 @@ class EvidenceStringProcess():
                                           ).lookup
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
-        '''create and overwrite old data'''
+
+        # create and overwrite old data
         loader = Loader(self.es)
         overwrite_indices = not dry_run
         if not dry_run:
             overwrite_indices = not bool(datasources)
+
         for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
             loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=overwrite_indices)
             loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v))
+
         loader.create_new_index(
             Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default'],
             recreate=overwrite_indices)
+
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
         if datasources and overwrite_indices:
@@ -1192,18 +1199,19 @@ class EvidenceStringProcess():
             targets_with_data.add(ev.evidence['target']['id'][0])
             if input_generated_count.value % 1e4 == 0:
                 logger.info("%i entries submitted for process" % (input_generated_count.value))
+
         input_loading_finished.set()
 
         '''wait for other processes to finish'''
         while not data_storage_finished.is_set():
             time.sleep(.1)
+
         for w in scorers:
-            if w.is_alive():
-                w.terminate()
+            w.join()
+
         for w in storers:
-            if w.is_alive():
-                time.sleep(.1)
-                w.terminate()
+            w.join()
+
         logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
 
         loader.close()
