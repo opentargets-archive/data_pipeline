@@ -142,7 +142,7 @@ class Loader():
                         break
                     else:
                         time_to_wait = 5*retry
-                        self.logger.error("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
+                        self.logger.warning("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
                         time.sleep(time_to_wait)
             self.cache = []
 
