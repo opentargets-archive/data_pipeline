@@ -6,7 +6,8 @@ import multiprocessing
 import time
 
 from elasticsearch import Elasticsearch
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
@@ -24,6 +25,7 @@ from mrtarget.common.connection import PipelineConnectors
 
 
 logger = logging.getLogger(__name__)
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 # logger = multiprocessing.get_logger()
 
 
@@ -1104,6 +1106,7 @@ class EvidenceStringProcess():
         self.es = es
         self.es_query = ESQuery(es)
         self.r_server = r_server
+        self.logger = logging.getLogger(__name__)
 
     def process_all(self, datasources=[], dry_run=False, inject_literature=False):
         return self._process_evidence_string_data(datasources=datasources,
@@ -1146,7 +1149,7 @@ class EvidenceStringProcess():
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
         if datasources and overwrite_indices:
-            logging.info('deleting data for datasources %s'%','.join(datasources))
+            self.logger.info('deleting data for datasources %s'%','.join(datasources))
             self.es_query.delete_evidence_for_datasources(datasources)
 
         '''create queues'''
@@ -1204,6 +1207,7 @@ class EvidenceStringProcess():
                         desc='Reading available evidence_strings',
                         total=self.es_query.count_validated_evidence_strings(datasources=datasources),
                         unit=' evidence',
+                        file=tqdm_out,
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name'])
             idev = row['uniq_assoc_fields_hashdig']
