@@ -980,8 +980,7 @@ class EvidenceProcesser(multiprocessing.Process):
                        self.input_generated_count.value == self.input_processed_count.value) and
                        self.input_loading_finished.is_set()):
             data = self.input_q.get()
-            with self.lock:
-                self.input_processed_count.value += 1
+            self.input_processed_count.value += 1
             if data:
                 idev, ev = data
                 try:
@@ -1002,13 +1001,11 @@ class EvidenceProcesser(multiprocessing.Process):
                     # if fixed:
                     #     fix+=1
                     self.output_q.put((idev, ev_string_to_load))
-                    with self.lock:
-                        self.output_computed_count.value += 1
+                    self.output_computed_count.value += 1
 
                 except Exception as error:
                     logger.exception(error)
-                    with self.lock:
-                        self.processing_errors_count.value += 1
+                    self.processing_errors_count.value += 1
                     # UploadError(ev, error, idev).save()
                     # err += 1
 
@@ -1063,10 +1060,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
                     if not self.q.empty():
                         output = self.q.get()
                         idev, ev = output
-                        storer.put(idev,
-                                   ev)
-                        with self.lock:
-                            self.total_loaded.value += 1
+                        storer.put(idev, ev)
+                        self.total_loaded.value += 1
                             # if self.total_loaded.value % (self.chunk_size*5) ==0:
                             #     logger.info("pushed %i entries to es"%self.total_loaded.value)
                     else:
@@ -1166,7 +1161,7 @@ class EvidenceStringProcess():
                                      input_processed_count,
                                      data_processing_lock,
                                      inject_literature
-                                     ) for i in range(workers_number)]
+                                     ) for _ in range(workers_number)]
         # ) for i in range(2)]
         for w in scorers:
             w.start()
@@ -1178,7 +1173,7 @@ class EvidenceStringProcess():
                                         output_computed_count,
                                         data_storage_lock,
                                         dry_run,
-                                        ) for i in range(workers_number)]
+                                        ) for _ in range(workers_number)]
         # ) for i in range(1)]
         for w in storers:
             w.start()
