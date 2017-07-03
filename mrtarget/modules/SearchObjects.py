@@ -295,7 +295,7 @@ class SearchObjectProcess(object):
         q_reporter.start()
         lookup_data = LookUpDataRetriever(self.loader.es,self.r_server,data_types=[LookUpDataType.CHEMBL_DRUGS]).lookup
         workers = [SearchObjectAnalyserWorker(queue,
-                                              self.r_server.db,
+                                              None,
                                               lookup=lookup_data,
                                               dry_run=dry_run) for i in range(Config.WORKERS_NUMBER)]
         # workers = [SearchObjectAnalyserWorker(queue)]

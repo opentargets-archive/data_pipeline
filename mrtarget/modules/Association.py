@@ -617,7 +617,7 @@ class ScoringProcess():
 
         '''create data storage workers'''
         storers = [ScoreStorerWorker(score_data_q,
-                                     self.r_server.db,
+                                     None,
                                      chunk_size=1000,
                                      dry_run = dry_run,
                                      ) for _ in range(number_of_storers)]
@@ -626,7 +626,7 @@ class ScoringProcess():
             w.start()
 
         scorers = [ScoreProducer(target_disease_pair_q,
-                                 self.r_server.db,
+                                 None,
                                  score_data_q,
                                  lookup_data,
                                  ) for _ in range(number_of_workers)]
@@ -636,7 +636,7 @@ class ScoringProcess():
 
         '''start target-disease evidence producer'''
         readers = [TargetDiseaseEvidenceProducer(target_q,
-                                                 self.r_server.db,
+                                                 None,
                                                  target_disease_pair_q,
                                                 ) for _ in range(number_of_workers*2)]
         for w in readers:
