@@ -281,7 +281,9 @@ def main():
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                targets = EvidenceStringProcess(connectors.es, connectors.r_server).process_all(datasources = args.datasource,
+                targets = EvidenceStringProcess(connectors.es,
+                                                connectors.r_server,
+                                                es_pub=connectors.es_pub).process_all(datasources = args.datasource,
                                                                           dry_run=args.dry_run,inject_literature=args.inject_literature)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
