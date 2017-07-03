@@ -148,6 +148,8 @@ class Config():
 
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=['http://127.0.0.1:9200'])
+    ELASTICSEARCH_NODES_PUB = read_option('ELASTICSEARCH_NODES_PUB', cast=list,
+                                      default=['http://127.0.0.1:9200'])
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'

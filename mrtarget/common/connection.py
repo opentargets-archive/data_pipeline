@@ -29,41 +29,79 @@ class PipelineConnectors():
             os.remove(Config.REDISLITE_DB_PATH)
         time.sleep(2)
 
-    def init_services_connections(self, redispersist=False):
-        '''init es client'''
-        connection_attempt = 1
+    def init_services_connections(self,
+                                  data_es = True,
+                                  publication_es = False,
+                                  redispersist=False):
         success = False
+        '''init es client for data'''
         hosts = Config.ELASTICSEARCH_NODES
-        if hosts:
+        if data_es and hosts:
             self.es = Elasticsearch(hosts=hosts,
-                                    maxsize=50,
-                                    timeout=1800,
-                                    # sniff_on_connection_fail=True,
-                                    #sniff_on_start=True,
-                                    #sniffer_timeout=60,
-                                    retry_on_timeout=True,
-                                    max_retries=10,
-                                    connection_class=RequestsHttpConnection,
-                                    verify_certs=True
-                                   )
+                                maxsize=50,
+                                timeout=1800,
+                                # sniff_on_connection_fail=True,
+                                #sniff_on_start=True,
+                                #sniffer_timeout=60,
+                                retry_on_timeout=True,
+                                max_retries=10,
+                                connection_class=RequestsHttpConnection,
+                                verify_certs=True
+                               )
             try:
                 connection_attempt = 1
                 while not self.es.ping():
                     wait_time = 3*connection_attempt
-                    self.logger.warn('Cannot connect to Elasticsearch retrying in %i', wait_time)
+                    self.logger.warn('Cannot connect to elasticsearch data nodes retrying in %i', wait_time)
                     time.sleep(wait_time)
                     if connection_attempt >= 3:
                         raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES))
                     connection_attempt += 1
-                self.logger.info('Connected to elasticsearch nodes: %s', str(Config.ELASTICSEARCH_NODES))
+                self.logger.info('Connected to elasticsearch data nodes: %s', str(Config.ELASTICSEARCH_NODES))
                 success = True
             except ConnectionTimeout:
-                self.logger.exception("Elasticsearch connection timeout")
+                self.logger.exception("Elasticsearch data nodes connection timeout")
 
         else:
-            self.logger.warn('No valid configuration available for elasticsearch')
+            self.logger.warn('No valid configuration available for elasticsearch data nodes')
             self.es = None
 
+        '''init es client for publication'''
+        pub_hosts = Config.ELASTICSEARCH_NODES_PUB
+        if pub_hosts != hosts:
+            if publication_es and pub_hosts:
+                self.es_pub  = Elasticsearch(hosts=pub_hosts,
+                                        maxsize=50,
+                                        timeout=1800,
+                                        # sniff_on_connection_fail=True,
+                                        # sniff_on_start=True,
+                                        # sniffer_timeout=60,
+                                        retry_on_timeout=True,
+                                        max_retries=10,
+                                        connection_class=RequestsHttpConnection,
+                                        verify_certs=True
+                                        )
+                try:
+                    connection_attempt = 1
+                    while not self.es.ping():
+                        wait_time = 3 * connection_attempt
+                        self.logger.warn('Cannot connect to elasticsearch publication nodes retrying in %i', wait_time)
+                        time.sleep(wait_time)
+                        if connection_attempt >= 3:
+                            raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES))
+                        connection_attempt += 1
+                    self.logger.info('Connected to elasticsearch publication nodes: %s', str(Config.ELASTICSEARCH_NODES))
+                    success = True
+                except ConnectionTimeout:
+                    self.logger.exception("Elasticsearch publication nodes connection timeout")
+
+            else:
+                self.logger.warn('No valid configuration available for elasticsearch publication nodes')
+                self.es_pub = None
+        else:
+            self.es_pub = self.es
+
+        '''init redislite erver'''
         if not redispersist:
             self.clear_redislite_db()
             self.logger.info('Clearing previous instances of redislite db...')
