@@ -13,6 +13,7 @@ from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.modules import GeneData
 from mrtarget.modules.ECO import ECO
@@ -22,6 +23,7 @@ from mrtarget.modules.Literature import Publication, PublicationFetcher
 from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common.connection import PipelineConnectors
+from aifc import data
 
 
 logger = logging.getLogger(__name__)
@@ -736,7 +738,6 @@ class Evidence(JSONSerializable):
 
     def stamp_data_release(self):
         self.evidence['data_release'] = Config.RELEASE_VERSION
-
         return
 
     def score_to_json(self):
@@ -960,29 +961,32 @@ class EvidenceProcesser(multiprocessing.Process):
                  output_computed_count,
                  processing_errors_count,
                  input_processed_count,
-                 lock,
+                 lock=None,
                  inject_literature,
                  es=None):
         super(EvidenceProcesser, self).__init__()
         self.input_q = input_q
         self.output_q = output_q
-        self.start_time = time.time()
-        self.evidence_manager = EvidenceManager(lookup_data)
+
+        self.lu_data = lookup_data
+        self.evidence_manager = None
+
         self.input_loading_finished = input_loading_finished
         self.output_computation_finished = output_computation_finished
         self.input_generated_count = input_generated_count
         self.output_computed_count = output_computed_count
         self.processing_errors_count = processing_errors_count
         self.input_processed_count = input_processed_count
-        self.start_time = time.time()  # reset timer start
-        self.lock = lock
+        self.start_time = None
         self.inject_literature = inject_literature
         self.pub_fetcher = None
 
     def run(self):
+        self.start_time = time.time()
         connector = PipelineConnectors()
         connector.init_services_connections()
         es = connector.es
+        self.evidence_manager = EvidenceManager(self.lu_data)
         self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
@@ -1042,55 +1046,44 @@ class EvidenceProcesser(multiprocessing.Process):
         logger.info("%s finished" % self.name)
 
 
-class EvidenceStorerWorker(multiprocessing.Process):
+class EvidenceStorerWorker(RedisQueueWorkerProcess):
     def __init__(self,
                  processing_output_q,
-                 processing_finished,
-                 signal_finish,
                  submitted_to_storage,
                  output_generated_count,
-                 lock,
                  chunk_size=1e4,
                  dry_run=False,
-                 es=None
-                 ):
-        super(EvidenceStorerWorker, self).__init__()
+                 es=None):
+        super(EvidenceStorerWorker, self).__init__(processing_output_q, None)
         self.q = processing_output_q
-        self.signal_finish = signal_finish
         self.chunk_size = chunk_size
-        self.processing_finished = processing_finished
         self.output_generated_count = output_generated_count
         self.total_loaded = submitted_to_storage
-        self.es = None
-        self.lock = lock
+        self.es = es
         self.dry_run = dry_run
+        self.loader = None
 
-    def run(self):
-        connector = PipelineConnectors()
-        connector.init_services_connections()
-        self.es = connector.es
+    def process(self, data):
+        # split data element
+        idev, ev = data
 
-        logger.info("worker %s started" % self.name)
-        with Loader(self.es, chunk_size=self.chunk_size, dry_run=self.dry_run) as es_loader:
-            with ProcessedEvidenceStorer(es_loader, chunk_size=self.chunk_size, quiet=False) as storer:
-                while not (((self.output_generated_count.value == self.total_loaded.value) and \
-                                    self.processing_finished.is_set()) or self.signal_finish.is_set()):
-                    if not self.q.empty():
-                        output = self.q.get()
-                        idev, ev = output
-                        storer.put(idev, ev)
-                        self.total_loaded.value += 1
-                            # if self.total_loaded.value % (self.chunk_size*5) ==0:
-                            #     logger.info("pushed %i entries to es"%self.total_loaded.value)
-                    else:
-                        time.sleep(0.01)
-                        # print self.name, (((self.output_generated_count.value == self.total_loaded.value) and \
-                        #         self.processing_finished.is_set()) or self.signal_finish.is_set()),
-                        # self.output_generated_count.value == self.total_loaded.value,
-                        # self.processing_finished.is_set(),  self.signal_finish.is_set(), self.total_loaded.value
+        self.loader.put(
+            Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + \
+            Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+            ev.get_doc_name(),
+            idev,
+            ev.to_json(),
+            create_index=False,
+            routing=ev.evidence['target']['id'])
 
-        self.signal_finish.set()
-        logger.info("%s finished" % self.name)
+    def init(self):
+        super(EvidenceStorerWorker, self).init()
+        self.loader = Loader(chunk_size=self.chunk_size,
+                             dry_run=self.dry_run)
+
+    def close(self):
+        super(EvidenceStorerWorker, self).close()
+        self.loader.close()
 
 
 class EvidenceStringProcess():
@@ -1116,7 +1109,7 @@ class EvidenceStringProcess():
         err = 0
         fix = 0
 
-        logger.debug("Starting Evidence Manager")
+        self.logger.info("Starting Evidence Manager")
 
         lookup_data_types = [LookUpDataType.TARGET,
                              LookUpDataType.DISEASE,
@@ -1132,7 +1125,6 @@ class EvidenceStringProcess():
                                           autoload=True
                                           ).lookup
         # lookup_data.available_genes.load_uniprot2ensembl()
-        get_evidence_page_size = 5000
 
         # create and overwrite old data
         loader = Loader(self.es)
@@ -1140,7 +1132,7 @@ class EvidenceStringProcess():
         if not dry_run:
             overwrite_indices = not bool(datasources)
 
-        for k, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
+        for _, v in Config.DATASOURCE_TO_INDEX_KEY_MAPPING:
             loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v, recreate=overwrite_indices)
             loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + v))
 
@@ -1151,17 +1143,9 @@ class EvidenceStringProcess():
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
         if datasources and overwrite_indices:
-            self.logger.info('deleting data for datasources %s'%','.join(datasources))
+            self.logger.info('deleting data for datasources %s',
+                             ','.join(datasources))
             self.es_query.delete_evidence_for_datasources(datasources)
-
-        '''create queues'''
-        input_q = multiprocessing.Queue(maxsize=get_evidence_page_size + 1)
-        output_q = multiprocessing.Queue(maxsize=get_evidence_page_size)
-        '''create events'''
-        input_loading_finished = multiprocessing.Event()
-        output_computation_finished = multiprocessing.Event()
-        data_storage_finished = multiprocessing.Event()
-        '''create shared memory objects'''
 
         input_generated_count = multiprocessing.Value('i', 0)
         processing_errors_count = multiprocessing.Value('i', 0)
@@ -1169,13 +1153,27 @@ class EvidenceStringProcess():
         input_processed_count = multiprocessing.Value('i', 0)
         submitted_to_storage_count = multiprocessing.Value('i', 0)
 
-        '''create locks'''
-        data_processing_lock = multiprocessing.Lock()
-        data_storage_lock = multiprocessing.Lock()
+        number_of_workers = Config.WORKERS_NUMBER
+        number_of_storers = min(16, number_of_workers)
+        queue_per_worker = 250
 
-        workers_number = Config.WORKERS_NUMBER
+        chunk_per_batch = queue_per_worker * number_of_workers
 
-        '''create workers'''
+        input_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|evidence_q',
+                              max_size=queue_per_worker * number_of_workers,
+                              job_timeout=3600,
+                              r_server=self.r_server)
+
+        output_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|store_q',
+                                  max_size=queue_per_worker * number_of_storers,
+                                  job_timeout=1200,
+                                  batch_size=10,
+                                  r_server=self.r_server,
+                                  serialiser=None)
+
+        q_reporter = RedisQueueStatusReporter([input_q, output_q], interval=30)
+        q_reporter.start()
+
         scorers = [EvidenceProcesser(input_q,
                                      output_q,
                                      lookup_data,
@@ -1187,25 +1185,22 @@ class EvidenceStringProcess():
                                      input_processed_count,
                                      data_processing_lock,
                                      inject_literature
-                                     ) for _ in range(workers_number)]
-        # ) for i in range(2)]
+                                     ) for _ in range(number_of_workers)]
+
         for w in scorers:
             w.start()
 
         storers = [EvidenceStorerWorker(output_q,
-                                        output_computation_finished,
-                                        data_storage_finished,
                                         submitted_to_storage_count,
                                         output_computed_count,
-                                        data_storage_lock,
-                                        dry_run,
-                                        ) for _ in range(workers_number)]
-        # ) for i in range(1)]
+                                        dry_run=dry_run,
+                                        ) for _ in range(number_of_storers)]
+
         for w in storers:
             w.start()
 
         targets_with_data = set()
-        for row in tqdm(self.get_evidence(page_size=get_evidence_page_size, datasources=datasources),
+        for row in tqdm(self.get_evidence(page_size=chunk_per_batch, datasources=datasources),
                         desc='Reading available evidence_strings',
                         total=self.es_query.count_validated_evidence_strings(datasources=datasources),
                         unit=' evidence',
@@ -1215,40 +1210,36 @@ class EvidenceStringProcess():
             idev = row['uniq_assoc_fields_hashdig']
             ev.evidence['id'] = idev
             input_q.put((idev, ev))
+
             input_generated_count.value += 1
             targets_with_data.add(ev.evidence['target']['id'][0])
             if input_generated_count.value % 1e4 == 0:
-                logger.info("%i entries submitted for process" % (input_generated_count.value))
+                self.logger.info("%i entries submitted for process", input_generated_count.value)
 
-        input_loading_finished.set()
-
-        '''wait for other processes to finish'''
-        while not data_storage_finished.is_set():
-            time.sleep(.1)
-
-        for w in scorers:
-            w.join()
+        input_q.set_submission_finished()
 
         for w in storers:
             w.join()
 
-        logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
+        for w in scorers:
+            w.join()
+
+        self.logger.info("%i entries processed with %i errors and %i fixes",
+                         base_id, err, fix)
 
         loader.close()
-        logger.info('flushing data to index')
+        self.logger.info('flushing data to index')
         self.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
                               wait_if_ongoing=True)
-
-        logger.info('Processed data for %i targets' % len(targets_with_data))
+        self.logger.info('Processed data for %i targets', len(targets_with_data))
 
         return list(targets_with_data)
 
     def get_evidence(self, page_size=5000, datasources=[]):
-
         c = 0
         for row in self.es_query.get_validated_evidence_strings(size=page_size, datasources=datasources):
             c += 1
             if c % page_size == 0:
-                logger.info("loaded %i ev from db to process" % c)
+                self.logger.info("loaded %i ev from db to process", c)
             yield row
-        logger.info("loaded %i ev from db to process" % c)
+        self.logger.info("loaded %i ev from db to process", c)
