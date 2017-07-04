@@ -963,7 +963,7 @@ class EvidenceProcesser(multiprocessing.Process):
 
     def run(self):
         connector = PipelineConnectors()
-        connector.init_services_connections()
+        connector.init_services_connections(publication_es=True)
         es = connector.es
         self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
@@ -1052,7 +1052,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
 
     def run(self):
         connector = PipelineConnectors()
-        connector.init_services_connections()
+        connector.init_services_connections(publication_es=True)
         self.es = connector.es
 
         logger.info("worker %s started" % self.name)

@@ -103,10 +103,10 @@ class PipelineConnectors():
                         time.sleep(wait_time)
                         if connection_attempt >= 3:
                             raise ConnectionTimeout(
-                                "Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES))
+                                "Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES_PUB))
                         connection_attempt += 1
                     self.logger.debug('Connected to elasticsearch publication nodes: %s',
-                                     str(Config.ELASTICSEARCH_NODES))
+                                     str(Config.ELASTICSEARCH_NODES_PUB))
                     success = True
                 except ConnectionTimeout:
                     self.logger.exception("Elasticsearch publication nodes connection timeout")
