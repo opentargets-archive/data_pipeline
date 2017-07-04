@@ -206,7 +206,7 @@ class PublicationFetcher(object):
         for publication_doc in self.es_query.get_publications_by_id(ids=pub_ids):
             pub = Publication()
             pub.load_json(publication_doc)
-            pubs[pub.pub_id] = pub
+            pubs[pub.id] = pub
         return pubs
 
 
