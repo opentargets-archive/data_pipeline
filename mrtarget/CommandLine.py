@@ -309,7 +309,10 @@ def main():
             if (DumpActions.DUMP in args.dump) or do_all:
                 DumpGenerator().dump()
 
+    logger.debug('close connectors')
     connectors.close()
+
+    logger.info('it was correctly executed - finished')
     return 0
 
 

@@ -5,7 +5,8 @@ import re
 import functools as ft
 from StringIO import StringIO
 from zipfile import ZipFile
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 import requests
 import petl
@@ -413,6 +414,8 @@ class HPALookUpTable(object):
         self._table = RedisLookupTablePickle(namespace=namespace,
                                              r_server=self.r_server,
                                              ttl=ttl)
+        self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
         if self.r_server:
             self._load_hpa_data(self.r_server)
@@ -423,6 +426,7 @@ class HPALookUpTable(object):
                        unit=' hpa',
                        unit_scale=True,
                        total=self._es_query.count_all_hpa(),
+                       file=tqdm_out,
                        leave=False):
             self.set_hpa(el, r_server=self._get_r_server(r_server))
 

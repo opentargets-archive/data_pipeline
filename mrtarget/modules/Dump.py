@@ -1,5 +1,6 @@
 import json
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 import gzip, time, logging
@@ -19,14 +20,14 @@ class DumpGenerator(object):
                                         port=Config.DUMP_REMOTE_API_PORT,
                                         auth_app_name=Config.DUMP_REMOTE_API_APPNAME,
                                         auth_secret=Config.DUMP_REMOTE_API_SECRET)
-
+        self.logger = logging.getLogger(__name__)
 
     def dump(self):
 
         '''dump evidence data'''
-        logging.info('Dumping association data')
+        self.logger.info('Dumping association data')
         a = self.client.filter_associations(size=10000, )
         a.to_file(Config.DUMP_FILE_ASSOCIATION, progress_bar=True)
-        logging.info('Dumping evidence data')
+        self.logger.info('Dumping evidence data')
         ev = self.client.filter_evidence(size=10000)
         ev.to_file(Config.DUMP_FILE_EVIDENCE, progress_bar=True)

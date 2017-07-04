@@ -1,6 +1,8 @@
 import logging
 
 from tqdm import tqdm
+from mrtarget.common import TqdmToLogger
+
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable, denormDict
 from mrtarget.common.ElasticsearchLoader import Loader
@@ -16,6 +18,7 @@ from mrtarget.Settings import Config
 
 global_reporting_step = 5e5
 logger = logging.getLogger(__name__)
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 
 class AssociationActions(Actions):
@@ -651,6 +654,7 @@ class ScoringProcess():
         for target in tqdm(targets,
                            desc='fetching evidence for targets',
                            unit=' targets',
+                           file=tqdm_out,
                            unit_scale=True):
             target_q.put(target)
         target_q.set_submission_finished()

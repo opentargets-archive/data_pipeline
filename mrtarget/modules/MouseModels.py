@@ -2,7 +2,8 @@ import sys
 import httplib
 import time
 import optparse
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 import logging
 import os
 import json
@@ -59,6 +60,7 @@ class Phenodigm():
         self.diseases = {}
         self.hashkeys = {}
         self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
 
     def list_files(self, path):
@@ -607,7 +609,7 @@ class Phenodigm():
             self._logger("Processing key %s"%(hashkey))
             evidenceString = self.hashkeys[hashkey]
             
-            error = evidenceString.validate(logging)
+            error = evidenceString.validate(self._logger)
             
             if error == 0:
     #        and (evidenceString.evidence.association_score.probability.value >= 0.5 || evidenceString.evidence.in_locus):
@@ -624,7 +626,8 @@ class Phenodigm():
 
         bar = tqdm(desc='Generate PhenoDigm evidence strings',
                    total=8,
-                   unit='steps')
+                   unit='steps',
+                   file=tqdm_out)
 
         self._logger.info("Load MP classes")
         self.mp.load_mp_classes()
