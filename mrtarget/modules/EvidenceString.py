@@ -982,13 +982,12 @@ class EvidenceProcesser(multiprocessing.Process):
     def run(self):
         connector = PipelineConnectors()
         connector.init_services_connections(publication_es=True)
-        es = connector.es
         self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
 
         # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
-        self.pub_fetcher = PublicationFetcher(es)
+        self.pub_fetcher = PublicationFetcher(connector.es_pub)
 
         logger.info("%s started" % self.name)
         # TODO : for testing
