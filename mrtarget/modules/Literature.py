@@ -206,7 +206,7 @@ class PublicationFetcher(object):
         for publication_doc in self.es_query.get_publications_by_id(ids=pub_ids):
             pub = Publication()
             pub.load_json(publication_doc)
-            pubs[pub.pub_id] = pub
+            pubs[pub.id] = pub
         return pubs
 
 
@@ -361,7 +361,7 @@ class LiteratureLookUpTable(object):
                                             ttl = ttl)
         if es is None:
             connector = PipelineConnectors()
-            connector.init_services_connections()
+            connector.init_services_connections(publication_es=True)
             es = connector.es
         self._es = es
         self._es_query = ESQuery(es)
