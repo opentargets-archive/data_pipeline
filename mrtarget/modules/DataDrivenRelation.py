@@ -620,7 +620,7 @@ class DataDrivenRelationProcess(object):
         if os.path.exists(tmp_data_dump):
             target_data, disease_data = pickle.load(open(tmp_data_dump))
         else:
-            target_data, disease_data = self.es_query.get_disease_to_targets_vectors
+            target_data, disease_data = self.es_query.get_disease_to_targets_vectors()
             pickle.dump((target_data, disease_data), open(tmp_data_dump, 'w'))
         logger.info('Retrieved all the associations data in %i s'%(time.time()-start_time))
         logger.info('target data length: %s size in memory: %f Kb'%(len(target_data),sys.getsizeof(target_data)/1024.))
