@@ -5,24 +5,22 @@ import math
 import multiprocessing
 import time
 
-from elasticsearch import Elasticsearch
-from tqdm import tqdm 
-from mrtarget.common import TqdmToLogger
+from tqdm import tqdm
 
+from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import Actions
+from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules import GeneData
 from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
-from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
-from mrtarget.Settings import Config, file_or_resource
-from mrtarget.common.connection import PipelineConnectors
-
+from mrtarget.modules.LiteratureNLP import NounChuncker
 
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger,level=logging.INFO)
@@ -198,13 +196,13 @@ class ExtendedInfoECO(ExtendedInfo):
 class ExtendedInfoLiterature(ExtendedInfo):
     root = "literature"
 
-    def __init__(self, literature, analyzed_literature):
+    def __init__(self, literature):
         if isinstance(literature, Publication):
-            self.extract_info(literature, analyzed_literature)
+            self.extract_info(literature)
         else:
             raise AttributeError("you need to pass a Publication not a: " + str(type(literature)))
 
-    def extract_info(self, literature, analyzed_literature):
+    def extract_info(self, literature):
 
         self.data = dict(abstract=literature.abstract,
                          journal=literature.journal,
@@ -213,10 +211,11 @@ class ExtendedInfoLiterature(ExtendedInfo):
                          doi=literature.doi,
                          pub_type=literature.pub_type,
                          mesh_headings=literature.mesh_headings,
+                         keywords=literature.keywords,
                          chemicals=literature.chemicals,
-                         abstract_lemmas=analyzed_literature.lemmas,
-                         noun_chunks=analyzed_literature.noun_chunks,
-                         date=literature.date,
+                         noun_chunks=literature.text_mined_entities['nlp']['chunks'],
+                         top_chunks = literature.text_mined_entities['nlp']['top_chunks'],
+                         date=literature.pub_date,
                          journal_reference = literature.journal_reference)
 
 
@@ -589,24 +588,20 @@ class EvidenceManager():
                 try:
                     pmid_url = extended_evidence['literature']['references'][0]['lit_id']
                     pmid = pmid_url.split('/')[-1]
-                    pubs={}
+                    pub=None
                     if pmid in self.available_publications:
                         pub = self.available_publications[pmid]
-                        pubs[pmid] = [pub, PublicationAnalysisSpacy(pmid)]
                     else:
-                        # pubs = pub_fetcher.get_publication_with_analyzed_data([pmid])
                         try:
                             pub_dict = pub_fetcher.get_publications(pmid)
                             if pub_dict:
-                                pubs[pmid] = [pub_dict[pmid], PublicationAnalysisSpacy(pmid)]
-                                # self.available_publications.set_literature(pub_dict[pmid])
+                                pub = pub_dict[pmid]
                         except KeyError as e:
                             logger.warning('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
 
 
-                    if pubs:
-                        pub, pub_analysis = pubs[pmid][0], pubs[pmid][1]
-                        literature_info = ExtendedInfoLiterature(pub, pub_analysis)
+                    if pub is not None:
+                        literature_info = ExtendedInfoLiterature(pub)
                         extended_evidence['literature']['date'] = literature_info.data['date']
                         extended_evidence['literature']['abstract'] = literature_info.data['abstract']
                         extended_evidence['literature']['journal_data'] = literature_info.data['journal']
@@ -621,16 +616,19 @@ class EvidenceManager():
                         extended_evidence['literature']['journal_reference'] = journal_reference
                         extended_evidence['literature']['authors'] = literature_info.data['authors']
                         extended_evidence['private']['facets']['literature'] = {}
-                        # extended_evidence['private']['facets']['literature']['abstract_lemmas'] = literature_info.data.get(
-                        #     'abstract_lemmas')
                         extended_evidence['literature']['doi'] = literature_info.data.get('doi')
                         extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
-                        extended_evidence['private']['facets']['literature']['mesh_headings'] = literature_info.data.get(
+                        extended_evidence['private']['facets']['literature'][
+                            'mesh_headings'] = literature_info.data.get(
                             'mesh_headings')
-                        # extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
-                        #     'chemicals')
-                        extended_evidence['private']['facets']['literature']['noun_chunks'] = self.noun_chuncker.digest(
-                            pub.get_text_to_analyze())
+                        extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
+                            'chemicals')
+                        extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
+                            'noun_chunks')
+                        extended_evidence['private']['facets']['literature']['top_chunks'] = literature_info.data.get(
+                            'top_chunks')
+                        extended_evidence['private']['facets']['literature']['keywords'] = literature_info.data.get('keywords')
+
                 except Exception:
                     logger.exception('Error in publication data injection - skipped for evidence id: '+extended_evidence['id'])
 
@@ -981,14 +979,13 @@ class EvidenceProcesser(multiprocessing.Process):
 
     def run(self):
         connector = PipelineConnectors()
-        connector.init_services_connections()
-        es = connector.es
+        connector.init_services_connections(publication_es=True)
         self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
 
         # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
-        self.pub_fetcher = PublicationFetcher(es)
+        self.pub_fetcher = PublicationFetcher(connector.es_pub)
 
         logger.info("%s started" % self.name)
         # TODO : for testing
@@ -1070,7 +1067,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
 
     def run(self):
         connector = PipelineConnectors()
-        connector.init_services_connections()
+        connector.init_services_connections(publication_es=True)
         self.es = connector.es
 
         logger.info("worker %s started" % self.name)
@@ -1101,11 +1098,13 @@ class EvidenceStorerWorker(multiprocessing.Process):
 class EvidenceStringProcess():
     def __init__(self,
                  es,
-                 r_server):
+                 r_server,
+                 es_pub):
         self.loaded_entries_to_pg = 0
         self.es = es
         self.es_query = ESQuery(es)
         self.r_server = r_server
+        self.es_pub = es_pub
         self.logger = logging.getLogger(__name__)
 
     def process_all(self, datasources=[], dry_run=False, inject_literature=False):
@@ -1131,7 +1130,8 @@ class EvidenceStringProcess():
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=lookup_data_types,
-                                          autoload=True
+                                          autoload=True,
+                                          es_pub = self.es_pub,
                                           ).lookup
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
