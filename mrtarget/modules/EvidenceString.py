@@ -6,7 +6,7 @@ import multiprocessing
 import time
 
 from elasticsearch import Elasticsearch
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
@@ -21,7 +21,7 @@ from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
 from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
 from mrtarget.Settings import Config, file_or_resource
-from mrtarget.common.connection import PipelineConnectors
+from mrtarget.common.connection import new_es_client, new_redis_client
 
 
 logger = logging.getLogger(__name__)
@@ -980,12 +980,11 @@ class EvidenceProcesser(multiprocessing.Process):
         self.pub_fetcher = None
 
     def run(self):
-        connector = PipelineConnectors()
-        connector.init_services_connections()
-        es = connector.es
-        self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
-        self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
-        self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
+        es = new_es_client()
+        r_server = new_redis_client()
+        self.evidence_manager.available_ecos._table.set_r_server(r_server)
+        self.evidence_manager.available_efos._table.set_r_server(r_server)
+        self.evidence_manager.available_genes._table.set_r_server(r_server)
 
         # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
         self.pub_fetcher = PublicationFetcher(es)
@@ -1069,9 +1068,7 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.dry_run = dry_run
 
     def run(self):
-        connector = PipelineConnectors()
-        connector.init_services_connections()
-        self.es = connector.es
+        self.es = new_es_client()
 
         logger.info("worker %s started" % self.name)
         with Loader(self.es, chunk_size=self.chunk_size, dry_run=self.dry_run) as es_loader:

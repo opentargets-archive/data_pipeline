@@ -18,6 +18,19 @@ def new_redis_client():
                  port=Config.REDISLITE_DB_PORT)
 
 
+def new_es_client(hosts=Config.ELASTICSEARCH_NODES):
+    return Elasticsearch(hosts=hosts,
+                         maxsize=50,
+                         timeout=1800,
+                         # sniff_on_connection_fail=True,
+                         # sniff_on_start=True,
+                         # sniffer_timeout=60,
+                         retry_on_timeout=True,
+                         max_retries=10,
+                         connection_class=RequestsHttpConnection,
+                         verify_certs=True)
+
+
 class PipelineConnectors():
 
     def __init__(self):
@@ -42,17 +55,7 @@ class PipelineConnectors():
         hosts = Config.ELASTICSEARCH_NODES
 
         if hosts:
-            self.es = Elasticsearch(hosts=hosts,
-                                    maxsize=50,
-                                    timeout=1800,
-                                    # sniff_on_connection_fail=True,
-                                    #sniff_on_start=True,
-                                    #sniffer_timeout=60,
-                                    retry_on_timeout=True,
-                                    max_retries=10,
-                                    connection_class=RequestsHttpConnection,
-                                    verify_certs=True
-                                   )
+            self.es = new_es_client(hosts)
             try:
                 connection_attempt = 1
                 while not self.es.ping():
