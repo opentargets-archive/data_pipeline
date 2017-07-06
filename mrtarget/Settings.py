@@ -345,7 +345,8 @@ class Config():
                                                          cttv025 = 'europepmc',
                                                          cttv005 = 'rare2common',
                                                          cttv010 = 'expression_atlas',
-                                                         cttv026 = 'phewascatalog'
+                                                         cttv026 = 'phewas_catalog',
+                                                         cttv027 = '23andme'
 
                                                 )
 
@@ -363,7 +364,8 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['phewascatalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['23andme'] = 'genetic_association'
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
