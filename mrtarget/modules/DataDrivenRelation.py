@@ -215,6 +215,7 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
             super(DistanceStorageWorker, self).__init__(queue_in, redis_path, queue_out)
             self.loader = None
             self.chunk_size = chunk_size
+            self.dry_run = dry_run
 
         def process(self, data):
             r = data
