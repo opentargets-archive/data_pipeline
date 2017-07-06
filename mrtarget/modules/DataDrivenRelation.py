@@ -328,11 +328,10 @@ class RedisRelationHandler(object):
         :return:
         '''
 
-#         self.r_server = r_server
-#         if self.r_server is None:
-#             self.r_server = new_redis_client()
+        self.r_server = r_server
+        if self.r_server is None:
+            self.r_server = new_redis_client()
 
-        self.r_server = new_redis_client()
         self.target_data = target_data
         self.disease_data = disease_data
         self.available_targets = target_data.keys()
@@ -380,11 +379,10 @@ class RelationHandler(object):
         :return:
         '''
 
-#         self.r_server = r_server
-#         if self.r_server is None:
-#             self.r_server = new_redis_client()
+        self.r_server = r_server
+        if self.r_server is None:
+            self.r_server = new_redis_client()
 
-        self.r_server = new_redis_client()
         self.target_data = target_data
         self.disease_data = disease_data
         self.available_targets = ordered_target_keys
@@ -469,6 +467,8 @@ class OverlapDistance(object):
 class RelationHandlerEuristicOverlapEstimation(RelationHandler):
 
     def _produce_pairs(self, subject_data, subject_ids, shared_ids, threshold=0.5, sample_size=512, subject_analysis_queue = None, produced_pairs_queue = None, redis_path = None):
+        # self.r_server = redis_path if redis_path else new_redis_client()
+        self.r_server = new_redis_client()
         vectorizer = DictVectorizer(sparse=True)
         # tdidf_transformer = LocalTfidfTransformer(smooth_idf=False, norm=None)
         tdidf_transformer = TfidfTransformer(smooth_idf=False, norm=None)
@@ -637,7 +637,8 @@ class DataDrivenRelationProcess(object):
         rel_handler = RelationHandlerEuristicOverlapEstimation(target_data=target_data,
                                                                disease_data=disease_data,
                                                                ordered_target_keys=target_keys,
-                                                               ordered_disease_keys=disease_keys)
+                                                               ordered_disease_keys=disease_keys,
+                                                               r_server=self.r_server)
         logger.info('getting disese labels')
         disease_id_to_label = self.es_query.get_disease_labels(disease_keys)
         disease_labels = [disease_id_to_label[hit_id] for hit_id in disease_keys]
