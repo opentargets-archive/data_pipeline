@@ -467,8 +467,8 @@ class OverlapDistance(object):
 class RelationHandlerEuristicOverlapEstimation(RelationHandler):
 
     def _produce_pairs(self, subject_data, subject_ids, shared_ids, threshold=0.5, sample_size=512, subject_analysis_queue = None, produced_pairs_queue = None, redis_path = None):
-        # self.r_server = redis_path if redis_path else new_redis_client()
-        self.r_server = new_redis_client()
+        self.r_server = redis_path if redis_path else new_redis_client()
+
         vectorizer = DictVectorizer(sparse=True)
         # tdidf_transformer = LocalTfidfTransformer(smooth_idf=False, norm=None)
         tdidf_transformer = TfidfTransformer(smooth_idf=False, norm=None)
