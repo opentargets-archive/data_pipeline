@@ -12,7 +12,7 @@ import scipy.sparse as sp
 from redislite import Redis
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
@@ -213,7 +213,7 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
                      dry_run = False,
                      chunk_size=1000):
             super(DistanceStorageWorker, self).__init__(queue_in, redis_path, queue_out)
-            self.loader = Loader( chunk_size=chunk_size, dry_run = dry_run)
+            self.loader = None
 
         def process(self, data):
             r = data
@@ -328,9 +328,11 @@ class RedisRelationHandler(object):
         :return:
         '''
 
-        self.r_server = r_server
-        if self.r_server is None:
-            self.r_server = new_redis_client()
+#         self.r_server = r_server
+#         if self.r_server is None:
+#             self.r_server = new_redis_client()
+
+        self.r_server = new_redis_client()
         self.target_data = target_data
         self.disease_data = disease_data
         self.available_targets = target_data.keys()
@@ -378,9 +380,11 @@ class RelationHandler(object):
         :return:
         '''
 
-        self.r_server = r_server
-        if self.r_server is None:
-            self.r_server = new_redis_client()
+#         self.r_server = r_server
+#         if self.r_server is None:
+#             self.r_server = new_redis_client()
+
+        self.r_server = new_redis_client()
         self.target_data = target_data
         self.disease_data = disease_data
         self.available_targets = ordered_target_keys
