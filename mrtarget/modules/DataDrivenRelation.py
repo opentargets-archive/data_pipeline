@@ -214,6 +214,7 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
                      chunk_size=1000):
             super(DistanceStorageWorker, self).__init__(queue_in, redis_path, queue_out)
             self.loader = None
+            self.chunk_size = chunk_size
 
         def process(self, data):
             r = data
@@ -633,6 +634,7 @@ class DataDrivenRelationProcess(object):
         number_of_storers = number_of_workers / 2
         queue_per_worker =150
 
+        logger.debug('call relationhandlereuristicoverlapestimation')
         # rel_handler = RelationHandlerProduceAll(target_data=target_data,
         rel_handler = RelationHandlerEuristicOverlapEstimation(target_data=target_data,
                                                                disease_data=disease_data,
@@ -650,7 +652,7 @@ class DataDrivenRelationProcess(object):
 
         '''create the index'''
         self.loader = Loader(self.es, dry_run=dry_run)
-        self.loader.create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME)
+        self.loader.create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME, recreate=True)
         self.loader.prepare_for_bulk_indexing(self.loader.get_versioned_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME))
 
 
@@ -685,7 +687,7 @@ class DataDrivenRelationProcess(object):
                                    max_size=int(queue_per_worker * number_of_storers*10),
                                    batch_size=10,
                                    job_timeout=300,
-                                   serialiser='jsonpickle')
+                                   serialiser='pickle')
         '''start shared workers'''
         q_reporter = RedisQueueStatusReporter([d2d_pair_producing,
                                                t2t_pair_producing,
