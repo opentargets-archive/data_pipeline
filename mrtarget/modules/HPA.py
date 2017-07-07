@@ -5,7 +5,7 @@ import re
 import functools as ft
 from StringIO import StringIO
 from zipfile import ZipFile
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
 import requests
@@ -19,6 +19,64 @@ from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
 from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 
 from mrtarget.Settings import Config
+from numpy.ma.mrecords import addfield
+from addict import Dict
+
+
+def level_from_text(key):
+    level_translation = {'Not detected': 0,
+                              'Low': 1,
+                              'Medium': 2,
+                              'High': 3,
+                              }
+    return level_translation[key]
+
+
+def reliability_from_text(key):
+    reliability_translation = {'Supportive': True,
+                                    'Uncertain': False,
+                                    ## new types for hpa v16
+                                    'Approved' : True,
+                                    'Supported': True,
+                                    }
+    return reliability_translation[key]
+
+
+def format_expression(rec):
+    d = Dict()
+    d.gene = rec['gene']
+    d.data_release = Config.RELEASE_VERSION
+    d.tissues = []
+    d.cancer = {}
+    d.subcellular_location = {}
+
+    tissues = []
+    for el in rec['data']:
+        t_code, t_name, c_types = el
+        tissue = Dict()
+        tissue.label = list(t_name)[0]
+        tissue.efo_code = t_code
+
+        protein = Dict()
+        protein.level = 0
+        protein.reliability = False
+
+        lct = []
+        for ct in c_types:
+            ct_name, ct_level, ct_reliability = ct
+            ctype = Dict()
+            ctype.level = ct_level
+            ctype.reliability = ct_reliability
+            ctype.name = ct_name
+            lct.append(ctype)
+
+        protein.cell_type = lct
+        tissue.protein = protein
+        tissues.append(tissue)
+
+
+    d.tissues = tissues
+    return d.to_dict()
 
 
 def code_from_tissue(tissue_name):
@@ -84,7 +142,7 @@ class HPAActions(Actions):
 class HPAExpression(JSONSerializable):
     def __init__(self, gene=None):
         self.gene = gene
-        self.tissues = {}
+        self.tissues = []
 
     def get_id(self):
         return self.gene
@@ -122,10 +180,31 @@ class HPADataDownloader():
                      'Reliability': 'reliability',
                      'Gene': 'gene'})
             .cut('tissue', 'cell_type', 'level', 'reliability', 'gene')
+            .addfield('tissue_label', lambda rec: rec['tissue']\
+                                                    .replace('1', '')\
+                                                    .replace('2', '')\
+                                                    .strip() )
+            .addfield('tissue_code', lambda rec: code_from_tissue(rec['tissue_label']))
+            .addfield('tissue_level', lambda rec: level_from_text(rec['level']))
+            .addfield('tissue_reliability', lambda rec: reliability_from_text(rec['reliability']))
+            .aggregate(('tissue_code', 'gene'),
+                       aggregation={'cell_types': (('cell_type','tissue_level',
+                                              'tissue_reliability'),list),
+                                    'tissue_label': ('tissue_label',set)},
+                       presorted=True)
+            .aggregate('gene', aggregation={'data': (('tissue_code',
+                                                      'tissue_label',
+                                                      'cell_types'),list)},
+                       presorted=True)
+            .addfield('result', lambda rec: format_expression(rec))
+            .cut('result')
             )
 
-        for d in petl.dicts(table):
-            yield d
+        # TODO just get the element and return as a dictionary
+#         for d in table.data():
+#             # yielding dict result
+#             yield d[0]
+        return table
 
     def retrieve_rna_data(self):
         """
@@ -213,7 +292,7 @@ class ExpressionObjectStorer(RedisQueueWorkerProcess):
         self.loader.put(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
                        Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
                        ID=geneid,
-                       body=gene['expression'].to_json(),
+                       body=gene,
                        create_index=False)
 
     def init(self):
@@ -238,8 +317,8 @@ class HPAProcess():
 
     def process_all(self, dry_run=False):
 
-        self.process_normal_tissue()
-        self.process_rna()
+        self.hpa_normal_table = self.process_normal_tissue()
+#         self.process_rna()
         self.store_data(dry_run=dry_run)
         self.loader.close()
 
@@ -247,17 +326,7 @@ class HPAProcess():
         return self.available_genes
 
     def process_normal_tissue(self):
-        self.normal_tissue_data = dict()
-        for row in self.downloader.retrieve_normal_tissue_data():
-            gene = row['gene']
-            if gene not in self.available_genes:
-                self.init_gene(gene)
-                self.normal_tissue_data[gene] = []
-                self.available_genes.add(gene)
-            self.normal_tissue_data[gene].append(row)
-        for gene in self.available_genes:
-            self.data[gene]['expression'].tissues = self.get_normal_tissue_data_for_gene(gene)
-        return
+        return self.downloader.retrieve_normal_tissue_data()
 
     def process_rna(self):
         self.rna_data = dict()
@@ -277,37 +346,39 @@ class HPAProcess():
 
     def store_data(self, dry_run=False):
         self.logger.info('store_data called')
-        if self.data.values()[0]['expression']:  # if there is expression data
-            self.logger.debug('calling to create new expression index')
-            self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-            queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
-                               r_server=self.r_server,
-                               serialiser='jsonpickle',
-                               max_size=10000,
-                               job_timeout=600)
 
-            q_reporter = RedisQueueStatusReporter([queue])
-            q_reporter.start()
+        self.logger.debug('calling to create new expression index')
+        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+        queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
+                           r_server=self.r_server,
+                           serialiser='jsonpickle',
+                           max_size=10000,
+                           job_timeout=600)
 
-            workers = [ExpressionObjectStorer(self.loader.es,
-                                        None,
-                                        queue,
-                                        dry_run=dry_run) for i in range(4)]
+        q_reporter = RedisQueueStatusReporter([queue])
+        q_reporter.start()
 
-            for w in workers:
-                w.start()
+        workers = [ExpressionObjectStorer(self.loader.es,
+                                    None,
+                                    queue,
+                                    dry_run=dry_run) for _ in range(4)]
 
-            for gene, data in self.data.items():
-                queue.put((gene, data), self.r_server)
+        for w in workers:
+            w.start()
 
-            queue.set_submission_finished(r_server=self.r_server)
+        for row in self.hpa_normal_table.data():
+            # just one field with all data frommated into a dict
+            hpa = row[0]
+            queue.put((hpa['gene'], hpa), self.r_server)
 
-            for w in workers:
-                w.join()
+        queue.set_submission_finished(r_server=self.r_server)
 
-            q_reporter.join()
+        for w in workers:
+            w.join()
 
-            self.logger.info('all expressions objects pushed to elasticsearch')
+        q_reporter.join()
+
+        self.logger.info('all expressions objects pushed to elasticsearch')
 
         if self.data.values()[0]['cancer']:  # if there is cancer data
             pass
@@ -343,13 +414,13 @@ class HPAProcess():
             if row['cell_type'] not in tissue_data[tissue]['protein']['cell_type']:
                 tissue_data[tissue]['protein']['cell_type'][row['cell_type']] = []
             tissue_data[tissue]['protein']['cell_type'][row['cell_type']].append(
-                dict(level=self.level_translation[row['level']],
-                     reliability=self.reliability_translation[row['reliability']],
+                dict(level=level_from_text(row['level']),
+                     reliability=reliability_from_text(row['reliability']),
                      ))
-            if self.level_translation[row['level']] > tissue_data[tissue]['protein']['level']:
-                tissue_data[tissue]['protein']['level'] = self.level_translation[row['level']]  # TODO: improvable by
+            if level_from_text(row['level']) > tissue_data[tissue]['protein']['level']:
+                tissue_data[tissue]['protein']['level'] = level_from_text(row['level'])
                 # giving higher priority to reliable annotations over uncertain
-            if self.reliability_translation[row['reliability']]:
+            if reliability_from_text(row['reliability']):
                 tissue_data[tissue]['protein']['reliability'] = True
 
         return tissue_data
@@ -382,19 +453,6 @@ class HPAProcess():
                 tissue_data[sample]['rna']['level'] = int(row['level'])
 
         return tissue_data
-
-    def set_translations(self):
-        self.level_translation = {'Not detected': 0,
-                                  'Low': 1,
-                                  'Medium': 2,
-                                  'High': 3,
-                                  }
-        self.reliability_translation = {'Supportive': True,
-                                        'Uncertain': False,
-                                        ## new types for hpa v16
-                                        'Approved' : True,
-                                        'Supported': True,
-                                        }
 
 
 class HPALookUpTable(object):
