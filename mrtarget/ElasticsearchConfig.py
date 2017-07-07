@@ -108,7 +108,7 @@ class ElasticSearchConfiguration():
 
     unip = Dict()
     unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.type = 'binary'
-    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.store = False
+    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.store = True
     unip.settings.number_of_shards = '1'
     unip.settings.number_of_replicas = generic_replicas_number
     unip.settings.refresh_interval = '60s'
@@ -117,9 +117,9 @@ class ElasticSearchConfiguration():
 
     ecom = Dict()
 
-    ecom.mappings.properties.code.type = 'keyword'
-    ecom.mappings.properties.path_codes.type = 'keyword'
-    ecom.mappings.properties.path.properties.url.type = 'keyword'
+    ecom.mappings[Config.ELASTICSEARCH_ECO_DOC_NAME].properties.code.type = 'keyword'
+    ecom.mappings[Config.ELASTICSEARCH_ECO_DOC_NAME].properties.path_codes.type = 'keyword'
+    ecom.mappings[Config.ELASTICSEARCH_ECO_DOC_NAME].properties.path.properties.uri.type = 'keyword'
     ecom.settings.number_of_shards = generic_shard_number
     ecom.settings.number_of_replicas = generic_replicas_number
     ecom.settings.refresh_interval = '60s'
@@ -129,9 +129,9 @@ class ElasticSearchConfiguration():
     efom = Dict()
     efomp = Dict()
     efomp.code.type = 'keyword'
-    efomp.phenotypes.uri.type = 'keyword'
+    efomp.phenotypes.properties.uri.type = 'keyword'
     efomp.path_codes.type = 'keyword'
-    efomp.path.properties.url.type = 'keyword'
+    efomp.path.properties.uri.type = 'keyword'
     efom.mappings[Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME].properties = efomp
 
     efom.settings.number_of_shards = generic_shard_number
@@ -366,7 +366,8 @@ class ElasticSearchConfiguration():
                 "evidence_string_template": {
                     "path_match": "evidence_string.*",
                     "mapping": {
-                        "index": "no"
+                        "type": "binary",
+                        "store": True
                     }
                 }
             },
