@@ -23,7 +23,8 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, \
     RedisQueueWorkerProcess, RedisLookupTablePickle, \
     WhiteCollarWorker, RedisQueueWorkerThread
-from mrtarget.common.connection import new_es_client, new_redis_client
+from mrtarget.common.connection import new_es_client, new_redis_client, \
+    PipelineConnectors
 from mrtarget.Settings import Config
 
 logger = logging.getLogger(__name__)
@@ -207,7 +208,7 @@ class PublicationFetcher(object):
         for publication_doc in self.es_query.get_publications_by_id(ids=pub_ids):
             pub = Publication()
             pub.load_json(publication_doc)
-            pubs[pub.pub_id] = pub
+            pubs[pub.id] = pub
         return pubs
 
 
@@ -360,7 +361,13 @@ class LiteratureLookUpTable(object):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = r_server,
                                             ttl = ttl)
-        self._es = es if es else new_es_client()
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections(publication_es=True)
+            self._es = connector.es_pub
+        else:
+            self._es = es
+
         self._es_query = ESQuery(self._es)
         self.r_server = r_server if r_server else new_redis_client()
 

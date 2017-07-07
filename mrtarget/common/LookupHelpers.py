@@ -73,9 +73,12 @@ class LookUpDataRetriever(object):
                  data_types=(LookUpDataType.TARGET,
                              LookUpDataType.DISEASE,
                              LookUpDataType.ECO),
-                 autoload=True):
+                 autoload=True,
+                 es_pub=None,
+                 ):
 
         self.es = es
+        self.es_pub = es_pub
         self.r_server = r_server
 
         self.esquery = ESQuery(self.es)
@@ -200,7 +203,7 @@ class LookUpDataRetriever(object):
 
     def _get_available_publications(self):
         self.logger.info('getting literature/publications')
-        self.lookup.available_publications = LiteratureLookUpTable(self.es, 'LITERATURE_LOOKUP', self.r_server)
+        self.lookup.available_publications = LiteratureLookUpTable(self.es_pub, 'LITERATURE_LOOKUP', self.r_server)
 
 
     def _get_from_pickled_file_cache(self, file_id):

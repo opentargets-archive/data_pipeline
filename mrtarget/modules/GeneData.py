@@ -724,7 +724,7 @@ class GeneLookUpTable(object):
                                             r_server = self.r_server,
                                             ttl = ttl)
         self._logger = logging.getLogger(__name__)
-        tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
+        self.tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
         self.uniprot2ensembl = {}
         if self.r_server and autoload:
             self.load_gene_data(self.r_server, targets)
