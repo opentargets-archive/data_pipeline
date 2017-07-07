@@ -107,7 +107,8 @@ class ElasticSearchConfiguration():
     bulk_load_chunk = 1000
 
     unip = Dict()
-    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.type = 'keyword'
+    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.type = 'binary'
+    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.store = False
     unip.settings.number_of_shards = '1'
     unip.settings.number_of_replicas = generic_replicas_number
     unip.settings.refresh_interval = '60s'
