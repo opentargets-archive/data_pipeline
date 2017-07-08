@@ -12,7 +12,7 @@ import scipy.sparse as sp
 from redislite import Redis
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
@@ -213,7 +213,9 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
                      dry_run = False,
                      chunk_size=1000):
             super(DistanceStorageWorker, self).__init__(queue_in, redis_path, queue_out)
-            self.loader = Loader( chunk_size=chunk_size, dry_run = dry_run)
+            self.loader = None
+            self.chunk_size = chunk_size
+            self.dry_run = dry_run
 
         def process(self, data):
             r = data
@@ -331,6 +333,7 @@ class RedisRelationHandler(object):
         self.r_server = r_server
         if self.r_server is None:
             self.r_server = new_redis_client()
+
         self.target_data = target_data
         self.disease_data = disease_data
         self.available_targets = target_data.keys()
@@ -381,6 +384,7 @@ class RelationHandler(object):
         self.r_server = r_server
         if self.r_server is None:
             self.r_server = new_redis_client()
+
         self.target_data = target_data
         self.disease_data = disease_data
         self.available_targets = ordered_target_keys
@@ -465,6 +469,8 @@ class OverlapDistance(object):
 class RelationHandlerEuristicOverlapEstimation(RelationHandler):
 
     def _produce_pairs(self, subject_data, subject_ids, shared_ids, threshold=0.5, sample_size=512, subject_analysis_queue = None, produced_pairs_queue = None, redis_path = None):
+        self.r_server = redis_path if redis_path else new_redis_client()
+
         vectorizer = DictVectorizer(sparse=True)
         # tdidf_transformer = LocalTfidfTransformer(smooth_idf=False, norm=None)
         tdidf_transformer = TfidfTransformer(smooth_idf=False, norm=None)
@@ -616,7 +622,7 @@ class DataDrivenRelationProcess(object):
         if os.path.exists(tmp_data_dump):
             target_data, disease_data = pickle.load(open(tmp_data_dump))
         else:
-            target_data, disease_data = self.es_query.get_disease_to_targets_vectors
+            target_data, disease_data = self.es_query.get_disease_to_targets_vectors()
             pickle.dump((target_data, disease_data), open(tmp_data_dump, 'w'))
         logger.info('Retrieved all the associations data in %i s'%(time.time()-start_time))
         logger.info('target data length: %s size in memory: %f Kb'%(len(target_data),sys.getsizeof(target_data)/1024.))
@@ -629,11 +635,13 @@ class DataDrivenRelationProcess(object):
         number_of_storers = number_of_workers / 2
         queue_per_worker =150
 
+        logger.debug('call relationhandlereuristicoverlapestimation')
         # rel_handler = RelationHandlerProduceAll(target_data=target_data,
         rel_handler = RelationHandlerEuristicOverlapEstimation(target_data=target_data,
                                                                disease_data=disease_data,
                                                                ordered_target_keys=target_keys,
-                                                               ordered_disease_keys=disease_keys)
+                                                               ordered_disease_keys=disease_keys,
+                                                               r_server=self.r_server)
         logger.info('getting disese labels')
         disease_id_to_label = self.es_query.get_disease_labels(disease_keys)
         disease_labels = [disease_id_to_label[hit_id] for hit_id in disease_keys]
@@ -645,7 +653,7 @@ class DataDrivenRelationProcess(object):
 
         '''create the index'''
         self.loader = Loader(self.es, dry_run=dry_run)
-        self.loader.create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME)
+        self.loader.create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME, recreate=True)
         self.loader.prepare_for_bulk_indexing(self.loader.get_versioned_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME))
 
 
@@ -680,7 +688,7 @@ class DataDrivenRelationProcess(object):
                                    max_size=int(queue_per_worker * number_of_storers*10),
                                    batch_size=10,
                                    job_timeout=300,
-                                   serialiser='jsonpickle')
+                                   serialiser='pickle')
         '''start shared workers'''
         q_reporter = RedisQueueStatusReporter([d2d_pair_producing,
                                                t2t_pair_producing,
