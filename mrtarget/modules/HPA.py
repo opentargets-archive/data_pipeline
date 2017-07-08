@@ -13,13 +13,11 @@ import petl
 from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
-from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
 from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 
 from mrtarget.Settings import Config
-from numpy.ma.mrecords import addfield
 from addict import Dict
 
 
@@ -51,6 +49,7 @@ def format_expression(rec):
     d.subcellular_location = {}
 
     tissues = []
+    # for each tissue
     for el in rec['data']:
         t_code, t_name, c_types = el
         tissue = Dict()
@@ -62,6 +61,7 @@ def format_expression(rec):
         protein.reliability = False
 
         lct = []
+        # iterate all cell_types
         for ct in c_types:
             ct_name, ct_level, ct_reliability = ct
             ctype = Dict()
@@ -70,14 +70,21 @@ def format_expression(rec):
             ctype.name = ct_name
             lct.append(ctype)
 
+            if ct_level > protein.level:
+                protein.level = ct_level
+                protein.reliability = ct_reliability
+
         protein.cell_type = lct
         tissue.protein = protein
         tissues.append(tissue)
 
-
     d.tissues = tissues
     return d.to_dict()
 
+
+def format_expression_with_rna(rec):
+    # get gene,result,data = rec
+    return rec
 
 def code_from_tissue(tissue_name):
     t2m = Config.TISSUE_TRANSLATION_MAP['tissue']
@@ -187,7 +194,10 @@ class HPADataDownloader():
             .addfield('tissue_code', lambda rec: code_from_tissue(rec['tissue_label']))
             .addfield('tissue_level', lambda rec: level_from_text(rec['level']))
             .addfield('tissue_reliability', lambda rec: reliability_from_text(rec['reliability']))
-            .aggregate(('tissue_code', 'gene'),
+            .cut('gene', 'tissue_code',
+                 'tissue_label', 'tissue_level',
+                 'tissue_reliability', 'cell_type')
+            .aggregate(('gene', 'tissue_code'),
                        aggregation={'cell_types': (('cell_type','tissue_level',
                                               'tissue_reliability'),list),
                                     'tissue_label': ('tissue_label',set)},
@@ -197,7 +207,7 @@ class HPADataDownloader():
                                                       'cell_types'),list)},
                        presorted=True)
             .addfield('result', lambda rec: format_expression(rec))
-            .cut('result')
+            .cut('gene','result')
             )
 
         # TODO just get the element and return as a dictionary
@@ -215,34 +225,48 @@ class HPADataDownloader():
         """
         self.logger.info('get rna tissue rows into dicts')
         self.logger.debug('melting rna level table into geneid tissue level')
-        t_level = petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL),
+        t_level = (
+            petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL),
                                delimiter='\t')
-        headers = t_level.header()
-        t_level = petl.setheader(t_level,
-                                ['ID'] + [e.split('_')[1] \
-                                          if '_' in e else e \
-                                    for e in headers if e != 'ID'])
-        t_level = petl.melt(t_level, key='ID',
-                            variablefield='sample',
-                            valuefield='level')
-        t_level = petl.rename(t_level, {'ID': 'gene'})
+            .melt(key='ID', variablefield='tissue', valuefield='rna_level')
+            .rename({'ID': 'gene'})
+            .addfield('tissue_label', lambda rec: rec['tissue']\
+                                                    .replace('1', '')\
+                                                    .replace('2', '')\
+                                                    .strip() )
+            .addfield('tissue_code', lambda rec: code_from_tissue(rec['tissue_label']))
+            .cutout('tissue')
+        )
 
-        t_value = petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL),
+
+        t_value = (
+            petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL),
                                delimiter='\t')
-        t_value = petl.setheader(t_value,
-                                ['ID'] + [e.split('_')[1] \
-                                          if '_' in e else e \
-                                    for e in t_value.header() if e != 'ID'])
-        t_value = petl.melt(t_value, key='ID',
-                            variablefield='sample',
-                            valuefield='value')
-        t_value = petl.rename(t_value, {'ID': 'gene'})
-        t_value = petl.addfield(t_value, 'unit', 'TPM')
+            .melt(key='ID', variablefield='tissue', valuefield='rna_value')
+            .rename({'ID': 'gene'})
+            .addfield('tissue_label', lambda rec: rec['tissue']\
+                                                    .replace('1', '')\
+                                                    .replace('2', '')\
+                                                    .strip() )
+            .addfield('tissue_code', lambda rec: code_from_tissue(rec['tissue_label']))
+            .addfield('rna_unit', 'TPM')
+            .cutout('tissue')
+        )
 
-        t_join = petl.join(t_level, t_value, presorted=True)
+        t_join = (petl.join(t_level,
+                           t_value,
+                           key=('gene','tissue_code','tissue_label'),
+                           presorted=True)
+                  .aggregate('gene',
+                             aggregation={'data': (('tissue_code',
+                                                      'tissue_label',
+                                                      'rna_level',
+                                                      'rna_value',
+                                                      'rna_unit'),list)},
+                       presorted=True)
+        )
 
-        for d in petl.dicts(t_join):
-            yield d
+        return t_join
 
     def retrieve_cancer_data(self):
         self.logger.info('retrieve cancer data from HPA')
@@ -314,11 +338,16 @@ class HPAProcess():
         self.set_translations()
         self.downloader = HPADataDownloader()
         self.logger = logging.getLogger(__name__)
+        self.hpa_normal_table = None
+        self.hpa_rna_table = None
+        self.hpa_merged_table = None
 
     def process_all(self, dry_run=False):
 
         self.hpa_normal_table = self.process_normal_tissue()
-#         self.process_rna()
+        self.hpa_rna_table = self.process_rna()
+        self.hpa_merged_table = self.process_join()
+
         self.store_data(dry_run=dry_run)
         self.loader.close()
 
@@ -329,20 +358,30 @@ class HPAProcess():
         return self.downloader.retrieve_normal_tissue_data()
 
     def process_rna(self):
-        self.rna_data = dict()
-        for row in self.downloader.retrieve_rna_data():
-            gene = row['gene']
-            if gene not in self.available_genes:
-                self.init_gene(gene)
-                self.available_genes.add(gene)
-            if gene not in self.rna_data:
-                self.rna_data[gene] = []
-            self.rna_data[gene].append(row)
+        return self.downloader.retrieve_rna_data()
 
-        for gene in self.available_genes:
-            self.data[gene]['expression'].tissues = self.get_rna_data_for_gene(gene)
-        self.logger.info('process_rna completed')
-        return
+#             gene = row['gene']
+#             if gene not in self.available_genes:
+#                 self.init_gene(gene)
+#                 self.available_genes.add(gene)
+#             if gene not in self.rna_data:
+#                 self.rna_data[gene] = []
+#             self.rna_data[gene].append(row)
+#
+#         for gene in self.available_genes:
+#             self.data[gene]['expression'].tissues = self.get_rna_data_for_gene(gene)
+#         self.logger.info('process_rna completed')
+#         return
+
+    def process_join(self):
+        hpa_merged_table = (
+            petl.outerjoin(self.hpa_normal_table, self.hpa_rna_table,
+                           key='gene', presorted=True)
+            .addfield('expression', lambda rec: format_expression_with_rna(rec))
+            .cut('expression')
+        )
+        return hpa_merged_table
+
 
     def store_data(self, dry_run=False):
         self.logger.info('store_data called')
@@ -366,7 +405,7 @@ class HPAProcess():
         for w in workers:
             w.start()
 
-        for row in self.hpa_normal_table.data():
+        for row in self.hpa_merged_table.data():
             # just one field with all data frommated into a dict
             hpa = row[0]
             queue.put((hpa['gene'], hpa), self.r_server)
