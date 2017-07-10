@@ -1,21 +1,15 @@
 from __future__ import absolute_import
-import csv
 import logging
 import re
 import functools as ft
-import itertools as iter
 import operator as oper
-from StringIO import StringIO
-from zipfile import ZipFile
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
-import requests
 import petl
 from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
-from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
 from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 

@@ -9,7 +9,7 @@ from elasticsearch import helpers
 
 from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
-from mrtarget.common.connection import PipelineConnectors, new_es_client
+from mrtarget.common.connection import new_es_client
 from mrtarget.Settings import Config
 
 
