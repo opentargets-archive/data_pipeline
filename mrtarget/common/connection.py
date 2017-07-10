@@ -50,8 +50,8 @@ class PipelineConnectors():
         self.r_instance = r_instance['instance']
 
     def init_services_connections(self,
-                                  data_es = True,
-                                  publication_es = False,
+                                  data_es=True,
+                                  publication_es=False,
                                   redispersist=False):
         success = False
         self.persist = redispersist

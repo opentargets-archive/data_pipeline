@@ -310,6 +310,9 @@ class ElasticSearchConfiguration():
     expm.settings.number_of_shards = generic_shard_number
     expm.settings.number_of_replicas = generic_replicas_number
     expm.settings.refresh_interval = '60s'
+    expm.mappings[Config.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.gene.type = 'keyword'
+    expm.mappings[Config.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.tissues.properties.efo_code.type = 'keyword'
+    expm.mappings[Config.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.tissues.properties.rna.properties.value.type = 'float'
 
     expression_data_mapping = expm.to_dict()
 

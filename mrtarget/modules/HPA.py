@@ -3,6 +3,8 @@ import csv
 import logging
 import re
 import functools as ft
+import itertools as iter
+import operator as oper
 from StringIO import StringIO
 from zipfile import ZipFile
 from tqdm import tqdm
@@ -40,27 +42,84 @@ def reliability_from_text(key):
     return reliability_translation[key]
 
 
-def format_expression(rec):
-    d = Dict()
-    d.gene = rec['gene']
-    d.data_release = Config.RELEASE_VERSION
-    d.tissues = []
-    d.cancer = {}
-    d.subcellular_location = {}
+class HPAExpression(Dict):
+    def __init__(self, *args, **kwargs):
+        super(HPAExpression,self).__init__(*args, **kwargs)
+        if 'data_release' not in self:
+            self.data_release = Config.RELEASE_VERSION
 
-    tissues = []
+        if 'tissues' not in self:
+            self.tissues = []
+
+        if 'cancer' not in self:
+            self.cancer = Dict()
+
+        if 'subcellular_location' not in self:
+            self.subcellular_location = {}
+
+    def set_id(self, gene_id):
+        self.gene = gene_id
+
+    def get_id(self):
+        return self.gene if 'gene' in self else None
+
+    @staticmethod
+    def new_tissue_protein(*args, **kwargs):
+        protein = Dict(*args, **kwargs)
+
+        if 'level' not in protein:
+            protein.level = 0
+
+        if 'reliability' not in protein:
+            protein.reliability = False
+
+        if 'cell_type' not in protein:
+            protein.cell_type = []
+
+        return protein
+
+    @staticmethod
+    def new_tissue_rna(*args, **kwargs):
+        rna = Dict(*args, **kwargs)
+
+        if 'level' not in rna:
+            rna.level = 0
+
+        if 'value' not in rna:
+            rna.value = 0
+
+        if 'unit' not in rna:
+            rna.unit = ''
+
+        return rna
+
+    @staticmethod
+    def new_tissue(*args, **kwargs):
+        tissue = Dict(*args, **kwargs)
+        if 'efo_code' not in tissue:
+            tissue.efo_code = ''
+
+        if 'label' not in tissue:
+            tissue.label = ''
+
+        if 'protein' not in tissue:
+            tissue.protein = HPAExpression.new_tissue_protein()
+        if 'rna' not in tissue:
+            tissue.rna = HPAExpression.new_tissue_rna()
+
+        return tissue
+
+
+def format_expression(rec):
+    d = HPAExpression(gene=rec['gene'],
+                      data_release=Config.RELEASE_VERSION)
+
     # for each tissue
     for el in rec['data']:
         t_code, t_name, c_types = el
-        tissue = Dict()
-        tissue.label = list(t_name)[0]
-        tissue.efo_code = t_code
+        tissue = d.new_tissue(label = list(t_name)[0],
+                              efo_code = t_code)
 
-        protein = Dict()
-        protein.level = 0
-        protein.reliability = False
-
-        lct = []
         # iterate all cell_types
         for ct in c_types:
             ct_name, ct_level, ct_reliability = ct
@@ -68,23 +127,66 @@ def format_expression(rec):
             ctype.level = ct_level
             ctype.reliability = ct_reliability
             ctype.name = ct_name
-            lct.append(ctype)
+            tissue.protein.cell_type.append(ctype)
 
-            if ct_level > protein.level:
-                protein.level = ct_level
-                protein.reliability = ct_reliability
+            if ct_level > tissue.protein.level:
+                tissue.protein.level = ct_level
+                tissue.protein.reliability = ct_reliability
 
-        protein.cell_type = lct
-        tissue.protein = protein
-        tissues.append(tissue)
+        # per tissue
+        d.tissues.append(tissue)
 
-    d.tissues = tissues
     return d.to_dict()
 
 
 def format_expression_with_rna(rec):
     # get gene,result,data = rec
-    return rec
+    exp = HPAExpression(gene=rec['gene'],
+                        data_release=Config.RELEASE_VERSION)
+
+    if rec['result']:
+        exp.update(rec['result'])
+
+    if rec['data']:
+        new_tissues = []
+        has_tissues = len(exp.tissues) > 0
+
+        sorted(rec['data'], key=oper.itemgetter(0))
+        t_set = ft.reduce(lambda x, y: x.union(set([y['efo_code']])),
+                          exp.tissues, set()) \
+                    if has_tissues else set()
+        nt_set = ft.reduce(lambda x, y: x.union(set([y[0]])),
+                          rec['data'], set())
+
+        intersection = t_set.intersection(nt_set)
+        intersection_idxs = [i for i, e in enumerate(exp.tissues) if e['efo_code'] in intersection]
+        intersection_idxs_data = [i for i, e in enumerate(rec['data']) if e[0] in intersection]
+        difference = nt_set.difference(t_set)
+        difference_idxs = [i for i, e in enumerate(rec['data']) if e[0] in difference]
+
+        for i, _ in enumerate(intersection):
+            tidx = intersection_idxs[i]
+            didx = intersection_idxs_data[i]
+
+            exp.tissues[tidx].rna.level = int(rec['data'][didx][2])
+            exp.tissues[tidx].rna.value = float(rec['data'][didx][3])
+            exp.tissues[tidx].rna.unit = rec['data'][didx][4]
+
+
+        for idx in difference_idxs:
+            rna = rec['data'][idx]
+            t = exp.new_tissue(efo_code=rna[0],
+                               label=rna[1])
+            t.rna.level = int(rna[2])
+            t.rna.value = float(rna[3])
+            t.rna.unit = rna[4]
+
+            new_tissues.append(t)
+
+        # iterate all tissues
+        exp.tissues.extend(new_tissues)
+
+    return exp.to_dict()
 
 def code_from_tissue(tissue_name):
     t2m = Config.TISSUE_TRANSLATION_MAP['tissue']
@@ -146,31 +248,9 @@ class HPAActions(Actions):
     PROCESS = 'process'
 
 
-class HPAExpression(JSONSerializable):
-    def __init__(self, gene=None):
-        self.gene = gene
-        self.tissues = []
-
-    def get_id(self):
-        return self.gene
-
-
 class HPADataDownloader():
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-
-    def _download_data(self, url):
-        r = requests.get(url)
-        try:
-            r.raise_for_status()
-        except:
-            raise Exception("failed to download data from url: %s. Status code: %i" % (url, r.status_code))
-        zipped_data = ZipFile(StringIO(r.content))
-        info = zipped_data.getinfo(zipped_data.filelist[0].orig_filename)
-        return zipped_data.open(info)
-
-    def _get_csv_reader(self, csvfile):
-        return csv.DictReader(csvfile)
 
     def retrieve_normal_tissue_data(self):
         """Parse 'normal_tissue' csv file,
@@ -210,10 +290,6 @@ class HPADataDownloader():
             .cut('gene','result')
             )
 
-        # TODO just get the element and return as a dictionary
-#         for d in table.data():
-#             # yielding dict result
-#             yield d[0]
         return table
 
     def retrieve_rna_data(self):
@@ -268,38 +344,38 @@ class HPADataDownloader():
 
         return t_join
 
-    def retrieve_cancer_data(self):
-        self.logger.info('retrieve cancer data from HPA')
-        table = (
-            petl.fromcsv(URLZSource(Config.HPA_CANCER_URL))
-            .rename({'Tumor': 'tumor',
-                     'Level': 'level',
-                     'Count patients': 'count_patients',
-                     'Total patients': 'total_patients',
-                     'Gene': 'gene',
-                     'Expression type': 'expression_type'})
-            .cut('tumor', 'count_patients', 'level', 'total_patients', 'gene',
-                 'expression_type')
-            )
-
-        for d in petl.dicts(table):
-            yield d
-
-    def retrieve_subcellular_location_data(self):
-        self.logger.info('retrieve subcellular location data from HPA')
-        table = (
-            petl.fromcsv(URLZSource(Config.HPA_SUBCELLULAR_LOCATION_URL))
-            .rename({'Main location': 'main_location',
-                     'Other location': 'other_location',
-                     'Gene': 'gene',
-                     'Reliability': 'reliability',
-                     'Expression type': 'expression_type'})
-            .cut('main_location', 'other_location', 'gene', 'reliability',
-                 'expression_type')
-            )
-
-        for d in table.dicts():
-            yield d
+#     def retrieve_cancer_data(self):
+#         self.logger.info('retrieve cancer data from HPA')
+#         table = (
+#             petl.fromcsv(URLZSource(Config.HPA_CANCER_URL))
+#             .rename({'Tumor': 'tumor',
+#                      'Level': 'level',
+#                      'Count patients': 'count_patients',
+#                      'Total patients': 'total_patients',
+#                      'Gene': 'gene',
+#                      'Expression type': 'expression_type'})
+#             .cut('tumor', 'count_patients', 'level', 'total_patients', 'gene',
+#                  'expression_type')
+#             )
+#
+#         for d in petl.dicts(table):
+#             yield d
+#
+#     def retrieve_subcellular_location_data(self):
+#         self.logger.info('retrieve subcellular location data from HPA')
+#         table = (
+#             petl.fromcsv(URLZSource(Config.HPA_SUBCELLULAR_LOCATION_URL))
+#             .rename({'Main location': 'main_location',
+#                      'Other location': 'other_location',
+#                      'Gene': 'gene',
+#                      'Reliability': 'reliability',
+#                      'Expression type': 'expression_type'})
+#             .cut('main_location', 'other_location', 'gene', 'reliability',
+#                  'expression_type')
+#             )
+#
+#         for d in table.dicts():
+#             yield d
 
 
 class ExpressionObjectStorer(RedisQueueWorkerProcess):
@@ -333,9 +409,6 @@ class HPAProcess():
         self.loader = loader
         self.esquery = ESQuery(loader.es)
         self.r_server = r_server
-        self.data = {}
-        self.available_genes = set()
-        self.set_translations()
         self.downloader = HPADataDownloader()
         self.logger = logging.getLogger(__name__)
         self.hpa_normal_table = None
@@ -351,27 +424,11 @@ class HPAProcess():
         self.store_data(dry_run=dry_run)
         self.loader.close()
 
-    def _get_available_genes(self, ):
-        return self.available_genes
-
     def process_normal_tissue(self):
         return self.downloader.retrieve_normal_tissue_data()
 
     def process_rna(self):
         return self.downloader.retrieve_rna_data()
-
-#             gene = row['gene']
-#             if gene not in self.available_genes:
-#                 self.init_gene(gene)
-#                 self.available_genes.add(gene)
-#             if gene not in self.rna_data:
-#                 self.rna_data[gene] = []
-#             self.rna_data[gene].append(row)
-#
-#         for gene in self.available_genes:
-#             self.data[gene]['expression'].tissues = self.get_rna_data_for_gene(gene)
-#         self.logger.info('process_rna completed')
-#         return
 
     def process_join(self):
         hpa_merged_table = (
@@ -390,17 +447,18 @@ class HPAProcess():
         self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
                            r_server=self.r_server,
-                           serialiser='jsonpickle',
+                           serialiser='json',
                            max_size=10000,
                            job_timeout=600)
 
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
+        loaders = min([16,Config.WORKERS_NUMBER])
 
         workers = [ExpressionObjectStorer(self.loader.es,
                                     None,
                                     queue,
-                                    dry_run=dry_run) for _ in range(4)]
+                                    dry_run=dry_run) for _ in range(loaders)]
 
         for w in workers:
             w.start()
@@ -419,79 +477,10 @@ class HPAProcess():
 
         self.logger.info('all expressions objects pushed to elasticsearch')
 
-        if self.data.values()[0]['cancer']:  # if there is cancer data
-            pass
-        if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
-            pass
-
-    def init_gene(self, gene):
-        self.data[gene] = dict(expression=HPAExpression(gene),
-                               cancer={},  # TODO
-                               subcellular_location={},  # TODO
-                               )
-
-    def get_normal_tissue_data_for_gene(self, gene):
-        tissue_data = {}
-        for row in self.normal_tissue_data[gene]:
-            # XXX why do I have to replace on a curated list of tissues
-            tissue = row['tissue'].replace('1', '').replace('2', '').strip()
-            # tissue = row['tissue']
-            code = code_from_tissue(tissue)
-
-            if tissue not in tissue_data:
-                tissue_data[tissue] = {'protein': {
-                        'cell_type': {},
-                        'level': 0,
-                        'reliability': False,
-                    },
-
-                        'rna': {
-                        },
-                        'efo_code': code
-                    }
-
-            if row['cell_type'] not in tissue_data[tissue]['protein']['cell_type']:
-                tissue_data[tissue]['protein']['cell_type'][row['cell_type']] = []
-            tissue_data[tissue]['protein']['cell_type'][row['cell_type']].append(
-                dict(level=level_from_text(row['level']),
-                     reliability=reliability_from_text(row['reliability']),
-                     ))
-            if level_from_text(row['level']) > tissue_data[tissue]['protein']['level']:
-                tissue_data[tissue]['protein']['level'] = level_from_text(row['level'])
-                # giving higher priority to reliable annotations over uncertain
-            if reliability_from_text(row['reliability']):
-                tissue_data[tissue]['protein']['reliability'] = True
-
-        return tissue_data
-
-    def get_rna_data_for_gene(self, gene):
-        tissue_data = self.data[gene]['expression'].tissues
-
-        if not tissue_data:
-            tissue_data = {}
-
-        if gene in self.rna_data:
-            for row in self.rna_data[gene]:
-                sample = row['sample'].replace('1', '').replace('2', '').strip()
-                code = code_from_tissue(sample)
-
-                if sample not in tissue_data:
-                    tissue_data[sample] = {'protein': {
-                            'cell_type': {},
-                            'level': 0,
-                            'reliability': False,
-                        },
-
-                            'rna': {
-                            },
-                            'efo_code': code
-                        }
-
-                tissue_data[sample]['rna']['value'] = float(row['value'])
-                tissue_data[sample]['rna']['unit'] = row['unit']
-                tissue_data[sample]['rna']['level'] = int(row['level'])
-
-        return tissue_data
+#         if self.data.values()[0]['cancer']:  # if there is cancer data
+#             pass
+#         if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
+#             pass
 
 
 class HPALookUpTable(object):
