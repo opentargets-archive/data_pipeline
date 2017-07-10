@@ -912,8 +912,8 @@ class ESQuery(object):
                     self._flush_bulk(batch)
                     batch = []
 
-            if len(batch) >= chunk_size:
-                self._flush_bulk(batch)
+            #if len(batch) >= chunk_size:
+            self._flush_bulk(batch)
             '''flush changes'''
             self.handler.indices.flush(Loader.get_versioned_index(index,True),
                              wait_if_ongoing=True)

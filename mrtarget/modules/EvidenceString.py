@@ -779,9 +779,9 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'genetic_association':
                 score=0.
                 if 'gene2variant' in self.evidence['evidence']:
-                    if self.evidence['sourceID'] == 'phewascatalog':
+                    if self.evidence['sourceID'] in ['phewas_catalog','23andme']:
                         no_of_cases = self.evidence['unique_association_fields']['cases']
-                        score = self._score_phewascatalog(
+                        score = self._score_phewas_data(self.evidence['sourceID'],
                             self.evidence['evidence']['variant2disease']['resource_score']['value'],
                             no_of_cases)
 
@@ -914,9 +914,17 @@ class Evidence(JSONSerializable):
         # normalised_pvalue, sample_size,normalised_sample_size, severity))
         return score
 
-    def _score_phewascatalog(self, pvalue, no_of_cases):
-        normalised_pvalue = self._get_score_from_pvalue_linear(float(pvalue), range_min=1, range_max=1e-15)
-        normalised_no_of_cases = DataNormaliser.renormalize(no_of_cases, [0, 5000], [0, 1])
+    def _score_phewas_data(self, source , pvalue, no_of_cases):
+        if source == 'phewas_catalog':
+            max_cases = 8800
+            range_min = 0.05
+            range_max = 1e-25
+        elif source == '23andme':
+            max_cases = 297901
+            range_min = 0.05
+            range_max = 1e-30
+        normalised_pvalue = self._get_score_from_pvalue_linear(float(pvalue), range_min, range_max)
+        normalised_no_of_cases = DataNormaliser.renormalize(no_of_cases, [0, max_cases], [0, 1])
         score = normalised_pvalue * normalised_no_of_cases
         return score
 
