@@ -437,7 +437,7 @@ class ESQuery(object):
         def get_ids(ids):
             return self.handler.mget(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
                                    body={'docs': ids},
-                                   _source= {"include": ["target.id",
+                                   _source= {"includes": ["target.id",
                                                         "private.efo_codes",
                                                         "disease.id",
                                                         "scores.association_score",
@@ -457,7 +457,7 @@ class ESQuery(object):
                                            "terms": {"target.id": target}
                                        }
                                    }},
-                '_source':  {"include": ["target.id",
+                '_source':  {"includes": ["target.id",
                                         "disease.id",
                             ]},
                 "sort": ["target.id", "disease.id"],
@@ -542,7 +542,7 @@ class ESQuery(object):
                                   }
                                 }
                             },
-            '_source': {"include": ["target.id",
+            '_source': {"includes": ["target.id",
                                     "private.efo_codes",
                                     "disease.id",
                                     "scores.association_score",
