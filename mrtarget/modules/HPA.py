@@ -203,8 +203,8 @@ def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     def _split_tissue(k, v):
         '''from tissue dict to rna and protein dicts pair'''
-        tid = code_from_tissue(k)
-        tlabel = k
+        tid = k
+        tlabel = v['label']
 
         rna = {'id': tid, 'label': tlabel, 'level': v['rna']['level'],
                'unit': v['rna']['unit'],
@@ -215,7 +215,7 @@ def hpa2tissues(hpa=None):
         return (rna, protein)
 
     # generate a list with rna, protein pairs per tissue
-    splitted_tissues = [_split_tissue(k, v) for k, v in hpa.tissues.iteritems()
+    splitted_tissues = [_split_tissue(t['efo_code'], t) for t in hpa.tissues
                         if hpa is not None]
 
     rnas = [[(l+1, tissue[0]) for l in xrange(tissue[0]['level'])]

@@ -471,7 +471,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 # to fill from Redis cache lookup_data
                 hpa_data = HPAExpression()
                 try:
-                    hpa_data.load_json(
+                    hpa_data.update(
                         self.lookup_data.available_hpa.get_hpa(target,
                                                                self.r_server))
                     score.set_hpa_data(hpa_data)
