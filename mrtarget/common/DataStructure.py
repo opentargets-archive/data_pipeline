@@ -29,22 +29,6 @@ def json_serialize(obj):
             raise TypeError('Type not serializable')
 
 
-class JSONAddict(Dict):
-    def load_json(self, data):
-        self.update(json.loads(data))
-
-    def to_json(self):
-        return json.dumps(self.__timestamp(self).to_dict(),
-                          default=json_serialize,
-                          sort_keys=True,
-                          # indent=4,
-                          cls=PipelineEncoder)
-
-    @staticmethod
-    def __timestamp(data):
-        '''this method add the data_release key to the addict.Dict'''
-        data.data_release = Config.RELEASE_VERSION.split('-')[-1]
-        return data
 
 
 class JSONSerializable(object):
