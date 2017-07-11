@@ -2,6 +2,7 @@ import collections
 import json
 import logging
 import time
+import addict
 from collections import Counter
 
 import jsonpickle
@@ -179,75 +180,47 @@ class ESQuery(object):
 
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
-        aggs ={}
-        if get_top_hits:
-            aggs = {
-                       "direct_associations": {
-                           "filter": {"term": {"is_direct": True}},
-                           'aggs': {
-                               "top_direct_ass": {
-                                   "top_hits": {
-                                       "sort": {"harmonic-sum.overall": {"order": "desc"}},
-                                       "_source": source,
 
-                                       "size": size
-                                   },
-                               }
-                           },
-                       }
-                   }
+        aggs = addict.Dict()
+        if get_top_hits:
+            aggs.direct_associations.filter.term.is_direct = True
+            aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
+            aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
+            aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
+
+        q = addict.Dict()
+        q.query.constant_score.filter.terms['target.id'] = [target]
+        q.sort['harmonic-sum.overall'].order = 'desc'
+        q._source = source
+        q.aggs = aggs
+        q.size = size
 
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                  body={"query": {
-                                          "filtered": {
-                                              "filter": {
-                                                   "terms": {"target.id": [target]}
-                                              }
-                                          }
-                                        },
-                                       "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
-                                       '_source': source,
-                                       "aggs" : aggs,
-                                       'size': size,
-                                       }
+                                  body=q.to_dict()
                                   )
         return AssociationSummary(res)
 
     def get_associations_for_disease(self, disease, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
-        aggs = {}
-        if get_top_hits:
-            aggs = {
-                "direct_associations": {
-                    "filter": {"term": {"is_direct": True}},
-                    'aggs': {
-                        "top_direct_ass": {
-                            "top_hits": {
-                                "sort": {"harmonic-sum.overall": {"order": "desc"}},
-                                "_source": source,
 
-                                "size": size
-                            },
-                        }
-                    },
-                }
-            }
+        aggs = addict.Dict()
+        if get_top_hits:
+            aggs.direct_associations.filter.term.is_direct = True
+            aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
+            aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
+            aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
+
+        q = addict.Dict()
+        q.query.constant_score.filter.terms['disease.id'] = [disease]
+        q.sort['harmonic-sum.overall'].order = 'desc'
+        q._source = source
+        q.aggs = aggs
+        q.size = size
 
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                  body={"query": {
-                                          "filtered": {
-                                              "filter": {
-                                                   "terms": {"disease.id": [disease]}
-                                              }
-                                          }
-                                        },
-                                       "sort" : { "harmonic-sum.overall" : {"order":"desc"}},
-                                       '_source': source,
-                                       "aggs" : aggs,
-                                       'size': size,
-                                       }
+                                  body=q.to_dict()
                                   )
         return AssociationSummary(res)
 
@@ -353,7 +326,7 @@ class ESQuery(object):
                                    "is_direct": True,
                                }
                            },
-                               '_source': {'include':["target.id", 'disease.id', 'harmonic-sum.overall']},
+                               '_source': {'includes':["target.id", 'disease.id', 'harmonic-sum.overall']},
                                'size': 1000,
                            },
                            scroll='12h',
