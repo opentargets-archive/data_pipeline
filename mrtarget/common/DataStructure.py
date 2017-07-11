@@ -43,7 +43,7 @@ class JSONAddict(Dict):
     @staticmethod
     def __timestamp(data):
         '''this method add the data_release key to the addict.Dict'''
-        data.data_release = Config.RELEASE_VERSION
+        data.data_release = Config.RELEASE_VERSION.split('-')[-1]
         return data
 
 
