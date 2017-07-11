@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import logging
 import re
+import json
 import functools as ft
 import operator as oper
 from tqdm import tqdm
@@ -15,6 +16,7 @@ from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReport
 
 from mrtarget.Settings import Config
 from addict import Dict
+from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
 
 
 def level_from_text(key):
@@ -36,7 +38,7 @@ def reliability_from_text(key):
     return reliability_translation[key]
 
 
-class HPAExpression(Dict):
+class HPAExpression(Dict, JSONSerializable):
     def __init__(self, *args, **kwargs):
         super(HPAExpression,self).__init__(*args, **kwargs)
         if 'data_release' not in self:
@@ -102,6 +104,23 @@ class HPAExpression(Dict):
             tissue.rna = HPAExpression.new_tissue_rna()
 
         return tissue
+
+    def stamp_data_release(self):
+        self.data_release = Config.RELEASE_VERSION
+
+    def to_json(self):
+        self.stamp_data_release()
+        return json.dumps(self.to_dict(),
+                          default=json_serialize,
+                          sort_keys=True,
+                          # indent=4,
+                          cls=PipelineEncoder)
+
+    def load_json(self, data):
+        try:
+            self.update(json.loads(data))
+        except Exception as e:
+            raise e
 
 
 def format_expression(rec):
