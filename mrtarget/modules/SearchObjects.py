@@ -1,13 +1,8 @@
 import json
 import logging
-import random
-import time
 
-import multiprocessing
 from collections import defaultdict
 from datetime import datetime
-
-from redislite import Redis
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -15,15 +10,13 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from  multiprocessing import Process
-from elasticsearch import Elasticsearch, helpers
 
 from mrtarget.Settings import Config
 
 
-
 class SearchObjectActions(Actions):
     PROCESS = 'process'
+
 
 class SearchObjectTypes(object):
     __ROOT__ = 'search_type'
@@ -34,6 +27,7 @@ class SearchObjectTypes(object):
     PUBLICATION = 'pub'
     SNP = 'snp'
     GENERIC = 'generic'
+
 
 class SearchObject(JSONSerializable, object):
     """ Base class for search objects
