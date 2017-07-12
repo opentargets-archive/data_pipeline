@@ -736,8 +736,7 @@ class Evidence(JSONSerializable):
                           # indent=4,
                           cls=PipelineEncoder)
 
-    def stamp_data_release(self):
-        self.evidence['data_release'] = Config.RELEASE_VERSION
+
 
         return
 
