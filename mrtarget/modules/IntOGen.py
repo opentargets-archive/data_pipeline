@@ -124,10 +124,11 @@ class IntOGen():
         self.evidence_strings = list()
         self.ensembl_current = {}
         self.symbols = {}
+        self.logger = logging.getLogger(__name__)
 
     def load_Ensembl(self):
 
-        logging.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
+        self.logger.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
             Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
 
         for row in self.esquery.get_all_ensembl_genes():
@@ -149,7 +150,7 @@ class IntOGen():
                     self.symbols[display_name]["ensembl_secondary_ids"] = []
                 self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
 
-        logging.debug("Loading ES Ensembl finished")
+        self.logger.debug("Loading ES Ensembl finished")
 
     def process_intogen(self, infile=INTOGEN_FILENAME, outfile=INTOGEN_EVIDENCE_FILENAME):
         self.load_Ensembl()
@@ -174,7 +175,7 @@ class IntOGen():
         )
         error = provenance_type.validate(logging)
         if error > 0:
-            logging.error(provenance_type.to_JSON(indentation=4))
+            self.logger.error(provenance_type.to_JSON(indentation=4))
             sys.exit(1)
 
         with open(filename, 'r') as intogen_file:
@@ -226,10 +227,10 @@ class IntOGen():
                         elif "ensembl_secondary_ids" in record:
                             ensembl_gene_id = record["ensembl_secondary_ids"][0]
                         else:
-                            logging.error("%s is in Ensembl but could not find it"%Symbol)
+                            self.logger.error("%s is in Ensembl but could not find it"%Symbol)
                             continue
                     else:
-                        logging.error("%s is not found in Ensembl" % Symbol)
+                        self.logger.error("%s is not found in Ensembl" % Symbol)
                         continue
 
                     # id = [ "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id) ], #["http://identifiers.org/ensembl/{0}".format(Ensg)],
@@ -280,31 +281,31 @@ class IntOGen():
 
                     error = evidenceString.validate(logging)
                     if error > 0:
-                        logging.error(evidenceString.to_JSON())
+                        self.logger.error(evidenceString.to_JSON())
                         sys.exit(1)
 
                     self.evidence_strings.append(evidenceString)
 
 
-            logging.info("%s evidence parsed"%(n-1))
-            logging.info("%s evidence created"%len(self.evidence_strings))
+            self.logger.info("%s evidence parsed"%(n-1))
+            self.logger.info("%s evidence created"%len(self.evidence_strings))
 
         intogen_file.close()
 
     def write_evidence_strings(self, filename=INTOGEN_EVIDENCE_FILENAME):
-        logging.info("Writing IntOGen evidence strings")
+        self.logger.info("Writing IntOGen evidence strings")
         with open(filename, 'w') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
                 n+=1
-                logging.info(evidence_string.disease.id[0])
+                self.logger.info(evidence_string.disease.id[0])
                 # get max_phase_for_all_diseases
                 error = evidence_string.validate(logging)
                 if error == 0:
                     tp_file.write(evidence_string.to_JSON(indentation=None)+"\n")
                 else:
-                    logging.error("REPORTING ERROR %i" % n)
-                    logging.error(evidence_string.to_JSON(indentation=4))
+                    self.logger.error("REPORTING ERROR %i" % n)
+                    self.logger.error(evidence_string.to_JSON(indentation=4))
                     #sys.exit(1)
         tp_file.close()
 

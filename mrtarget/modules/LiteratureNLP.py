@@ -17,7 +17,8 @@ from spacy.symbols import *
 from spacy.tokens import Span
 from spacy.tokens.doc import Doc
 from textblob.en.inflect import singularize
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -138,10 +139,10 @@ class AbstractNormalizer(object):
         return unidecode(text)
 
 class PerceptronNPExtractor(BaseNPExtractor):
-    '''modified from 
+    '''modified from
 
     http://thetokenizer.com/2013/05/09/efficient-way-to-extract-the-main-topics-of-a-sentence/
-    
+
     To use Perceptron POS Tagger (more accurate)
     '''
 
@@ -289,6 +290,7 @@ class LiteratureNLPProcess(object):
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
         if not self.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
@@ -309,7 +311,7 @@ class LiteratureNLPProcess(object):
 
         # Start literature-analyser-worker processes
         analyzers = [LiteratureAnalyzerProcess(literature_q,
-                                               self.r_server.db,
+                                               None,
                                                dry_run,
                                                ) for i in range(no_of_workers)]
 
@@ -322,6 +324,7 @@ class LiteratureNLPProcess(object):
                     desc='Reading available evidence_strings to analyse publications',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                     unit=' evidence',
+                    file=tqdm_out,
                     unit_scale=True):
             pubs = pub_fetcher.get_publication(pub_id)
             if pubs:
@@ -332,11 +335,11 @@ class LiteratureNLPProcess(object):
         for a in analyzers:
                 a.join()
 
-        logging.info('flushing data to index')
+        self.logger.info('flushing data to index')
 
         self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
             wait_if_ongoing=True)
-        logging.info("DONE")
+        self.logger.info("DONE")
 
     @staticmethod
     def get_pub_id_from_url(url):
@@ -388,7 +391,7 @@ class PublicationAnalysisSpacy(object):
                     try:
                         ec[e_str] += tl.count(e_str)
                     except:
-                        logging.info(e_str)
+                        self.logger.info(e_str)
                         #            print( e_str, e_str in STOPLIST)
                         #        print (e.label, repr(e.label_),  ' '.join(t.orth_ for t in e))
         # print('FILTERED NOUN CHUNKS:')
@@ -490,7 +493,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
 
     def process(self, data):
         publications = data
-        logging.debug("In LiteratureAnalyzerProcess- {} ".format(self.name))
+        self.logger.debug("In LiteratureAnalyzerProcess- {} ".format(self.name))
         try:
 
             for pub_id, pub in publications.items():
@@ -507,7 +510,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
                         )
 
         except Exception as e:
-            logging.error("Error in loading analysed publication for pmid {}: {}".format(pub_id, e.message))
+            self.logger.error("Error in loading analysed publication for pmid {}: {}".format(pub_id, e.message))
 
 
 
@@ -542,6 +545,7 @@ class LiteratureInfoExtractor(object):
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
         self.nlp = init_spacy_english_language()
 
 
@@ -551,26 +555,26 @@ class LiteratureInfoExtractor(object):
 
 
         if not os.path.isfile(Config.GENE_LEXICON_JSON_LOCN):
-            logging.info('Generating gene matcher patterns')
+            self.logger.info('Generating gene matcher patterns')
             gene_lexicon_parser = LexiconParser(Config.BIOLEXICON_GENE_XML_LOCN,Config.GENE_LEXICON_JSON_LOCN,'GENE')
             gene_lexicon_parser.parse_lexicon()
 
         if not os.path.isfile(Config.DISEASE_LEXICON_JSON_LOCN):
-            logging.info('Generating disease matcher patterns')
+            self.logger.info('Generating disease matcher patterns')
             disease_lexicon_parser = LexiconParser(Config.BIOLEXICON_DISEASE_XML_LOCN, Config.DISEASE_LEXICON_JSON_LOCN, 'DISEASE')
             disease_lexicon_parser.parse_lexicon()
 
         i = 1
         j = 0
         spacyManager = NLPManager(self.nlp)
-        logging.info('Loading lexicon json')
+        self.logger.info('Loading lexicon json')
         disease_patterns = json.load(open(Config.DISEASE_LEXICON_JSON_LOCN))
         gene_patterns = json.load(open(Config.GENE_LEXICON_JSON_LOCN))
 
         # matcher = Matcher.load(path = 'gene_lexicon.json',
         #                        vocab=nlp.vocab)
         # TODO: FIXED IN SPACY MASTER BUT A BUG IN 1.5.0
-        logging.info('Generating matcher patterns')
+        self.logger.info('Generating matcher patterns')
         '''load all the new patterns, do not use Matcher.load since there is a bug'''
         disease_matcher = Matcher(vocab=spacyManager.nlp.vocab,
                           patterns=disease_patterns
@@ -581,11 +585,12 @@ class LiteratureInfoExtractor(object):
         '''should save the new vocab now'''
         # Matcher.vocab.dump('lexeme.bin')
 
-        logging.info('Finding entity matches')
+        self.logger.info('Finding entity matches')
         for ev in tqdm(self.es_query.get_abstracts_from_val_ev(),
                     desc='Reading available publications for nlp information extraction',
                     total = self.es_query.count_validated_evidence_strings(),
                     unit=' evidence',
+                    file=tqdm_out,
                     unit_scale=True):
 
             j=j+1
@@ -599,10 +604,10 @@ class LiteratureInfoExtractor(object):
 
                 disease_matches = spacyManager.findEntityMatches(disease_matcher,tokens)
                 gene_matches = spacyManager.findEntityMatches(gene_matcher,tokens)
-                logging.info('Text to analyze - {} --------- Gene Matches {} -------- Disease Matches {}'.format(text_to_analyze,gene_matches, disease_matches))
+                self.logger.info('Text to analyze - {} --------- Gene Matches {} -------- Disease Matches {}'.format(text_to_analyze,gene_matches, disease_matches))
 
                 #spacyManager.generateRelations(disease_matches,gene_matches)
-        logging.info("DONE")
+        self.logger.info("DONE")
 
 
 
@@ -675,7 +680,7 @@ class LexiconParser(object):
 
             self.lexicon[item.id] = item
             if c % 10000 == 0:
-                logging.info('parsed %i lexicon term' % c)
+                self.logger.info('parsed %i lexicon term' % c)
             yield item
 
     def print_matched_entities(self, matcher, doc, i, matches):
@@ -728,6 +733,7 @@ class LitEntity(JSONSerializable):
         self.start_pos = start_pos
         self.end_pos = end_pos
         self.doc_id = doc_id
+        self.logger = logging.getLogger(__name__)
 
 # This is meant only for testing purpose
 def load_entity_matches(self, loader, nlp, doc):
@@ -736,7 +742,7 @@ def load_entity_matches(self, loader, nlp, doc):
                       )
     disease_matches = matcher(doc)
     disease_matched_list = []
-    logging.info('Disease Matches!!!!!!!!!!!!!!!!!!!')
+    self.logger.info('Disease Matches!!!!!!!!!!!!!!!!!!!')
     i = 1
     for ent_id, label, start, end in disease_matches:
         i = i + 1
@@ -749,7 +755,7 @@ def load_entity_matches(self, loader, nlp, doc):
                    litentity,
                    create_index=False)
 
-        logging.info(span)
+        self.logger.info(span)
     disease_matched_entities = {"entities": disease_matched_list}
 
     matcher = Matcher(vocab=nlp.vocab,
@@ -757,7 +763,7 @@ def load_entity_matches(self, loader, nlp, doc):
                       )
     gene_matches = matcher(doc)
     gene_matched_list = []
-    logging.info('Gene Matches!!!!!!!!!!!!!!!!!!!')
+    self.logger.info('Gene Matches!!!!!!!!!!!!!!!!!!!')
     for ent_id, label, start, end in gene_matches:
         i = i + 1
         span = (matcher.get_entity(ent_id), label, doc[start: end])
@@ -768,7 +774,7 @@ def load_entity_matches(self, loader, nlp, doc):
                    i,
                    litentity,
                    create_index=False)
-        logging.info(span)
+        self.logger.info(span)
     gene_matched_entities = {"litentity": gene_matched_list}
 
 
@@ -1046,8 +1052,8 @@ class SentenceAnalysisSpacy(object):
     def get_extended_verb(self, v):
         '''
         given a verb build a representative chain of verbs for the sintax tree
-        :param v: 
-        :return: 
+        :param v:
+        :return:
         '''
         verb_modifiers = [prep,agent]
         verb_path = [v]
@@ -1068,17 +1074,17 @@ class SentenceAnalysisSpacy(object):
     def get_verb_path_from_ancestors(self, tok):
         '''
         given a token return the chain of verbs of his ancestors
-        :param tok: 
-        :return: 
+        :param tok:
+        :return:
         '''
         return [i for i in tok.ancestors if i.pos == VERB and i.dep != aux]
 
     def get_extended_token(self, tok):
         '''
         given a token find a more descriptive string extending it with its chindren
-        :param tok: 
-        :param doc: 
-        :return: 
+        :param tok:
+        :param doc:
+        :return:
         '''
         allowed_pos = [NOUN, ADJ, PUNCT, PROPN]
         allowed_dep = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "dobj",  "attr", "oprd", "pobj",# "conj",
@@ -1109,9 +1115,9 @@ class SentenceAnalysisSpacy(object):
     def traverse_obj_children(self, tok, verb_path):
         '''
         iterate over all the children and the conjuncts to return objects within the same chain of verbs
-        :param tok: 
-        :param verb_path: 
-        :return: 
+        :param tok:
+        :param verb_path:
+        :return:
         '''
         for i in tok.children:
             # print i, verb_path, get_verb_path_from_ancestors(i), get_verb_path_from_ancestors(i) ==verb_path
@@ -1146,9 +1152,9 @@ class SentenceAnalysisSpacy(object):
     def get_dependent_obj(self, tok, verb_path):
         '''
         given a token find related objects for the sape chain of verbs (verb_path
-        :param tok: 
-        :param verb_path: 
-        :return: 
+        :param tok:
+        :param verb_path:
+        :return:
         '''
         all_descendants = []
         if tok.dep_ in OBJECTS and (self.get_verb_path_from_ancestors(tok) == verb_path):
@@ -1171,8 +1177,8 @@ class SentenceAnalysisSpacy(object):
     def collapse_noun_phrases_by_punctation(self):
         '''
         this collapse needs tobe used on a single sentence, otherwise it will ocncatenate different sentences
-        :param sentence: 
-        :return: 
+        :param sentence:
+        :return:
         '''
         prev_span = ''
         open_brackets = u'( { [ <'.split()

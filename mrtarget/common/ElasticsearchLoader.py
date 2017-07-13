@@ -142,7 +142,7 @@ class Loader():
                         break
                     else:
                         time_to_wait = 5*retry
-                        self.logger.error("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
+                        self.logger.warning("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
                         time.sleep(time_to_wait)
             self.cache = []
 
@@ -239,7 +239,7 @@ class Loader():
                                          )
             if not self._check_is_aknowledge(res):
                 if res['error']['root_cause'][0]['reason']== 'already exists':
-                    logging.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
+                    self.logger.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
                     return
                 else:
                     raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
@@ -297,8 +297,8 @@ class Loader():
 
             if not index_created:
                 self._safe_create_index(index_name)
-                logging.warning('Index %s created without explicit mappings' % index_name)
-            logging.info("%s index created" % index_name)
+                self.logger.warning('Index %s created without explicit mappings' % index_name)
+            self.logger.info("%s index created" % index_name)
             return
 
     def _enforce_mapping(self, index_name):

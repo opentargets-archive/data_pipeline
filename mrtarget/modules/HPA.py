@@ -1,10 +1,12 @@
 from __future__ import absolute_import
 import csv
 import logging
+import re
 import functools as ft
 from StringIO import StringIO
 from zipfile import ZipFile
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 import requests
 import petl
@@ -26,10 +28,13 @@ def code_from_tissue(tissue_name):
         tid = t2m[tissue_name]
     except KeyError:
         logger = logging.getLogger(__name__)
-        logger.debug('the tissue name %s was not found in the mapping', 
+        logger.debug('the tissue name %s was not found in the mapping',
                      tissue_name)
-        tid = tissue_name
-        
+        # TODO the id has to be one word to not get splitted by the analyser
+        # this is a temporal fix by the time we get all items mapped
+        tid = tissue_name.strip().replace(' ', '_')
+        tid = re.sub('[^0-9a-zA-Z_]+', '',tid)
+
     return tid
 
 
@@ -37,9 +42,9 @@ def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     def _split_tissue(k, v):
         '''from tissue dict to rna and protein dicts pair'''
-        tid = code_from_tissue(k)            
+        tid = code_from_tissue(k)
         tlabel = k
-        
+
         rna = {'id': tid, 'label': tlabel, 'level': v['rna']['level'],
                'unit': v['rna']['unit'],
                'value': v['rna']['value']} if v['rna'] else {}
@@ -134,25 +139,27 @@ class HPADataDownloader():
         t_level = petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL),
                                delimiter='\t')
         headers = t_level.header()
-        t_level = petl.setheader(t_level, 
+        t_level = petl.setheader(t_level,
                                 ['ID'] + [e.split('_')[1] \
+                                          if '_' in e else e \
                                     for e in headers if e != 'ID'])
-        t_level = petl.melt(t_level, key='ID', 
-                            variablefield='sample', 
+        t_level = petl.melt(t_level, key='ID',
+                            variablefield='sample',
                             valuefield='level')
         t_level = petl.rename(t_level, {'ID': 'gene'})
-        
+
         t_value = petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL),
                                delimiter='\t')
-        t_value = petl.setheader(t_value, 
+        t_value = petl.setheader(t_value,
                                 ['ID'] + [e.split('_')[1] \
+                                          if '_' in e else e \
                                     for e in t_value.header() if e != 'ID'])
-        t_value = petl.melt(t_value, key='ID', 
-                            variablefield='sample', 
+        t_value = petl.melt(t_value, key='ID',
+                            variablefield='sample',
                             valuefield='value')
         t_value = petl.rename(t_value, {'ID': 'gene'})
         t_value = petl.addfield(t_value, 'unit', 'TPM')
-        
+
         t_join = petl.join(t_level, t_value, presorted=True)
 
         for d in petl.dicts(t_join):
@@ -208,11 +215,11 @@ class ExpressionObjectStorer(RedisQueueWorkerProcess):
                        ID=geneid,
                        body=gene['expression'].to_json(),
                        create_index=False)
-        
+
     def init(self):
         super(ExpressionObjectStorer, self).init()
         self.loader = Loader(dry_run=self.dry_run)
-               
+
     def close(self):
         super(ExpressionObjectStorer, self).close()
         self.loader.close()
@@ -278,35 +285,35 @@ class HPAProcess():
                                serialiser='jsonpickle',
                                max_size=10000,
                                job_timeout=600)
-            
+
             q_reporter = RedisQueueStatusReporter([queue])
             q_reporter.start()
-        
+
             workers = [ExpressionObjectStorer(self.loader.es,
                                         None,
                                         queue,
                                         dry_run=dry_run) for i in range(4)]
-            
+
             for w in workers:
                 w.start()
-        
+
             for gene, data in self.data.items():
                 queue.put((gene, data), self.r_server)
-        
+
             queue.set_submission_finished(r_server=self.r_server)
-        
+
             for w in workers:
                 w.join()
-                
+
             q_reporter.join()
-        
+
             self.logger.info('all expressions objects pushed to elasticsearch')
 
         if self.data.values()[0]['cancer']:  # if there is cancer data
             pass
         if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
             pass
-        
+
     def init_gene(self, gene):
         self.data[gene] = dict(expression=HPAExpression(gene),
                                cancer={},  # TODO
@@ -320,14 +327,14 @@ class HPAProcess():
             tissue = row['tissue'].replace('1', '').replace('2', '').strip()
             # tissue = row['tissue']
             code = code_from_tissue(tissue)
-            
+
             if tissue not in tissue_data:
                 tissue_data[tissue] = {'protein': {
                         'cell_type': {},
                         'level': 0,
                         'reliability': False,
                     },
-        
+
                         'rna': {
                         },
                         'efo_code': code
@@ -352,28 +359,28 @@ class HPAProcess():
 
         if not tissue_data:
             tissue_data = {}
-        
+
         if gene in self.rna_data:
             for row in self.rna_data[gene]:
                 sample = row['sample'].replace('1', '').replace('2', '').strip()
                 code = code_from_tissue(sample)
-                
+
                 if sample not in tissue_data:
                     tissue_data[sample] = {'protein': {
                             'cell_type': {},
                             'level': 0,
                             'reliability': False,
                         },
-        
+
                             'rna': {
                             },
                             'efo_code': code
                         }
-        
+
                 tissue_data[sample]['rna']['value'] = float(row['value'])
                 tissue_data[sample]['rna']['unit'] = row['unit']
                 tissue_data[sample]['rna']['level'] = int(row['level'])
-        
+
         return tissue_data
 
     def set_translations(self):
@@ -407,6 +414,8 @@ class HPALookUpTable(object):
         self._table = RedisLookupTablePickle(namespace=namespace,
                                              r_server=self.r_server,
                                              ttl=ttl)
+        self._logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
         if self.r_server:
             self._load_hpa_data(self.r_server)
@@ -417,6 +426,7 @@ class HPALookUpTable(object):
                        unit=' hpa',
                        unit_scale=True,
                        total=self._es_query.count_all_hpa(),
+                       file=self.tqdm_out,
                        leave=False):
             self.set_hpa(el, r_server=self._get_r_server(r_server))
 

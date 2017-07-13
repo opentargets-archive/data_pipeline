@@ -58,6 +58,7 @@ class G2P():
                         unit_scale=True,
                         unit='genes',
                         leave=False,
+                        file=tqdm_out,
                         total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
 
             '''
@@ -168,20 +169,19 @@ class G2P():
             print "%i %i" % (total_efo, c)
 
     def write_evidence_strings(self, filename):
-        logging.info("Writing G2P evidence strings to ")
-
+        self.logger.info("Writing IntOGen evidence strings")
         with open(filename, 'w') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
                 n += 1
-                logging.info(evidence_string.disease.id[0])
+                self.logger.info(evidence_string.disease.id[0])
                 # get max_phase_for_all_diseases
                 error = evidence_string.validate(logging)
                 if error == 0:
                     tp_file.write(evidence_string.to_JSON(indentation=None) + "\n")
                 else:
-                    logging.error("REPORTING ERROR %i" % n)
-                    logging.error(evidence_string.to_JSON(indentation=4))
+                    self.logger.error("REPORTING ERROR %i" % n)
+                    self.logger.error(evidence_string.to_JSON(indentation=4))
                     # sys.exit(1)
         tp_file.close()
 
