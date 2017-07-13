@@ -40,6 +40,8 @@ class GE(object):
         self.hpo = OntologyClassReader()
         self.hpo_labels = dict()
         self.efo_labels = dict()
+        self.ols_synonyms = dict()
+        self.not_ols_synonyms = set()
         self.panel_app_info = list()
         self.high_confidence_mappings = dict()
         self.other_zooma_mappings = dict()
@@ -52,6 +54,7 @@ class GE(object):
         self.fh_zooma_high = None
         self.fh_zooma_low = None
         self._logger = logging.getLogger(__name__)
+        self._logger.info(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         self._logger.warning("GE init")
         self.map_strings = dict()
 
@@ -168,7 +171,7 @@ class GE(object):
                             First check whether it's an OMIM identifier
                             '''
                             match_omim = re.match('^(\d{6,})$', element)
-                            match_omim2 = re.match('^\s*OMIM:(\d{6,})$', element)
+                            match_omim2 = re.match('^\s*OMIM:?[#\s]*(\d{6,})$', element)
                             if match_omim or match_omim2:
                                 if match_omim:
                                     omim_id = match_omim.groups()[0]
@@ -186,6 +189,7 @@ class GE(object):
                                                                     item['EnsembleGeneIds'][0],
                                                                     ensembl_iri,
                                                                     item['LevelOfConfidence'],
+                                                                    element,
                                                                     omim_id,
                                                                     item['Publications'],
                                                                     item['Evidences'],
@@ -232,6 +236,11 @@ class GE(object):
                                     if disease_uri in self.hpo.current_classes:
                                         disease_label = self.hpo.current_classes[disease_uri]
                                         is_hpo = True
+                                elif self.search_request_to_ols(query=element) is True:
+                                    disease_uri = self.ols_synonyms[element]["iri"]
+                                    disease_label = self.ols_synonyms[element]["label"]
+                                    phenotype_label = disease_label
+                                    is_hpo = True
                                 elif match_curly_brackets_omim:
                                     #[{Pancreatitis, idiopathic}, 167800]
                                     phenotype_label = match_curly_brackets_omim.groups()[0]
@@ -278,6 +287,7 @@ class GE(object):
                                                                 item['EnsembleGeneIds'][0],
                                                                 ensembl_iri,
                                                                 item['LevelOfConfidence'],
+                                                                element,
                                                                 phenotype_label,
                                                                 item['Publications'],
                                                                 item['Evidences'],
@@ -295,6 +305,7 @@ class GE(object):
                                                                     item['EnsembleGeneIds'][0],
                                                                     ensembl_iri,
                                                                     item['LevelOfConfidence'],
+                                                                    element,
                                                                     phenotype_label,
                                                                     item['Publications'],
                                                                     item['Evidences'],
@@ -315,6 +326,7 @@ class GE(object):
                                                                                 item['EnsembleGeneIds'][0],
                                                                                 ensembl_iri,
                                                                                 item['LevelOfConfidence'],
+                                                                                element,
                                                                                 phenotype_label,
                                                                                 item['Publications'],
                                                                                 item['Evidences'],
@@ -334,6 +346,7 @@ class GE(object):
                                                                         item['EnsembleGeneIds'][0],
                                                                         ensembl_iri,
                                                                         item['LevelOfConfidence'],
+                                                                        element,
                                                                         phenotype_label,
                                                                         item['Publications'],
                                                                         item['Evidences'],
@@ -352,6 +365,39 @@ class GE(object):
 
             self.phenotype_set = set(phenotype_list)
         return self.phenotype_set
+
+
+    def search_request_to_ols(self, query=None, ontology='efo', type='class'):
+        in_ols = False
+        if query in self.ols_synonyms:
+            return True
+        elif query in self.not_ols_synonyms:
+            return False
+        else:
+            # curl 'http://www.ebi.ac.uk/ols/api/search?q=Myofascial%20Pain%20Syndromes&queryFields=synonym&exact=true&ontology=efo,ordo' -i -H 'Accept: application/json'
+            url = 'http://www.ebi.ac.uk/ols/api/search?q=%s&queryFields=synonym&exact=true&ontology=efo,ordo,hpo'%(query)
+            self._logger.info("Requesting %s as synonym to OLS"%(query))
+            r = requests.get('http://www.ebi.ac.uk/ols/api/search',
+                             params={'q': query, 'queryFields': 'synonym', 'eact' : 'true', 'ontology': 'efo,ordo,hpo'})
+            results = r.json()
+            if results["response"]["numFound"] > 0:
+                in_ols = True
+                docs = results["response"]["docs"]
+                for doc in docs:
+                    if doc["ontology_name"] == 'efo':
+                        self.ols_synonyms[query] = { "iri" : doc["iri"], "label" : doc["label"], "ontology_name" : doc["ontology_name"] }
+                        return True
+                for doc in docs:
+                    if doc["ontology_name"] == 'hpo':
+                        self.ols_synonyms[query] = { "iri" : doc["iri"], "label" : doc["label"], "ontology_name" : doc["ontology_name"] }
+                        return True
+                for doc in docs:
+                    if doc["ontology_name"] == 'ordo':
+                        self.ols_synonyms[query] = { "iri" : doc["iri"], "label" : doc["label"], "ontology_name" : doc["ontology_name"] }
+                        return True
+            else:
+                self.not_ols_synonyms.add(query)
+        return in_ols
 
     def request_to_zooma(self, property_value=None):
         '''
@@ -425,37 +471,37 @@ class GE(object):
         unmapped_tsv_writer = csv.writer(unmapped_fh, delimiter='\t')
 
         for row in self.panel_app_info:
-            panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, phenotype, publications, evidences, omim_ids, disease_uri, disease_label = row
+            panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, original_label, phenotype, publications, evidences, omim_ids, disease_uri, disease_label = row
             if len(omim_ids) > 0 and disease_uri:
                 self.generate_single_evidence(panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence,
-                                              phenotype, publications, evidences, omim_ids, disease_uri, disease_label, now)
+                                              original_label, phenotype, publications, evidences, omim_ids, disease_uri, disease_label, now)
                 mapping_tsv_writer.writerow([panel_name, panel_id, gene_symbol, phenotype, disease_uri, disease_label])
             elif phenotype in self.high_confidence_mappings:
                 disease_label = self.high_confidence_mappings[phenotype]['label']
                 disease_uri = self.high_confidence_mappings[phenotype]['uri']
-                self.generate_single_evidence(panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, phenotype, publications, evidences, omim_ids, disease_uri , disease_label, now)
+                self.generate_single_evidence(panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, original_label, phenotype, publications, evidences, omim_ids, disease_uri , disease_label, now)
                 mapping_tsv_writer.writerow([panel_name, panel_id, gene_symbol, phenotype, disease_uri, disease_label])
             elif phenotype.lower() in self.zooma_to_efo_map:
                 for item in self.zooma_to_efo_map[phenotype.lower()]:
                     disease_uri = item['efo_uri']
                     disease_label = "N/A"
-                    self.generate_single_evidence(panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, phenotype, publications, evidences, omim_ids, disease_uri , disease_label, now)
+                    self.generate_single_evidence(panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, original_label, phenotype, publications, evidences, omim_ids, disease_uri , disease_label, now)
                     mapping_tsv_writer.writerow(
                         [panel_name, panel_id, gene_symbol, phenotype, disease_uri, disease_label])
             elif disease_uri:
                 self.generate_single_evidence(panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri,
-                                              level_of_confidence, phenotype, publications, evidences, omim_ids,
+                                              level_of_confidence, original_label, phenotype, publications, evidences, omim_ids,
                                               disease_uri, disease_label, now)
                 mapping_tsv_writer.writerow(
-                    [panel_name, panel_id, gene_symbol, phenotype, disease_uri, disease_label])
+                    [panel_name, panel_id, gene_symbol, original_label, disease_uri, disease_label])
             else:
                 unmapped_tsv_writer.writerow(
-                        [panel_name, panel_id, gene_symbol, phenotype])
+                        [panel_name, panel_id, gene_symbol, original_label])
 
         mapping_fh.close()
         unmapped_fh.close()
 
-    def generate_single_evidence(self, panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, phenotype, publications, evidences, omim_ids, disease_uri , disease_label, now):
+    def generate_single_evidence(self, panel_name, panel_id, gene_symbol, ensemble_gene_ids, ensembl_iri, level_of_confidence, original_label, phenotype, publications, evidences, omim_ids, disease_uri , disease_label, now):
 
         single_lit_ref_list = []
         if publications is not None:
