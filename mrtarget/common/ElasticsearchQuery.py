@@ -902,13 +902,14 @@ class ESQuery(object):
 
         if not isinstance(datasources, (list, tuple)):
             datasources = [datasources]
-        query = {
-            "constant_score": {
-                "filter": {
-                    "terms": {"sourceID": datasources},
+        query = {"query": {
+                    "constant_score": {
+                        "filter": {
+                            "terms": {"sourceID": datasources},
+                            }
+                        }
                     }
-                }
-            }
+                 }
         self.delete_data(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
                          query=query)
 
