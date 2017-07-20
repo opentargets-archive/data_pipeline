@@ -17,7 +17,7 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 import ujson as json
 
@@ -35,7 +35,7 @@ DISTINCT_DISEASES_QUERY = {  "size": 0, "aggs" : {  "distinct_diseases" : {  "ca
 SUBMISSION_FILTER_FILENAME_QUERY = '''
 {
   "query": {
-    "filtered": {
+    "constant_score": {
       "filter": {
         "terms" : { "filename": ["%s"]}
       }
@@ -49,7 +49,7 @@ SUBMISSION_FILTER_FILENAME_QUERY = '''
 SUBMISSION_FILTER_MD5_QUERY = '''
 {
   "query": {
-    "filtered": {
+    "constant_score": {
       "filter": {
         "terms" : { "md5": ["%s"]}
       }

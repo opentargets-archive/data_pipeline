@@ -425,7 +425,7 @@ class ESQuery(object):
 
         for target in targets:
             query_body = {
-                "query": { "filtered": {
+                "query": { "constant_score": {
                                        "filter": {
                                            "terms": {"target.id": target}
                                        }
@@ -809,7 +809,7 @@ class ESQuery(object):
         count = Counter()
         for ev_hit in helpers.scan(client=self.handler,
                                     query={"query": {
-                                              "filtered": {
+                                              "constant_score": {
                                                   "filter": {
                                                       "bool": {
                                                           "must": [
@@ -903,7 +903,7 @@ class ESQuery(object):
         if not isinstance(datasources, (list, tuple)):
             datasources = [datasources]
         query = {
-            "filtered": {
+            "constant_score": {
                 "filter": {
                     "terms": {"sourceID": datasources},
                     }
