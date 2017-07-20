@@ -490,7 +490,7 @@ class ESQuery(object):
 
     def get_lit_entities_for_type(self,type):
         query_body = {"query": {
-            "bool": {
+            "constant_score": {
                 "filter": {
                     "term": {
                         "ent_type": type
@@ -507,7 +507,7 @@ class ESQuery(object):
 
     def get_evidence_for_target_simple(self, target, expected = None):
         query_body = {"query": {
-                                "bool": {
+                                "constant_score": {
                                   "filter": {
                                     "term": {
                                       "target.id": target
@@ -549,7 +549,7 @@ class ESQuery(object):
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
                                   body={
                                         "query": {
-                                            "bool": {
+                                            "constant_score": {
                                               "filter": {
                                                 "term": {
                                                   "target.id": target
