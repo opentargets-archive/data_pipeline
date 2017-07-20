@@ -640,7 +640,7 @@ class ScoringProcess():
         readers = [TargetDiseaseEvidenceProducer(target_q,
                                                  None,
                                                  target_disease_pair_q,
-                                                ) for _ in range(number_of_workers*2)]
+                                                ) for _ in range(number_of_workers)]
         for w in readers:
             w.start()
 
