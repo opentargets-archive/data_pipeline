@@ -132,7 +132,7 @@ def read_option(option, cast=None, ini=ini, section='dev',
 
 def update_schema_version(config, schema_version_string):
     config.EVIDENCEVALIDATION_SCHEMA = schema_version_string
-    for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS.iterkeys():
+    for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS:
         config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
                                                               schema_version_string)
 
@@ -352,7 +352,7 @@ class Config():
 
                                                 )
 
-    DATASOURCE_TO_DATATYPE_MAPPING = defaultdict(lambda: "other")
+    DATASOURCE_TO_DATATYPE_MAPPING = {}
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
@@ -366,7 +366,8 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['phewascatalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['23andme'] = 'genetic_association'
 
     # use specific index for a datasource
