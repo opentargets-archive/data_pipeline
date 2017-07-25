@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 import logging
 import re
-import json
+import ujson as json
 import functools as ft
 import operator as oper
 from tqdm import tqdm

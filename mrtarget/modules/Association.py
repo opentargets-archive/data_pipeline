@@ -1,5 +1,7 @@
 import logging
 
+import cProfile
+
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
@@ -15,8 +17,6 @@ from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, Extended
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
 
-
-global_reporting_step = 5e5
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
@@ -517,7 +517,6 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         self.loader = None
 
 
-
     def process(self, data):
         if data is None:
             pass
@@ -591,22 +590,23 @@ class ScoringProcess():
         if targets and len(targets) < number_of_workers:
             number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
-                              max_size=number_of_workers*5,
+                              max_size=number_of_workers * queue_per_worker,
                               job_timeout=3600,
                               r_server=self.r_server,
+                              serialiser='jsonpickle',
                               total=len(targets))
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
                                            max_size=queue_per_worker * number_of_workers,
                                            job_timeout=1200,
                                            batch_size=10,
                                            r_server=self.r_server,
-                                           serialiser='pickle')
+                                           serialiser='jsonpickle')
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
                                   max_size=queue_per_worker * number_of_storers,
                                   job_timeout=1200,
                                   batch_size=10,
                                   r_server=self.r_server,
-                                  serialiser='pickle')
+                                  serialiser='jsonpickle')
 
         q_reporter = RedisQueueStatusReporter([target_q,
                                                target_disease_pair_q,

@@ -12,10 +12,11 @@ jsonpickle.set_preferred_backend('ujson')
 import logging
 import uuid
 import datetime
-from threading import Thread
+from threading import Thread, current_thread
 
 import numpy as np
 import psutil
+import cProfile
 
 np.seterr(divide='warn', invalid='warn')
 from tqdm import tqdm
@@ -26,7 +27,7 @@ try:
 except ImportError:
     import pickle
 import time
-from multiprocessing import Process
+from multiprocessing import Process, current_process
 from colorama import Fore, Back, Style
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,11 @@ def timeout_handler(signum, frame):
     raise TimeoutException
 
 signal.signal(signal.SIGALRM, timeout_handler)
+
+_redis_queue_worker_base = {'profiling': False}
+
+def enable_profiling(enable=True):
+    _redis_queue_worker_base['profiling'] = enable
 
 def millify(n):
     try:
@@ -639,11 +645,7 @@ def get_redis_worker(base = Process):
             self.job_result_cache = []
             self.kill_switch = False
 
-
-        def run(self):
-            # here we are inside the new process
-            self._init()
-
+        def _inner_run(self):
             while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
                 job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
@@ -678,6 +680,24 @@ def get_redis_worker(base = Process):
             self.logger.info('%s done processing' % self.name)
             if (self.queue_out is not None) and self.auto_signal:
                 self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
+
+        def _outer_run(self):
+
+            cur_file_token = current_process().name
+
+            if _redis_queue_worker_base['profiling']:
+                print str(_redis_queue_worker_base)
+                cProfile.runctx('self._inner_run()',
+                                globals(), locals(),
+                                '/tmp/prof_%s.prof' % cur_file_token)
+            else:
+                self._inner_run()
+
+        def run(self):
+            # here we are inside the new process
+            self._init()
+
+            self._outer_run()
 
             # closing everything properly before exiting the spawned process/thread
             self._close()
