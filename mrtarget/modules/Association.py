@@ -435,7 +435,10 @@ class ScoreProducer(RedisQueueWorkerProcess):
                  evidence_data_q,
                  r_path,
                  score_q,
-                 lookup_data
+                 lookup_data,
+                 chunk_size = 1e4,
+                 dry_run = False,
+                 es = None
                  ):
         super(ScoreProducer, self).__init__(queue_in=evidence_data_q,
                                             redis_path=r_path,
@@ -443,11 +446,21 @@ class ScoreProducer(RedisQueueWorkerProcess):
         self.evidence_data_q = evidence_data_q
         self.score_q = score_q
         self.lookup_data = lookup_data
+        self.chunk_size = chunk_size
+        self.dry_run = dry_run
+        self.es = None
+        self.loader = None
 
     def init(self):
         super(ScoreProducer, self).init()
         self.scorer = Scorer()
         self.lookup_data.set_r_server(self.r_server)
+        self.loader = Loader(chunk_size=self.chunk_size,
+                             dry_run=self.dry_run)
+
+    def close(self):
+        super(ScoreStorerWorker, self).close()
+        self.loader.close()
 
     def process(self, data):
         target, disease, evidence, is_direct = data
@@ -512,7 +525,14 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 score.set_disease_data(disease_data)
 
                 if score: #bypass associations with overall score=0
-                    return (target, disease, score.to_json())
+                    element_id = '%s-%s' % (target, disease)
+                    self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+                                           Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
+                                           element_id,
+                                           score,
+                                           create_index=False)
+                                           # routing=score.target['id']
+
                 else:
                     logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
 
@@ -613,7 +633,7 @@ class ScoringProcess():
                               serialiser='jsonpickle',
                               total=len(targets))
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
-                                           max_size=queue_per_worker * number_of_workers,
+                                           max_size=queue_per_worker * number_of_storers,
                                            job_timeout=1200,
                                            batch_size=10,
                                            r_server=self.r_server,
@@ -627,28 +647,31 @@ class ScoringProcess():
 
         q_reporter = RedisQueueStatusReporter([target_q,
                                                target_disease_pair_q,
-                                               score_data_q
+                                               # score_data_q
                                                ],
                                               interval=30,
                                               )
         q_reporter.start()
 
 
-        '''create data storage workers'''
-        storers = [ScoreStorerWorker(score_data_q,
-                                     None,
-                                     chunk_size=1000,
-                                     dry_run = dry_run,
-                                     ) for _ in range(number_of_storers)]
+#         '''create data storage workers'''
+#         storers = [ScoreStorerWorker(score_data_q,
+#                                      None,
+#                                      chunk_size=1000,
+#                                      dry_run = dry_run,
+#                                      ) for _ in range(number_of_storers)]
+#
+#         for w in storers:
+#             w.start()
 
-        for w in storers:
-            w.start()
-
+        # storage is located inside this code because the serialisation time
         scorers = [ScoreProducer(target_disease_pair_q,
                                  None,
-                                 score_data_q,
+                                 None,
                                  lookup_data,
-                                 ) for _ in range(number_of_workers)]
+                                 chunk_size=1000,
+                                 dry_run=dry_run
+                                 ) for _ in range(number_of_storers)]
         for w in scorers:
             w.start()
 
@@ -680,8 +703,8 @@ class ScoringProcess():
             w.join()
         for w in scorers:
             w.join()
-        for w in storers:
-            w.join()
+#         for w in storers:
+#             w.join()
 
         logger.info('flushing data to index')
         self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
