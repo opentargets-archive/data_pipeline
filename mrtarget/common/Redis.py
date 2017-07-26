@@ -4,6 +4,7 @@
 import base64
 import ujson as json
 from collections import Counter
+import pylru as lru
 
 import jsonpickle
 from mrtarget.common import require_all
@@ -646,6 +647,9 @@ def get_redis_worker(base = Process):
             self.kill_switch = False
 
         def _inner_run(self):
+            # here we are inside the new process
+            self._init()
+
             while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
                 job = self.queue_in.get(r_server=self.r_server, timeout=1)
 
@@ -681,8 +685,10 @@ def get_redis_worker(base = Process):
             if (self.queue_out is not None) and self.auto_signal:
                 self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
 
-        def _outer_run(self):
+            # closing everything properly before exiting the spawned process/thread
+            self._close()
 
+        def _outer_run(self):
             cur_file_token = current_process().name
 
             if _redis_queue_worker_base['profiling']:
@@ -694,13 +700,7 @@ def get_redis_worker(base = Process):
                 self._inner_run()
 
         def run(self):
-            # here we are inside the new process
-            self._init()
-
             self._outer_run()
-
-            # closing everything properly before exiting the spawned process/thread
-            self._close()
 
         def _split_iterable(self, item_list, size):
                 for i in range(0, len(item_list), size):
@@ -743,10 +743,13 @@ def get_redis_worker(base = Process):
 
         def _init(self):
             self.r_server = new_redis_client()
+            # TODO move 1000 to a conf
+            self.lru_cache = lru.lrucache(1000)
             self.init()
 
         def _close(self):
             self.close()
+            self.lru_cache.clear()
 
         def __enter__(self):
             pass

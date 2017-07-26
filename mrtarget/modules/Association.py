@@ -455,30 +455,47 @@ class ScoreProducer(RedisQueueWorkerProcess):
             score = self.scorer.score(target, disease, evidence, is_direct)
             if score.get_scoring_method(
                     ScoringMethods.HARMONIC_SUM).overall != 0:  # skip associations only with data with score 0
-                gene_data = Gene()
-                try:
-                    gene_data.load_json(
-                        self.lookup_data.available_genes.get_gene(target,
-                                                                  self.r_server))
-                except KeyError as e:
-                    self.logger.debug('Cannot find gene code "%s" '
-                                      'in lookup table' % target)
-                    self.logger.exception(e)
+
+                # look for the gene in the lru cache
+                gene_data = None
+                hpa_data = None
+                if target in self.lru_cache:
+                    gene_data, hpa_data = self.lru_cache[target]
+
+                if not gene_data:
+                    gene_data = Gene()
+                    try:
+                        gene_data.load_json(
+                            self.lookup_data.available_genes.get_gene(target,
+                                                                      self.r_server))
+
+                    except KeyError as e:
+                        self.logger.debug('Cannot find gene code "%s" '
+                                          'in lookup table' % target)
+                        self.logger.exception(e)
 
                 score.set_target_data(gene_data)
 
                 # create a hpa expression empty jsonserializable class
                 # to fill from Redis cache lookup_data
-                hpa_data = HPAExpression()
-                try:
-                    hpa_data.update(
-                        self.lookup_data.available_hpa.get_hpa(target,
-                                                               self.r_server))
-                    score.set_hpa_data(hpa_data)
+                if not hpa_data:
+                    hpa_data = HPAExpression()
+                    try:
+                        hpa_data.update(
+                            self.lookup_data.available_hpa.get_hpa(target,
+                                                                   self.r_server))
+                    except KeyError:
+                        pass
+                    except Exception as e:
+                        self.logger.exception(e)
 
+                    # set everything in the lru_cache
+                    self.lru_cache[target] = (gene_data, hpa_data)
+
+                try:
+                    score.set_hpa_data(hpa_data)
                 except KeyError:
                     pass
-
                 except Exception as e:
                     self.logger.exception(e)
 
