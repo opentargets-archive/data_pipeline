@@ -1,7 +1,4 @@
 import logging
-
-import cProfile
-
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
@@ -209,7 +206,7 @@ class EvidenceScore():
 
 class HarmonicSumScorer():
 
-    def __init__(self, buffer = 100):
+    def __init__(self, buffer=100):
         """
         An HarmonicSumScorer will ingest any number of numeric score, keep in memory the top max number
         defined by the buffer and calculate an harmonic sum of those
