@@ -6,6 +6,7 @@ import addict
 from collections import Counter
 
 import jsonpickle
+import base64
 from elasticsearch import helpers
 
 from mrtarget.common.DataStructure import SparseFloatDict
@@ -298,7 +299,7 @@ class ESQuery(object):
                            timeout="10m",
                            )
         for hit in res:
-            yield jsonpickle.loads(hit['_source']['entry'])
+            yield jsonpickle.encode(base64.b64decode(hit['_source']['entry']))
 
 
     def get_reaction(self, reaction_id):
