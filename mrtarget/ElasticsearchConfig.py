@@ -108,6 +108,7 @@ class ElasticSearchConfiguration():
 
     unip = Dict()
     unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.type = 'binary'
+    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.index = False
     unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.store = True
     unip.settings.number_of_shards = '1'
     unip.settings.number_of_replicas = generic_replicas_number
