@@ -299,7 +299,7 @@ class ESQuery(object):
                            timeout="10m",
                            )
         for hit in res:
-            yield jsonpickle.encode(base64.b64decode(hit['_source']['entry']))
+            yield jsonpickle.decode(base64.b64decode(hit['_source']['entry']))
 
 
     def get_reaction(self, reaction_id):
