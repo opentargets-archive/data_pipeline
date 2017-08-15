@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import logging
 import re
+import hashlib
 import ujson as json
 import functools as ft
 import operator as oper
@@ -64,7 +65,7 @@ class HPAExpression(Dict, JSONSerializable):
         protein = Dict(*args, **kwargs)
 
         if 'level' not in protein:
-            protein.level = 0
+            protein.level = -1
 
         if 'reliability' not in protein:
             protein.reliability = False
@@ -79,7 +80,7 @@ class HPAExpression(Dict, JSONSerializable):
         rna = Dict(*args, **kwargs)
 
         if 'level' not in rna:
-            rna.level = 0
+            rna.level = -1
 
         if 'value' not in rna:
             rna.value = 0
@@ -201,21 +202,42 @@ def format_expression_with_rna(rec):
 
     return exp.to_dict()
 
+def clean_tissue_name(tissue_name):
+    tname = tissue_name
+    if tissue_name.endswith(' tissue'):
+        tname = tissue_name[:-7]
+    
+    return tname
+
+
 def code_from_tissue(tissue_name):
-    t2m = Config.TISSUE_TRANSLATION_MAP['tissue']
+    '''from stripped tissue name get a ripemd160 hash code none if error'''
     tid = None
     try:
-        tid = t2m[tissue_name]
-    except KeyError:
+        tid = hashlib.new('ripemd160', tissue_name.strip()).hexdigest()
+
+    except Exception as e:
         logger = logging.getLogger(__name__)
-        logger.debug('the tissue name %s was not found in the mapping',
-                     tissue_name)
-        # TODO the id has to be one word to not get splitted by the analyser
-        # this is a temporal fix by the time we get all items mapped
-        tid = tissue_name.strip().replace(' ', '_')
-        tid = re.sub('[^0-9a-zA-Z_]+', '',tid)
+        logger.exception(e)
 
     return tid
+
+
+# def code_from_tissue(tissue_name):
+#     t2m = Config.TISSUE_TRANSLATION_MAP['tissue']
+#     tid = None
+#     try:
+#         tid = t2m[tissue_name]
+#     except KeyError:
+#         logger = logging.getLogger(__name__)
+#         logger.debug('the tissue name %s was not found in the mapping',
+#                      tissue_name)
+#         # TODO the id has to be one word to not get splitted by the analyser
+#         # this is a temporal fix by the time we get all items mapped
+#         tid = tissue_name.strip().replace(' ', '_')
+#         tid = re.sub('[^0-9a-zA-Z_]+', '',tid)
+# 
+#     return tid
 
 
 def hpa2tissues(hpa=None):
@@ -280,10 +302,10 @@ class HPADataDownloader():
                      'Reliability': 'reliability',
                      'Gene': 'gene'})
             .cut('tissue', 'cell_type', 'level', 'reliability', 'gene')
-            .addfield('tissue_label', lambda rec: rec['tissue']\
+            .addfield('tissue_label', lambda rec: clean_tissue_name(rec['tissue']\
                                                     .replace('1', '')\
                                                     .replace('2', '')\
-                                                    .strip() )
+                                                    .strip()) )
             .addfield('tissue_code', lambda rec: code_from_tissue(rec['tissue_label']))
             .addfield('tissue_level', lambda rec: level_from_text(rec['level']))
             .addfield('tissue_reliability', lambda rec: reliability_from_text(rec['reliability']))
@@ -319,10 +341,10 @@ class HPADataDownloader():
                                delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_level')
             .rename({'ID': 'gene'})
-            .addfield('tissue_label', lambda rec: rec['tissue']\
+            .addfield('tissue_label', lambda rec: clean_tissue_name(rec['tissue']\
                                                     .replace('1', '')\
                                                     .replace('2', '')\
-                                                    .strip() )
+                                                    .strip()) )
             .addfield('tissue_code', lambda rec: code_from_tissue(rec['tissue_label']))
             .cutout('tissue')
         )
