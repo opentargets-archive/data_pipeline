@@ -4,6 +4,7 @@
 import base64
 import ujson as json
 from collections import Counter
+import pylru as lru
 
 import jsonpickle
 from mrtarget.common import require_all
@@ -12,10 +13,11 @@ jsonpickle.set_preferred_backend('ujson')
 import logging
 import uuid
 import datetime
-from threading import Thread
+from threading import Thread, current_thread
 
 import numpy as np
 import psutil
+import cProfile
 
 np.seterr(divide='warn', invalid='warn')
 from tqdm import tqdm
@@ -26,7 +28,7 @@ try:
 except ImportError:
     import pickle
 import time
-from multiprocessing import Process
+from multiprocessing import Process, current_process
 from colorama import Fore, Back, Style
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,11 @@ def timeout_handler(signum, frame):
     raise TimeoutException
 
 signal.signal(signal.SIGALRM, timeout_handler)
+
+_redis_queue_worker_base = {'profiling': False}
+
+def enable_profiling(enable=True):
+    _redis_queue_worker_base['profiling'] = enable
 
 def millify(n):
     try:
@@ -639,8 +646,7 @@ def get_redis_worker(base = Process):
             self.job_result_cache = []
             self.kill_switch = False
 
-
-        def run(self):
+        def _inner_run(self):
             # here we are inside the new process
             self._init()
 
@@ -681,6 +687,20 @@ def get_redis_worker(base = Process):
 
             # closing everything properly before exiting the spawned process/thread
             self._close()
+
+        def _outer_run(self):
+            cur_file_token = current_process().name
+
+            if _redis_queue_worker_base['profiling']:
+                print str(_redis_queue_worker_base)
+                cProfile.runctx('self._inner_run()',
+                                globals(), locals(),
+                                '/tmp/prof_%s.prof' % cur_file_token)
+            else:
+                self._inner_run()
+
+        def run(self):
+            self._outer_run()
 
         def _split_iterable(self, item_list, size):
                 for i in range(0, len(item_list), size):
@@ -723,10 +743,13 @@ def get_redis_worker(base = Process):
 
         def _init(self):
             self.r_server = new_redis_client()
+            # TODO move 1000 to a conf
+            self.lru_cache = lru.lrucache(1000)
             self.init()
 
         def _close(self):
             self.close()
+            self.lru_cache.clear()
 
         def __enter__(self):
             pass
