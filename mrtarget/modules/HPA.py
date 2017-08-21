@@ -210,34 +210,34 @@ def clean_tissue_name(tissue_name):
     return tname
 
 
-def code_from_tissue(tissue_name):
-    '''from stripped tissue name get a ripemd160 hash code none if error'''
-    tid = None
-    try:
-        tid = hashlib.new('ripemd160', tissue_name.strip()).hexdigest()
-
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.exception(e)
-
-    return tid
-
-
 # def code_from_tissue(tissue_name):
-#     t2m = Config.TISSUE_TRANSLATION_MAP['tissue']
+#     '''from stripped tissue name get a ripemd160 hash code none if error'''
 #     tid = None
 #     try:
-#         tid = t2m[tissue_name]
-#     except KeyError:
+#         tid = hashlib.new('ripemd160', tissue_name.strip()).hexdigest()
+# 
+#     except Exception as e:
 #         logger = logging.getLogger(__name__)
-#         logger.debug('the tissue name %s was not found in the mapping',
-#                      tissue_name)
-#         # TODO the id has to be one word to not get splitted by the analyser
-#         # this is a temporal fix by the time we get all items mapped
-#         tid = tissue_name.strip().replace(' ', '_')
-#         tid = re.sub('[^0-9a-zA-Z_]+', '',tid)
+#         logger.exception(e)
 # 
 #     return tid
+
+
+def code_from_tissue(tissue_name):
+    t2m = Config.TISSUE_TRANSLATION_MAP['tissue']
+    tid = None
+    try:
+        tid = t2m[tissue_name]
+    except KeyError:
+        logger = logging.getLogger(__name__)
+        logger.debug('the tissue name %s was not found in the mapping',
+                     tissue_name)
+        # TODO the id has to be one word to not get splitted by the analyser
+        # this is a temporal fix by the time we get all items mapped
+        tid = tissue_name.strip().replace(' ', '_')
+        tid = re.sub('[^0-9a-zA-Z_]+', '',tid)
+ 
+    return tid
 
 
 def hpa2tissues(hpa=None):
