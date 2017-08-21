@@ -150,39 +150,39 @@ class LogAccum(object):
         self._logger = logger_o
         self._accum = {'counter': 0}
         self._limit = elem_limit
-    
+
     def _flush(self, force=False):
         if force or self._accum['counter'] >= self._limit:
             keys = set(self._accum.iterkeys()) - set(['counter'])
-            
+
             for k in keys:
                 for msg in self._accum[k]:
                     self._logger.log(k, msg[0], *msg[1])
             # reset the accum
             self._accum = {'counter': 0}
-            
+
     def flush(self, force=True):
         self._flush(force)
-    
+
     def log(self, level, message, *args):
         if level in self._accum:
             self._accum[level].append((message, args))
         else:
             self._accum[level] = [(message, args)]
-        
+
         self._accum['counter'] += 1
         self._flush()
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         self.flush(True)
-    
+
 
 def require_all(*predicates):
     r_all = all(predicates)
     if not r_all:
         print 'ERROR require_all failed checking all predicates true'
         _l.error('require_all failed checking all predicates true')
-        
+
 def require_any(*predicates):
     r_any = any(predicates)
     if not r_any:
