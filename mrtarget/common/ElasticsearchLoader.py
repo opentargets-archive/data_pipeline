@@ -133,8 +133,8 @@ class Loader():
             retry = 0
             while 1:
                 try:
-                    self._flush()
-                    break
+                   self._flush()
+                   break
                 except Exception as e:
                     retry+=1
                     if retry >= max_retry:
@@ -168,7 +168,7 @@ class Loader():
                                      'generated index docs while dry_run '
                                      'is activated with file %s',
                                      self._tmp_fd.name)
-
+                    
 
                 # flush self.cache into temp file converted as text lines
                 self._tmp_fd.writelines([json.dumps(el) + '\n'

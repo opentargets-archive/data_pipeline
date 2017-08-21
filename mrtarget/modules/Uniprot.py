@@ -7,7 +7,6 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.UniprotIO import UniprotIterator, Parser
 from requests.exceptions import Timeout, HTTPError, ConnectionError
 import jsonpickle
-import base64
 
 from mrtarget.Settings import Config, build_uniprot_query
 
@@ -172,7 +171,7 @@ class UniprotDownloader():
 
     def _save_to_elasticsearch(self, uniprotid, seqrec):
         # seqrec = UniprotIterator(StringIO(uniprot_xml), 'uniprot-xml').next()
-        json_seqrec = base64.b64encode(jsonpickle.encode(seqrec))
+        json_seqrec = jsonpickle.dumps(seqrec)
         # pprint(jsonpickle.json.loads(json_seqrec))
         self.loader.put(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME,
                         Config.ELASTICSEARCH_UNIPROT_DOC_NAME,

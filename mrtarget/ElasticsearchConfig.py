@@ -1,91 +1,290 @@
 from mrtarget.Settings import Config
-from addict import Dict
 
 
 def _get_evidence_string_generic_mapping():
-    mmap = Dict()
-    mmap._routing.required = True
-    mmap.properties.target.properties.id.type = 'keyword'
-    mmap.properties.target.properties.target_type.type = 'keyword'
-    mmap.properties.target.properties.activity.type = 'keyword'
+    return {
+        "_all": {"enabled": True},
+        "_routing": {"required": True},
+        "properties": {
+            "target": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "index": "not_analyzed",
+                    },
+                    "target_type": {
+                        "type": "string",
+                        "index": "not_analyzed",
+                    },
+                    "activity": {
+                        "type": "string",
+                        "index": "not_analyzed",
+                    },
 
-    mmap.properties.disease.properties.id.type = 'keyword'
-    mmap.properties.disease.properties.efo_info.properties.path.type = 'keyword'
+                }
+            },
+            "disease": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "index": "not_analyzed",
+                    },
+                    "efo_info": {
+                        "properties": {
+                            "path": {
+                                "type": "string",
+                                "index": "not_analyzed",
+                            }
+                        }
+                    }
 
-    mmap.properties.private.properties.efo_codes.type = 'keyword'
+                }
+            },
+            "private": {
+                "properties": {
+                    "efo_codes": {
+                        "type": "string",
+                        "index": "not_analyzed",
+                    },
+                    "facets": {
+                        "properties": {
+                            "uniprot_keywords": {
+                                "type": "string",
+                                "index": "not_analyzed",
+                            },
+                            "reactome": {
+                                "properties": {
+                                    "pathway_type_code": {
+                                        "type": "string",
+                                        "index": "not_analyzed",
+                                    },
+                                    "pathway_code": {
+                                        "type": "string",
+                                        "index": "not_analyzed",
+                                    },
+                                }
+                            },
+                            "literature": {
+                                "properties": {
+                                    "abstract_lemmas": {
+                                        "properties": {
+                                            "count": {
+                                                "type": "long"
+                                            },
+                                            "value": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
+                                    },
+                                    "noun_chunks": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    },
+                                    "chemicals": {
+                                        "properties": {
+                                            "registryNumber": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            },
+                                            "name": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
+                                    },
+                                    "doi": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    },
+                                    "pub_type": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    },
+                                    "mesh_headings": {
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            },
+                                            "label": {
+                                                "type": "string",
+                                                "index": "not_analyzed"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "evidence": {
+                "properties": {
+                    "evidence_codes": {
+                        "type": "string",
+                        "index": "not_analyzed",
+                    },
+                    "provenance_type": {
+                        "properties": {
+                            "database": {
+                                "properties": {
+                                    "version": {
+                                        "type": "string",
+                                        "index": "not_analyzed"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "literature": {
+                "properties": {
+                    "references": {
+                        "properties": {
+                            "lit_id": {
+                                "type": "string",
+                                "index": "not_analyzed",
+                            }
+                        }
+                    },
+                    "abstract": {
+                        "type": "string",
+                        "analyzer": "english"
 
-    facets = Dict()
-    facets.properties.uniprot_keywords.type = 'keyword'
+                    },
+                    "title": {
+                        "type": "string",
+                        "analyzer": "english"
 
-    facets.properties.reactome.properties.pathway_type_code.type = 'keyword'
-    facets.properties.reactome.properties.pathway_code.type = 'keyword'
+                    },
+                    "year": {
+                        "type": "date",
+                        "format": "yyyy"
 
-    facets.properties.literature.properties.abstract_lemmas.properties.count.type = 'long'
-    facets.properties.literature.properties.abstract_lemmas.properties.value.type = 'keyword'
-    facets.properties.literature.properties.noun_chunks.type = 'keyword'
-    facets.properties.literature.properties.chemicals.properties.registryNumber.type = 'keyword'
-    facets.properties.literature.properties.chemicals.properties.name.type = 'keyword'
-    facets.properties.literature.properties.doi.type = 'keyword'
-    facets.properties.literature.properties.pub_type.type = 'keyword'
-    facets.properties.literature.properties.mesh_heading.properties.id.type = 'keyword'
-    facets.properties.literature.properties.mesh_heading.properties.label.type = 'keyword'
+                    },
+                    "journal_data": {
+                        "properties": {
+                            "medlineAbbreviation": {
+                                "type": "string",
+                                "index": "not_analyzed"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "dynamic_templates": [
+            {
+                "scores": {
+                    "path_match": "scores.*",
+                    "mapping": {
+                        "type": "double",
+                    }
+                }
+            },
 
-    mmap.properties.private.properties.facets = facets
+            {
+                "do_not_index_evidence": {
+                    "path_match": "evidence.*",
+                    "path_unmatch": "evidence.evidence_codes*",
+                    "mapping": {
+                        "enabled": False,
+                    }
+                }
+            },
 
-    mmap.properties.evidence.properties.evidence_codes.type = 'keyword'
-    mmap.properties.evidence.properties.provenance_type.properties.database.properties.version.type = 'keyword'
+            {
+                "do_not_index_drug": {
+                    "path_match": "drug.*",
+                    "mapping": {
+                        "enabled": False,
+                    }
+                }
+            },
+            {
+                "do_not_index_unique_ass": {
+                    "path_match": "unique_association_fields.*",
+                    "mapping": {
+                        "enabled": False,
+                    }
+                }
+            },
 
-    mmap.properties.literature.properties.references.properties.lit_id.type = 'keyword'
-    mmap.properties.literature.properties.abstract.type = 'text'
-    mmap.properties.literature.properties.abstract.analyzer = 'english'
-    mmap.properties.literature.properties.title.type = 'text'
-    mmap.properties.literature.properties.title.analyzer = 'english'
-    mmap.properties.literature.properties.year.type = 'date'
-    mmap.properties.literature.properties.year.format = 'yyyy'
-    mmap.properties.literature.properties.journal_data.properties.medlineAbbreviation.type = 'keyword'
-
-    dscores = Dict()
-    dscores.scores.path_match = 'scores.*'
-    dscores.scores.mapping.type = 'float'
-
-    devs = Dict()
-    devs.do_not_index_evidence.path_match = 'evidence.*'
-    devs.do_not_index_evidence.path_unmatch = 'evidence.evidence_codes*'
-    devs.do_not_index_evidence.mapping.enabled = False
-
-    ddrug = Dict()
-    ddrug.do_not_index_drug.path_match = 'drug.*'
-    ddrug.do_not_index_drug.mapping.enabled = False
-
-    dass = Dict()
-    dass.do_not_index_unique_ass.path_match = 'unique_association_fields.*'
-    dass.do_not_index_unique_ass.mapping.enabled = False
-
-    mmap.dynamic_templates = [
-        dscores,
-        devs,
-        ddrug,
-        dass
         ]
+    }
 
-    return mmap.to_dict()
 
 def _get_relation_generic_mapping():
-    mmap = Dict()
-    mmap._routing.required = True
-    mmap.properties.subject.properties.id.type = 'keyword'
-    mmap.properties.object.properties.id.type = 'keyword'
-    mmap.properties.type.type = 'keyword'
-    mmap.properties.id.type = 'keyword'
-    mmap.properties.shared_targets.type = 'keyword'
-    mmap.properties.shared_diseases.type = 'keyword'
+    return {
+        "_all": {"enabled": True},
+        "_routing": {"required": True},
+        "properties": {
+            "subject": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "index": "not_analyzed",
+                    },
+                    # "target_type" : {
+                    #      "type" : "string",
+                    #      "index" : "not_analyzed",
+                    # },
+                    # "activity" : {
+                    #      "type" : "string",
+                    #      "index" : "not_analyzed",
+                    # },
 
-    dscores = Dict()
-    dscores.scores.path_match = 'scores.*'
-    dscores.scores.mapping.type = 'float'
+                }
+            },
+            "object": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "index": "not_analyzed",
+                    },
+                    # "efo_info" : {
+                    #     "properties" : {
+                    #         "path": {
+                    #            "type": "string",
+                    #            "index": "not_analyzed",
+                    #         }
+                    #     }
+                    # }
 
-    mmap.dynamic_templates = [dscores]
-    return mmap.to_dict()
+                }
+            },
+            "type": {
+                "type": "string",
+                "index": "not_analyzed",
+            },
+            "id": {
+                "type": "string",
+                "index": "not_analyzed",
+            },
+            "shared_targets": {
+                "type": "string",
+                "index": "not_analyzed",
+            },
+            "shared_diseases": {
+                "type": "string",
+                "index": "not_analyzed",
+            },
+
+        },
+        "dynamic_templates": [
+            {
+                "scores": {
+                    "path_match": "scores.*",
+                    "mapping": {
+                        "type": "double",
+                    }
+                }
+            },
+
+        ]
+    }
 
 
 class ElasticSearchConfiguration():
@@ -106,56 +305,138 @@ class ElasticSearchConfiguration():
     submission_audit_replicas_number = '1'
     bulk_load_chunk = 1000
 
-    unip = Dict()
-    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.type = 'binary'
-    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.index = False
-    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.store = True
-    unip.settings.number_of_shards = '1'
-    unip.settings.number_of_replicas = generic_replicas_number
-    unip.settings.refresh_interval = '60s'
+    uniprot_data_mapping = eco_data_mapping = {"mappings": {
+        Config.ELASTICSEARCH_UNIPROT_DOC_NAME: {
+            "properties": {
+                "entry": {
+                    "type": "string",
+                    "index": "no"
+                },
+            }
+        }
+    },
+        "settings": {"number_of_shards": '1',
+                     "number_of_replicas": '1',
+                     "refresh_interval": "60s",
+                     },
+    }
 
-    uniprot_data_mapping = unip.to_dict()
+    eco_data_mapping = {"mappings": {
+        Config.ELASTICSEARCH_ECO_DOC_NAME: {
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                },
+                "path_codes": {
+                    "type": "string",
+                    "index": "not_analyzed"
+                },
+                "path": {
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "index": "not_analyzed"
+                        },
+                    },
+                },
+            }
+        }
+    },
+        "settings": {"number_of_shards": generic_shard_number,
+                     "number_of_replicas": generic_replicas_number,
+                     "refresh_interval": "60s",
+                     },
+    }
 
-    ecom = Dict()
-
-    ecom.mappings[Config.ELASTICSEARCH_ECO_DOC_NAME].properties.code.type = 'keyword'
-    ecom.mappings[Config.ELASTICSEARCH_ECO_DOC_NAME].properties.path_codes.type = 'keyword'
-    ecom.mappings[Config.ELASTICSEARCH_ECO_DOC_NAME].properties.path.properties.uri.type = 'keyword'
-    ecom.settings.number_of_shards = generic_shard_number
-    ecom.settings.number_of_replicas = generic_replicas_number
-    ecom.settings.refresh_interval = '60s'
-
-    eco_data_mapping = ecom.to_dict()
-
-    efom = Dict()
-    efomp = Dict()
-    efomp.code.type = 'keyword'
-    efomp.phenotypes.properties.uri.type = 'keyword'
-    efomp.path_codes.type = 'keyword'
-    efomp.path.properties.uri.type = 'keyword'
-    efom.mappings[Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME].properties = efomp
-
-    efom.settings.number_of_shards = generic_shard_number
-    efom.settings.number_of_replicas = generic_replicas_number
-    efom.settings.refresh_interval = '60s'
-    efom.settings.analysis.filter.edgeNGram_filter.type = 'edgeNGram'
-    efom.settings.analysis.filter.edgeNGram_filter.min_gram = '2'
-    efom.settings.analysis.filter.edgeNGram_filter.max_gram = '20'
-    efom.settings.analysis.filter.edgeNGram_filter.token_chars = ['letter', 'digit']
-    efom.settings.analysis.filter.simple_filter.type = 'standard'
-    efom.settings.analysis.filter.simple_filter.token_chars = ['letter', 'digit']
-    efom.settings.analysis.analyzer.edgeNGram_analyzer.type = 'custom'
-    efom.settings.analysis.analyzer.edgeNGram_analyzer.tokenizer = 'whitespace'
-    efom.settings.analysis.analyzer.edgeNGram_analyzer.filter = ["lowercase",
-                                                                 "asciifolding",
-                                                                 "edgeNGram_filter"]
-    efom.settings.analysis.analyzer.whitespace_analyzer.type = 'custom'
-    efom.settings.analysis.analyzer.whitespace_analyzer.tokenizer = 'whitespace'
-    efom.settings.analysis.analyzer.whitespace_analyzer.filter = ["lowercase",
-                                                                 "asciifolding",
-                                                                 "simple_filter"]
-
-    efo_data_mapping = efom.to_dict()
+    efo_data_mapping = {
+        "mappings": {
+            Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME: {
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "index": "not_analyzed"
+                    },
+                    "phenotypes": {
+                        "properties": {
+                            "uri": {
+                                "type": "string",
+                                "index": "not_analyzed"
+                            },
+                        },
+                    },
+                    "path_codes": {
+                        "type": "string",
+                        "index": "not_analyzed"
+                    },
+                    "path": {
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "index": "not_analyzed"
+                            },
+                        },
+                    },
+                    # "private": {
+                    #     # "type" : "object",
+                    #     "properties": {
+                    #         "suggestions": {
+                    #             "type": "completion",
+                    #             "analyzer": "whitespace_analyzer",
+                    #             "search_analyzer": "edgeNGram_analyzer",
+                    #             "payloads": True
+                    #         },
+                    #     },
+                    # },
+                }
+            }
+        },
+        "settings": {
+            "number_of_shards": generic_shard_number,
+            "number_of_replicas": generic_replicas_number,
+            "refresh_interval": "60s",
+            "analysis": {
+                "filter": {
+                    "edgeNGram_filter": {
+                        "type": "edgeNGram",
+                        "min_gram": "2",
+                        "max_gram": "20",
+                        "token_chars": [
+                            "letter",
+                            "digit"
+                        ]
+                    },
+                    "simple_filter": {
+                        "type": "standard",
+                        "token_chars": [
+                            "letter",
+                            "digit"
+                        ]
+                    }
+                },
+                "analyzer": {
+                    "edgeNGram_analyzer": {
+                        "type": "custom",
+                        "tokenizer": "whitespace",
+                        "filter": [
+                            "lowercase",
+                            "asciifolding",
+                            "edgeNGram_filter"
+                        ]
+                    },
+                    "whitespace_analyzer": {
+                        "type": "custom",
+                        "tokenizer": "whitespace",
+                        "filter": [
+                            "lowercase",
+                            "asciifolding",
+                            "simple_filter",
+                        ]
+                    }
+                }
+            }
+        },
+    }
 
     gene_data_mapping = {
         "settings": {
@@ -223,7 +504,8 @@ class ElasticSearchConfiguration():
                     "protein_class": {
                         "properties": {
                             "label": {
-                                "type": "keyword"
+                                "type": "string",
+                                "index": "not_analyzed"
                             }
                         }
                     },
@@ -243,15 +525,18 @@ class ElasticSearchConfiguration():
                                         # "type" : "object",
                                         "properties": {
                                             "pathway_type_code": {
-                                                "type": "keyword"
+                                                "type": "string",
+                                                "index": "not_analyzed"
                                             },
                                             "pathway_code": {
-                                                "type": "keyword"
+                                                "type": "string",
+                                                "index": "not_analyzed"
                                             }
                                         }
                                     },
                                     "uniprot_keywords": {
-                                        "type": "keyword"
+                                        "type": "string",
+                                        "index": "not_analyzed"
                                     }
 
                                 }
@@ -307,29 +592,32 @@ class ElasticSearchConfiguration():
         }
     }
 
-    expm = Dict()
-    expm.settings.number_of_shards = generic_shard_number
-    expm.settings.number_of_replicas = generic_replicas_number
-    expm.settings.refresh_interval = '60s'
-    expm.mappings[Config.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.gene.type = 'keyword'
-    expm.mappings[Config.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.tissues.properties.efo_code.type = 'keyword'
-    expm.mappings[Config.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.tissues.properties.rna.properties.value.type = 'float'
+    expression_data_mapping = {
+        "settings": {
+            "number_of_shards": generic_shard_number,
+            "number_of_replicas": generic_replicas_number,
+            "refresh_interval": "60s"
+        }
 
-    expression_data_mapping = expm.to_dict()
+    }
 
     submission_audit_mapping = {
         "properties": {
             "md5": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed",
             },
             "provider_id": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed",
             },
             "data_source_name": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed",
             },
             "filename": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed",
             },
             "nb_submission": {
                 "type": "integer",
@@ -370,30 +658,35 @@ class ElasticSearchConfiguration():
                 "evidence_string_template": {
                     "path_match": "evidence_string.*",
                     "mapping": {
-                        "type": "binary",
-                        "store": True
+                        "index": "no"
                     }
                 }
             },
         ],
         "properties": {
             "uniq_assoc_fields_hashdig": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed",
             },
             "json_doc_hashdig": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed",
             },
             "target_id": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed"
             },
             "disease_id": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed"
             },
             "data_source_name": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed"
             },
             "json_schema_version": {
-                "type": "keyword"
+                "type": "string",
+                "index": "not_analyzed"
             },
             "json_doc_version": {
                 "type": "integer",
@@ -457,28 +750,34 @@ class ElasticSearchConfiguration():
                                              },
                                 "mappings": {
                                     Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {
+                                        "_all": {"enabled": True},
                                         # "_routing": {"required": True,},
                                         "properties": {
                                             "target": {
                                                 "properties": {
                                                     "id": {
-                                                        "type": "keyword"
+                                                        "type": "string",
+                                                        "index": "not_analyzed",
                                                     },
                                                     "gene_info": {
                                                         "properties": {
                                                             "name": {
-                                                                "type": "keyword"
+                                                                "type": "string",
+                                                                "index": "not_analyzed",
                                                             },
                                                             "symbol": {
-                                                                "type": "keyword"
+                                                                "type": "string",
+                                                                "index": "not_analyzed",
                                                             },
                                                         }
                                                     },
                                                     "activity": {
-                                                        "type": "keyword"
+                                                        "type": "string",
+                                                        "index": "not_analyzed",
                                                     },
                                                     "activity": {
-                                                        "type": "keyword"
+                                                        "type": "string",
+                                                        "index": "not_analyzed",
                                                     },
 
                                                 }
@@ -486,17 +785,20 @@ class ElasticSearchConfiguration():
                                             "disease": {
                                                 "properties": {
                                                     "id": {
-                                                        "type": "keyword"
+                                                        "type": "string",
+                                                        "index": "not_analyzed",
                                                     },
                                                     "efo_info": {
                                                         "properties": {
                                                             "label": {
-                                                                "type": "keyword"
+                                                                "type": "string",
+                                                                "index": "not_analyzed",
                                                             },
                                                             "therapeutic_area": {
                                                                 "properties": {
                                                                     "label": {
-                                                                        "type": "keyword"
+                                                                        "type": "string",
+                                                                        "index": "not_analyzed",
                                                                     },
                                                                 },
                                                             },
@@ -508,20 +810,24 @@ class ElasticSearchConfiguration():
                                             "private": {
                                                 "properties": {
                                                     "efo_codes": {
-                                                        "type": "keyword"
+                                                        "type": "string",
+                                                        "index": "not_analyzed",
                                                     },
                                                     "facets": {
                                                         "properties": {
                                                             "uniprot_keywords": {
-                                                                "type": "keyword"
+                                                                "type": "string",
+                                                                "index": "not_analyzed",
                                                             },
                                                             "reactome": {
                                                                 "properties": {
                                                                     "pathway_type_code": {
-                                                                        "type": "keyword"
+                                                                        "type": "string",
+                                                                        "index": "not_analyzed",
                                                                     },
                                                                     "pathway_code": {
-                                                                        "type": "keyword"
+                                                                        "type": "string",
+                                                                        "index": "not_analyzed",
                                                                     },
                                                                 }
                                                             },
@@ -530,14 +836,16 @@ class ElasticSearchConfiguration():
                                                                     "level1": {
                                                                         "properties": {
                                                                             "label": {
-                                                                                "type": "keyword"
+                                                                                "type": "string",
+                                                                                "index": "not_analyzed",
                                                                             },
                                                                         },
                                                                     },
                                                                     "level2": {
                                                                         "properties": {
                                                                             "label": {
-                                                                                "type": "keyword"
+                                                                                "type": "string",
+                                                                                "index": "not_analyzed",
                                                                             },
                                                                         },
                                                                     },
@@ -551,11 +859,17 @@ class ElasticSearchConfiguration():
                                         },
                                         "dynamic_templates": [{
                                             "label_not_indexed": {
-                                                "match_mapping_type": "text",
+                                                "match_mapping_type": "string",
                                                 "path_match": "private.facets.expression_tissues.*.label",
                                                 "mapping": {
-                                                    "type": "keyword",
+                                                    "type": "string",
                                                     "index": "not_analyzed"
+#                                                     "fields": {
+#                                                         "raw": {
+#                                                             "type": "string",
+#                                                             "index": "not_analyzed"
+#                                                         }
+#                                                     }
                                                 }
                                             }
                                         }]
@@ -626,10 +940,9 @@ class ElasticSearchConfiguration():
                 "dynamic_templates": [
                     {
                         "do_not_analyze_ortholog": {
-                            "match_mapping_type": "text",
+                            "match_mapping_type": "string",
                             "path_match": "ortholog*symbol",
                             "mapping": {
-                                "type": "keyword",
                                 "index": "not_analyzed"
                             }
                         }
@@ -651,6 +964,7 @@ class ElasticSearchConfiguration():
                     "date_of_revision": {
                         "type": "date",
                         "format": "strict_date_optional_time||epoch_millis",
+
                     },
                     "date": {
                         "type": "date",
@@ -661,22 +975,24 @@ class ElasticSearchConfiguration():
                         "format": "strict_date_optional_time||epoch_millis",
                     },
                     "title": {
-                        "type": "text"
+                        "type": "string",
+                        "index": "analyzed",
 
                     },
                     "abstract": {
-                        "type": "text"
+                        "type": "string",
+                        "index": "analyzed",
                     },
                 },
                 "dynamic_templates": [
                     {
                         "string_fields": {
                             "match": "*",
-                            "match_mapping_type": "text",
+                            "match_mapping_type": "string",
                             "mapping": {
+                                "index": "not_analyzed",
                                 "omit_norms": True,
-                                "type": "keyword",
-                                "index": "not_analyzed"
+                                "type": "string"
                             }
                         }
                     }
@@ -701,11 +1017,11 @@ class ElasticSearchConfiguration():
                     {
                         "string_fields": {
                             "match": "*",
-                            "match_mapping_type": "text",
+                            "match_mapping_type": "string",
                             "mapping": {
                                 "index": "not_analyzed",
                                 "omit_norms": True,
-                                "type": "keyword"
+                                "type": "string"
                             }
                         }
                     }
@@ -723,35 +1039,51 @@ class ElasticSearchConfiguration():
         "mappings": {
             Config.ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME: {
                 "properties": {
+
+
                                 "id": {
                                     "type": "integer"
                                 },
                                 "label": {
-                                    "type": "keyword"
+                                    "type": "string",
+                                    "index": "not_analyzed"
                                 },
                                 "ent_type": {
-                                    "type": "keyword"
+                                    "type": "string",
+                                    "index": "not_analyzed"
                                 },
                                 "label": {
-                                    "type": "keyword"
+                                    "type": "string",
+                                    "index": "not_analyzed"
                                 },
                                 "matched_word": {
-                                    "type": "keyword"
+                                    "type": "string",
+                                    "index": "not_analyzed"
                                 },
                                 "start_pos": {
                                     "type": "integer"
+
                                 },
                                 "end_pos": {
                                     "type": "integer"
+
                                 },
                                 "doc_id": {
                                     "type": "integer"
+
                                 }
 
                             }
+
+
+
+
                 }
             }
+
+
     }
+
 
     INDEX_MAPPPINGS = {Config.ELASTICSEARCH_DATA_INDEX_NAME: evidence_data_mapping,
                        Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME: association_data_mapping,

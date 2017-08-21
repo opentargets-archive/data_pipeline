@@ -18,19 +18,6 @@ def new_redis_client():
                  port=Config.REDISLITE_DB_PORT)
 
 
-def new_es_client(hosts=Config.ELASTICSEARCH_NODES):
-    return Elasticsearch(hosts=hosts,
-                         maxsize=50,
-                         timeout=1800,
-                         # sniff_on_connection_fail=True,
-                         # sniff_on_start=True,
-                         # sniffer_timeout=60,
-                         retry_on_timeout=True,
-                         max_retries=10,
-                         connection_class=RequestsHttpConnection,
-                         verify_certs=True)
-
-
 class PipelineConnectors():
 
     def __init__(self):
@@ -50,8 +37,8 @@ class PipelineConnectors():
         self.r_instance = r_instance['instance']
 
     def init_services_connections(self,
-                                  data_es=True,
-                                  publication_es=False,
+                                  data_es = True,
+                                  publication_es = False,
                                   redispersist=False):
         success = False
         self.persist = redispersist
@@ -62,9 +49,19 @@ class PipelineConnectors():
         '''init es client for data'''
         hosts = Config.ELASTICSEARCH_NODES
 
-        if hosts:
-            self.es = new_es_client(hosts)
 
+        if data_es and hosts:
+            self.es = Elasticsearch(hosts=hosts,
+                                maxsize=50,
+                                timeout=1800,
+                                # sniff_on_connection_fail=True,
+                                #sniff_on_start=True,
+                                #sniffer_timeout=60,
+                                retry_on_timeout=True,
+                                max_retries=10,
+                                connection_class=RequestsHttpConnection,
+                                verify_certs=True
+                               )
             try:
                 connection_attempt = 1
                 while not self.es.ping():
@@ -87,7 +84,17 @@ class PipelineConnectors():
         pub_hosts = Config.ELASTICSEARCH_NODES_PUB
         if pub_hosts != hosts:
             if publication_es and pub_hosts:
-                self.es_pub = new_es_client(pub_hosts)
+                self.es_pub = Elasticsearch(hosts=pub_hosts,
+                                            maxsize=50,
+                                            timeout=1800,
+                                            # sniff_on_connection_fail=True,
+                                            # sniff_on_start=True,
+                                            # sniffer_timeout=60,
+                                            retry_on_timeout=True,
+                                            max_retries=10,
+                                            connection_class=RequestsHttpConnection,
+                                            verify_certs=True
+                                            )
                 try:
                     connection_attempt = 1
                     while not self.es.ping():

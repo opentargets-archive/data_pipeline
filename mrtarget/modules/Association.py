@@ -1,4 +1,5 @@
 import logging
+
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
@@ -14,6 +15,8 @@ from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, Extended
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
 
+
+global_reporting_step = 5e5
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
@@ -206,7 +209,7 @@ class EvidenceScore():
 
 class HarmonicSumScorer():
 
-    def __init__(self, buffer=100):
+    def __init__(self, buffer = 100):
         """
         An HarmonicSumScorer will ingest any number of numeric score, keep in memory the top max number
         defined by the buffer and calculate an harmonic sum of those
@@ -432,10 +435,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                  evidence_data_q,
                  r_path,
                  score_q,
-                 lookup_data,
-                 chunk_size = 1e4,
-                 dry_run = False,
-                 es = None
+                 lookup_data
                  ):
         super(ScoreProducer, self).__init__(queue_in=evidence_data_q,
                                             redis_path=r_path,
@@ -443,21 +443,11 @@ class ScoreProducer(RedisQueueWorkerProcess):
         self.evidence_data_q = evidence_data_q
         self.score_q = score_q
         self.lookup_data = lookup_data
-        self.chunk_size = chunk_size
-        self.dry_run = dry_run
-        self.es = None
-        self.loader = None
 
     def init(self):
         super(ScoreProducer, self).init()
         self.scorer = Scorer()
         self.lookup_data.set_r_server(self.r_server)
-        self.loader = Loader(chunk_size=self.chunk_size,
-                             dry_run=self.dry_run)
-
-    def close(self):
-        super(ScoreProducer, self).close()
-        self.loader.close()
 
     def process(self, data):
         target, disease, evidence, is_direct = data
@@ -465,47 +455,30 @@ class ScoreProducer(RedisQueueWorkerProcess):
             score = self.scorer.score(target, disease, evidence, is_direct)
             if score.get_scoring_method(
                     ScoringMethods.HARMONIC_SUM).overall != 0:  # skip associations only with data with score 0
-
-                # look for the gene in the lru cache
-                gene_data = None
-                hpa_data = None
-                if target in self.lru_cache:
-                    gene_data, hpa_data = self.lru_cache[target]
-
-                if not gene_data:
-                    gene_data = Gene()
-                    try:
-                        gene_data.load_json(
-                            self.lookup_data.available_genes.get_gene(target,
-                                                                      self.r_server))
-
-                    except KeyError as e:
-                        self.logger.debug('Cannot find gene code "%s" '
-                                          'in lookup table' % target)
-                        self.logger.exception(e)
+                gene_data = Gene()
+                try:
+                    gene_data.load_json(
+                        self.lookup_data.available_genes.get_gene(target,
+                                                                  self.r_server))
+                except KeyError as e:
+                    self.logger.debug('Cannot find gene code "%s" '
+                                      'in lookup table' % target)
+                    self.logger.exception(e)
 
                 score.set_target_data(gene_data)
 
                 # create a hpa expression empty jsonserializable class
                 # to fill from Redis cache lookup_data
-                if not hpa_data:
-                    hpa_data = HPAExpression()
-                    try:
-                        hpa_data.update(
-                            self.lookup_data.available_hpa.get_hpa(target,
-                                                                   self.r_server))
-                    except KeyError:
-                        pass
-                    except Exception as e:
-                        self.logger.exception(e)
-
-                    # set everything in the lru_cache
-                    self.lru_cache[target] = (gene_data, hpa_data)
-
+                hpa_data = HPAExpression()
                 try:
+                    hpa_data.load_json(
+                        self.lookup_data.available_hpa.get_hpa(target,
+                                                               self.r_server))
                     score.set_hpa_data(hpa_data)
+
                 except KeyError:
                     pass
+
                 except Exception as e:
                     self.logger.exception(e)
 
@@ -522,14 +495,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 score.set_disease_data(disease_data)
 
                 if score: #bypass associations with overall score=0
-                    element_id = '%s-%s' % (target, disease)
-                    self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-                                           Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                           element_id,
-                                           score,
-                                           create_index=False)
-                                           # routing=score.target['id']
-
+                    return (target, disease, score.to_json())
                 else:
                     logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
 
@@ -549,6 +515,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
         self.dry_run = dry_run
         self.es = None
         self.loader = None
+
 
 
     def process(self, data):
@@ -624,51 +591,47 @@ class ScoringProcess():
         if targets and len(targets) < number_of_workers:
             number_of_workers = len(targets)
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
-                              max_size=number_of_workers * queue_per_worker,
+                              max_size=number_of_workers*5,
                               job_timeout=3600,
                               r_server=self.r_server,
-                              serialiser='jsonpickle',
                               total=len(targets))
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
-                                           max_size=queue_per_worker * number_of_storers,
+                                           max_size=queue_per_worker * number_of_workers,
                                            job_timeout=1200,
                                            batch_size=10,
                                            r_server=self.r_server,
-                                           serialiser='jsonpickle')
+                                           serialiser='pickle')
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
                                   max_size=queue_per_worker * number_of_storers,
                                   job_timeout=1200,
                                   batch_size=10,
                                   r_server=self.r_server,
-                                  serialiser='jsonpickle')
+                                  serialiser='pickle')
 
         q_reporter = RedisQueueStatusReporter([target_q,
                                                target_disease_pair_q,
-                                               # score_data_q
+                                               score_data_q
                                                ],
                                               interval=30,
                                               )
         q_reporter.start()
 
 
-#         '''create data storage workers'''
-#         storers = [ScoreStorerWorker(score_data_q,
-#                                      None,
-#                                      chunk_size=1000,
-#                                      dry_run = dry_run,
-#                                      ) for _ in range(number_of_storers)]
-#
-#         for w in storers:
-#             w.start()
+        '''create data storage workers'''
+        storers = [ScoreStorerWorker(score_data_q,
+                                     None,
+                                     chunk_size=1000,
+                                     dry_run = dry_run,
+                                     ) for _ in range(number_of_storers)]
 
-        # storage is located inside this code because the serialisation time
+        for w in storers:
+            w.start()
+
         scorers = [ScoreProducer(target_disease_pair_q,
                                  None,
-                                 None,
+                                 score_data_q,
                                  lookup_data,
-                                 chunk_size=1000,
-                                 dry_run=dry_run
-                                 ) for _ in range(number_of_storers)]
+                                 ) for _ in range(number_of_workers)]
         for w in scorers:
             w.start()
 
@@ -677,7 +640,7 @@ class ScoringProcess():
         readers = [TargetDiseaseEvidenceProducer(target_q,
                                                  None,
                                                  target_disease_pair_q,
-                                                ) for _ in range(number_of_workers)]
+                                                ) for _ in range(number_of_workers*2)]
         for w in readers:
             w.start()
 
@@ -700,8 +663,8 @@ class ScoringProcess():
             w.join()
         for w in scorers:
             w.join()
-#         for w in storers:
-#             w.join()
+        for w in storers:
+            w.join()
 
         logger.info('flushing data to index')
         self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),

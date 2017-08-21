@@ -4,7 +4,7 @@ from collections import Counter
 from pprint import pprint
 
 from elasticsearch import helpers
-from tqdm import tqdm
+from tqdm import tqdm 
 from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
@@ -35,8 +35,8 @@ class QCRunner(object):
         # self.run_associationQC()
 
     def run_associationQC(self):
-        # self.run_association2evidenceQC()
-        self.run_evidence2associationQC()
+        self.run_association2evidenceQC()
+        # self.run_evidence2associationQC()
         # self.check_association_gene_info()
         # self.check_evidence_gene_info()
 

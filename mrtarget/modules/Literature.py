@@ -12,7 +12,7 @@ import ftputil as ftputil
 import requests
 from dateutil.parser import parse
 from lxml import etree,objectify
-from tqdm import tqdm
+from tqdm import tqdm 
 from mrtarget.common import TqdmToLogger
 from mrtarget.common.NLP import init_spacy_english_language
 
@@ -20,11 +20,9 @@ from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, \
-    RedisQueueWorkerProcess, RedisLookupTablePickle, \
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle, \
     WhiteCollarWorker, RedisQueueWorkerThread
-from mrtarget.common.connection import new_es_client, new_redis_client, \
-    PipelineConnectors
+from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 
 logger = logging.getLogger(__name__)
@@ -364,13 +362,10 @@ class LiteratureLookUpTable(object):
         if es is None:
             connector = PipelineConnectors()
             connector.init_services_connections(publication_es=True)
-            self._es = connector.es_pub
-        else:
-            self._es = es
-
-        self._es_query = ESQuery(self._es)
-        self.r_server = r_server if r_server else new_redis_client()
-
+            es = connector.es
+        self._es = es
+        self._es_query = ESQuery(es)
+        self.r_server = r_server
         if r_server is not None:
             self._load_literature_data(r_server)
         self._logger = logging.getLogger(__name__)
