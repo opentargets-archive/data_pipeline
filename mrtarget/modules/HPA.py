@@ -298,39 +298,32 @@ def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     def _split_tissue(k, v):
         '''from tissue dict to rna and protein dicts pair'''
-        tid = k
         tlabel = v['label']
 
-        rna = {'id': tid, 'label': tlabel, 'level': v['rna']['level'],
+        rna = {'id': '_'.join([str(v['rna']['level']),k]), 
+               'label': tlabel, 
+               'level': v['rna']['level'],
                'unit': v['rna']['unit'],
-               'value': v['rna']['value']} if v['rna'] else {}
+               'value': v['rna']['value'],
+               'efo_code': k} if v['rna'] else {}
 
-        protein = {'id': tid, 'label': tlabel,
-                   'level': v['protein']['level']} if v['protein'] else {}
+        protein = {'id': '_'.join([str(v['protein']['level']),k]), 
+                   'label': tlabel,
+                   'level': v['protein']['level'],
+                   'efo_code': k} if v['protein'] else {}
+
         return (rna, protein)
 
     # generate a list with rna, protein pairs per tissue
     splitted_tissues = [_split_tissue(t['efo_code'], t) for t in hpa.tissues
                         if hpa is not None]
 
-    rnas = [[(l+1, tissue[0]) for l in xrange(tissue[0]['level'])]
-            for tissue in splitted_tissues if tissue[0]]
+    rnas = [tissue[0] for tissue in splitted_tissues if tissue[0]]
 
-    proteins = [[(l+1, tissue[1]) for l in xrange(tissue[1]['level'])]
-                for tissue in splitted_tissues if tissue[1]]
+    proteins = [tissue[1] for tissue in splitted_tissues if tissue[1]]
 
-    def _reduce_func(x, y):
-        for el in y:
-            k = str(el[0])
-            if k in x:
-                x[k].append(el[1])
-            else:
-                x[k] = [el[1]]
-
-        return x
-
-    return {'rna': ft.reduce(_reduce_func, rnas, {}),
-            'protein': ft.reduce(_reduce_func, proteins, {})}
+    return {'rna': rnas,
+            'protein': proteins}
 
 
 class HPAActions(Actions):
