@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import logging
 import re
+import csv
 import hashlib
 import ujson as json
 import functools as ft
@@ -19,6 +20,7 @@ from mrtarget.Settings import Config
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
 
+_missing_tissues = {}
 
 def level_from_text(key):
     level_translation = {'Not detected': 0,
@@ -98,6 +100,12 @@ class HPAExpression(Dict, JSONSerializable):
 
         if 'label' not in tissue:
             tissue.label = ''
+        
+        if 'anatomical_systems' not in tissue:
+            tissue.anatomical_systems = []
+        
+        if 'organs' not in tissue:
+            tissue.organs = []
 
         if 'protein' not in tissue:
             tissue.protein = HPAExpression.new_tissue_protein()
@@ -130,9 +138,15 @@ def format_expression(rec):
 
     # for each tissue
     for el in rec['data']:
-        t_code, t_name, c_types = el
+        t_code, t_name, c_types, t_asys, t_organs = el
+
+        asys = list(set([item for sublist in t_asys for item in sublist]))
+        organs = list(set([item for sublist in t_organs for item in sublist]))
+
         tissue = d.new_tissue(label = list(t_name)[0],
-                              efo_code = t_code)
+                              efo_code = t_code,
+                              anatomical_systems = asys,
+                              organs = organs)
 
         # iterate all cell_types
         for ct in c_types:
@@ -190,7 +204,9 @@ def format_expression_with_rna(rec):
         for idx in difference_idxs:
             rna = rec['data'][idx]
             t = exp.new_tissue(efo_code=rna[0],
-                               label=rna[1])
+                               label=rna[1],
+                               anatomical_systems=rna[5],
+                               organs=rna[6])
             t.rna.level = int(rna[2])
             t.rna.value = float(rna[3])
             t.rna.unit = rna[4]
@@ -201,13 +217,6 @@ def format_expression_with_rna(rec):
         exp.tissues.extend(new_tissues)
 
     return exp.to_dict()
-
-def clean_tissue_name(tissue_name):
-    tname = tissue_name
-    if tissue_name.endswith(' tissue'):
-        tname = tissue_name[:-7]
-    
-    return tname
 
 
 # def code_from_tissue(tissue_name):
@@ -222,22 +231,67 @@ def clean_tissue_name(tissue_name):
 # 
 #     return tid
 
+def name_from_tissue(tissue_name, t2m):
+    curated = None
+    tname = None
 
-def code_from_tissue(tissue_name):
-    t2m = Config.TISSUE_TRANSLATION_MAP['tissue']
+    try:
+        curated = t2m['curations'].get(tissue_name,tissue_name)
+        tname = t2m['tissues'][curated]['label']
+    except KeyError:
+        # TODO the id has to be one word to not get splitted by the analyser
+        tname = curated
+        
+        if curated not in _missing_tissues:
+            _missing_tissues[curated] = curated
+            logger = logging.getLogger(__name__)
+            logger.warning('the tissue name %s was not found in the mapping', curated)
+ 
+ 
+    return tname
+
+
+def code_from_tissue(tissue_name, t2m):
+    curated = None
     tid = None
     try:
-        tid = t2m[tissue_name]
+        curated = t2m['curations'].get(tissue_name,tissue_name)
+        tid = t2m['tissues'][curated]['efo_code']
     except KeyError:
-        logger = logging.getLogger(__name__)
-        logger.debug('the tissue name %s was not found in the mapping',
-                     tissue_name)
         # TODO the id has to be one word to not get splitted by the analyser
-        # this is a temporal fix by the time we get all items mapped
         tid = tissue_name.strip().replace(' ', '_')
         tid = re.sub('[^0-9a-zA-Z_]+', '',tid)
+
+        if curated not in _missing_tissues:
+            _missing_tissues[curated] = curated
+            logger = logging.getLogger(__name__)
+            logger.warning('the tissue name %s was not found in the mapping', curated)
  
     return tid
+
+
+def asys_from_tissue(tissue_name, t2m):
+    curated = None
+    tname = []
+    try:
+        curated = t2m['curations'].get(tissue_name,tissue_name)
+        tname = t2m['tissues'][curated].get('anatomical_systems',[])
+    except KeyError:
+        pass
+
+    return tname
+
+
+def organs_from_tissue(tissue_name, t2m):
+    curated = None
+    tname = []
+    try:
+        curated = t2m['curations'].get(tissue_name,tissue_name)
+        tname = t2m['tissues'][curated].get('organs',[])
+    except KeyError:
+        pass
+
+    return tname
 
 
 def hpa2tissues(hpa=None):
@@ -286,6 +340,22 @@ class HPAActions(Actions):
 class HPADataDownloader():
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.t2m = self.load_t2m()
+
+    def load_t2m(self):
+        t2m = {'tissues': {} ,
+               'curations': {}}
+
+        with URLZSource(Config.TISSUE_TRANSLATION_MAP_URL).open() as r_file:
+            t2m['tissues'] = json.load(r_file)['tissues']
+
+ 
+        with URLZSource(Config.TISSUE_CURATION_MAP_URL).open() as r_file:
+            t2m['curations'] = {el['name']: el['canonical'] 
+                                    for el in csv.DictReader(r_file,
+                                              fieldnames=['name', 'canonical'],
+                                              delimiter='\t')}
+        return t2m
 
     def retrieve_normal_tissue_data(self):
         """Parse 'normal_tissue' csv file,
@@ -302,24 +372,32 @@ class HPADataDownloader():
                      'Reliability': 'reliability',
                      'Gene': 'gene'})
             .cut('tissue', 'cell_type', 'level', 'reliability', 'gene')
-            .addfield('tissue_label', lambda rec: clean_tissue_name(rec['tissue']\
-                                                    .replace('1', '')\
-                                                    .replace('2', '')\
-                                                    .strip()) )
-            .addfield('tissue_code', lambda rec: code_from_tissue(rec['tissue_label']))
+            .addfield('tissue_label',
+                      lambda rec: name_from_tissue(rec['tissue'].strip(), self.t2m))
+            .addfield('tissue_code',
+                      lambda rec: code_from_tissue(rec['tissue_label'], self.t2m))
             .addfield('tissue_level', lambda rec: level_from_text(rec['level']))
+            .addfield('anatomical_systems',
+                      lambda rec: asys_from_tissue(rec['tissue_label'], self.t2m))
+            .addfield('organs', 
+                      lambda rec: organs_from_tissue(rec['tissue_label'], self.t2m))
             .addfield('tissue_reliability', lambda rec: reliability_from_text(rec['reliability']))
             .cut('gene', 'tissue_code',
                  'tissue_label', 'tissue_level',
-                 'tissue_reliability', 'cell_type')
+                 'tissue_reliability', 'cell_type',
+                 'anatomical_systems', 'organs')
             .aggregate(('gene', 'tissue_code'),
                        aggregation={'cell_types': (('cell_type','tissue_level',
                                               'tissue_reliability'),list),
-                                    'tissue_label': ('tissue_label',set)},
+                                    'tissue_label': ('tissue_label',set),
+                                    'anatomical_systems': ('anatomical_systems',list),
+                                    'organs': ('organs',list)},
                        presorted=True)
             .aggregate('gene', aggregation={'data': (('tissue_code',
                                                       'tissue_label',
-                                                      'cell_types'),list)},
+                                                      'cell_types',
+                                                      'anatomical_systems',
+                                                      'organs'),list)},
                        presorted=True)
             .addfield('result', lambda rec: format_expression(rec))
             .cut('gene','result')
@@ -341,11 +419,14 @@ class HPADataDownloader():
                                delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_level')
             .rename({'ID': 'gene'})
-            .addfield('tissue_label', lambda rec: clean_tissue_name(rec['tissue']\
-                                                    .replace('1', '')\
-                                                    .replace('2', '')\
-                                                    .strip()) )
-            .addfield('tissue_code', lambda rec: code_from_tissue(rec['tissue_label']))
+            .addfield('tissue_label',
+                      lambda rec: name_from_tissue(rec['tissue'].strip(), self.t2m))
+            .addfield('tissue_code',
+                      lambda rec: code_from_tissue(rec['tissue_label'], self.t2m))
+            .addfield('anatomical_systems',
+                      lambda rec: asys_from_tissue(rec['tissue_label'], self.t2m))
+            .addfield('organs', 
+                      lambda rec: organs_from_tissue(rec['tissue_label'], self.t2m))
             .cutout('tissue')
         )
 
@@ -355,11 +436,10 @@ class HPADataDownloader():
                                delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_value')
             .rename({'ID': 'gene'})
-            .addfield('tissue_label', lambda rec: rec['tissue']\
-                                                    .replace('1', '')\
-                                                    .replace('2', '')\
-                                                    .strip() )
-            .addfield('tissue_code', lambda rec: code_from_tissue(rec['tissue_label']))
+            .addfield('tissue_label',
+                      lambda rec: name_from_tissue(rec['tissue'].strip(), self.t2m))
+            .addfield('tissue_code',
+                      lambda rec: code_from_tissue(rec['tissue_label'], self.t2m))
             .addfield('rna_unit', 'TPM')
             .cutout('tissue')
         )
@@ -373,7 +453,9 @@ class HPADataDownloader():
                                                       'tissue_label',
                                                       'rna_level',
                                                       'rna_value',
-                                                      'rna_unit'),list)},
+                                                      'rna_unit',
+                                                      'anatomical_systems',
+                                                      'organs'),list)},
                        presorted=True)
         )
 
@@ -451,7 +533,6 @@ class HPAProcess():
         self.hpa_merged_table = None
 
     def process_all(self, dry_run=False):
-
         self.hpa_normal_table = self.process_normal_tissue()
         self.hpa_rna_table = self.process_rna()
         self.hpa_merged_table = self.process_join()
