@@ -626,6 +626,7 @@ class ScoringProcess():
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
                               max_size=number_of_workers * queue_per_worker,
                               job_timeout=3600,
+                              batch_size=10,
                               r_server=self.r_server,
                               serialiser='',
                               total=len(targets))
