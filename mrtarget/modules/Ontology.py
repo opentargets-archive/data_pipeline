@@ -55,6 +55,38 @@ EFO_TAS = [
     'http://www.ebi.ac.uk/efo/EFO_0001421', # liver disease
 ]
 
+HPO_TAS = [
+    "http://purl.obolibrary.org/obo/HP_0005386", #"behavior/neurological phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005375", #"adipose tissue phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005385", #"cardiovascular system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005384", #"cellular phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005382", #"craniofacial phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005381", #"digestive/alimentary phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005380", #"embryo phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005379", #"endocrine/exocrine phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005378", #"growth/size/body region phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005377", #"hearing/vestibular/ear phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005397", #"hematopoietic system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005376", #"homeostasis/metabolism phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005387", #"immune system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0010771", #"integument phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005371", #"limbs/digits/tail phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005370", #"liver/biliary system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0010768", #"mortality/aging",
+    "http://purl.obolibrary.org/obo/HP_0005369", #"muscle phenotype",
+    "http://purl.obolibrary.org/obo/HP_0002006", #"neoplasm",
+    "http://purl.obolibrary.org/obo/HP_0003631", #"nervous system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0002873", #"normal phenotype",
+    "http://purl.obolibrary.org/obo/HP_0001186", #"pigmentation phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005367", #"renal/urinary system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005389", #"reproductive system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005388", #"respiratory system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005390", #"skeleton phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005394", #"taste/olfaction phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005391", #"vision/eye phenotype"
+]
+
+
 TOP_LEVELS = '''
 PREFIX obo: <http://purl.obolibrary.org/obo/>
 select *
@@ -522,9 +554,62 @@ class OntologyClassReader():
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
 
+    def load_human_phenotype_ontology(self):
+        """
+            Loads the HPO graph and extracts the current and obsolete classes.
+            Status: production
+        """
+        logger.debug("load_human_phenotype_ontology...")
+        #self.load_hpo_classes()
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+
+        all_ns = [n for n in self.rdf_graph.namespace_manager.namespaces()]
+
         '''
-        Add all phenotypes to the EFO classes
+        Detach the anatomical system from the phenotypic abnormality node
+        and load all the classes
         '''
+
+        phenotypic_abnormality_uri = 'http://purl.obolibrary.org/obo/HP_0000118'
+        phenotypic_abnormality_uriref = URIRef(phenotypic_abnormality_uri)
+        self.get_children(phenotypic_abnormality_uri)
+
+        for child in self.children[phenotypic_abnormality_uri]:
+            print "%s %s..."%(child['code'], child['label'])
+            uri = "http://purl.obolibrary.org/obo/" + child['code']
+            uriref = URIRef(uri)
+            self.rdf_graph.remove((uriref, None, phenotypic_abnormality_uriref))
+            self.load_ontology_classes(base_class=uri)
+            self.get_classes_paths(root_uri=uri, level=0)
+            print len(self.current_classes)
+
+    def load_mammalian_phenotype_ontology(self):
+        """
+            Loads the MP graph and extracts the current and obsolete classes.
+            Status: production
+        """
+        logger.debug("load_mammalian_phenotype_ontology...")
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+
+        all_ns = [n for n in self.rdf_graph.namespace_manager.namespaces()]
+
+        '''
+        Detach the anatomical system from the mammalian phenotype node
+        and load all the classes
+        '''
+
+        mp_root_uri = 'http://purl.obolibrary.org/obo/MP_0000001'
+        mp_root_uriref = URIRef(mp_root_uri)
+        self.get_children(mp_root_uri)
+
+        for child in self.children[mp_root_uri]:
+            print "%s %s..."%(child['code'], child['label'])
+            uri = "http://purl.obolibrary.org/obo/" + child['code']
+            uriref = URIRef(uri)
+            self.rdf_graph.remove((uriref, None, mp_root_uriref))
+            self.load_ontology_classes(base_class=uri)
+            self.get_classes_paths(root_uri=uri, level=0)
+            print len(self.current_classes)
 
     def load_efo_omim_xrefs(self):
         '''

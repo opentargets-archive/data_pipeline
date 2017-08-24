@@ -15,38 +15,31 @@ logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 '''
-Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 
-WHenever an evidence or association has an EFO code, we use this module to decorate and expand the information around the code and ultimately save it in the objects.
+Module to Fetch the HPO ontology and store it in ElasticSearch as a lookup table
 '''
 
 
-class EfoActions(Actions):
+class HpoActions(Actions):
     PROCESS='process'
     UPLOAD='upload'
 
 def get_ontology_code_from_url(url):
     base_code = url.split('/')[-1]
-    if '/identifiers.org/efo/' in url:
+    # http://purl.obolibrary.org/obo/HP_0012531
+    if '/purl.obolibrary.org/obo/' in url:
         if ('_' not in base_code) and (':' not in base_code):
-            return "EFO_"+base_code
-    if ('/identifiers.org/orphanet/' in url) and not ("Orphanet_" in base_code):
-        return "Orphanet_"+base_code
-    if ('/identifiers.org/eco/' in url) and ('ECO:' in base_code):
-        return "ECO_"+base_code.replace('ECO:','')
-    if ('/identifiers.org/so/' in url) and ('SO:' in base_code):
-        return "SO_"+base_code.replace('SO:','')
-    if ('/identifiers.org/doid/' in url) and ('ECO:' in base_code):
-        return "DOID_"+base_code.replace('SO:','')
+            return "HP_"+base_code
     if base_code is None:
         return url
     return base_code
 
-class EFO(JSONSerializable):
+class HPO(JSONSerializable):
     def __init__(self,
                  code='',
                  label='',
-                 synonyms=[],
-                 phenotypes=[],
+                 exact_synonyms=[],
+                 broad_synonyms=[],
+                 narrow_synonyms=[],
                  path=[],
                  path_codes=[],
                  path_labels=[],
@@ -54,12 +47,12 @@ class EFO(JSONSerializable):
                  definition=""):
         self.code = code
         self.label = label
-        self.efo_synonyms = synonyms
-        self.phenotypes = phenotypes
+        self.broad_synonyms = broad_synonyms
+        self.exact_synonyms = exact_synonyms
+        self.narrow_synonyms = narrow_synonyms
         self.path = path
         self.path_codes = path_codes
         self.path_labels = path_labels
-        # self.id_org = id_org
         self.definition = definition
         self.children=[]
 
@@ -76,9 +69,9 @@ class EFO(JSONSerializable):
 
         self._private = {'suggestions' : dict(input = [],
                                               output = self.label,
-                                              payload = dict(efo_id = self.get_id(),
-                                                             efo_url = self.code,
-                                                             efo_label = self.label,),
+                                              payload = dict(hpo_id = self.get_id(),
+                                                             hpo_url = self.code,
+                                                             hpo_label = self.label,),
                                               )
         }
 
@@ -90,68 +83,70 @@ class EFO(JSONSerializable):
         self._private['suggestions']['input'].append(self.get_id())
 
 
-class EfoProcess():
+class HpoProcess():
 
     def __init__(self,
                  loader,):
         self.loader = loader
-        self.efos = OrderedDict()
+        self.hpos = OrderedDict()
 
     def process_all(self):
         self._process_ontology_data()
-        self._store_efo()
+        self._store_hpo()
 
     def _process_ontology_data(self):
 
-        self.disease_ontology = OntologyClassReader()
-        self.disease_ontology.load_open_targets_disease_ontology()
-        '''
-        Get all phenotypes
-        '''
-        utils = DiseaseUtils()
-        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology)
+        self.phenotype_ontology = OntologyClassReader()
+        self.phenotype_ontology.load_human_phenotype_ontology()
 
-        for uri,label in self.disease_ontology.current_classes.items():
-            properties = self.disease_ontology.parse_properties(URIRef(uri))
+        for uri,label in self.phenotype_ontology.current_classes.items():
+            print "--- %s --- %s"%(uri, label)
+            properties = self.phenotype_ontology.parse_properties(URIRef(uri))
             definition = ''
-            if 'http://www.ebi.ac.uk/efo/definition' in properties:
-                definition = ". ".join(properties['http://www.ebi.ac.uk/efo/definition'])
-            synonyms = []
-            if 'http://www.ebi.ac.uk/efo/alternative_term' in properties:
-                synonyms = properties['http://www.ebi.ac.uk/efo/alternative_term']
-            phenotypes = []
-            if uri in disease_phenotypes:
-                phenotypes = disease_phenotypes[uri]['phenotypes']
+            if 'http://purl.obolibrary.org/obo/IAO_0000115' in properties:
+                definition = ". ".join(properties['http://purl.obolibrary.org/obo/IAO_0000115'])
+            exact_synonyms = []
+            narrow_synonyms = []
+            broad_synonyms = []
+            # oboInOwl:hasExactSynonym
+            # http://www.geneontology.org/formats/oboInOwl#hasExactSynonym
+            if 'http://www.geneontology.org/formats/oboInOwl#hasExactSynonym' in properties:
+                exact_synonyms = properties['http://www.geneontology.org/formats/oboInOwl#hasExactSynonym']
+            if 'http://www.geneontology.org/formats/oboInOwl#hasBroadSynonym' in properties:
+                broad_synonyms = properties['http://www.geneontology.org/formats/oboInOwl#hasBroadSynonym']
+            if 'http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym' in properties:
+                narrow_synonyms = properties['http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym']
 
-            efo = EFO(code=uri,
+            hpo = HPO(code=uri,
                       label=label,
-                      synonyms=synonyms,
-                      phenotypes=phenotypes,
-                      path=self.disease_ontology.classes_paths[uri]['all'],
-                      path_codes=self.disease_ontology.classes_paths[uri]['ids'],
-                      path_labels=self.disease_ontology.classes_paths[uri]['labels'],
+                      exact_synonyms=exact_synonyms,
+                      broad_synonyms=broad_synonyms,
+                      narrow_synonyms=narrow_synonyms,
+                      path=self.phenotype_ontology.classes_paths[uri]['all'],
+                      path_codes=self.phenotype_ontology.classes_paths[uri]['ids'],
+                      path_labels=self.phenotype_ontology.classes_paths[uri]['labels'],
                       definition=definition
                       )
-            id = self.disease_ontology.classes_paths[uri]['ids'][0][-1]
-            if uri in self.disease_ontology.children:
-                efo.children = self.disease_ontology.children[uri]
-            self.efos[id] = efo
+            id = self.phenotype_ontology.classes_paths[uri]['ids'][0][-1]
+            if uri in self.phenotype_ontology.children:
+                hpo.children = self.phenotype_ontology.children[uri]
+            self.hpos[id] = hpo
 
 
-    def _store_efo(self):
+    def _store_hpo(self):
 
-        for efo_id, efo_obj in self.efos.items():
-            self.loader.put(index_name=Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                            doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                            ID=efo_id,
-                            body = efo_obj)
+        for hpo_id, hpo_obj in self.hpos.items():
+            self.loader.put(index_name=Config.ELASTICSEARCH_HPO_LABEL_INDEX_NAME,
+                            doc_type=Config.ELASTICSEARCH_HPO_LABEL_DOC_NAME,
+                            ID=hpo_id,
+                            body = hpo_obj)
 
 
 
-class EFOLookUpTable(object):
+class HPOLookUpTable(object):
     """
-    A redis-based pickable efo look up table. 
-    Allows to grab the EFO saved in ES and load it up in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
+    A redis-based pickable hpo look up table.
+    Allows to grab the HPO saved in ES and load it up in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
     """
 
     def __init__(self,
@@ -167,34 +162,34 @@ class EFOLookUpTable(object):
                                             ttl = ttl)
 
         if self.r_server is not None:
-            self._load_efo_data(r_server)
+            self._load_hpo_data(r_server)
 
-    def _load_efo_data(self, r_server = None):
-        for efo in tqdm(self._es_query.get_all_diseases(),
-                        desc='loading diseases',
-                        unit=' diseases',
+    def _load_hpo_data(self, r_server = None):
+        for hpo in tqdm(self._es_query.get_all_human_phenotypes(),
+                        desc='loading human phenotypes',
+                        unit=' human phenotypes',
                         unit_scale=True,
                         file=tqdm_out,
-                        total=self._es_query.count_all_diseases(),
+                        total=self._es_query.count_all_human_phenotypes(),
                         leave=False,
                         ):
-            self.set_efo(efo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
+            self.set_hpo(hpo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
 
-    def get_efo(self, efo_id, r_server=None):
-        return self._table.get(efo_id, r_server=self._get_r_server(r_server))
+    def get_hpo(self, hpo_id, r_server=None):
+        return self._table.get(hpo_id, r_server=self._get_r_server(r_server))
 
-    def set_efo(self, efo, r_server=None):
-        efo_key = efo['path_codes'][0][-1]
-        self._table.set(efo_key,efo, r_server=self._get_r_server(r_server))
+    def set_hpo(self, hpo, r_server=None):
+        hpo_key = hpo['path_codes'][0][-1]
+        self._table.set(hpo_key, hpo, r_server=self._get_r_server(r_server))
 
-    def get_available_gefo_ids(self, r_server=None):
+    def get_available_hpo_ids(self, r_server=None):
         return self._table.keys(r_server=self._get_r_server(r_server))
 
     def __contains__(self, key, r_server=None):
         return self._table.__contains__(key, r_server=self._get_r_server(r_server))
 
     def __getitem__(self, key, r_server=None):
-        return self.get_efo(key, r_server=self._get_r_server(r_server))
+        return self.get_hpo(key, r_server=self._get_r_server(r_server))
 
     def __setitem__(self, key, value, r_server=None):
         self._table.set(key, value, r_server=self._get_r_server(r_server))
@@ -204,37 +199,3 @@ class EFOLookUpTable(object):
 
     def _get_r_server(self, r_server = None):
         return r_server if r_server else self.r_server
-
-
-class DiseaseGraph:
-    """
-    A DAG of disease nodes whose elements are instances of class DiseaseNode
-    Input: g - an RDFLib-generated ConjugativeGraph, i.e. list of RDF triples
-    """
-
-    def __init__(self, g):
-        self.g = g
-        self.root = None
-        self.node_map = {}
-        self.node_cnt = 0
-        self.print_rdf_tree_from_root(g)
-        self.make_node_graph(g)
-
-    def print_rdf_tree_from_root(self, g):
-        print("STUB for method: print_rdf_tree_from_root()")
-
-    def make_node_graph(self, g):
-        print("STUB for method: make_node_graph()")
-
-
-class DiseaseNode:
-    """
-    A class representing all triples associated with a particular disease subject
-    e.g. asthma: http://www.ebi.ac.uk/efo/EFO_0000270
-    and its parents and children
-    """
-
-    def __init__(self, name="name", parents = [], children = []):
-        self.name = name,
-        self.parents = parents
-        self.children = children

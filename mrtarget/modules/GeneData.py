@@ -18,6 +18,7 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.ChEMBL import ChEMBLLookup
+from mrtarget.modules.GenotypePhenotype import MouseminePhenotypeETL
 from mrtarget.modules.Reactome import ReactomeRetriever
 from mrtarget.Settings import Config
 from elasticsearch.exceptions import NotFoundError
@@ -87,6 +88,7 @@ class Gene(JSONSerializable):
         self.ortholog = {}
         self._private ={}
         self.drugs = {}
+        self.mouse_phenotypes = {}
         self.protein_classification = {}
 
     def _set_id(self):
@@ -212,8 +214,6 @@ class Gene(JSONSerializable):
                     self.ortholog[species].append(ortholog_data)
                 except KeyError:
                     self.ortholog[species] = [ortholog_data]
-
-
 
     def load_ensembl_data(self, data):
 
@@ -430,7 +430,7 @@ class GeneSet():
 \t%i (%1.1f%%) with other IDs
 \t%i (%1.1f%%) with Uniprot IDs
 \t%i (%1.1f%%) with a Uniprot reviewed entry
-\t%i (%1.1f%%) active genes in Emsembl'''
+\t%i (%1.1f%%) active genes in Ensembl'''
 
         ens, hgnc, other, ens_active, uni, swiss = 0., 0., 0., 0., 0., 0.
 
@@ -513,7 +513,7 @@ class GeneManager():
 
     def merge_all(self, dry_run = False):
         bar = tqdm(desc='Merging data from available databases',
-                   total = 6,
+                   total = 7,
                    unit= 'steps',
                    file=self.tqdm_out)
         self._get_hgnc_data_from_json()
@@ -531,6 +531,8 @@ class GeneManager():
             self._logger.error('no uniprot index in ES. Skipping. Has the --uniprot step been run?')
         bar.update()
         self._get_chembl_data()
+        bar.update()
+        self._get_mouse_phenotypes_data()
         bar.update()
         self._store_data(dry_run=dry_run)
         bar.update()
@@ -571,12 +573,22 @@ class GeneManager():
             if row['human_ensembl_gene'] in self.genes:
                 self.genes[row['human_ensembl_gene']].load_ortholog_data(row)
 
-
-
-
         self._logger.info("STATS AFTER HGNC ortholog PARSING:\n" + self.genes.get_stats())
 
+    def _get_mouse_phenotypes_data(self):
 
+        mpetl = MouseminePhenotypeETL(loader=self.loader, r_server=self.r_server)
+        mpetl.process_all()
+        for gene_id, gene in tqdm(self.genes.iterate(),
+                                  desc='Adding phenotype data from MGI',
+                                  unit=' gene',
+                                  file=self.tqdm_out):
+            target_drugnames = []
+            ''' extend gene with related mouse phenotype data '''
+            #gene = Gene()
+            if gene.ensembl_gene_id and gene.ensembl_gene_id in mpetl.human_ensembl_gene_ids:
+                gene_symbol = mpetl.human_ensembl_gene_ids[gene.ensembl_gene_id]
+                gene.mouse_phenotypes = mpetl.human_genes[gene_symbol]["mouse_orthologs"]
 
     def _get_ensembl_data(self):
         for row in tqdm(self.esquery.get_all_ensembl_genes(),

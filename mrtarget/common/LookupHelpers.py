@@ -10,6 +10,8 @@ from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.modules.ECO import ECOLookUpTable
 from mrtarget.modules.EFO import EFOLookUpTable
+from mrtarget.modules.HPO import HPOLookUpTable
+from mrtarget.modules.MP import MPLookUpTable
 from mrtarget.modules.HPA import HPALookUpTable
 from mrtarget.modules.GeneData import GeneLookUpTable
 from mrtarget.modules.Literature import LiteratureLookUpTable
@@ -25,6 +27,8 @@ class LookUpData():
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
+        self.available_hpos = None
+        self.available_mps = None
         self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
@@ -42,6 +46,12 @@ class LookUpData():
         if self.available_efos:
             self.available_efos.r_server = r_server
             self.available_efos._table.set_r_server(r_server)
+        if self.available_hpos:
+            self.available_hpos.r_server = r_server
+            self.available_hpos._table.set_r_server(r_server)
+        if self.available_mps:
+            self.available_mps.r_server = r_server
+            self.available_mps._table.set_r_server(r_server)
         if self.available_hpa:
             self.available_hpa.r_server = r_server
             self.available_hpa._table.set_r_server(r_server)
@@ -57,10 +67,10 @@ class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
     EFO = 'efo'
+    HPO = 'hpo'
     ECO = 'eco'
     PUBLICATION = 'publication'
     MP = 'mp'
-    HPO = 'hpo'
     CHEMBL_DRUGS = 'chembl_drugs'
     HPA = 'hpa'
 
@@ -86,10 +96,12 @@ class LookUpDataRetriever(object):
         require_all(self.es is not None, self.r_server is not None)
         
         self.lookup = LookUpData()
-        self.logger = logging.getLogger(__name__)
-        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
+        self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
 
         # TODO: run the steps in parallel to speedup loading times
+        for dt in data_types:
+            self._logger.info("get %s info"%dt)
         for dt in tqdm(data_types,
                        desc='loading lookup data',
                        unit=' steps',
@@ -103,7 +115,8 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
             elif dt == LookUpDataType.MP:
-                self._get_mp()
+                self._logger.info("get mp info")
+                self._get_mp_info()
             elif dt == LookUpDataType.HPO:
                 self._get_hpo()
             elif dt == LookUpDataType.EFO:
@@ -115,7 +128,7 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.HPA:
                 self._get_available_hpa()
 
-            self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
+            self._logger.info("finished loading %s data into redis, took %ss" % (dt, str(time.time() - start_time)))
 
     def set_r_server(self, r_server):
         self.r_server = r_server
@@ -123,16 +136,27 @@ class LookUpDataRetriever(object):
         self.esquery = ESQuery()
 
     def _get_available_efos(self):
-        self.logger.info('getting efos')
+        self._logger.info('getting efos')
         self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
 
+    def _get_available_hpos(self):
+        self._logger.info('getting hpos')
+        self.lookup.available_efos = HPOLookUpTable(self.es, 'HPO_LOOKUP', self.r_server)
+
+    def _get_available_mps(self):
+        self._logger.info('getting mps info')
+        self.lookup.available_mps = MPLookUpTable(self.es,
+                                                  'MP_LOOKUP',
+                                                  self.r_server,
+                                                  autoload = autoload)
+
     def _get_available_ecos(self):
-        self.logger.info('getting ecos')
+        self._logger.info('getting ecos')
         self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
 
 
     def _get_gene_info(self, targets=[], autoload = True):
-        self.logger.info('getting gene info')
+        self._logger.info('getting gene info')
         self.lookup.available_genes = GeneLookUpTable(self.es,
                                                       'GENE_LOOKUP',
                                                       self.r_server,
@@ -140,6 +164,13 @@ class LookUpDataRetriever(object):
                                                       autoload = autoload)
         self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
         self._get_non_reference_gene_mappings()
+
+    def _get_mp_info(self, autoload = True):
+        self._logger.info('getting MP info')
+        self.lookup.available_mps = MPLookUpTable(self.es,
+                                                      'MP_LOOKUP',
+                                                  self.r_server,
+                                                  autoload = autoload)
 
     def _get_non_reference_gene_mappings(self):
         self.lookup.non_reference_genes = {}
@@ -202,7 +233,7 @@ class LookUpDataRetriever(object):
 
 
     def _get_available_publications(self):
-        self.logger.info('getting literature/publications')
+        self._logger.info('getting literature/publications')
         self.lookup.available_publications = LiteratureLookUpTable(self.es_pub, 'LITERATURE_LOOKUP', self.r_server)
 
 
@@ -231,6 +262,6 @@ class LookUpDataRetriever(object):
         self.lookup.chembl = chembl_handler
 
     def _get_available_hpa(self):
-        self.logger.info('getting expressions')
+        self._logger.info('getting expressions')
         self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP',
                                                    self.r_server)
