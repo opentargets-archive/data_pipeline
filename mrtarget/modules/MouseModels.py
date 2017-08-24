@@ -1,7 +1,5 @@
-import urllib2
+import requests
 import httplib
-import time
-import optparse
 from tqdm import tqdm
 import logging
 import os
@@ -62,8 +60,7 @@ class Phenodigm():
 
     def get_omim_to_efo_mappings(self):
         self._logger.info("OMIM to EFO parsing - requesting from URL %s" % Config.OMIM_TO_EFO_MAP_URL)
-        req = urllib2.Request(Config.OMIM_TO_EFO_MAP_URL)
-        response = urllib2.urlopen(req)
+        response = requests.get(Config.OMIM_TO_EFO_MAP_URL)
         self._logger.info("OMIM to EFO parsing - response code %s" % response.code)
         lines = response.readlines()
 
@@ -380,9 +377,9 @@ class Phenodigm():
                                         disease = None
                                         if disease_id in self.diseases:
                                             disease = self.diseases[disease_id]
-                                            self._logger.info("\t\t\tdisease: {0} {1}".format(disease_id, disease['disease_term']))
+                                            self._logger.info("\t\t\tdisease: %s %s"%(disease_id, disease['disease_term']))
                                         else:
-                                            self._logger.info("\t\t\tdisease: {0}".format(disease_id))
+                                            self._logger.info("\t\t\tdisease: %s"%(disease_id))
                                         
                                         '''
                                         Map the disease ID to EFO
@@ -633,7 +630,7 @@ class Phenodigm():
                                             self._logger.error("marker_symbol in disease_gene_locus[disease_id][hgnc_gene_id]): {0}".format(disease_term_uris is not None and disease_id in self.disease_gene_locus and marker_symbol in self.disease_gene_locus[disease_id][hgnc_gene_id]))
 
     def write_phenodigm_evidence_strings(self, path):
-        cttvFile = open(os.path.join(path, "cttv001_external_mousemodels.json"), "wb")
+        cttvFile = open(os.path.join(path, "phenodigm.json"), "wb")
         #cttvFile.write("[\n")
         countExported = 0
         self._logger.info("Processing %i records" % (len(self.hashkeys)))
