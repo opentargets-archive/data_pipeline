@@ -1,8 +1,9 @@
+from __future__ import print_function
 import argparse
 import logging
 import sys
 import itertools as it
-
+import atexit
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import PipelineConnectors
@@ -12,6 +13,8 @@ from mrtarget.modules.DataDrivenRelation import DataDrivenRelationActions, DataD
 from mrtarget.modules.Dump import DumpActions, DumpGenerator
 from mrtarget.modules.ECO import EcoActions, EcoProcess
 from mrtarget.modules.EFO import EfoActions, EfoProcess
+from mrtarget.modules.HPO import HpoActions, HpoProcess
+from mrtarget.modules.MP import MpActions, MpProcess
 from mrtarget.modules.Ensembl import  EnsemblActions, EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
@@ -21,40 +24,50 @@ from mrtarget.modules.IntOGen import IntOGenActions, IntOGen
 from mrtarget.modules.Literature import LiteratureActions, MedlineRetriever
 from mrtarget.modules.LiteratureNLP import LiteratureNLPProcess, LiteratureNLPActions
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
+from mrtarget.modules.GenotypePhenotype import MousePhenotypeActions, MouseminePhenotypeETL
 from mrtarget.modules.Ontology import OntologyActions, PhenotypeSlim
 from mrtarget.modules.QC import QCActions, QCRunner
 from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
-from mrtarget.Settings import Config, file_or_resource
-
-
-logging.config.fileConfig(file_or_resource('logging.ini'),
-                          disable_existing_loggers=False)
+from mrtarget.modules.G2P import G2PActions, G2P
+from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 
 def load_nlp_corpora():
     '''load here all the corpora needed by nlp steps'''
     import nltk
-    nltk.download([ 'punkt', 'averaged_perceptron_tagger']) #'brown' corpora might be needed
+    nltk.download([ 'punkt', 'averaged_perceptron_tagger', 'stopwords']) #'brown' corpora might be needed
 
 
 def main():
+
+    logging.config.fileConfig(file_or_resource('logging.ini'),
+                              disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
+    parser.add_argument('release_tag', nargs='?', default=Config.RELEASE_VERSION,
+                        help='The prefix to prepend default: %s' % \
+                        Config.RELEASE_VERSION)
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
                         action="append_const", const = Actions.ALL)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",
                         action="append_const", const = HPAActions.ALL)
     parser.add_argument("--rea", dest='rea', help="download reactome data, process it and upload it to elasticsearch",
                         action="append_const", const = ReactomeActions.ALL)
-    parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in postgresql",
+    parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in elasticsearch",
                         action="append_const", const = UniProtActions.CACHE)
-    parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in elasticsearch",
                         action="append_const", const = GeneActions.ALL)
-    parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in elasticsearch",
                         action="append_const", const = EfoActions.ALL)
+    parser.add_argument("--hpo", dest='hpo',
+                        help="process the Human Phenotype Ontology (HPO), store the resulting json objects in elasticsearch",
+                        action="append_const", const=HpoActions.ALL)
+    parser.add_argument("--mp", dest='mp',
+                        help="process the Mammalian Phenotype ontology (MP), store the resulting json objects in elasticsearch",
+                        action="append_const", const=MpActions.ALL)
     parser.add_argument("--eco", dest='eco', help="process the eco information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EcoActions.ALL)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
@@ -75,7 +88,8 @@ def main():
                         action="append_const", const = SearchObjectActions.PROCESS)
     parser.add_argument("--ddr", dest='ddr', help="precompute data driven t2t and d2d relations",
                         action="append_const", const=DataDrivenRelationActions.PROCESS)
-    parser.add_argument("--persist-redis", dest='redispersist', help="use a fresh redislite db",
+    parser.add_argument("--persist-redis", dest='redispersist',
+                        help="the temporary file wont be deleted if True default: False",
                         action='store_true', default=False)
     parser.add_argument("--musu", dest='mus', help="update mouse model data",
                         action="append_const", const = MouseModelsActions.UPDATE_CACHE)
@@ -85,8 +99,12 @@ def main():
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
+    parser.add_argument("--mgi", dest='mgi', help="update mouse phenotypes data",
+                        action="append_const", const=MousePhenotypeActions.ALL)
     parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
-                        action="append_const", const = IntOGenActions.GENERATE_EVIDENCE)
+                        action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
+    parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
+                        action="append_const", const=G2PActions.GENERATE_EVIDENCE)
     parser.add_argument("--ontos", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.PHENOTYPESLIM)
     parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
@@ -112,16 +130,21 @@ def main():
                         action='append', default=[])
     parser.add_argument("--targets", dest='targets', help="just process data for this target. Does not work with all the steps!!",
                         action='append', default=[])
+    parser.add_argument("--redis-remote", dest='redis_remote', help="connect to a remote redis",
+                        action='store_true', default=False)
+    parser.add_argument("--redis-host", dest='redis_host',
+                        help="redis host",
+                        action='store', default='')
+    parser.add_argument("--redis-port", dest='redis_port',
+                        help="redis port",
+                        action='store', default='')
     parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
                         action='store_true', default=False)
     parser.add_argument("--increment", dest='increment',
                         help="add new evidence from a data source but does not delete existing evidence. Works only for the validation step",
                         action='store_true', default=False)
-    parser.add_argument("--local-file", dest='local_file',
+    parser.add_argument("--input-file", dest='input_file',
                         help="pass the path to a local gzipped file to use as input for the data validation step",
-                        action='append', default=[])
-    parser.add_argument("--remote-file", dest='remote_file',
-                        help="pass the url to a remote gzipped file to use as input for the data validation step",
                         action='append', default=[])
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
@@ -132,27 +155,55 @@ def main():
     parser.add_argument("--inject-literature", dest='inject_literature',
                         help="inject literature data in the evidence-string, default set to False",
                         action='store_true', default=False)
+    parser.add_argument("--schema-version", dest='schema_version',
+                        help="set the schema version aka 'branch' name",
+                        action='store', default='master')
 
     args = parser.parse_args()
 
+    if not args.release_tag and not args.do_nothing:
+        logger.error('A [release-tag] has to be specified.')
+        print('A [release-tag] has to be specified.', file=sys.stderr)
+        return 1
+    else:
+        Config.RELEASE_VERSION = args.release_tag
+
     targets = args.targets
+
+    if args.redis_remote:
+        Config.REDISLITE_REMOTE = args.redis_remote
+
+    if args.redis_host:
+        Config.REDISLITE_DB_HOST = args.redis_host
+
+    if args.redis_port:
+        Config.REDISLITE_DB_PORT = args.redis_port
+
+    logger.debug('redis remote %s and host %s port %s',
+                 str(Config.REDISLITE_REMOTE),
+                 Config.REDISLITE_DB_HOST,
+                 Config.REDISLITE_DB_PORT)
 
     connectors = PipelineConnectors()
 
     if args.loglevel:
         try:
-            logger = logging.getLogger()
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.getLevelName(args.loglevel))
             logger.setLevel(logging.getLevelName(args.loglevel))
         except Exception, e:
-            logger.exception(e)
+            root_logger.exception(e)
 
     if args.do_nothing:
-        sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
+        print("Exiting. I pity the fool that tells me to 'do nothing'",
+              file=sys.stdout)
+        return 0
 
-    logger.info('Attempting to establish connection to the backend...')
-    db_connected = connectors.init_services_connections(redispersist=args.redispersist)
+    connected = connectors.init_services_connections(redispersist=args.redispersist,
+                                                     publication_es=args.inject_literature or args.lit)
 
-
+    logger.debug('Attempting to establish connection to the backend... %s',
+                 str(connected))
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
@@ -163,12 +214,17 @@ def main():
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
                 dry_run = args.dry_run) as loader:
         run_full_pipeline = False
+
+        # get the schema version and change all needed resources
+        update_schema_version(Config,args.schema_version)
+        logger.info('setting schema version string to %s', args.schema_version)
+
         if args.all and (Actions.ALL in args.all):
             run_full_pipeline = True
         if args.hpa or run_full_pipeline:
             do_all = (HPAActions.ALL in args.hpa) or run_full_pipeline
             if (HPAActions.PROCESS in args.hpa) or do_all:
-                HPAProcess(loader).process_all()
+                HPAProcess(loader,connectors.r_server).process_all(dry_run=args.dry_run)
         if args.rea or run_full_pipeline:
             do_all = (ReactomeActions.ALL in args.rea) or run_full_pipeline
             if (ReactomeActions.PROCESS in args.rea) or do_all:
@@ -190,10 +246,22 @@ def main():
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:
                 EfoProcess(loader).process_all()
+        if args.hpo or run_full_pipeline:
+            do_all = (HpoActions.ALL in args.hpo) or run_full_pipeline
+            if (HpoActions.PROCESS in args.hpo) or do_all:
+                HpoProcess(loader).process_all()
+        if args.mp or run_full_pipeline:
+            do_all = (MpActions.ALL in args.mp) or run_full_pipeline
+            if (MpActions.PROCESS in args.mp) or do_all:
+                MpProcess(loader).process_all()
         if args.eco or run_full_pipeline:
             do_all = (EcoActions.ALL in args.eco) or run_full_pipeline
             if (EcoActions.PROCESS in args.eco) or do_all:
                 EcoProcess(loader).process_all()
+        if args.mgi or run_full_pipeline:
+            do_all = (MousePhenotypeActions.ALL in args.mgi) or run_full_pipeline
+            if (MousePhenotypeActions.PROCESS in args.mgi) or do_all:
+                MouseminePhenotypeETL(loader=loader, r_server=connectors.r_server).process_all()
         if args.mus or run_full_pipeline:
             do_all = (MouseModelsActions.ALL in args.mus) or run_full_pipeline
             if (MouseModelsActions.UPDATE_CACHE in args.mus) or do_all:
@@ -204,11 +272,15 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
         if args.lit or run_full_pipeline:
             if LiteratureActions.FETCH in args.lit :
-                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.local_file)
+                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.input_file)
             if LiteratureActions.UPDATE in args.lit:
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(update=True)
             if LiteratureNLPActions.PROCESS in args.lit :
                 LiteratureNLPProcess(connectors.es, loader, connectors.r_server).process()
+        if args.g2p or run_full_pipeline:
+            do_all = (G2PActions.ALL in args.g2p) or run_full_pipeline
+            if (G2PActions.GENERATE_EVIDENCE in args.g2p) or do_all:
+                G2P(connectors.es).process_g2p()
         if args.intogen or run_full_pipeline:
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
@@ -216,24 +288,25 @@ def main():
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
-                PhenotypeSlim().create_phenotype_slim(args.local_file)
+                PhenotypeSlim().create_phenotype_slim(args.input_file)
 
-        r_files = list(it.chain.from_iterable([el.split(",") for el in args.remote_file]))
+        input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
 
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
             if (ValidationActions.CHECKFILES in args.val) or do_all:
                 EvidenceValidationFileChecker(connectors.es,
                                               connectors.r_server,
-                                              dry_run=args.dry_run).check_all(local_files=args.local_file,
-                                                                              remote_files=r_files,
+                                              dry_run=args.dry_run).check_all(input_files=input_files,
                                                                               increment=args.increment)
         if args.valreset:
             EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                targets = EvidenceStringProcess(connectors.es, connectors.r_server).process_all(datasources = args.datasource,
+                targets = EvidenceStringProcess(connectors.es,
+                                                connectors.r_server,
+                                                es_pub=connectors.es_pub).process_all(datasources = args.datasource,
                                                                           dry_run=args.dry_run,inject_literature=args.inject_literature)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
@@ -259,6 +332,12 @@ def main():
             if (DumpActions.DUMP in args.dump) or do_all:
                 DumpGenerator().dump()
 
+    logger.debug('close connectors')
+    connectors.close()
+
+    logger.info('it was correctly executed - finished')
+    return 0
+
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

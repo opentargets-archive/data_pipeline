@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# coding: latin-1
+# -*- coding: UTF-8 -*-
 import gzip
 import io
 import logging
@@ -12,17 +12,21 @@ import ftputil as ftputil
 import requests
 from dateutil.parser import parse
 from lxml import etree,objectify
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
+from mrtarget.common.NLP import init_spacy_english_language
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisLookupTablePickle, \
+    WhiteCollarWorker, RedisQueueWorkerThread
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 
 logger = logging.getLogger(__name__)
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 MAX_PUBLICATION_CHUNKS =100
 
@@ -34,6 +38,7 @@ class LiteratureActions(Actions):
 MEDLINE_BASE_PATH = 'pubmed/baseline'
 MEDLINE_UPDATE_PATH = 'pubmed/updatefiles'
 EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE = 30000
+
 
 def ftp_connect(dir=MEDLINE_BASE_PATH):
     host = ftputil.FTPHost(Config.PUBMED_FTP_SERVER, 'anonymous', 'support@targetvalidation.org')
@@ -103,23 +108,23 @@ class PublicationFetcher(object):
             pub_ids = [pub_ids]
 
         '''get from elasticsearch cache'''
-        logging.debug( "getting pub id {}".format( pub_ids))
+        self.logger.debug( "getting pub id {}".format( pub_ids))
         pubs ={}
         try:
 
             for pub_source in self.es_query.get_publications_by_id(pub_ids):
-                logging.debug( 'got pub %s from cache'%pub_source['pub_id'])
+                self.logger.debug( 'got pub %s from cache'%pub_source['pub_id'])
                 pub = Publication()
                 pub.load_json(pub_source)
                 pubs[pub.pub_id] = pub
             # if len(pubs)<pub_ids:
             #     for pub_id in pub_ids:
             #         if pub_id not in pubs:
-            #             logging.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
+            #             self.logger.info( 'getting pub from remote {}'.format(self._QUERY_BY_EXT_ID.format(pub_id)))
             #             r=requests.get(self._QUERY_BY_EXT_ID.format(pub_id))
             #             r.raise_for_status()
             #             result = r.json()['resultList']['result'][0]
-            #             logging.debug("Publication data --- {}" .format(result))
+            #             self.logger.debug("Publication data --- {}" .format(result))
             #             pub = Publication(pub_id=pub_id,
             #                           title=result['title'],
             #                           abstract=result['abstractText'],
@@ -158,12 +163,12 @@ class PublicationFetcher(object):
             #     self.loader.flush()
         except Exception, error:
 
-            logging.error("Error in retrieving publication data for pmid {} ".format(pub_ids))
+            self.logger.error("Error in retrieving publication data for pmid {} ".format(pub_ids))
             pubs = None
             if error:
-                logging.info(str(error))
+                self.logger.info(str(error))
             else:
-                logging.info(Exception.message)
+                self.logger.info(Exception.message)
 
         return pubs
 
@@ -186,7 +191,7 @@ class PublicationFetcher(object):
         return pub
 
     # def get_publication_with_analyzed_data(self, pub_ids):
-    #     # logging.debug("getting publication/analyzed data for id {}".format(pub_ids))
+    #     # self.logger.debug("getting publication/analyzed data for id {}".format(pub_ids))
     #     pubs = {}
     #     for parent_publication,analyzed_publication in self.es_query.get_publications_with_analyzed_data(ids=pub_ids):
     #         pub = Publication()
@@ -201,7 +206,7 @@ class PublicationFetcher(object):
         for publication_doc in self.es_query.get_publications_by_id(ids=pub_ids):
             pub = Publication()
             pub.load_json(publication_doc)
-            pubs[pub.pub_id] = pub
+            pubs[pub.id] = pub
         return pubs
 
 
@@ -264,7 +269,7 @@ class Publication(JSONSerializable):
             self._process_authors()
         if self.abstract:
             self._sanitize_abstract()
-            self._split_sentences()
+            # self._split_sentences()
         if self.title or self.abstract:
             self._base_nlp()
         self._text_analyzers = None # to allow for object serialisation
@@ -334,7 +339,11 @@ class Publication(JSONSerializable):
 
     def _base_nlp(self):
         for analyzer in self._text_analyzers:
-            self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
+            try:
+                self.text_mined_entities[str(analyzer)]=analyzer.digest(self.get_text_to_analyze())
+            except:
+                logger.exception("error in nlp analysis with %s analyser for text: %s"%(str(analyzer), self.get_text_to_analyze()))
+                self.text_mined_entities[str(analyzer)] = {}
 
 
 class LiteratureLookUpTable(object):
@@ -352,7 +361,7 @@ class LiteratureLookUpTable(object):
                                             ttl = ttl)
         if es is None:
             connector = PipelineConnectors()
-            connector.init_services_connections()
+            connector.init_services_connections(publication_es=True)
             es = connector.es
         self._es = es
         self._es_query = ESQuery(es)
@@ -433,6 +442,7 @@ class MedlineRetriever(object):
         self.dry_run = dry_run
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
     def fetch(self,
               local_file_locn = [],
@@ -443,9 +453,9 @@ class MedlineRetriever(object):
                 self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME, recreate=force)
             self.loader.prepare_for_bulk_indexing(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
-        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        no_of_workers = Config.WORKERS_NUMBER
         ftp_readers = no_of_workers
-        max_ftp_readers = 8 #avoid too many connections errors
+        max_ftp_readers = no_of_workers/4 #avoid too many connections errors
         if ftp_readers >max_ftp_readers:
             ftp_readers = max_ftp_readers
 
@@ -456,14 +466,16 @@ class MedlineRetriever(object):
 
         # Parser Queue
         parser_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_parser',
-                                  max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                                  job_timeout=120)
+                              max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
+                              batch_size=1,
+                              job_timeout=1200)
 
         # ES-Loader Queue
         loader_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|medline_loader',
+                              batch_size=1,
                               serialiser='pickle',
                               max_size=MAX_PUBLICATION_CHUNKS*no_of_workers,
-                              job_timeout=120)
+                              job_timeout=1200)
 
 
 
@@ -485,40 +497,35 @@ class MedlineRetriever(object):
             os.makedirs(pubmed_xml_locn)
 
         '''Start file-reader workers'''
-        retrievers = [PubmedFTPReaderProcess(retriever_q,
-                                          self.r_server.db,
-                                          parser_q,
-                                          self.dry_run,
-                                          update=update
-                                          )
-                      for i in range(ftp_readers)]
-
-        for w in retrievers:
-            w.start()
-
-
+        retrievers = WhiteCollarWorker(target=PubmedFTPReaderProcess,
+                                       pool_size=ftp_readers,
+                                       queue_in=retriever_q,
+                                       redis_path=None,
+                                       queue_out=parser_q,
+                                       kwargs=dict(dry_run=self.dry_run)
+                                       )
+        retrievers.start()
 
         'Start xml file parser workers'
-        parsers = [PubmedXMLParserProcess(parser_q,
-                                     self.r_server.db,
-                                     loader_q,
-                                     self.dry_run
-                                     )
-                   for i in range(no_of_workers)]
-
-        for w in parsers:
-            w.start()
+        parsers = WhiteCollarWorker(target=PubmedXMLParserProcess,
+                                    pool_size=no_of_workers,
+                                    queue_in=parser_q,
+                                    redis_path=None,
+                                    queue_out=loader_q,
+                                    kwargs = dict(dry_run=self.dry_run)
+                                    )
+        parsers.start()
 
         '''Start es-loader workers'''
         '''Fixed number of workers to reduce the overhead of creating ES connections for each worker process'''
-        loaders = [LiteratureLoaderProcess(loader_q,
-                                          self.r_server.db,
-                                          self.dry_run
-                                          )
-                   for i in range(no_of_workers/2 +1)]
+        loaders = WhiteCollarWorker(target=LiteratureLoaderProcess,
+                                    pool_size=no_of_workers/2 +1,
+                                    queue_in=loader_q,
+                                    redis_path=None,
+                                    kwargs=dict(dry_run=self.dry_run))
 
-        for w in loaders:
-            w.start()
+
+        loaders.start()
 
         # shift_downloading = 2
         if update:
@@ -529,7 +536,8 @@ class MedlineRetriever(object):
         #filter for update files
         gzip_files = [i for i in files if i.endswith('.xml.gz')]
         for file_ in tqdm(gzip_files,
-                  desc='enqueuing remote files'):
+                  desc='enqueuing remote files',
+                  file=tqdm_out):
             if host.path.isfile(file_):
                 # Remote name, local name, binary mode
                 file_path = os.path.join(pubmed_xml_locn, file_)
@@ -538,21 +546,18 @@ class MedlineRetriever(object):
         host.close()
         retriever_q.set_submission_finished(r_server=self.r_server)
 
-        for r in retrievers:
-                r.join()
+        retrievers.join()
 
-        for p in parsers:
-                p.join()
+        parsers.join()
 
-        for l in loaders:
-                l.join()
+        loaders.join()
 
-        logging.info('flushing data to index')
+        self.logger.info('flushing data to index')
         if not self.dry_run:
             self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
                 wait_if_ongoing=True)
 
-        logging.info("DONE")
+        self.logger.info("DONE")
 
 
 
@@ -571,6 +576,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
         self.update = update
         self.es_query = ESQuery()
         if update:
@@ -594,7 +600,7 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 entries_in_file += 1
 
         if entries_in_file != EXPECTED_ENTRIES_IN_MEDLINE_BASELINE_FILE and not self.update:
-            logging.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
+            self.logger.info('Medline baseline file %s has a number of entries not expected: %i'%(os.path.basename(file_path),entries_in_file))
 
     def fetch_file(self,file_path):
         if not os.path.isfile(file_path):
@@ -614,7 +620,9 @@ class PubmedFTPReaderProcess(RedisQueueWorkerProcess):
                 t = tqdm(desc = 'downloading %s via HTTP' % os.path.basename(file_path),
                          total = file_size,
                          unit = 'B',
-                         unit_scale = True)
+                         unit_scale = True,
+                         file=tqdm_out,
+                         disable=self.logger.level == logging.DEBUG)
                 for chunk in response.iter_content(chunk_size=128):
                     file_handler.write(chunk)
                     t.update(len(chunk))
@@ -689,9 +697,17 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
         self.start_time = time.time()  # reset timer start
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
-        from mrtarget.modules.LiteratureNLP import NounChuncker
-        self.analyzers = [NounChuncker()]
+        self._init_analyzers()
+        self.processed_counter = 0
 
+    def init(self):
+        self._init_analyzers()
+
+
+    def _init_analyzers(self):
+        from mrtarget.modules.LiteratureNLP import NounChuncker, DocumentAnalysisSpacy
+        self.nlp = init_spacy_english_language() #store it as class instance to make sure it is deleted if called again
+        self.analyzers = [NounChuncker(), DocumentAnalysisSpacy(self.nlp)]
 
     def process(self,data):
         record, filename = data
@@ -782,6 +798,12 @@ class PubmedXMLParserProcess(RedisQueueWorkerProcess):
 
         except etree.XMLSyntaxError as e:
             self.logger.error("Error parsing XML file {} - medline record {} %s".format(filename,record),e.message)
+        self.processed_counter+=1
+        if self.processed_counter%10000 == 0:
+            #restart spacy from scratch to free up memory
+            self._init_analyzers()
+            logger.debug('restarting analyzers after %i docs processed in worker %s'%(self.processed_counter, self.name))
+
 
     def parse_article_info(self, article, publication):
 
@@ -855,13 +877,16 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
     def __init__(self,
                  queue_in,
                  redis_path,
+                 queue_out = None,
                  dry_run=False):
-        super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path)
-        self.loader = Loader(chunk_size=10000, dry_run=dry_run)
+        super(LiteratureLoaderProcess, self).__init__(queue_in, redis_path, queue_out)
+        self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
+
+    def init(self):
+        self.loader = Loader(chunk_size=1000, dry_run=self.dry_run)
         self.es = self.loader.es
         self.es_query = ESQuery(self.es)
-        self.start_time = time.time()  # reset timer start
-        self.logger = logging.getLogger(__name__)
 
 
     def process(self, data):
@@ -884,7 +909,7 @@ class LiteratureLoaderProcess(RedisQueueWorkerProcess):
                                 pub,
                                 create_index=False)
             except KeyError as e:
-                logging.exception("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
+                self.logger.exception("Error creating publication object for pmid {} , filename {}, missing key: {}".format(
                     pub.id,
                     pub.filename,
                     e.message))

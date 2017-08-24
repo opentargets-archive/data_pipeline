@@ -4,14 +4,15 @@ from collections import Counter
 from pprint import pprint
 
 from elasticsearch import helpers
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 logger = logging.getLogger(__name__)
-
+tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 class QCActions(Actions):
     QC='qc'
@@ -28,6 +29,8 @@ class QCRunner(object):
 
         self.es = es
         self.esquery = ESQuery(es)
+        self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
         # self.run_associationQC()
 
@@ -43,6 +46,7 @@ class QCRunner(object):
         for ass in tqdm(self.esquery.get_all_associations(),
                            desc = 'checking associations are computed on all the evidence',
                            unit=' associations',
+                           file=tqdm_out,
                            unit_scale=True,
                            total= self.esquery.count_elements_in_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                            leave=True,
@@ -75,6 +79,7 @@ class QCRunner(object):
         for as_id in tqdm(self.esquery.get_all_target_disease_pair_from_evidence(),
                            desc = 'checking t-d pairs in evidence data',
                            unit=' t-d pairs',
+                           file=tqdm_out,
                            unit_scale=True,
                            total= total_evidence*5,# estimate t-d pairs
                            leave=True,
@@ -99,6 +104,7 @@ class QCRunner(object):
                         desc='checking target info is correct in all associations',
                         unit=' associations',
                         unit_scale=True,
+                        file=tqdm_out,
                         total=self.esquery.count_elements_in_index(
                             Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                         leave=True,
@@ -130,6 +136,7 @@ class QCRunner(object):
                         desc='checking target info is correct in all evidence',
                         unit=' evidence',
                         unit_scale=True,
+                        file=tqdm_out,
                         total=self.esquery.count_elements_in_index(
                             Config.ELASTICSEARCH_DATA_INDEX_NAME+'*'),
                         leave=True,

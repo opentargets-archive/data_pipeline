@@ -24,7 +24,7 @@ class Loader():
                  es = None,
                  chunk_size=1000,
                  dry_run = False,
-                 max_flush_interval = random.choice(range(8,16))):
+                 max_flush_interval = random.choice(range(60,120))):
 
         self.logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class Loader():
             if check_custom_idxs and \
             Config.ES_CUSTOM_IDXS and \
             Config.ES_CUSTOM_IDXS_INI and \
-            Config.ES_CUSTOM_IDXS.has_option('indexes', raw_name) \
+            Config.ES_CUSTOM_IDXS_INI.has_option('indexes', raw_name) \
             else Config.RELEASE_VERSION + '_' + index_name
 
         return idx_name + suffix
@@ -142,7 +142,7 @@ class Loader():
                         break
                     else:
                         time_to_wait = 5*retry
-                        self.logger.error("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
+                        self.logger.warning("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
                         time.sleep(time_to_wait)
             self.cache = []
 
@@ -162,11 +162,13 @@ class Loader():
             # create a temporal file if necessary
             if self._tmp_fd_enable and self._tmp_fd_count > 0:
                 if self._tmp_fd is None:
-                    self.logger.info('create temporary file to output '
-                                     'generated index docs while dry_run '
-                                     'is activated')
                     self._tmp_fd = tempfile.NamedTemporaryFile(
                         delete=self._tmp_fd_delete)
+                    self.logger.info('create temporary file to output '
+                                     'generated index docs while dry_run '
+                                     'is activated with file %s',
+                                     self._tmp_fd.name)
+                    
 
                 # flush self.cache into temp file converted as text lines
                 self._tmp_fd.writelines([json.dumps(el) + '\n'
@@ -237,7 +239,7 @@ class Loader():
                                          )
             if not self._check_is_aknowledge(res):
                 if res['error']['root_cause'][0]['reason']== 'already exists':
-                    logging.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
+                    self.logger.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
                     return
                 else:
                     raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
@@ -295,8 +297,8 @@ class Loader():
 
             if not index_created:
                 self._safe_create_index(index_name)
-                logging.warning('Index %s created without explicit mappings' % index_name)
-            logging.info("%s index created" % index_name)
+                self.logger.warning('Index %s created without explicit mappings' % index_name)
+            self.logger.info("%s index created" % index_name)
             return
 
     def _enforce_mapping(self, index_name):
@@ -332,13 +334,14 @@ class LoaderWorker(RedisQueueWorkerProcess):
     def __init__(self,
                  queue_in,
                  redis_path,
+                 queue_out = None,
                  chunk_size = 1000,
                  dry_run = False
                  ):
-        super(LoaderWorker, self).__init__(queue_in, redis_path)
+        super(LoaderWorker, self).__init__(queue_in, redis_path, queue_out)
         self.chunk_size = chunk_size
-        self.loader = Loader(chunk_size=chunk_size,
-                             dry_run=dry_run)
+        self.es = None
+        self.loader = None
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 
@@ -355,6 +358,11 @@ class LoaderWorker(RedisQueueWorkerProcess):
                             **kwargs
                             )
 
+    def init(self):
+        super(LoaderWorker, self).init()
+        self.loader = Loader(chunk_size=self.chunk_size,
+                             dry_run=self.dry_run)
 
     def close(self):
+        super(LoaderWorker, self).close()
         self.loader.close()

@@ -4,6 +4,7 @@ from UserDict import UserDict
 from datetime import datetime, date
 
 from mrtarget.Settings import Config
+from addict import Dict
 
 
 
@@ -27,6 +28,9 @@ def json_serialize(obj):
         except AttributeError:
             raise TypeError('Type not serializable')
 
+
+
+
 class JSONSerializable(object):
     def to_json(self):
         self.stamp_data_release()
@@ -45,7 +49,7 @@ class JSONSerializable(object):
             raise AttributeError("cannot load JSON object from %s type"%str(type(data)))
 
     def stamp_data_release(self):
-        self.__dict__['data_release'] = Config.RELEASE_VERSION
+        self.__dict__['data_release'] = Config.RELEASE_VERSION.split('-')[-1]
 
 
 class TreeNode(object):

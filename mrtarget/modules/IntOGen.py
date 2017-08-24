@@ -12,25 +12,23 @@ import opentargets.model.evidence.association_score as association_score
 import opentargets.model.evidence.mutation as evidence_mutation
 from mrtarget.common.ElasticsearchQuery import ESQuery
 
-
-__copyright__ = "Copyright 2014-2016, Open Targets"
-__credits__ = ["Gautier Koscielny", "David Tamborero"]
-__license__ = "Apache 2.0"
-__version__ = "1.2.2"
-__maintainer__ = "Gautier Koscielny"
-__email__ = "gautierk@targetvalidation.org"
-__status__ = "Production"
+__copyright__  = "Copyright 2014-2017, Open Targets"
+__credits__    = ["Gautier Koscielny", "David Tamborero"]
+__license__    = "Apache 2.0"
+__version__    = "1.2.6"
+__maintainer__ = "ChuangKee Ong"
+__email__      = ["gautierk@targetvalidation.org", "ckong@ebi.ac.uk"]
+__status__     = "Production"
 
 INTOGEN_RELEASE_DATE = ''
-#INTOGEN_FILENAME = 'C:\Users\gk680303\github\data_pipeline\resources\intogen_opentargets.tsv'
 INTOGEN_FILENAME = file_or_resource('intogen_opentargets.tsv')
-INTOGEN_EVIDENCE_FILENAME = '/Users/otvisitor/Documents/work/github/data_pipeline/mrtarget/resources/cttv001_intogen-01-06-2017.json'
+INTOGEN_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_intogen-01-06-2017.json'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {
     'A' : 'the gene exhibits several signals of positive selection in the tumor type',
     'B' : 'the gene is already described as a cancer gene and exhibits a signal of positive selection in the tumor type',
     'C' : 'the gene exhibits a signal of positive selection and is functionally connected to the genes with evidence A or B in the tumor type'
-}q
+}
 INTOGEN_ROLE_MAP = {
     'Act' : 'http://identifiers.org/cttv.activity/gain_of_function',
     'LoF' : 'http://identifiers.org/cttv.activity/loss_of_function',
@@ -122,16 +120,17 @@ class IntOGen():
 
     def __init__(self, es=None, r_server=None):
         self.es = es
-        self.r_server=r_server
-        self.esquery = ESQuery(self.es)
+        self.r_server = r_server
+        self.esquery  = ESQuery(self.es)
         self.evidence_strings = list()
         self.ensembl_current = {}
         self.symbols = {}
+        self.logger = logging.getLogger(__name__)
 
 
     def load_Ensembl(self):
 
-        logging.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
+        self.logger.debug("Loading ES Ensembl {0} assembly genes and non reference assembly".format(
             Config.EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY))
 
         for row in self.esquery.get_all_ensembl_genes():
@@ -153,7 +152,7 @@ class IntOGen():
                     self.symbols[display_name]["ensembl_secondary_ids"] = []
                 self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
 
-        logging.debug("Loading ES Ensembl finished")
+        self.logger.debug("Loading ES Ensembl finished")
 
     def process_intogen(self, infile=INTOGEN_FILENAME, outfile=INTOGEN_EVIDENCE_FILENAME):
         self.load_Ensembl()
@@ -178,7 +177,7 @@ class IntOGen():
         )
         error = provenance_type.validate(logging)
         if error > 0:
-            logging.error(provenance_type.to_JSON(indentation=4))
+            self.logger.error(provenance_type.to_JSON(indentation=4))
             sys.exit(1)
 
         with open(filename, 'r') as intogen_file:
@@ -198,7 +197,7 @@ class IntOGen():
                         value=INTOGEN_SCORE_MAP[Evidence])
 
                     evidenceString = opentargets.Literature_Curated()
-                    evidenceString.validated_against_schema_version = '1.2.5'
+                    evidenceString.validated_against_schema_version = '1.2.6'
                     evidenceString.access_level = "public"
                     evidenceString.type = "somatic_mutation"
                     evidenceString.sourceID = "intogen"
@@ -230,20 +229,22 @@ class IntOGen():
                         elif "ensembl_secondary_ids" in record:
                             ensembl_gene_id = record["ensembl_secondary_ids"][0]
                         else:
-                            logging.error("%s is in Ensembl but could not find it"%Symbol)
+                            self.logger.error("%s is in Ensembl but could not find it"%Symbol)
                             continue
                     else:
-                        logging.error("%s is not found in Ensembl" % Symbol)
+                        self.logger.error("%s is not found in Ensembl" % Symbol)
                         continue
 
-                    logging.error(ensembl_gene_id)
+                    # id = [ "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id) ], #["http://identifiers.org/ensembl/{0}".format(Ensg)],
                     evidenceString.target = bioentity.Target(
-                                            id = "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id), #["http://identifiers.org/ensembl/{0}".format(Ensg)],
+                        id= "http://identifiers.org/ensembl/{0}".format(ensembl_gene_id),
                                             target_name = Symbol,
                                             activity=INTOGEN_ROLE_MAP[Role],
                                             target_type='http://identifiers.org/cttv.target/gene_evidence'
                                             )
 
+#                    id = [INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['uri']],
+#                    name = [INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['label']]
                     ''' disease information '''
                     evidenceString.disease = bioentity.Disease(
                                             id = INTOGEN_TUMOR_TYPE_EFO_MAP[Tumor_Type]['uri'],
@@ -282,31 +283,31 @@ class IntOGen():
 
                     error = evidenceString.validate(logging)
                     if error > 0:
-                        logging.error(evidenceString.to_JSON())
+                        self.logger.error(evidenceString.to_JSON())
                         sys.exit(1)
 
                     self.evidence_strings.append(evidenceString)
 
 
-            logging.info("%s evidence parsed"%(n-1))
-            logging.info("%s evidence created"%len(self.evidence_strings))
+            self.logger.info("%s evidence parsed"%(n-1))
+            self.logger.info("%s evidence created"%len(self.evidence_strings))
 
         intogen_file.close()
 
     def write_evidence_strings(self, filename=INTOGEN_EVIDENCE_FILENAME):
-        logging.info("Writing IntOGen evidence strings")
+        self.logger.info("Writing IntOGen evidence strings")
         with open(filename, 'w') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
                 n+=1
-                logging.info(evidence_string.disease.id[0])
+                self.logger.info(evidence_string.disease.id[0])
                 # get max_phase_for_all_diseases
                 error = evidence_string.validate(logging)
                 if error == 0:
                     tp_file.write(evidence_string.to_JSON(indentation=None)+"\n")
                 else:
-                    logging.error("REPORTING ERROR %i" % n)
-                    logging.error(evidence_string.to_JSON(indentation=4))
+                    self.logger.error("REPORTING ERROR %i" % n)
+                    self.logger.error(evidence_string.to_JSON(indentation=4))
                     #sys.exit(1)
         tp_file.close()
 
@@ -314,10 +315,6 @@ def main():
     import logging
     logger = logging.getLogger(__name__)
     logger.info("Load IntOGen data")
-    itg = IntOGen()
-    itg.load_Ensembl()
-    itg.read_intogen('/Users/otvisitor/Documents/work/github/data_pipeline/mrtarget/resources/intogen_opentargets.tsv')
-    itg.write_evidence_strings('/Users/otvisitor/Documents/work/github/data_pipeline/mrtarget/resources/intogen_01062017.json')
 
 if __name__ == "__main__":
     main()

@@ -4,7 +4,9 @@ import time
 
 import pickle
 from tqdm import tqdm
+from mrtarget.common import TqdmToLogger
 from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.modules.ECO import ECOLookUpTable
 from mrtarget.modules.EFO import EFOLookUpTable
@@ -13,10 +15,13 @@ from mrtarget.modules.GeneData import GeneLookUpTable
 from mrtarget.modules.Literature import LiteratureLookUpTable
 from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common import require_all
 
 
 class LookUpData():
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
@@ -27,7 +32,26 @@ class LookUpData():
         self.available_efo_objects = None
         self.available_eco_objects = None
         self.chembl = None
-
+        self.available_publications = None
+        
+    def set_r_server(self, r_server):
+        self.logger.debug('setting r_server to all lookup tables from external r_server')
+        if self.available_ecos:
+            self.available_ecos.r_server = r_server
+            self.available_ecos._table.set_r_server(r_server)            
+        if self.available_efos:
+            self.available_efos.r_server = r_server
+            self.available_efos._table.set_r_server(r_server)
+        if self.available_hpa:
+            self.available_hpa.r_server = r_server
+            self.available_hpa._table.set_r_server(r_server)
+        if self.available_genes:
+            self.available_genes.r_server = r_server
+            self.available_genes._table.set_r_server(r_server)
+        if self.available_publications:
+            self.available_publications.r_server = r_server
+            self.available_publications._table.set_r_server(r_server)
+        
 
 class LookUpDataType(object):
     TARGET = 'target'
@@ -49,19 +73,27 @@ class LookUpDataRetriever(object):
                  data_types=(LookUpDataType.TARGET,
                              LookUpDataType.DISEASE,
                              LookUpDataType.ECO),
-                 autoload=True):
+                 autoload=True,
+                 es_pub=None,
+                 ):
 
         self.es = es
+        self.es_pub = es_pub
         self.r_server = r_server
-        if es is not None:
-            self.esquery = ESQuery(es)
+
+        self.esquery = ESQuery(self.es)
+        
+        require_all(self.es is not None, self.r_server is not None)
+        
         self.lookup = LookUpData()
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
         # TODO: run the steps in parallel to speedup loading times
         for dt in tqdm(data_types,
                        desc='loading lookup data',
                        unit=' steps',
+                       file=tqdm_out,
                        leave=False):
             start_time = time.time()
             if dt == LookUpDataType.TARGET:
@@ -84,6 +116,11 @@ class LookUpDataRetriever(object):
                 self._get_available_hpa()
 
             self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
+
+    def set_r_server(self, r_server):
+        self.r_server = r_server
+        self.lookup.set_r_server(r_server)
+        self.esquery = ESQuery()
 
     def _get_available_efos(self):
         self.logger.info('getting efos')
@@ -166,7 +203,7 @@ class LookUpDataRetriever(object):
 
     def _get_available_publications(self):
         self.logger.info('getting literature/publications')
-        self.lookup.available_publications = LiteratureLookUpTable(self.es, 'LITERATURE_LOOKUP', self.r_server)
+        self.lookup.available_publications = LiteratureLookUpTable(self.es_pub, 'LITERATURE_LOOKUP', self.r_server)
 
 
     def _get_from_pickled_file_cache(self, file_id):

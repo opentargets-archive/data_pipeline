@@ -61,7 +61,7 @@ class ESQuery(object):
                                       "match_all": {}
                                     },
                                    '_source': source,
-                                   'size': 20,
+                                   'size': 100,
                                    },
                             scroll='12h',
                             doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
@@ -134,9 +134,9 @@ class ESQuery(object):
         res = helpers.scan(client=self.handler,
                            query={"query": {
                                "match_all": {}
-                           },
-                                  '_source': source,
-                                  'size': 1000,
+                            },
+                            '_source': source,
+                            'size': 100,
                            },
                            scroll='12h',
                            doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
@@ -347,10 +347,10 @@ class ESQuery(object):
         for hit in res['hits']['hits']:
             return hit['_source']
 
-    @property
     def get_disease_to_targets_vectors(self):
         #TODO: look at the multiquery api
 
+        self.logger.debug('scan es to get all diseases and targets')
         res = helpers.scan(client=self.handler,
                            query={"query": {
                                "term": {
@@ -368,6 +368,7 @@ class ESQuery(object):
         target_results = dict()
         disease_results = dict()
 
+        self.logger.debug('start getting all targets and diseases from es')
         c=0
         for hit in res:
             c+=1
@@ -382,8 +383,8 @@ class ESQuery(object):
                 disease_results[hit['disease']['id']] = SparseFloatDict()
             disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
 
-            if c%10000 ==0:
-                print c
+            if c%10000 == 0:
+                self.logger.debug('%d elements gotten', c)
 
         return target_results, disease_results
 
@@ -915,8 +916,8 @@ class ESQuery(object):
                     self._flush_bulk(batch)
                     batch = []
 
-            if len(batch) >= chunk_size:
-                self._flush_bulk(batch)
+            #if len(batch) >= chunk_size:
+            self._flush_bulk(batch)
             '''flush changes'''
             self.handler.indices.flush(Loader.get_versioned_index(index,True),
                              wait_if_ongoing=True)

@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# coding: UTF-8
+# -*- coding: UTF-8 -*-
 import logging
 import multiprocessing
 import re
@@ -9,6 +9,7 @@ import json
 from collections import Counter
 import os
 
+from mrtarget.common.NLP import init_spacy_english_language, DOMAIN_STOP_WORDS
 from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 import spacy
 from spacy.en import English
@@ -16,7 +17,8 @@ from spacy.symbols import *
 from spacy.tokens import Span
 from spacy.tokens.doc import Doc
 from textblob.en.inflect import singularize
-from tqdm import tqdm
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -36,7 +38,7 @@ from unidecode import unidecode
 try:
     import nltk
     from nltk.corpus import stopwords as nltk_stopwords
-    from nltk import Tree
+    from nltk import Tree, pprint
 except ImportError:
     logging.getLogger(__name__).warning('cannot import nltk or stopwords')
 
@@ -47,8 +49,7 @@ ANY_NOUN = SUBJECTS + OBJECTS + ['compound']
 from lxml import etree
 from spacy.attrs import ORTH, TAG, LEMMA
 from spacy.matcher import Matcher
-from spacy.tokenizer import Tokenizer
-from spacy.language_data import TOKENIZER_INFIXES
+
 import spacy.util
 
 # List of symbols we don't care about
@@ -138,10 +139,10 @@ class AbstractNormalizer(object):
         return unidecode(text)
 
 class PerceptronNPExtractor(BaseNPExtractor):
-    '''modified from 
+    '''modified from
 
     http://thetokenizer.com/2013/05/09/efficient-way-to-extract-the-main-topics-of-a-sentence/
-    
+
     To use Perceptron POS Tagger (more accurate)
     '''
 
@@ -213,12 +214,17 @@ class PerceptronNPExtractor(BaseNPExtractor):
 class NounChuncker(object):
 
     def __init__(self):
+        import nltk
+        try:
+            from nltk.corpus import stopwords as nltk_stopwords
+        except ImportError:
+            nltk.download(['punkt', 'averaged_perceptron_tagger', 'stopwords'])  # 'brown' corpora might be needed
+            from nltk.corpus import stopwords as nltk_stopwords
         self.np_ex = PerceptronNPExtractor()
         self.normalizer = AbstractNormalizer()
         self.abbreviations_finder = AbbreviationsParser()
 
     def digest(self, text):
-        from pprint import pprint
         normalized = self.normalizer.normalize(text)
         parsed = TextBlob(normalized, np_extractor=self.np_ex)
         counted_noun_phrases = parsed.noun_phrases
@@ -284,6 +290,7 @@ class LiteratureNLPProcess(object):
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
         if not self.es.indices.exists(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME):
             self.loader.create_new_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
@@ -295,7 +302,7 @@ class LiteratureNLPProcess(object):
         #todo, add method to process all cached publications??
 
         # Literature Queue
-        no_of_workers = Config.WORKERS_NUMBER or multiprocessing.cpu_count()
+        no_of_workers = Config.WORKERS_NUMBER
 
         literature_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|literature_analyzer_q',
                                   max_size=MAX_CHUNKS*no_of_workers,
@@ -304,7 +311,7 @@ class LiteratureNLPProcess(object):
 
         # Start literature-analyser-worker processes
         analyzers = [LiteratureAnalyzerProcess(literature_q,
-                                               self.r_server.db,
+                                               None,
                                                dry_run,
                                                ) for i in range(no_of_workers)]
 
@@ -317,6 +324,7 @@ class LiteratureNLPProcess(object):
                     desc='Reading available evidence_strings to analyse publications',
                     total = self.es_query.count_validated_evidence_strings(datasources= datasources),
                     unit=' evidence',
+                    file=tqdm_out,
                     unit_scale=True):
             pubs = pub_fetcher.get_publication(pub_id)
             if pubs:
@@ -327,11 +335,11 @@ class LiteratureNLPProcess(object):
         for a in analyzers:
                 a.join()
 
-        logging.info('flushing data to index')
+        self.logger.info('flushing data to index')
 
         self.loader.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
             wait_if_ongoing=True)
-        logging.info("DONE")
+        self.logger.info("DONE")
 
     @staticmethod
     def get_pub_id_from_url(url):
@@ -383,7 +391,7 @@ class PublicationAnalysisSpacy(object):
                     try:
                         ec[e_str] += tl.count(e_str)
                     except:
-                        logging.info(e_str)
+                        self.logger.info(e_str)
                         #            print( e_str, e_str in STOPLIST)
                         #        print (e.label, repr(e.label_),  ' '.join(t.orth_ for t in e))
         # print('FILTERED NOUN CHUNKS:')
@@ -485,7 +493,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
 
     def process(self, data):
         publications = data
-        logging.debug("In LiteratureAnalyzerProcess- {} ".format(self.name))
+        self.logger.debug("In LiteratureAnalyzerProcess- {} ".format(self.name))
         try:
 
             for pub_id, pub in publications.items():
@@ -502,7 +510,7 @@ class LiteratureAnalyzerProcess(RedisQueueWorkerProcess):
                         )
 
         except Exception as e:
-            logging.error("Error in loading analysed publication for pmid {}: {}".format(pub_id, e.message))
+            self.logger.error("Error in loading analysed publication for pmid {}: {}".format(pub_id, e.message))
 
 
 
@@ -537,6 +545,8 @@ class LiteratureInfoExtractor(object):
         self.loader = loader
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
+        self.nlp = init_spacy_english_language()
 
 
     def process(self,
@@ -545,26 +555,26 @@ class LiteratureInfoExtractor(object):
 
 
         if not os.path.isfile(Config.GENE_LEXICON_JSON_LOCN):
-            logging.info('Generating gene matcher patterns')
+            self.logger.info('Generating gene matcher patterns')
             gene_lexicon_parser = LexiconParser(Config.BIOLEXICON_GENE_XML_LOCN,Config.GENE_LEXICON_JSON_LOCN,'GENE')
             gene_lexicon_parser.parse_lexicon()
 
         if not os.path.isfile(Config.DISEASE_LEXICON_JSON_LOCN):
-            logging.info('Generating disease matcher patterns')
+            self.logger.info('Generating disease matcher patterns')
             disease_lexicon_parser = LexiconParser(Config.BIOLEXICON_DISEASE_XML_LOCN, Config.DISEASE_LEXICON_JSON_LOCN, 'DISEASE')
             disease_lexicon_parser.parse_lexicon()
 
         i = 1
         j = 0
-        spacyManager = NLPManager()
-        logging.info('Loading lexicon json')
+        spacyManager = NLPManager(self.nlp)
+        self.logger.info('Loading lexicon json')
         disease_patterns = json.load(open(Config.DISEASE_LEXICON_JSON_LOCN))
         gene_patterns = json.load(open(Config.GENE_LEXICON_JSON_LOCN))
 
         # matcher = Matcher.load(path = 'gene_lexicon.json',
         #                        vocab=nlp.vocab)
         # TODO: FIXED IN SPACY MASTER BUT A BUG IN 1.5.0
-        logging.info('Generating matcher patterns')
+        self.logger.info('Generating matcher patterns')
         '''load all the new patterns, do not use Matcher.load since there is a bug'''
         disease_matcher = Matcher(vocab=spacyManager.nlp.vocab,
                           patterns=disease_patterns
@@ -575,11 +585,12 @@ class LiteratureInfoExtractor(object):
         '''should save the new vocab now'''
         # Matcher.vocab.dump('lexeme.bin')
 
-        logging.info('Finding entity matches')
+        self.logger.info('Finding entity matches')
         for ev in tqdm(self.es_query.get_abstracts_from_val_ev(),
                     desc='Reading available publications for nlp information extraction',
                     total = self.es_query.count_validated_evidence_strings(),
                     unit=' evidence',
+                    file=tqdm_out,
                     unit_scale=True):
 
             j=j+1
@@ -593,10 +604,10 @@ class LiteratureInfoExtractor(object):
 
                 disease_matches = spacyManager.findEntityMatches(disease_matcher,tokens)
                 gene_matches = spacyManager.findEntityMatches(gene_matcher,tokens)
-                logging.info('Text to analyze - {} --------- Gene Matches {} -------- Disease Matches {}'.format(text_to_analyze,gene_matches, disease_matches))
+                self.logger.info('Text to analyze - {} --------- Gene Matches {} -------- Disease Matches {}'.format(text_to_analyze,gene_matches, disease_matches))
 
                 #spacyManager.generateRelations(disease_matches,gene_matches)
-        logging.info("DONE")
+        self.logger.info("DONE")
 
 
 
@@ -669,7 +680,7 @@ class LexiconParser(object):
 
             self.lexicon[item.id] = item
             if c % 10000 == 0:
-                logging.info('parsed %i lexicon term' % c)
+                self.logger.info('parsed %i lexicon term' % c)
             yield item
 
     def print_matched_entities(self, matcher, doc, i, matches):
@@ -722,6 +733,7 @@ class LitEntity(JSONSerializable):
         self.start_pos = start_pos
         self.end_pos = end_pos
         self.doc_id = doc_id
+        self.logger = logging.getLogger(__name__)
 
 # This is meant only for testing purpose
 def load_entity_matches(self, loader, nlp, doc):
@@ -730,7 +742,7 @@ def load_entity_matches(self, loader, nlp, doc):
                       )
     disease_matches = matcher(doc)
     disease_matched_list = []
-    logging.info('Disease Matches!!!!!!!!!!!!!!!!!!!')
+    self.logger.info('Disease Matches!!!!!!!!!!!!!!!!!!!')
     i = 1
     for ent_id, label, start, end in disease_matches:
         i = i + 1
@@ -743,7 +755,7 @@ def load_entity_matches(self, loader, nlp, doc):
                    litentity,
                    create_index=False)
 
-        logging.info(span)
+        self.logger.info(span)
     disease_matched_entities = {"entities": disease_matched_list}
 
     matcher = Matcher(vocab=nlp.vocab,
@@ -751,7 +763,7 @@ def load_entity_matches(self, loader, nlp, doc):
                       )
     gene_matches = matcher(doc)
     gene_matched_list = []
-    logging.info('Gene Matches!!!!!!!!!!!!!!!!!!!')
+    self.logger.info('Gene Matches!!!!!!!!!!!!!!!!!!!')
     for ent_id, label, start, end in gene_matches:
         i = i + 1
         span = (matcher.get_entity(ent_id), label, doc[start: end])
@@ -762,22 +774,16 @@ def load_entity_matches(self, loader, nlp, doc):
                    i,
                    litentity,
                    create_index=False)
-        logging.info(span)
+        self.logger.info(span)
     gene_matched_entities = {"litentity": gene_matched_list}
 
 
-def create_tokenizer(nlp):
-    infix_re = spacy.util.compile_infix_regex(tuple(TOKENIZER_INFIXES + ['/', ',']))
-    return Tokenizer(nlp.vocab, {}, nlp.tokenizer.prefix_search, nlp.tokenizer.suffix_search,
-                     infix_re.finditer)
 
+
+#####TEMPRORARY KEEPING THIS FOR REFERENCE IF NEEDED##################
 class NLPManager(object):
-    def __init__(self, nlp=None):
-        if nlp is None:
-           if nlp is None:
-                    self.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
-        else:
-            self.nlp = nlp
+    def __init__(self, nlp):
+        self.nlp = nlp
 
     def tokenizeText(self,text):
 
@@ -848,9 +854,7 @@ class NLPManager(object):
 class DocumentAnalysisSpacy(object):
 
     def __init__(self,
-                 document,
-                 nlp=None,
-                 abbreviations=None,
+                 nlp,
                  normalize=True,
                  stopwords=None
                  ):
@@ -858,52 +862,112 @@ class DocumentAnalysisSpacy(object):
         self.logger = logging.getLogger(__name__)
         self._normalizer = AbstractNormalizer()
         self._abbreviations_finder = AbbreviationsParser()
+
+        self.normalize = normalize
+        if self.normalize:
+            self._normalizer = AbstractNormalizer()
         if stopwords is None:
-            self.stopwords  = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS))
+            self.stopwords  = set(nltk_stopwords.words('english') + ["n't", "'s", "'m", "ca", "p", "t"] + list(ENGLISH_STOP_WORDS) + DOMAIN_STOP_WORDS + list(string.punctuation))
 
         self.nlp = nlp
-        if self.nlp is None:
-            self.nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
+        self.processed_counter = 0
+
+
+
+    def process(self, document):
 
         if isinstance(document, Doc):
-            self.doc = document
+            doc = document
+            abbreviations = self._abbreviations_finder.digest_as_dict(doc.text)
         elif isinstance(document, unicode):
-            # if not document.replace('\n','').strip():
-            #     raise AttributeError('document cannot be empty')
-            if normalize:
-                self._normalizer = AbstractNormalizer()
+            if self.normalize:
                 document = u''+self._normalizer.normalize(document)
-            if abbreviations is None:
-                self.abbreviations = self._abbreviations_finder.digest_as_dict(document)
-                self.logger.info('abbreviations: ' + str(self.abbreviations))
+            abbreviations = self._abbreviations_finder.digest_as_dict(document)
+            # self.logger.debug('abbreviations: ' + str(abbreviations))
 
             if abbreviations:
-                for short, long in abbreviations:
+                for short, long in abbreviations.items():
                     if short in document and not long in document:
                         document = document.replace(short, long)
-            self.doc = self.nlp(document)
+            try:
+                doc = self.nlp(document)
+            except:
+                self.logger.exception('Error parsing the document: %s' % document)
+                return [None, {}]
         else:
             raise AttributeError('document needs to be unicode or Doc not %s' % document.__class__)
 
-    def digest(self):
-
-        self.concepts = []
-        self.noun_phrases = []
-        for sentence in self.doc.sents:
-            sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
-            sentence.analyse()
-            self.concepts.extend(sentence.concepts)
-            self.noun_phrases.extend(sentence.noun_phrases)
+        concepts = []
+        noun_phrases = []
+        for sentence in doc.sents:
+            try:
+                analysed_sentence = SentenceAnalysisSpacy(sentence.text, self.nlp)
+                analysed_sentence.analyse()
+                concepts.extend(analysed_sentence.concepts)
+                noun_phrases.extend(analysed_sentence.noun_phrases)
+            except:
+                self.logger.exception('Error parsing the sentence: %s'%sentence.text)
         # print self.noun_phrases
-        self.noun_phrases = list(set([i.text for i in self.noun_phrases if i.text.lower() not in self.stopwords ]))
-        self.noun_phrase_counter = Counter()
-        lowered_text = self.doc.text.lower()
-        for i in self.noun_phrases:
-            lowered_np = i.lower()
-            self.noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
-        self.noun_phrases_top = [i[0] for i in self.noun_phrase_counter.most_common(5) if i[1] > 1]
-        self.noun_phrases_recurring = [i for i, k in self.noun_phrase_counter.items() if k > 1]
+        noun_phrases = list(set([i.text for i in noun_phrases if i.text.lower() not in self.stopwords ]))
 
+        # clustered_np = self.cluster_np(noun_phrases)
+        noun_phrase_counter = Counter()
+        lowered_text = doc.text.lower()
+        for i in noun_phrases:
+            lowered_np = i.lower()
+            noun_phrase_counter[lowered_np]= lowered_text.count(lowered_np)
+        '''remove plurals with appended s'''
+        for np in noun_phrase_counter.keys():
+            if np + 's' in noun_phrase_counter:
+                noun_phrase_counter[np] += noun_phrase_counter[np + 's']
+                del noun_phrase_counter[np + 's']
+        '''increase count of shorter form with longer form'''
+        for short, long in abbreviations.items():
+            if short.lower() in noun_phrase_counter:
+                noun_phrase_counter[long.lower()] += noun_phrase_counter[short.lower()]
+                del noun_phrase_counter[short.lower()]
+        noun_phrases_top = [i[0] for i in noun_phrase_counter.most_common(5) if i[1] > 1]
+        noun_phrases_recurring = [i for i, k in noun_phrase_counter.items() if k > 1]
+
+        # bug https://github.com/explosion/spaCy/issues/589
+        # self.processed_counter+=1
+        # if self.processed_counter%100 == 0:
+            # self.nlp.vocab.strings.flush_oov()
+        return doc, \
+               dict(chunks = noun_phrases,
+                    recurring_chunks = noun_phrases_recurring,
+                    top_chunks = noun_phrases_top,
+                    abbreviations = [dict(short=k, long=v) for k,v in abbreviations.items()],
+                    concepts = concepts)
+
+    def digest(self, document):
+        return self.process(document)[1]
+
+    def __str__(self):
+        return 'nlp'
+
+    def cluster_np(self,noun_phrases):
+        '''todo: optimise for speed'''
+
+        clusters = {i:[i] for i in noun_phrases}
+        for i in noun_phrases:
+            for j in noun_phrases:
+                if i!=j and i in j.split(' '):
+                    # print '%s -> %s'%(i,j)
+                    clusters[j].extend(clusters[i])
+                    del clusters[i]
+                    # elif i != j and j in i:
+                    #     print '%s <- %s'%(j,i)
+        # pprint(clusters)
+        filtered_noun_phrases = []
+        for k,v in clusters.items():
+            if len(v)>1:
+                longest = sorted(v, key=lambda x: len(x), reverse=True)[0]
+                filtered_noun_phrases.append(longest)
+            else:
+                filtered_noun_phrases.append(v[0])
+        # print filtered_noun_phrases
+        return filtered_noun_phrases
 
 
 
@@ -912,7 +976,7 @@ class SentenceAnalysisSpacy(object):
 
     def __init__(self,
                  sentence,
-                 nlp = None,
+                 nlp,
                  abbreviations = None,
                  normalize = True):
         self.logger = logging.getLogger(__name__)
@@ -928,13 +992,11 @@ class SentenceAnalysisSpacy(object):
         elif isinstance(sentence, unicode):
             if not sentence.replace('\n','').strip():
                 raise AttributeError('sentence cannot be empty')
-            if nlp is None:
-                nlp = spacy.load('en_core_web_md', create_make_doc=create_tokenizer)
             if normalize:
                 sentence = u'' + self._normalizer.normalize(sentence)
             if abbreviations is None:
                 self.abbreviations = self._abbreviations_finder.digest_as_dict(sentence)
-                self.logger.info('abbreviations: ' + str(self.abbreviations))
+                # self.logger.info('abbreviations: ' + str(self.abbreviations))
 
             if abbreviations:
                 for short, long in abbreviations:
@@ -944,7 +1006,7 @@ class SentenceAnalysisSpacy(object):
             self.doc = self.sentence
         else:
             raise AttributeError('sentence needs to be unicode or Doc or Span not %s'%sentence.__class__)
-
+        # self.logger.debug(u'Sentence to analyse: '+self.sentence.text)
 
 
 
@@ -954,6 +1016,11 @@ class SentenceAnalysisSpacy(object):
         for dep in list(tok.lefts) + list(tok.rights):
             if dep.lower_ in negations:
                 return True
+
+        # alternatively look for
+        #     for child in predicate.children:
+        #       if child.dep_ == 'neg':
+        #            context = 'Negative'
         return False
 
     def get_alternative_subjects(self, tok):
@@ -985,8 +1052,8 @@ class SentenceAnalysisSpacy(object):
     def get_extended_verb(self, v):
         '''
         given a verb build a representative chain of verbs for the sintax tree
-        :param v: 
-        :return: 
+        :param v:
+        :return:
         '''
         verb_modifiers = [prep,agent]
         verb_path = [v]
@@ -1007,41 +1074,50 @@ class SentenceAnalysisSpacy(object):
     def get_verb_path_from_ancestors(self, tok):
         '''
         given a token return the chain of verbs of his ancestors
-        :param tok: 
-        :return: 
+        :param tok:
+        :return:
         '''
         return [i for i in tok.ancestors if i.pos == VERB and i.dep != aux]
 
     def get_extended_token(self, tok):
         '''
         given a token find a more descriptive string extending it with its chindren
-        :param tok: 
-        :param doc: 
-        :return: 
+        :param tok:
+        :param doc:
+        :return:
         '''
         allowed_pos = [NOUN, ADJ, PUNCT, PROPN]
-        allowed_dep = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "dobj",  "attr", "oprd", "pobj", "conj",
-                       "compound", "amod", "punct", "meta", "npadvmod", "nmod"]#, add "prep" to extend for "of and "in"
+        allowed_dep = ["nsubj", "nsubjpass", "csubj", "csubjpass", "agent", "expl", "dobj",  "attr", "oprd", "pobj",# "conj",
+                       "compound", "amod", "meta", "npadvmod", "nmod", "amod"]#, add "prep" to extend for "of and "in"
         extended_tokens = [i for i in tok.subtree if (i.dep_ in allowed_dep and i in tok.children) or (i == tok)]
-        allowed_continous_tokens = []
-        #break the extened token if something not allowed is between the selected tokens in the subtree
-        curr_pos = extended_tokens[0].i -1
-        for ex_t in extended_tokens:
-            if ex_t.i == curr_pos+1:
-                curr_pos = ex_t.i
-                allowed_continous_tokens.append(ex_t)
-            else:
-                break
-        span= Span(self.doc, allowed_continous_tokens[0].i, allowed_continous_tokens[-1].i+1)
+        # just get continous tokens
+        span_range = [tok.i, tok.i]
+        ext_tokens_i = [i.i for i in extended_tokens]
+        max_bound = max(ext_tokens_i)
+        min_bound = min(ext_tokens_i)
+        curr_pos = tok.i
+        for cursor in range(tok.i, max_bound+1):
+            if cursor in ext_tokens_i:
+                if cursor == curr_pos + 1:
+                    span_range[1] = cursor
+                    curr_pos = cursor
+
+        curr_pos = tok.i
+        for cursor in range(tok.i, min_bound-1, -1):
+            if cursor in ext_tokens_i:
+                if cursor == curr_pos - 1:
+                    span_range[0] = cursor
+                    curr_pos = cursor
+        span= Span(self.doc, span_range[0], span_range[1]+1)
         return span
 
 
     def traverse_obj_children(self, tok, verb_path):
         '''
         iterate over all the children and the conjuncts to return objects within the same chain of verbs
-        :param tok: 
-        :param verb_path: 
-        :return: 
+        :param tok:
+        :param verb_path:
+        :return:
         '''
         for i in tok.children:
             # print i, verb_path, get_verb_path_from_ancestors(i), get_verb_path_from_ancestors(i) ==verb_path
@@ -1076,9 +1152,9 @@ class SentenceAnalysisSpacy(object):
     def get_dependent_obj(self, tok, verb_path):
         '''
         given a token find related objects for the sape chain of verbs (verb_path
-        :param tok: 
-        :param verb_path: 
-        :return: 
+        :param tok:
+        :param verb_path:
+        :return:
         '''
         all_descendants = []
         if tok.dep_ in OBJECTS and (self.get_verb_path_from_ancestors(tok) == verb_path):
@@ -1101,54 +1177,66 @@ class SentenceAnalysisSpacy(object):
     def collapse_noun_phrases_by_punctation(self):
         '''
         this collapse needs tobe used on a single sentence, otherwise it will ocncatenate different sentences
-        :param sentence: 
-        :return: 
+        :param sentence:
+        :return:
         '''
         prev_span = ''
+        open_brackets = u'( { [ <'.split()
+        closed_brackets = u') } ] >'.split()
         for token in self.sentence:
             try:
-                next_token = None
-                if token.nbor(1).pos is PUNCT and token.whitespace_ == u'':
-                    next_token = token.nbor(2)
-                # elif token.pos is PUNCT :
-                #     next_token = token.nbor(1)
-                if next_token and next_token.pos in [NOUN ,PROPN, ADJ]:
-                    span = Span(self.doc, token.i, next_token.i + 1)
-                    prev_span = span.text
-                    yield span
+                if token.text in open_brackets and token.whitespace_ ==u'' :
+                    next_token = token.nbor(1)
+                    if any([i in next_token.text for i in closed_brackets]):
+                        span = Span(self.doc, token.i, next_token.i +1)
+                        # prev_span = span.text
+                        yield span
+                elif any([i in token.text for i in open_brackets]):
+                    next_token = token.nbor(1)
+                    if next_token.text in closed_brackets:
+                        span = Span(self.doc, token.i, next_token.i + 1)
+                        # prev_span = span.text
+                        yield span
+
             except IndexError: #skip end of sentence
                 pass
 
 
     def collapse_noun_phrases_by_syntax(self):
+        allowed_conjunction_dep = [prep]
         for token in self.sentence:
             if token.pos in [NOUN ,PROPN]:
                 extended = self.get_extended_token(token)
                 if extended.text != token.text:
                     yield extended
                 siblings = list(token.head.children)
-                last_sibling = token
+                span_range = [token.i, token.i]
                 for sibling in siblings:
-                    if sibling.i > token.i and sibling.dep == token.dep:
-                        last_sibling = sibling
-                if last_sibling != token:
-                    span = Span(self.doc, token.i, last_sibling.i + 1)
+                    if sibling.dep == token.dep:# or sibling.dep in allowed_conjunction_dep:
+                        if sibling.i > token.i:
+                            span_range[1]= sibling.i
+                        elif sibling.i < token.i:
+                            span_range[0] = sibling.i
+
+                if span_range != [token.i, token.i]:
+                    span = Span(self.doc, span_range[0], span_range[1] + 1)
                     yield span
 
 
-    def analyse(self):
+    def analyse(self, merge_with_syntax = True,verbose = False):
         '''extract concepts'''
 
-        '''collapse noun phrases separated just with punctation'''
+        '''collapse noun phrases based on syntax tree'''
         noun_phrases = list(self.collapse_noun_phrases_by_punctation())
         for np in noun_phrases:
             np.merge()
-        '''collapse noun phrases based on syntax tree'''
         noun_phrases = list(self.collapse_noun_phrases_by_syntax())
-        for np in noun_phrases:
-            np.merge()
-        self.print_syntax_list()
-        self.print_syntax_tree()
+        if merge_with_syntax:
+            for np in noun_phrases:
+                np.merge()
+        if verbose:
+            self.print_syntax_list()
+            self.print_syntax_tree()
 
 
         self.concepts = []
@@ -1169,7 +1257,7 @@ class SentenceAnalysisSpacy(object):
                                                     subject=any_subject.text,
                                                     object=do.text,
                                                     verb=verb_text,
-                                                    verb_path = verb_path,
+                                                    verb_path = [i.text for i in verb_path],
                                                     verb_subtree = self.doc[v.left_edge.i : v.right_edge.i + 1].text,
                                                     subj_ver= '%s -> %s' %(any_subject.text, verb_text),
                                                     ver_obj =  '%s -> %s' %(verb_text, do.text),
@@ -1178,9 +1266,9 @@ class SentenceAnalysisSpacy(object):
                                                               self.isNegated(do)
                             ))
         self.noun_phrases=list(set(noun_phrases))
-        self.logger.info(self.noun_phrases)
-        for c in self.concepts:
-            self.logger.info(c['concept'])
+        # self.logger.info(self.noun_phrases)
+        # for c in self.concepts:
+        #     self.logger.info(c['concept'])
 
 
     def __str__(self):
