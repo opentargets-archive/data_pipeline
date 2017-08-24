@@ -460,7 +460,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                     gene_data.load_json(
                         self.lookup_data.available_genes.get_gene(target,
                                                                   self.r_server))
-                except KeyError, e:
+                except KeyError as e:
                     self.logger.debug('Cannot find gene code "%s" '
                                       'in lookup table' % target)
                     self.logger.exception(e)
@@ -477,8 +477,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                     score.set_hpa_data(hpa_data)
 
                 except KeyError:
-                    self.logger.error('hpa code %s was not found in hpa',
-                                      target)
+                    pass
 
                 except Exception as e:
                     self.logger.exception(e)
@@ -488,7 +487,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                     disease_data.load_json(
                         self.lookup_data.available_efos.get_efo(disease, self.r_server))
 
-                except KeyError, e:
+                except KeyError as e:
                     self.logger.debug('Cannot find EFO code "%s" '
                                       'in lookup table' % disease)
                     self.logger.exception(e)
