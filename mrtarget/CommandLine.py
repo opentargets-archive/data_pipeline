@@ -28,6 +28,7 @@ from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.modules.G2P import G2PActions, G2P
+from mrtarget.modules.GE import GenomicsEnglandActions, GE
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 
@@ -90,6 +91,8 @@ def main():
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
+    parser.add_argument("--gel", dest='gel', help="update genomics england data",
+                        action="append_const", const = GenomicsEnglandActions.ALL)
     parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
                         action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
     parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
@@ -247,6 +250,13 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
+
+        if args.gel or run_full_pipeline:
+            do_all = (GenomicsEnglandActions.ALL in args.gel) or run_full_pipeline
+            if (GenomicsEnglandActions.GENERATE_EVIDENCE in args.gel) or do_all:
+                logger.warning("GenomicsEnglandActions...")
+                GE(es=connectors.es, r_server=connectors.r_server).process_all()
+
         if args.lit or run_full_pipeline:
             if LiteratureActions.FETCH in args.lit :
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.input_file)

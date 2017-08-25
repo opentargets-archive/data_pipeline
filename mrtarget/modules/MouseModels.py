@@ -594,6 +594,7 @@ class Phenodigm():
                                                     if self.hashkeys[hashkey].unique_association_fields['score'] > evidenceString.unique_association_fields['score']:
                                                         self.hashkeys[hashkey] = evidenceString
                                         else:
+
                                             self._logger.error("Unable to incorpate this strain for this disease: {0}".format(disease_id))
                                             self._logger.error("No disease id {0}".format(disease_term_uris == None))
                                             self._logger.error("model_to_disease_score in mouse_model2disease: {0}".format( 'model_to_disease_score' in mouse_model2disease) )    
