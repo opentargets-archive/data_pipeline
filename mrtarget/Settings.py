@@ -9,7 +9,6 @@ from envparse import env, ConfigurationError
 import mrtarget
 import petl
 import multiprocessing as mp
-import tempfile
 import logging
 
 from mrtarget.common import URLZSource
@@ -25,17 +24,17 @@ def from_expression_to_map(filename):
         agg['tissues'] = ('tissue_name','tissue_id'), dict
         t = petl.fromcsv(URLZSource(filename),delimiter='|')
         t_agg = petl.aggregate(t, key=['organ_name','organ_id'], aggregation=agg)
-        
+
         ret['organ'] = dict(t_agg.cut('organ_name','organ_id').data().tol())
         ret['tissue'] = {}
-        
+
         for e in t_agg.cut('tissues').data():
             ret['tissue'].update(e[0])
-    
+
     except Exception:
         logger.error('impossible to generate the inverse mapping dict for uberon'
                      ' mapping file so either the url or content is not correct')
-        
+
     finally:
         return ret
 
@@ -133,12 +132,12 @@ def read_option(option, cast=None, ini=ini, section='dev',
 
 def update_schema_version(config, schema_version_string):
     config.EVIDENCEVALIDATION_SCHEMA = schema_version_string
-    for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS.iterkeys():
+    for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS:
         config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
                                                               schema_version_string)
 
 
-class Config():  
+class Config():
     EV_LIMIT = read_option('CTTV_EV_LIMIT', cast=bool, default=False)
     MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
@@ -162,7 +161,7 @@ class Config():
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
-    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='17.06')
+    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='')
 
     # [elasticsearch]
 
@@ -181,6 +180,8 @@ class Config():
     # )
 
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
+                                      default=[])
+    ELASTICSEARCH_NODES_PUB = read_option('ELASTICSEARCH_NODES_PUB', cast=list,
                                       default=[])
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
@@ -237,6 +238,7 @@ class Config():
     }
 
     OMIM_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/xref_mappings/omim_to_efo.txt'
+    ZOOMA_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/zooma/cttv_indications_3.txt'
 
     # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
@@ -345,10 +347,13 @@ class Config():
                                                          cttv007 = 'cancer_gene_census',
                                                          cttv025 = 'europepmc',
                                                          cttv005 = 'rare2common',
-                                                         cttv010 = 'expression_atlas'
+                                                         cttv010 = 'expression_atlas',
+                                                         cttv026 = 'phewas_catalog',
+                                                         cttv027 = '23andme'
+
                                                 )
 
-    DATASOURCE_TO_DATATYPE_MAPPING = defaultdict(lambda: "other")
+    DATASOURCE_TO_DATATYPE_MAPPING = {}
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
@@ -362,6 +367,9 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['phewascatalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['23andme'] = 'genetic_association'
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
@@ -386,9 +394,8 @@ class Config():
 
     TEMP_DIR = os.path.sep + 'tmp'
 
-    REDISLITE_DB_PATH = os.path.join(TEMP_DIR, 'opentargets_redislite.rdb')
-    
-    # 
+    REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
+                                   cast=bool, default=False)
     REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
         read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
 

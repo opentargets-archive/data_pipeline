@@ -31,11 +31,11 @@ jobs:
       - run:
           name: Dry run to check imports
           command: |
-            mrtarget --dry-run
+            mrtarget --dry-run citest
       - run:
           name: Run Scoring tests
           command: |
-            pytest tests/test_score.py
+            pytest tests/
   # uncomment this to use workflows (see below)
   # push_containers:
   #   working_directory: /usr/src/app

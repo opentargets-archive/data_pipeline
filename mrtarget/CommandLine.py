@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 import logging
 import sys
@@ -27,10 +28,9 @@ from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.modules.G2P import G2PActions, G2P
+from mrtarget.modules.GE import GenomicsEnglandActions, GE
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
-
-connectors = None
 
 def load_nlp_corpora():
     '''load here all the corpora needed by nlp steps'''
@@ -39,12 +39,15 @@ def load_nlp_corpora():
 
 
 def main():
-    
+
     logging.config.fileConfig(file_or_resource('logging.ini'),
                               disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
+    parser.add_argument('release_tag', nargs='?', default=Config.RELEASE_VERSION,
+                        help='The prefix to prepend default: %s' % \
+                        Config.RELEASE_VERSION)
     parser.add_argument("--all", dest='all', help="run the full pipeline (at your own risk)",
                         action="append_const", const = Actions.ALL)
     parser.add_argument("--hpa", dest='hpa', help="download human protein atlas data, process it and upload it to elasticsearch",
@@ -77,8 +80,9 @@ def main():
                         action="append_const", const = SearchObjectActions.PROCESS)
     parser.add_argument("--ddr", dest='ddr', help="precompute data driven t2t and d2d relations",
                         action="append_const", const=DataDrivenRelationActions.PROCESS)
-    parser.add_argument("--persist-redis", dest='redispersist', help="use a fresh redislite db",
-                        action='store_true', default=True)
+    parser.add_argument("--persist-redis", dest='redispersist',
+                        help="the temporary file wont be deleted if True default: False",
+                        action='store_true', default=False)
     parser.add_argument("--musu", dest='mus', help="update mouse model data",
                         action="append_const", const = MouseModelsActions.UPDATE_CACHE)
     parser.add_argument("--musg", dest='mus', help="update mus musculus and home sapiens gene list",
@@ -87,6 +91,8 @@ def main():
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
+    parser.add_argument("--gel", dest='gel', help="update genomics england data",
+                        action="append_const", const = GenomicsEnglandActions.ALL)
     parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
                         action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
     parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
@@ -116,6 +122,14 @@ def main():
                         action='append', default=[])
     parser.add_argument("--targets", dest='targets', help="just process data for this target. Does not work with all the steps!!",
                         action='append', default=[])
+    parser.add_argument("--redis-remote", dest='redis_remote', help="connect to a remote redis",
+                        action='store_true', default=False)
+    parser.add_argument("--redis-host", dest='redis_host',
+                        help="redis host",
+                        action='store', default='')
+    parser.add_argument("--redis-port", dest='redis_port',
+                        help="redis port",
+                        action='store', default='')
     parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
                         action='store_true', default=False)
     parser.add_argument("--increment", dest='increment',
@@ -139,7 +153,28 @@ def main():
 
     args = parser.parse_args()
 
+    if not args.release_tag and not args.do_nothing:
+        logger.error('A [release-tag] has to be specified.')
+        print('A [release-tag] has to be specified.', file=sys.stderr)
+        return 1
+    else:
+        Config.RELEASE_VERSION = args.release_tag
+
     targets = args.targets
+
+    if args.redis_remote:
+        Config.REDISLITE_REMOTE = args.redis_remote
+
+    if args.redis_host:
+        Config.REDISLITE_DB_HOST = args.redis_host
+
+    if args.redis_port:
+        Config.REDISLITE_DB_PORT = args.redis_port
+
+    logger.debug('redis remote %s and host %s port %s',
+                 str(Config.REDISLITE_REMOTE),
+                 Config.REDISLITE_DB_HOST,
+                 Config.REDISLITE_DB_PORT)
 
     connectors = PipelineConnectors()
 
@@ -152,12 +187,15 @@ def main():
             root_logger.exception(e)
 
     if args.do_nothing:
-        sys.exit("Exiting. I pity the fool that tells me to 'do nothing'")
+        print("Exiting. I pity the fool that tells me to 'do nothing'",
+              file=sys.stdout)
+        return 0
 
-    logger.info('Attempting to establish connection to the backend...')
-    db_connected = connectors.init_services_connections(redispersist=args.redispersist)
+    connected = connectors.init_services_connections(redispersist=args.redispersist,
+                                                     publication_es=args.inject_literature or args.lit)
 
-
+    logger.debug('Attempting to establish connection to the backend... %s',
+                 str(connected))
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
@@ -168,11 +206,11 @@ def main():
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
                 dry_run = args.dry_run) as loader:
         run_full_pipeline = False
-        
+
         # get the schema version and change all needed resources
         update_schema_version(Config,args.schema_version)
         logger.info('setting schema version string to %s', args.schema_version)
-        
+
         if args.all and (Actions.ALL in args.all):
             run_full_pipeline = True
         if args.hpa or run_full_pipeline:
@@ -212,6 +250,13 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
+
+        if args.gel or run_full_pipeline:
+            do_all = (GenomicsEnglandActions.ALL in args.gel) or run_full_pipeline
+            if (GenomicsEnglandActions.GENERATE_EVIDENCE in args.gel) or do_all:
+                logger.warning("GenomicsEnglandActions...")
+                GE(es=connectors.es, r_server=connectors.r_server).process_all()
+
         if args.lit or run_full_pipeline:
             if LiteratureActions.FETCH in args.lit :
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.input_file)
@@ -246,7 +291,9 @@ def main():
         if args.evs or run_full_pipeline:
             do_all = (EvidenceStringActions.ALL in args.evs) or run_full_pipeline
             if (EvidenceStringActions.PROCESS in args.evs) or do_all:
-                targets = EvidenceStringProcess(connectors.es, connectors.r_server).process_all(datasources = args.datasource,
+                targets = EvidenceStringProcess(connectors.es,
+                                                connectors.r_server,
+                                                es_pub=connectors.es_pub).process_all(datasources = args.datasource,
                                                                           dry_run=args.dry_run,inject_literature=args.inject_literature)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
@@ -272,13 +319,12 @@ def main():
             if (DumpActions.DUMP in args.dump) or do_all:
                 DumpGenerator().dump()
 
+    logger.debug('close connectors')
     connectors.close()
 
+    logger.info('it was correctly executed - finished')
+    return 0
 
-@atexit.register
-def shutdown_connections():
-    if connectors:
-        connectors.close()
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

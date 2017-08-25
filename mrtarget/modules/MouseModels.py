@@ -1,6 +1,9 @@
 import requests
 import httplib
-from tqdm import tqdm
+import time
+import optparse
+from tqdm import tqdm 
+from mrtarget.common import TqdmToLogger
 import logging
 import os
 import json
@@ -57,6 +60,7 @@ class Phenodigm():
         self.diseases = {}
         self.hashkeys = {}
         self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
     def get_omim_to_efo_mappings(self):
         self._logger.info("OMIM to EFO parsing - requesting from URL %s" % Config.OMIM_TO_EFO_MAP_URL)
@@ -622,6 +626,7 @@ class Phenodigm():
                                                     if self.hashkeys[hashkey].unique_association_fields['score'] > evidenceString.unique_association_fields['score']:
                                                         self.hashkeys[hashkey] = evidenceString
                                         else:
+
                                             self._logger.error("Unable to incorpate this strain for this disease: {0}".format(disease_id))
                                             self._logger.error("No disease id {0}".format(disease_term_uris == None))
                                             self._logger.error("model_to_disease_score in mouse_model2disease: {0}".format( 'model_to_disease_score' in mouse_model2disease) )    
@@ -655,7 +660,8 @@ class Phenodigm():
 
         bar = tqdm(desc='Generate PhenoDigm evidence strings',
                    total=8,
-                   unit='steps')
+                   unit='steps',
+                   file=tqdm_out)
 
         self._logger.info("Load MP classes")
         self.mp.load_mp_classes()
