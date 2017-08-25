@@ -1,4 +1,4 @@
-import sys
+import requests
 import httplib
 import time
 import optparse
@@ -25,7 +25,7 @@ import opentargets.model.evidence.core as evidence_core
 import opentargets.model.evidence.association_score as association_score
 
 
-__copyright__ = "Copyright 2014-2017, The Centre for Therapeutic Target Validation (CTTV)"
+__copyright__ = "Copyright 2014-2017, Open Targets"
 __credits__ = ["Gautier Koscielny", "Damian Smedley"]
 __license__ = "Apache 2.0"
 __version__ = "1.2.6"
@@ -50,7 +50,7 @@ class Phenodigm():
         self.counter = 0
         self.mmGenes = {}
         self.hsGenes = {}
-        self.OMIMmap = {}
+        self.omim_to_efo_map = dict()
         self.hgnc2mgis = {}
         self.symbol2hgncids = {}
         self.mgi2mouse_models = {}
@@ -62,6 +62,21 @@ class Phenodigm():
         self._logger = logging.getLogger(__name__)
         tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
+    def get_omim_to_efo_mappings(self):
+        self._logger.info("OMIM to EFO parsing - requesting from URL %s" % Config.OMIM_TO_EFO_MAP_URL)
+        response = requests.get(Config.OMIM_TO_EFO_MAP_URL)
+        self._logger.info("OMIM to EFO parsing - response code %s" % response.code)
+        lines = response.readlines()
+
+        for line in lines:
+            '''
+            omim	efo_uri	efo_label	source	status
+
+            '''
+            (omim, efo_uri, efo_label, source, status) = line.split("\t")
+            if omim not in self.omim_to_efo_map:
+                self.omim_to_efo_map[omim] = []
+            self.omim_to_efo_map[omim].append({'efo_uri': efo_uri, 'efo_label': efo_label})
 
     def list_files(self, path):
         '''
@@ -129,8 +144,11 @@ class Phenodigm():
         mm_buffer = []
         hs_buffer = []
 
-        parts = self.list_files(Config.MOUSEMODELS_CACHE_DIRECTORY)
-        parts.sort()
+        #parts = self.list_files(Config.MOUSEMODELS_CACHE_DIRECTORY)
+        #parts.sort()
+        parts = list()
+        parts.append(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "all_types.json"))
+        #parts.append(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "disease_model_association.json"))
         tick = 0
         for part in parts:
             self._logger.info("processing {0}\n".format(part))
@@ -208,8 +226,10 @@ class Phenodigm():
             self._logger.info("mm {0} {1}".format(marker_symbol, ensemblId))
 
     def parse_phenodigm_files(self):
-        parts = self.list_files(Config.MOUSEMODELS_CACHE_DIRECTORY)
-        parts.sort()
+        #parts = self.list_files(Config.MOUSEMODELS_CACHE_DIRECTORY)
+        #parts.sort()
+        parts = list()
+        parts.append(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "all_types.json"))
         parts.append(os.path.join(Config.MOUSEMODELS_CACHE_DIRECTORY, "disease_model_association.json"))
         for part in parts:
             self._logger.info("Processing PhenoDigm chunk {0}".format(part))
@@ -273,7 +293,7 @@ class Phenodigm():
                     #    sys.exit(1)
             myfile.close()    
 
-    def generate_phenodigm_evidence_strings(self):
+    def generate_phenodigm_evidence_strings(self, upper_limit=0):
         '''
          Once you have retrieved all the genes,and mouse models   
          Create an evidence string for every gene to disease relationship
@@ -286,7 +306,11 @@ class Phenodigm():
             hgnc_gene_id = self.symbol2hgncids[hs_symbol]
             hs_ensembl_gene_id = self.hsGenes[hs_symbol]
 
-
+            '''
+            Useful if you want to test on a subset of the data
+            '''
+            if upper_limit > 0 and len(self.hashkeys) > upper_limit:
+                break
 
             if hgnc_gene_id and hs_ensembl_gene_id and re.match('^ENSG.*', hs_ensembl_gene_id) and hgnc_gene_id in self.hgnc2mgis:
 
@@ -345,51 +369,55 @@ class Phenodigm():
                                             hp_matched_terms = mouse_model2disease['hp_matched_terms']
                                         '''
                                          Check if there are any MP terms
+                                         There is a bug in the current PhenoDigm.
+                                        
                                         '''
-                                        mp_matched_terms = None
-                                        if 'mp_matched_terms' in mouse_model2disease:
-                                            mp_matched_terms = mouse_model2disease['mp_matched_terms']
+                                        mp_matched_ids = None
+                                        if 'mp_matched_ids' in mouse_model2disease:
+                                            mp_matched_ids = mouse_model2disease['mp_matched_ids']
                                         '''
                                          Retrieve the disease document
                                         '''
                                         disease = None
                                         if disease_id in self.diseases:
                                             disease = self.diseases[disease_id]
-                                        self._logger.info("disease: {0}".format(disease_id))
+                                            self._logger.info("\t\t\tdisease: %s %s"%(disease_id, disease['disease_term']))
+                                        else:
+                                            self._logger.info("\t\t\tdisease: %s"%(disease_id))
                                         
                                         '''
                                         Map the disease ID to EFO
                                         Can be a one to many mapping
                                         '''
-                                        disease_term_uris = None
+                                        disease_terms = list()
+
                                         diseaseName = None
                                         if not disease_id in efoMapping:
                                             # find corresponding EFO disease term
                                             matchOMIM = re.match("^OMIM:(.+)$", disease_id)
                                             matchORPHANET = re.match("^ORPHANET:(.+)$", disease_id)
                                             if matchOMIM:
-                                                continue
-                                                terms = []
-                                                if disease_id in self.OMIMmap:
-                                                    terms = self.OMIMmap[disease_id]
-                                                if len(terms) > 0:
-                                                    for efo_uri in terms:
-                                                        if efo_uri in self.efo.current_classes:
-                                                            self._logger.info("{0} => {1} {2}".format(disease_id, efo_uri, self.efo.current_classes[efo_uri]))
-                                                        else:
-                                                            self._logger.info("{0} => {1} (no EFO mapping)".format(disease_id, efo_uri))
-                                                    disease_term_uris = terms
-                                                    efoMapping[disease_id] = terms
+                                                (source, omim_id) = disease_id.split(':')
+                                                self._logger.info("\t\t\tCheck OMIM id = %s is in efo"%omim_id)
+                                                if omim_id in self.omim_to_efo_map:
+                                                    efoMapping[disease_id] = self.omim_to_efo_map[omim_id]
+                                                if len(disease_terms) > 0:
+                                                    #for disease_term in disease_terms:
+                                                    #    if disease_term['efo_uri'] in self.efo.current_classes:
+                                                    #        self._logger.info("{0} => {1} {2}".format(disease_id, disease_term['efo_uri'], self.efo.current_classes[disease_term['efo_uri']]))
+                                                    #    else:
+                                                    #        self._logger.info("{0} => {1} (no EFO mapping)".format(disease_id, disease_term['efo_uri']))
+                                                    disease_terms = efoMapping[disease_id]
                                                         
                                             elif matchORPHANET:
                                                     suffix = matchORPHANET.groups()[0]
                                                     orphanetId = "Orphanet:{0}".format(suffix)
                                                     orphanet_uri = "http://www.orpha.net/ORDO/Orphanet_{0}".format(suffix)
                                                     if orphanet_uri in self.efo.current_classes:
-                                                        efoMapping[disease_id] = [ orphanet_uri ]
-                                                        disease_term_uris = [ orphanet_uri ]
+                                                        efoMapping[disease_id] = [ {'efo_uri': orphanet_uri, 'efo_label': self.diseases[disease_id]['disease_term'] } ]
+                                                        disease_terms = efoMapping[disease_id]
                                         else:
-                                            disease_term_uris = efoMapping[disease_id]
+                                            disease_terms = efoMapping[disease_id]
                                             
                                         '''
                                         OK, we have a disease mapped to EFO
@@ -399,10 +427,10 @@ class Phenodigm():
                                         If the score >= 0.5 or in_locus for the same disease
                                         and mouse_model2disease['model_to_disease_score'] >= 50
                                         '''
-                                        if disease_term_uris is not None and (('model_to_disease_score' in mouse_model2disease ) or
+                                        if disease_terms is not None and (('model_to_disease_score' in mouse_model2disease ) or
                                             (disease_id in self.disease_gene_locus and hgnc_gene_id in self.disease_gene_locus[disease_id] and marker_symbol in self.disease_gene_locus[disease_id][hgnc_gene_id])):
 
-                                            for disease_uri in disease_term_uris:
+                                            for disease_term in disease_terms:
 
                                                 '''
                                                 Create a new evidence string
@@ -434,13 +462,14 @@ class Phenodigm():
                                                 '''
                                                 Disease
                                                 '''
-                                                name = 'TEST'
-                                                if disease_uri in self.efo.current_classes:
-                                                    name = self.efo.current_classes[disease_uri]
-
+                                                name = 'N/A'
+                                                if disease_term['efo_uri'] in self.efo.current_classes:
+                                                    name = self.efo.current_classes[disease_term['efo_uri']]
+                                                self._logger.info("Disease id is %s"%(disease_term['efo_uri']))
                                                 evidenceString.disease = bioentity.Disease(
-                                                    id = disease_uri,
-                                                    name=name
+                                                    id=disease_term['efo_uri'],
+                                                    name=name,
+                                                    source_name=self.diseases[disease_id]['disease_term']
                                                     )
 
                                                 '''
@@ -454,7 +483,7 @@ class Phenodigm():
                                                     #evidenceString.evidence.evidence_codes.append("http://identifiers.org/eco/ECO:0000057")
                                                     evidenceString.unique_association_fields['predictionModel'] = 'impc_predicted'
 
-                                                evidenceString.unique_association_fields['disease'] = disease_uri
+                                                evidenceString.unique_association_fields['disease'] = disease_term
                                                 evidenceString.unique_association_fields['targetId'] = "http://identifiers.org/ensembl/{0}".format(hs_ensembl_gene_id)
 
                                                 '''
@@ -463,7 +492,7 @@ class Phenodigm():
                                                 '''
                                                 evidenceString.evidence.orthologs = evidence_phenotype.Orthologs(
                                                     evidence_codes = ["http://identifiers.org/eco/ECO:0000265"],
-                                                    provenance_type= evidence_core.BaseProvenance_Type(database=evidence_core.BaseDatabase(id="MGI", version="2015")),
+                                                    provenance_type= evidence_core.BaseProvenance_Type(database=evidence_core.BaseDatabase(id="MGI", version="2016")),
                                                     resource_score= association_score.Pvalue(type="pvalue", method= association_score.Method(description ="orthology from MGI"), value=0.0),
                                                     date_asserted= now.isoformat(),
                                                     human_gene_id = "http://identifiers.org/ensembl/{0}".format(hs_ensembl_gene_id),
@@ -530,10 +559,13 @@ class Phenodigm():
                                                                 label = term_name
                                                                 )
                                                             )
-                                                ''' get all matched mouse phenotypes '''
+                                                ''' 
+                                                get all matched mouse phenotypes
+                                                Format is: 
+                                                '''
                                                 mouse_phenotypes = []
-                                                if mp_matched_terms:
-                                                    for mp in mp_matched_terms:
+                                                if mp_matched_ids:
+                                                    for mp in mp_matched_ids:
                                                         term_id = "http://purl.obolibrary.org/obo/" + mp.replace(":", "_")
                                                         term_name = None
                                                         if term_id in self.mp.current_classes:
@@ -571,9 +603,9 @@ class Phenodigm():
                                                 evidenceString.unique_association_fields['score'] = score
 
                                                 evidenceString.evidence.disease_model_association = evidence_phenotype.Disease_Model_Association(
-                                                    disease_id = disease_uri,
+                                                    disease_id = disease_term['efo_uri'],
                                                     model_id = "{0}".format(mouse_model['model_id']),
-                                                    provenance_type= evidence_core.BaseProvenance_Type(database=evidence_core.BaseDatabase(id="PhenoDigm", version="June 2015")),
+                                                    provenance_type= evidence_core.BaseProvenance_Type(database=evidence_core.BaseDatabase(id="PhenoDigm", version="June 2016")),
                                                     evidence_codes = ["http://identifiers.org/eco/ECO:0000057"],
                                                     resource_score= association_score.Summed_Total(type = "summed_total", method = association_score.Method(description = method), value = score),
                                                     date_asserted= now.isoformat(),
@@ -590,7 +622,7 @@ class Phenodigm():
                                                 if not hashkey in self.hashkeys:
                                                     self.hashkeys[hashkey] = evidenceString
                                                 else:
-                                                    self._logger.warn("Doc {0} - Duplicated mouse model {1} to disease {2} URI: {3}".format(mouse_model2disease['id'],model_id, disease_id, disease_uri))
+                                                    self._logger.warn("Doc {0} - Duplicated mouse model {1} to disease {2} URI: {3}".format(mouse_model2disease['id'],model_id, disease_id, disease_term))
                                                     if self.hashkeys[hashkey].unique_association_fields['score'] > evidenceString.unique_association_fields['score']:
                                                         self.hashkeys[hashkey] = evidenceString
                                         else:
@@ -603,11 +635,12 @@ class Phenodigm():
                                             self._logger.error("marker_symbol in disease_gene_locus[disease_id][hgnc_gene_id]): {0}".format(disease_term_uris is not None and disease_id in self.disease_gene_locus and marker_symbol in self.disease_gene_locus[disease_id][hgnc_gene_id]))
 
     def write_phenodigm_evidence_strings(self, path):
-        cttvFile = open(path + "/otar_external_mousemodels.json", "w")
+        cttvFile = open(os.path.join(path, "phenodigm.json"), "wb")
         #cttvFile.write("[\n")
         countExported = 0
+        self._logger.info("Processing %i records" % (len(self.hashkeys)))
         for hashkey in self.hashkeys:
-            self._logger("Processing key %s"%(hashkey))
+            self._logger.info("Processing key %s"%(hashkey))
             evidenceString = self.hashkeys[hashkey]
             
             error = evidenceString.validate(self._logger)
@@ -640,13 +673,13 @@ class Phenodigm():
         self.efo.load_efo_classes()
         bar.update()
         self._logger.info("Get all OMIM x-refs")
-        self.OMIMmap = self.efo.load_efo_omim_xrefs()
+        self.get_omim_to_efo_mappings()
 
-        self.OMIMmap["OMIM:191390"] = ["http://www.ebi.ac.uk/efo/EFO_0003767"]
-        self.OMIMmap["OMIM:266600"] = ["http://www.ebi.ac.uk/efo/EFO_0003767"]
-        self.OMIMmap["OMIM:612278"] = ["http://www.ebi.ac.uk/efo/EFO_0003767"]
-        self.OMIMmap["OMIM:608049"] = ["http://www.ebi.ac.uk/efo/EFO_0003756"]
-        self.OMIMmap["OMIM:300494"] = ["http://www.ebi.ac.uk/efo/EFO_0003757"]
+        #self.omim_to_efo_map["OMIM:191390"] = ["http://www.ebi.ac.uk/efo/EFO_0003767"]
+        #self.omim_to_efo_map["OMIM:266600"] = ["http://www.ebi.ac.uk/efo/EFO_0003767"]
+        #self.omim_to_efo_map["OMIM:612278"] = ["http://www.ebi.ac.uk/efo/EFO_0003767"]
+        #self.omim_to_efo_map["OMIM:608049"] = ["http://www.ebi.ac.uk/efo/EFO_0003756"]
+        #self.omim_to_efo_map["OMIM:300494"] = ["http://www.ebi.ac.uk/efo/EFO_0003757"]
         bar.update()
         self._logger.info("Load all mouse and human")
         self.load_mouse_genes(Config.MOUSEMODELS_CACHE_DIRECTORY)
