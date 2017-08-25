@@ -145,7 +145,27 @@ docker run -d --name mrtarget_master \
 ```
 
 
-### Package developers
+## Environment variables and howto use them
+
+Here the list to change, enable or disable functionality:
+
+* `CTTV_EV_LIMIT` string `true` to enable otherwise `false` or delete (WIP)
+* `CTTV_MINIMAL` string `true` to enable otherwise `false` or delete
+* `CTTV_DATA_VERSION` indexes prefix a name to enable otherwise `17.04`
+* `CTTV_EL_LOADER` the name of the section of the ES config file db.ini default `dev`
+* `ELASTICSEARCH_NODES` default is `['http://127.0.0.1:9200']`
+* `CTTV_WORKERS_NUMBER` is an number and by default is `multiprocessing.cpu_count()`
+* `CTTV_DUMP_FOLDER` is a string of a writable path and by default is `tempfile.gettempdir()`
+* `DUMP_REMOTE_API_URL` a string and by default is `http://beta.opentargets.io`
+* `DUMP_REMOTE_API_PORT` a number and by default is `80`
+* `DUMP_REMOTE_API_SECRET` a string and by default is `None`
+* `DUMP_REMOTE_API_APPNAME` a string and by default is `None`
+* `CTTV_DRY_RUN_OUTPUT` string `true` to enable otherwise is `false` by default
+* `CTTV_DRY_RUN_OUTPUT_DELETE` string `true` to enable otherwise is `false` by fefault
+* `CTTV_DRY_RUN_OUTPUT_COUNT` number `1000` by default
+* `CTTV_ES_CUSTOM_IDXS` `true` to enable it and by default is `false`
+
+## Contributing
 
 Here the recipe to start coding on it:
 
@@ -173,37 +193,14 @@ To skip running tests in the CI when pushing append `[skip ci]` to the commit me
 The elasticsearch guide can be very useful: https://www.elastic.co/guide/en/elasticsearch/guide/2.x/getting-started.html
 The important bits to run/understand the data pipeline are the `getting started`, `search in depth`, `aggregations`, and `modeling your data`. You can probably ignore the others. 
 
+### Internal features for developers
 
-
-
-## Environment variables and howto use them
-
-Here the list to change, enable or disable functionality:
-
-* `CTTV_EV_LIMIT` string `true` to enable otherwise `false` or delete (WIP)
-* `CTTV_MINIMAL` string `true` to enable otherwise `false` or delete
-* `CTTV_DATA_VERSION` indexes prefix a name to enable otherwise `17.04`
-* `CTTV_EL_LOADER` the name of the section of the ES config file db.ini default `dev`
-* `ELASTICSEARCH_NODES` default is `['http://127.0.0.1:9200']`
-* `CTTV_WORKERS_NUMBER` is an number and by default is `multiprocessing.cpu_count()`
-* `CTTV_DUMP_FOLDER` is a string of a writable path and by default is `tempfile.gettempdir()`
-* `DUMP_REMOTE_API_URL` a string and by default is `http://beta.opentargets.io`
-* `DUMP_REMOTE_API_PORT` a number and by default is `80`
-* `DUMP_REMOTE_API_SECRET` a string and by default is `None`
-* `DUMP_REMOTE_API_APPNAME` a string and by default is `None`
-* `CTTV_DRY_RUN_OUTPUT` string `true` to enable otherwise is `false` by default
-* `CTTV_DRY_RUN_OUTPUT_DELETE` string `true` to enable otherwise is `false` by fefault
-* `CTTV_DRY_RUN_OUTPUT_COUNT` number `1000` by default
-* `CTTV_ES_CUSTOM_IDXS` `true` to enable it and by default is `false`
-
-## Internal features for developers
-
-### Evidence Validation (--val step) limit (WIP)
+#### Evidence Validation (--val step) limit (WIP)
 
 It will give up if too many evidences were failed under schema validation. 1000 docs will be a
 rasonable upper bound limit per launched process.
 
-### Minimal dataset
+#### Minimal dataset
 
 In case you want to run steps with a minimal dataset you should `export CTTV_MINIMAL=true`. If you want
 to regenerate used data source files:
@@ -216,15 +213,15 @@ $ bash generate_minimal_dataset.sh
 It should upload to gcloud storage and enable public link to files but you need to be logged
 in the gcloud account.
 
-### Dry-run to file
+#### Dry-run to file
 
 TBD
 
-### Custom read indexes
+#### Custom read indexes
 
 TBD
 
-### Redislite and/or remote redis
+#### Redislite and/or remote redis
 
 --redis-remote 'enable remote'
 --redis-host 'by example 127.0.0.1'
