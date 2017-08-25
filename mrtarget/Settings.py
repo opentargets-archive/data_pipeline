@@ -311,18 +311,12 @@ class Config():
     # TODO remove refs to user directories
     MOUSEMODELS_CACHE_DIRECTORY = '/Users/otvisitor/.phenodigmcache'
 
-    # hardcoded folder of json file to be preprocessed to extract
-    # HP and MP terms not in EFO but that will be combined in a SLIM
-    ONTOLOGY_PREPROCESSING_DATASOURCES = [
-        'cttv008-14-03-2016.json.gz',
-        ''
+    # put the path to the file where you want to get the list of HP terms to be included in our ontology
+    PHENOTYPE_SLIM_INPUT_URLS = [
+        'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/eva/hpo_mappings.txt'
     ]
-
-    ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS = ["cttv008", "cttv012"]
-
-    # put the path to the file where you want to write the SLIM file (turtle format)
-    # TODO remove refs to user directories
-    ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
+    #  put the path to the file where you want to write the SLIM file (turtle format)
+    PHENOTYPE_SLIM_OUTPUT_FILE = '/tmp/opentargets_disease_phenotype_slim.ttl'
 
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
