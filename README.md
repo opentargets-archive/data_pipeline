@@ -1,4 +1,4 @@
-[![CircleCI](https://circleci.com/gh/opentargets/data_pipeline.svg?style=svg&circle-token=e368180959ed512016dbfe75ec65814e896e0aea)](https://circleci.com/gh/opentargets/data_pipeline)
+CircleCI build status: [![CircleCI](https://circleci.com/gh/opentargets/data_pipeline.svg?style=svg&circle-token=e368180959ed512016dbfe75ec65814e896e0aea)](https://circleci.com/gh/opentargets/data_pipeline)
 
 Docker containers are saved on [quay.io](https://quay.io/repository/opentargets/mrtarget?tab=tags):
 [![Docker Repository on Quay](https://quay.io/repository/opentargets/mrtarget/status?token=7cd783a9-247c-4625-ae97-e0933192b2f4 "Docker Repository on Quay")](https://quay.io/repository/opentargets/mrtarget)
@@ -7,10 +7,76 @@ and [eu.gcr.io](https://console.cloud.google.com/gcr/images/open-targets/EU/mrta
 
 ## MrT-arget
 
-Practically, all code related with the computation of the process needed to
-complete the pipeline are here refactored into a proper package.
+All code related with the computation of the process needed to
+complete the pipeline are here refactored into a python package.
+
+We are also building a container with all the python (and nonpython) 
+dependencies that allows you to run each step of the pipeline.
 
 ## Installation instructions
+
+### Useful prep
+
+#### Elasticsearch
+
+You should have an elasticsearch instance running to use the pipeline code. 
+You can run an instance locally using docker containers. You can use our ES v2.4 docker containers ([repo](https://github.com/opentargets/docker-elasticsearch-singlenode) | [![Docker Repository on Quay](https://quay.io/repository/opentargets/docker-elasticsearch-singlenode/status "Docker Repository on Quay")](https://quay.io/repository/opentargets/docker-elasticsearch-singlenode) )
+```sh
+docker run -p 9200:9200 -e NUMBER_OF_REPLICAS=0 quay.io/opentargets/docker-elasticsearch-singlenode:v2.4.1
+```
+Do take a look at the repo for other options you can pass to the container. 
+If this is anything more than a test, you will want to change the ES_HEAP, etc. 
+
+After deploying elasticsearch, you should check that you can query its API. 
+Typing `curl localhost:9200` should show something like: 
+```json
+{
+  "name": "Kenneth Crichton",
+  "cluster_name": "open-targets-dev",
+  "version": {
+    "number": "2.4",
+    "build_hash": "218bdf10790eef486ff2c41a3df5cfa32dadcfde",
+    "build_timestamp": "2016-05-17T15:40:04Z",
+    "build_snapshot": false,
+    "lucene_version": "5.5.0"
+  },
+  "tagline": "You Know, for Search"
+}
+```
+
+#### Kibana
+
+Kibana, marvel and sense are useful tools to monitor the performance of mrTarget, and to browse the output/input of the various steps.
+
+You can install kibana in a variety of ways. **Important:** your version of kibana [must be compatible](https://www.elastic.co/support/matrix#show_compatibility) with the version of ES we are using. 
+
+On mac: 
+```sh
+brew install kibana
+
+#Install the sense plugin
+kibana plugin --install elastic/sense
+#Install marvel 
+kibana plugin --install elasticsearch/marvel
+
+#start the service
+brew services start kibana
+```
+
+Using docker:
+
+For ES>5, you can use the official [docker images](https://www.elastic.co/guide/en/kibana/current/_pulling_the_image.html)
+```sh
+docker run docker.elastic.co/kibana/kibana:5.5.2 -e "ELASTICSEARCH_URL=http://localhost:9200"
+```
+
+For ES2.4:
+```sh
+docker run kibana:4.6 -e "ELASTICSEARCH_URL=http://localhost:9200"
+```
+
+Once kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
+
 
 ### Package users
 
@@ -104,7 +170,13 @@ pytest tests/test_score.py
 
 To skip running tests in the CI when pushing append `[skip ci]` to the commit message.
 
-### Environment variables and howto use them
+The elasticsearch guide can be very useful: https://www.elastic.co/guide/en/elasticsearch/guide/2.x/getting-started.html
+The important bits to run/understand the data pipeline are the `getting started`, `search in depth`, `aggregations`, and `modeling your data`. You can probably ignore the others. 
+
+
+
+
+## Environment variables and howto use them
 
 Here the list to change, enable or disable functionality:
 
