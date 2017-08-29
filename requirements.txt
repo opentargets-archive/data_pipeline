@@ -1,7 +1,7 @@
 future
 redislite
 addict==2.1.0
-argparse==1.3.0
+argparse<2.0
 dateutils==0.6.6
 decorator==3.4.2
 envparse
@@ -11,13 +11,12 @@ networkx==1.9.1
 python-dateutil==2.4.2
 pytz==2015.2
 requests>=2.11.1<3.0
-six==1.9.0
+six
 ujson==1.35
 iso8601>=0.1.11
 lxml>=3.4.4
 opentargets
 SPARQLWrapper>=1.7.6
-grequests
 paramiko==1.17.0
 pysftp==0.2.9
 jsonpickle
@@ -43,11 +42,11 @@ ftputil
 psutil
 textblob
 unidecode
-urllib3>=1.21.1<1.22
+urllib3
 coverage
 pylru
 cement==2.10.2
-git+https://github.com/opentargets/data_model.git@v1.2.6#egg=data-model
-https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.0.12.tar.gz
+# git+https://github.com/opentargets/data_model.git@v1.2.6#egg=data-model
+# https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz
 # https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
 -e .
