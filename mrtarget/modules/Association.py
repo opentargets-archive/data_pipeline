@@ -628,7 +628,7 @@ class ScoringProcess():
                               job_timeout=3600,
                               batch_size=10,
                               r_server=self.r_server,
-                              serialiser='',
+                              serialiser='jsonpickle',
                               total=len(targets))
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
                                            max_size=queue_per_worker * number_of_storers,
