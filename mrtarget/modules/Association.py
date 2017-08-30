@@ -407,6 +407,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
         self.data_cache = dict()
 
     def produce_pairs(self):
+        self.logger.debug('call to produce pairs using self.data_cache')
         for key,evidence in self.data_cache.items():
             is_direct = False
             for e in evidence:
@@ -494,8 +495,8 @@ class ScoreProducer(RedisQueueWorkerProcess):
                         hpa_data.update(
                             self.lookup_data.available_hpa.get_hpa(target,
                                                                    self.r_server))
-                    except KeyError:
-                        pass
+                    except KeyError as ke:
+                        self.logger.exception(ke)
                     except Exception as e:
                         self.logger.exception(e)
 
@@ -504,8 +505,8 @@ class ScoreProducer(RedisQueueWorkerProcess):
 
                 try:
                     score.set_hpa_data(hpa_data)
-                except KeyError:
-                    pass
+                except KeyErroras as ke:
+                    self.logger.exception(ke)
                 except Exception as e:
                     self.logger.exception(e)
 
@@ -626,7 +627,6 @@ class ScoringProcess():
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
                               max_size=number_of_workers * queue_per_worker,
                               job_timeout=3600,
-                              batch_size=10,
                               r_server=self.r_server,
                               serialiser='jsonpickle',
                               total=len(targets))
