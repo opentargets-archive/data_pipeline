@@ -305,9 +305,6 @@ class EvidenceManager():
             except:
                 evidence['evidence']['gene2variant']['provenance_type']['database']['dbxref']['version'] = ''
                 fixed = True
-        if evidence['sourceID'] == 'gwascatalog':
-            evidence['sourceID'] = 'gwas_catalog'
-            fixed = True
         '''split EVA in two datasources depending on the datatype'''
         if (evidence['sourceID'] == 'eva') and \
                 (evidence['type'] == 'somatic_mutation'):
