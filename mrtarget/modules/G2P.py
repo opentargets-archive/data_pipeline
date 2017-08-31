@@ -21,14 +21,13 @@ import csv
 __copyright__  = "Copyright 2014-2017, Open Targets"
 __credits__    = ["Gautier Koscielny", "ChuangKee Ong"]
 __license__    = "Apache 2.0"
-__version__    = "1.2.6"
+__version__    = "1.2.7"
 __maintainer__ = "ChuangKee Ong"
 __email__      = ["gautierk@targetvalidation.org", "ckong@ebi.ac.uk"]
 __status__     = "Production"
 
 G2P_FILENAME = file_or_resource('DDG2P_14_5_2017.csv.gz')
-G2P_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_gene2phenotype-16-06-2017.json'
-#G2P_EVIDENCE_FILENAME = '/Users/otvisitor/Documents/data/cttv001_gene2phenotype-16-06-2017.json'
+G2P_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_gene2phenotype-30-08-2017.json'
 
 class G2PActions(Actions):
     GENERATE_EVIDENCE = 'generateevidence'
@@ -132,7 +131,7 @@ class G2P():
 
                             obj.access_level = "public"
                             obj.sourceID = "gene2phenotype"
-                            obj.validated_against_schema_version = "1.2.6"
+                            obj.validated_against_schema_version = Config.EVIDENCEVALIDATION_SCHEMA
                             obj.unique_association_fields = {"target": ensembl_iri, "original_disease_label" : disease_name, "disease_uri": disease['efo_uri'], "source_id": "gene2phenotype"}
                             obj.target = bioentity.Target(id=ensembl_iri,
                                                           activity="http://identifiers.org/cttv.activity/unknown",
@@ -148,7 +147,7 @@ class G2P():
                             obj.evidence.is_associated = True
                             obj.evidence.evidence_codes = ["http://purl.obolibrary.org/obo/ECO_0000204"]
                             obj.evidence.provenance_type = provenance_type
-                            obj.evidence.date_asserted = '2017-06-14T00:00:00'
+                            obj.evidence.date_asserted = '2017-08-30T00:00:00'
                             obj.evidence.provenance_type = provenance_type
                             obj.evidence.resource_score = resource_score
                             linkout = evidence_linkout.Linkout(
@@ -169,19 +168,19 @@ class G2P():
             print "%i %i" % (total_efo, c)
 
     def write_evidence_strings(self, filename):
-        self.logger.info("Writing IntOGen evidence strings")
+        self._logger.info("Writing IntOGen evidence strings")
         with open(filename, 'w') as tp_file:
             n = 0
             for evidence_string in self.evidence_strings:
                 n += 1
-                self.logger.info(evidence_string.disease.id[0])
+                self._logger.info(evidence_string.disease.id[0])
                 # get max_phase_for_all_diseases
                 error = evidence_string.validate(logging)
                 if error == 0:
                     tp_file.write(evidence_string.to_JSON(indentation=None) + "\n")
                 else:
-                    self.logger.error("REPORTING ERROR %i" % n)
-                    self.logger.error(evidence_string.to_JSON(indentation=4))
+                    self._logger.error("REPORTING ERROR %i" % n)
+                    self._logger.error(evidence_string.to_JSON(indentation=4))
                     # sys.exit(1)
         tp_file.close()
 
