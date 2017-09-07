@@ -334,6 +334,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING = {}
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
     DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
