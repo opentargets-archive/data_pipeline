@@ -744,7 +744,7 @@ def get_redis_worker(base = Process):
         def _init(self):
             self.r_server = new_redis_client()
             # TODO move 1000 to a conf
-            self.lru_cache = lru.lrucache(1000)
+            self.lru_cache = lru.lrucache(10000)
             self.init()
 
         def _close(self):

@@ -338,6 +338,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
     DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['gwascatalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
