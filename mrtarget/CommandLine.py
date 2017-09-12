@@ -4,6 +4,8 @@ import logging
 import sys
 import itertools as it
 import atexit
+
+from mrtarget.common.Redis import enable_profiling
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import PipelineConnectors
@@ -31,6 +33,7 @@ from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.modules.G2P import G2PActions, G2P
+from mrtarget.modules.GE import GenomicsEnglandActions, GE
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 
@@ -140,6 +143,8 @@ def main():
                         action='store', default='')
     parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
                         action='store_true', default=False)
+    parser.add_argument("--profile", dest='profile', help="magically profiling process() per process",
+                        action='store_true', default=False)
     parser.add_argument("--increment", dest='increment',
                         help="add new evidence from a data source but does not delete existing evidence. Works only for the validation step",
                         action='store_true', default=False)
@@ -178,6 +183,8 @@ def main():
 
     if args.redis_port:
         Config.REDISLITE_DB_PORT = args.redis_port
+
+    enable_profiling(args.profile)
 
     logger.debug('redis remote %s and host %s port %s',
                  str(Config.REDISLITE_REMOTE),
@@ -270,6 +277,13 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
+
+        if args.gel or run_full_pipeline:
+            do_all = (GenomicsEnglandActions.ALL in args.gel) or run_full_pipeline
+            if (GenomicsEnglandActions.GENERATE_EVIDENCE in args.gel) or do_all:
+                logger.warning("GenomicsEnglandActions...")
+                GE(es=connectors.es, r_server=connectors.r_server).process_all()
+
         if args.lit or run_full_pipeline:
             if LiteratureActions.FETCH in args.lit :
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.input_file)

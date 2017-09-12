@@ -12,6 +12,7 @@ import opentargets.model.core as opentargets
 import logging
 import json
 import rdflib
+import requests
 from rdflib import URIRef
 from rdflib.namespace import Namespace, NamespaceManager
 from rdflib.namespace import OWL, RDF, RDFS
@@ -824,8 +825,8 @@ class PhenotypeSlim():
         self.phenotype_excluded = set()
 
         self._remote_filenames = dict()
-        self.logger = logging.getLogger(self.__class__.__name__)
-        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
+        self._logger = logging.getLogger(self.__class__.__name__)
+        tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
 
 
     def get_ontology_path(self, base_class, term):
@@ -849,7 +850,7 @@ class PhenotypeSlim():
                         n = 3
                     except SPARQLWrapper.SPARQLExceptions.EndPointNotFound, e:
                         print e
-                        self.logger.error(e)
+                        self._logger.error(e)
                         if n > 2:
                             raise e
                         else:
@@ -911,10 +912,10 @@ class PhenotypeSlim():
 
     def _store_remote_filename(self, filename):
         # print "%s" % filename
-        self.logger.debug("%s" % filename)
+        self._logger.debug("%s" % filename)
         if filename.startswith('/upload/submissions/') and \
             filename.endswith('.json.gz'):
-            self.logger.debug("%s" % filename)
+            self._logger.debug("%s" % filename)
             if True:
                 version_name = filename.split('/')[3].split('.')[0]
                 # print "%s" % filename
@@ -947,16 +948,26 @@ class PhenotypeSlim():
             #    self.logger.debug('error getting remote file%s'%filename)
 
     def _callback_not_used(self, path):
-        self.logger.debug("skipped "+path)
+        self._logger.debug("skipped " + path)
 
-    def create_phenotype_slim(self, local_files = []):
+    def create_phenotype_slim_from_selection(self):
+
+        for url in Config.PHENOTYPE_SLIM_INPUT_URLS:
+            response = requests.get(url)
+            self._logger.info("Read url %s - response code %s" % (url, response.code))
+            lines = response.readlines()
+
+            for line in lines:
+                self._logger.info(line.rstrip())
+
+    def create_phenotype_slim_from_evidence(self, local_files = []):
 
         self.load_all_phenotypes()
 
         if local_files:
 
             for file_path in local_files:
-                self.logger.info("Parsing file %s" % (file_path))
+                self._logger.info("Parsing file %s" % (file_path))
                 file_size, file_mod_time = os.path.getsize(file_path), os.path.getmtime(file_path)
                 with open(file_path, mode='rb') as f:
                     self.parse_gzipfile(filename=file_path, mode='rb', fileobj=f, mtime=file_mod_time)
@@ -968,7 +979,7 @@ class PhenotypeSlim():
                              leave=False):
                 try:
                     p = Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[u]
-                    self.logger.info("%s %s"%(u, p))
+                    self._logger.info("%s %s" % (u, p))
                     cnopts = pysftp.CnOpts()
                     cnopts.hostkeys = None  # disable host key checking.
                     with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
@@ -985,10 +996,10 @@ class PhenotypeSlim():
                                                           leave=False,):
                             latest_file = file_data['file_path']
                             file_version = file_data['file_version']
-                            self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
+                            self._logger.info("found latest file %s for datasource %s" % (latest_file, datasource))
                             self.parse_gzipfile(latest_file, u, p)
                 except AuthenticationException:
-                    self.logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
+                    self._logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
 
         for uri, p in self.phenotype_map.iteritems():
             logger.debug(uri)
@@ -1001,7 +1012,7 @@ class PhenotypeSlim():
                            fileobj=fileobj,
                            mtime=mtime) as fh:
 
-            self.logger.info('Starting parsing %s' % filename)
+            self._logger.info('Starting parsing %s' % filename)
 
             line_buffer = []
             offset = 0
@@ -1042,7 +1053,7 @@ class PhenotypeSlim():
 
     def parse_sftp_gzipfile(self, file_path, u, p):
         # print "---->%s"%file_path
-        self.logger.info("%s %s" % (u, p))
+        self._logger.info("%s %s" % (u, p))
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None  # disable host key checking.
         with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],

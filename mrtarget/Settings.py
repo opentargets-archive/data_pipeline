@@ -16,29 +16,6 @@ from mrtarget.common import URLZSource
 logger = logging.getLogger(__name__)
 
 
-def from_expression_to_map(filename):
-    '''return a dict with 2 dicts and organ and tissue called as said'''
-    ret = {}
-    try:
-        agg = {}
-        agg['tissues'] = ('tissue_name','tissue_id'), dict
-        t = petl.fromcsv(URLZSource(filename),delimiter='|')
-        t_agg = petl.aggregate(t, key=['organ_name','organ_id'], aggregation=agg)
-
-        ret['organ'] = dict(t_agg.cut('organ_name','organ_id').data().tol())
-        ret['tissue'] = {}
-
-        for e in t_agg.cut('tissues').data():
-            ret['tissue'].update(e[0])
-
-    except Exception:
-        logger.error('impossible to generate the inverse mapping dict for uberon'
-                     ' mapping file so either the url or content is not correct')
-
-    finally:
-        return ret
-
-
 def build_uniprot_query(l):
     return '+or+'.join(l)
 
@@ -242,10 +219,12 @@ class Config():
     }
 
     OMIM_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/xref_mappings/omim_to_efo.txt'
+    ZOOMA_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/zooma/cttv_indications_3.txt'
 
     # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
-    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
-    TISSUE_TRANSLATION_MAP = from_expression_to_map(TISSUE_TRANSLATION_MAP_URL)
+    # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
+    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
+    TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
 
     HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
     HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')
@@ -315,18 +294,12 @@ class Config():
     # TODO remove refs to user directories
     MOUSEMODELS_CACHE_DIRECTORY = '/Users/otvisitor/.phenodigmcache'
 
-    # hardcoded folder of json file to be preprocessed to extract
-    # HP and MP terms not in EFO but that will be combined in a SLIM
-    ONTOLOGY_PREPROCESSING_DATASOURCES = [
-        'cttv008-14-03-2016.json.gz',
-        ''
+    # put the path to the file where you want to get the list of HP terms to be included in our ontology
+    PHENOTYPE_SLIM_INPUT_URLS = [
+        'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/eva/hpo_mappings.txt'
     ]
-
-    ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS = ["cttv008", "cttv012"]
-
-    # put the path to the file where you want to write the SLIM file (turtle format)
-    # TODO remove refs to user directories
-    ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
+    #  put the path to the file where you want to write the SLIM file (turtle format)
+    PHENOTYPE_SLIM_OUTPUT_FILE = '/tmp/opentargets_disease_phenotype_slim.ttl'
 
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
@@ -363,6 +336,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
     DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['gwascatalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'

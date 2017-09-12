@@ -8,7 +8,7 @@ from StringIO import StringIO
 from collections import OrderedDict
 
 import requests
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
 from mrtarget.common import Actions
@@ -479,11 +479,11 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
                        geneid,
                        gene.to_json(),
                        create_index=False)
-        
+
     def init(self):
         super(GeneObjectStorer, self).init()
         self.loader = Loader(dry_run=self.dry_run)
-               
+
     def close(self):
         super(GeneObjectStorer, self).close()
         self.loader.close()
@@ -730,7 +730,7 @@ class GeneLookUpTable(object):
                  autoload=True):
         self._logger = logging.getLogger(__name__)
         self._es = es
-        self.r_server = r_server            
+        self.r_server = r_server
         self._es_query = ESQuery(self._es)
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = self.r_server,
@@ -828,6 +828,6 @@ class GeneLookUpTable(object):
 
     def keys(self, r_server=None):
         return self._table.keys(self._get_r_server(r_server))
-    
+
     def _get_r_server(self, r_server = None):
         return r_server if r_server else self.r_server

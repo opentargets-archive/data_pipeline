@@ -2,14 +2,16 @@ import collections
 import json
 import logging
 import time
+import addict
 from collections import Counter
 
 import jsonpickle
+import base64
 from elasticsearch import helpers
 
 from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
-from mrtarget.common.connection import PipelineConnectors
+from mrtarget.common.connection import new_es_client
 from mrtarget.Settings import Config
 
 
@@ -39,11 +41,7 @@ class AssociationSummary(object):
 class ESQuery(object):
 
     def __init__(self, es = None, dry_run = False):
-        if es is None:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
-        self.handler = es
+        self.handler = es if es else new_es_client()
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 
@@ -228,75 +226,47 @@ class ESQuery(object):
 
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
-        aggs ={}
-        if get_top_hits:
-            aggs = {
-                       "direct_associations": {
-                           "filter": {"term": {"is_direct": True}},
-                           'aggs': {
-                               "top_direct_ass": {
-                                   "top_hits": {
-                                       "sort": {"harmonic-sum.overall": {"order": "desc"}},
-                                       "_source": source,
 
-                                       "size": size
-                                   },
-                               }
-                           },
-                       }
-                   }
+        aggs = addict.Dict()
+        if get_top_hits:
+            aggs.direct_associations.filter.term.is_direct = True
+            aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
+            aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
+            aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
+
+        q = addict.Dict()
+        q.query.constant_score.filter.terms['target.id'] = [target]
+        q.sort['harmonic-sum.overall'].order = 'desc'
+        q._source = source
+        q.aggs = aggs
+        q.size = size
 
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                  body={"query": {
-                                          "filtered": {
-                                              "filter": {
-                                                   "terms": {"target.id": [target]}
-                                              }
-                                          }
-                                        },
-                                       "sort" : { "harmonic-sum.overall" : {"order":"desc" }},
-                                       '_source': source,
-                                       "aggs" : aggs,
-                                       'size': size,
-                                       }
+                                  body=q.to_dict()
                                   )
         return AssociationSummary(res)
 
     def get_associations_for_disease(self, disease, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
-        aggs = {}
-        if get_top_hits:
-            aggs = {
-                "direct_associations": {
-                    "filter": {"term": {"is_direct": True}},
-                    'aggs': {
-                        "top_direct_ass": {
-                            "top_hits": {
-                                "sort": {"harmonic-sum.overall": {"order": "desc"}},
-                                "_source": source,
 
-                                "size": size
-                            },
-                        }
-                    },
-                }
-            }
+        aggs = addict.Dict()
+        if get_top_hits:
+            aggs.direct_associations.filter.term.is_direct = True
+            aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
+            aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
+            aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
+
+        q = addict.Dict()
+        q.query.constant_score.filter.terms['disease.id'] = [disease]
+        q.sort['harmonic-sum.overall'].order = 'desc'
+        q._source = source
+        q.aggs = aggs
+        q.size = size
 
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
                                   doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                  body={"query": {
-                                          "filtered": {
-                                              "filter": {
-                                                   "terms": {"disease.id": [disease]}
-                                              }
-                                          }
-                                        },
-                                       "sort" : { "harmonic-sum.overall" : {"order":"desc"}},
-                                       '_source': source,
-                                       "aggs" : aggs,
-                                       'size': size,
-                                       }
+                                  body=q.to_dict()
                                   )
         return AssociationSummary(res)
 
@@ -374,7 +344,7 @@ class ESQuery(object):
                            timeout="10m",
                            )
         for hit in res:
-            yield jsonpickle.loads(hit['_source']['entry'])
+            yield jsonpickle.decode(base64.b64decode(hit['_source']['entry']))
 
 
     def get_reaction(self, reaction_id):
@@ -402,7 +372,7 @@ class ESQuery(object):
                                    "is_direct": True,
                                }
                            },
-                               '_source': {'include':["target.id", 'disease.id', 'harmonic-sum.overall']},
+                               '_source': {'includes':["target.id", 'disease.id', 'harmonic-sum.overall']},
                                'size': 1000,
                            },
                            scroll='12h',
@@ -486,7 +456,7 @@ class ESQuery(object):
         def get_ids(ids):
             return self.handler.mget(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
                                    body={'docs': ids},
-                                   _source= {"include": ["target.id",
+                                   _source= {"includes": ["target.id",
                                                         "private.efo_codes",
                                                         "disease.id",
                                                         "scores.association_score",
@@ -501,12 +471,12 @@ class ESQuery(object):
 
         for target in targets:
             query_body = {
-                "query": { "filtered": {
+                "query": { "constant_score": {
                                        "filter": {
                                            "terms": {"target.id": target}
                                        }
                                    }},
-                '_source':  {"include": ["target.id",
+                '_source':  {"includes": ["target.id",
                                         "disease.id",
                             ]},
                 "sort": ["target.id", "disease.id"],
@@ -566,7 +536,7 @@ class ESQuery(object):
 
     def get_lit_entities_for_type(self,type):
         query_body = {"query": {
-            "bool": {
+            "constant_score": {
                 "filter": {
                     "term": {
                         "ent_type": type
@@ -583,7 +553,7 @@ class ESQuery(object):
 
     def get_evidence_for_target_simple(self, target, expected = None):
         query_body = {"query": {
-                                "bool": {
+                                "constant_score": {
                                   "filter": {
                                     "term": {
                                       "target.id": target
@@ -591,7 +561,7 @@ class ESQuery(object):
                                   }
                                 }
                             },
-            '_source': {"include": ["target.id",
+            '_source': {"includes": ["target.id",
                                     "private.efo_codes",
                                     "disease.id",
                                     "scores.association_score",
@@ -625,7 +595,7 @@ class ESQuery(object):
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
                                   body={
                                         "query": {
-                                            "bool": {
+                                            "constant_score": {
                                               "filter": {
                                                 "term": {
                                                   "target.id": target
@@ -885,7 +855,7 @@ class ESQuery(object):
         count = Counter()
         for ev_hit in helpers.scan(client=self.handler,
                                     query={"query": {
-                                              "filtered": {
+                                              "constant_score": {
                                                   "filter": {
                                                       "bool": {
                                                           "must": [
@@ -978,13 +948,14 @@ class ESQuery(object):
 
         if not isinstance(datasources, (list, tuple)):
             datasources = [datasources]
-        query = {
-            "filtered": {
-                "filter": {
-                    "terms": {"sourceID": datasources},
+        query = {"query": {
+                    "constant_score": {
+                        "filter": {
+                            "terms": {"sourceID": datasources},
+                            }
+                        }
                     }
-                }
-            }
+                 }
         self.delete_data(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
                          query=query)
 
