@@ -5,7 +5,9 @@ import math
 import multiprocessing
 import time
 
+from elasticsearch import Elasticsearch
 from tqdm import tqdm
+from mrtarget.common import TqdmToLogger
 
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import Actions
@@ -20,7 +22,9 @@ from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
-from mrtarget.modules.LiteratureNLP import NounChuncker
+from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
+from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common.connection import new_es_client, new_redis_client
 
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger,level=logging.INFO)
@@ -1073,9 +1077,8 @@ class EvidenceStorerWorker(multiprocessing.Process):
         self.dry_run = dry_run
 
     def run(self):
-        connector = PipelineConnectors()
-        connector.init_services_connections(publication_es=True)
-        self.es = connector.es
+
+        self.es = new_es_client()
 
         logger.info("worker %s started" % self.name)
         with Loader(self.es, chunk_size=self.chunk_size, dry_run=self.dry_run) as es_loader:

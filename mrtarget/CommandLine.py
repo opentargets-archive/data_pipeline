@@ -4,6 +4,8 @@ import logging
 import sys
 import itertools as it
 import atexit
+
+from mrtarget.common.Redis import enable_profiling
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import PipelineConnectors
@@ -132,6 +134,8 @@ def main():
                         action='store', default='')
     parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
                         action='store_true', default=False)
+    parser.add_argument("--profile", dest='profile', help="magically profiling process() per process",
+                        action='store_true', default=False)
     parser.add_argument("--increment", dest='increment',
                         help="add new evidence from a data source but does not delete existing evidence. Works only for the validation step",
                         action='store_true', default=False)
@@ -170,6 +174,8 @@ def main():
 
     if args.redis_port:
         Config.REDISLITE_DB_PORT = args.redis_port
+
+    enable_profiling(args.profile)
 
     logger.debug('redis remote %s and host %s port %s',
                  str(Config.REDISLITE_REMOTE),
