@@ -1,3 +1,5 @@
+import pprint
+
 import opentargets.model.core as opentargets
 import opentargets.model.bioentity as bioentity
 import opentargets.model.evidence.core as evidence_core
@@ -54,8 +56,8 @@ class GE(object):
         self.fh_zooma_high = None
         self.fh_zooma_low = None
         self._logger = logging.getLogger(__name__)
-        self._logger.info(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
-        self._logger.warning("GE init")
+        self._logger.info("Index used for gene name: "+Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        self._logger.warning("Initialising Genomics England module")
         self.map_strings = dict()
 
 
@@ -68,8 +70,8 @@ class GE(object):
                                                autoload=True
                                                ).lookup
         for ensembl_id in self.lookup_data.available_genes.get_available_gene_ids():
-            gene = self.lookup_data.available_genes.get_gene(ensembl_id,
-                                                             self.r_server)
+            gene = self.lookup_data.available_genes.get_gene(ensembl_id, self.r_server)
+
             self.symbol2ensembl[gene["approved_symbol"]] = gene["ensembl_gene_id"]
 
         for k,v in self.lookup_data.efo_ontology.current_classes.items():
@@ -93,37 +95,45 @@ class GE(object):
         self._logger.info("OMIM to EFO parsing - requesting from URL %s" % Config.OMIM_TO_EFO_MAP_URL)
         req = urllib2.Request(Config.OMIM_TO_EFO_MAP_URL)
         response = urllib2.urlopen(req)
-        self._logger.info("OMIM to EFO parsing - response code %s" % response.code)
+        self._logger.info("OMIM to EFO parsing - url response code is %s" % response.code)
         lines = response.readlines()
 
         for line in lines:
-            '''
+            ''' file header
             omim	efo_uri	efo_label	source	status
+            609055	http://www.orpha.net/ORDO/Orphanet_228357	CLN9 disease	EFO	current
             '''
             (omim, efo_uri, efo_label, source, status) = line.split("\t")
+
             if omim not in self.omim_to_efo_map:
                 self.omim_to_efo_map[omim] = []
             self.omim_to_efo_map[omim].append({'efo_uri': efo_uri, 'efo_label': efo_label})
+
+        self._logger.info("OMIM to EFO loading - %s mappings loaded" % len(self.omim_to_efo_map.keys()))
+
 
     def get_opentargets_zooma_to_efo_mappings(self):
         self._logger.info("ZOOMA to EFO parsing - requesting from URL %s" % Config.ZOOMA_TO_EFO_MAP_URL)
         req = urllib2.Request(Config.ZOOMA_TO_EFO_MAP_URL)
         response = urllib2.urlopen(req)
-        self._logger.info("ZOOMA to EFO parsing - response code %s" % response.code)
+        self._logger.info("ZOOMA to EFO parsing - url response code is %s" % response.code)
         lines = response.readlines()
+
         n = 0
         for line in lines:
-            '''
+            ''' file header
             STUDY	BIOENTITY	PROPERTY_TYPE	PROPERTY_VALUE	SEMANTIC_TAG	ANNOTATOR	ANNOTATION_DATE
             disease	Amyotrophic lateral sclerosis 1	http://www.ebi.ac.uk/efo/EFO_0000253
             '''
             n +=1
             if n > 1:
-                #self._logger.info("[%s]"%line)
                 (study, bioentity, property_type, property_value, semantic_tag, annotator, annotation_date) = line.split("\t")
                 if property_value not in self.omim_to_efo_map:
                     self.zooma_to_efo_map[property_value.lower()] = []
+
                 self.zooma_to_efo_map[property_value.lower()].append({'efo_uri': semantic_tag, 'efo_label': semantic_tag})
+
+        self._logger.info("ZOOMA to EFO loading - %s mappings loaded" % len(self.zooma_to_efo_map.keys()))
 
     @staticmethod
     def request_to_panel_app():
@@ -131,7 +141,6 @@ class GE(object):
         Makes a request to panel app to get the list of all panels
         :return: tuple of list of panel name and panel id's
         '''
-        #requests_cache.install_cache('GE_results_cache_Feb', backend='sqlite', expire_after=3000000)
         r = requests.get('https://bioinfo.extge.co.uk/crowdsourcing/WebServices/list_panels', params={})
         results = r.json()
 
@@ -143,21 +152,21 @@ class GE(object):
         Create panel app info list and phenotype set
         :return: Unique phenotype list
         '''
-        self._logger.warning("execute_ge_request...")
+        self._logger.warning("Querying Genomics England web service...")
         phenotype_list = []
         nb_panels = 0
         for panel_name, panel_id in self.request_to_panel_app():
             nb_panels +=1
-            self._logger.warning("reading panel %s %s" % (panel_name, panel_id))
+            self._logger.warning("Get all genes on GE Panel - %s with Panel_Id %s" % (panel_name, panel_id))
+
             url = 'https://bioinfo.extge.co.uk/crowdsourcing/WebServices/search_genes/all/'
             r = requests.get(url, params={"panel_name": panel_name})
             results = r.json()
-            for item in results['results']:
 
+            for item in results['results']:
                 ensembl_iri = None
 
                 if item['GeneSymbol'] in self.symbol2ensembl:
-                    ''' map gene symbol to ensembl '''
                     target = self.symbol2ensembl[item['GeneSymbol']]
                     ensembl_iri = "http://identifiers.org/ensembl/" + target
 
@@ -165,24 +174,28 @@ class GE(object):
                     for element in item['Phenotypes']:
 
                         element = element.rstrip().lstrip().rstrip("?")
-                        if len(element) > 0:
 
+                        if len(element) > 0:
                             '''
                             First check whether it's an OMIM identifier
                             '''
                             match_omim = re.match('^(\d{6,})$', element)
                             match_omim2 = re.match('^\s*OMIM:?[#\s]*(\d{6,})$', element)
+
                             if match_omim or match_omim2:
                                 if match_omim:
                                     omim_id = match_omim.groups()[0]
                                 elif match_omim2:
                                     omim_id = match_omim2.groups()[0]
-                                self._logger.info("Found OMIM ID: %s" % (omim_id))
+                                #self._logger.info("Phenotypes is an OMIM ID: %s" % (omim_id))
+
                                 if omim_id in self.omim_to_efo_map:
-                                    self._logger.info("Maps to EFO")
+                                    self._logger.info("Phenotypes is an OMIM ID: %s and maps to EFO" % (omim_id))
+                                    #self._logger.info("Maps to EFO")
                                     for mapping in self.omim_to_efo_map[omim_id]:
                                         disease_label = mapping['efo_label']
                                         disease_uri = mapping['efo_uri']
+
                                         self.panel_app_info.append([panel_name,
                                                                     panel_id,
                                                                     item['GeneSymbol'],
@@ -199,7 +212,6 @@ class GE(object):
                                                                     ])
                                 self.map_strings = "%s\t%s\t%s\t%s\t%s\t%s"%(panel_name, item['GeneSymbol'], item['LevelOfConfidence'], element, disease_uri, disease_label)
                             else:
-
                                 '''
                                 if there is already an OMIM xref to EFO/Orphanet, no need to map
                                 '''
@@ -217,6 +229,7 @@ class GE(object):
                                 match_no_curly_brackets_omim_continued = re.match('^(.+),\s+(\d{6,})\s+.*$', element)
                                 # Myopathy, early-onset, with fatal cardiomyopathy 611705
                                 match_no_curly_brackets_no_comma_omim = re.match('^(.+)\s+(\d{6,})\s*$', element)
+
                                 if element.lower() in self.efo_labels:
                                     disease_uri = self.efo_labels[element.lower()]
                                     disease_label = element
@@ -266,16 +279,12 @@ class GE(object):
                                     phenotype_label = re.sub(r"\{", "", phenotype_label)
                                     phenotype_label = re.sub(r"\}", "", phenotype_label)
 
-                                self._logger.info("[%s] => [%s]" % (element, phenotype_label))
-
-
+                                self._logger.info("Mapping Phenotypes [%s] => Label [%s]" % (element, phenotype_label))
 
                                 if omim_ids is None:
                                     omim_ids = []
 
                                 self.map_omim[phenotype_label] = omim_ids
-
-
 
                                 if not is_hpo and not is_efo and all(l not in self.omim_to_efo_map for l in omim_ids) and phenotype_label.lower() not in self.zooma_to_efo_map:
                                     self._logger.info("Unknown term '%s' with unknown OMIM ID(s): %s"%(phenotype_label, ";".join(omim_ids)))
@@ -353,19 +362,11 @@ class GE(object):
                                                                         omim_ids,
                                                                         disease_uri,
                                                                         disease_label])
-
-
-
-
-                                self.map_strings = "%s\t%s\t%s\t%s\t%s\t%s" % (
-                                panel_name, item['GeneSymbol'], item['LevelOfConfidence'], element, disease_uri,
-                                disease_label)
+                                self.map_strings = "%s\t%s\t%s\t%s\t%s\t%s" % ( panel_name, item['GeneSymbol'], item['LevelOfConfidence'], element, disease_uri, disease_label)
             #if nb_panels > 2:
             #    break
-
             self.phenotype_set = set(phenotype_list)
         return self.phenotype_set
-
 
     def search_request_to_ols(self, query=None, ontology='efo', type='class'):
         in_ols = False
@@ -407,7 +408,7 @@ class GE(object):
         see docs: http://www.ebi.ac.uk/spot/zooma/docs/api.html
         '''
         #requests_cache.install_cache('zooma_results_cache_jan', backend='sqlite', expire_after=3000000)
-        self._logger.info("Requesting")
+        #self._logger.info("Requesting Zooma")
         r = requests.get('http://www.ebi.ac.uk/spot/zooma/v2/api/services/annotate',
                              params={'propertyValue': property_value, 'propertyType': 'phenotype'})
         results = r.json()
@@ -433,13 +434,13 @@ class GE(object):
         Call request to Zooma function
         :return: None.
         '''
-
-
-        logger.info("use Zooma")
+        logger.info("Querying Zooma web service for unmapped Phenoype terms")
         for phenotype in self.phenotype_set:
             if phenotype:
-                self._logger.info("Mapping '%s' with zooma..."%(phenotype))
+                self._logger.info("Mapping '%s' with zooma ..."%(phenotype))
                 self.request_to_zooma(phenotype)
+
+        return
 
         with open(Config.GE_ZOOMA_DISEASE_MAPPING, 'w') as outfile:
             tsv_writer = csv.writer(outfile, delimiter='\t')
@@ -458,7 +459,6 @@ class GE(object):
         '''
         logger.info("Process panel app file")
         now = datetime.datetime.now()
-
 
         with open(Config.GE_ZOOMA_DISEASE_MAPPING, 'w') as outfile:
             tsv_writer = csv.writer(outfile, delimiter='\t')
@@ -506,6 +506,7 @@ class GE(object):
         single_lit_ref_list = []
         if publications is not None:
             publications = re.findall(r"\'(.+?)\'", str(publications))
+
             for paper_set in publications:
                 paper_set = re.findall(r"\d{7,12}", paper_set)
                 for paper in paper_set:
@@ -514,6 +515,7 @@ class GE(object):
 
         obj = opentargets.Literature_Curated(type='genetic_literature')
         target = "http://identifiers.org/ensembl/" + ensemble_gene_ids
+
         provenance_type = evidence_core.BaseProvenance_Type(
             database=evidence_core.BaseDatabase(
                 id="Genomics England PanelApp",
@@ -525,9 +527,10 @@ class GE(object):
                 references=single_lit_ref_list
             )
         )
+
         obj.access_level = "public"
         obj.sourceID = "genomics_england"
-        obj.validated_against_schema_version = "1.2.6"
+        obj.validated_against_schema_version = Config.EVIDENCEVALIDATION_SCHEMA
 
         obj.unique_association_fields = {"panel_name": panel_name, "original_disease_name": disease_label, "panel_id": panel_id, "target_id": ensembl_iri, "disease_iri": disease_uri }
 
@@ -551,16 +554,16 @@ class GE(object):
                     type="probability",
                     method=association_score.Method(
                         description="Further details in the Genomics England PanelApp.",
-                        reference="NA",
-                        url="https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/"),
+                        #reference="NA",
+                        url="https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/EditPanel/"),
                 value = 0.25)
             elif level_of_confidence == 'HighEvidence':
                 resource_score = association_score.Probability(
                     type="probability",
                     method=association_score.Method(
                         description="Further details in the Genomics England PanelApp.",
-                        reference="NA",
-                        url="https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/"),
+                        #reference="NA",
+                        url="https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/EditPanel/"),
                 value = 1)
             else :
                 resource_score = association_score.Probability(
@@ -568,7 +571,7 @@ class GE(object):
                     method=association_score.Method(
                         description="Further details in the Genomics England PanelApp.",
                         reference="NA",
-                        url="https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/"),
+                        url="https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/EditPanel"),
                 value = 0.5)
 
             obj.disease = bioentity.Disease(id=disease_uri, source_name=phenotype, name=disease_label)
