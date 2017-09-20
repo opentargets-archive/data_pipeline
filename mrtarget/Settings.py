@@ -135,7 +135,7 @@ class Config():
         PROXY_PORT = int(ini.get('proxy', 'port'))
 
     TEMP_DIR = os.path.sep + 'tmp'
-    
+
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))

@@ -79,7 +79,7 @@ class MouseminePhenotypeETL(object):
 
         self.assign_to_human_genes()
 
-        self.write_all_to_file(filename="/Users/otvisitor/Documents/data/genotype_phenotype.json")
+        self.write_all_to_file(filename=Config.GENOTYPE_PHENOTYPE_OUTPUT)
 
 
     def _get_mp_classes(self):
