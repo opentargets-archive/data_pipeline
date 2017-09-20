@@ -7,7 +7,7 @@ from collections import Counter
 
 import jsonpickle
 import base64
-from elasticsearch import helpers
+from elasticsearch import helpers, TransportError
 
 from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
@@ -695,17 +695,26 @@ class ESQuery(object):
                     raise KeyError('object with id %s not found' % (doc['_id']))
 
         else:
-            res = self.handler.get(index=Loader.get_versioned_index(index,True),
-                                    doc_type=doc_type,
-                                    id=ids,
-                                    _source=source,
-                                    _source_exclude=source_exclude,
-                                    realtime=True,
-                                    )
+
             try:
-                yield res['_source']
-            except Exception as e:
-                self.logger.exception('cannot retrieve single object by id %s '%e.msg)
+                res = self.handler.get(index=Loader.get_versioned_index(index, True),
+                                       doc_type=doc_type,
+                                       id=ids,
+                                       _source=source,
+                                       _source_exclude=source_exclude,
+                                       realtime=True,
+                                       )
+                try:
+                    yield res['_source']
+                except Exception as e:
+                    self.logger.exception('cannot retrieve single object by id %s ' % ids)
+                    raise KeyError('object with id %s not found' % ids)
+
+            except TransportError as te:
+                if te.status_code == 404:
+                    raise KeyError('object with id %s not found' % ids)
+
+
 
     def get_publications_by_id(self, ids):
         return self.get_objects_by_id(ids,
@@ -843,13 +852,20 @@ class ESQuery(object):
                            request_timeout=2 * 60 * 60,
                            )
 
+        yielded_pairs =set()
         for hit in res:
             if hit['_source']['scores']['association_score']>0:
                 if only_direct:
-                    yield '-'.join([hit['_source']['target']['id'],hit['_source']['disease']['id']])
+                    pair =  '-'.join([hit['_source']['target']['id'],hit['_source']['disease']['id']])
+                    if pair not in yielded_pairs:
+                        yield pair
+                        yielded_pairs.add(pair)
                 else:
                     for efo_id in hit['_source']['private']['efo_codes']:
-                        yield '-'.join([hit['_source']['target']['id'],efo_id])
+                        pair = '-'.join([hit['_source']['target']['id'],efo_id])
+                        if pair not in yielded_pairs:
+                            yield pair
+                            yielded_pairs.add(pair)
 
     def count_evidence_sourceIDs(self, target, disease):
         count = Counter()
