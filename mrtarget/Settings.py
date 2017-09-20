@@ -307,6 +307,13 @@ class Config():
     CHEMBL_PROTEIN_CLASS = ini.get(INI_SECTION, 'chembl_protein')
     CHEMBL_TARGET_COMPONENT = ini.get(INI_SECTION, 'chembl_component')
 
+    # Mouse/Human Orthology with Phenotype Annotations (tab-delimited)
+    GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY = "http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt"
+    # All Genotypes and Mammalian Phenotype Annotations (tab-delimited)
+    GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES = "http://www.informatics.jax.org/downloads/reports/MGI_PhenoGenoMP.rpt"
+    # data dump location if you want to merge the data without running all the steps again
+    GENOTYPE_PHENOTYPE_OUTPUT = "/tmp/genotype_phenotype.json"
+
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
         )

@@ -278,12 +278,6 @@ def main():
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
 
-        if args.gel or run_full_pipeline:
-            do_all = (GenomicsEnglandActions.ALL in args.gel) or run_full_pipeline
-            if (GenomicsEnglandActions.GENERATE_EVIDENCE in args.gel) or do_all:
-                logger.warning("GenomicsEnglandActions...")
-                GE(es=connectors.es, r_server=connectors.r_server).process_all()
-
         if args.lit or run_full_pipeline:
             if LiteratureActions.FETCH in args.lit :
                 MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.input_file)
