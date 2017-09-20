@@ -134,6 +134,8 @@ class Config():
         PROXY_HOST = ini.get('proxy', 'host')
         PROXY_PORT = int(ini.get('proxy', 'port'))
 
+    TEMP_DIR = os.path.sep + 'tmp'
+    
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
@@ -375,8 +377,6 @@ class Config():
 
     ENSEMBL_RELEASE_VERSION = 90
     ENSEMBL_CHUNK_SIZE = 100
-
-    TEMP_DIR = os.path.sep + 'tmp'
 
     REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
                                    cast=bool, default=False)
