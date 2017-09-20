@@ -19,10 +19,11 @@ from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReport
 from mrtarget.Settings import Config
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
+import pprint
 
 
-_missing_tissues = {'names': [],
-                    'codes': []}
+_missing_tissues = {'names': {},
+                    'codes': {}}
 
 def level_from_text(key):
     level_translation = {'Not detected': 0,
@@ -233,9 +234,9 @@ def name_from_tissue(tissue_name, t2m):
         tname = curated
 
         if curated not in _missing_tissues:
-            _missing_tissues['names'].append(curated)
+            _missing_tissues['names'][tname] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.warning('the tissue name %s was not found in the mapping', curated)
+            logger.debug('the tissue name %s was not found in the mapping', curated)
 
     return tname.strip()
 
@@ -252,9 +253,9 @@ def code_from_tissue(tissue_name, t2m):
         tid = re.sub('[^0-9a-zA-Z_]+', '', tid)
 
         if tid not in _missing_tissues:
-            _missing_tissues['codes'].append(tid)
+            _missing_tissues['codes'][tid] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.warning('the tissue name %s was not found in the mapping', curated)
+            logger.debug('the tissue name %s was not found in the mapping', curated)
 
     return tid.strip()
 
@@ -569,6 +570,7 @@ class HPAProcess():
 
         q_reporter.join()
 
+        self.logger.info('missing tissues', str(_missing_tissues))
         self.logger.info('all expressions objects pushed to elasticsearch')
 
 #         if self.data.values()[0]['cancer']:  # if there is cancer data
