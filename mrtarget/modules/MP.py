@@ -55,6 +55,7 @@ class MP(JSONSerializable):
         self.path_labels = path_labels
         self.definition = definition
         self.children=[]
+        self._logger = logging.getLogger(__name__)
 
     def get_id(self):
         return self.code
@@ -100,7 +101,7 @@ class MpProcess():
         self.phenotype_ontology.load_mammalian_phenotype_ontology()
 
         for uri,label in self.phenotype_ontology.current_classes.items():
-            print "--- %s --- %s"%(uri, label)
+            self._logger.debug("--- %s --- %s"%(uri, label))
             properties = self.phenotype_ontology.parse_properties(URIRef(uri))
             definition = ''
             if 'http://purl.obolibrary.org/obo/IAO_0000115' in properties:
