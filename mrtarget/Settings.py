@@ -299,7 +299,7 @@ class Config():
         'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/eva/hpo_mappings.txt'
     ]
     #  put the path to the file where you want to write the SLIM file (turtle format)
-    PHENOTYPE_SLIM_OUTPUT_FILE = '/tmp/opentargets_disease_phenotype_slim.ttl'
+    PHENOTYPE_SLIM_OUTPUT_FILE = TEMP_DIR + os.path.sep + 'opentargets_disease_phenotype_slim.ttl'
 
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
@@ -312,7 +312,7 @@ class Config():
     # All Genotypes and Mammalian Phenotype Annotations (tab-delimited)
     GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES = "http://www.informatics.jax.org/downloads/reports/MGI_PhenoGenoMP.rpt"
     # data dump location if you want to merge the data without running all the steps again
-    GENOTYPE_PHENOTYPE_OUTPUT = "/tmp/genotype_phenotype.json"
+    GENOTYPE_PHENOTYPE_OUTPUT = TEMP_DIR + os.path.sep + 'genotype_phenotype.json'
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
@@ -412,10 +412,10 @@ class Config():
 
     # GE Pipeline
 
-    GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
+    GE_EVIDENCE_STRING = TEMP_DIR + os.path.sep + 'genomics_england_evidence_string.json'
     GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
-    GE_ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
-    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
+    GE_ZOOMA_DISEASE_MAPPING = TEMP_DIR + os.path.sep + 'zooma_disease_mapping.csv'
+    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = TEMP_DIR + os.path.sep + 'zooma_disease_mapping_low_confidence.csv'
 
     # for developers
     DRY_RUN_OUTPUT = read_option('DRY_RUN_OUTPUT_ENABLE',
