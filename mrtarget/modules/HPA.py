@@ -20,7 +20,9 @@ from mrtarget.Settings import Config
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
 
-_missing_tissues = {}
+
+_missing_tissues = {'names': [],
+                    'codes': []}
 
 def level_from_text(key):
     level_translation = {'Not detected': 0,
@@ -231,11 +233,11 @@ def name_from_tissue(tissue_name, t2m):
         tname = curated
 
         if curated not in _missing_tissues:
-            _missing_tissues[curated] = curated
+            _missing_tissues['names'].append(curated)
             logger = logging.getLogger(__name__)
             logger.warning('the tissue name %s was not found in the mapping', curated)
 
-    return tname
+    return tname.strip()
 
 
 def code_from_tissue(tissue_name, t2m):
@@ -249,12 +251,12 @@ def code_from_tissue(tissue_name, t2m):
         tid = tissue_name.strip().replace(' ', '_')
         tid = re.sub('[^0-9a-zA-Z_]+', '', tid)
 
-        if curated not in _missing_tissues:
-            _missing_tissues[curated] = curated
+        if tid not in _missing_tissues:
+            _missing_tissues['codes'].append(tid)
             logger = logging.getLogger(__name__)
             logger.warning('the tissue name %s was not found in the mapping', curated)
 
-    return tid
+    return tid.strip()
 
 
 def asys_from_tissue(tissue_name, t2m):
@@ -394,9 +396,8 @@ class HPADataDownloader():
         """
         self.logger.info('get rna tissue rows into dicts')
         self.logger.debug('melting rna level table into geneid tissue level')
-        t_level = (
-            petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL),
-                               delimiter='\t')
+
+        t_level = (petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_level')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
@@ -410,10 +411,7 @@ class HPADataDownloader():
             .cutout('tissue')
         )
 
-
-        t_value = (
-            petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL),
-                               delimiter='\t')
+        t_value = (petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_value')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
