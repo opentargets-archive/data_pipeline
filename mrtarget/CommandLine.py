@@ -21,6 +21,7 @@ from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValid
 from mrtarget.modules.GeneData import GeneActions, GeneManager
 from mrtarget.modules.HPA import HPAActions, HPAProcess
 from mrtarget.modules.IntOGen import IntOGenActions, IntOGen
+from mrtarget.modules.SLAPEnrich import SLAPEnrichActions, SLAPEnrich
 from mrtarget.modules.Literature import LiteratureActions, MedlineRetriever
 from mrtarget.modules.LiteratureNLP import LiteratureNLPProcess, LiteratureNLPActions
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
@@ -99,6 +100,8 @@ def main():
                         action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
     parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
                         action="append_const", const=G2PActions.GENERATE_EVIDENCE)
+    parser.add_argument("--slapenrich", dest='slapenrich', help="parse SLAPEnrich pathway evidence",
+                        action="append_const", const=SLAPEnrichActions.GENERATE_EVIDENCE)
     parser.add_argument("--ontos", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.PHENOTYPESLIM)
     parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
@@ -278,6 +281,10 @@ def main():
             do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
             if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
                 IntOGen(connectors.es, connectors.r_server).process_intogen()
+        if args.slapenrich or run_full_pipeline:
+            do_all = (SLAPEnrichActions.ALL in args.slapenrich) or run_full_pipeline
+            if (SLAPEnrichActions.GENERATE_EVIDENCE in args.slapenrich) or do_all:
+                SLAPEnrich(connectors.es, connectors.r_server).process_slapenrich()
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:

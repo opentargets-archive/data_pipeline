@@ -14,14 +14,14 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 __copyright__  = "Copyright 2014-2017, Open Targets"
 __credits__    = ["Gautier Koscielny", "David Tamborero"]
 __license__    = "Apache 2.0"
-__version__    = "1.2.6"
+__version__    = "1.2.7"
 __maintainer__ = "ChuangKee Ong"
 __email__      = ["gautierk@targetvalidation.org", "ckong@ebi.ac.uk"]
 __status__     = "Production"
 
 INTOGEN_RELEASE_DATE = ''
 INTOGEN_FILENAME = file_or_resource('intogen_opentargets.tsv')
-INTOGEN_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_intogen-01-06-2017.json'
+INTOGEN_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_intogen-29-08-2017.json'
 INTOGEN_SCORE_MAP = { 'A' : 0.75, 'B': 0.5, 'C': 0.25 }
 INTOGEN_SCORE_DOC = {
     'A' : 'the gene exhibits several signals of positive selection in the tumor type',
@@ -195,7 +195,7 @@ class IntOGen():
                         value=INTOGEN_SCORE_MAP[Evidence])
 
                     evidenceString = opentargets.Literature_Curated()
-                    evidenceString.validated_against_schema_version = '1.2.6'
+                    evidenceString.validated_against_schema_version = Config.EVIDENCEVALIDATION_SCHEMA
                     evidenceString.access_level = "public"
                     evidenceString.type = "somatic_mutation"
                     evidenceString.sourceID = "intogen"
