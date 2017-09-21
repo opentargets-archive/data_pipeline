@@ -182,7 +182,6 @@ def format_expression_with_rna(rec):
         new_tissues = []
         has_tissues = len(exp.tissues) > 0
 
-        sorted(rec['data'], key=oper.itemgetter(0))
         t_set = ft.reduce(lambda x, y: x.union(set([y['efo_code']])),
                           exp.tissues, set()) \
                     if has_tissues else set()
@@ -190,14 +189,14 @@ def format_expression_with_rna(rec):
                           rec['data'], set())
 
         intersection = t_set.intersection(nt_set)
-        intersection_idxs = [i for i, e in enumerate(exp.tissues) if e['efo_code'] in intersection]
-        intersection_idxs_data = [i for i, e in enumerate(rec['data']) if e[0] in intersection]
+        intersection_idxs = {e['efo_code']: i for i, e in enumerate(exp.tissues) if e['efo_code'] in intersection}
+        intersection_idxs_data = {e[0]: i for i, e in enumerate(rec['data']) if e[0] in intersection}
         difference = nt_set.difference(t_set)
         difference_idxs = [i for i, e in enumerate(rec['data']) if e[0] in difference]
 
-        for i, _ in enumerate(intersection):
-            tidx = intersection_idxs[i]
-            didx = intersection_idxs_data[i]
+        for ec in intersection:
+            tidx = intersection_idxs[ec]
+            didx = intersection_idxs_data[ec]
 
             exp.tissues[tidx].rna.level = int(rec['data'][didx][2])
             exp.tissues[tidx].rna.value = float(rec['data'][didx][3])
