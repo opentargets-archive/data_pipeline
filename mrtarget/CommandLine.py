@@ -22,8 +22,6 @@ from mrtarget.modules.GeneData import GeneActions, GeneManager
 from mrtarget.modules.HPA import HPAActions, HPAProcess
 from mrtarget.modules.IntOGen import IntOGenActions, IntOGen
 from mrtarget.modules.SLAPEnrich import SLAPEnrichActions, SLAPEnrich
-from mrtarget.modules.Literature import LiteratureActions, MedlineRetriever
-from mrtarget.modules.LiteratureNLP import LiteratureNLPProcess, LiteratureNLPActions
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
 from mrtarget.modules.Ontology import OntologyActions, PhenotypeSlim
 from mrtarget.modules.QC import QCActions, QCRunner
@@ -106,14 +104,6 @@ def main():
                         action="append_const", const = OntologyActions.PHENOTYPESLIM)
     parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
                         action="append_const", const = OntologyActions.ALL)
-    parser.add_argument("--lit", dest='lit', help="fetch and process literature data",
-                        action="append_const", const=LiteratureActions.ALL)
-    parser.add_argument("--lit-fetch", dest='lit', help="fetch literature data",
-                        action="append_const", const=LiteratureActions.FETCH)
-    parser.add_argument("--lit-process", dest='lit', help="process literature data",
-                        action="append_const", const=LiteratureNLPActions.PROCESS)
-    parser.add_argument("--lit-update", dest='lit', help="update literature data",
-                        action="append_const", const=LiteratureActions.UPDATE)
     parser.add_argument("--qc", dest='qc',
                         help="Run quality control scripts",
                         action="append_const", const=QCActions.ALL)
@@ -150,9 +140,6 @@ def main():
                         action='store', default='INFO')
     parser.add_argument("--do-nothing", dest='do_nothing',
                         help="to be used just for test",
-                        action='store_true', default=False)
-    parser.add_argument("--inject-literature", dest='inject_literature',
-                        help="inject literature data in the evidence-string, default set to False",
                         action='store_true', default=False)
     parser.add_argument("--schema-version", dest='schema_version',
                         help="set the schema version aka 'branch' name",
@@ -200,16 +187,13 @@ def main():
               file=sys.stdout)
         return 0
 
-    connected = connectors.init_services_connections(redispersist=args.redispersist,
-                                                     publication_es=args.inject_literature or args.lit)
+    connected = connectors.init_services_connections(redispersist=args.redispersist)
 
     logger.debug('Attempting to establish connection to the backend... %s',
                  str(connected))
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
-    if args.inject_literature or args.lit:
-        load_nlp_corpora()
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
@@ -266,13 +250,6 @@ def main():
                 logger.warning("GenomicsEnglandActions...")
                 GE(es=connectors.es, r_server=connectors.r_server).process_all()
 
-        if args.lit or run_full_pipeline:
-            if LiteratureActions.FETCH in args.lit :
-                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.input_file)
-            if LiteratureActions.UPDATE in args.lit:
-                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(update=True)
-            if LiteratureNLPActions.PROCESS in args.lit :
-                LiteratureNLPProcess(connectors.es, loader, connectors.r_server).process()
         if args.g2p or run_full_pipeline:
             do_all = (G2PActions.ALL in args.g2p) or run_full_pipeline
             if (G2PActions.GENERATE_EVIDENCE in args.g2p) or do_all:
@@ -307,7 +284,8 @@ def main():
                 targets = EvidenceStringProcess(connectors.es,
                                                 connectors.r_server,
                                                 es_pub=connectors.es_pub).process_all(datasources = args.datasource,
-                                                                          dry_run=args.dry_run,inject_literature=args.inject_literature)
+                                                                                      dry_run=args.dry_run,
+                                                                                      inject_literature=True)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:
