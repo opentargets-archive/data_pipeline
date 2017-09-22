@@ -5,6 +5,7 @@ import csv
 import hashlib
 import ujson as json
 import functools as ft
+import itertools as it
 import operator as oper
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
@@ -287,19 +288,13 @@ def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     def _split_tissue(k, v):
         '''from tissue dict to rna and protein dicts pair'''
-        tlabel = v['label']
+        rna = list(it.imap(lambda e: {'id': '_'.join(e, k),
+                                      'level': v['rna']['level']} if v['rna'] else {},
+                           xrange(-1, v['rna']['level'] + 1)))
 
-        rna = {'id': '_'.join([str(v['rna']['level']), k]),
-               'label': tlabel,
-               'level': v['rna']['level'],
-               'unit': v['rna']['unit'],
-               'value': v['rna']['value'],
-               'efo_code': k} if v['rna'] else {}
-
-        protein = {'id': '_'.join([str(v['protein']['level']), k]),
-                   'label': tlabel,
-                   'level': v['protein']['level'],
-                   'efo_code': k} if v['protein'] else {}
+        protein = list(it.imap(lambda e: {'id': '_'.join(e, k),
+                                          'level': v['protein']['level']} if v['protein'] else {},
+                               xrange(-1, v['protein']['level'] + 1)))
 
         return (rna, protein)
 
@@ -307,9 +302,11 @@ def hpa2tissues(hpa=None):
     splitted_tissues = [_split_tissue(t['efo_code'], t) for t in hpa.tissues
                         if hpa is not None]
 
-    rnas = [tissue[0] for tissue in splitted_tissues if tissue[0]]
+    rnas = []
+    proteins = []
+    rnas = [rnas + tissue[0] for tissue in splitted_tissues if tissue[0]]
 
-    proteins = [tissue[1] for tissue in splitted_tissues if tissue[1]]
+    proteins = [proteins + tissue[1] for tissue in splitted_tissues if tissue[1]]
 
     return {'rna': rnas,
             'protein': proteins}

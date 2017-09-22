@@ -368,7 +368,7 @@ class Config():
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
 
-    ENSEMBL_RELEASE_VERSION = 89
+    ENSEMBL_RELEASE_VERSION = 90
     ENSEMBL_CHUNK_SIZE = 100
 
     TEMP_DIR = os.path.sep + 'tmp'
