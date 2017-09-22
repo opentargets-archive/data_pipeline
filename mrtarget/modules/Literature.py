@@ -1,21 +1,8 @@
 #!/usr/local/bin/python
 # -*- coding: UTF-8 -*-
-import gzip
-import io
 import logging
-import multiprocessing
-import os
-import time
-from StringIO import StringIO
-
-import ftputil as ftputil
 import requests
-from dateutil.parser import parse
-from lxml import etree,objectify
-from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
-from mrtarget.common.NLP import init_spacy_english_language
-
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
