@@ -287,14 +287,16 @@ def organs_from_tissue(tissue_name, t2m):
 def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     def _split_tissue(k, v):
+        rna_level = v['rna']['level'] if v['rna'] else -1
         '''from tissue dict to rna and protein dicts pair'''
         rna = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
-                                      'level': v['rna']['level']} if v['rna'] else {},
-                           xrange(-1, v['rna']['level'] + 1)))
+                                      'level': e} if v['rna'] else {},
+                           xrange(0, rna_level + 1) if rna_level >= 0 else xrange(-1, 0)))
 
+        pro_level = v['protein']['level'] if v['protein'] else -1
         protein = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
-                                          'level': v['protein']['level']} if v['protein'] else {},
-                               xrange(-1, v['protein']['level'] + 1)))
+                                          'level': e} if v['protein'] else {},
+                               xrange(0, pro_level + 1) if pro_level >= 0 else xrange(-1, 0)))
 
         return (rna, protein)
 
