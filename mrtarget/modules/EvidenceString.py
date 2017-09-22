@@ -22,7 +22,6 @@ from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
-from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common.connection import new_es_client, new_redis_client
 
@@ -217,8 +216,8 @@ class ExtendedInfoLiterature(ExtendedInfo):
                          mesh_headings=literature.mesh_headings,
                          keywords=literature.keywords,
                          chemicals=literature.chemicals,
-                         noun_chunks=literature.text_mined_entities['nlp']['chunks'],
-                         top_chunks = literature.text_mined_entities['nlp']['top_chunks'],
+                         noun_chunks=literature.text_mined_entities['nlp'].get('chunks'),
+                         top_chunks = literature.text_mined_entities['nlp'].get('top_chunks'),
                          date=literature.pub_date,
                          journal_reference = literature.journal_reference)
 
@@ -270,7 +269,6 @@ class EvidenceManager():
         self.available_publications = {}
         if 'available_publications' in lookup_data.__dict__:
             self.available_publications = lookup_data.available_publications
-        self.noun_chuncker = NounChuncker()
 
 
         # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
@@ -987,7 +985,7 @@ class EvidenceProcesser(multiprocessing.Process):
 
     def run(self):
         connector = PipelineConnectors()
-        connector.init_services_connections(publication_es=True)
+        connector.init_services_connections()
         self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_genes._table.set_r_server(connector.r_server)

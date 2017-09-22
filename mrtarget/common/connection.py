@@ -50,8 +50,6 @@ class PipelineConnectors():
         self.r_instance = r_instance['instance']
 
     def init_services_connections(self,
-                                  data_es=True,
-                                  publication_es=False,
                                   redispersist=False):
         success = False
         self.persist = redispersist
@@ -86,7 +84,7 @@ class PipelineConnectors():
         '''init es client for publication'''
         pub_hosts = Config.ELASTICSEARCH_NODES_PUB
         if pub_hosts != hosts:
-            if publication_es and pub_hosts:
+            if pub_hosts:
                 self.es_pub = new_es_client(pub_hosts)
                 try:
                     connection_attempt = 1
