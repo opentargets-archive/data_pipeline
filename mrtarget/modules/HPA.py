@@ -288,11 +288,11 @@ def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     def _split_tissue(k, v):
         '''from tissue dict to rna and protein dicts pair'''
-        rna = list(it.imap(lambda e: {'id': '_'.join([e, k]),
+        rna = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
                                       'level': v['rna']['level']} if v['rna'] else {},
                            xrange(-1, v['rna']['level'] + 1)))
 
-        protein = list(it.imap(lambda e: {'id': '_'.join([e, k]),
+        protein = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
                                           'level': v['protein']['level']} if v['protein'] else {},
                                xrange(-1, v['protein']['level'] + 1)))
 
