@@ -227,6 +227,7 @@ class Config():
     HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
     HPA_RNA_LEVEL_URL = ini.get(INI_SECTION, 'hpa_rna_level')
     HPA_RNA_VALUE_URL = ini.get(INI_SECTION, 'hpa_rna_value')
+    HPA_RNA_ZSCORE_URL = ini.get(INI_SECTION, 'hpa_rna_zscore')
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = ini.get(INI_SECTION, 'ensembl_reactome')
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
