@@ -571,7 +571,7 @@ class HPAProcess():
 
         q_reporter.join()
 
-        self.logger.info('missing tissues', str(_missing_tissues))
+        self.logger.info('missing tissues %s', str(_missing_tissues))
         self.logger.info('all expressions objects pushed to elasticsearch')
 
 #         if self.data.values()[0]['cancer']:  # if there is cancer data
