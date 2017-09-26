@@ -94,6 +94,9 @@ class HPAExpression(Dict, JSONSerializable):
         if 'unit' not in rna:
             rna.unit = ''
 
+        if 'zscore' not in rna:
+            rna.zscore = -1
+
         return rna
 
     @staticmethod
@@ -202,6 +205,7 @@ def format_expression_with_rna(rec):
             exp.tissues[tidx].rna.level = int(rec['data'][didx][2])
             exp.tissues[tidx].rna.value = float(rec['data'][didx][3])
             exp.tissues[tidx].rna.unit = rec['data'][didx][4]
+            exp.tissues[tidx].rna.zscore = int(rec['data'][didx][7])
 
 
         for idx in difference_idxs:
@@ -213,6 +217,7 @@ def format_expression_with_rna(rec):
             t.rna.level = int(rna[2])
             t.rna.value = float(rna[3])
             t.rna.unit = rna[4]
+            t.rna.zscore = int(rna[7])
 
             new_tissues.append(t)
 
@@ -424,8 +429,23 @@ class HPADataDownloader():
             .cutout('tissue')
         )
 
-        t_join = (petl.join(t_level,
+        t_zscore = (petl.fromcsv(URLZSource(Config.HPA_RNA_ZSCORE_URL), delimiter='\t')
+            .melt(key='ID', variablefield='tissue', valuefield='zscore_level')
+            .rename({'ID': 'gene'})
+            .addfield('tissue_label',
+                      lambda rec: name_from_tissue(rec['tissue'].strip(), self.t2m))
+            .addfield('tissue_code',
+                      lambda rec: code_from_tissue(rec['tissue_label'], self.t2m))
+            .cutout('tissue')
+        )
+
+        t_vl = petl.join(t_level,
                            t_value,
+                           key=('gene', 'tissue_code', 'tissue_label'),
+                           presorted=True)
+
+        t_join = (petl.join(t_vl,
+                           t_zscore,
                            key=('gene', 'tissue_code', 'tissue_label'),
                            presorted=True)
                   .aggregate('gene',
@@ -435,7 +455,8 @@ class HPADataDownloader():
                                                       'rna_value',
                                                       'rna_unit',
                                                       'anatomical_systems',
-                                                      'organs'), list)},
+                                                      'organs',
+                                                      'zscore_level'), list)},
                        presorted=True)
         )
 
