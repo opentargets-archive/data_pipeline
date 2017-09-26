@@ -628,8 +628,8 @@ class DataDrivenRelationProcess(object):
         logger.info('target data length: %s size in memory: %f Kb'%(len(target_data),sys.getsizeof(target_data)/1024.))
         logger.info('disease data length: %s size in memory: %f Kb' % (len(disease_data),sys.getsizeof(disease_data)/1024.))
 
-        disease_keys = disease_data.keys()
-        target_keys = target_data.keys()
+        disease_keys = sorted(disease_data.keys())
+        target_keys = sorted(target_data.keys())
 
         number_of_workers = Config.WORKERS_NUMBER
         number_of_storers = number_of_workers / 2
