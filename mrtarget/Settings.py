@@ -334,22 +334,24 @@ class Config():
 
     DATASOURCE_TO_DATATYPE_MAPPING = {}
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_somatic'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
-    DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
-    DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
     DATASOURCE_TO_DATATYPE_MAPPING['europepmc'] = 'literature'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
+    DATASOURCE_TO_DATATYPE_MAPPING['slapenrich'] = 'affected_pathway'
     DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_somatic'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['23andme'] = 'genetic_association'
+
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
