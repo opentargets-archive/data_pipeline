@@ -116,6 +116,7 @@ class HPAExpression(Dict, JSONSerializable):
 
         if 'protein' not in tissue:
             tissue.protein = HPAExpression.new_tissue_protein()
+
         if 'rna' not in tissue:
             tissue.rna = HPAExpression.new_tissue_rna()
 
@@ -561,7 +562,13 @@ class HPAProcess():
         self.logger.info('store_data called')
 
         self.logger.debug('calling to create new expression index')
-        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+        overwrite_indices = not dry_run
+        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                                     recreate=overwrite_indices)
+        self.loader.prepare_for_bulk_indexing(
+            self.loader.get_versioned_index(
+                Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
+
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
                            r_server=self.r_server,
                            serialiser='json',
