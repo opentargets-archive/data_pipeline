@@ -5,7 +5,7 @@ from mrtarget.common import Actions
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common.ElasticsearchQuery import ESQuery
 
-HALLMARK_FILENAME = file_or_resource('hallmarks_20_genes.txt')
+HALLMARK_FILENAME = file_or_resource('census_annot.tsv')
 
 class HallmarksActions(Actions):
     GENERATE_JSON = 'generatejson'
