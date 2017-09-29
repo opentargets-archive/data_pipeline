@@ -343,7 +343,7 @@ class ESQuery(object):
         for hit in res:
             c+=1
             hit = hit['_source']
-            if hit['evidence-count']['total']>=3 and \
+            if hit['evidence_count']['total']>=3 and \
                 hit['harmonic-sum']['overall'] >=0.1:
                 '''store target associations'''
                 if hit['target']['id'] not in target_results:
