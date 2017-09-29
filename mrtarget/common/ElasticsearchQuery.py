@@ -327,7 +327,7 @@ class ESQuery(object):
                                    "is_direct": True,
                                }
                            },
-                               '_source': {'includes':["target.id", 'disease.id', 'harmonic-sum', 'evidence-count']},
+                               '_source': {'includes':["target.id", 'disease.id', 'harmonic-sum', 'evidence_count']},
                                'size': 1000,
                            },
                            scroll='12h',
