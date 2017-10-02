@@ -330,7 +330,7 @@ class Config():
                                                          cttv005 = 'rare2common',
                                                          cttv010 = 'expression_atlas',
                                                          cttv026 = 'phewas_catalog',
-                                                         cttv027 = '23andme'
+                                                         cttv027 = 'twentythreeandme'
 
                                                 )
 
@@ -352,7 +352,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['23andme'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['twentythreeandme'] = 'genetic_association'
 
 
     # use specific index for a datasource
