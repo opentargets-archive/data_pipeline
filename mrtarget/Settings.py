@@ -185,6 +185,8 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
+    ELASTICSEARCH_HALLMARK_INDEX_NAME = 'hallmark-data'
+    ELASTICSEARCH_HALLMARK_DOC_NAME = 'hallmark-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
@@ -227,6 +229,7 @@ class Config():
     HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
     HPA_RNA_LEVEL_URL = ini.get(INI_SECTION, 'hpa_rna_level')
     HPA_RNA_VALUE_URL = ini.get(INI_SECTION, 'hpa_rna_value')
+    HPA_RNA_ZSCORE_URL = ini.get(INI_SECTION, 'hpa_rna_zscore')
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = ini.get(INI_SECTION, 'ensembl_reactome')
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
@@ -327,22 +330,24 @@ class Config():
 
     DATASOURCE_TO_DATATYPE_MAPPING = {}
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_somatic'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
-    DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
-    DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
     DATASOURCE_TO_DATATYPE_MAPPING['europepmc'] = 'literature'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
+    DATASOURCE_TO_DATATYPE_MAPPING['slapenrich'] = 'affected_pathway'
     DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_somatic'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['23andme'] = 'genetic_association'
+
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")

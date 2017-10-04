@@ -9,7 +9,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-         keys: 
+         keys:
           # Find a cache corresponding to this specific requirements.txt checksum
           # when this file is changed, this key will fail
           - mrt-py27-b-{{ .Branch }}-{{ checksum "requirements.txt" }}
@@ -20,8 +20,6 @@ jobs:
           name: Install requirements.txt
           command: |
             pip install -U -r requirements.txt
-            pip uninstall -y requests
-            pip install requests
       - save_cache:
           key: mrt-py27-b-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
@@ -75,7 +73,7 @@ jobs:
             docker tag ${QUAY_REPO}:${CIRCLE_BRANCH} ${QUAY_REPO}:circle-${CIRCLE_SHA1}
             docker push ${QUAY_REPO}:circle-${CIRCLE_SHA1}
             ## push latest if master
-            if [ "$CIRCLE_BRANCH" = "master" ] 
+            if [ "$CIRCLE_BRANCH" = "master" ]
               then
                 docker tag ${QUAY_REPO}:${CIRCLE_BRANCH} ${QUAY_REPO}:latest
                 docker push ${QUAY_REPO}:latest

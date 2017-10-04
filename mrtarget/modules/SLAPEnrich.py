@@ -20,7 +20,7 @@ __email__     = ["ckong@ebi.ac.uk"]
 __status__    = "Production"
 
 SLAPENRICH_FILENAME = file_or_resource('slapenrich_opentargets.tsv')
-SLAPENRICH_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_slapenrich-30-08-2017.json'
+SLAPENRICH_EVIDENCE_FILENAME = '/Users/ckong/Desktop/cttv001_slapenrich-22-09-2017.json'
 
 #INTOGEN_ROLE_MAP = {
 #    'Act' : 'http://identifiers.org/cttv.activity/gain_of_function',
@@ -87,16 +87,48 @@ TUMOR_TYPE_MAP = {
 }
 
 SYMBOL_MAPPING = {
-    'C15orf55': 'NUTM1',
-    'CSDA': 'YBX3',
-    'EIF2C3': 'AGO3',
-    'ERBB2IP': 'ERBIN',
-    'FAM123B': 'AMER1',
-    'HNRPDL': 'HNRNPDL',
-    'MLL': 'KMT2A',
-    'MLL2': 'KMT2D',
-    'MLL3': 'KMT2C',
-    'RQCD1': 'CNOT9'
+    # TODO These symbols does not has Ensembl ID mappings, need alternative mapping
+    '''
+    i.e 'C15orf55': 'NUTM1',
+
+    ADRBK1
+    ADRBK2
+    BRE
+    C10orf2
+    CASC5
+    CECR1
+    CSRP2BP
+    DEFB131
+    ERBB2IP
+    FAM175A
+    FAM175B
+    FIGF
+    FYB
+    GYLTL1B
+    IKBKAP
+    INADL
+    KIAA0101
+    KIRREL
+    MINA
+    MRE11A
+    NGFRAP1
+    PARK2
+    PTRF
+    RQCD1
+    SEPP1
+    SHFM1
+    TCEB1
+    TCEB2
+    TCEB3
+    TCEB3B
+    TCEB3C
+    TCEB3CL
+    UFD1L
+    VPRBP
+    WBSCR17
+    WHSC1
+    WHSC1L1
+    '''
 }
 
 class SLAPEnrichActions(Actions):
@@ -131,7 +163,7 @@ class SLAPEnrich():
             else:
                 if "ensembl_secondary_id" not in self.symbols[display_name] or row["id"] < \
                         self.symbols[display_name]["ensembl_secondary_id"]:
-                    self.symbols[display_name]["ensembl_secondary_id"] = row["id"];
+                    self.symbols[display_name]["ensembl_secondary_id"] = row["id"]
                 if "ensembl_secondary_ids" not in self.symbols[display_name]:
                     self.symbols[display_name]["ensembl_secondary_ids"] = []
                 self.symbols[display_name]["ensembl_secondary_ids"].append(row["id"])
@@ -144,7 +176,7 @@ class SLAPEnrich():
         self.write_evidence(filename=outfile)
 
     def build_evidence(self, filename=SLAPENRICH_FILENAME):
-        records = []
+
         now = datetime.datetime.now()
 
         '''
@@ -167,13 +199,21 @@ class SLAPEnrich():
 
         with open(filename, 'r') as slapenrich_input:
             n = 0
+
             for line in slapenrich_input:
                 n +=1
                 if n>1:
+                    '''
+                        pval    => pvalue of the SLAPenrichment of the pathway indicated in the cancer/tumor type
+                        fdr     => FDR percentage of the SLAPenrichment of the pathway in the cancer/tumor type
+                        logOdds => log10 odd ratio (number of patients with mutations in the pathway / number of expected patients with mutations in the pathway)
+                        exeeco  => exclusive coverage of the pathway = number patients with mutations in exactly 1 gene in the pathway / number of patients with mutations in at least one gene in the pathway.
+                    '''
+                    (tumor_type, gene_symbol, mutFreq_dataset, pathway_id, mutFreq_pathway, pval, fdr, logodds, excco) = tuple(line.rstrip().split('\t'))
 
-                    (Tumor_Type, Symbol, MutFreq_Dataset, Pathway_Id, MutFreq_Pathway, pval) = tuple(line.rstrip().split('\t'))
-                    # TODO Pathway_Id will need striping "R-HSA-167161: Immune System" and create a reactome url i.e "http://www.reactome.org/PathwayBrowser/#R-HSA-1225949"
-
+                    pathway = pathway_id.split(":")
+                    pathway_id = pathway[0].rstrip()
+                    pathway_desc = pathway[1].rstrip()
                     '''
                         build evidence.resource_score object
                     '''
@@ -196,81 +236,79 @@ class SLAPEnrich():
                         build unique_association_field object
                     '''
                     evidenceString.unique_association_fields = {}
-                    evidenceString.unique_association_fields['symbol'] = Symbol
-                    evidenceString.unique_association_fields['tumor_type_acronym'] = Tumor_Type
-                    evidenceString.unique_association_fields['tumor_type'] = TUMOR_TYPE_MAP[Tumor_Type]
-                    # TODO need to ensure the pathway_id is the full reactome url
-                    evidenceString.unique_association_fields['pathway_id'] = Pathway_Id
-                    evidenceString.unique_association_fields['efo_id'] = TUMOR_TYPE_EFO_MAP[Tumor_Type]['uri']
+                    evidenceString.unique_association_fields['symbol'] = gene_symbol
+                    evidenceString.unique_association_fields['tumor_type_acronym'] = tumor_type
+                    evidenceString.unique_association_fields['tumor_type'] = TUMOR_TYPE_MAP[tumor_type]
+                    evidenceString.unique_association_fields['pathway_id'] = 'http://www.reactome.org/PathwayBrowser/#%s' % (pathway_id)
+                    evidenceString.unique_association_fields['efo_id'] = TUMOR_TYPE_EFO_MAP[tumor_type]['uri']
 
                     target_type = 'http://identifiers.org/cttv.target/gene_evidence'
                     ensembl_gene_id = None
 
-                    # TODO will this mapping be required
-                    # if Symbol in SYMBOL_MAPPING:
-                    #     Symbol = SYMBOL_MAPPING[Symbol]
+                    if gene_symbol in SYMBOL_MAPPING:
+                      gene_symbol = SYMBOL_MAPPING[gene_symbol]
 
                     '''
                         build target object,
                     '''
-                    if Symbol in self.symbols:
+                    if gene_symbol in self.symbols:
                         record = self.symbols
                         # u'GNB3': {'assembly_name': u'GRCh38', 'ensembl_release': 89,'ensembl_primary_id': u'ENSG00000111664'},
-                        if "ensembl_primary_id" in record[Symbol]:
-                            ensembl_gene_id = record[Symbol]["ensembl_primary_id"]
+                        if "ensembl_primary_id" in record[gene_symbol]:
+                            ensembl_gene_id = record[gene_symbol]["ensembl_primary_id"]
                         elif "ensembl_secondary_ids" in record:
-                            ensembl_gene_id = record[Symbol]["ensembl_secondary_ids"][0]
+                            ensembl_gene_id = record[gene_symbol]["ensembl_secondary_ids"][0]
                         else:
-                            self.logger.error("%s is in Ensembl but cound not find its ensembl_gene_id" %Symbol)
+                            self.logger.error("%s is in Ensembl but cound not find its ensembl_gene_id" %gene_symbol)
                             continue
+
+                        evidenceString.target = bioentity.Target(
+                            id="http://identifiers.org/ensembl/{0}".format(ensembl_gene_id),
+                            target_name=gene_symbol,
+                            #TODO activity is a required field in target object, currently set as unknown
+                            activity="http://identifiers.org/cttv.activity/unknown",
+                            target_type=target_type
+                        )
+
+                        '''
+                            build disease object
+                        '''
+                        evidenceString.disease = bioentity.Disease(
+                            id=TUMOR_TYPE_EFO_MAP[tumor_type]['uri'],
+                            name=TUMOR_TYPE_EFO_MAP[tumor_type]['label']
+                        )
+
+                        '''
+                            build evidence object
+                        '''
+                        evidenceString.evidence = evidence_core.Literature_Curated()
+                        evidenceString.evidence.date_asserted = now.isoformat()
+                        evidenceString.evidence.is_associated = True
+                        #TODO check is this the correct evidence code "computational combinatorial evidence"
+                        evidenceString.evidence.evidence_codes = ["http://purl.obolibrary.org/obo/ECO_0000053"]
+                        evidenceString.evidence.provenance_type = provenance_type
+                        evidenceString.evidence.resource_score = resource_score
+
+                        '''
+                            build evidence.url object
+                        '''
+                        linkout = evidence_linkout.Linkout (
+                            url='http://www.reactome.org/PathwayBrowser/#%s'%(pathway_id),
+                            nice_name='%s'%(pathway_desc)
+                        )
+
+                        evidenceString.evidence.urls = [linkout]
+
+                        error = evidenceString.validate(logging)
+
+                        if error > 0:
+                            self.logger.error(evidenceString.to_JSON())
+                            sys.exit(1)
+
+                        self.evidence_strings.append(evidenceString)
+
                     else:
-                        self.logger.error("%s is not found in Ensembl" %Symbol)
-
-                    evidenceString.target = bioentity.Target(
-                        id="http://identifiers.org/ensembl/{0}".format(ensembl_gene_id),
-                        target_name=Symbol,
-                        #TODO activity is a required field in target object, currently set as unknown
-                        activity="http://identifiers.org/cttv.activity/unknown",
-                        target_type=target_type
-                    )
-
-                    '''
-                        build disease object
-                    '''
-                    evidenceString.disease = bioentity.Disease(
-                        id=TUMOR_TYPE_EFO_MAP[Tumor_Type]['uri'],
-                        name=TUMOR_TYPE_EFO_MAP[Tumor_Type]['label']
-                    )
-
-                    '''
-                        build evidence object
-                    '''
-                    evidenceString.evidence = evidence_core.Literature_Curated()
-                    evidenceString.evidence.date_asserted = now.isoformat()
-                    evidenceString.evidence.is_associated = True
-                    #TODO check is this the correct evidence code "computational combinatorial evidence"
-                    evidenceString.evidence.evidence_codes = ["http://purl.obolibrary.org/obo/ECO_0000053"]
-                    evidenceString.evidence.provenance_type = provenance_type
-                    evidenceString.evidence.resource_score = resource_score
-
-                    '''
-                        build evidence.url object
-                    '''
-                    #TODO need to get nice pathway name and ensure the url is correct
-                    linkout = evidence_linkout.Linkout (
-                        url='http://www.reactome.org/PathwayBrowser/#%s'%(Pathway_Id),
-                        nice_name='%s'%(Pathway_Id)
-                    )
-
-                    evidenceString.evidence.urls = [linkout]
-
-                    error = evidenceString.validate(logging)
-
-#                    if error > 0:
-#                        self.logger.error(evidenceString.to_JSON())
-#                        sys.exit(1)
-
-                    self.evidence_strings.append(evidenceString)
+                        self.logger.error("%s is not found in Ensembl" % gene_symbol)
 
             self.logger.info("%s evidence parsed"%(n-1))
             self.logger.info("%s evidence created"%len(self.evidence_strings))
@@ -293,10 +331,11 @@ class SLAPEnrich():
                     self.logger.error(evidence_string.to_JSON(indentation=4))
             slapenrich_output.close()
 
-#def main():
-#    import logging
-#    logger = logging.getLogger(__name__)
-#    logger.info("Load IntOGen data")
+'''
+def main():
+    import logging
+    logger = logging.getLogger(__name__)
 
-#if __name__ == "__main__":
-#    main()
+if __name__ == "__main__":
+    main()
+'''
