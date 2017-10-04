@@ -2,7 +2,7 @@ import copy
 import json
 import logging
 import math
-import time
+from collections import Counter
 
 from tqdm import tqdm
 
@@ -924,6 +924,7 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
                  dry_run=False,
                  lookup_data=None,
                  inject_literature=False,
+                 global_stats = None,
                  ):
         super(EvidenceProcesser, self).__init__(score_q, r_path, loader_q, ignore_errors=[AttributeError])
         self.q = score_q
@@ -935,6 +936,7 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         self.evidence_manager = EvidenceManager(lookup_data)
         self.inject_literature = inject_literature
         self.pub_fetcher = None
+        self.global_stats = global_stats
 
     def init(self):
         super(EvidenceProcesser, self).init()
@@ -973,6 +975,64 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         return loader_args, loader_kwargs
 
 
+class EvidenceGlobalCounter():
+    '''stores aggregated stats about evidence properties used in the computation of the score'''
+    GLOBAL_COUNTERS = ['target',
+                       'disease',
+                       ]
+
+    def __init__(self):
+        self.total = self._init_counter()
+        self.experiment = {}
+        self.literature = {}
+
+    def _init_counter(self):
+        d = {'total':0}
+        for i in self.GLOBAL_COUNTERS:
+            d[i]=Counter()
+        return d
+
+    def digest(self, ev):
+        '''takes an evidence in dict format and populate the appropiate counters'''
+        self._inject_counts(self.total, ev)
+        for lit in self.get_literature(ev):
+            if lit not in self.literature:
+                self.literature[lit]= self._init_counter()
+            self._inject_counts(self.literature[lit], ev)
+        exp = self.get_experiment(ev)
+        if exp:
+            if exp not in self.experiment:
+                self.experiment[exp] = self._init_counter()
+            self._inject_counts(self.experiment[exp], ev)
+
+    @staticmethod
+    def _inject_counts(target, ev):
+        target['target'][EvidenceGlobalCounter.get_target(ev)] += 1
+        target['disease'][EvidenceGlobalCounter.get_disease(ev)] += 1
+        target['total']+= 1
+
+
+    @staticmethod
+    def get_target(ev):
+        return ev['target']['id']
+
+    @staticmethod
+    def get_disease(ev):
+        return ev['disease']['id']
+
+    @staticmethod
+    def get_literature(ev):
+        try:
+            return [i['lit_id'].split('/')[-1] for i in ev['literature']['references']]
+        except KeyError as e:
+            return ()
+    @staticmethod
+    def get_experiment(ev):
+        try:
+            return ev['evidence']['unique_experiment_reference']
+        except KeyError as e:
+            pass
+
 class EvidenceStringProcess():
     def __init__(self,
                  es,
@@ -996,6 +1056,7 @@ class EvidenceStringProcess():
                                       inject_literature=False):
 
         logger.debug("Starting Evidence Manager")
+        '''get lookup data and stats'''
         lookup_data_types = [LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
         if inject_literature:
             lookup_data_types = [LookUpDataType.PUBLICATION, LookUpDataType.TARGET, LookUpDataType.DISEASE,
@@ -1008,9 +1069,11 @@ class EvidenceStringProcess():
                                           autoload=True,
                                           es_pub=self.es_pub,
                                           ).lookup
+
+        global_stats = self.get_global_stats(datasources= datasources)
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
-        '''create and overwrite old data'''
+        '''prepare es indices'''
         loader = Loader(self.es)
         overwrite_indices = not dry_run
         if not dry_run:
@@ -1056,15 +1119,16 @@ class EvidenceStringProcess():
         '''create workers'''
 
         scorers = WhiteCollarWorker(target=EvidenceProcesser,
-                                       pool_size=number_of_workers,
-                                       queue_in=evidence_q,
-                                       redis_path=None,
-                                       queue_out=store_q,
-                                       kwargs=dict(
-                                                   lookup_data=lookup_data,
-                                                   inject_literature=inject_literature
-                                                   )
-                                       )
+                                    pool_size=number_of_workers,
+                                    queue_in=evidence_q,
+                                    redis_path=None,
+                                    queue_out=store_q,
+                                    kwargs=dict(
+                                        lookup_data=lookup_data,
+                                        inject_literature=inject_literature,
+                                        global_stats=global_stats
+                                    )
+                                    )
         scorers.start()
 
         loaders = WhiteCollarWorker(target=LoaderWorker,
@@ -1115,4 +1179,10 @@ class EvidenceStringProcess():
                 logger.debug("loaded %i ev from db to process" % c)
             yield row
         logger.info("loaded %i ev from db to process" % c)
+
+    def get_global_stats(self, page_size=5000, datasources=[]):
+        global_stats = EvidenceGlobalCounter()
+        for ev in self.es_query.get_validated_evidence_strings(size=page_size, datasources=datasources):
+            global_stats.digest(ev)
+        return global_stats
 
