@@ -47,6 +47,7 @@ urllib3
 coverage
 pylru
 cement==2.10.2
+yapsy==1.11.223
 git+https://github.com/opentargets/data_model.git@v1.2.6#egg=data-model
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz
 -e .

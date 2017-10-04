@@ -21,6 +21,7 @@ from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.modules.Reactome import ReactomeRetriever
 from mrtarget.Settings import Config
 from elasticsearch.exceptions import NotFoundError
+from yapsy.PluginManager import PluginManager
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
 ENS_ID_ORG_PREFIX = 'http://identifiers.org/ensembl/'
@@ -507,11 +508,24 @@ class GeneManager():
         self.reactome_retriever=ReactomeRetriever(loader.es)
         self.chembl_handler = ChEMBLLookup()
         self._logger = logging.getLogger(__name__)
+        # Build the manager
+        self.simplePluginManager = PluginManager()
+        # Tell it the default place(s) where to find plugins
+        self.simplePluginManager.setPluginPlaces(Config.GENE_DATA_PLUGIN_PLACES)
+        # Load all plugins
+        self.simplePluginManager.collectPlugins()
+
         self.tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
 
-
     def merge_all(self, dry_run = False):
+
+        # Loop round the plugins and print their names.
+        for plugin in self.simplePluginManager.getAllPlugins():
+            plugin.plugin_object.print_name()
+        return
+
+
         bar = tqdm(desc='Merging data from available databases',
                    total = 6,
                    unit= 'steps',
