@@ -100,6 +100,21 @@ class HarmonicSumTestCase(unittest.TestCase):
         value = Evidence._get_score_from_pvalue_linear(1e-5, range_min=1e-2, range_max= 1e-6)
         self.assertEqual(value, .75)
 
+    def test_sigmoind_scaling(self):
+        value = HarmonicSumScorer.sigmoid_scaling(1)
+        self.assertEqual(value, 1)
+
+        value = HarmonicSumScorer.sigmoid_scaling(100)
+        self.assertEqual(value, 0.542)
+
+        value = HarmonicSumScorer.sigmoid_scaling(1000)
+        self.assertEqual(value, 0)
+
+        value = HarmonicSumScorer.sigmoid_scaling(100, precision=6)
+        self.assertEqual(value, 0.541824)
+
+        value = HarmonicSumScorer.sigmoid_scaling(100, mid_value=10)
+        self.assertEqual(value, 0)
 
 
 

@@ -1,4 +1,6 @@
 import logging
+
+import numpy as np
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
@@ -276,6 +278,12 @@ class HarmonicSumScorer():
                         harmonic_sum > cap:
             return cap
         return harmonic_sum
+
+    @staticmethod
+    def sigmoid_scaling(value,mid_value=100, precision=3):
+        center = 1
+        s = 2. / (1 + np.exp(1./mid_value * (value - center)))
+        return round(s, precision)
 
 
 

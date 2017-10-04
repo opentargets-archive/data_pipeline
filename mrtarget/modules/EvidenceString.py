@@ -1181,8 +1181,9 @@ class EvidenceStringProcess():
         logger.info("loaded %i ev from db to process" % c)
 
     def get_global_stats(self, page_size=5000, datasources=[]):
+        #TODO: fix target id independently of processing
         global_stats = EvidenceGlobalCounter()
-        for ev in self.es_query.get_validated_evidence_strings(size=page_size, datasources=datasources):
-            global_stats.digest(ev)
+        for row in self.get_evidence(page_size, datasources):
+            global_stats.digest(ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence)
         return global_stats
 
