@@ -552,8 +552,6 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 
 
     def process(self, data):
-        if data is None:
-            pass
 
         target, disease, score = data
         element_id = '%s-%s' % (target, disease)
