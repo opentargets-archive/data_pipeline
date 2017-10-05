@@ -299,19 +299,28 @@ def hpa2tissues(hpa=None):
                                       'level': e} if v['rna'] else {},
                            xrange(0, rna_level + 1) if rna_level >= 0 else xrange(-1, 0)))
 
+        zscore_level = v['rna']['zscore'] if v['rna'] else -1
+        '''from tissue dict to rna and protein dicts pair'''
+        zscore = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+                                      'level': e} if v['rna'] else {},
+                           xrange(0, zscore_level + 1) if zscore_level >= 0 else xrange(-1, 0)))
+
+
         pro_level = v['protein']['level'] if v['protein'] else -1
         protein = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
                                           'level': e} if v['protein'] else {},
                                xrange(0, pro_level + 1) if pro_level >= 0 else xrange(-1, 0)))
 
-        return (rna, protein)
+        return (rna, protein, zscore)
 
-    # generate a list with rna, protein pairs per tissue
+    # generate a list with (rna, protein, zscore) tuple pairs per tissue
     splitted_tissues = [_split_tissue(t['efo_code'], t) for t in hpa.tissues
                         if hpa is not None]
 
     rnas = []
     proteins = []
+    zscores = []
+
     for tissue in splitted_tissues:
         if tissue[0]:
             rnas += tissue[0]
@@ -319,8 +328,12 @@ def hpa2tissues(hpa=None):
         if tissue[1]:
             proteins += tissue[1]
 
+        if tissue[2]:
+            zscores += tissue[2]
+
     return {'rna': rnas,
-            'protein': proteins}
+            'protein': proteins,
+            'zscore': zscores}
 
 
 class HPAActions(Actions):
