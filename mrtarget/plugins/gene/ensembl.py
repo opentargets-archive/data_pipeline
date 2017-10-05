@@ -1,19 +1,27 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
+from mrtarget.common.ElasticsearchQuery import ESQuery
+from elasticsearch.exceptions import NotFoundError
 from tqdm import tqdm
+import sys
 import logging
 logging.basicConfig(level=logging.INFO)
 
 class Ensembl(IPlugin):
 
     def print_name(self):
-        logging.info("This is plugin ENSEMBL")
+        logging.info("ENSEMBL gene data plugin")
 
-    def merge_data(self, genes, esquery, tqdm_out):
+    def merge_data(self, genes, loader, r_server, tqdm_out):
+
+        esquery = ESQuery(loader.es)
 
         try:
-            esquery.get_all_ensembl_genes()
+            count = esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
+        except NotFoundError as ex:
+            logging.error('no Ensembl index in ES. Skipping. Has the --ensembl step been run? Are you pointing to the correct index? %s' % ex)
+            raise ex
 
 
         for row in tqdm(esquery.get_all_ensembl_genes(),

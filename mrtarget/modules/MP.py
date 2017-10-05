@@ -1,4 +1,5 @@
 import logging
+import ujson as json
 from collections import OrderedDict
 from tqdm import tqdm 
 from mrtarget.common import TqdmToLogger
@@ -44,7 +45,7 @@ class MP(JSONSerializable):
                  path_codes=[],
                  path_labels=[],
                  # id_org=None,
-                 definition=""):
+                 definition=''):
         self.code = code
         self.label = label
         self.broad_synonyms = broad_synonyms
@@ -55,7 +56,6 @@ class MP(JSONSerializable):
         self.path_labels = path_labels
         self.definition = definition
         self.children=[]
-        self._logger = logging.getLogger(__name__)
 
     def get_id(self):
         return self.code
@@ -90,6 +90,7 @@ class MpProcess():
                  loader,):
         self.loader = loader
         self.mps = OrderedDict()
+        self._logger = logging.getLogger(__name__)
 
     def process_all(self):
         self._process_ontology_data()
@@ -118,16 +119,16 @@ class MpProcess():
             if 'http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym' in properties:
                 narrow_synonyms = properties['http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym']
 
-            mp = MP(code=uri,
-                      label=label,
-                      exact_synonyms=exact_synonyms,
-                      broad_synonyms=broad_synonyms,
-                      narrow_synonyms=narrow_synonyms,
-                      path=self.phenotype_ontology.classes_paths[uri]['all'],
-                      path_codes=self.phenotype_ontology.classes_paths[uri]['ids'],
-                      path_labels=self.phenotype_ontology.classes_paths[uri]['labels'],
-                      definition=definition
-                      )
+            mp = MP(
+                code=uri,
+                label=label,
+                exact_synonyms=exact_synonyms,
+                broad_synonyms=broad_synonyms,
+                narrow_synonyms=narrow_synonyms,
+                path=self.phenotype_ontology.classes_paths[uri]['all'],
+                path_codes=self.phenotype_ontology.classes_paths[uri]['ids'],
+                path_labels=self.phenotype_ontology.classes_paths[uri]['labels'],
+                definition=definition)
             id = self.phenotype_ontology.classes_paths[uri]['ids'][0][-1]
             if uri in self.phenotype_ontology.children:
                 mp.children = self.phenotype_ontology.children[uri]

@@ -6,12 +6,9 @@ from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from mrtarget.modules.ChEMBL import ChEMBLLookup
-from mrtarget.modules.GenotypePhenotype import MouseminePhenotypeETL
-from mrtarget.modules.Reactome import ReactomeRetriever
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from mrtarget.Settings import Config
-from elasticsearch.exceptions import NotFoundError
+
 from yapsy.PluginManager import PluginManager
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
@@ -422,14 +419,11 @@ class GeneManager():
                  loader,
                  r_server):
 
-
         self.loader = loader
         self.r_server = r_server
-        self.esquery = ESQuery(loader.es)
         self.genes = GeneSet()
-        self.reactome_retriever=ReactomeRetriever(loader.es)
-        self.chembl_handler = ChEMBLLookup()
         self._logger = logging.getLogger(__name__)
+
         self._logger.info("Preparing the plug in management system")
         # Build the manager
         self.simplePluginManager = PluginManager()
@@ -455,101 +449,14 @@ class GeneManager():
             try:
                 plugin = self.simplePluginManager.getPluginByName(plugin_name)
                 plugin.plugin_object.print_name()
-                plugin.plugin_object.merge_data(genes=self.genes, esquery=self.esquery, tqdm_out=self.tqdm_out)
-
-            except NotFoundError:
+                plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server, tqdm_out=self.tqdm_out)
+            except Exception as error:
                 self._logger.error('The following gene index merging procedure failed: %s. Please check that the previous steps of the pipeline have been executed properly.'%(plugin_name))
-            bar.update()
-        return
+            finally:
+                bar.update()
 
-
-        try:
-            self._get_uniprot_data()
-        except NotFoundError:
-            self._logger.error('no uniprot index in ES. Skipping. Has the --uniprot step been run?')
-        bar.update()
-        self._get_chembl_data()
-        bar.update()
-        self._get_mouse_phenotypes_data()
-        bar.update()
         self._store_data(dry_run=dry_run)
         bar.update()
-
-    def _get_mouse_phenotypes_data(self):
-
-        mpetl = MouseminePhenotypeETL(loader=self.loader, r_server=self.r_server)
-        mpetl.process_all()
-        for gene_id, gene in tqdm(self.genes.iterate(),
-                                  desc='Adding phenotype data from MGI',
-                                  unit=' gene',
-                                  file=self.tqdm_out):
-            ''' extend gene with related mouse phenotype data '''
-            if gene.approved_symbol in mpetl.human_genes:
-                    self._logger.info("Adding phenotype data from MGI for gene %s" % (gene.approved_symbol))
-                    gene.mouse_phenotypes = mpetl.human_genes[gene.approved_symbol]["mouse_orthologs"]
-
-    def _get_ensembl_data(self):
-        for row in tqdm(self.esquery.get_all_ensembl_genes(),
-                        desc='loading genes from Ensembl',
-                        unit_scale=True,
-                        unit='genes',
-                        file=self.tqdm_out,
-                        leave=False,
-                        total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
-            if row['id'] in self.genes:
-                gene = self.genes.get_gene(row['id'])
-                gene.load_ensembl_data(row)
-                self.genes.add_gene(gene)
-            else:
-                gene = Gene()
-                gene.load_ensembl_data(row)
-                self.genes.add_gene(gene)
-
-        self._clean_non_reference_genes()
-
-        self._logger.info("STATS AFTER ENSEMBL PARSING:\n" + self.genes.get_stats())
-
-    def _clean_non_reference_genes(self):
-        for geneid, gene in self.genes.iterate():
-            if not gene.is_ensembl_reference:
-                self.genes.remove_gene(geneid)
-
-    # @do_profile
-    def _get_uniprot_data(self):
-        c = 0
-        for seqrec in tqdm(self.esquery.get_all_uniprot_entries(),
-                           desc='loading genes from UniProt',
-                           unit_scale=True,
-                           unit='genes',
-                           leave=False,
-                           file=self.tqdm_out,
-                           total= self.esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
-            c += 1
-            if c % 1000 == 0:
-                self._logger.info("%i entries retrieved for uniprot" % c)
-            if 'Ensembl' in seqrec.annotations['dbxref_extended']:
-                ensembl_data=seqrec.annotations['dbxref_extended']['Ensembl']
-                ensembl_genes_id=[]
-                for ens_data_point in ensembl_data:
-                    ensembl_genes_id.append(ens_data_point['value']['gene ID'])
-                ensembl_genes_id = list(set(ensembl_genes_id))
-                success = False
-                for ensembl_id in ensembl_genes_id:
-                    if ensembl_id in self.genes:
-                        gene = self.genes.get_gene(ensembl_id)
-                        gene.load_uniprot_entry(seqrec, self.reactome_retriever)
-                        self.genes.add_gene(gene)
-                        success=True
-                        break
-                if not success:
-                    self._logger.debug('Cannot find ensembl id(s) %s coming from uniprot entry %s in available geneset' % (ensembl_genes_id, seqrec.id))
-            else:
-                self._logger.debug('Cannot find ensembl mapping in the uniprot entry %s' % seqrec.id)
-        self._logger.info("%i entries retrieved for uniprot" % c)
-
-        # self._logger.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
-
-
 
     def _store_data(self, dry_run = False):
 
@@ -580,34 +487,4 @@ class GeneManager():
             w.join()
 
         self._logger.info('all gene objects pushed to elasticsearch')
-
-    def _get_chembl_data(self):
-        self._logger.info("Retrieving Chembl Drug")
-        self.chembl_handler.download_molecules_linked_to_target()
-        self._logger.info("Retrieving Chembl Target Class ")
-        self.chembl_handler.download_protein_classification()
-        self._logger.info("Adding Chembl data to genes ")
-        for gene_id, gene in tqdm(self.genes.iterate(),
-                                  desc='Getting drug data from chembl',
-                                  unit=' gene',
-                                  file=self.tqdm_out):
-            target_drugnames = []
-            ''' extend gene with related drug names '''
-            if gene.uniprot_accessions:
-                for a in gene.uniprot_accessions:
-                    if a in self.chembl_handler.uni2chembl:
-                        chembl_id = self.chembl_handler.uni2chembl[a]
-                        if chembl_id in self.chembl_handler.target2molecule:
-                            molecules = self.chembl_handler.target2molecule[chembl_id]
-                            for mol in molecules:
-                                if mol in self.chembl_handler.molecule2synonyms:
-                                    synonyms = self.chembl_handler.molecule2synonyms[mol]
-                                    target_drugnames.extend(synonyms)
-                        if a in self.chembl_handler.protein_classification:
-                            gene.protein_classification['chembl'] = self.chembl_handler.protein_classification[a]
-                        break
-            if target_drugnames:
-                gene.drugs['chembl_drugs'] = target_drugnames
-
-
 
