@@ -4,6 +4,7 @@ import logging
 import math
 from collections import Counter
 
+import pickle
 from tqdm import tqdm
 
 from mrtarget.Settings import Config, file_or_resource
@@ -323,33 +324,12 @@ class EvidenceManager():
         #         evidence['id']))
 
         '''remove identifiers.org from genes and map to ensembl ids'''
-        target_id = evidence['target']['id']
-        new_target_id = None
-        id_not_in_ensembl = False
-        try:
-            if target_id.startswith(self.uni_header):
-                if '-' in target_id:
-                    target_id = target_id.split('-')[0]
-                uniprotid = target_id.split(self.uni_header)[1].strip()
-                ensemblid = self.uni2ens[uniprotid]
-                new_target_id = self.get_reference_ensembl_id(ensemblid)
-            elif target_id.startswith(self.ens_header):
-                ensemblid = target_id.split(self.ens_header)[1].strip()
-                new_target_id = self.get_reference_ensembl_id(ensemblid)
-            else:
-                logger.warning("could not recognize target.id: %s | not added" % target_id)
-                id_not_in_ensembl = True
-        except KeyError:
-            logger.error("cannot find an ensembl ID for: %s" % target_id)
-            id_not_in_ensembl = True
+        EvidenceManager.fix_target_id(evidence,
+                                      self.uni2ens,
+                                      self.available_genes,
+                                      self.non_reference_genes
+                                      )
 
-        if id_not_in_ensembl:
-            logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s" % (
-                evidence['id'], target_id))
-
-        # if new_target_id is None:
-        #     raise AttributeError('cannot find any valid target id for evidence %s'%evidence['id'])
-        evidence['target']['id'] = new_target_id
 
         '''remove identifiers.org from cttv activity  and target type ids'''
         if 'target_type' in evidence['target']:
@@ -358,14 +338,7 @@ class EvidenceManager():
             evidence['target']['activity'] = evidence['target']['activity'].split('/')[-1]
 
         '''remove identifiers.org from efos'''
-        disease_id = evidence['disease']['id']
-        new_disease_id = get_ontology_code_from_url(disease_id)
-        if len(new_disease_id.split('_')) != 2:
-            logger.warning("could not recognize disease.id: %s | added anyway" % disease_id)
-        evidence['disease']['id'] = new_disease_id
-        if not new_disease_id:
-            logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
-                evidence['id'], disease_id))
+        EvidenceManager.fix_disease_id(evidence)
 
         '''remove identifiers.org from ecos'''
         new_eco_ids = []
@@ -397,6 +370,66 @@ class EvidenceManager():
                 evidence['id'], str(eco_ids)[:100]))
 
         return Evidence(evidence), fixed
+
+    @staticmethod
+    def normalise_target_id(evidence, uni2ens, available_genes,non_reference_genes ):
+
+        target_id = evidence['target']['id']
+        new_target_id = None
+        id_not_in_ensembl = False
+        try:
+            if target_id.startswith(GeneData.UNI_ID_ORG_PREFIX):
+                if '-' in target_id:
+                    target_id = target_id.split('-')[0]
+                uniprotid = target_id.split(GeneData.UNI_ID_ORG_PREFIX)[1].strip()
+                ensemblid = uni2ens[uniprotid]
+                new_target_id = EvidenceManager.get_reference_ensembl_id(ensemblid,
+                                                                         available_genes=available_genes,
+                                                                         non_reference_genes=non_reference_genes)
+            elif target_id.startswith(GeneData.ENS_ID_ORG_PREFIX):
+                ensemblid = target_id.split(GeneData.ENS_ID_ORG_PREFIX)[1].strip()
+                new_target_id = EvidenceManager.get_reference_ensembl_id(ensemblid,
+                                                                         available_genes=available_genes,
+                                                                         non_reference_genes=non_reference_genes)
+            else:
+                logger.warning("could not recognize target.id: %s | not added" % target_id)
+                id_not_in_ensembl = True
+        except KeyError:
+            logger.error("cannot find an ensembl ID for: %s" % target_id)
+            id_not_in_ensembl = True
+
+        return new_target_id, id_not_in_ensembl
+
+    @staticmethod
+    def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes) :
+        target_id = evidence['target']['id']
+
+        try:
+            new_target_id, id_not_in_ensembl = EvidenceManager.normalise_target_id(evidence,
+                                                                                   uni2ens,
+                                                                                   available_genes,
+                                                                                   non_reference_genes)
+        except KeyError:
+            logger.error("cannot find an ensembl ID for: %s" % target_id)
+            id_not_in_ensembl = True
+            new_target_id = target_id
+
+        if id_not_in_ensembl:
+            logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s" % (
+                evidence['id'], target_id))
+
+        evidence['target']['id'] = new_target_id
+
+    @staticmethod
+    def fix_disease_id(evidence):
+        disease_id = evidence['disease']['id']
+        new_disease_id = get_ontology_code_from_url(disease_id)
+        if len(new_disease_id.split('_')) != 2:
+            logger.warning("could not recognize disease.id: %s | added anyway" % disease_id)
+        evidence['disease']['id'] = new_disease_id
+        if not new_disease_id:
+            logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
+                evidence['id'], disease_id))
 
     def is_valid(self, evidence, datasource):
         '''check consistency of the data in the evidence'''
@@ -631,16 +664,17 @@ class EvidenceManager():
             else:
                 self.non_reference_genes[symbol]['alternative'].append(ensg)
 
-    def _map_to_reference_ensembl_gene(self, ensg):
-        for symbol, data in self.non_reference_genes.items():
+    @staticmethod
+    def _map_to_reference_ensembl_gene(ensg, non_reference_genes):
+        for symbol, data in non_reference_genes.items():
             if ensg in data['alternative']:
                 logger.warning(
                     "Mapped non reference ensembl gene id %s to %s for gene %s" % (ensg, data['reference'], symbol))
                 return data['reference']
-
-    def get_reference_ensembl_id(self, ensemblid):
-        if ensemblid not in self.available_genes:
-            ensemblid = self._map_to_reference_ensembl_gene(ensemblid) or ensemblid
+    @staticmethod
+    def get_reference_ensembl_id(ensemblid, available_genes, non_reference_genes):
+        if ensemblid not in available_genes:
+            ensemblid = EvidenceManager._map_to_reference_ensembl_gene(ensemblid, non_reference_genes) or ensemblid
         return ensemblid
 
     def _get_eco_scoring_values(self):
@@ -1070,7 +1104,11 @@ class EvidenceStringProcess():
                                           es_pub=self.es_pub,
                                           ).lookup
 
-        global_stats = self.get_global_stats(datasources= datasources)
+        global_stats = self.get_global_stats(lookup_data.uni2ens,
+                                             lookup_data.available_genes,
+                                             lookup_data.non_reference_genes,
+                                             datasources= datasources)
+        pickle.dump(global_stats, open('global_stats.pkl','w'))
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
         '''prepare es indices'''
@@ -1146,7 +1184,7 @@ class EvidenceStringProcess():
                         desc='Reading available evidence_strings',
                         total=self.es_query.count_validated_evidence_strings(datasources=datasources),
                         unit=' evidence',
-                        file=tqdm_out,
+                        # file=tqdm_out,
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name'])
             idev = row['uniq_assoc_fields_hashdig']
@@ -1175,15 +1213,21 @@ class EvidenceStringProcess():
         c = 0
         for row in self.es_query.get_validated_evidence_strings(size=page_size, datasources=datasources):
             c += 1
-            if c % page_size == 0:
+            if c % 1e5 == 0:
                 logger.debug("loaded %i ev from db to process" % c)
             yield row
         logger.info("loaded %i ev from db to process" % c)
 
-    def get_global_stats(self, page_size=5000, datasources=[]):
-        #TODO: fix target id independently of processing
+    def get_global_stats(self, uni2ens, available_genes, non_reference_genes, page_size=5000, datasources=[]):
         global_stats = EvidenceGlobalCounter()
-        for row in self.get_evidence(page_size, datasources):
-            global_stats.digest(ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence)
+        for row in tqdm(self.get_evidence(page_size, datasources),
+                        desc='getting global stats on  available evidence_strings',
+                        total=self.es_query.count_validated_evidence_strings(datasources=datasources),
+                        unit=' evidence',
+                        # file=tqdm_out,
+                        unit_scale=True):
+            ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence
+            EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)
+            EvidenceManager.fix_disease_id(ev)
+            global_stats.digest(ev=ev)
         return global_stats
-
