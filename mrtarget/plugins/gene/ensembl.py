@@ -12,6 +12,10 @@ class Ensembl(IPlugin):
 
     def merge_data(self, genes, esquery, tqdm_out):
 
+        try:
+            esquery.get_all_ensembl_genes()
+
+
         for row in tqdm(esquery.get_all_ensembl_genes(),
                         desc='loading genes from Ensembl',
                         unit_scale=True,

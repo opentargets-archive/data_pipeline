@@ -50,7 +50,6 @@ cement==2.10.2
 yapsy==1.11.223
 git+https://github.com/opentargets/data_model.git@v1.2.6#egg=data-model
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz
-intermine=1.09.09
 # https://github.com/explosion/spacy-models/releases/download/en_core_web_md-1.2.1/en_core_web_md-1.2.1.tar.gz
 -e .
 
