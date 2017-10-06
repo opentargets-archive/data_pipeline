@@ -876,7 +876,7 @@ class Evidence(JSONSerializable):
 
             experiment_id = EvidenceGlobalCounter.get_experiment(self.evidence)
 
-            global_counts = []
+            global_counts = [1]
             for pmid in evidence_pmids:
                 global_counts.append(max(global_stats.get_target_and_disease_uniques_for_literature(pmid)))
             if experiment_id is not None:
@@ -1037,7 +1037,10 @@ class EvidenceGlobalCounter():
     def __init__(self):
         self.total = self._init_counter()
         self.experiment = {}
+        self._all_experiment_ids = set()
         self.literature = {}
+        self._all_literature_ids = set()
+
 
     def _init_counter(self):
         d = {'total':0}
@@ -1067,7 +1070,10 @@ class EvidenceGlobalCounter():
         try:
             literature_data = self.literature[lit_id]
         except KeyError as e:
-            return (0,0)
+            if lit_id in self._all_literature_ids:
+                return (1,1)
+            else:
+                return (0,0)
         return len(literature_data['target']), len(literature_data['disease'])
 
     def get_target_and_disease_uniques_for_experiment(self, exp_id):
@@ -1079,8 +1085,24 @@ class EvidenceGlobalCounter():
         try:
             experiment_data = self.experiment[exp_id]
         except KeyError as e:
-            return (0, 0)
+            if exp_id in self._all_experiment_ids:
+                return (1,1)
+            else:
+                return (0,0)
         return len(experiment_data['target']), len(experiment_data['disease'])
+
+    def compress(self):
+        '''removes all the entries with a single occurrence and assume the counts are 1 when a query raise a keyerror'''
+        self._all_literature_ids = set(self.literature.keys())
+        for lit_id in self._all_literature_ids:
+            if self.literature[lit_id]['total'] == 1:
+                del self.literature[lit_id]
+
+        self._all_experiment_ids = set(self.experiment.keys())
+        for exp_id in self._all_experiment_ids:
+            if self.experiment[exp_id]['total'] == 1:
+                del self.experiment[exp_id]
+
 
     @staticmethod
     def _inject_counts(target, ev):
@@ -1155,7 +1177,7 @@ class EvidenceStringProcess():
                                                  lookup_data.available_genes,
                                                  lookup_data.non_reference_genes,
                                                  datasources= datasources)
-            pickle.dump(global_stats, open(global_stat_cache,'w'))
+            pickle.dump(global_stats, open(global_stat_cache,'w'), protocol=pickle.HIGHEST_PROTOCOL)
 
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
@@ -1278,4 +1300,5 @@ class EvidenceStringProcess():
             EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)
             EvidenceManager.fix_disease_id(ev)
             global_stats.digest(ev=ev)
+        global_stats.compress()
         return global_stats

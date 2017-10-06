@@ -1,18 +1,18 @@
+import base64
 import collections
 import json
 import logging
 import time
-import addict
 from collections import Counter
 
+import addict
 import jsonpickle
-import base64
 from elasticsearch import helpers, TransportError
 
+from mrtarget.Settings import Config
 from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import new_es_client
-from mrtarget.Settings import Config
 
 
 class AssociationSummary(object):
@@ -267,7 +267,16 @@ class ESQuery(object):
             doc_type = datasources
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '*',
-                                            doc_type = doc_type)
+                                            doc_type=doc_type,
+                                            query={
+                                                "match": {
+                                                    "is_valid": {
+                                                        "query": True,
+                                                        "type": "phrase"
+                                                    }
+                                                }
+
+                                            })
 
 
     def get_all_ensembl_genes(self):
@@ -394,12 +403,12 @@ class ESQuery(object):
 
         return dict((hit['_id'],hit['_source']['label']) for hit in res)
 
-    def count_elements_in_index(self, index_name, doc_type=None):
+    def count_elements_in_index(self, index_name, doc_type=None, query = None):
+        if query is None:
+            query =  {"match_all": {}}
         res = self.handler.search(index=Loader.get_versioned_index(index_name,True),
                                   doc_type=doc_type,
-                                  body={"query": {
-                                      "match_all": {}
-                                  },
+                                  body={"query": query,
                                       '_source': False,
                                       'size': 0,
                                   }
