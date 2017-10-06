@@ -1,6 +1,6 @@
 import unittest
 
-from mrtarget.modules.Association import HarmonicSumScorer
+from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.EvidenceString import DataNormaliser, Evidence
 
 

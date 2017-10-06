@@ -2,6 +2,7 @@ import copy
 import json
 import logging
 import math
+import os
 from collections import Counter
 
 import pickle
@@ -17,6 +18,7 @@ from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, WhiteCollarWorker
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules import GeneData
+from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
@@ -749,7 +751,7 @@ class Evidence(JSONSerializable):
     def load_json(self, data):
         self.evidence = json.loads(data)
 
-    def score_evidence(self, modifiers={}):
+    def score_evidence(self, modifiers={}, global_stats = None):
         self.evidence['scores'] = dict(association_score=0.,
                                        )
         try:
@@ -867,6 +869,22 @@ class Evidence(JSONSerializable):
                                                                                                        self.evidence[
                                                                                                            'sourceID']]
                                                                                                    ))
+
+        '''scale score according to global stats'''
+        if global_stats is not None:
+            evidence_pmids = EvidenceGlobalCounter.get_literature(self.evidence)
+
+            experiment_id = EvidenceGlobalCounter.get_experiment(self.evidence)
+
+            global_counts = []
+            for pmid in evidence_pmids:
+                global_counts.append(max(global_stats.get_target_and_disease_uniques_for_literature(pmid)))
+            if experiment_id is not None:
+                global_counts.append(max(global_stats.get_target_and_disease_uniques_for_experiment(experiment_id)))
+            max_count = max(global_counts)
+
+            modifier = HarmonicSumScorer.sigmoid_scaling(max_count)
+            self.evidence['scores']['association_score'] *= modifier
 
         '''modify scores accodigng to weights'''
         datasource_weight = Config.DATASOURCE_EVIDENCE_SCORE_WEIGHT.get(self.evidence['sourceID'], 1.)
@@ -989,7 +1007,8 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         fixed_ev, fixed = self.evidence_manager.fix_evidence(ev_raw)
         if self.evidence_manager.is_valid(fixed_ev, datasource=fixed_ev.datasource):
             '''add scoring to evidence string'''
-            fixed_ev.score_evidence(self.evidence_manager.score_modifiers)
+            fixed_ev.score_evidence(self.evidence_manager.score_modifiers,
+                                    self.global_stats)
             '''extend data in evidencestring'''
 
             ev = self.evidence_manager.get_extended_evidence(fixed_ev,
@@ -1039,6 +1058,30 @@ class EvidenceGlobalCounter():
                 self.experiment[exp] = self._init_counter()
             self._inject_counts(self.experiment[exp], ev)
 
+    def get_target_and_disease_uniques_for_literature(self, lit_id):
+        '''
+        
+        :param lit_id: literature id 
+        :return: tuple of target and disease unique ids linked to the literature id
+        '''
+        try:
+            literature_data = self.literature[lit_id]
+        except KeyError as e:
+            return (0,0)
+        return len(literature_data['target']), len(literature_data['disease'])
+
+    def get_target_and_disease_uniques_for_experiment(self, exp_id):
+        '''
+
+        :param exp_id: experiment id 
+        :return: tuple of target and disease unique ids linked to the experiment id
+        '''
+        try:
+            experiment_data = self.experiment[exp_id]
+        except KeyError as e:
+            return (0, 0)
+        return len(experiment_data['target']), len(experiment_data['disease'])
+
     @staticmethod
     def _inject_counts(target, ev):
         target['target'][EvidenceGlobalCounter.get_target(ev)] += 1
@@ -1059,7 +1102,7 @@ class EvidenceGlobalCounter():
         try:
             return [i['lit_id'].split('/')[-1] for i in ev['literature']['references']]
         except KeyError as e:
-            return ()
+            return []
     @staticmethod
     def get_experiment(ev):
         try:
@@ -1104,11 +1147,16 @@ class EvidenceStringProcess():
                                           es_pub=self.es_pub,
                                           ).lookup
 
-        global_stats = self.get_global_stats(lookup_data.uni2ens,
-                                             lookup_data.available_genes,
-                                             lookup_data.non_reference_genes,
-                                             datasources= datasources)
-        pickle.dump(global_stats, open('global_stats.pkl','w'))
+        global_stat_cache= 'global_stats.pkl'
+        if os.path.exists(global_stat_cache):
+            global_stats = pickle.load(open(global_stat_cache))
+        else:
+            global_stats = self.get_global_stats(lookup_data.uni2ens,
+                                                 lookup_data.available_genes,
+                                                 lookup_data.non_reference_genes,
+                                                 datasources= datasources)
+            pickle.dump(global_stats, open(global_stat_cache,'w'))
+
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
         '''prepare es indices'''

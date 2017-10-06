@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from mrtarget.modules.EvidenceString import DataNormaliser, Evidence, EvidenceGlobalCounter
+from mrtarget.modules.EvidenceString import  EvidenceGlobalCounter
 
 
 literature_evidence ='''
@@ -242,11 +242,14 @@ rna_evidence='''
 }
 '''
 
-class EvidenceGlobalCounterTest(unittest.TestCase):
+class EvidenceGlobalCounterTestCase(unittest.TestCase):
 
     def setUp(self):
         self.literature_test_data = json.loads(literature_evidence)
         self.rna_test_data = json.loads(rna_evidence)
+        self.global_counts = EvidenceGlobalCounter()
+        self.global_counts.digest(self.rna_test_data)
+        self.global_counts.digest(self.literature_test_data)
 
     def test_digest(self):
         self.assertEqual(EvidenceGlobalCounter.get_target(self.literature_test_data), 'ENSG00000260852')
@@ -258,20 +261,22 @@ class EvidenceGlobalCounterTest(unittest.TestCase):
         self.assertEqual(EvidenceGlobalCounter.get_experiment(self.rna_test_data), 'STUDYID_E-MTAB-3201')
 
     def test_count(self):
-        global_counts = EvidenceGlobalCounter()
-        global_counts.digest(self.rna_test_data)
-        global_counts.digest(self.literature_test_data)
-        self.assertEquals(global_counts.total['target']['ENSG00000260852'],1)
-        self.assertEquals(global_counts.total['target']['ENSG00000166503'],1)
-        self.assertEquals(global_counts.total['disease']['EFO_0003778'],1)
-        self.assertEquals(global_counts.total['disease']['EFO_0000311'],1)
-        self.assertEquals(global_counts.total['total'], 2)
-        self.assertEquals(global_counts.literature['28479250']['target']['ENSG00000260852'], 1)
-        self.assertEquals(global_counts.literature['28479250']['disease']['EFO_0000311'], 1)
-        self.assertEquals(global_counts.literature['28479250']['total'], 1)
-        self.assertEquals(global_counts.experiment['STUDYID_E-MTAB-3201']['target']['ENSG00000166503'], 1)
-        self.assertEquals(global_counts.experiment['STUDYID_E-MTAB-3201']['disease']['EFO_0003778'], 1)
-        self.assertEquals(global_counts.experiment['STUDYID_E-MTAB-3201']['total'], 1)
+
+        self.assertEquals(self.global_counts.total['target']['ENSG00000260852'],1)
+        self.assertEquals(self.global_counts.total['target']['ENSG00000166503'],1)
+        self.assertEquals(self.global_counts.total['disease']['EFO_0003778'],1)
+        self.assertEquals(self.global_counts.total['disease']['EFO_0000311'],1)
+        self.assertEquals(self.global_counts.total['total'], 2)
+        self.assertEquals(self.global_counts.literature['28479250']['target']['ENSG00000260852'], 1)
+        self.assertEquals(self.global_counts.literature['28479250']['disease']['EFO_0000311'], 1)
+        self.assertEquals(self.global_counts.literature['28479250']['total'], 1)
+        self.assertEquals(self.global_counts.experiment['STUDYID_E-MTAB-3201']['target']['ENSG00000166503'], 1)
+        self.assertEquals(self.global_counts.experiment['STUDYID_E-MTAB-3201']['disease']['EFO_0003778'], 1)
+        self.assertEquals(self.global_counts.experiment['STUDYID_E-MTAB-3201']['total'], 1)
+
+    def test_retrieval(self):
+        self.assertEquals((1,1), self.global_counts.get_target_and_disease_uniques_for_literature('28479250'))
+        self.assertEquals((1, 1), self.global_counts.get_target_and_disease_uniques_for_experiment('STUDYID_E-MTAB-3201'))
 
 
 
