@@ -326,7 +326,7 @@ class ESQuery(object):
         for hit in res['hits']['hits']:
             return hit['_source']
 
-    def get_disease_to_targets_vectors(self):
+    def get_disease_to_targets_vectors(self, treshold = 0.1):
         #TODO: look at the multiquery api
 
         self.logger.debug('scan es to get all diseases and targets')
@@ -352,18 +352,19 @@ class ESQuery(object):
         for hit in res:
             c+=1
             hit = hit['_source']
-            '''store target associations'''
-            if hit['target']['id'] not in target_results:
-                target_results[hit['target']['id']] = SparseFloatDict()
-            target_results[hit['target']['id']][hit['disease']['id']]=hit['harmonic-sum']['overall']
+            if hit['harmonic-sum']['overall'] >= treshold:
+                '''store target associations'''
+                if hit['target']['id'] not in target_results:
+                    target_results[hit['target']['id']] = SparseFloatDict()
+                target_results[hit['target']['id']][hit['disease']['id']]=hit['harmonic-sum']['overall']
 
-            '''store disease associations'''
-            if hit['disease']['id'] not in disease_results:
-                disease_results[hit['disease']['id']] = SparseFloatDict()
-            disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
+                '''store disease associations'''
+                if hit['disease']['id'] not in disease_results:
+                    disease_results[hit['disease']['id']] = SparseFloatDict()
+                disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
 
             if c%10000 == 0:
-                self.logger.debug('%d elements gotten', c)
+                self.logger.debug('%d elements read', c)
 
         return target_results, disease_results
 

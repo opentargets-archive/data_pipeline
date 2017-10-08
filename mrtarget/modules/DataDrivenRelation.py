@@ -389,7 +389,7 @@ class RelationHandler(object):
         self.disease_data = disease_data
         self.available_targets = ordered_target_keys
         self.available_diseases = ordered_disease_keys
-        self.use_quantitiative_scores = False
+        self.use_quantitiative_scores = use_quantitiative_scores
 
     def produce_d2d_pairs(self, subject_analysis_queue=None, produced_pairs_queue=None, redis_path=None):
 
