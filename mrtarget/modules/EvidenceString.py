@@ -1296,7 +1296,7 @@ class EvidenceStringProcess():
         global_stats = EvidenceGlobalCounter()
         for row in tqdm(self.get_evidence(page_size, datasources),
                         desc='getting global stats on  available evidence_strings',
-                        total=self.es_query.count_validated_evidence_strings(datasources=datasources),
+                        total=self.es_query.count_validated_evidence_strings(),
                         unit=' evidence',
                         # file=tqdm_out,
                         unit_scale=True):
