@@ -833,8 +833,12 @@ class Evidence(JSONSerializable):
                         score = 1.
                 self.evidence['scores']['association_score'] = score
             elif self.evidence['type'] == 'affected_pathway':
-                self.evidence['scores']['association_score'] = float(
-                    self.evidence['evidence']['resource_score']['value'])
+                if self.evidence['evidence']['resource_score']['type']== 'pvalue':
+                    score = self._get_score_from_pvalue_linear(float(self.evidence['evidence']['resource_score']['value']))
+                else:
+                    score = float(
+                        self.evidence['evidence']['resource_score']['value'])
+                self.evidence['scores']['association_score'] = score
                 # if self.evidence['sourceID']=='expression_atlas':
                 #     pass
                 # elif self.evidence['sourceID']=='uniprot':
