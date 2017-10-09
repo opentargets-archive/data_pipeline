@@ -2,8 +2,10 @@ import copy
 import json
 import logging
 import math
-import time
+import os
+from collections import Counter
 
+import pickle
 from tqdm import tqdm
 
 from mrtarget.Settings import Config, file_or_resource
@@ -16,6 +18,7 @@ from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, WhiteCollarWorker
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules import GeneData
+from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
@@ -323,33 +326,12 @@ class EvidenceManager():
         #         evidence['id']))
 
         '''remove identifiers.org from genes and map to ensembl ids'''
-        target_id = evidence['target']['id']
-        new_target_id = None
-        id_not_in_ensembl = False
-        try:
-            if target_id.startswith(self.uni_header):
-                if '-' in target_id:
-                    target_id = target_id.split('-')[0]
-                uniprotid = target_id.split(self.uni_header)[1].strip()
-                ensemblid = self.uni2ens[uniprotid]
-                new_target_id = self.get_reference_ensembl_id(ensemblid)
-            elif target_id.startswith(self.ens_header):
-                ensemblid = target_id.split(self.ens_header)[1].strip()
-                new_target_id = self.get_reference_ensembl_id(ensemblid)
-            else:
-                logger.warning("could not recognize target.id: %s | not added" % target_id)
-                id_not_in_ensembl = True
-        except KeyError:
-            logger.error("cannot find an ensembl ID for: %s" % target_id)
-            id_not_in_ensembl = True
+        EvidenceManager.fix_target_id(evidence,
+                                      self.uni2ens,
+                                      self.available_genes,
+                                      self.non_reference_genes
+                                      )
 
-        if id_not_in_ensembl:
-            logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s" % (
-                evidence['id'], target_id))
-
-        # if new_target_id is None:
-        #     raise AttributeError('cannot find any valid target id for evidence %s'%evidence['id'])
-        evidence['target']['id'] = new_target_id
 
         '''remove identifiers.org from cttv activity  and target type ids'''
         if 'target_type' in evidence['target']:
@@ -358,14 +340,7 @@ class EvidenceManager():
             evidence['target']['activity'] = evidence['target']['activity'].split('/')[-1]
 
         '''remove identifiers.org from efos'''
-        disease_id = evidence['disease']['id']
-        new_disease_id = get_ontology_code_from_url(disease_id)
-        if len(new_disease_id.split('_')) != 2:
-            logger.warning("could not recognize disease.id: %s | added anyway" % disease_id)
-        evidence['disease']['id'] = new_disease_id
-        if not new_disease_id:
-            logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
-                evidence['id'], disease_id))
+        EvidenceManager.fix_disease_id(evidence)
 
         '''remove identifiers.org from ecos'''
         new_eco_ids = []
@@ -397,6 +372,66 @@ class EvidenceManager():
                 evidence['id'], str(eco_ids)[:100]))
 
         return Evidence(evidence), fixed
+
+    @staticmethod
+    def normalise_target_id(evidence, uni2ens, available_genes,non_reference_genes ):
+
+        target_id = evidence['target']['id']
+        new_target_id = None
+        id_not_in_ensembl = False
+        try:
+            if target_id.startswith(GeneData.UNI_ID_ORG_PREFIX):
+                if '-' in target_id:
+                    target_id = target_id.split('-')[0]
+                uniprotid = target_id.split(GeneData.UNI_ID_ORG_PREFIX)[1].strip()
+                ensemblid = uni2ens[uniprotid]
+                new_target_id = EvidenceManager.get_reference_ensembl_id(ensemblid,
+                                                                         available_genes=available_genes,
+                                                                         non_reference_genes=non_reference_genes)
+            elif target_id.startswith(GeneData.ENS_ID_ORG_PREFIX):
+                ensemblid = target_id.split(GeneData.ENS_ID_ORG_PREFIX)[1].strip()
+                new_target_id = EvidenceManager.get_reference_ensembl_id(ensemblid,
+                                                                         available_genes=available_genes,
+                                                                         non_reference_genes=non_reference_genes)
+            else:
+                logger.warning("could not recognize target.id: %s | not added" % target_id)
+                id_not_in_ensembl = True
+        except KeyError:
+            logger.error("cannot find an ensembl ID for: %s" % target_id)
+            id_not_in_ensembl = True
+
+        return new_target_id, id_not_in_ensembl
+
+    @staticmethod
+    def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes) :
+        target_id = evidence['target']['id']
+
+        try:
+            new_target_id, id_not_in_ensembl = EvidenceManager.normalise_target_id(evidence,
+                                                                                   uni2ens,
+                                                                                   available_genes,
+                                                                                   non_reference_genes)
+        except KeyError:
+            logger.error("cannot find an ensembl ID for: %s" % target_id)
+            id_not_in_ensembl = True
+            new_target_id = target_id
+
+        if id_not_in_ensembl:
+            logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s" % (
+                evidence['id'], target_id))
+
+        evidence['target']['id'] = new_target_id
+
+    @staticmethod
+    def fix_disease_id(evidence):
+        disease_id = evidence['disease']['id']
+        new_disease_id = get_ontology_code_from_url(disease_id)
+        if len(new_disease_id.split('_')) != 2:
+            logger.warning("could not recognize disease.id: %s | added anyway" % disease_id)
+        evidence['disease']['id'] = new_disease_id
+        if not new_disease_id:
+            logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
+                evidence['id'], disease_id))
 
     def is_valid(self, evidence, datasource):
         '''check consistency of the data in the evidence'''
@@ -631,16 +666,17 @@ class EvidenceManager():
             else:
                 self.non_reference_genes[symbol]['alternative'].append(ensg)
 
-    def _map_to_reference_ensembl_gene(self, ensg):
-        for symbol, data in self.non_reference_genes.items():
+    @staticmethod
+    def _map_to_reference_ensembl_gene(ensg, non_reference_genes):
+        for symbol, data in non_reference_genes.items():
             if ensg in data['alternative']:
                 logger.warning(
                     "Mapped non reference ensembl gene id %s to %s for gene %s" % (ensg, data['reference'], symbol))
                 return data['reference']
-
-    def get_reference_ensembl_id(self, ensemblid):
-        if ensemblid not in self.available_genes:
-            ensemblid = self._map_to_reference_ensembl_gene(ensemblid) or ensemblid
+    @staticmethod
+    def get_reference_ensembl_id(ensemblid, available_genes, non_reference_genes):
+        if ensemblid not in available_genes:
+            ensemblid = EvidenceManager._map_to_reference_ensembl_gene(ensemblid, non_reference_genes) or ensemblid
         return ensemblid
 
     def _get_eco_scoring_values(self):
@@ -715,7 +751,7 @@ class Evidence(JSONSerializable):
     def load_json(self, data):
         self.evidence = json.loads(data)
 
-    def score_evidence(self, modifiers={}):
+    def score_evidence(self, modifiers={}, global_stats = None):
         self.evidence['scores'] = dict(association_score=0.,
                                        )
         try:
@@ -834,6 +870,22 @@ class Evidence(JSONSerializable):
                                                                                                            'sourceID']]
                                                                                                    ))
 
+        '''scale score according to global stats'''
+        if global_stats is not None:
+            evidence_pmids = EvidenceGlobalCounter.get_literature(self.evidence)
+
+            experiment_id = EvidenceGlobalCounter.get_experiment(self.evidence)
+
+            global_counts = [1]
+            for pmid in evidence_pmids:
+                global_counts.append(max(global_stats.get_target_and_disease_uniques_for_literature(pmid)))
+            if experiment_id is not None:
+                global_counts.append(max(global_stats.get_target_and_disease_uniques_for_experiment(experiment_id)))
+            max_count = max(global_counts)
+
+            modifier = HarmonicSumScorer.sigmoid_scaling(max_count)
+            self.evidence['scores']['association_score'] *= modifier
+
         '''modify scores accodigng to weights'''
         datasource_weight = Config.DATASOURCE_EVIDENCE_SCORE_WEIGHT.get(self.evidence['sourceID'], 1.)
         if datasource_weight != 1:
@@ -924,6 +976,7 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
                  dry_run=False,
                  lookup_data=None,
                  inject_literature=False,
+                 global_stats = None,
                  ):
         super(EvidenceProcesser, self).__init__(score_q, r_path, loader_q, ignore_errors=[AttributeError])
         self.q = score_q
@@ -935,6 +988,7 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         self.evidence_manager = EvidenceManager(lookup_data)
         self.inject_literature = inject_literature
         self.pub_fetcher = None
+        self.global_stats = global_stats
 
     def init(self):
         super(EvidenceProcesser, self).init()
@@ -953,7 +1007,8 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         fixed_ev, fixed = self.evidence_manager.fix_evidence(ev_raw)
         if self.evidence_manager.is_valid(fixed_ev, datasource=fixed_ev.datasource):
             '''add scoring to evidence string'''
-            fixed_ev.score_evidence(self.evidence_manager.score_modifiers)
+            fixed_ev.score_evidence(self.evidence_manager.score_modifiers,
+                                    self.global_stats)
             '''extend data in evidencestring'''
 
             ev = self.evidence_manager.get_extended_evidence(fixed_ev,
@@ -972,6 +1027,110 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
                              routing=ev.evidence['target']['id'])
         return loader_args, loader_kwargs
 
+
+class EvidenceGlobalCounter():
+    '''stores aggregated stats about evidence properties used in the computation of the score'''
+    GLOBAL_COUNTERS = ['target',
+                       'disease',
+                       ]
+
+    def __init__(self):
+        self.total = self._init_counter()
+        self.experiment = {}
+        self._all_experiment_ids = set()
+        self.literature = {}
+        self._all_literature_ids = set()
+
+
+    def _init_counter(self):
+        d = {'total':0}
+        for i in self.GLOBAL_COUNTERS:
+            d[i]=Counter()
+        return d
+
+    def digest(self, ev):
+        '''takes an evidence in dict format and populate the appropiate counters'''
+        self._inject_counts(self.total, ev)
+        for lit in self.get_literature(ev):
+            if lit not in self.literature:
+                self.literature[lit]= self._init_counter()
+            self._inject_counts(self.literature[lit], ev)
+        exp = self.get_experiment(ev)
+        if exp:
+            if exp not in self.experiment:
+                self.experiment[exp] = self._init_counter()
+            self._inject_counts(self.experiment[exp], ev)
+
+    def get_target_and_disease_uniques_for_literature(self, lit_id):
+        '''
+        
+        :param lit_id: literature id 
+        :return: tuple of target and disease unique ids linked to the literature id
+        '''
+        try:
+            literature_data = self.literature[lit_id]
+        except KeyError as e:
+            if lit_id in self._all_literature_ids:
+                return (1,1)
+            else:
+                return (0,0)
+        return len(literature_data['target']), len(literature_data['disease'])
+
+    def get_target_and_disease_uniques_for_experiment(self, exp_id):
+        '''
+
+        :param exp_id: experiment id 
+        :return: tuple of target and disease unique ids linked to the experiment id
+        '''
+        try:
+            experiment_data = self.experiment[exp_id]
+        except KeyError as e:
+            if exp_id in self._all_experiment_ids:
+                return (1,1)
+            else:
+                return (0,0)
+        return len(experiment_data['target']), len(experiment_data['disease'])
+
+    def compress(self):
+        '''removes all the entries with a single occurrence and assume the counts are 1 when a query raise a keyerror'''
+        self._all_literature_ids = set(self.literature.keys())
+        for lit_id in self._all_literature_ids:
+            if self.literature[lit_id]['total'] == 1:
+                del self.literature[lit_id]
+
+        self._all_experiment_ids = set(self.experiment.keys())
+        for exp_id in self._all_experiment_ids:
+            if self.experiment[exp_id]['total'] == 1:
+                del self.experiment[exp_id]
+
+
+    @staticmethod
+    def _inject_counts(target, ev):
+        target['target'][EvidenceGlobalCounter.get_target(ev)] += 1
+        target['disease'][EvidenceGlobalCounter.get_disease(ev)] += 1
+        target['total']+= 1
+
+
+    @staticmethod
+    def get_target(ev):
+        return ev['target']['id']
+
+    @staticmethod
+    def get_disease(ev):
+        return ev['disease']['id']
+
+    @staticmethod
+    def get_literature(ev):
+        try:
+            return [i['lit_id'].split('/')[-1] for i in ev['literature']['references']]
+        except KeyError as e:
+            return []
+    @staticmethod
+    def get_experiment(ev):
+        try:
+            return ev['evidence']['unique_experiment_reference']
+        except KeyError as e:
+            pass
 
 class EvidenceStringProcess():
     def __init__(self,
@@ -996,6 +1155,7 @@ class EvidenceStringProcess():
                                       inject_literature=False):
 
         logger.debug("Starting Evidence Manager")
+        '''get lookup data and stats'''
         lookup_data_types = [LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
         if inject_literature:
             lookup_data_types = [LookUpDataType.PUBLICATION, LookUpDataType.TARGET, LookUpDataType.DISEASE,
@@ -1008,9 +1168,20 @@ class EvidenceStringProcess():
                                           autoload=True,
                                           es_pub=self.es_pub,
                                           ).lookup
+
+        global_stat_cache= 'global_stats.pkl'
+        if os.path.exists(global_stat_cache):
+            global_stats = pickle.load(open(global_stat_cache))
+        else:
+            global_stats = self.get_global_stats(lookup_data.uni2ens,
+                                                 lookup_data.available_genes,
+                                                 lookup_data.non_reference_genes,
+                                                 datasources= datasources)
+            pickle.dump(global_stats, open(global_stat_cache,'w'), protocol=pickle.HIGHEST_PROTOCOL)
+
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
-        '''create and overwrite old data'''
+        '''prepare es indices'''
         loader = Loader(self.es)
         overwrite_indices = not dry_run
         if not dry_run:
@@ -1056,15 +1227,16 @@ class EvidenceStringProcess():
         '''create workers'''
 
         scorers = WhiteCollarWorker(target=EvidenceProcesser,
-                                       pool_size=number_of_workers,
-                                       queue_in=evidence_q,
-                                       redis_path=None,
-                                       queue_out=store_q,
-                                       kwargs=dict(
-                                                   lookup_data=lookup_data,
-                                                   inject_literature=inject_literature
-                                                   )
-                                       )
+                                    pool_size=number_of_workers,
+                                    queue_in=evidence_q,
+                                    redis_path=None,
+                                    queue_out=store_q,
+                                    kwargs=dict(
+                                        lookup_data=lookup_data,
+                                        inject_literature=inject_literature,
+                                        global_stats=global_stats
+                                    )
+                                    )
         scorers.start()
 
         loaders = WhiteCollarWorker(target=LoaderWorker,
@@ -1082,7 +1254,7 @@ class EvidenceStringProcess():
                         desc='Reading available evidence_strings',
                         total=self.es_query.count_validated_evidence_strings(datasources=datasources),
                         unit=' evidence',
-                        file=tqdm_out,
+                        # file=tqdm_out,
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name'])
             idev = row['uniq_assoc_fields_hashdig']
@@ -1111,8 +1283,22 @@ class EvidenceStringProcess():
         c = 0
         for row in self.es_query.get_validated_evidence_strings(size=page_size, datasources=datasources):
             c += 1
-            if c % page_size == 0:
+            if c % 1e5 == 0:
                 logger.debug("loaded %i ev from db to process" % c)
             yield row
         logger.info("loaded %i ev from db to process" % c)
 
+    def get_global_stats(self, uni2ens, available_genes, non_reference_genes, page_size=5000, datasources=[]):
+        global_stats = EvidenceGlobalCounter()
+        for row in tqdm(self.get_evidence(page_size, datasources),
+                        desc='getting global stats on  available evidence_strings',
+                        total=self.es_query.count_validated_evidence_strings(datasources=datasources),
+                        unit=' evidence',
+                        # file=tqdm_out,
+                        unit_scale=True):
+            ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence
+            EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)
+            EvidenceManager.fix_disease_id(ev)
+            global_stats.digest(ev=ev)
+        global_stats.compress()
+        return global_stats
