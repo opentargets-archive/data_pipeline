@@ -70,9 +70,9 @@ class ReactomeDataDownloader():
         for row in self._download_data(Config.REACTOME_PATHWAY_DATA).split('\n'):
             if row:
                 pathway_id, pathway_name, species = row.split('\t')
-                pathway_id = pathway_id[1:-1]
-                pathway_name = pathway_name[1:-1]
-                species = species[1:-1]
+                pathway_id = pathway_id[1:-1] if pathway_id[0] == '"' else pathway_id
+                pathway_name = pathway_name[1:-1] if pathway_name[0] == '"' else pathway_name
+                species = species[1:-1] if species[0] == '"' else species
 
                 if pathway_id not in self.valid_pathway_ids:
                     if species in self.allowed_species:
@@ -92,8 +92,8 @@ class ReactomeDataDownloader():
         for row in self._download_data(Config.REACTOME_PATHWAY_RELATION).split('\n'):
             if row:
                 parent_id, child_id = row.split('\t')
-                parent_id = parent_id[1:-1]
-                child_id = child_id[1:-1]
+                parent_id = parent_id[1:-1] if parent_id[0] == '"' else parent_id
+                child_id = child_id[1:-1] if child_id[0] == '"' else child_id
 
                 relation = (parent_id, child_id)
                 if relation not in added_relations:
