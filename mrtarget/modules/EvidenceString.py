@@ -1181,7 +1181,8 @@ class EvidenceStringProcess():
                                                  lookup_data.available_genes,
                                                  lookup_data.non_reference_genes,
                                                  datasources= datasources)
-            pickle.dump(global_stats, open(global_stat_cache,'w'), protocol=pickle.HIGHEST_PROTOCOL)
+            if logger.level == logging.DEBUG:
+                pickle.dump(global_stats, open(global_stat_cache,'w'), protocol=pickle.HIGHEST_PROTOCOL)
 
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
