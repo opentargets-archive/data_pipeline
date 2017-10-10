@@ -1258,7 +1258,7 @@ class EvidenceStringProcess():
                         desc='Reading available evidence_strings',
                         total=self.es_query.count_validated_evidence_strings(datasources=datasources),
                         unit=' evidence',
-                        # file=tqdm_out,
+                        file=tqdm_out,
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name'])
             idev = row['uniq_assoc_fields_hashdig']
@@ -1298,7 +1298,7 @@ class EvidenceStringProcess():
                         desc='getting global stats on  available evidence_strings',
                         total=self.es_query.count_validated_evidence_strings(),
                         unit=' evidence',
-                        # file=tqdm_out,
+                        file=tqdm_out,
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence
             EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)
