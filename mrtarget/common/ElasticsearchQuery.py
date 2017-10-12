@@ -1,18 +1,18 @@
+import base64
 import collections
 import json
 import logging
 import time
-import addict
 from collections import Counter
 
+import addict
 import jsonpickle
-import base64
 from elasticsearch import helpers, TransportError
 
+from mrtarget.Settings import Config
 from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import new_es_client
-from mrtarget.Settings import Config
 
 
 class AssociationSummary(object):
@@ -267,7 +267,16 @@ class ESQuery(object):
             doc_type = datasources
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '*',
-                                            doc_type = doc_type)
+                                            doc_type=doc_type,
+                                            query={
+                                                "match": {
+                                                    "is_valid": {
+                                                        "query": True,
+                                                        "type": "phrase"
+                                                    }
+                                                }
+
+                                            })
 
 
     def get_all_ensembl_genes(self):
@@ -317,7 +326,7 @@ class ESQuery(object):
         for hit in res['hits']['hits']:
             return hit['_source']
 
-    def get_disease_to_targets_vectors(self):
+    def get_disease_to_targets_vectors(self, treshold = 0.1):
         #TODO: look at the multiquery api
 
         self.logger.debug('scan es to get all diseases and targets')
@@ -343,18 +352,19 @@ class ESQuery(object):
         for hit in res:
             c+=1
             hit = hit['_source']
-            '''store target associations'''
-            if hit['target']['id'] not in target_results:
-                target_results[hit['target']['id']] = SparseFloatDict()
-            target_results[hit['target']['id']][hit['disease']['id']]=hit['harmonic-sum']['overall']
+            if hit['harmonic-sum']['overall'] >= treshold:
+                '''store target associations'''
+                if hit['target']['id'] not in target_results:
+                    target_results[hit['target']['id']] = SparseFloatDict()
+                target_results[hit['target']['id']][hit['disease']['id']]=hit['harmonic-sum']['overall']
 
-            '''store disease associations'''
-            if hit['disease']['id'] not in disease_results:
-                disease_results[hit['disease']['id']] = SparseFloatDict()
-            disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
+                '''store disease associations'''
+                if hit['disease']['id'] not in disease_results:
+                    disease_results[hit['disease']['id']] = SparseFloatDict()
+                disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
 
             if c%10000 == 0:
-                self.logger.debug('%d elements gotten', c)
+                self.logger.debug('%d elements read', c)
 
         return target_results, disease_results
 
@@ -394,12 +404,12 @@ class ESQuery(object):
 
         return dict((hit['_id'],hit['_source']['label']) for hit in res)
 
-    def count_elements_in_index(self, index_name, doc_type=None):
+    def count_elements_in_index(self, index_name, doc_type=None, query = None):
+        if query is None:
+            query =  {"match_all": {}}
         res = self.handler.search(index=Loader.get_versioned_index(index_name,True),
                                   doc_type=doc_type,
-                                  body={"query": {
-                                      "match_all": {}
-                                  },
+                                  body={"query": query,
                                       '_source': False,
                                       'size': 0,
                                   }
