@@ -47,6 +47,7 @@ class EFO(JSONSerializable):
                  path=[],
                  path_codes=[],
                  path_labels=[],
+                 therapeutic_labels=[],
                  # id_org=None,
                  definition=""):
         self.code = code
@@ -56,6 +57,7 @@ class EFO(JSONSerializable):
         self.path = path
         self.path_codes = path_codes
         self.path_labels = path_labels
+        self.therapeutic_labels = therapeutic_labels
         # self.id_org = id_org
         self.definition = definition
         self.children=[]
@@ -120,6 +122,9 @@ class EfoProcess():
             if uri in disease_phenotypes:
                 phenotypes = disease_phenotypes[uri]['phenotypes']
 
+            therapeutic_labels = [item[0] for item in self.disease_ontology.classes_paths[uri]['labels']]
+            therapeutic_labels = self._remove_duplicates(therapeutic_labels)
+
             efo = EFO(code=uri,
                       label=label,
                       synonyms=synonyms,
@@ -127,6 +132,7 @@ class EfoProcess():
                       path=self.disease_ontology.classes_paths[uri]['all'],
                       path_codes=self.disease_ontology.classes_paths[uri]['ids'],
                       path_labels=self.disease_ontology.classes_paths[uri]['labels'],
+                      therapeutic_labels=therapeutic_labels,
                       definition=definition
                       )
             id = self.disease_ontology.classes_paths[uri]['ids'][0][-1]
@@ -134,6 +140,14 @@ class EfoProcess():
                 efo.children = self.disease_ontology.children[uri]
             self.efos[id] = efo
 
+    def _remove_duplicates(self, list):
+
+        newlist = []
+
+        for item in list:
+            if item not in newlist:
+                newlist.append(item)
+        return newlist
 
     def _store_efo(self):
 

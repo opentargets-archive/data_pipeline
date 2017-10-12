@@ -629,6 +629,7 @@ def get_redis_worker(base = Process):
                      redis_path,
                      queue_out=None,
                      auto_signal_submission_finished=True,
+                     ignore_errors =[],
                      **kwargs
                      ):
 
@@ -645,6 +646,7 @@ def get_redis_worker(base = Process):
             self.logger.info('%s started' % self.name)
             self.job_result_cache = []
             self.kill_switch = False
+            self.ignore_errors = ignore_errors
 
         def _inner_run(self):
             # here we are inside the new process
@@ -669,7 +671,13 @@ def get_redis_worker(base = Process):
                         self.logger.exception('Timed out processing job %s: %s' % (key, e.message))
                     except Exception as e:
                         error = True
-                        self.logger.exception('Error processing job %s: %s' % (key, e.message))
+                        for ignored_error in self.ignore_errors:
+                            if isinstance(e, ignored_error):
+                                error = False
+                        if error:
+                            self.logger.exception('Error processing job %s: %s' % (key, e.message))
+                        else:
+                            self.logger.debug('Error processing job %s: %s' % (key, e.message))
                     else:
                         signal.alarm(0)
 
@@ -780,7 +788,8 @@ class WhiteCollarWorker(Thread):
                  queue_out=None,
                  args=[],
                  kwargs={},
-                 max_restart=3):
+                 max_restart=3,
+                 max_memory_level = 80):
         super(WhiteCollarWorker, self).__init__()
         self.daemon = True
         self.target = target
@@ -794,6 +803,7 @@ class WhiteCollarWorker(Thread):
         self.max_restarts=max_restart
         self.restart_log = Counter()
         self.logger = logging.getLogger(__name__)
+        self.MAX_MEMORY_LEVEL = max_memory_level
 
 
 

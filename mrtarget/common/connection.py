@@ -6,8 +6,11 @@ import tempfile as tmp
 from elasticsearch import Elasticsearch, ConnectionTimeout
 from elasticsearch import RequestsHttpConnection
 from redislite import Redis
+import redis.exceptions as redis_ex
 
 from mrtarget.Settings import Config
+from redis.exceptions import ConnectionError
+
 
 # just one redis instance per app
 r_instance = {'instance': None}
@@ -16,6 +19,21 @@ r_instance = {'instance': None}
 def new_redis_client():
     return Redis(host=Config.REDISLITE_DB_HOST,
                  port=Config.REDISLITE_DB_PORT)
+
+
+def redis_server_is_up(log_h=None):
+    is_up = False
+    try:
+        c = new_redis_client()
+        c.ping()
+        is_up = True
+
+        log_h.warning('detected a redis-server instance running, so attaching to it')
+    except redis_ex.ConnectionError:
+        if log_h:
+            log_h.info('not detected a redis-server running so starting a new one')
+    finally:
+        return is_up
 
 
 def new_es_client(hosts=Config.ELASTICSEARCH_NODES):
@@ -50,8 +68,6 @@ class PipelineConnectors():
         self.r_instance = r_instance['instance']
 
     def init_services_connections(self,
-                                  data_es=True,
-                                  publication_es=False,
                                   redispersist=False):
         success = False
         self.persist = redispersist
@@ -86,7 +102,7 @@ class PipelineConnectors():
         '''init es client for publication'''
         pub_hosts = Config.ELASTICSEARCH_NODES_PUB
         if pub_hosts != hosts:
-            if publication_es and pub_hosts:
+            if pub_hosts:
                 self.es_pub = new_es_client(pub_hosts)
                 try:
                     connection_attempt = 1
@@ -109,6 +125,13 @@ class PipelineConnectors():
                 self.es_pub = None
         else:
             self.es_pub = self.es
+
+        
+        # check if redis server is already running it will be checked if we dont want
+        # remote enabled but the local redis server instance is still running and we want
+        # things implicit and stop bothering other developers forced to kill local redis
+        if redis_server_is_up(self.logger):
+            r_remote = True
 
         if not r_remote and not r_instance['instance']:
             self.redis_db_file = tmp.mktemp(suffix='.rdb', dir='/tmp')

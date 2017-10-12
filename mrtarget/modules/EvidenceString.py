@@ -2,32 +2,30 @@ import copy
 import json
 import logging
 import math
-import multiprocessing
-import time
+import os
+from collections import Counter
 
-from elasticsearch import Elasticsearch
+import pickle
 from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
 
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import Actions
 from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
-from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, WhiteCollarWorker
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules import GeneData
+from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.Literature import Publication, PublicationFetcher
-from mrtarget.modules.LiteratureNLP import PublicationAnalysisSpacy, NounChuncker
-from mrtarget.Settings import Config, file_or_resource
-from mrtarget.common.connection import new_es_client, new_redis_client
 
 logger = logging.getLogger(__name__)
-tqdm_out = TqdmToLogger(logger,level=logging.INFO)
+tqdm_out = TqdmToLogger(logger, level=logging.INFO)
 # logger = multiprocessing.get_logger()
 
 
@@ -65,8 +63,6 @@ except ImportError:
 
         return inner
 '''end of line profiler code'''
-
-
 
 
 class EvidenceStringActions(Actions):
@@ -172,7 +168,7 @@ class ExtendedInfoEFO(ExtendedInfo):
     def extract_info(self, efo):
         therapeutic_area_codes = set()
         therapeutic_area_labels = set()
-        for i,path_codes in enumerate(efo.path_codes):
+        for i, path_codes in enumerate(efo.path_codes):
             if len(path_codes) > 1:
                 therapeutic_area_codes.add(path_codes[0])
                 therapeutic_area_labels.add(efo.path_labels[i][0])
@@ -217,39 +213,10 @@ class ExtendedInfoLiterature(ExtendedInfo):
                          mesh_headings=literature.mesh_headings,
                          keywords=literature.keywords,
                          chemicals=literature.chemicals,
-                         noun_chunks=literature.text_mined_entities['nlp']['chunks'],
-                         top_chunks = literature.text_mined_entities['nlp']['top_chunks'],
+                         noun_chunks=literature.text_mined_entities['nlp'].get('chunks'),
+                         top_chunks=literature.text_mined_entities['nlp'].get('top_chunks'),
                          date=literature.pub_date,
-                         journal_reference = literature.journal_reference)
-
-
-class ProcessedEvidenceStorer():
-    def __init__(self, es_loader, chunk_size=1e4, quiet=False):
-        self.chunk_size = chunk_size
-        self.cache = {}
-        self.counter = 0
-        self.quiet = quiet
-        self.es_loader = es_loader
-
-    def put(self, id, ev):
-        # self.cache[id] = ev
-        self.counter += 1
-        self.es_loader.put(
-            Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
-            ev.get_doc_name(),
-            id,
-            ev.to_json(),
-            create_index=False,
-            routing=ev.evidence['target']['id'])
-
-    def close(self):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
+                         journal_reference=literature.journal_reference)
 
 
 class EvidenceManager():
@@ -260,7 +227,7 @@ class EvidenceManager():
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
         self._get_eco_scoring_values()
-        #logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
+        # logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
         # self.gene_retriever = GeneLookUpTable(self.es)
@@ -270,10 +237,9 @@ class EvidenceManager():
         self.available_publications = {}
         if 'available_publications' in lookup_data.__dict__:
             self.available_publications = lookup_data.available_publications
-        self.noun_chuncker = NounChuncker()
 
 
-        # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
+            # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
 
     # @do_profile()#follow=[])
     def fix_evidence(self, evidence):
@@ -327,8 +293,8 @@ class EvidenceManager():
                 available_score = evidence['evidence']['gene2variant']['resource_score']['value']
             except KeyError:
                 if 'resource_score' in evidence['evidence'] and \
-                    'value' in  evidence['evidence']['resource_score']:
-                        available_score = evidence['evidence']['resource_score']['value']
+                                'value' in evidence['evidence']['resource_score']:
+                    available_score = evidence['evidence']['resource_score']['value']
             try:
                 eco_uri = evidence['evidence']['gene2variant']['functional_consequence']
                 if 'evidence_codes' in evidence['evidence']:
@@ -337,7 +303,6 @@ class EvidenceManager():
                 if 'evidence_codes' in evidence['evidence']:
                     eco_uri = evidence['evidence']['evidence_codes'][0]
                     eco_uri.rstrip()
-
 
             if eco_uri in self.eco_scores:
                 if 'gene2variant' in evidence['evidence']:
@@ -361,33 +326,12 @@ class EvidenceManager():
         #         evidence['id']))
 
         '''remove identifiers.org from genes and map to ensembl ids'''
-        target_id = evidence['target']['id']
-        new_target_id = None
-        id_not_in_ensembl = False
-        try:
-            if target_id.startswith(self.uni_header):
-                if '-' in target_id:
-                    target_id = target_id.split('-')[0]
-                uniprotid = target_id.split(self.uni_header)[1].strip()
-                ensemblid = self.uni2ens[uniprotid]
-                new_target_id = self.get_reference_ensembl_id(ensemblid)
-            elif target_id.startswith(self.ens_header):
-                ensemblid = target_id.split(self.ens_header)[1].strip()
-                new_target_id = self.get_reference_ensembl_id(ensemblid)
-            else:
-                logger.warning("could not recognize target.id: %s | not added" % target_id)
-                id_not_in_ensembl = True
-        except KeyError:
-            logger.error("cannot find an ensembl ID for: %s" % target_id)
-            id_not_in_ensembl = True
+        EvidenceManager.fix_target_id(evidence,
+                                      self.uni2ens,
+                                      self.available_genes,
+                                      self.non_reference_genes
+                                      )
 
-        if id_not_in_ensembl:
-            logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s" % (
-            evidence['id'], target_id))
-
-        # if new_target_id is None:
-        #     raise AttributeError('cannot find any valid target id for evidence %s'%evidence['id'])
-        evidence['target']['id'] = new_target_id
 
         '''remove identifiers.org from cttv activity  and target type ids'''
         if 'target_type' in evidence['target']:
@@ -396,14 +340,7 @@ class EvidenceManager():
             evidence['target']['activity'] = evidence['target']['activity'].split('/')[-1]
 
         '''remove identifiers.org from efos'''
-        disease_id = evidence['disease']['id']
-        new_disease_id = get_ontology_code_from_url(disease_id)
-        if len(new_disease_id.split('_')) != 2:
-            logger.warning("could not recognize disease.id: %s | added anyway" % disease_id)
-        evidence['disease']['id'] = new_disease_id
-        if not new_disease_id:
-            logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
-            evidence['id'], disease_id))
+        EvidenceManager.fix_disease_id(evidence)
 
         '''remove identifiers.org from ecos'''
         new_eco_ids = []
@@ -432,9 +369,69 @@ class EvidenceManager():
         evidence['evidence']['evidence_codes'] = list(set(new_eco_ids))
         if not new_eco_ids:
             logger.warning("No valid ECO could be found in evidence: %s. original ECO mapping: %s" % (
-            evidence['id'], str(eco_ids)[:100]))
+                evidence['id'], str(eco_ids)[:100]))
 
         return Evidence(evidence), fixed
+
+    @staticmethod
+    def normalise_target_id(evidence, uni2ens, available_genes,non_reference_genes ):
+
+        target_id = evidence['target']['id']
+        new_target_id = None
+        id_not_in_ensembl = False
+        try:
+            if target_id.startswith(GeneData.UNI_ID_ORG_PREFIX):
+                if '-' in target_id:
+                    target_id = target_id.split('-')[0]
+                uniprotid = target_id.split(GeneData.UNI_ID_ORG_PREFIX)[1].strip()
+                ensemblid = uni2ens[uniprotid]
+                new_target_id = EvidenceManager.get_reference_ensembl_id(ensemblid,
+                                                                         available_genes=available_genes,
+                                                                         non_reference_genes=non_reference_genes)
+            elif target_id.startswith(GeneData.ENS_ID_ORG_PREFIX):
+                ensemblid = target_id.split(GeneData.ENS_ID_ORG_PREFIX)[1].strip()
+                new_target_id = EvidenceManager.get_reference_ensembl_id(ensemblid,
+                                                                         available_genes=available_genes,
+                                                                         non_reference_genes=non_reference_genes)
+            else:
+                logger.warning("could not recognize target.id: %s | not added" % target_id)
+                id_not_in_ensembl = True
+        except KeyError:
+            logger.error("cannot find an ensembl ID for: %s" % target_id)
+            id_not_in_ensembl = True
+
+        return new_target_id, id_not_in_ensembl
+
+    @staticmethod
+    def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes) :
+        target_id = evidence['target']['id']
+
+        try:
+            new_target_id, id_not_in_ensembl = EvidenceManager.normalise_target_id(evidence,
+                                                                                   uni2ens,
+                                                                                   available_genes,
+                                                                                   non_reference_genes)
+        except KeyError:
+            logger.error("cannot find an ensembl ID for: %s" % target_id)
+            id_not_in_ensembl = True
+            new_target_id = target_id
+
+        if id_not_in_ensembl:
+            logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s" % (
+                evidence['id'], target_id))
+
+        evidence['target']['id'] = new_target_id
+
+    @staticmethod
+    def fix_disease_id(evidence):
+        disease_id = evidence['disease']['id']
+        new_disease_id = get_ontology_code_from_url(disease_id)
+        if len(new_disease_id.split('_')) != 2:
+            logger.warning("could not recognize disease.id: %s | added anyway" % disease_id)
+        evidence['disease']['id'] = new_disease_id
+        if not new_disease_id:
+            logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
+                evidence['id'], disease_id))
 
     def is_valid(self, evidence, datasource):
         '''check consistency of the data in the evidence'''
@@ -467,7 +464,7 @@ class EvidenceManager():
 
         return True
 
-    def get_extended_evidence(self, evidence, process_name, pub_fetcher, inject_literature):
+    def get_extended_evidence(self, evidence, pub_fetcher, inject_literature):
 
         extended_evidence = copy.copy(evidence.evidence)
         extended_evidence['private'] = dict()
@@ -560,7 +557,7 @@ class EvidenceManager():
                 extended_evidence['evidence'][ExtendedInfoECO.root] = data
         except:
             extended_evidence['evidence'][ExtendedInfoECO.root] = None
-            all_eco_codes=[]
+            all_eco_codes = []
 
         '''Add private objects used just for faceting'''
 
@@ -584,12 +581,12 @@ class EvidenceManager():
         ''' Add literature data '''
         if inject_literature:
             if 'literature' in extended_evidence and \
-                    'references' in extended_evidence['literature'] and \
+                            'references' in extended_evidence['literature'] and \
                     extended_evidence['literature']['references']:
                 try:
                     pmid_url = extended_evidence['literature']['references'][0]['lit_id']
                     pmid = pmid_url.split('/')[-1]
-                    pub=None
+                    pub = None
                     if pmid in self.available_publications:
                         pub = self.available_publications[pmid]
                     else:
@@ -598,8 +595,7 @@ class EvidenceManager():
                             if pub_dict:
                                 pub = pub_dict[pmid]
                         except KeyError as e:
-                            logger.warning('Cannot find publication %s in elasticsearch. Not injecting data'%pmid)
-
+                            logger.warning('Cannot find publication %s in elasticsearch. Not injecting data' % pmid)
 
                     if pub is not None:
                         literature_info = ExtendedInfoLiterature(pub)
@@ -628,10 +624,12 @@ class EvidenceManager():
                             'noun_chunks')
                         extended_evidence['private']['facets']['literature']['top_chunks'] = literature_info.data.get(
                             'top_chunks')
-                        extended_evidence['private']['facets']['literature']['keywords'] = literature_info.data.get('keywords')
+                        extended_evidence['private']['facets']['literature']['keywords'] = literature_info.data.get(
+                            'keywords')
 
                 except Exception:
-                    logger.exception('Error in publication data injection - skipped for evidence id: '+extended_evidence['id'])
+                    logger.exception(
+                        'Error in publication data injection - skipped for evidence id: ' + extended_evidence['id'])
 
         return Evidence(extended_evidence)
 
@@ -668,16 +666,17 @@ class EvidenceManager():
             else:
                 self.non_reference_genes[symbol]['alternative'].append(ensg)
 
-    def _map_to_reference_ensembl_gene(self, ensg):
-        for symbol, data in self.non_reference_genes.items():
+    @staticmethod
+    def _map_to_reference_ensembl_gene(ensg, non_reference_genes):
+        for symbol, data in non_reference_genes.items():
             if ensg in data['alternative']:
                 logger.warning(
                     "Mapped non reference ensembl gene id %s to %s for gene %s" % (ensg, data['reference'], symbol))
                 return data['reference']
-
-    def get_reference_ensembl_id(self, ensemblid):
-        if ensemblid not in self.available_genes:
-            ensemblid = self._map_to_reference_ensembl_gene(ensemblid) or ensemblid
+    @staticmethod
+    def get_reference_ensembl_id(ensemblid, available_genes, non_reference_genes):
+        if ensemblid not in available_genes:
+            ensemblid = EvidenceManager._map_to_reference_ensembl_gene(ensemblid, non_reference_genes) or ensemblid
         return ensemblid
 
     def _get_eco_scoring_values(self):
@@ -733,8 +732,6 @@ class Evidence(JSONSerializable):
                           # indent=4,
                           cls=PipelineEncoder)
 
-
-
         return
 
     def score_to_json(self):
@@ -754,7 +751,7 @@ class Evidence(JSONSerializable):
     def load_json(self, data):
         self.evidence = json.loads(data)
 
-    def score_evidence(self, modifiers={}):
+    def score_evidence(self, modifiers={}, global_stats = None):
         self.evidence['scores'] = dict(association_score=0.,
                                        )
         try:
@@ -773,13 +770,14 @@ class Evidence(JSONSerializable):
                 self.evidence['scores']['association_score'] = score
 
             elif self.evidence['type'] == 'genetic_association':
-                score=0.
+                score = 0.
                 if 'gene2variant' in self.evidence['evidence']:
-                    if self.evidence['sourceID'] in ['phewas_catalog','23andme']:
+                    if self.evidence['sourceID'] in ['phewas_catalog', '23andme']:
                         no_of_cases = self.evidence['unique_association_fields']['cases']
                         score = self._score_phewas_data(self.evidence['sourceID'],
-                            self.evidence['evidence']['variant2disease']['resource_score']['value'],
-                            no_of_cases)
+                                                        self.evidence['evidence']['variant2disease']['resource_score'][
+                                                            'value'],
+                                                        no_of_cases)
 
                     else:
 
@@ -820,11 +818,11 @@ class Evidence(JSONSerializable):
                     for mutation in self.evidence['evidence']['known_mutations']:
                         if 'number_samples_with_mutation_type' in mutation:
                             sample_total_coverage += int(mutation['number_samples_with_mutation_type'])
-                            if int(mutation['number_mutated_samples']) >  max_sample_size:
+                            if int(mutation['number_mutated_samples']) > max_sample_size:
                                 max_sample_size = int(mutation['number_mutated_samples'])
                     if sample_total_coverage > max_sample_size:
                         sample_total_coverage = max_sample_size
-                    frequency = DataNormaliser.renormalize(sample_total_coverage/max_sample_size, [0., 9.], [.5, 1.])
+                    frequency = DataNormaliser.renormalize(sample_total_coverage / max_sample_size, [0., 9.], [.5, 1.])
                 self.evidence['scores']['association_score'] = float(
                     self.evidence['evidence']['resource_score']['value']) * frequency
             elif self.evidence['type'] == 'literature':
@@ -835,8 +833,12 @@ class Evidence(JSONSerializable):
                         score = 1.
                 self.evidence['scores']['association_score'] = score
             elif self.evidence['type'] == 'affected_pathway':
-                self.evidence['scores']['association_score'] = float(
-                    self.evidence['evidence']['resource_score']['value'])
+                if self.evidence['evidence']['resource_score']['type']== 'pvalue':
+                    score = self._get_score_from_pvalue_linear(float(self.evidence['evidence']['resource_score']['value']))
+                else:
+                    score = float(
+                        self.evidence['evidence']['resource_score']['value'])
+                self.evidence['scores']['association_score'] = score
                 # if self.evidence['sourceID']=='expression_atlas':
                 #     pass
                 # elif self.evidence['sourceID']=='uniprot':
@@ -871,6 +873,22 @@ class Evidence(JSONSerializable):
                                                                                                        self.evidence[
                                                                                                            'sourceID']]
                                                                                                    ))
+
+        '''scale score according to global stats'''
+        if global_stats is not None:
+            evidence_pmids = EvidenceGlobalCounter.get_literature(self.evidence)
+
+            experiment_id = EvidenceGlobalCounter.get_experiment(self.evidence)
+
+            global_counts = [1]
+            for pmid in evidence_pmids:
+                global_counts.append(max(global_stats.get_target_and_disease_uniques_for_literature(pmid)))
+            if experiment_id is not None:
+                global_counts.append(max(global_stats.get_target_and_disease_uniques_for_experiment(experiment_id)))
+            max_count = max(global_counts)
+
+            modifier = HarmonicSumScorer.sigmoid_scaling(max_count)
+            self.evidence['scores']['association_score'] *= modifier
 
         '''modify scores accodigng to weights'''
         datasource_weight = Config.DATASOURCE_EVIDENCE_SCORE_WEIGHT.get(self.evidence['sourceID'], 1.)
@@ -910,7 +928,7 @@ class Evidence(JSONSerializable):
         # normalised_pvalue, sample_size,normalised_sample_size, severity))
         return score
 
-    def _score_phewas_data(self, source , pvalue, no_of_cases):
+    def _score_phewas_data(self, source, pvalue, no_of_cases):
         if source == 'phewas_catalog':
             max_cases = 8800
             range_min = 0.05
@@ -923,8 +941,6 @@ class Evidence(JSONSerializable):
         normalised_no_of_cases = DataNormaliser.renormalize(no_of_cases, [0, max_cases], [0, 1])
         score = normalised_pvalue * normalised_no_of_cases
         return score
-
-
 
 
 class UploadError():
@@ -955,152 +971,170 @@ class UploadError():
         # json.dump(self.evidence, open(filename + '.json', 'w'))
 
 
-class EvidenceProcesser(multiprocessing.Process):
+class EvidenceProcesser(RedisQueueWorkerProcess):
     def __init__(self,
-                 input_q,
-                 output_q,
-                 lookup_data,
-                 input_loading_finished,
-                 output_computation_finished,
-                 input_generated_count,
-                 output_computed_count,
-                 processing_errors_count,
-                 input_processed_count,
-                 lock,
-                 inject_literature,
-                 es=None):
-        super(EvidenceProcesser, self).__init__()
-        self.input_q = input_q
-        self.output_q = output_q
-        self.start_time = time.time()
+                 score_q,
+                 r_path,
+                 loader_q,
+                 chunk_size=1e4,
+                 dry_run=False,
+                 lookup_data=None,
+                 inject_literature=False,
+                 global_stats = None,
+                 ):
+        super(EvidenceProcesser, self).__init__(score_q, r_path, loader_q, ignore_errors=[AttributeError])
+        self.q = score_q
+        self.chunk_size = chunk_size
+        self.dry_run = dry_run
+        self.es = None
+        self.loader = None
+        self.lookup_data = lookup_data
         self.evidence_manager = EvidenceManager(lookup_data)
-        self.input_loading_finished = input_loading_finished
-        self.output_computation_finished = output_computation_finished
-        self.input_generated_count = input_generated_count
-        self.output_computed_count = output_computed_count
-        self.processing_errors_count = processing_errors_count
-        self.input_processed_count = input_processed_count
-        self.start_time = time.time()  # reset timer start
-        self.lock = lock
         self.inject_literature = inject_literature
         self.pub_fetcher = None
+        self.global_stats = global_stats
 
-    def run(self):
+    def init(self):
+        super(EvidenceProcesser, self).init()
+        self.logger = logging.getLogger(__name__)
         connector = PipelineConnectors()
-        connector.init_services_connections(publication_es=True)
+        connector.init_services_connections()
+        self.lookup_data.set_r_server(connector.r_server)
         self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
         self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
-
-        # es = Elasticsearch(Config.ELASTICSEARCH_NODES)
         self.pub_fetcher = PublicationFetcher(connector.es_pub)
+        self.es = connector.es
 
-        logger.info("%s started" % self.name)
-        # TODO : for testing
-        process_name = self.name
-        self.data_processing_started = False
-        while not ((
-                       self.input_generated_count.value == self.input_processed_count.value) and
-                       self.input_loading_finished.is_set()):
-            data = self.input_q.get()
-            with self.lock:
-                self.input_processed_count.value += 1
-            if data:
-                idev, ev = data
-                try:
-                    fixed_ev, fixed = self.evidence_manager.fix_evidence(ev)
-                    # logger.critical("%i processed"%self.output_computed_count.value)
-                    if self.evidence_manager.is_valid(fixed_ev, datasource=fixed_ev.datasource):
-                        '''add scoring to evidence string'''
-                        fixed_ev.score_evidence(self.evidence_manager.score_modifiers)
-                        '''extend data in evidencestring'''
+    def process(self, data):
+        idev, ev_raw = data
+        fixed_ev, fixed = self.evidence_manager.fix_evidence(ev_raw)
+        if self.evidence_manager.is_valid(fixed_ev, datasource=fixed_ev.datasource):
+            '''add scoring to evidence string'''
+            fixed_ev.score_evidence(self.evidence_manager.score_modifiers,
+                                    self.global_stats)
+            '''extend data in evidencestring'''
 
-                        ev_string_to_load = self.evidence_manager.get_extended_evidence(ev, process_name,
-                                                                                        self.pub_fetcher,
-                                                                                        self.inject_literature)
-                        # logger.info('%s processed'%idev)
-                    else:
-                        # traceback.print_exc(limit=1, file=sys.stdout)
-                        raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
-                    # if fixed:
-                    #     fix+=1
-                    self.output_q.put((idev, ev_string_to_load))
-                    with self.lock:
-                        self.output_computed_count.value += 1
+            ev = self.evidence_manager.get_extended_evidence(fixed_ev,
+                                                             self.pub_fetcher,
+                                                             self.inject_literature)
+        else:
+            raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
 
-                except Exception as error:
-                    logger.exception(error)
-                    with self.lock:
-                        self.processing_errors_count.value += 1
-                    # UploadError(ev, error, idev).save()
-                    # err += 1
+        loader_args = (
+            Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
+            ev.get_doc_name(),
+            idev,
+            ev.to_json(),
+        )
+        loader_kwargs = dict(create_index=False,
+                             routing=ev.evidence['target']['id'])
+        return loader_args, loader_kwargs
 
-                    # raise
-                    logger.exception("Error loading data for id %s: %s" % (idev, str(error)))
-                    # traceback.print_exc(limit=1, file=sys.stdout)
 
-                if self.input_processed_count.value % 5e4 == 0:
-                    logger.info("%i processed | %i errors | processing %1.2f evidence per second" % (
-                    self.output_computed_count.value,
-                    self.processing_errors_count.value,
-                    float(self.input_processed_count.value) / (time.time() - self.start_time)))
+class EvidenceGlobalCounter():
+    '''stores aggregated stats about evidence properties used in the computation of the score'''
+    GLOBAL_COUNTERS = ['target',
+                       'disease',
+                       ]
+
+    def __init__(self):
+        self.total = self._init_counter()
+        self.experiment = {}
+        self._all_experiment_ids = set()
+        self.literature = {}
+        self._all_literature_ids = set()
+
+
+    def _init_counter(self):
+        d = {'total':0}
+        for i in self.GLOBAL_COUNTERS:
+            d[i]=Counter()
+        return d
+
+    def digest(self, ev):
+        '''takes an evidence in dict format and populate the appropiate counters'''
+        self._inject_counts(self.total, ev)
+        for lit in self.get_literature(ev):
+            if lit not in self.literature:
+                self.literature[lit]= self._init_counter()
+            self._inject_counts(self.literature[lit], ev)
+        exp = self.get_experiment(ev)
+        if exp:
+            if exp not in self.experiment:
+                self.experiment[exp] = self._init_counter()
+            self._inject_counts(self.experiment[exp], ev)
+
+    def get_target_and_disease_uniques_for_literature(self, lit_id):
+        '''
+        
+        :param lit_id: literature id 
+        :return: tuple of target and disease unique ids linked to the literature id
+        '''
+        try:
+            literature_data = self.literature[lit_id]
+        except KeyError as e:
+            if lit_id in self._all_literature_ids:
+                return (1,1)
             else:
-                time.sleep(0.01)
-        self.output_computation_finished.set()
-        logger.info("%s finished" % self.name)
+                return (0,0)
+        return len(literature_data['target']), len(literature_data['disease'])
+
+    def get_target_and_disease_uniques_for_experiment(self, exp_id):
+        '''
+
+        :param exp_id: experiment id 
+        :return: tuple of target and disease unique ids linked to the experiment id
+        '''
+        try:
+            experiment_data = self.experiment[exp_id]
+        except KeyError as e:
+            if exp_id in self._all_experiment_ids:
+                return (1,1)
+            else:
+                return (0,0)
+        return len(experiment_data['target']), len(experiment_data['disease'])
+
+    def compress(self):
+        '''removes all the entries with a single occurrence and assume the counts are 1 when a query raise a keyerror'''
+        self._all_literature_ids = set(self.literature.keys())
+        for lit_id in self._all_literature_ids:
+            if self.literature[lit_id]['total'] == 1:
+                del self.literature[lit_id]
+
+        self._all_experiment_ids = set(self.experiment.keys())
+        for exp_id in self._all_experiment_ids:
+            if self.experiment[exp_id]['total'] == 1:
+                del self.experiment[exp_id]
 
 
-class EvidenceStorerWorker(multiprocessing.Process):
-    def __init__(self,
-                 processing_output_q,
-                 processing_finished,
-                 signal_finish,
-                 submitted_to_storage,
-                 output_generated_count,
-                 lock,
-                 chunk_size=1e4,
-                 dry_run=False,
-                 es=None
-                 ):
-        super(EvidenceStorerWorker, self).__init__()
-        self.q = processing_output_q
-        self.signal_finish = signal_finish
-        self.chunk_size = chunk_size
-        self.processing_finished = processing_finished
-        self.output_generated_count = output_generated_count
-        self.total_loaded = submitted_to_storage
-        self.es = None
-        self.lock = lock
-        self.dry_run = dry_run
+    @staticmethod
+    def _inject_counts(target, ev):
+        target['target'][EvidenceGlobalCounter.get_target(ev)] += 1
+        target['disease'][EvidenceGlobalCounter.get_disease(ev)] += 1
+        target['total']+= 1
 
-    def run(self):
 
-        self.es = new_es_client()
+    @staticmethod
+    def get_target(ev):
+        return ev['target']['id']
 
-        logger.info("worker %s started" % self.name)
-        with Loader(self.es, chunk_size=self.chunk_size, dry_run=self.dry_run) as es_loader:
-            with ProcessedEvidenceStorer(es_loader, chunk_size=self.chunk_size, quiet=False) as storer:
-                while not (((self.output_generated_count.value == self.total_loaded.value) and \
-                                    self.processing_finished.is_set()) or self.signal_finish.is_set()):
-                    if not self.q.empty():
-                        output = self.q.get()
-                        idev, ev = output
-                        storer.put(idev,
-                                   ev)
-                        with self.lock:
-                            self.total_loaded.value += 1
-                            # if self.total_loaded.value % (self.chunk_size*5) ==0:
-                            #     logger.info("pushed %i entries to es"%self.total_loaded.value)
-                    else:
-                        time.sleep(0.01)
-                        # print self.name, (((self.output_generated_count.value == self.total_loaded.value) and \
-                        #         self.processing_finished.is_set()) or self.signal_finish.is_set()),
-                        # self.output_generated_count.value == self.total_loaded.value,
-                        # self.processing_finished.is_set(),  self.signal_finish.is_set(), self.total_loaded.value
+    @staticmethod
+    def get_disease(ev):
+        return ev['disease']['id']
 
-        self.signal_finish.set()
-        logger.info("%s finished" % self.name)
-
+    @staticmethod
+    def get_literature(ev):
+        try:
+            return [i['lit_id'].split('/')[-1] for i in ev['literature']['references']]
+        except KeyError as e:
+            return []
+    @staticmethod
+    def get_experiment(ev):
+        try:
+            return ev['evidence']['unique_experiment_reference']
+        except KeyError as e:
+            pass
 
 class EvidenceStringProcess():
     def __init__(self,
@@ -1123,26 +1157,36 @@ class EvidenceStringProcess():
                                       datasources=[],
                                       dry_run=False,
                                       inject_literature=False):
-        base_id = 0
-        err = 0
-        fix = 0
 
         logger.debug("Starting Evidence Manager")
-
+        '''get lookup data and stats'''
         lookup_data_types = [LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
         if inject_literature:
-            lookup_data_types = [LookUpDataType.PUBLICATION,LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
+            lookup_data_types = [LookUpDataType.PUBLICATION, LookUpDataType.TARGET, LookUpDataType.DISEASE,
+                                 LookUpDataType.ECO]
             # lookup_data_types.append(LookUpDataType.PUBLICATION)
 
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=lookup_data_types,
                                           autoload=True,
-                                          es_pub = self.es_pub,
+                                          es_pub=self.es_pub,
                                           ).lookup
+
+        global_stat_cache= 'global_stats.pkl'
+        if os.path.exists(global_stat_cache):
+            global_stats = pickle.load(open(global_stat_cache))
+        else:
+            global_stats = self.get_global_stats(lookup_data.uni2ens,
+                                                 lookup_data.available_genes,
+                                                 lookup_data.non_reference_genes,
+                                                 datasources= datasources)
+            if logger.level == logging.DEBUG:
+                pickle.dump(global_stats, open(global_stat_cache,'w'), protocol=pickle.HIGHEST_PROTOCOL)
+
         # lookup_data.available_genes.load_uniprot2ensembl()
         get_evidence_page_size = 5000
-        '''create and overwrite old data'''
+        '''prepare es indices'''
         loader = Loader(self.es)
         overwrite_indices = not dry_run
         if not dry_run:
@@ -1156,58 +1200,59 @@ class EvidenceStringProcess():
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
         if datasources and overwrite_indices:
-            self.logger.info('deleting data for datasources %s'%','.join(datasources))
+            self.logger.info('deleting data for datasources %s' % ','.join(datasources))
             self.es_query.delete_evidence_for_datasources(datasources)
 
         '''create queues'''
-        input_q = multiprocessing.Queue(maxsize=get_evidence_page_size + 1)
-        output_q = multiprocessing.Queue(maxsize=get_evidence_page_size)
-        '''create events'''
-        input_loading_finished = multiprocessing.Event()
-        output_computation_finished = multiprocessing.Event()
-        data_storage_finished = multiprocessing.Event()
-        '''create shared memory objects'''
+        number_of_workers = Config.WORKERS_NUMBER
+        # too many storers
+        number_of_storers = min(16, number_of_workers / 2 + 1,)
+        queue_per_worker = 250
 
-        input_generated_count = multiprocessing.Value('i', 0)
-        processing_errors_count = multiprocessing.Value('i', 0)
-        output_computed_count = multiprocessing.Value('i', 0)
-        input_processed_count = multiprocessing.Value('i', 0)
-        submitted_to_storage_count = multiprocessing.Value('i', 0)
+        evidence_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|evidence_q',
+                                max_size=queue_per_worker * number_of_storers,
+                                job_timeout=1200,
+                                batch_size=1,
+                                r_server=self.r_server,
+                                serialiser='pickle')
+        store_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|store_evidence_q',
+                             max_size=queue_per_worker * 5 * number_of_storers,
+                             job_timeout=1200,
+                             batch_size=10,
+                             r_server=self.r_server,
+                             serialiser='pickle')
 
-        '''create locks'''
-        data_processing_lock = multiprocessing.Lock()
-        data_storage_lock = multiprocessing.Lock()
-
-        workers_number = Config.WORKERS_NUMBER
+        q_reporter = RedisQueueStatusReporter([evidence_q,
+                                               store_q,
+                                               ],
+                                              interval=30,
+                                              )
+        q_reporter.start()
 
         '''create workers'''
-        scorers = [EvidenceProcesser(input_q,
-                                     output_q,
-                                     lookup_data,
-                                     input_loading_finished,
-                                     output_computation_finished,
-                                     input_generated_count,
-                                     output_computed_count,
-                                     processing_errors_count,
-                                     input_processed_count,
-                                     data_processing_lock,
-                                     inject_literature
-                                     ) for i in range(workers_number)]
-        # ) for i in range(2)]
-        for w in scorers:
-            w.start()
 
-        storers = [EvidenceStorerWorker(output_q,
-                                        output_computation_finished,
-                                        data_storage_finished,
-                                        submitted_to_storage_count,
-                                        output_computed_count,
-                                        data_storage_lock,
-                                        dry_run,
-                                        ) for i in range(workers_number)]
-        # ) for i in range(1)]
-        for w in storers:
-            w.start()
+        scorers = WhiteCollarWorker(target=EvidenceProcesser,
+                                    pool_size=number_of_workers,
+                                    queue_in=evidence_q,
+                                    redis_path=None,
+                                    queue_out=store_q,
+                                    kwargs=dict(
+                                        lookup_data=lookup_data,
+                                        inject_literature=inject_literature,
+                                        global_stats=global_stats
+                                    )
+                                    )
+        scorers.start()
+
+        loaders = WhiteCollarWorker(target=LoaderWorker,
+                                    pool_size=number_of_storers,
+                                    queue_in=store_q,
+                                    redis_path=None,
+                                    kwargs=dict(dry_run=dry_run))
+
+        loaders.start()
+
+
 
         targets_with_data = set()
         for row in tqdm(self.get_evidence(page_size=get_evidence_page_size, datasources=datasources),
@@ -1219,40 +1264,46 @@ class EvidenceStringProcess():
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name'])
             idev = row['uniq_assoc_fields_hashdig']
             ev.evidence['id'] = idev
-            input_q.put((idev, ev))
-            input_generated_count.value += 1
+            evidence_q.put((idev, ev))
             targets_with_data.add(ev.evidence['target']['id'][0])
-            if input_generated_count.value % 1e4 == 0:
-                logger.info("%i entries submitted for process" % (input_generated_count.value))
-        input_loading_finished.set()
 
-        '''wait for other processes to finish'''
-        while not data_storage_finished.is_set():
-            time.sleep(.1)
-        for w in scorers:
-            if w.is_alive():
-                w.terminate()
-        for w in storers:
-            if w.is_alive():
-                time.sleep(.1)
-                w.terminate()
-        logger.info("%i entries processed with %i errors and %i fixes" % (base_id, err, fix))
+        '''wait for all workers to finish'''
+        scorers.join()
+        loaders.join()
 
-        loader.close()
+
         logger.info('flushing data to index')
         self.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
                               wait_if_ongoing=True)
 
         logger.info('Processed data for %i targets' % len(targets_with_data))
+        logger.info("DONE")
 
         return list(targets_with_data)
+
+
 
     def get_evidence(self, page_size=5000, datasources=[]):
 
         c = 0
         for row in self.es_query.get_validated_evidence_strings(size=page_size, datasources=datasources):
             c += 1
-            if c % page_size == 0:
-                logger.info("loaded %i ev from db to process" % c)
+            if c % 1e5 == 0:
+                logger.debug("loaded %i ev from db to process" % c)
             yield row
         logger.info("loaded %i ev from db to process" % c)
+
+    def get_global_stats(self, uni2ens, available_genes, non_reference_genes, page_size=5000, datasources=[]):
+        global_stats = EvidenceGlobalCounter()
+        for row in tqdm(self.get_evidence(page_size, datasources),
+                        desc='getting global stats on  available evidence_strings',
+                        total=self.es_query.count_validated_evidence_strings(),
+                        unit=' evidence',
+                        file=tqdm_out,
+                        unit_scale=True):
+            ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence
+            EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)
+            EvidenceManager.fix_disease_id(ev)
+            global_stats.digest(ev=ev)
+        global_stats.compress()
+        return global_stats

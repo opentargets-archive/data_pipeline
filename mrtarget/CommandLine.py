@@ -3,7 +3,6 @@ import argparse
 import logging
 import sys
 import itertools as it
-import atexit
 
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common import Actions
@@ -17,17 +16,15 @@ from mrtarget.modules.ECO import EcoActions, EcoProcess
 from mrtarget.modules.EFO import EfoActions, EfoProcess
 from mrtarget.modules.HPO import HpoActions, HpoProcess
 from mrtarget.modules.MP import MpActions, MpProcess
-from mrtarget.modules.Ensembl import  EnsemblActions, EnsemblProcess
+from mrtarget.modules.Ensembl import EnsemblActions, EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneActions, GeneManager
 from mrtarget.modules.HPA import HPAActions, HPAProcess
 from mrtarget.modules.IntOGen import IntOGenActions, IntOGen
 from mrtarget.modules.SLAPEnrich import SLAPEnrichActions, SLAPEnrich
-from mrtarget.modules.Literature import LiteratureActions, MedlineRetriever
-from mrtarget.modules.LiteratureNLP import LiteratureNLPProcess, LiteratureNLPActions
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
-from mrtarget.modules.GenotypePhenotype import MousePhenotypeActions, MouseminePhenotypeETL
+from mrtarget.modules.Hallmarks import HallmarksActions, Hallmarks
 from mrtarget.modules.Ontology import OntologyActions, PhenotypeSlim
 from mrtarget.modules.QC import QCActions, QCRunner
 from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
@@ -102,26 +99,18 @@ def main():
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
-    parser.add_argument("--mgi", dest='mgi', help="update mouse phenotypes data",
-                        action="append_const", const=MousePhenotypeActions.ALL)
     parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
                         action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
     parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
                         action="append_const", const=G2PActions.GENERATE_EVIDENCE)
     parser.add_argument("--slapenrich", dest='slapenrich', help="parse SLAPEnrich pathway evidence",
                         action="append_const", const=SLAPEnrichActions.GENERATE_EVIDENCE)
+    parser.add_argument("--hallmark", dest='hallmark', help="generate Hallmark Json",
+                        action="append_const", const=HallmarksActions.GENERATE_JSON)
     parser.add_argument("--ontos", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.PHENOTYPESLIM)
     parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
                         action="append_const", const = OntologyActions.ALL)
-    parser.add_argument("--lit", dest='lit', help="fetch and process literature data",
-                        action="append_const", const=LiteratureActions.ALL)
-    parser.add_argument("--lit-fetch", dest='lit', help="fetch literature data",
-                        action="append_const", const=LiteratureActions.FETCH)
-    parser.add_argument("--lit-process", dest='lit', help="process literature data",
-                        action="append_const", const=LiteratureNLPActions.PROCESS)
-    parser.add_argument("--lit-update", dest='lit', help="update literature data",
-                        action="append_const", const=LiteratureActions.UPDATE)
     parser.add_argument("--qc", dest='qc',
                         help="Run quality control scripts",
                         action="append_const", const=QCActions.ALL)
@@ -158,9 +147,6 @@ def main():
                         action='store', default='INFO')
     parser.add_argument("--do-nothing", dest='do_nothing',
                         help="to be used just for test",
-                        action='store_true', default=False)
-    parser.add_argument("--inject-literature", dest='inject_literature',
-                        help="inject literature data in the evidence-string, default set to False",
                         action='store_true', default=False)
     parser.add_argument("--schema-version", dest='schema_version',
                         help="set the schema version aka 'branch' name",
@@ -208,16 +194,13 @@ def main():
               file=sys.stdout)
         return 0
 
-    connected = connectors.init_services_connections(redispersist=args.redispersist,
-                                                     publication_es=args.inject_literature or args.lit)
+    connected = connectors.init_services_connections(redispersist=args.redispersist)
 
     logger.debug('Attempting to establish connection to the backend... %s',
                  str(connected))
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
-    if args.inject_literature or args.lit:
-        load_nlp_corpora()
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
@@ -267,10 +250,6 @@ def main():
             do_all = (EcoActions.ALL in args.eco) or run_full_pipeline
             if (EcoActions.PROCESS in args.eco) or do_all:
                 EcoProcess(loader).process_all()
-        if args.mgi or run_full_pipeline:
-            do_all = (MousePhenotypeActions.ALL in args.mgi) or run_full_pipeline
-            if (MousePhenotypeActions.PROCESS in args.mgi) or do_all:
-                MouseminePhenotypeETL(loader=loader, r_server=connectors.r_server).process_all()
         if args.mus or run_full_pipeline:
             do_all = (MouseModelsActions.ALL in args.mus) or run_full_pipeline
             if (MouseModelsActions.UPDATE_CACHE in args.mus) or do_all:
@@ -279,14 +258,6 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
-
-        if args.lit or run_full_pipeline:
-            if LiteratureActions.FETCH in args.lit :
-                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(args.input_file)
-            if LiteratureActions.UPDATE in args.lit:
-                MedlineRetriever(connectors.es, loader, args.dry_run, connectors.r_server).fetch(update=True)
-            if LiteratureNLPActions.PROCESS in args.lit :
-                LiteratureNLPProcess(connectors.es, loader, connectors.r_server).process()
         if args.g2p or run_full_pipeline:
             do_all = (G2PActions.ALL in args.g2p) or run_full_pipeline
             if (G2PActions.GENERATE_EVIDENCE in args.g2p) or do_all:
@@ -299,6 +270,10 @@ def main():
             do_all = (SLAPEnrichActions.ALL in args.slapenrich) or run_full_pipeline
             if (SLAPEnrichActions.GENERATE_EVIDENCE in args.slapenrich) or do_all:
                 SLAPEnrich(connectors.es, connectors.r_server).process_slapenrich()
+        if args.hallmark or run_full_pipeline:
+            do_all = (HallmarksActions.ALL in args.hallmark) or run_full_pipeline
+            if (HallmarksActions.GENERATE_JSON in args.hallmark) or do_all:
+                Hallmarks(loader, connectors.es, connectors.r_server).process_hallmarks()
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
@@ -321,7 +296,8 @@ def main():
                 targets = EvidenceStringProcess(connectors.es,
                                                 connectors.r_server,
                                                 es_pub=connectors.es_pub).process_all(datasources = args.datasource,
-                                                                          dry_run=args.dry_run,inject_literature=args.inject_literature)
+                                                                                      dry_run=args.dry_run,
+                                                                                      inject_literature=True)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:
