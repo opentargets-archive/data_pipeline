@@ -2,7 +2,8 @@ import logging
 from tqdm import tqdm
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
-
+from mrtarget.common.connection import new_redis_client, PipelineConnectors
+from mrtarget.Settings import Config
 
 class HPALookUpTable(object):
     """
@@ -419,3 +420,85 @@ class HPOLookUpTable(object):
 
     def _get_r_server(self, r_server = None):
         return r_server if r_server else self.r_server
+
+class LiteratureLookUpTable(object):
+    """
+    A redis-based pickable literature look up table
+    """
+
+    def __init__(self,
+                 es = None,
+                 namespace = None,
+                 r_server = None,
+                 ttl = 60*60*24+7):
+        self._table = RedisLookupTablePickle(namespace = namespace,
+                                            r_server = r_server,
+                                            ttl = ttl)
+        if es is None:
+            connector = PipelineConnectors()
+            connector.init_services_connections(publication_es=True)
+            self._es = connector.es_pub
+        else:
+            self._es = es
+
+        self._es_query = ESQuery(self._es)
+        self.r_server = r_server if r_server else new_redis_client()
+
+        if r_server is not None:
+            self._load_literature_data(r_server)
+        self._logger = logging.getLogger(__name__)
+
+    def _load_literature_data(self, r_server = None):
+        # for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
+        #                 desc='loading publications',
+        #                 unit=' publication',
+        #                 unit_scale=True,
+        #                 leave=False,
+        #                 ):
+        #     pub = Publication()
+        #     pub.load_json(pub_source)
+        #
+        #     self.set_literature(pub,self._get_r_server(
+        #             r_server))# TODO can be improved by sending elements in batches
+        return
+
+    def get_literature(self, pmid, r_server = None):
+        try:
+            return self._table.get(pmid, r_server=self._get_r_server(r_server))
+        except KeyError:
+            try:
+                pub = self._es_query.get_objects_by_id(pmid,
+                                                          Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+                                                          Config.ELASTICSEARCH_PUBLICATION_DOC_NAME).next()
+            except Exception as e:
+                self._logger.exception('Cannot retrieve target from elasticsearch')
+                raise KeyError()
+            self.set_literature(pub, r_server)
+            return pub
+
+    def set_literature(self, literature, r_server = None):
+        self._table.set((literature.pub_id), literature, r_server=self._get_r_server(
+            r_server))
+
+    def get_available_literature_ids(self, r_server = None):
+        return self._table.keys()
+
+    def __contains__(self, key, r_server=None):
+        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
+
+    def __getitem__(self, key, r_server=None):
+        return self.get_literature(key, r_server)
+
+    def __setitem__(self, key, value, r_server=None):
+        self._table.set(key, value, r_server=self._get_r_server(r_server))
+
+    def _get_r_server(self, r_server=None):
+        if not r_server:
+            r_server = self.r_server
+        if r_server is None:
+            raise AttributeError('A redis server is required either at class instantiation or at the method level')
+        return r_server
+
+    def keys(self):
+        return self._table.keys()
+

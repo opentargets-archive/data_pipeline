@@ -13,7 +13,7 @@ from mrtarget.common.LookupTables import HPOLookUpTable
 from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
-from mrtarget.modules.Literature import LiteratureLookUpTable
+from mrtarget.common.LookupTables import LiteratureLookUpTable
 from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
