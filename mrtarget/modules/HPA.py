@@ -15,7 +15,7 @@ from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
-from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
+from mrtarget.common.Redis import RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 
 from mrtarget.Settings import Config
 from addict import Dict
@@ -619,63 +619,3 @@ class HPAProcess():
 #             pass
 #         if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
 #             pass
-
-
-class HPALookUpTable(object):
-    """
-    A redis-based pickable hpa look up table using gene id as table
-    id
-    """
-
-    def __init__(self,
-                 es=None,
-                 namespace=None,
-                 r_server=None,
-                 ttl=(60 * 60 * 24 + 7)):
-        self._es = es
-        self.r_server = r_server
-        self._es_query = ESQuery(self._es)
-        self._table = RedisLookupTablePickle(namespace=namespace,
-                                             r_server=self.r_server,
-                                             ttl=ttl)
-        self._logger = logging.getLogger(__name__)
-        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-
-        if self.r_server:
-            self._load_hpa_data(self.r_server)
-
-    def _load_hpa_data(self, r_server=None):
-        for el in tqdm(self._es_query.get_all_hpa(),
-                       desc='loading hpa',
-                       unit=' hpa',
-                       unit_scale=True,
-                       total=self._es_query.count_all_hpa(),
-                       file=self.tqdm_out,
-                       leave=False):
-            self.set_hpa(el, r_server=self._get_r_server(r_server))
-
-    def get_hpa(self, idx, r_server=None):
-        return self._table.get(idx, r_server=self._get_r_server(r_server))
-
-    def set_hpa(self, hpa, r_server=None):
-        self._table.set(hpa['gene'], hpa,
-                        r_server=self._get_r_server(r_server))
-
-    def get_available_hpa_ids(self, r_server=None):
-        return self._table.keys(self._get_r_server(r_server))
-
-    def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key,
-                                        r_server=self._get_r_server(r_server))
-
-    def __getitem__(self, key, r_server=None):
-        return self.get_hpa(key, r_server=self._get_r_server(r_server))
-
-    def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
-
-    def keys(self, r_server=None):
-        return self._table.keys(self._get_r_server(r_server))
-
-    def _get_r_server(self, r_server=None):
-        return r_server if r_server else self.r_server
