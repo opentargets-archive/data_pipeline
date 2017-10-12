@@ -194,7 +194,7 @@ class RedisQueue(object):
         pipe.execute()
         return key
 
-    def get(self, r_server=None, timeout = 0):
+    def get(self, r_server=None, timeout = 30):
         '''
 
         :param r_server:

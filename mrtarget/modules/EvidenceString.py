@@ -1267,6 +1267,8 @@ class EvidenceStringProcess():
             evidence_q.put((idev, ev))
             targets_with_data.add(ev.evidence['target']['id'][0])
 
+        evidence_q.set_submission_finished()
+
         '''wait for all workers to finish'''
         scorers.join()
         loaders.join()
