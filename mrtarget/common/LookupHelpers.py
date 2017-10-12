@@ -7,11 +7,11 @@ from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
-from mrtarget.modules.ECO import ECOLookUpTable
-from mrtarget.modules.EFO import EFOLookUpTable
-from mrtarget.modules.HPO import HPOLookUpTable
-from mrtarget.modules.MP import MPLookUpTable
-from mrtarget.modules.HPA import HPALookUpTable
+from mrtarget.common.LookupTables import ECOLookUpTable
+from mrtarget.common.LookupTables import EFOLookUpTable
+from mrtarget.common.LookupTables import HPOLookUpTable
+from mrtarget.common.LookupTables import MPLookUpTable
+from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 from mrtarget.modules.Literature import LiteratureLookUpTable
 from mrtarget.modules.Ontology import OntologyClassReader

@@ -3,10 +3,7 @@ from collections import OrderedDict
 from tqdm import tqdm 
 from mrtarget.common import TqdmToLogger
 from mrtarget.common import Actions
-from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.modules.Ontology import OntologyClassReader, DiseaseUtils
 from rdflib import URIRef
 from mrtarget.Settings import Config
@@ -55,7 +52,6 @@ class MP(JSONSerializable):
         self.path_labels = path_labels
         self.definition = definition
         self.children=[]
-        self._logger = logging.getLogger(__name__)
 
     def get_id(self):
         return self.code
@@ -90,6 +86,7 @@ class MpProcess():
                  loader,):
         self.loader = loader
         self.mps = OrderedDict()
+        self._logger = logging.getLogger(__name__)
 
     def process_all(self):
         self._process_ontology_data()
@@ -101,7 +98,7 @@ class MpProcess():
         self.phenotype_ontology.load_mammalian_phenotype_ontology()
 
         for uri,label in self.phenotype_ontology.current_classes.items():
-            self._logger.debug("--- %s --- %s"%(uri, label))
+
             properties = self.phenotype_ontology.parse_properties(URIRef(uri))
             definition = ''
             if 'http://purl.obolibrary.org/obo/IAO_0000115' in properties:
@@ -141,63 +138,3 @@ class MpProcess():
                             doc_type=Config.ELASTICSEARCH_MP_LABEL_DOC_NAME,
                             ID=mp_id,
                             body = mp_obj)
-
-
-
-class MPLookUpTable(object):
-    """
-    A redis-based pickable mp look up table.
-    Allows to grab the MP saved in ES and load it up in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
-    """
-
-    def __init__(self,
-                 es=None,
-                 namespace=None,
-                 r_server=None,
-                 ttl = 60*60*24+7,
-                 autoload=True):
-        self._es = es
-        self.r_server = r_server
-        self._es_query = ESQuery(self._es)
-        self._table = RedisLookupTablePickle(namespace = namespace,
-                                            r_server = self.r_server,
-                                            ttl = ttl)
-
-        if self.r_server is not None and autoload:
-            self._load_mp_data(r_server)
-
-    def _load_mp_data(self, r_server = None):
-        for mp in tqdm(self._es_query.get_all_mammalian_phenotypes(),
-                        desc='loading mammalian phenotypes',
-                        unit=' mammalian phenotypes',
-                        unit_scale=True,
-                        file=tqdm_out,
-                        total=self._es_query.count_all_mammalian_phenotypes(),
-                        leave=False,
-                        ):
-            self.set_mp(mp, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
-
-    def get_mp(self, mp_id, r_server=None):
-        return self._table.get(mp_id, r_server=self._get_r_server(r_server))
-
-    def set_mp(self, mp, r_server=None):
-        mp_key = mp['path_codes'][0][-1]
-        self._table.set(mp_key, mp, r_server=self._get_r_server(r_server))
-
-    def get_available_mp_ids(self, r_server=None):
-        return self._table.keys(r_server=self._get_r_server(r_server))
-
-    def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
-
-    def __getitem__(self, key, r_server=None):
-        return self.get_mp(key, r_server=self._get_r_server(r_server))
-
-    def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
-
-    def keys(self, r_server=None):
-        return self._table.keys(r_server=self._get_r_server(r_server))
-
-    def _get_r_server(self, r_server = None):
-        return r_server if r_server else self.r_server
