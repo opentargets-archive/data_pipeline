@@ -29,9 +29,11 @@ class ReactomeDataDownloader():
 
     def _download_data(self, url):
         r = requests.get(url)
+        print "getting from " + url
         try:
             r.raise_for_status()
         except:
+            print "failed to load file"
             raise Exception("failed to download data from url: %s. Status code: %i" % (url, r.status_code))
         return r.content
 
@@ -68,6 +70,10 @@ class ReactomeDataDownloader():
         for row in self._download_data(Config.REACTOME_PATHWAY_DATA).split('\n'):
             if row:
                 pathway_id, pathway_name, species = row.split('\t')
+                pathway_id = pathway_id[1:-1] if pathway_id[0] == '"' else pathway_id
+                pathway_name = pathway_name[1:-1] if pathway_name[0] == '"' else pathway_name
+                species = species[1:-1] if species[0] == '"' else species
+
                 if pathway_id not in self.valid_pathway_ids:
                     if species in self.allowed_species:
                         self.valid_pathway_ids.append(pathway_id)
@@ -86,6 +92,9 @@ class ReactomeDataDownloader():
         for row in self._download_data(Config.REACTOME_PATHWAY_RELATION).split('\n'):
             if row:
                 parent_id, child_id = row.split('\t')
+                parent_id = parent_id[1:-1] if parent_id[0] == '"' else parent_id
+                child_id = child_id[1:-1] if child_id[0] == '"' else child_id
+
                 relation = (parent_id, child_id)
                 if relation not in added_relations:
                     if parent_id in self.valid_pathway_ids:

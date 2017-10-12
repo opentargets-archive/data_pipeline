@@ -116,6 +116,7 @@ class HPAExpression(Dict, JSONSerializable):
 
         if 'protein' not in tissue:
             tissue.protein = HPAExpression.new_tissue_protein()
+
         if 'rna' not in tissue:
             tissue.rna = HPAExpression.new_tissue_rna()
 
@@ -298,19 +299,28 @@ def hpa2tissues(hpa=None):
                                       'level': e} if v['rna'] else {},
                            xrange(0, rna_level + 1) if rna_level >= 0 else xrange(-1, 0)))
 
+        zscore_level = v['rna']['zscore'] if v['rna'] else -1
+        '''from tissue dict to rna and protein dicts pair'''
+        zscore = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+                                      'level': e} if v['rna'] else {},
+                           xrange(0, zscore_level + 1) if zscore_level >= 0 else xrange(-1, 0)))
+
+
         pro_level = v['protein']['level'] if v['protein'] else -1
         protein = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
                                           'level': e} if v['protein'] else {},
                                xrange(0, pro_level + 1) if pro_level >= 0 else xrange(-1, 0)))
 
-        return (rna, protein)
+        return (rna, protein, zscore)
 
-    # generate a list with rna, protein pairs per tissue
+    # generate a list with (rna, protein, zscore) tuple pairs per tissue
     splitted_tissues = [_split_tissue(t['efo_code'], t) for t in hpa.tissues
                         if hpa is not None]
 
     rnas = []
     proteins = []
+    zscores = []
+
     for tissue in splitted_tissues:
         if tissue[0]:
             rnas += tissue[0]
@@ -318,8 +328,12 @@ def hpa2tissues(hpa=None):
         if tissue[1]:
             proteins += tissue[1]
 
+        if tissue[2]:
+            zscores += tissue[2]
+
     return {'rna': rnas,
-            'protein': proteins}
+            'protein': proteins,
+            'zscore': zscores}
 
 
 class HPAActions(Actions):
@@ -561,7 +575,13 @@ class HPAProcess():
         self.logger.info('store_data called')
 
         self.logger.debug('calling to create new expression index')
-        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+        overwrite_indices = not dry_run
+        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                                     recreate=overwrite_indices)
+        self.loader.prepare_for_bulk_indexing(
+            self.loader.get_versioned_index(
+                Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
+
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
                            r_server=self.r_server,
                            serialiser='json',
