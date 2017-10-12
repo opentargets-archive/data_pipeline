@@ -1,7 +1,3 @@
-import os
-import warnings
-import logging
-import json
 from collections import OrderedDict
 
 from tqdm import tqdm
@@ -11,10 +7,7 @@ from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config
-
-
-from logging.config import fileConfig
-
+import logging
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
