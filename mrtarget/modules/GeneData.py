@@ -18,7 +18,7 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.ChEMBL import ChEMBLLookup
-from mrtarget.modules.GenotypePhenotype import MouseminePhenotypeETL
+# from mrtarget.modules.GenotypePhenotype import MouseminePhenotypeETL
 from mrtarget.modules.Reactome import ReactomeRetriever
 from mrtarget.Settings import Config
 from elasticsearch.exceptions import NotFoundError
