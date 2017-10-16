@@ -1,14 +1,17 @@
+import json
 import logging
 import logging.config
 import time
-import json
-import requests
 import urllib2
-from mrtarget.common import TqdmToLogger
-from mrtarget.common import Actions
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from mrtarget.Settings import file_or_resource
+
+import requests
+
 from mrtarget.Settings import Config
+from mrtarget.Settings import file_or_resource
+from mrtarget.common import Actions
+from mrtarget.common import TqdmToLogger
+from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+
 
 logging.config.fileConfig(file_or_resource('logging.ini'),
                               disable_existing_loggers=False)
@@ -56,7 +59,6 @@ class MouseminePhenotypeETL(object):
         self.r_server = r_server
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-        self.service = Service("http://www.mousemine.org/mousemine/service")
         self.mouse_genes = dict()
         self.ancestors = dict()
         self.lookup_data = None
