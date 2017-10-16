@@ -1,8 +1,9 @@
 from __future__ import print_function
-import argparse
 import logging
+import argparse
 import sys
 import itertools as it
+from logging.config import fileConfig
 
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common import Actions
@@ -42,7 +43,7 @@ def load_nlp_corpora():
 
 def main():
 
-    logging.config.fileConfig(file_or_resource('logging.ini'),
+    fileConfig(file_or_resource('logging.ini'),
                               disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
 
