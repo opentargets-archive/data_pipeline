@@ -199,10 +199,12 @@ class ECOLookUpTable(object):
         self._es = es
         self._es_query = ESQuery(es)
         self.r_server = r_server
+        self._logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
         if r_server is not None:
             self._load_eco_data(r_server)
 
-    def get_ontology_code_from_url(url):
+    def get_ontology_code_from_url(self, url):
         return url.split('/')[-1]
 
     def _load_eco_data(self, r_server=None):
@@ -210,11 +212,11 @@ class ECOLookUpTable(object):
                         desc='loading eco',
                         unit=' eco',
                         unit_scale=True,
-                        file=tqdm_out,
+                        file=self.tqdm_out,
                         total=self._es_query.count_all_eco(),
                         leave=False,
                         ):
-            self._table.set(get_ontology_code_from_url(eco['code']), eco,
+            self._table.set(self.get_ontology_code_from_url(eco['code']), eco,
                             r_server=self._get_r_server(r_server))  # TODO can be improved by sending elements in batches
 
 
@@ -223,7 +225,7 @@ class ECOLookUpTable(object):
 
 
     def set_eco(self, eco, r_server=None):
-        self._table.set(get_ontology_code_from_url(eco['code']), eco, r_server=self._get_r_server(r_server))
+        self._table.set(self.get_ontology_code_from_url(eco['code']), eco, r_server=self._get_r_server(r_server))
 
 
     def get_available_eco_ids(self, r_server=None):
@@ -266,7 +268,8 @@ class EFOLookUpTable(object):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = self.r_server,
                                             ttl = ttl)
-
+        self._logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
         if self.r_server is not None:
             self._load_efo_data(r_server)
 
@@ -275,7 +278,7 @@ class EFOLookUpTable(object):
                         desc='loading diseases',
                         unit=' diseases',
                         unit_scale=True,
-                        file=tqdm_out,
+                        file=self.tqdm_out,
                         total=self._es_query.count_all_diseases(),
                         leave=False,
                         ):
@@ -326,6 +329,8 @@ class MPLookUpTable(object):
                                             r_server = self.r_server,
                                             ttl = ttl)
 
+        self._logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
         if self.r_server is not None and autoload:
             self._load_mp_data(r_server)
 
@@ -334,7 +339,7 @@ class MPLookUpTable(object):
                         desc='loading mammalian phenotypes',
                         unit=' mammalian phenotypes',
                         unit_scale=True,
-                        file=tqdm_out,
+                        file=self.tqdm_out,
                         total=self._es_query.count_all_mammalian_phenotypes(),
                         leave=False,
                         ):
@@ -382,6 +387,8 @@ class HPOLookUpTable(object):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = self.r_server,
                                             ttl = ttl)
+        self._logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
 
         if self.r_server is not None:
             self._load_hpo_data(r_server)
@@ -391,7 +398,7 @@ class HPOLookUpTable(object):
                         desc='loading human phenotypes',
                         unit=' human phenotypes',
                         unit_scale=True,
-                        file=tqdm_out,
+                        file=self.tqdm_out,
                         total=self._es_query.count_all_human_phenotypes(),
                         leave=False,
                         ):

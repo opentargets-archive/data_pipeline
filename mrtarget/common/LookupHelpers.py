@@ -142,7 +142,7 @@ class LookUpDataRetriever(object):
         self._logger.info('getting hpos')
         self.lookup.available_efos = HPOLookUpTable(self.es, 'HPO_LOOKUP', self.r_server)
 
-    def _get_available_mps(self):
+    def _get_available_mps(self, autoload=True):
         self._logger.info('getting mps info')
         self.lookup.available_mps = MPLookUpTable(self.es,
                                                   'MP_LOOKUP',
