@@ -381,7 +381,7 @@ class ESQuery(object):
                                    "is_direct": True,
                                }
                            },
-                               '_source': {'includes':["target.id", 'disease.id', 'harmonic-sum.overall']},
+                               '_source': {'includes':["target.id", 'disease.id', 'harmonic-sum', 'evidence_count']},
                                'size': 1000,
                            },
                            scroll='12h',
@@ -397,19 +397,22 @@ class ESQuery(object):
         for hit in res:
             c+=1
             hit = hit['_source']
-            if hit['harmonic-sum']['overall'] >= treshold:
+            if hit['evidence_count']['total']>=3 and \
+                hit['harmonic-sum']['overall'] >=0.1:
                 '''store target associations'''
                 if hit['target']['id'] not in target_results:
                     target_results[hit['target']['id']] = SparseFloatDict()
+                #TODO: return all counts and scores up to datasource level
                 target_results[hit['target']['id']][hit['disease']['id']]=hit['harmonic-sum']['overall']
 
                 '''store disease associations'''
                 if hit['disease']['id'] not in disease_results:
                     disease_results[hit['disease']['id']] = SparseFloatDict()
+                # TODO: return all counts and scores up to datasource level
                 disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
 
-            if c%10000 == 0:
-                self.logger.debug('%d elements read', c)
+                if c%10000 == 0:
+                    self.logger.debug('%d elements retrieved', c)
 
         return target_results, disease_results
 
