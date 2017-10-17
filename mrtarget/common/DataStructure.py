@@ -22,6 +22,8 @@ def json_serialize(obj):
         return obj.isoformat(' ')
     elif isinstance(obj, date):
         return obj.isoformat()
+    if isinstance(obj, set):
+        return list(obj)
     else:
         try:
             return obj.__dict__
