@@ -310,124 +310,124 @@ class EFOLookUpTable(object):
         return r_server if r_server else self.r_server
 
 
-class MPLookUpTable(object):
-    """
-    A redis-based pickable mp look up table.
-    Allows to grab the MP saved in ES and load it up in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
-    """
+# class MPLookUpTable(object):
+#     """
+#     A redis-based pickable mp look up table.
+#     Allows to grab the MP saved in ES and load it up in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
+#     """
+#
+#     def __init__(self,
+#                  es=None,
+#                  namespace=None,
+#                  r_server=None,
+#                  ttl = 60*60*24+7,
+#                  autoload=True):
+#         self._es = es
+#         self.r_server = r_server
+#         self._es_query = ESQuery(self._es)
+#         self._table = RedisLookupTablePickle(namespace = namespace,
+#                                             r_server = self.r_server,
+#                                             ttl = ttl)
+#
+#         self._logger = logging.getLogger(__name__)
+#         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
+#         if self.r_server is not None and autoload:
+#             self._load_mp_data(r_server)
+#
+#     def _load_mp_data(self, r_server = None):
+#         for mp in tqdm(self._es_query.get_all_mammalian_phenotypes(),
+#                         desc='loading mammalian phenotypes',
+#                         unit=' mammalian phenotypes',
+#                         unit_scale=True,
+#                         file=self.tqdm_out,
+#                         total=self._es_query.count_all_mammalian_phenotypes(),
+#                         leave=False,
+#                         ):
+#             self.set_mp(mp, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
+#
+#     def get_mp(self, mp_id, r_server=None):
+#         return self._table.get(mp_id, r_server=self._get_r_server(r_server))
+#
+#     def set_mp(self, mp, r_server=None):
+#         mp_key = mp['path_codes'][0][-1]
+#         self._table.set(mp_key, mp, r_server=self._get_r_server(r_server))
+#
+#     def get_available_mp_ids(self, r_server=None):
+#         return self._table.keys(r_server=self._get_r_server(r_server))
+#
+#     def __contains__(self, key, r_server=None):
+#         return self._table.__contains__(key, r_server=self._get_r_server(r_server))
+#
+#     def __getitem__(self, key, r_server=None):
+#         return self.get_mp(key, r_server=self._get_r_server(r_server))
+#
+#     def __setitem__(self, key, value, r_server=None):
+#         self._table.set(key, value, r_server=self._get_r_server(r_server))
+#
+#     def keys(self, r_server=None):
+#         return self._table.keys(r_server=self._get_r_server(r_server))
+#
+#     def _get_r_server(self, r_server = None):
+#         return r_server if r_server else self.r_server
 
-    def __init__(self,
-                 es=None,
-                 namespace=None,
-                 r_server=None,
-                 ttl = 60*60*24+7,
-                 autoload=True):
-        self._es = es
-        self.r_server = r_server
-        self._es_query = ESQuery(self._es)
-        self._table = RedisLookupTablePickle(namespace = namespace,
-                                            r_server = self.r_server,
-                                            ttl = ttl)
-
-        self._logger = logging.getLogger(__name__)
-        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-        if self.r_server is not None and autoload:
-            self._load_mp_data(r_server)
-
-    def _load_mp_data(self, r_server = None):
-        for mp in tqdm(self._es_query.get_all_mammalian_phenotypes(),
-                        desc='loading mammalian phenotypes',
-                        unit=' mammalian phenotypes',
-                        unit_scale=True,
-                        file=self.tqdm_out,
-                        total=self._es_query.count_all_mammalian_phenotypes(),
-                        leave=False,
-                        ):
-            self.set_mp(mp, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
-
-    def get_mp(self, mp_id, r_server=None):
-        return self._table.get(mp_id, r_server=self._get_r_server(r_server))
-
-    def set_mp(self, mp, r_server=None):
-        mp_key = mp['path_codes'][0][-1]
-        self._table.set(mp_key, mp, r_server=self._get_r_server(r_server))
-
-    def get_available_mp_ids(self, r_server=None):
-        return self._table.keys(r_server=self._get_r_server(r_server))
-
-    def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
-
-    def __getitem__(self, key, r_server=None):
-        return self.get_mp(key, r_server=self._get_r_server(r_server))
-
-    def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
-
-    def keys(self, r_server=None):
-        return self._table.keys(r_server=self._get_r_server(r_server))
-
-    def _get_r_server(self, r_server = None):
-        return r_server if r_server else self.r_server
-
-class HPOLookUpTable(object):
-    """
-    A redis-based pickable hpo look up table.
-    Allows to grab the HPO saved in ES and load it up in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
-    """
-
-    def __init__(self,
-                 es=None,
-                 namespace=None,
-                 r_server=None,
-                 ttl = 60*60*24+7):
-        self._es = es
-        self.r_server = r_server
-        self._es_query = ESQuery(self._es)
-        self._table = RedisLookupTablePickle(namespace = namespace,
-                                            r_server = self.r_server,
-                                            ttl = ttl)
-        self._logger = logging.getLogger(__name__)
-        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-
-        if self.r_server is not None:
-            self._load_hpo_data(r_server)
-
-    def _load_hpo_data(self, r_server = None):
-        for hpo in tqdm(self._es_query.get_all_human_phenotypes(),
-                        desc='loading human phenotypes',
-                        unit=' human phenotypes',
-                        unit_scale=True,
-                        file=self.tqdm_out,
-                        total=self._es_query.count_all_human_phenotypes(),
-                        leave=False,
-                        ):
-            self.set_hpo(hpo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
-
-    def get_hpo(self, hpo_id, r_server=None):
-        return self._table.get(hpo_id, r_server=self._get_r_server(r_server))
-
-    def set_hpo(self, hpo, r_server=None):
-        hpo_key = hpo['path_codes'][0][-1]
-        self._table.set(hpo_key, hpo, r_server=self._get_r_server(r_server))
-
-    def get_available_hpo_ids(self, r_server=None):
-        return self._table.keys(r_server=self._get_r_server(r_server))
-
-    def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
-
-    def __getitem__(self, key, r_server=None):
-        return self.get_hpo(key, r_server=self._get_r_server(r_server))
-
-    def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
-
-    def keys(self, r_server=None):
-        return self._table.keys(r_server=self._get_r_server(r_server))
-
-    def _get_r_server(self, r_server = None):
-        return r_server if r_server else self.r_server
+# class HPOLookUpTable(object):
+#     """
+#     A redis-based pickable hpo look up table.
+#     Allows to grab the HPO saved in ES and load it up in memory/redis so that it can be accessed quickly from multiple processes, reducing memory usage by sharing.
+#     """
+#
+#     def __init__(self,
+#                  es=None,
+#                  namespace=None,
+#                  r_server=None,
+#                  ttl = 60*60*24+7):
+#         self._es = es
+#         self.r_server = r_server
+#         self._es_query = ESQuery(self._es)
+#         self._table = RedisLookupTablePickle(namespace = namespace,
+#                                             r_server = self.r_server,
+#                                             ttl = ttl)
+#         self._logger = logging.getLogger(__name__)
+#         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
+#
+#         if self.r_server is not None:
+#             self._load_hpo_data(r_server)
+#
+#     def _load_hpo_data(self, r_server = None):
+#         for hpo in tqdm(self._es_query.get_all_human_phenotypes(),
+#                         desc='loading human phenotypes',
+#                         unit=' human phenotypes',
+#                         unit_scale=True,
+#                         file=self.tqdm_out,
+#                         total=self._es_query.count_all_human_phenotypes(),
+#                         leave=False,
+#                         ):
+#             self.set_hpo(hpo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
+#
+#     def get_hpo(self, hpo_id, r_server=None):
+#         return self._table.get(hpo_id, r_server=self._get_r_server(r_server))
+#
+#     def set_hpo(self, hpo, r_server=None):
+#         hpo_key = hpo['path_codes'][0][-1]
+#         self._table.set(hpo_key, hpo, r_server=self._get_r_server(r_server))
+#
+#     def get_available_hpo_ids(self, r_server=None):
+#         return self._table.keys(r_server=self._get_r_server(r_server))
+#
+#     def __contains__(self, key, r_server=None):
+#         return self._table.__contains__(key, r_server=self._get_r_server(r_server))
+#
+#     def __getitem__(self, key, r_server=None):
+#         return self.get_hpo(key, r_server=self._get_r_server(r_server))
+#
+#     def __setitem__(self, key, value, r_server=None):
+#         self._table.set(key, value, r_server=self._get_r_server(r_server))
+#
+#     def keys(self, r_server=None):
+#         return self._table.keys(r_server=self._get_r_server(r_server))
+#
+#     def _get_r_server(self, r_server = None):
+#         return r_server if r_server else self.r_server
 
 class LiteratureLookUpTable(object):
     """

@@ -18,7 +18,7 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.ChEMBL import ChEMBLLookup
-from mrtarget.modules.GenotypePhenotype import MouseminePhenotypeETL
+# from mrtarget.modules.GenotypePhenotype import MouseminePhenotypeETL
 from mrtarget.modules.Reactome import ReactomeRetriever
 from mrtarget.Settings import Config
 from elasticsearch.exceptions import NotFoundError
@@ -532,8 +532,8 @@ class GeneManager():
         bar.update()
         self._get_chembl_data()
         bar.update()
-        self._get_mouse_phenotypes_data()
-        bar.update()
+        # self._get_mouse_phenotypes_data()
+        # bar.update()
         self._store_data(dry_run=dry_run)
         bar.update()
 
@@ -575,18 +575,18 @@ class GeneManager():
 
         self._logger.info("STATS AFTER HGNC ortholog PARSING:\n" + self.genes.get_stats())
 
-    def _get_mouse_phenotypes_data(self):
-
-        mpetl = MouseminePhenotypeETL(loader=self.loader, r_server=self.r_server)
-        mpetl.process_all()
-        for gene_id, gene in tqdm(self.genes.iterate(),
-                                  desc='Adding phenotype data from MGI',
-                                  unit=' gene',
-                                  file=self.tqdm_out):
-            ''' extend gene with related mouse phenotype data '''
-            if gene.approved_symbol in mpetl.human_genes:
-                    self._logger.info("Adding phenotype data from MGI for gene %s" % (gene.approved_symbol))
-                    gene.mouse_phenotypes = mpetl.human_genes[gene.approved_symbol]["mouse_orthologs"]
+    # def _get_mouse_phenotypes_data(self):
+    #
+    #     mpetl = MouseminePhenotypeETL(loader=self.loader, r_server=self.r_server)
+    #     mpetl.process_all()
+    #     for gene_id, gene in tqdm(self.genes.iterate(),
+    #                               desc='Adding phenotype data from MGI',
+    #                               unit=' gene',
+    #                               file=self.tqdm_out):
+    #         ''' extend gene with related mouse phenotype data '''
+    #         if gene.approved_symbol in mpetl.human_genes:
+    #                 self._logger.info("Adding phenotype data from MGI for gene %s" % (gene.approved_symbol))
+    #                 gene.mouse_phenotypes = mpetl.human_genes[gene.approved_symbol]["mouse_orthologs"]
 
     def _get_ensembl_data(self):
         for row in tqdm(self.esquery.get_all_ensembl_genes(),

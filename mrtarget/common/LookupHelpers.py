@@ -9,8 +9,8 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
-from mrtarget.common.LookupTables import HPOLookUpTable
-from mrtarget.common.LookupTables import MPLookUpTable
+# from mrtarget.common.LookupTables import HPOLookUpTable
+# from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 from mrtarget.common.LookupTables import LiteratureLookUpTable
@@ -22,12 +22,12 @@ from mrtarget.common import require_all
 class LookUpData():
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        
+
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
-        self.available_hpos = None
-        self.available_mps = None
+        # self.available_hpos = None
+        # self.available_mps = None
         self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
@@ -36,21 +36,21 @@ class LookUpData():
         self.available_eco_objects = None
         self.chembl = None
         self.available_publications = None
-        
+
     def set_r_server(self, r_server):
         self.logger.debug('setting r_server to all lookup tables from external r_server')
         if self.available_ecos:
             self.available_ecos.r_server = r_server
-            self.available_ecos._table.set_r_server(r_server)            
+            self.available_ecos._table.set_r_server(r_server)
         if self.available_efos:
             self.available_efos.r_server = r_server
             self.available_efos._table.set_r_server(r_server)
-        if self.available_hpos:
-            self.available_hpos.r_server = r_server
-            self.available_hpos._table.set_r_server(r_server)
-        if self.available_mps:
-            self.available_mps.r_server = r_server
-            self.available_mps._table.set_r_server(r_server)
+        # if self.available_hpos:
+        #     self.available_hpos.r_server = r_server
+        #     self.available_hpos._table.set_r_server(r_server)
+        # if self.available_mps:
+        #     self.available_mps.r_server = r_server
+        #     self.available_mps._table.set_r_server(r_server)
         if self.available_hpa:
             self.available_hpa.r_server = r_server
             self.available_hpa._table.set_r_server(r_server)
@@ -60,7 +60,7 @@ class LookUpData():
         if self.available_publications:
             self.available_publications.r_server = r_server
             self.available_publications._table.set_r_server(r_server)
-        
+
 
 class LookUpDataType(object):
     TARGET = 'target'
@@ -91,9 +91,9 @@ class LookUpDataRetriever(object):
         self.r_server = r_server
 
         self.esquery = ESQuery(self.es)
-        
+
         require_all(self.es is not None, self.r_server is not None)
-        
+
         self.lookup = LookUpData()
         self._logger = logging.getLogger(__name__)
         tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
@@ -114,8 +114,7 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
             elif dt == LookUpDataType.MP:
-                self._logger.info("get mp info")
-                self._get_mp_info()
+                self._get_mp()
             elif dt == LookUpDataType.HPO:
                 self._get_hpo()
             elif dt == LookUpDataType.EFO:
@@ -138,16 +137,16 @@ class LookUpDataRetriever(object):
         self._logger.info('getting efos')
         self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
 
-    def _get_available_hpos(self):
-        self._logger.info('getting hpos')
-        self.lookup.available_efos = HPOLookUpTable(self.es, 'HPO_LOOKUP', self.r_server)
-
-    def _get_available_mps(self, autoload=True):
-        self._logger.info('getting mps info')
-        self.lookup.available_mps = MPLookUpTable(self.es,
-                                                  'MP_LOOKUP',
-                                                  self.r_server,
-                                                  autoload = autoload)
+    # def _get_available_hpos(self):
+    #     self._logger.info('getting hpos')
+    #     self.lookup.available_efos = HPOLookUpTable(self.es, 'HPO_LOOKUP', self.r_server)
+    #
+    # def _get_available_mps(self, autoload=True):
+    #     self._logger.info('getting mps info')
+    #     self.lookup.available_mps = MPLookUpTable(self.es,
+    #                                               'MP_LOOKUP',
+    #                                               self.r_server,
+    #                                               autoload = autoload)
 
     def _get_available_ecos(self):
         self._logger.info('getting ecos')
@@ -164,12 +163,12 @@ class LookUpDataRetriever(object):
         self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
         self._get_non_reference_gene_mappings()
 
-    def _get_mp_info(self, autoload = True):
-        self._logger.info('getting MP info')
-        self.lookup.available_mps = MPLookUpTable(self.es,
-                                                      'MP_LOOKUP',
-                                                  self.r_server,
-                                                  autoload = autoload)
+    # def _get_mp_info(self, autoload = True):
+    #     self._logger.info('getting MP info')
+    #     self.lookup.available_mps = MPLookUpTable(self.es,
+    #                                                   'MP_LOOKUP',
+    #                                               self.r_server,
+    #                                               autoload = autoload)
 
     def _get_non_reference_gene_mappings(self):
         self.lookup.non_reference_genes = {}

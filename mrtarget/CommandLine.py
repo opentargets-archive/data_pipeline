@@ -1,8 +1,9 @@
 from __future__ import print_function
-import argparse
 import logging
+import argparse
 import sys
 import itertools as it
+from logging.config import fileConfig
 
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common import Actions
@@ -14,8 +15,8 @@ from mrtarget.modules.DataDrivenRelation import DataDrivenRelationActions, DataD
 from mrtarget.modules.Dump import DumpActions, DumpGenerator
 from mrtarget.modules.ECO import EcoActions, EcoProcess
 from mrtarget.modules.EFO import EfoActions, EfoProcess
-from mrtarget.modules.HPO import HpoActions, HpoProcess
-from mrtarget.modules.MP import MpActions, MpProcess
+# from mrtarget.modules.HPO import HpoActions, HpoProcess
+# from mrtarget.modules.MP import MpActions, MpProcess
 from mrtarget.modules.Ensembl import EnsemblActions, EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
@@ -42,7 +43,7 @@ def load_nlp_corpora():
 
 def main():
 
-    logging.config.fileConfig(file_or_resource('logging.ini'),
+    fileConfig(file_or_resource('logging.ini'),
                               disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
 
@@ -62,12 +63,12 @@ def main():
                         action="append_const", const = GeneActions.ALL)
     parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in elasticsearch",
                         action="append_const", const = EfoActions.ALL)
-    parser.add_argument("--hpo", dest='hpo',
-                        help="process the Human Phenotype Ontology (HPO), store the resulting json objects in elasticsearch",
-                        action="append_const", const=HpoActions.ALL)
-    parser.add_argument("--mp", dest='mp',
-                        help="process the Mammalian Phenotype ontology (MP), store the resulting json objects in elasticsearch",
-                        action="append_const", const=MpActions.ALL)
+    # parser.add_argument("--hpo", dest='hpo',
+    #                     help="process the Human Phenotype Ontology (HPO), store the resulting json objects in elasticsearch",
+    #                     action="append_const", const=HpoActions.ALL)
+    # parser.add_argument("--mp", dest='mp',
+    #                     help="process the Mammalian Phenotype ontology (MP), store the resulting json objects in elasticsearch",
+    #                     action="append_const", const=MpActions.ALL)
     parser.add_argument("--eco", dest='eco', help="process the eco information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EcoActions.ALL)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
@@ -238,14 +239,14 @@ def main():
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:
                 EfoProcess(loader).process_all()
-        if args.hpo or run_full_pipeline:
-            do_all = (HpoActions.ALL in args.hpo) or run_full_pipeline
-            if (HpoActions.PROCESS in args.hpo) or do_all:
-                HpoProcess(loader).process_all()
-        if args.mp or run_full_pipeline:
-            do_all = (MpActions.ALL in args.mp) or run_full_pipeline
-            if (MpActions.PROCESS in args.mp) or do_all:
-                MpProcess(loader).process_all()
+        # if args.hpo or run_full_pipeline:
+        #     do_all = (HpoActions.ALL in args.hpo) or run_full_pipeline
+        #     if (HpoActions.PROCESS in args.hpo) or do_all:
+        #         HpoProcess(loader).process_all()
+        # if args.mp or run_full_pipeline:
+        #     do_all = (MpActions.ALL in args.mp) or run_full_pipeline
+        #     if (MpActions.PROCESS in args.mp) or do_all:
+        #         MpProcess(loader).process_all()
         if args.eco or run_full_pipeline:
             do_all = (EcoActions.ALL in args.eco) or run_full_pipeline
             if (EcoActions.PROCESS in args.eco) or do_all:
