@@ -3,7 +3,6 @@ import argparse
 import logging
 import sys
 import itertools as it
-import atexit
 
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common import Actions
@@ -15,7 +14,9 @@ from mrtarget.modules.DataDrivenRelation import DataDrivenRelationActions, DataD
 from mrtarget.modules.Dump import DumpActions, DumpGenerator
 from mrtarget.modules.ECO import EcoActions, EcoProcess
 from mrtarget.modules.EFO import EfoActions, EfoProcess
-from mrtarget.modules.Ensembl import  EnsemblActions, EnsemblProcess
+from mrtarget.modules.HPO import HpoActions, HpoProcess
+from mrtarget.modules.MP import MpActions, MpProcess
+from mrtarget.modules.Ensembl import EnsemblActions, EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneActions, GeneManager
@@ -23,13 +24,13 @@ from mrtarget.modules.HPA import HPAActions, HPAProcess
 from mrtarget.modules.IntOGen import IntOGenActions, IntOGen
 from mrtarget.modules.SLAPEnrich import SLAPEnrichActions, SLAPEnrich
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
+from mrtarget.modules.Hallmarks import HallmarksActions, Hallmarks
 from mrtarget.modules.Ontology import OntologyActions, PhenotypeSlim
 from mrtarget.modules.QC import QCActions, QCRunner
 from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.modules.G2P import G2PActions, G2P
-from mrtarget.modules.GE import GenomicsEnglandActions, GE
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 
@@ -55,12 +56,18 @@ def main():
                         action="append_const", const = HPAActions.ALL)
     parser.add_argument("--rea", dest='rea', help="download reactome data, process it and upload it to elasticsearch",
                         action="append_const", const = ReactomeActions.ALL)
-    parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in postgresql",
+    parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in elasticsearch",
                         action="append_const", const = UniProtActions.CACHE)
-    parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in elasticsearch",
                         action="append_const", const = GeneActions.ALL)
-    parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in elasticsearch",
                         action="append_const", const = EfoActions.ALL)
+    parser.add_argument("--hpo", dest='hpo',
+                        help="process the Human Phenotype Ontology (HPO), store the resulting json objects in elasticsearch",
+                        action="append_const", const=HpoActions.ALL)
+    parser.add_argument("--mp", dest='mp',
+                        help="process the Mammalian Phenotype ontology (MP), store the resulting json objects in elasticsearch",
+                        action="append_const", const=MpActions.ALL)
     parser.add_argument("--eco", dest='eco', help="process the eco information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EcoActions.ALL)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
@@ -92,14 +99,14 @@ def main():
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
-    parser.add_argument("--gel", dest='gel', help="update genomics england data",
-                        action="append_const", const = GenomicsEnglandActions.ALL)
     parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
                         action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
     parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
                         action="append_const", const=G2PActions.GENERATE_EVIDENCE)
     parser.add_argument("--slapenrich", dest='slapenrich', help="parse SLAPEnrich pathway evidence",
                         action="append_const", const=SLAPEnrichActions.GENERATE_EVIDENCE)
+    parser.add_argument("--hallmark", dest='hallmark', help="generate Hallmark Json",
+                        action="append_const", const=HallmarksActions.GENERATE_JSON)
     parser.add_argument("--ontos", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.PHENOTYPESLIM)
     parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
@@ -231,6 +238,14 @@ def main():
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:
                 EfoProcess(loader).process_all()
+        if args.hpo or run_full_pipeline:
+            do_all = (HpoActions.ALL in args.hpo) or run_full_pipeline
+            if (HpoActions.PROCESS in args.hpo) or do_all:
+                HpoProcess(loader).process_all()
+        if args.mp or run_full_pipeline:
+            do_all = (MpActions.ALL in args.mp) or run_full_pipeline
+            if (MpActions.PROCESS in args.mp) or do_all:
+                MpProcess(loader).process_all()
         if args.eco or run_full_pipeline:
             do_all = (EcoActions.ALL in args.eco) or run_full_pipeline
             if (EcoActions.PROCESS in args.eco) or do_all:
@@ -243,13 +258,6 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
-
-        if args.gel or run_full_pipeline:
-            do_all = (GenomicsEnglandActions.ALL in args.gel) or run_full_pipeline
-            if (GenomicsEnglandActions.GENERATE_EVIDENCE in args.gel) or do_all:
-                logger.warning("GenomicsEnglandActions...")
-                GE(es=connectors.es, r_server=connectors.r_server).process_all()
-
         if args.g2p or run_full_pipeline:
             do_all = (G2PActions.ALL in args.g2p) or run_full_pipeline
             if (G2PActions.GENERATE_EVIDENCE in args.g2p) or do_all:
@@ -262,6 +270,10 @@ def main():
             do_all = (SLAPEnrichActions.ALL in args.slapenrich) or run_full_pipeline
             if (SLAPEnrichActions.GENERATE_EVIDENCE in args.slapenrich) or do_all:
                 SLAPEnrich(connectors.es, connectors.r_server).process_slapenrich()
+        if args.hallmark or run_full_pipeline:
+            do_all = (HallmarksActions.ALL in args.hallmark) or run_full_pipeline
+            if (HallmarksActions.GENERATE_JSON in args.hallmark) or do_all:
+                Hallmarks(loader, connectors.es, connectors.r_server).process_hallmarks()
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:

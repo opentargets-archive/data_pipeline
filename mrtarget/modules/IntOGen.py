@@ -3,6 +3,7 @@ import logging
 import datetime
 from mrtarget.common import Actions
 from mrtarget.Settings import Config, file_or_resource
+#from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 import opentargets.model.core as opentargets
 import opentargets.model.bioentity as bioentity
 import opentargets.model.evidence.core as evidence_core
@@ -125,6 +126,7 @@ class IntOGen():
         self.ensembl_current = {}
         self.symbols = {}
         self.logger = logging.getLogger(__name__)
+
 
     def load_Ensembl(self):
 

@@ -12,6 +12,7 @@ import opentargets.model.core as opentargets
 import logging
 import json
 import rdflib
+import requests
 from rdflib import URIRef
 from rdflib.namespace import Namespace, NamespaceManager
 from rdflib.namespace import OWL, RDF, RDFS
@@ -54,6 +55,38 @@ EFO_TAS = [
     'http://www.ebi.ac.uk/efo/EFO_0000701', # skin disease
     'http://www.ebi.ac.uk/efo/EFO_0001421', # liver disease
 ]
+
+HPO_TAS = [
+    "http://purl.obolibrary.org/obo/HP_0005386", #"behavior/neurological phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005375", #"adipose tissue phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005385", #"cardiovascular system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005384", #"cellular phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005382", #"craniofacial phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005381", #"digestive/alimentary phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005380", #"embryo phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005379", #"endocrine/exocrine phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005378", #"growth/size/body region phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005377", #"hearing/vestibular/ear phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005397", #"hematopoietic system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005376", #"homeostasis/metabolism phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005387", #"immune system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0010771", #"integument phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005371", #"limbs/digits/tail phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005370", #"liver/biliary system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0010768", #"mortality/aging",
+    "http://purl.obolibrary.org/obo/HP_0005369", #"muscle phenotype",
+    "http://purl.obolibrary.org/obo/HP_0002006", #"neoplasm",
+    "http://purl.obolibrary.org/obo/HP_0003631", #"nervous system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0002873", #"normal phenotype",
+    "http://purl.obolibrary.org/obo/HP_0001186", #"pigmentation phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005367", #"renal/urinary system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005389", #"reproductive system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005388", #"respiratory system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005390", #"skeleton phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005394", #"taste/olfaction phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005391", #"vision/eye phenotype"
+]
+
 
 TOP_LEVELS = '''
 PREFIX obo: <http://purl.obolibrary.org/obo/>
@@ -522,9 +555,62 @@ class OntologyClassReader():
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
 
+    def load_human_phenotype_ontology(self):
+        """
+            Loads the HPO graph and extracts the current and obsolete classes.
+            Status: production
+        """
+        logger.debug("load_human_phenotype_ontology...")
+        #self.load_hpo_classes()
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+
+        all_ns = [n for n in self.rdf_graph.namespace_manager.namespaces()]
+
         '''
-        Add all phenotypes to the EFO classes
+        Detach the anatomical system from the phenotypic abnormality node
+        and load all the classes
         '''
+
+        phenotypic_abnormality_uri = 'http://purl.obolibrary.org/obo/HP_0000118'
+        phenotypic_abnormality_uriref = URIRef(phenotypic_abnormality_uri)
+        self.get_children(phenotypic_abnormality_uri)
+
+        for child in self.children[phenotypic_abnormality_uri]:
+            print "%s %s..."%(child['code'], child['label'])
+            uri = "http://purl.obolibrary.org/obo/" + child['code']
+            uriref = URIRef(uri)
+            self.rdf_graph.remove((uriref, None, phenotypic_abnormality_uriref))
+            self.load_ontology_classes(base_class=uri)
+            self.get_classes_paths(root_uri=uri, level=0)
+            print len(self.current_classes)
+
+    def load_mammalian_phenotype_ontology(self):
+        """
+            Loads the MP graph and extracts the current and obsolete classes.
+            Status: production
+        """
+        logger.debug("load_mammalian_phenotype_ontology...")
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+
+        all_ns = [n for n in self.rdf_graph.namespace_manager.namespaces()]
+
+        '''
+        Detach the anatomical system from the mammalian phenotype node
+        and load all the classes
+        '''
+
+        mp_root_uri = 'http://purl.obolibrary.org/obo/MP_0000001'
+        mp_root_uriref = URIRef(mp_root_uri)
+        self.get_children(mp_root_uri)
+
+        for child in self.children[mp_root_uri]:
+            print "%s %s..."%(child['code'], child['label'])
+            uri = "http://purl.obolibrary.org/obo/" + child['code']
+            uriref = URIRef(uri)
+            self.rdf_graph.remove((uriref, None, mp_root_uriref))
+            self.load_ontology_classes(base_class=uri)
+            self.get_classes_paths(root_uri=uri, level=0)
+            print len(self.current_classes)
 
     def load_efo_omim_xrefs(self):
         '''
@@ -739,8 +825,8 @@ class PhenotypeSlim():
         self.phenotype_excluded = set()
 
         self._remote_filenames = dict()
-        self.logger = logging.getLogger(self.__class__.__name__)
-        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
+        self._logger = logging.getLogger(self.__class__.__name__)
+        tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
 
 
     def get_ontology_path(self, base_class, term):
@@ -764,7 +850,7 @@ class PhenotypeSlim():
                         n = 3
                     except SPARQLWrapper.SPARQLExceptions.EndPointNotFound, e:
                         print e
-                        self.logger.error(e)
+                        self._logger.error(e)
                         if n > 2:
                             raise e
                         else:
@@ -826,10 +912,10 @@ class PhenotypeSlim():
 
     def _store_remote_filename(self, filename):
         # print "%s" % filename
-        self.logger.debug("%s" % filename)
+        self._logger.debug("%s" % filename)
         if filename.startswith('/upload/submissions/') and \
             filename.endswith('.json.gz'):
-            self.logger.debug("%s" % filename)
+            self._logger.debug("%s" % filename)
             if True:
                 version_name = filename.split('/')[3].split('.')[0]
                 # print "%s" % filename
@@ -862,16 +948,26 @@ class PhenotypeSlim():
             #    self.logger.debug('error getting remote file%s'%filename)
 
     def _callback_not_used(self, path):
-        self.logger.debug("skipped "+path)
+        self._logger.debug("skipped " + path)
 
-    def create_phenotype_slim(self, local_files = []):
+    def create_phenotype_slim_from_selection(self):
+
+        for url in Config.PHENOTYPE_SLIM_INPUT_URLS:
+            response = requests.get(url)
+            self._logger.info("Read url %s - response code %s" % (url, response.code))
+            lines = response.readlines()
+
+            for line in lines:
+                self._logger.info(line.rstrip())
+
+    def create_phenotype_slim_from_evidence(self, local_files = []):
 
         self.load_all_phenotypes()
 
         if local_files:
 
             for file_path in local_files:
-                self.logger.info("Parsing file %s" % (file_path))
+                self._logger.info("Parsing file %s" % (file_path))
                 file_size, file_mod_time = os.path.getsize(file_path), os.path.getmtime(file_path)
                 with open(file_path, mode='rb') as f:
                     self.parse_gzipfile(filename=file_path, mode='rb', fileobj=f, mtime=file_mod_time)
@@ -883,7 +979,7 @@ class PhenotypeSlim():
                              leave=False):
                 try:
                     p = Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[u]
-                    self.logger.info("%s %s"%(u, p))
+                    self._logger.info("%s %s" % (u, p))
                     cnopts = pysftp.CnOpts()
                     cnopts.hostkeys = None  # disable host key checking.
                     with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
@@ -900,10 +996,10 @@ class PhenotypeSlim():
                                                           leave=False,):
                             latest_file = file_data['file_path']
                             file_version = file_data['file_version']
-                            self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
+                            self._logger.info("found latest file %s for datasource %s" % (latest_file, datasource))
                             self.parse_gzipfile(latest_file, u, p)
                 except AuthenticationException:
-                    self.logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
+                    self._logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
 
         for uri, p in self.phenotype_map.iteritems():
             logger.debug(uri)
@@ -916,7 +1012,7 @@ class PhenotypeSlim():
                            fileobj=fileobj,
                            mtime=mtime) as fh:
 
-            self.logger.info('Starting parsing %s' % filename)
+            self._logger.info('Starting parsing %s' % filename)
 
             line_buffer = []
             offset = 0
@@ -957,7 +1053,7 @@ class PhenotypeSlim():
 
     def parse_sftp_gzipfile(self, file_path, u, p):
         # print "---->%s"%file_path
-        self.logger.info("%s %s" % (u, p))
+        self._logger.info("%s %s" % (u, p))
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None  # disable host key checking.
         with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],

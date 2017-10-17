@@ -5,6 +5,7 @@ import csv
 import hashlib
 import ujson as json
 import functools as ft
+import itertools as it
 import operator as oper
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
@@ -14,13 +15,16 @@ from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
-from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
+from mrtarget.common.Redis import RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 
 from mrtarget.Settings import Config
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
+import pprint
 
-_missing_tissues = {}
+
+_missing_tissues = {'names': {},
+                    'codes': {}}
 
 def level_from_text(key):
     level_translation = {'Not detected': 0,
@@ -90,6 +94,9 @@ class HPAExpression(Dict, JSONSerializable):
         if 'unit' not in rna:
             rna.unit = ''
 
+        if 'zscore' not in rna:
+            rna.zscore = -1
+
         return rna
 
     @staticmethod
@@ -109,6 +116,7 @@ class HPAExpression(Dict, JSONSerializable):
 
         if 'protein' not in tissue:
             tissue.protein = HPAExpression.new_tissue_protein()
+
         if 'rna' not in tissue:
             tissue.rna = HPAExpression.new_tissue_rna()
 
@@ -179,7 +187,6 @@ def format_expression_with_rna(rec):
         new_tissues = []
         has_tissues = len(exp.tissues) > 0
 
-        sorted(rec['data'], key=oper.itemgetter(0))
         t_set = ft.reduce(lambda x, y: x.union(set([y['efo_code']])),
                           exp.tissues, set()) \
                     if has_tissues else set()
@@ -187,18 +194,19 @@ def format_expression_with_rna(rec):
                           rec['data'], set())
 
         intersection = t_set.intersection(nt_set)
-        intersection_idxs = [i for i, e in enumerate(exp.tissues) if e['efo_code'] in intersection]
-        intersection_idxs_data = [i for i, e in enumerate(rec['data']) if e[0] in intersection]
+        intersection_idxs = {e['efo_code']: i for i, e in enumerate(exp.tissues) if e['efo_code'] in intersection}
+        intersection_idxs_data = {e[0]: i for i, e in enumerate(rec['data']) if e[0] in intersection}
         difference = nt_set.difference(t_set)
         difference_idxs = [i for i, e in enumerate(rec['data']) if e[0] in difference]
 
-        for i, _ in enumerate(intersection):
-            tidx = intersection_idxs[i]
-            didx = intersection_idxs_data[i]
+        for ec in intersection:
+            tidx = intersection_idxs[ec]
+            didx = intersection_idxs_data[ec]
 
             exp.tissues[tidx].rna.level = int(rec['data'][didx][2])
             exp.tissues[tidx].rna.value = float(rec['data'][didx][3])
             exp.tissues[tidx].rna.unit = rec['data'][didx][4]
+            exp.tissues[tidx].rna.zscore = int(rec['data'][didx][7])
 
 
         for idx in difference_idxs:
@@ -210,6 +218,7 @@ def format_expression_with_rna(rec):
             t.rna.level = int(rna[2])
             t.rna.value = float(rna[3])
             t.rna.unit = rna[4]
+            t.rna.zscore = int(rna[7])
 
             new_tissues.append(t)
 
@@ -231,11 +240,11 @@ def name_from_tissue(tissue_name, t2m):
         tname = curated
 
         if curated not in _missing_tissues:
-            _missing_tissues[curated] = curated
+            _missing_tissues['names'][tname] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.warning('the tissue name %s was not found in the mapping', curated)
+            logger.debug('the tissue name %s was not found in the mapping', curated)
 
-    return tname
+    return tname.strip()
 
 
 def code_from_tissue(tissue_name, t2m):
@@ -249,12 +258,12 @@ def code_from_tissue(tissue_name, t2m):
         tid = tissue_name.strip().replace(' ', '_')
         tid = re.sub('[^0-9a-zA-Z_]+', '', tid)
 
-        if curated not in _missing_tissues:
-            _missing_tissues[curated] = curated
+        if tid not in _missing_tissues:
+            _missing_tissues['codes'][tid] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.warning('the tissue name %s was not found in the mapping', curated)
+            logger.debug('the tissue name %s was not found in the mapping', curated)
 
-    return tid
+    return tid.strip()
 
 
 def asys_from_tissue(tissue_name, t2m):
@@ -284,33 +293,47 @@ def organs_from_tissue(tissue_name, t2m):
 def hpa2tissues(hpa=None):
     '''return a list of tissues if any or empty list'''
     def _split_tissue(k, v):
+        rna_level = v['rna']['level'] if v['rna'] else -1
         '''from tissue dict to rna and protein dicts pair'''
-        tlabel = v['label']
+        rna = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+                                      'level': e} if v['rna'] else {},
+                           xrange(0, rna_level + 1) if rna_level >= 0 else xrange(-1, 0)))
 
-        rna = {'id': '_'.join([str(v['rna']['level']), k]),
-               'label': tlabel,
-               'level': v['rna']['level'],
-               'unit': v['rna']['unit'],
-               'value': v['rna']['value'],
-               'efo_code': k} if v['rna'] else {}
+        zscore_level = v['rna']['zscore'] if v['rna'] else -1
+        '''from tissue dict to rna and protein dicts pair'''
+        zscore = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+                                      'level': e} if v['rna'] else {},
+                           xrange(0, zscore_level + 1) if zscore_level >= 0 else xrange(-1, 0)))
 
-        protein = {'id': '_'.join([str(v['protein']['level']), k]),
-                   'label': tlabel,
-                   'level': v['protein']['level'],
-                   'efo_code': k} if v['protein'] else {}
 
-        return (rna, protein)
+        pro_level = v['protein']['level'] if v['protein'] else -1
+        protein = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+                                          'level': e} if v['protein'] else {},
+                               xrange(0, pro_level + 1) if pro_level >= 0 else xrange(-1, 0)))
 
-    # generate a list with rna, protein pairs per tissue
+        return (rna, protein, zscore)
+
+    # generate a list with (rna, protein, zscore) tuple pairs per tissue
     splitted_tissues = [_split_tissue(t['efo_code'], t) for t in hpa.tissues
                         if hpa is not None]
 
-    rnas = [tissue[0] for tissue in splitted_tissues if tissue[0]]
+    rnas = []
+    proteins = []
+    zscores = []
 
-    proteins = [tissue[1] for tissue in splitted_tissues if tissue[1]]
+    for tissue in splitted_tissues:
+        if tissue[0]:
+            rnas += tissue[0]
+
+        if tissue[1]:
+            proteins += tissue[1]
+
+        if tissue[2]:
+            zscores += tissue[2]
 
     return {'rna': rnas,
-            'protein': proteins}
+            'protein': proteins,
+            'zscore': zscores}
 
 
 class HPAActions(Actions):
@@ -394,9 +417,8 @@ class HPADataDownloader():
         """
         self.logger.info('get rna tissue rows into dicts')
         self.logger.debug('melting rna level table into geneid tissue level')
-        t_level = (
-            petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL),
-                               delimiter='\t')
+
+        t_level = (petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_level')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
@@ -410,10 +432,7 @@ class HPADataDownloader():
             .cutout('tissue')
         )
 
-
-        t_value = (
-            petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL),
-                               delimiter='\t')
+        t_value = (petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_value')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
@@ -424,8 +443,23 @@ class HPADataDownloader():
             .cutout('tissue')
         )
 
-        t_join = (petl.join(t_level,
+        t_zscore = (petl.fromcsv(URLZSource(Config.HPA_RNA_ZSCORE_URL), delimiter='\t')
+            .melt(key='ID', variablefield='tissue', valuefield='zscore_level')
+            .rename({'ID': 'gene'})
+            .addfield('tissue_label',
+                      lambda rec: name_from_tissue(rec['tissue'].strip(), self.t2m))
+            .addfield('tissue_code',
+                      lambda rec: code_from_tissue(rec['tissue_label'], self.t2m))
+            .cutout('tissue')
+        )
+
+        t_vl = petl.join(t_level,
                            t_value,
+                           key=('gene', 'tissue_code', 'tissue_label'),
+                           presorted=True)
+
+        t_join = (petl.join(t_vl,
+                           t_zscore,
                            key=('gene', 'tissue_code', 'tissue_label'),
                            presorted=True)
                   .aggregate('gene',
@@ -435,7 +469,8 @@ class HPADataDownloader():
                                                       'rna_value',
                                                       'rna_unit',
                                                       'anatomical_systems',
-                                                      'organs'), list)},
+                                                      'organs',
+                                                      'zscore_level'), list)},
                        presorted=True)
         )
 
@@ -540,7 +575,13 @@ class HPAProcess():
         self.logger.info('store_data called')
 
         self.logger.debug('calling to create new expression index')
-        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+        overwrite_indices = not dry_run
+        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                                     recreate=overwrite_indices)
+        self.loader.prepare_for_bulk_indexing(
+            self.loader.get_versioned_index(
+                Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
+
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
                            r_server=self.r_server,
                            serialiser='json',
@@ -571,69 +612,10 @@ class HPAProcess():
 
         q_reporter.join()
 
+        self.logger.info('missing tissues %s', str(_missing_tissues))
         self.logger.info('all expressions objects pushed to elasticsearch')
 
 #         if self.data.values()[0]['cancer']:  # if there is cancer data
 #             pass
 #         if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
 #             pass
-
-
-class HPALookUpTable(object):
-    """
-    A redis-based pickable hpa look up table using gene id as table
-    id
-    """
-
-    def __init__(self,
-                 es=None,
-                 namespace=None,
-                 r_server=None,
-                 ttl=(60 * 60 * 24 + 7)):
-        self._es = es
-        self.r_server = r_server
-        self._es_query = ESQuery(self._es)
-        self._table = RedisLookupTablePickle(namespace=namespace,
-                                             r_server=self.r_server,
-                                             ttl=ttl)
-        self._logger = logging.getLogger(__name__)
-        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-
-        if self.r_server:
-            self._load_hpa_data(self.r_server)
-
-    def _load_hpa_data(self, r_server=None):
-        for el in tqdm(self._es_query.get_all_hpa(),
-                       desc='loading hpa',
-                       unit=' hpa',
-                       unit_scale=True,
-                       total=self._es_query.count_all_hpa(),
-                       file=self.tqdm_out,
-                       leave=False):
-            self.set_hpa(el, r_server=self._get_r_server(r_server))
-
-    def get_hpa(self, idx, r_server=None):
-        return self._table.get(idx, r_server=self._get_r_server(r_server))
-
-    def set_hpa(self, hpa, r_server=None):
-        self._table.set(hpa['gene'], hpa,
-                        r_server=self._get_r_server(r_server))
-
-    def get_available_hpa_ids(self, r_server=None):
-        return self._table.keys(self._get_r_server(r_server))
-
-    def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key,
-                                        r_server=self._get_r_server(r_server))
-
-    def __getitem__(self, key, r_server=None):
-        return self.get_hpa(key, r_server=self._get_r_server(r_server))
-
-    def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
-
-    def keys(self, r_server=None):
-        return self._table.keys(self._get_r_server(r_server))
-
-    def _get_r_server(self, r_server=None):
-        return r_server if r_server else self.r_server

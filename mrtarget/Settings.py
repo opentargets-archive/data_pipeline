@@ -134,6 +134,8 @@ class Config():
         PROXY_HOST = ini.get('proxy', 'host')
         PROXY_PORT = int(ini.get('proxy', 'port'))
 
+    TEMP_DIR = os.path.sep + 'tmp'
+
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
@@ -169,6 +171,10 @@ class Config():
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
     ELASTICSEARCH_EFO_LABEL_DOC_NAME = 'efo'
+    ELASTICSEARCH_HPO_LABEL_INDEX_NAME = 'hpo-data'
+    ELASTICSEARCH_HPO_LABEL_DOC_NAME = 'hpo'
+    ELASTICSEARCH_MP_LABEL_INDEX_NAME = 'mp-data'
+    ELASTICSEARCH_MP_LABEL_DOC_NAME = 'mp'
     ELASTICSEARCH_ECO_INDEX_NAME = 'eco-data'
     ELASTICSEARCH_ECO_DOC_NAME = 'eco'
     ELASTICSEARCH_GENE_NAME_INDEX_NAME = 'gene-data'
@@ -185,6 +191,8 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
+    ELASTICSEARCH_HALLMARK_INDEX_NAME = 'hallmark-data'
+    ELASTICSEARCH_HALLMARK_DOC_NAME = 'hallmark-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
@@ -227,6 +235,7 @@ class Config():
     HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
     HPA_RNA_LEVEL_URL = ini.get(INI_SECTION, 'hpa_rna_level')
     HPA_RNA_VALUE_URL = ini.get(INI_SECTION, 'hpa_rna_value')
+    HPA_RNA_ZSCORE_URL = ini.get(INI_SECTION, 'hpa_rna_zscore')
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
     REACTOME_ENSEMBL_MAPPINGS = ini.get(INI_SECTION, 'ensembl_reactome')
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
@@ -290,24 +299,25 @@ class Config():
     # TODO remove refs to user directories
     MOUSEMODELS_CACHE_DIRECTORY = '/Users/otvisitor/.phenodigmcache'
 
-    # hardcoded folder of json file to be preprocessed to extract
-    # HP and MP terms not in EFO but that will be combined in a SLIM
-    ONTOLOGY_PREPROCESSING_DATASOURCES = [
-        'cttv008-14-03-2016.json.gz',
-        ''
+    # put the path to the file where you want to get the list of HP terms to be included in our ontology
+    PHENOTYPE_SLIM_INPUT_URLS = [
+        'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/eva/hpo_mappings.txt'
     ]
-
-    ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS = ["cttv008", "cttv012"]
-
-    # put the path to the file where you want to write the SLIM file (turtle format)
-    # TODO remove refs to user directories
-    ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
+    #  put the path to the file where you want to write the SLIM file (turtle format)
+    PHENOTYPE_SLIM_OUTPUT_FILE = TEMP_DIR + os.path.sep + 'opentargets_disease_phenotype_slim.ttl'
 
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
     CHEMBL_PROTEIN_CLASS = ini.get(INI_SECTION, 'chembl_protein')
     CHEMBL_TARGET_COMPONENT = ini.get(INI_SECTION, 'chembl_component')
+
+    # Mouse/Human Orthology with Phenotype Annotations (tab-delimited)
+    GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY = "http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt"
+    # All Genotypes and Mammalian Phenotype Annotations (tab-delimited)
+    GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES = "http://www.informatics.jax.org/downloads/reports/MGI_PhenoGenoMP.rpt"
+    # data dump location if you want to merge the data without running all the steps again
+    GENOTYPE_PHENOTYPE_OUTPUT = TEMP_DIR + os.path.sep + 'genotype_phenotype.json'
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
@@ -333,22 +343,24 @@ class Config():
 
     DATASOURCE_TO_DATATYPE_MAPPING = {}
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_somatic'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
-    DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
-    DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
     DATASOURCE_TO_DATATYPE_MAPPING['europepmc'] = 'literature'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
+    DATASOURCE_TO_DATATYPE_MAPPING['slapenrich'] = 'affected_pathway'
     DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_somatic'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
+    DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['23andme'] = 'genetic_association'
+
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
@@ -370,8 +382,6 @@ class Config():
 
     ENSEMBL_RELEASE_VERSION = 90
     ENSEMBL_CHUNK_SIZE = 100
-
-    TEMP_DIR = os.path.sep + 'tmp'
 
     REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
                                    cast=bool, default=False)
@@ -407,10 +417,10 @@ class Config():
 
     # GE Pipeline
 
-    GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
+    GE_EVIDENCE_STRING = TEMP_DIR + os.path.sep + 'genomics_england_evidence_string.json'
     GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
-    GE_ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
-    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
+    GE_ZOOMA_DISEASE_MAPPING = TEMP_DIR + os.path.sep + 'zooma_disease_mapping.csv'
+    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = TEMP_DIR + os.path.sep + 'zooma_disease_mapping_low_confidence.csv'
 
     # for developers
     DRY_RUN_OUTPUT = read_option('DRY_RUN_OUTPUT_ENABLE',
