@@ -535,8 +535,8 @@ class EvidenceValidationFileChecker():
                                           data_types=(LookUpDataType.TARGET,
                                                       LookUpDataType.EFO,
                                                       LookUpDataType.ECO,
-                                                      # LookUpDataType.HPO,
-                                                      # LookUpDataType.MP,
+                                                      LookUpDataType.HPO,
+                                                      LookUpDataType.MP,
                                                       # LookUpDataType.HPA
                                                      ),
                                           autoload=True,
