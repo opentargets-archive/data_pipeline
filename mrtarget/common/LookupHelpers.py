@@ -115,10 +115,11 @@ class LookUpDataRetriever(object):
                 self._get_available_ecos()
             elif dt == LookUpDataType.MP:
                 self._logger.info("get mp info")
-                self._get_mp_info()
+                self._get_mp()
             elif dt == LookUpDataType.HPO:
                 self._get_hpo()
             elif dt == LookUpDataType.EFO:
+                self._logger.info("get EFO info")
                 self._get_efo()
             elif dt == LookUpDataType.PUBLICATION:
                 self._get_available_publications()

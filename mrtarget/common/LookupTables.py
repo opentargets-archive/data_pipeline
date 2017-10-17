@@ -1,5 +1,6 @@
 import logging
 from tqdm import tqdm
+from mrtarget.common import TqdmToLogger
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.common.connection import new_redis_client, PipelineConnectors
@@ -200,20 +201,24 @@ class ECOLookUpTable(object):
         self.r_server = r_server
         if r_server is not None:
             self._load_eco_data(r_server)
+        self._logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
 
-    def get_ontology_code_from_url(url):
+    def get_ontology_code_from_url(self, url):
         return url.split('/')[-1]
 
     def _load_eco_data(self, r_server=None):
+        self._logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
         for eco in tqdm(self._es_query.get_all_eco(),
                         desc='loading eco',
                         unit=' eco',
                         unit_scale=True,
-                        file=tqdm_out,
+                        file=self.tqdm_out,
                         total=self._es_query.count_all_eco(),
                         leave=False,
                         ):
-            self._table.set(get_ontology_code_from_url(eco['code']), eco,
+            self._table.set(self.get_ontology_code_from_url(eco['code']), eco,
                             r_server=self._get_r_server(r_server))  # TODO can be improved by sending elements in batches
 
 
@@ -270,11 +275,13 @@ class EFOLookUpTable(object):
             self._load_efo_data(r_server)
 
     def _load_efo_data(self, r_server = None):
+        self._logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
         for efo in tqdm(self._es_query.get_all_diseases(),
                         desc='loading diseases',
                         unit=' diseases',
                         unit_scale=True,
-                        file=tqdm_out,
+                        file=self.tqdm_out,
                         total=self._es_query.count_all_diseases(),
                         leave=False,
                         ):
@@ -329,11 +336,13 @@ class MPLookUpTable(object):
             self._load_mp_data(r_server)
 
     def _load_mp_data(self, r_server = None):
+        self._logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
         for mp in tqdm(self._es_query.get_all_mammalian_phenotypes(),
                         desc='loading mammalian phenotypes',
                         unit=' mammalian phenotypes',
                         unit_scale=True,
-                        file=tqdm_out,
+                        file=self.tqdm_out,
                         total=self._es_query.count_all_mammalian_phenotypes(),
                         leave=False,
                         ):
