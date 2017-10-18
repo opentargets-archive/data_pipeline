@@ -8,6 +8,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+
 from mrtarget.Settings import Config
 
 from yapsy.PluginManager import PluginManager

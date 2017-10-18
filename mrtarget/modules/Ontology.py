@@ -18,7 +18,7 @@ from rdflib.namespace import Namespace, NamespaceManager
 from rdflib.namespace import OWL, RDF, RDFS
 from mrtarget.common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 from datetime import date
 from mrtarget.Settings import Config
@@ -975,7 +975,7 @@ class PhenotypeSlim():
 
             for u in tqdm(Config.ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS,
                              desc='scanning ftp accounts',
-                             file=tqdm_out,
+                             # file=tqdm_out,
                              leave=False):
                 try:
                     p = Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[u]
@@ -992,7 +992,7 @@ class PhenotypeSlim():
                         srv.close()
                         for datasource, file_data in tqdm(self._remote_filenames[u].items(),
                                                           desc='scanning available datasource for account %s'%u,
-                                                          file=tqdm_out,
+                                                          # file=tqdm_out,
                                                           leave=False,):
                             latest_file = file_data['file_path']
                             file_version = file_data['file_version']
