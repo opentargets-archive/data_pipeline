@@ -114,7 +114,7 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
             elif dt == LookUpDataType.MP:
-                self._logger.info("get mp info")
+                self._logger.info("get MP info")
                 self._get_mp()
             elif dt == LookUpDataType.HPO:
                 self._get_hpo()
@@ -164,13 +164,6 @@ class LookUpDataRetriever(object):
                                                       autoload = autoload)
         self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
         self._get_non_reference_gene_mappings()
-
-    def _get_mp_info(self, autoload = True):
-        self._logger.info('getting MP info')
-        self.lookup.available_mps = MPLookUpTable(self.es,
-                                                      'MP_LOOKUP',
-                                                  self.r_server,
-                                                  autoload = autoload)
 
     def _get_non_reference_gene_mappings(self):
         self.lookup.non_reference_genes = {}
