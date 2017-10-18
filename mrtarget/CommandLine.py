@@ -1,8 +1,6 @@
 from __future__ import print_function
 import logging
 import argparse
-import logging
-import argparse
 import sys
 import itertools as it
 from logging.config import fileConfig
