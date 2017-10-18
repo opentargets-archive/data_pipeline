@@ -1,9 +1,9 @@
 import unittest
 import uuid
+import pytest
 
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess, WhiteCollarWorker, RedisQueueWorkerThread
 from mrtarget.common.connection import PipelineConnectors
-
 
 class ProxyWorker(RedisQueueWorkerThread):
     '''reads from the input queue and push it to the output queue'''
@@ -20,7 +20,7 @@ class ConsumerWorker(RedisQueueWorkerThread):
         return
 
 
-class RedisWorkerTestCase(unittest.TestCase):
+class TestRedisWorker(unittest.TestCase):
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
     queue_name_test = UNIQUE_RUN_ID+'|test_queue'
 
@@ -41,7 +41,12 @@ class RedisWorkerTestCase(unittest.TestCase):
                                 r_server=cls.connectors.r_server,
                                 serialiser='pickle')
 
+    @classmethod
+    def tearDown(cls):
+        cls.connectors.close()
+
     def test_WhiteCollar(self):
+
         test_workers = WhiteCollarWorker(target=ProxyWorker,
                                          pool_size=1,
                                          queue_in=self.queue1,
@@ -65,13 +70,12 @@ class RedisWorkerTestCase(unittest.TestCase):
         test_workers.join(timeout=10)
         test_consumer.join(timeout=10)
         queue1_status =self.queue1.get_status()
+
         self.assertEquals(queue1_status['submitted_counter'], iterations)
         self.assertEquals(queue1_status['processed_counter'], iterations)
         self.assertTrue(self.queue1.is_done())
         self.assertTrue(self.queue2.is_done())
         self.assertFalse(test_workers.is_alive())
         self.assertFalse(test_consumer.is_alive())
-
-
 
 

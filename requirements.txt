@@ -36,6 +36,7 @@ petl==1.1.1
 hyperframe==3.2
 nose==1.3.7
 pytest
+pytest-cov
 toml
 rdflib
 colorama
@@ -46,6 +47,7 @@ unidecode
 urllib3
 coverage
 pylru
+toolz
 cement==2.10.2
 git+https://github.com/opentargets/data_model.git@v1.2.6#egg=data-model
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz
