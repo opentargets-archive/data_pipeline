@@ -3,7 +3,6 @@ import argparse
 import logging
 import sys
 import itertools as it
-import atexit
 
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common import Actions
@@ -17,7 +16,7 @@ from mrtarget.modules.ECO import EcoActions, EcoProcess
 from mrtarget.modules.EFO import EfoActions, EfoProcess
 from mrtarget.modules.HPO import HpoActions, HpoProcess
 from mrtarget.modules.MP import MpActions, MpProcess
-from mrtarget.modules.Ensembl import  EnsemblActions, EnsemblProcess
+from mrtarget.modules.Ensembl import EnsemblActions, EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneActions, GeneManager
@@ -32,7 +31,6 @@ from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.modules.G2P import G2PActions, G2P
-from mrtarget.modules.GE import GenomicsEnglandActions, GE
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 

@@ -7,13 +7,13 @@ from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
-from mrtarget.modules.ECO import ECOLookUpTable
-from mrtarget.modules.EFO import EFOLookUpTable
-from mrtarget.modules.HPO import HPOLookUpTable
-from mrtarget.modules.MP import MPLookUpTable
-from mrtarget.modules.HPA import HPALookUpTable
+from mrtarget.common.LookupTables import ECOLookUpTable
+from mrtarget.common.LookupTables import EFOLookUpTable
+from mrtarget.common.LookupTables import HPOLookUpTable
+from mrtarget.common.LookupTables import MPLookUpTable
+from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
-from mrtarget.modules.Literature import LiteratureLookUpTable
+from mrtarget.common.LookupTables import LiteratureLookUpTable
 from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
@@ -114,11 +114,12 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
             elif dt == LookUpDataType.MP:
-                self._logger.info("get mp info")
-                self._get_mp_info()
+                self._logger.info("get MP info")
+                self._get_mp()
             elif dt == LookUpDataType.HPO:
                 self._get_hpo()
             elif dt == LookUpDataType.EFO:
+                self._logger.info("get EFO info")
                 self._get_efo()
             elif dt == LookUpDataType.PUBLICATION:
                 self._get_available_publications()
@@ -163,13 +164,6 @@ class LookUpDataRetriever(object):
                                                       autoload = autoload)
         self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
         self._get_non_reference_gene_mappings()
-
-    def _get_mp_info(self, autoload = True):
-        self._logger.info('getting MP info')
-        self.lookup.available_mps = MPLookUpTable(self.es,
-                                                      'MP_LOOKUP',
-                                                  self.r_server,
-                                                  autoload = autoload)
 
     def _get_non_reference_gene_mappings(self):
         self.lookup.non_reference_genes = {}

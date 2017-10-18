@@ -1,24 +1,14 @@
-import os
-import warnings
-import logging
-import json
 from collections import OrderedDict
 
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
-
+from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config
-
-
-from logging.config import fileConfig
-
+import logging
 logger = logging.getLogger(__name__)
-tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 
 '''
@@ -30,10 +20,6 @@ WHenever an evidence or association has an ECO code, we use this module to decor
 class EcoActions(Actions):
     PROCESS='process'
     UPLOAD='upload'
-
-def get_ontology_code_from_url(url):
-    return url.split('/')[-1]
-
 
 class ECO(JSONSerializable):
     def __init__(self,
@@ -53,11 +39,7 @@ class ECO(JSONSerializable):
 
     def get_id(self):
         # return self.code
-        return get_ontology_code_from_url(self.code)
-
-
-
-
+        return ECOLookUpTable.get_ontology_code_from_url(self.code)
 
 class EcoProcess():
 
@@ -130,58 +112,4 @@ class EcoProcess():
                             ID=eco_id,
                             body=eco_obj)
 
-
-class ECOLookUpTable(object):
-    """
-    A redis-based pickable gene look up table
-    """
-
-    def __init__(self,
-                 es,
-                 namespace = None,
-                 r_server = None,
-                 ttl = 60*60*24+7):
-        self._table = RedisLookupTablePickle(namespace = namespace,
-                                            r_server = r_server,
-                                            ttl = ttl)
-        self._es = es
-        self._es_query = ESQuery(es)
-        self.r_server = r_server
-        if r_server is not None:
-            self._load_eco_data(r_server)
-
-    def _load_eco_data(self, r_server = None):
-        for eco in tqdm(self._es_query.get_all_eco(),
-                        desc='loading eco',
-                        unit=' eco',
-                        unit_scale=True,
-                        file=tqdm_out,
-                        total=self._es_query.count_all_eco(),
-                        leave=False,
-                       ):
-            self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
-
-    def get_eco(self, efo_id, r_server = None):
-        return self._table.get(efo_id, r_server=self._get_r_server(r_server))
-
-    def set_eco(self, eco, r_server = None):
-        self._table.set(get_ontology_code_from_url(eco['code']),eco, r_server=self._get_r_server(r_server))
-
-    def get_available_eco_ids(self, r_server = None):
-        return self._table.keys(r_server=self._get_r_server(r_server))
-
-    def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
-
-    def __getitem__(self, key, r_server=None):
-        return self.get_eco(key, r_server=self._get_r_server(r_server))
-
-    def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
-        
-    def _get_r_server(self, r_server = None):
-        return r_server if r_server else self.r_server
-
-    def keys(self, r_server=None):
-        return self._table.keys(r_server=self._get_r_server(r_server))
 
