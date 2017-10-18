@@ -1,6 +1,7 @@
 import logging
 from collections import OrderedDict
 from tqdm import tqdm
+import traceback
 from mrtarget.common import TqdmToLogger
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
@@ -452,6 +453,8 @@ class GeneManager():
                 plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server, tqdm_out=self.tqdm_out)
             except Exception as error:
                 self._logger.error('The following gene index merging procedure failed: %s. Please check that the previous steps of the pipeline have been executed properly.'%(plugin_name))
+                tb = traceback.format_exc()
+                self._logger.error(tb)
             finally:
                 bar.update()
 
