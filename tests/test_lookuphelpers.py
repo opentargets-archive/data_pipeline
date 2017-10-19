@@ -6,6 +6,8 @@ import logging
 from Settings import Config
 import unittest
 
+DRY_RUN=True
+
 def init_services_connections():
     logging.info("init_services_connections")
     connectors = PipelineConnectors()
@@ -22,7 +24,7 @@ class LookupHelpersTestCase(unittest.TestCase):
         self.connectors = init_services_connections()
         self.loader = Loader(self.connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
-                dry_run = False)
+                dry_run =DRY_RUN)
 
     def test_mp_lookup(self):
 
