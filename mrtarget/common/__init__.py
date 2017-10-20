@@ -147,6 +147,9 @@ def generate_validators_from_schemas(schemas_map):
 
 class LogAccum(object):
     def __init__(self, logger_o, elem_limit=1024):
+        if not logger_o:
+            raise TypeError('logger_o cannot have None value')
+
         self._logger = logger_o
         self._accum = {'counter': 0}
         self._limit = elem_limit
@@ -158,6 +161,8 @@ class LogAccum(object):
             for k in keys:
                 for msg in self._accum[k]:
                     self._logger.log(k, msg[0], *msg[1])
+                    del self._accum[k][:]
+
             # reset the accum
             self._accum = {'counter': 0}
 

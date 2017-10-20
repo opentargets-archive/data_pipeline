@@ -28,11 +28,11 @@ class Loader():
 
         self.logger = logging.getLogger(__name__)
 
-        if es is None:
+        if es is None and not dry_run:
             connector = PipelineConnectors()
             connector.init_services_connections()
             es = connector.es
-            if es is None and not dry_run:
+            if es is None:
                 e = EnvironmentError('no elasticsearch connection '
                                      'was properly setup')
                 self.logger.exception(e)
@@ -144,7 +144,8 @@ class Loader():
                         time_to_wait = 5*retry
                         self.logger.warning("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
                         time.sleep(time_to_wait)
-            self.cache = []
+
+            del self.cache[:]
 
 
         # if index_name:
