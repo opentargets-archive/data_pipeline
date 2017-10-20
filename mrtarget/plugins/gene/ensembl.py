@@ -40,11 +40,11 @@ class Ensembl(IPlugin):
                 gene.load_ensembl_data(row)
                 genes.add_gene(gene)
 
-        self._clean_non_reference_genes()
+        self._clean_non_reference_genes(genes)
 
         logging.info("STATS AFTER ENSEMBL PARSING:\n" + genes.get_stats())
 
-    def _clean_non_reference_genes(self):
+    def _clean_non_reference_genes(self, genes):
         for geneid, gene in genes.iterate():
             if not gene.is_ensembl_reference:
                 genes.remove_gene(geneid)
