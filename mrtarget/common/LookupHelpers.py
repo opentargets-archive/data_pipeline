@@ -10,7 +10,7 @@ from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
 # from mrtarget.common.LookupTables import HPOLookUpTable
-# from mrtarget.common.LookupTables import MPLookUpTable
+from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 from mrtarget.common.LookupTables import LiteratureLookUpTable
@@ -70,6 +70,7 @@ class LookUpDataType(object):
     ECO = 'eco'
     PUBLICATION = 'publication'
     MP = 'mp'
+    MP_LOOKUP = 'mp_lookup'
     CHEMBL_DRUGS = 'chembl_drugs'
     HPA = 'hpa'
 
@@ -113,6 +114,8 @@ class LookUpDataRetriever(object):
                 self._get_available_efos()
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
+            elif dt == LookUpDataType.MP_LOOKUP:
+                self._get_available_mps()
             elif dt == LookUpDataType.MP:
                 self._logger.debug("get MP info")
                 self._get_mp()
@@ -144,12 +147,10 @@ class LookUpDataRetriever(object):
     #     self._logger.info('getting hpos')
     #     self.lookup.available_efos = HPOLookUpTable(self.es, 'HPO_LOOKUP', self.r_server)
     #
-    # def _get_available_mps(self, autoload=True):
-    #     self._logger.info('getting mps info')
-    #     self.lookup.available_mps = MPLookUpTable(self.es,
-    #                                               'MP_LOOKUP',
-    #                                               self.r_server,
-    #                                               autoload = autoload)
+
+    def _get_available_mps(self, autoload=True):
+         self._logger.info('getting mps info from ES')
+         self.lookup.available_mps = MPLookUpTable(self.es, 'MP_LOOKUP',self.r_server)
 
     def _get_available_ecos(self):
         self._logger.info('getting ecos')

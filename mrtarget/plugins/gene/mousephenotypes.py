@@ -89,7 +89,7 @@ class MousePhenotypes(IPlugin):
 
     def _get_mp_classes(self):
         logging.info("_get_mp_classes")
-        lookup_data_types = (LookUpDataType.MP,)
+        lookup_data_types = (LookUpDataType.MP_LOOKUP,)
         logging.debug(LookUpDataType.MP)
         self.lookup_data = LookUpDataRetriever(self.loader.es,
                                                self.r_server,

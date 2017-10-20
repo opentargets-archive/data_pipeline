@@ -204,7 +204,7 @@ class Config():
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
 
-    GENE_DATA_PLUGIN_PLACES = ['mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene']
+    GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
     GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks' ]
 
     HALLMARK_FILENAME = file_or_resource(fname='census_annot.tsv')

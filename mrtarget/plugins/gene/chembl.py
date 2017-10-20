@@ -1,6 +1,7 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.ChEMBL import ChEMBLLookup
+from tqdm import tqdm
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -16,6 +17,7 @@ class ChEMBL(IPlugin):
         logging.info("Retrieving ChEMBL Target Class ")
         chembl_handler.download_protein_classification()
         logging.info("Adding ChEMBL data to genes ")
+
         for gene_id, gene in tqdm(genes.iterate(),
                                   desc='Getting drug data from ChEMBL',
                                   unit=' gene',

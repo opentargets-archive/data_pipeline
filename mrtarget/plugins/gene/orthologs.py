@@ -23,7 +23,7 @@ class Orthologs(IPlugin):
         for row in tqdm(csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)), delimiter="\t"),
                         desc='loading orthologues genes from HGNC',
                         unit_scale=True,
-                        unit='genes',
+                        unit=' genes',
                         file=tqdm_out,
                         leave=False):
             if row['human_ensembl_gene'] in genes:
