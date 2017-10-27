@@ -204,7 +204,8 @@ class ECOLookUpTable(object):
         if r_server is not None:
             self._load_eco_data(r_server)
 
-    def get_ontology_code_from_url(self, url):
+    @staticmethod
+    def get_ontology_code_from_url(url):
         return url.split('/')[-1]
 
     def _load_eco_data(self, r_server=None):
