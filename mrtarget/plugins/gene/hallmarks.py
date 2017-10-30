@@ -38,7 +38,7 @@ class Hallmarks(IPlugin):
                                       file=self.tqdm_out):
                 ''' extend gene with related Hallmark data '''
                 if gene.approved_symbol in self.hallmarks:
-                        gene.hallmarks = {}
+                        gene.hallmarks = dict()
                         logging.info("Adding Hallmark data to gene %s" % (gene.approved_symbol))
                         gene.hallmarks = self.hallmarks[gene.approved_symbol]
 
@@ -64,7 +64,7 @@ class Hallmarks(IPlugin):
                 Description = PMID + ":" + Description
 
                 if GeneSymbol not in self.hallmarks:
-                    self.hallmarks[GeneSymbol] = {}
+                    self.hallmarks[GeneSymbol] = dict()
 
                 '''
                     Census Hallmark Sections:

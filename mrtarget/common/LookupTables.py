@@ -207,7 +207,8 @@ class ECOLookUpTable(object):
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
 
-    def get_ontology_code_from_url(self, url):
+    @staticmethod
+    def get_ontology_code_from_url(url):
         return url.split('/')[-1]
 
     def _load_eco_data(self, r_server=None):

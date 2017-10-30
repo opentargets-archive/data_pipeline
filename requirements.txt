@@ -46,6 +46,7 @@ unidecode
 urllib3
 coverage
 pylru
+mock
 cement==2.10.2
 yapsy==1.11.223
 git+https://github.com/opentargets/data_model.git@v1.2.6#egg=data-model
