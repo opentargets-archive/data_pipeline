@@ -1,9 +1,7 @@
 import sys
-sys.path.append('../mrtarget')
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.connection import PipelineConnectors
-from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 import logging
 import mock
 import unittest
@@ -28,9 +26,7 @@ class LookupHelpersTestCase(unittest.TestCase):
         super(LookupHelpersTestCase, self).__init__(*args, **kwargs)
         self._logger = logging.getLogger(__name__)
         self.connectors = init_services_connections()
-        self.loader = Loader(self.connectors.es,
-                chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
-                dry_run=DRY_RUN)
+        self.loader = Loader(self.connectors.es, dry_run=DRY_RUN)
 
     @mock.patch('mrtarget.common.connection')
     def test_eco_lookup(self, mock_connectors):

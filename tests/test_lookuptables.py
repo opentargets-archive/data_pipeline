@@ -1,10 +1,6 @@
-import sys
 import re
-sys.path.append('../mrtarget')
 from mrtarget.common.ElasticsearchLoader import Loader
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.connection import PipelineConnectors
-from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 from mrtarget.common.LookupTables import ECOLookUpTable
 import logging
 import mock
@@ -30,9 +26,7 @@ class LookupTablesTestCase(unittest.TestCase):
         super(LookupTablesTestCase, self).__init__(*args, **kwargs)
         self._logger = logging.getLogger(__name__)
         self.connectors = init_services_connections()
-        self.loader = Loader(self.connectors.es,
-                chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
-                dry_run=DRY_RUN)
+        self.loader = Loader(self.connectors.es, dry_run=DRY_RUN)
 
     @mock.patch('mrtarget.common.connection')
     def test_eco_get_id(self, mock_connectors):

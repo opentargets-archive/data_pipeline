@@ -1,5 +1,3 @@
-import sys
-sys.path.append('../mrtarget')
 from mrtarget.modules.Ontology import OntologyClassReader
 import logging
 import unittest
