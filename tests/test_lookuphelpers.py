@@ -98,8 +98,7 @@ class LookupHelpersTestCase(unittest.TestCase):
         self.assertTrue(len(lookup_data.efo_ontology.obsolete_classes) > 0)
         self.assertIsNotNone(lookup_data.efo_ontology.top_level_classes)
         self.assertTrue(
-            len(lookup_data.efo_ontology.top_level_classes) > 10 and len(
-                lookup_data.efo_ontology.top_level_classes) < 30)
+            len(lookup_data.efo_ontology.top_level_classes) > 10)
 
 if __name__ == '__main__':
     unittest.main()
