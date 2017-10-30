@@ -329,10 +329,17 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
     def produce_pairs(self):
         for key,evidence in self.data_cache.items():
             is_direct = False
+            direct_datasources = []
             for e in evidence:
                 if e.is_direct:
-                    is_direct = True
-                    break
+                    if e.datasource not in Config.IS_DIRECT_DO_NOT_PROPAGATE:
+                        is_direct = True
+                        break
+                    else:
+                        direct_datasources.append(e.datasource)
+            if is_direct is False and direct_datasources:
+                '''set is_direct to true if '''
+                is_direct = True
             self.put_into_queue_out((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
 
