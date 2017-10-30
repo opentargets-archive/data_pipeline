@@ -555,9 +555,10 @@ class EvidenceManager():
                 for eco_info in ecos_info:
                     data.append(eco_info.data)
                 extended_evidence['evidence'][ExtendedInfoECO.root] = data
-        except:
+        except Exception as e:
             extended_evidence['evidence'][ExtendedInfoECO.root] = None
             all_eco_codes = []
+            logger.exception("Cannot get generic info for eco: %s:"%str(e))
 
         '''Add private objects used just for faceting'''
 
@@ -604,12 +605,13 @@ class EvidenceManager():
                         extended_evidence['literature']['journal_data'] = literature_info.data['journal']
                         extended_evidence['literature']['title'] = literature_info.data['title']
                         journal_reference = ''
-                        if 'volume' in literature_info.data['journal_reference']:
-                            journal_reference += literature_info.data['journal_reference']['volume']
-                        if 'issue' in literature_info.data['journal_reference']:
-                            journal_reference += "(%s)" % literature_info.data['journal_reference']['issue']
-                        if 'pgn' in literature_info.data['journal_reference']:
-                            journal_reference += ":%s" % literature_info.data['journal_reference']['pgn']
+                        if 'journal_reference' in literature_info.data and  literature_info.data['journal_reference']:
+                            if 'volume' in literature_info.data['journal_reference']:
+                                journal_reference += literature_info.data['journal_reference']['volume']
+                            if 'issue' in literature_info.data['journal_reference']:
+                                journal_reference += "(%s)" % literature_info.data['journal_reference']['issue']
+                            if  'pgn' in literature_info.data['journal_reference']:
+                                journal_reference += ":%s" % literature_info.data['journal_reference']['pgn']
                         extended_evidence['literature']['journal_reference'] = journal_reference
                         extended_evidence['literature']['authors'] = literature_info.data['authors']
                         extended_evidence['private']['facets']['literature'] = {}
@@ -649,6 +651,7 @@ class EvidenceManager():
             eco.load_json(self.available_ecos[ecoid])
             return eco
         except KeyError:
+            logger.debug('data for ECO code %s could not be injected'%ecoid)
             return
 
     def _get_non_reference_gene_mappings(self):
@@ -834,7 +837,9 @@ class Evidence(JSONSerializable):
                 self.evidence['scores']['association_score'] = score
             elif self.evidence['type'] == 'affected_pathway':
                 if self.evidence['evidence']['resource_score']['type']== 'pvalue':
-                    score = self._get_score_from_pvalue_linear(float(self.evidence['evidence']['resource_score']['value']))
+                    score = self._get_score_from_pvalue_linear(float(self.evidence['evidence']['resource_score']['value']),
+                                                               range_min=1e-4,
+                                                               range_max=1e-14)
                 else:
                     score = float(
                         self.evidence['evidence']['resource_score']['value'])
@@ -1067,8 +1072,8 @@ class EvidenceGlobalCounter():
 
     def get_target_and_disease_uniques_for_literature(self, lit_id):
         '''
-        
-        :param lit_id: literature id 
+
+        :param lit_id: literature id
         :return: tuple of target and disease unique ids linked to the literature id
         '''
         try:
@@ -1083,7 +1088,7 @@ class EvidenceGlobalCounter():
     def get_target_and_disease_uniques_for_experiment(self, exp_id):
         '''
 
-        :param exp_id: experiment id 
+        :param exp_id: experiment id
         :return: tuple of target and disease unique ids linked to the experiment id
         '''
         try:
