@@ -193,6 +193,7 @@ class ChEMBLLookup(object):
                            '/compound/' in i['url']]
             if molecule_ids:
                 molecule_id=molecule_ids[0]
+                self._l.error('retrieving ChEMBL evidence... %s' % molecule_id)
                 print('retrieving ChEMBL evidence... %s' % molecule_id)
                 disease_id = e['disease']['id']
                 target_id = e['target']['id']
