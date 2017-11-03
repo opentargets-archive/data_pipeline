@@ -19,7 +19,7 @@ class ChEMBL(IPlugin):
         logging.info("Adding ChEMBL data to genes ")
 
         for gene_id, gene in tqdm(genes.iterate(),
-                                  desc='Getting drug data from ChEMBL',
+                                  desc='Adding drug data from ChEMBL',
                                   unit=' gene',
                                   file=tqdm_out):
             target_drugnames = []

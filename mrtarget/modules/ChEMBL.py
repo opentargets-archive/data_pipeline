@@ -188,10 +188,12 @@ class ChEMBLLookup(object):
                                                                fields=['target.id',
                                                                        'disease.id',
                                                                        'evidence.target2drug.urls']):
+
             molecule_ids = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
                            '/compound/' in i['url']]
             if molecule_ids:
                 molecule_id=molecule_ids[0]
+                print('retrieving ChEMBL evidence... %s' % molecule_id)
                 disease_id = e['disease']['id']
                 target_id = e['target']['id']
                 if disease_id not in self.disease2molecule:
