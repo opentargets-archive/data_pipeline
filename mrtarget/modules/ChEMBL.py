@@ -184,6 +184,7 @@ class ChEMBLLookup(object):
         self.protein_class_label_to_id[label] = protein_class_id
 
     def get_molecules_from_evidence(self):
+        self._logger.debug('get_molecules_from_evidence')
         for e in self.es_query.get_all_evidence_for_datasource(['chembl'],
                                                                fields=['target.id',
                                                                        'disease.id',
