@@ -83,9 +83,8 @@ class MousePhenotypes(IPlugin):
                                   file=self.tqdm_out):
             ''' extend gene with related mouse phenotype data '''
             if gene.approved_symbol in self.human_genes:
-                    logging.info("Adding phenotype data from MGI for gene %s" % (gene.approved_symbol))
+                    logging.info("Adding %i phenotype data from MGI to gene %s" % (gene.approved_symbol, len(self.human_genes[gene.approved_symbol]["mouse_orthologs"][0]["phenotypes"])))
                     gene.mouse_phenotypes = self.human_genes[gene.approved_symbol]["mouse_orthologs"]
-
 
     def _get_mp_classes(self):
         logging.info("_get_mp_classes")
@@ -111,25 +110,6 @@ class MousePhenotypes(IPlugin):
             self.top_levels[mp_id] = paths
 
         #print json.dumps(mp_class, indent=2)
-
-    def _get_human_gene_ensembl_id(self, gene_symbol):
-        result = None
-        if gene_symbol not in self.human_genes and gene_symbol not in self.not_found_genes:
-            logging.info("Getting Human ENSEMBL GENE ID for %s"%(gene_symbol))
-            url = "https://rest.ensembl.org/lookup/symbol/homo_sapiens/%s?content-type=application/json;expand=0"%(gene_symbol)
-            r = requests.get(url)
-            results = r.json()
-            if 'error' in results:
-                logging.error(results['error'])
-                self.not_found_genes[gene_symbol] = results['error']
-            else:
-                gene_id = results["id"]
-                self.human_genes[gene_symbol] = { "gene_symbol" : gene_symbol, "ensembl_gene_id" : gene_id, "gene_id": "http://identifiers.org/ensembl/" + gene_id, "mouse_orthologs" : list() }
-                self.human_ensembl_gene_ids[gene_id] = gene_symbol
-                result = self.human_genes[gene_symbol]
-        else:
-            result = self.human_genes[gene_symbol]
-        return result
 
 
     def assign_to_human_genes(self):
@@ -187,6 +167,7 @@ class MousePhenotypes(IPlugin):
                     There are phenotypes for this gene
                     '''
                     if len(phenotypes_raw) > 0:
+                        logging.info("get phenotypes for %s" % (human_gene_symbol))
                         #ensembl_gene_id = self._get_human_gene_ensembl_id(human_gene_symbol)
                         #if ensembl_gene_id is not None:
                         #    print ensembl_gene_id
