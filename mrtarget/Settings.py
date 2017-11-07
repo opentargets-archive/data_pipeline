@@ -380,6 +380,8 @@ class Config():
     SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
+    IS_DIRECT_DO_NOT_PROPAGATE = ['europepmc']
+
 
     ENSEMBL_RELEASE_VERSION = 90
     ENSEMBL_CHUNK_SIZE = 100
