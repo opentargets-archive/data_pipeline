@@ -114,7 +114,7 @@ class MousePhenotypes(IPlugin):
 
     def assign_to_human_genes(self):
 
-        logging.debug("Assigning %i entries to human genes "%(len(self.mouse_genes)))
+        logging.info("Assigning %i entries to human genes "%(len(self.mouse_genes)))
         '''
         for any mouse gene...
         '''
@@ -123,13 +123,13 @@ class MousePhenotypes(IPlugin):
             retrieve the human orthologs...
             '''
             for ortholog in obj["human_orthologs"]:
-                gene_symbol = ortholog["gene_symbol"]
-                logging.debug("Assign mouse orthologs to human gene %s"%(gene_symbol))
+                human_gene_symbol = ortholog["gene_symbol"]
+                #logging.info("Assign %i phenotype categories to from mouse %s to human %s"%(len(obj["phenotypes"].values()), obj["gene_symbol"], human_gene_symbol))
                 '''
                 assign all the phenotypes for this specific gene
                 all phenotypes are classified per category
                 '''
-                self.human_genes[gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : obj["gene_id"],
+                self.human_genes[human_gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : obj["gene_id"],
                                                                           "mouse_gene_symbol" : obj["gene_symbol"],
                                                                           "phenotypes" : obj["phenotypes"].values()})
 
@@ -167,7 +167,7 @@ class MousePhenotypes(IPlugin):
                     There are phenotypes for this gene
                     '''
                     if len(phenotypes_raw) > 0:
-                        logging.info("get phenotypes for %s" % (human_gene_symbol))
+                        logging.debug("get phenotypes for %s" % (human_gene_symbol))
                         #ensembl_gene_id = self._get_human_gene_ensembl_id(human_gene_symbol)
                         #if ensembl_gene_id is not None:
                         #    print ensembl_gene_id
@@ -175,7 +175,7 @@ class MousePhenotypes(IPlugin):
                         mouse_gene_symbol = mouse_gene_symbol.strip()
                         if mouse_gene_id not in self.mouse_genes:
                             self.mouse_genes[mouse_gene_id] = {"gene_id": mouse_gene_id, "gene_symbol": mouse_gene_symbol,
-                                                         "phenotypes": dict(), "human_orthologs": [], "phenotypes_summary" : list(phenotypes_raw.strip().split("\s+"))}
+                                                         "phenotypes": dict(), "human_orthologs": list(), "phenotypes_summary" : list(phenotypes_raw.strip().split("\s+"))}
                         self.mouse_genes[mouse_gene_id]["human_orthologs"].append(
                             {"gene_symbol": human_gene_symbol, "gene_id": None})
 
@@ -183,12 +183,14 @@ class MousePhenotypes(IPlugin):
                             self.human_genes[human_gene_symbol] = {"gene_symbol": human_gene_symbol, "ensembl_gene_id": None,
                                                              "gene_id": None,
                                                              "mouse_orthologs": list()}
-
-            logging.info("get %s" % Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES)
+            logging.info("Retrieved %i mouse genes"%(len(self.mouse_genes.keys())))
+            logging.info("get %s" % (Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES))
             req = urllib2.Request(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES)
             response = urllib2.urlopen(req)
             lines = response.readlines()
             logging.info("get %i lines" % len(lines))
+            count_symbols = set()
+            count_accepted_symbols = set()
             for line in tqdm(
                     lines,
                     desc='Reading mouse KO phenotypes',
@@ -205,7 +207,9 @@ class MousePhenotypes(IPlugin):
                     # check for double-mutant but exclude duplicates
                     for mouse_gene_id in set(mouse_gene_ids.split(",")):
                         # exclude heritable phenotypic marker like http://www.informatics.jax.org/marker/MGI:97446
+                        count_symbols.add(mouse_gene_id)
                         if mouse_gene_id in self.mouse_genes:
+                            count_accepted_symbols.add(mouse_gene_id)
                             logging.info('get class for %s'% mp_id)
                             mp_class = self.mps[mp_id.replace(":", "_")]
                             mp_label = mp_class["label"]
@@ -231,6 +235,10 @@ class MousePhenotypes(IPlugin):
                                         "mp_identifier": mp_id,
                                         "mp_label": mp_label
                                     })
+                else:
+                    logging.info("could not process %i %s"%(len(array), line))
+            logging.info("Count symbols %i / %i with phenotypes" %(len(count_accepted_symbols), len(count_symbols)))
+
         except Exception:
             print(traceback.format_exc())
             # or
