@@ -175,7 +175,7 @@ class MousePhenotypes(IPlugin):
                         mouse_gene_symbol = mouse_gene_symbol.strip()
                         if mouse_gene_id not in self.mouse_genes:
                             self.mouse_genes[mouse_gene_id] = {"gene_id": mouse_gene_id, "gene_symbol": mouse_gene_symbol,
-                                                         "phenotypes": dict(), "human_orthologs": [], "phenotypes_summary" : list(phenotypes_raw.strip().split("\s+"))}
+                                                         "phenotypes": dict(), "human_orthologs": list(), "phenotypes_summary" : list(phenotypes_raw.strip().split("\s+"))}
                         self.mouse_genes[mouse_gene_id]["human_orthologs"].append(
                             {"gene_symbol": human_gene_symbol, "gene_id": None})
 
