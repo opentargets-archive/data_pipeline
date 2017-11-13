@@ -82,21 +82,6 @@ class TreeNode(object):
             self.is_root = is_root
 
 
-class OntologyNode(TreeNode):
-
-        def __init__(self,
-                     uri='',
-                     uri_code='',
-                     ontology_name='',
-                     **kwargs
-                     ):
-            super(OntologyNode, self).__init__(**kwargs)
-
-            self.uri = uri
-            self.uri_code = uri_code
-            self.ontology_name = ontology_name
-
-
 class SparseFloatDict(UserDict):
 
     def __missing__(self, key):

@@ -1,0 +1,1 @@
+pytest --cov=mrtarget --cov-report term tests/ --fulltrace

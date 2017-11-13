@@ -13,6 +13,7 @@ class ElasticsearchLoaderTestCase(unittest.TestCase):
         self.assertEquals(len(loader.cache),1)
         loader.flush()
         self.assertEquals(len(loader.cache),0)
+        loader.close()
 
     def test_many_put(self):
         loader = Loader(dry_run=True,
