@@ -285,7 +285,7 @@ def main():
         else:
             #default behaviour: use all the data sources listed in the evidences_sources.txt file
             logger.debug('reading the evidences sources URLs from evidence_sources.txt')
-            with open(file_or_resource('evidence_sources.txt')) as f:
+            with open(file_or_resource('evidences_sources.txt')) as f:
                 input_files = f.readlines()
 
         if args.val or run_full_pipeline:
