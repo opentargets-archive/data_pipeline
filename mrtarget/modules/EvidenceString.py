@@ -94,6 +94,7 @@ class EvidenceStringActions(Actions):
 
 class DataNormaliser(object):
     def __init__(self, min_value, max_value, old_min_value=0., old_max_value=1., cap=True):
+        '''just set all initial values and ranges'''
         self.min = float(min_value)
         self.max = float(max_value)
         self.old_min = old_min_value
@@ -101,6 +102,7 @@ class DataNormaliser(object):
         self.cap = cap
 
     def __call__(self, value):
+        '''apply method to wrap the normalization function'''
         return self.renormalize(value,
                                 (self.old_min, self.old_max),
                                 (self.min, self.max),
@@ -108,6 +110,11 @@ class DataNormaliser(object):
 
     @staticmethod
     def renormalize(n, start_range, new_range, cap=True):
+        '''apply the function f(x) to n using and old (start_range) and a new range
+
+        where f(x) = (dNewRange / dOldRange * (n - old_range_lower_bound)) + new_lower
+        if cap is True then f(n) will be capped to new range boundaries
+        '''
         n = float(n)
         max_new_range = max(new_range)
         min_new_range = min(new_range)
@@ -142,6 +149,7 @@ class ExtendedInfo():
 
 
 class ExtendedInfoGene(ExtendedInfo):
+    '''minimal info from Gene class'''
     root = "gene_info"
 
     def __init__(self, gene):
@@ -157,6 +165,9 @@ class ExtendedInfoGene(ExtendedInfo):
 
 
 class ExtendedInfoEFO(ExtendedInfo):
+    '''getting from and EFO obj label id and building 2 sets of area codes
+    and area labels
+    '''
     root = "efo_info"
 
     def __init__(self, efo):
@@ -582,8 +593,7 @@ class EvidenceManager():
         ''' Add literature data '''
         if inject_literature:
             if 'literature' in extended_evidence and \
-                            'references' in extended_evidence['literature'] and \
-                    extended_evidence['literature']['references']:
+                            'references' in extended_evidence['literature']:
                 try:
                     pmid_url = extended_evidence['literature']['references'][0]['lit_id']
                     pmid = pmid_url.split('/')[-1]
