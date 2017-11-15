@@ -280,7 +280,7 @@ def main():
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
                 PhenotypeSlim().create_phenotype_slim(args.input_file)
 
-        if input_file:
+        if args.input_file:
             input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
         else:
             #default behaviour: use all the data sources listed in the evidences_sources.txt file
