@@ -10,7 +10,7 @@ from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
 # from mrtarget.common.LookupTables import HPOLookUpTable
-# from mrtarget.common.LookupTables import MPLookUpTable
+from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 from mrtarget.common.LookupTables import LiteratureLookUpTable
@@ -70,6 +70,7 @@ class LookUpDataType(object):
     ECO = 'eco'
     PUBLICATION = 'publication'
     MP = 'mp'
+    MP_LOOKUP = 'mp_lookup'
     CHEMBL_DRUGS = 'chembl_drugs'
     HPA = 'hpa'
 
@@ -113,11 +114,16 @@ class LookUpDataRetriever(object):
                 self._get_available_efos()
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
+            elif dt == LookUpDataType.MP_LOOKUP:
+                self._get_available_mps()
             elif dt == LookUpDataType.MP:
+                self._logger.debug("get MP info")
                 self._get_mp()
             elif dt == LookUpDataType.HPO:
+                self._logger.debug("get HPO info")
                 self._get_hpo()
             elif dt == LookUpDataType.EFO:
+                self._logger.debug("get EFO info")
                 self._get_efo()
             elif dt == LookUpDataType.PUBLICATION:
                 self._get_available_publications()
@@ -141,12 +147,10 @@ class LookUpDataRetriever(object):
     #     self._logger.info('getting hpos')
     #     self.lookup.available_efos = HPOLookUpTable(self.es, 'HPO_LOOKUP', self.r_server)
     #
-    # def _get_available_mps(self, autoload=True):
-    #     self._logger.info('getting mps info')
-    #     self.lookup.available_mps = MPLookUpTable(self.es,
-    #                                               'MP_LOOKUP',
-    #                                               self.r_server,
-    #                                               autoload = autoload)
+
+    def _get_available_mps(self, autoload=True):
+         self._logger.info('getting mps info from ES')
+         self.lookup.available_mps = MPLookUpTable(self.es, 'MP_LOOKUP',self.r_server)
 
     def _get_available_ecos(self):
         self._logger.info('getting ecos')
@@ -162,13 +166,6 @@ class LookUpDataRetriever(object):
                                                       autoload = autoload)
         self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
         self._get_non_reference_gene_mappings()
-
-    # def _get_mp_info(self, autoload = True):
-    #     self._logger.info('getting MP info')
-    #     self.lookup.available_mps = MPLookUpTable(self.es,
-    #                                                   'MP_LOOKUP',
-    #                                               self.r_server,
-    #                                               autoload = autoload)
 
     def _get_non_reference_gene_mappings(self):
         self.lookup.non_reference_genes = {}
@@ -205,6 +202,7 @@ class LookUpDataRetriever(object):
         :return:
         '''
         cache_file = 'processed_mp_lookup'
+        obj = None
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
@@ -224,7 +222,7 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_efo_classes()
+            obj.load_open_targets_disease_ontology()
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.efo_ontology = obj

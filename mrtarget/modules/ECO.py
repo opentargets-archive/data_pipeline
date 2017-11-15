@@ -9,7 +9,6 @@ from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config
 import logging
 logger = logging.getLogger(__name__)
-tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 
 '''

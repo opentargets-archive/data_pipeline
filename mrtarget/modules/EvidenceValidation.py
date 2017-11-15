@@ -204,7 +204,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         self.dry_run = dry_run
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
-        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
+        self.tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
     def process(self, data):
         file_path, file_version, provider_id, data_source_name, md5_hash,\
@@ -532,7 +532,8 @@ class EvidenceValidationFileChecker():
         dry_run = dry_run or self.dry_run
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
-                                          data_types=(LookUpDataType.TARGET,
+                                          data_types=(
+                                                      LookUpDataType.TARGET,
                                                       LookUpDataType.EFO,
                                                       LookUpDataType.ECO,
                                                       LookUpDataType.HPO,

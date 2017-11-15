@@ -1,0 +1,9 @@
+[Core]
+Name = Orthologs
+Module = orthologs
+
+[Documentation]
+Author = Open Targets Core Team
+Version = 0.1
+Website = http://github.com/opentargets
+Description = Load HGNC information

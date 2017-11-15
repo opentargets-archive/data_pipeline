@@ -76,7 +76,7 @@ def get_chembl_url(uri):
 class ChEMBLLookup(object):
     def __init__(self):
         super(ChEMBLLookup, self).__init__()
-        self._l = logging.getLogger(__name__)
+        self._logger = logging.getLogger(__name__)
         self.es_query = ESQuery()
         self.protein_class = dict()
         self.target_component = dict()
@@ -94,8 +94,8 @@ class ChEMBLLookup(object):
 
     def download_targets(self):
         '''fetches all the targets from chembl and store their data and a mapping to uniprot id'''
-        self._l.info('chembl getting targets from ' +
-                     Config.CHEMBL_TARGET_BY_UNIPROT_ID)
+        self._logger.info('ChEMBL getting targets from ' +
+                          Config.CHEMBL_TARGET_BY_UNIPROT_ID)
 
         targets = get_chembl_url(Config.CHEMBL_TARGET_BY_UNIPROT_ID)
         for i in targets:
@@ -124,21 +124,21 @@ class ChEMBLLookup(object):
     def download_molecules_linked_to_target(self):
         '''generate a dictionary with all the synonyms known for a given molecules.
          Only retrieves molecules linked to a target'''
-        self._l.info('chembl downloading molecules linked to target')
+        self._logger.info('chembl downloading molecules linked to target')
         if not self.targets:
-            self._l.debug('chembl downloading targets')
+            self._logger.debug('chembl downloading targets')
             self.download_targets()
         if not self.target2molecule:
-            self._l.debug('chembl downloading mechanisms')
+            self._logger.debug('chembl downloading mechanisms')
             self.download_mechanisms()
         required_molecules = set()
-        self._l.info('chembl t2m mols')
+        self._logger.info('chembl t2m mols')
         for molecules in self.target2molecule.values():
             for molecule in molecules:
                 required_molecules.add(molecule)
         required_molecules = list(required_molecules)
         batch_size = 100
-        self._l.debug('chembl populate synonyms')
+        self._logger.debug('chembl populate synonyms')
         for i in range(0, len(required_molecules) + 1, batch_size):
             self._populate_synonyms_for_molecule(required_molecules[i:i + batch_size])
 
@@ -184,14 +184,18 @@ class ChEMBLLookup(object):
         self.protein_class_label_to_id[label] = protein_class_id
 
     def get_molecules_from_evidence(self):
+        self._logger.debug('get_molecules_from_evidence')
         for e in self.es_query.get_all_evidence_for_datasource(['chembl'],
                                                                fields=['target.id',
                                                                        'disease.id',
                                                                        'evidence.target2drug.urls']):
+            self._logger.info('retrieving ChEMBL evidence...')
             molecule_ids = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
                            '/compound/' in i['url']]
             if molecule_ids:
                 molecule_id=molecule_ids[0]
+                self._logger.info(molecule_id)
+                print('retrieving ChEMBL evidence... %s' % molecule_id)
                 disease_id = e['disease']['id']
                 target_id = e['target']['id']
                 if disease_id not in self.disease2molecule:

@@ -1,27 +1,17 @@
-import csv
-import gzip
 import logging
-import multiprocessing
-import ujson as json
-import urllib2
-from StringIO import StringIO
 from collections import OrderedDict
-
-import requests
 from tqdm import tqdm
+import traceback
 from mrtarget.common import TqdmToLogger
-
 from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from mrtarget.common.connection import PipelineConnectors
-from mrtarget.modules.ChEMBL import ChEMBLLookup
-# from mrtarget.modules.GenotypePhenotype import MouseminePhenotypeETL
-from mrtarget.modules.Reactome import ReactomeRetriever
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+
 from mrtarget.Settings import Config
-from elasticsearch.exceptions import NotFoundError
+
+from yapsy.PluginManager import PluginManager
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
 ENS_ID_ORG_PREFIX = 'http://identifiers.org/ensembl/'
@@ -102,46 +92,6 @@ class Gene(JSONSerializable):
             self.id = None
 
 
-    def load_hgnc_data(self, data):
-        if data.hgnc_id:
-            self.hgnc_id = data.hgnc_id
-        if data.approved_symbol:
-            self.approved_symbol = data.approved_symbol
-        if data.approved_name:
-            self.approved_name = data.approved_name
-        if data.status:
-            self.status = data.status
-        if data.locus_group:
-            self.locus_group = data.locus_group
-        if data.previous_symbols:
-            self.previous_symbols = data.previous_symbols.split(', ')
-        if data.previous_names:
-            self.previous_names = data.previous_names.split(', ')
-        if data.synonyms:
-            self.symbol_synonyms.extend(data.synonyms.split(', '))
-        if data.name_synonyms:
-            self.name_synonyms = data.name_synonyms.split(', ')
-        # if data.chromosome :
-        # self.chromosome = data.chromosome
-        if data.enzyme_ids:
-            self.enzyme_ids = data.enzyme_ids.split(', ')
-        if data.entrez_gene_id:
-            self.entrez_gene_id = data.entrez_gene_id
-        if data.ensembl_gene_id:
-            self.ensembl_gene_id = data.ensembl_gene_id
-            if not self.ensembl_gene_id:
-                self.ensembl_gene_id = data.ensembl_id_supplied_by_ensembl
-        if data.refseq_ids:
-            self.refseq_ids = data.refseq_ids.split(', ')
-        if data.gene_family_tag:
-            self.gene_family_tag = data.gene_family_tag
-        if data.gene_family_description:
-            self.gene_family_description = data.gene_family_description
-        if data.ccds_ids:
-            self.ccds_ids = data.ccds_ids.split(', ')
-        if data.vega_ids:
-            self.vega_ids = data.vega_ids.split(', ')
-
     def load_hgnc_data_from_json(self, data):
 
         if 'ensembl_gene_id' in data:
@@ -186,34 +136,6 @@ class Gene(JSONSerializable):
                     self.uniprot_id = self.uniprot_accessions[0]
             if 'pubmed_id' in data:
                 self.pubmed_ids = data['pubmed_id']
-
-
-    def load_ortholog_data(self, data):
-        '''loads data from the HCOP ortholog table
-        '''
-        if 'ortholog_species' in data:
-            if data['ortholog_species'] in Config.HGNC_ORTHOLOGS_SPECIES:
-                # get rid of some redundant (ie.human) field that we are going to
-                # get from other sources anyways
-                ortholog_data = dict((k, v) for (k, v) in data.iteritems() if k.startswith('ortholog'))
-
-                # split the fields with multiple values into lists
-                if 'ortholog_species_assert_ids' in data:
-                    ortholog_data['ortholog_species_assert_ids'] = data['ortholog_species_assert_ids'].split(',')
-                if 'support' in data:
-                    ortholog_data['support'] = data['support'].split(',')
-
-                # use a readable key for the species in the ortholog dictionary
-                species = Config.HGNC_ORTHOLOGS_SPECIES[ortholog_data['ortholog_species']]
-
-                try:
-                    # I am appending because there are more than one records
-                    # with the same ENSG id and the species.
-                    # They can come from the different orthology predictors
-                    # or just the case of multiple orthologs per gene.
-                    self.ortholog[species].append(ortholog_data)
-                except KeyError:
-                    self.ortholog[species] = [ortholog_data]
 
     def load_ensembl_data(self, data):
 
@@ -499,157 +421,46 @@ class GeneManager():
                  loader,
                  r_server):
 
-
         self.loader = loader
         self.r_server = r_server
-        self.esquery = ESQuery(loader.es)
         self.genes = GeneSet()
-        self.reactome_retriever=ReactomeRetriever(loader.es)
-        self.chembl_handler = ChEMBLLookup()
         self._logger = logging.getLogger(__name__)
+
+        self._logger.info("Preparing the plug in management system")
+        # Build the manager
+        self.simplePluginManager = PluginManager()
+        # Tell it the default place(s) where to find plugins
+        self.simplePluginManager.setPluginPlaces(Config.GENE_DATA_PLUGIN_PLACES)
+        for dir in Config.GENE_DATA_PLUGIN_PLACES:
+            self._logger.info(dir)
+        # Load all plugins
+        self.simplePluginManager.collectPlugins()
+
         self.tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
 
 
-
     def merge_all(self, dry_run = False):
+
+        plugin_count = len(self.simplePluginManager.getAllPlugins())
         bar = tqdm(desc='Merging data from available databases',
-                   total = 7,
-                   unit= 'steps',
+                   total=plugin_count,
+                   unit='steps',
                    file=self.tqdm_out)
-        self._get_hgnc_data_from_json()
-        bar.update()
-        self._get_ortholog_data()
-        bar.update()
-        try:
-            self._get_ensembl_data()
-        except NotFoundError:
-            self._logger.error('no ensembl index in ES. Skipping. Has the --ensembl step been run?')
-        bar.update()
-        try:
-            self._get_uniprot_data()
-        except NotFoundError:
-            self._logger.error('no uniprot index in ES. Skipping. Has the --uniprot step been run?')
-        bar.update()
-        self._get_chembl_data()
-        bar.update()
-        # self._get_mouse_phenotypes_data()
-        # bar.update()
+
+        for plugin_name in Config.GENE_DATA_PLUGIN_ORDER:
+            try:
+                plugin = self.simplePluginManager.getPluginByName(plugin_name)
+                plugin.plugin_object.print_name()
+                plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server, tqdm_out=self.tqdm_out)
+            except Exception as error:
+                self._logger.error('The following gene index merging procedure failed: %s. Please check that the previous steps of the pipeline have been executed properly.'%(plugin_name))
+                tb = traceback.format_exc()
+                self._logger.error(tb)
+            finally:
+                bar.update()
+
         self._store_data(dry_run=dry_run)
         bar.update()
-
-
-    def _get_hgnc_data_from_json(self):
-        self._logger.info("HGNC parsing - requesting from URL %s" % Config.HGNC_COMPLETE_SET)
-        req = urllib2.Request(Config.HGNC_COMPLETE_SET)
-        response = urllib2.urlopen(req)
-        self._logger.info("HGNC parsing - response code %s" % response.code)
-        data = json.loads(response.read())
-        for row in tqdm(data['response']['docs'],
-                        desc='loading genes from HGNC',
-                        unit_scale=True,
-                        unit='genes',
-                        file=self.tqdm_out,
-                        leave=False):
-            gene = Gene()
-            gene.load_hgnc_data_from_json(row)
-            self.genes.add_gene(gene)
-
-        self._logger.info("STATS AFTER HGNC PARSING:\n" + self.genes.get_stats())
-
-    def _get_ortholog_data(self):
-
-        self._logger.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
-        req = requests.get(Config.HGNC_ORTHOLOGS)
-        self._logger.info("Ortholog parsing - response code %s" % req.status_code)
-        req.raise_for_status()
-
-        # io.BytesIO is StringIO.StringIO in python 2
-        for row in tqdm(csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)),delimiter="\t"),
-                        desc='loading orthologues genes from HGNC',
-                        unit_scale=True,
-                        unit='genes',
-                        file=self.tqdm_out,
-                        leave=False):
-            if row['human_ensembl_gene'] in self.genes:
-                self.genes[row['human_ensembl_gene']].load_ortholog_data(row)
-
-        self._logger.info("STATS AFTER HGNC ortholog PARSING:\n" + self.genes.get_stats())
-
-    # def _get_mouse_phenotypes_data(self):
-    #
-    #     mpetl = MouseminePhenotypeETL(loader=self.loader, r_server=self.r_server)
-    #     mpetl.process_all()
-    #     for gene_id, gene in tqdm(self.genes.iterate(),
-    #                               desc='Adding phenotype data from MGI',
-    #                               unit=' gene',
-    #                               file=self.tqdm_out):
-    #         ''' extend gene with related mouse phenotype data '''
-    #         if gene.approved_symbol in mpetl.human_genes:
-    #                 self._logger.info("Adding phenotype data from MGI for gene %s" % (gene.approved_symbol))
-    #                 gene.mouse_phenotypes = mpetl.human_genes[gene.approved_symbol]["mouse_orthologs"]
-
-    def _get_ensembl_data(self):
-        for row in tqdm(self.esquery.get_all_ensembl_genes(),
-                        desc='loading genes from Ensembl',
-                        unit_scale=True,
-                        unit='genes',
-                        file=self.tqdm_out,
-                        leave=False,
-                        total=self.esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
-            if row['id'] in self.genes:
-                gene = self.genes.get_gene(row['id'])
-                gene.load_ensembl_data(row)
-                self.genes.add_gene(gene)
-            else:
-                gene = Gene()
-                gene.load_ensembl_data(row)
-                self.genes.add_gene(gene)
-
-        self._clean_non_reference_genes()
-
-        self._logger.info("STATS AFTER ENSEMBL PARSING:\n" + self.genes.get_stats())
-
-    def _clean_non_reference_genes(self):
-        for geneid, gene in self.genes.iterate():
-            if not gene.is_ensembl_reference:
-                self.genes.remove_gene(geneid)
-
-    # @do_profile
-    def _get_uniprot_data(self):
-        c = 0
-        for seqrec in tqdm(self.esquery.get_all_uniprot_entries(),
-                           desc='loading genes from UniProt',
-                           unit_scale=True,
-                           unit='genes',
-                           leave=False,
-                           file=self.tqdm_out,
-                           total= self.esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
-            c += 1
-            if c % 1000 == 0:
-                self._logger.info("%i entries retrieved for uniprot" % c)
-            if 'Ensembl' in seqrec.annotations['dbxref_extended']:
-                ensembl_data=seqrec.annotations['dbxref_extended']['Ensembl']
-                ensembl_genes_id=[]
-                for ens_data_point in ensembl_data:
-                    ensembl_genes_id.append(ens_data_point['value']['gene ID'])
-                ensembl_genes_id = list(set(ensembl_genes_id))
-                success = False
-                for ensembl_id in ensembl_genes_id:
-                    if ensembl_id in self.genes:
-                        gene = self.genes.get_gene(ensembl_id)
-                        gene.load_uniprot_entry(seqrec, self.reactome_retriever)
-                        self.genes.add_gene(gene)
-                        success=True
-                        break
-                if not success:
-                    self._logger.debug('Cannot find ensembl id(s) %s coming from uniprot entry %s in available geneset' % (ensembl_genes_id, seqrec.id))
-            else:
-                self._logger.debug('Cannot find ensembl mapping in the uniprot entry %s' % seqrec.id)
-        self._logger.info("%i entries retrieved for uniprot" % c)
-
-        # self._logger.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
-
-
 
     def _store_data(self, dry_run = False):
 
@@ -680,34 +491,4 @@ class GeneManager():
             w.join()
 
         self._logger.info('all gene objects pushed to elasticsearch')
-
-    def _get_chembl_data(self):
-        self._logger.info("Retrieving Chembl Drug")
-        self.chembl_handler.download_molecules_linked_to_target()
-        self._logger.info("Retrieving Chembl Target Class ")
-        self.chembl_handler.download_protein_classification()
-        self._logger.info("Adding Chembl data to genes ")
-        for gene_id, gene in tqdm(self.genes.iterate(),
-                                  desc='Getting drug data from chembl',
-                                  unit=' gene',
-                                  file=self.tqdm_out):
-            target_drugnames = []
-            ''' extend gene with related drug names '''
-            if gene.uniprot_accessions:
-                for a in gene.uniprot_accessions:
-                    if a in self.chembl_handler.uni2chembl:
-                        chembl_id = self.chembl_handler.uni2chembl[a]
-                        if chembl_id in self.chembl_handler.target2molecule:
-                            molecules = self.chembl_handler.target2molecule[chembl_id]
-                            for mol in molecules:
-                                if mol in self.chembl_handler.molecule2synonyms:
-                                    synonyms = self.chembl_handler.molecule2synonyms[mol]
-                                    target_drugnames.extend(synonyms)
-                        if a in self.chembl_handler.protein_classification:
-                            gene.protein_classification['chembl'] = self.chembl_handler.protein_classification[a]
-                        break
-            if target_drugnames:
-                gene.drugs['chembl_drugs'] = target_drugnames
-
-
 
