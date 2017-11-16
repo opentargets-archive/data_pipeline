@@ -286,7 +286,7 @@ def main():
             #default behaviour: use all the data sources listed in the evidences_sources.txt file
             logger.debug('reading the evidences sources URLs from evidence_sources.txt')
             with open(file_or_resource('evidences_sources.txt')) as f:
-                input_files = f.readlines()
+                input_files = [x.rstrip() for x in f.readlines()]
 
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
