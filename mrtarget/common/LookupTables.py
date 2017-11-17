@@ -394,7 +394,7 @@ class HPOLookUpTable(object):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = self.r_server,
                                             ttl = ttl)
-
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
         if self.r_server is not None:
             self._load_hpo_data(r_server)
 
@@ -403,7 +403,7 @@ class HPOLookUpTable(object):
                         desc='loading human phenotypes',
                         unit=' human phenotypes',
                         unit_scale=True,
-                        file=tqdm_out,
+                        file=self.tqdm_out,
                         total=self._es_query.count_all_human_phenotypes(),
                         leave=False,
                         ):

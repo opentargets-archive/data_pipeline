@@ -4,6 +4,7 @@ from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.Settings import Config
 import sys
 import urllib2
+import httplib
 import ujson as json
 from tqdm import tqdm
 import traceback
