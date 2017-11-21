@@ -110,8 +110,9 @@ def read_option(option, cast=None, ini=ini, section='dev',
 def update_schema_version(config, schema_version_string):
     config.EVIDENCEVALIDATION_SCHEMA = schema_version_string
     for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS:
-        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
-                                                              schema_version_string)
+        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el] = \
+            config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
+                                                                    schema_version_string)
 
 
 class Config():

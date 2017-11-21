@@ -140,6 +140,8 @@ def generate_validators_from_schemas(schemas_map):
     validators = {}
     for schema_name, schema_uri in schemas_map.iteritems():
         # per kv we create the validator and instantiate it
+        _l.info('generate_validator_from_schema %s using the uri %s',
+                schema_name, schema_uri)
         validators[schema_name] = generate_validator_from_schema(schema_uri)
 
     return validators
@@ -164,6 +166,7 @@ class LogAccum(object):
                     del self._accum[k][:]
 
             # reset the accum
+            del(self._accum)
             self._accum = {'counter': 0}
 
     def flush(self, force=True):
