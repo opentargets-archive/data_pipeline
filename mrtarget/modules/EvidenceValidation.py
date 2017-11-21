@@ -272,7 +272,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         super(ValidatorProcess, self).__init__(queue_in, redis_path, queue_out)
         self.es = es
         self.dry_run = dry_run
-        self.la = None
+        # log accumulator
+        self.log_acc = None
         self.loader = None
         self.lookup_data = lookup_data
 
@@ -287,7 +288,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.lookup_data.set_r_server(self.get_r_server())
         self.loader = Loader(dry_run=self.dry_run, chunk_size=1000)
         # log accumulator
-        self.la = LogAccum(self.logger, 128)
+        self.log_acc = LogAccum(self.logger, 128)
         # generate all validators once
         self.validators = \
             generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
@@ -295,7 +296,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
     def close(self):
         super(ValidatorProcess, self).close()
-        self.la.flush(True)
+        self.log_acc.flush(True)
         self.loader.close()
 
     def process(self, data):
@@ -327,6 +328,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
             explanation = {}
             disease_failed = False
             gene_failed = False
+            other_failures = False
             gene_mapping_failed = False
             target_id = None
             efo_id = None
@@ -338,7 +340,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 parsed_line = json.loads(line)
                 json_doc_hashdig = DatatStructureFlattener(parsed_line).get_hexdigest()
             except Exception as e:
-                self.la.log(l.ERROR, 'cannot parse line %i: %s', line_counter, e)
+                self.log_acc.log(l.ERROR, 'cannot parse line %i: %s', line_counter, e)
                 json_doc_hashdig = hashlib.md5(line).hexdigest()
                 explanation['unparsable_json'] = True
 
@@ -352,21 +354,24 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
             else:
                 explanation['key_fields_missing'] = True
-                self.la.log(l.ERROR, "Line %i: Not a valid %s evidence string"
+                other_failures = True
+                self.log_acc.log(l.ERROR, "Line %i: Not a valid %s evidence string"
                                   " - missing label and type mandatory attributes",
-                                  line_counter,
-                                  Config.EVIDENCEVALIDATION_SCHEMA)
+                                 line_counter,
+                                 Config.EVIDENCEVALIDATION_SCHEMA)
 
 
 
             if data_type is None:
                 explanation['missing_datatype'] = True
-                self.la.log(l.ERROR, "Line %i: Not a valid %s evidence string - "
+                other_failures = True
+                self.log_acc.log(l.ERROR, "Line %i: Not a valid %s evidence string - "
                                   "please add the mandatory 'type' attribute",
-                                  line_counter, Config.EVIDENCEVALIDATION_SCHEMA)
+                                 line_counter, Config.EVIDENCEVALIDATION_SCHEMA)
 
             elif data_type not in Config.EVIDENCEVALIDATION_DATATYPES:
-                self.la.log(l.ERROR, 'unsupported_datatype with data type %s and line %s', data_type, parsed_line)
+                other_failures = True
+                self.log_acc.log(l.ERROR, 'unsupported_datatype with data type %s and line %s', data_type, parsed_line)
                 explanation['unsupported_datatype'] = data_type
 
             else:
@@ -385,10 +390,11 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                         else error_messages[:2048] + ' ; ...'
 
                     explanation['validation_errors'] = error_messages
-                    self.la.log(l.DEBUG, 'validation_errors failed to validate %s:%i '
+                    other_failures = True
+                    self.log_acc.log(l.DEBUG, 'validation_errors failed to validate %s:%i '
                                       'eval %s secs with these errors %s',
-                                      file_path, line_counter, str(t2 - t1),
-                                      error_messages)
+                                     file_path, line_counter, str(t2 - t1),
+                                     error_messages)
 
                 else:
                     # generate fantabulous dict from addict
@@ -464,7 +470,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                                     target_id = self.lookup_data.uni2ens[uniprot_id]
                                 # self.logger.info("Found target id being: %s for %s" %(target_id, uniprot_id))
                                 if target_id is None:
-                                    self.la.log(l.INFO, "Found no target id for %s", uniprot_id)
+                                    self.log_acc.log(l.INFO, "Found no target id for %s", uniprot_id)
 
 
                     # If there is no target id after the processing step
@@ -473,13 +479,13 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                         gene_failed = True
 
             # flag as valid or not
-            if not disease_failed and not gene_failed:
+            if not (disease_failed or gene_failed or other_failures):
                 is_valid = True
             else:
                 explanation['disease_error'] = disease_failed
                 explanation['gene_error'] = gene_failed
                 explanation['gene_mapping_failed'] = gene_mapping_failed
-                self.la.log(l.ERROR, 'evidence validation step failed at the end with an '
+                self.log_acc.log(l.ERROR, 'evidence validation step failed at the end with an '
                             'explanation %s', str(explanation))
 
 

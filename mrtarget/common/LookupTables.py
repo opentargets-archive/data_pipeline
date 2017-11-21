@@ -450,7 +450,7 @@ class LiteratureLookUpTable(object):
                                             ttl = ttl)
         if es is None:
             connector = PipelineConnectors()
-            connector.init_services_connections(publication_es=True)
+            connector.init_services_connections()
             self._es = connector.es_pub
         else:
             self._es = es
