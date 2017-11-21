@@ -141,7 +141,7 @@ def main():
                         help="add new evidence from a data source but does not delete existing evidence. Works only for the validation step",
                         action='store_true', default=False)
     parser.add_argument("--input-file", dest='input_file',
-                        help="pass the path to a local gzipped file to use as input for the data validation step",
+                        help="pass the path to a gzipped file to use as input for the data validation step",
                         action='append', default=[])
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
@@ -280,7 +280,13 @@ def main():
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
                 PhenotypeSlim().create_phenotype_slim(args.input_file)
 
-        input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
+        if args.input_file:
+            input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
+        else:
+            #default behaviour: use all the data sources listed in the evidences_sources.txt file
+            logger.debug('reading the evidences sources URLs from evidence_sources.txt')
+            with open(file_or_resource('evidences_sources.txt')) as f:
+                input_files = [x.rstrip() for x in f.readlines()]
 
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline

@@ -110,8 +110,9 @@ def read_option(option, cast=None, ini=ini, section='dev',
 def update_schema_version(config, schema_version_string):
     config.EVIDENCEVALIDATION_SCHEMA = schema_version_string
     for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS:
-        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
-                                                              schema_version_string)
+        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el] = \
+            config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
+                                                                    schema_version_string)
 
 
 class Config():
@@ -357,6 +358,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['postgap'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
