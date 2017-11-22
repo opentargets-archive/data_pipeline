@@ -781,20 +781,15 @@ class Evidence(JSONSerializable):
                                                         self.evidence['evidence']['variant2disease']['resource_score'][
                                                             'value'],
                                                         no_of_cases)
-
                     else:
-
                         g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
                         if self.evidence['evidence']['variant2disease']['resource_score']['type'] == 'pvalue':
-                            # if self.evidence['sourceID']=='gwas_catalog':#temporary fix
-                            #     v2d_score = self._get_score_from_pvalue_linear(float(self.evidence[
-                            # 'unique_association_fields']['pvalue']))
-                            # else:
                             v2d_score = self._get_score_from_pvalue_linear(
                                 self.evidence['evidence']['variant2disease']['resource_score']['value'])
                         elif self.evidence['evidence']['variant2disease']['resource_score']['type'] == 'probability':
                             v2d_score = self.evidence['evidence']['variant2disease']['resource_score']['value']
                         else:
+                            '''this should not happen?'''
                             v2d_score = 0.
                         if self.evidence['sourceID'] == 'gwas_catalog':
                             sample_size = self.evidence['evidence']['variant2disease']['gwas_sample_size']
@@ -844,24 +839,6 @@ class Evidence(JSONSerializable):
                     score = float(
                         self.evidence['evidence']['resource_score']['value'])
                 self.evidence['scores']['association_score'] = score
-                # if self.evidence['sourceID']=='expression_atlas':
-                #     pass
-                # elif self.evidence['sourceID']=='uniprot':
-                #     pass
-                # elif self.evidence['sourceID']=='reactome':
-                #     pass
-                # elif self.evidence['sourceID']=='eva':
-                #     pass
-                # elif self.evidence['sourceID']=='phenodigm':
-                #     pass
-                # elif self.evidence['sourceID']=='gwas_catalog':
-                #     pass
-                # elif self.evidence['sourceID']=='cancer_gene_census':
-                #     pass
-                # elif self.evidence['sourceID']=='chembl':
-                #     pass
-                # elif self.evidence['sourceID']=='europmc':
-                #     pass
 
         except Exception as e:
             logger.error(
@@ -891,9 +868,9 @@ class Evidence(JSONSerializable):
             if experiment_id is not None:
                 global_counts.append(max(global_stats.get_target_and_disease_uniques_for_experiment(experiment_id)))
             max_count = max(global_counts)
-
-            modifier = HarmonicSumScorer.sigmoid_scaling(max_count)
-            self.evidence['scores']['association_score'] *= modifier
+            if max_count >1:
+                modifier = HarmonicSumScorer.sigmoid_scaling(max_count)
+                self.evidence['scores']['association_score'] *= modifier
 
         '''modify scores accodigng to weights'''
         datasource_weight = Config.DATASOURCE_EVIDENCE_SCORE_WEIGHT.get(self.evidence['sourceID'], 1.)
@@ -914,7 +891,7 @@ class Evidence(JSONSerializable):
             try:
                 return math.log10(n)
             except ValueError:
-                return 300
+                return math.log10(range_max)
 
         min_score = get_log(range_min)
         max_score = get_log(range_max)
@@ -1184,8 +1161,7 @@ class EvidenceStringProcess():
         else:
             global_stats = self.get_global_stats(lookup_data.uni2ens,
                                                  lookup_data.available_genes,
-                                                 lookup_data.non_reference_genes,
-                                                 datasources= datasources)
+                                                 lookup_data.non_reference_genes)
             if logger.level == logging.DEBUG:
                 pickle.dump(global_stats, open(global_stat_cache,'w'), protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -1300,9 +1276,9 @@ class EvidenceStringProcess():
             yield row
         logger.info("loaded %i ev from db to process" % c)
 
-    def get_global_stats(self, uni2ens, available_genes, non_reference_genes, page_size=5000, datasources=[]):
+    def get_global_stats(self, uni2ens, available_genes, non_reference_genes, page_size=5000,):
         global_stats = EvidenceGlobalCounter()
-        for row in tqdm(self.get_evidence(page_size, datasources),
+        for row in tqdm(self.get_evidence(page_size),
                         desc='getting global stats on  available evidence_strings',
                         total=self.es_query.count_validated_evidence_strings(),
                         unit=' evidence',
