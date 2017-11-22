@@ -391,6 +391,8 @@ class Config():
     ENSEMBL_RELEASE_VERSION = 90
     ENSEMBL_CHUNK_SIZE = 100
 
+    LT_REUSE = False
+    LT_NAMESPACE = ""
     REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
                                    cast=bool, default=False)
     REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
