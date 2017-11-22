@@ -23,6 +23,8 @@ np.seterr(divide='warn', invalid='warn')
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
+from mrtarget.Settings import Config
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -891,8 +893,10 @@ class RedisLookupTable(object):
                  namespace = None,
                  r_server = None,
                  ttl = 60*60*24+2):
+        self.lt_reuse = Config.LT_REUSE
         if namespace is None:
-            namespace = uuid.uuid4()
+            namespace = uuid.uuid4() if (not Config.LT_NAMESPACE) else Config.LT_NAMESPACE
+
         self.namespace = self.LOOK_UPTABLE_NAMESPACE % {'namespace': namespace}
         self.r_server = new_redis_client() if not r_server else r_server
         self.default_ttl = ttl
@@ -903,9 +907,10 @@ class RedisLookupTable(object):
         # if not (isinstance(obj, str) or isinstance(obj, unicode)):
         #     raise AttributeError('Only str and unicode types are accepted as object value. Use the \
         #     RedisLookupTablePickle subclass for generic objects.')
-        self._get_r_server(r_server).setex(self._get_key_namespace(key),
-                              self._encode(obj),
-                              ttl or self.default_ttl)
+        if not self.lt_reuse:
+            self._get_r_server(r_server).setex(self._get_key_namespace(key),
+                                  self._encode(obj),
+                                  ttl or self.default_ttl)
 
     def get(self, key, r_server = None):
         server = self._get_r_server(r_server)
@@ -943,8 +948,9 @@ class RedisLookupTable(object):
                  r_server=self._get_r_server(r_server))
 
     def __setitem__(self, key, value,  r_server=None):
-        self.set(self._get_key_namespace(key), value,
-                 r_server=self._get_r_server(r_server))
+        if not self.lt_reuse:
+            self.set(self._get_key_namespace(key), value,
+                     r_server=self._get_r_server(r_server))
 
 
 class RedisLookupTableJson(RedisLookupTable):

@@ -31,14 +31,15 @@ class HPALookUpTable(object):
             self._load_hpa_data(self.r_server)
 
     def _load_hpa_data(self, r_server=None):
-        for el in tqdm(self._es_query.get_all_hpa(),
-                       desc='loading hpa',
-                       unit=' hpa',
-                       unit_scale=True,
-                       total=self._es_query.count_all_hpa(),
-                       file=self.tqdm_out,
-                       leave=False):
-            self.set_hpa(el, r_server=self._get_r_server(r_server))
+        if not self._table.lt_reuse:
+            for el in tqdm(self._es_query.get_all_hpa(),
+                           desc='loading hpa',
+                           unit=' hpa',
+                           unit_scale=True,
+                           total=self._es_query.count_all_hpa(),
+                           file=self.tqdm_out,
+                           leave=False):
+                self.set_hpa(el, r_server=self._get_r_server(r_server))
 
     def get_hpa(self, idx, r_server=None):
         return self._table.get(idx, r_server=self._get_r_server(r_server))
@@ -88,7 +89,7 @@ class GeneLookUpTable(object):
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
         self.uniprot2ensembl = {}
-        if self.r_server and autoload:
+        if self.r_server and autoload and (not self._table.lt_reuse):
             self.load_gene_data(self.r_server, targets)
 
     def load_gene_data(self, r_server = None, targets = []):
@@ -113,27 +114,27 @@ class GeneLookUpTable(object):
             for accession in target['uniprot_accessions']:
                 self.uniprot2ensembl[accession] = target['id']
 
-    def load_uniprot2ensembl(self, targets = []):
-        uniprot_fields = ['uniprot_id','uniprot_accessions', 'id']
-        if targets:
-            data = self._es_query.get_targets_by_id(targets,
-                                                    fields= uniprot_fields)
-            total = len(targets)
-        else:
-            data = self._es_query.get_all_targets(fields= uniprot_fields)
-            total = self._es_query.count_all_targets()
-        for target in tqdm(data,
-                           desc='loading mappings from uniprot to ensembl',
-                           unit=' gene mapping',
-                           unit_scale=True,
-                           file=self.tqdm_out,
-                           total=total,
-                           leave=False,
-                           ):
-            if target['uniprot_id']:
-                self.uniprot2ensembl[target['uniprot_id']] = target['id']
-            for accession in target['uniprot_accessions']:
-                self.uniprot2ensembl[accession] = target['id']
+#     def load_uniprot2ensembl(self, targets = []):
+#         uniprot_fields = ['uniprot_id','uniprot_accessions', 'id']
+#         if targets:
+#             data = self._es_query.get_targets_by_id(targets,
+#                                                     fields= uniprot_fields)
+#             total = len(targets)
+#         else:
+#             data = self._es_query.get_all_targets(fields= uniprot_fields)
+#             total = self._es_query.count_all_targets()
+#         for target in tqdm(data,
+#                            desc='loading mappings from uniprot to ensembl',
+#                            unit=' gene mapping',
+#                            unit_scale=True,
+#                            file=self.tqdm_out,
+#                            total=total,
+#                            leave=False,
+#                            ):
+#             if target['uniprot_id']:
+#                 self.uniprot2ensembl[target['uniprot_id']] = target['id']
+#             for accession in target['uniprot_accessions']:
+#                 self.uniprot2ensembl[accession] = target['id']
 
     def get_gene(self, target_id, r_server = None):
         try:
@@ -202,7 +203,7 @@ class ECOLookUpTable(object):
         self.r_server = r_server
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-        if r_server is not None:
+        if r_server is not None and (not self._table.lt_reuse):
             self._load_eco_data(r_server)
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
@@ -276,7 +277,7 @@ class EFOLookUpTable(object):
                                             ttl = ttl)
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-        if self.r_server is not None:
+        if self.r_server is not None and (not self._table.lt_reuse):
             self._load_efo_data(r_server)
 
     def _load_efo_data(self, r_server = None):
@@ -336,7 +337,7 @@ class MPLookUpTable(object):
                                             r_server = self.r_server,
                                             ttl = ttl)
 
-        if self.r_server is not None and autoload:
+        if self.r_server is not None and autoload and (not self._table.lt_reuse):
             self._load_mp_data(r_server)
 
     def _load_mp_data(self, r_server = None):
@@ -395,7 +396,8 @@ class HPOLookUpTable(object):
                                             r_server = self.r_server,
                                             ttl = ttl)
 
-        if self.r_server is not None:
+        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
+        if self.r_server is not None and (not self._table.lt_reuse):
             self._load_hpo_data(r_server)
 
     def _load_hpo_data(self, r_server = None):
@@ -403,7 +405,7 @@ class HPOLookUpTable(object):
                         desc='loading human phenotypes',
                         unit=' human phenotypes',
                         unit_scale=True,
-                        file=tqdm_out,
+                        file=self.tqdm_out,
                         total=self._es_query.count_all_human_phenotypes(),
                         leave=False,
                         ):
@@ -458,7 +460,7 @@ class LiteratureLookUpTable(object):
         self._es_query = ESQuery(self._es)
         self.r_server = r_server if r_server else new_redis_client()
 
-        if r_server is not None:
+        if r_server is not None and (not self._table.lt_reuse):
             self._load_literature_data(r_server)
         self._logger = logging.getLogger(__name__)
 
