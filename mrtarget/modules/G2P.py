@@ -158,7 +158,7 @@ class G2P():
                             error = obj.validate(logging)
 
                             if error > 0:
-                                logging.error(obj.to_JSON())
+                                self._logger.error(obj.to_JSON())
                                 sys.exit(1)
                             else:
                                 self.evidence_strings.append(obj)

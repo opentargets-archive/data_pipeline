@@ -10,9 +10,11 @@ logging.basicConfig(level=logging.INFO)
 
 class Uniprot(IPlugin):
 
+    def __init__(self, *args, **kwargs):
+        self._logger = logging.getLogger(__name__)
+
     def print_name(self):
-        logging.info("Uniprot (and Reactome) gene data plugin")
-        gene = Gene()
+        self._logger.info("Uniprot (and Reactome) gene data plugin")
 
     def merge_data(self, genes, loader, r_server, tqdm_out):
 
@@ -22,7 +24,7 @@ class Uniprot(IPlugin):
         try:
             esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)
         except NotFoundError as ex:
-            logging.error('no Uniprot index found in ES. Skipping. Has the --uniprot step been run? Are you pointing to the correct index? %s' % ex)
+            self._logger.error('no Uniprot index found in ES. Skipping. Has the --uniprot step been run? Are you pointing to the correct index? %s' % ex)
             raise ex
 
         c = 0
@@ -35,7 +37,7 @@ class Uniprot(IPlugin):
                            total=esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
             c += 1
             if c % 1000 == 0:
-                logging.info("%i entries retrieved for uniprot" % c)
+                self._logger.info("%i entries retrieved for uniprot" % c)
             if 'Ensembl' in seqrec.annotations['dbxref_extended']:
                 ensembl_data = seqrec.annotations['dbxref_extended']['Ensembl']
                 ensembl_genes_id = []
@@ -51,12 +53,12 @@ class Uniprot(IPlugin):
                         success = True
                         break
                 if not success:
-                    logging.debug(
+                    self._logger.debug(
                         'Cannot find ensembl id(s) %s coming from uniprot entry %s in available geneset' % (
                         ensembl_genes_id, seqrec.id))
             else:
-                logging.debug('Cannot find ensembl mapping in the uniprot entry %s' % seqrec.id)
-        logging.info("%i entries retrieved for uniprot" % c)
+                self._logger.debug('Cannot find ensembl mapping in the uniprot entry %s' % seqrec.id)
+        self._logger.info("%i entries retrieved for uniprot" % c)
 
         # self._logger.info("STATS AFTER UNIPROT MAPPING:\n" + self.genes.get_stats())
 

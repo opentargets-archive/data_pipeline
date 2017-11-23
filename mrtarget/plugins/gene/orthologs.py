@@ -10,13 +10,16 @@ logging.basicConfig(level=logging.INFO)
 
 class Orthologs(IPlugin):
 
+    def __init__(self, *args, **kwargs):
+        self._logger = logging.getLogger(__name__)
+
     def print_name(self):
-        logging.info("This is plugin ORTHOLOGS")
+        self._logger.info("This is plugin ORTHOLOGS")
 
     def merge_data(self, genes, loader, r_server, tqdm_out):
-        logging.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
+        self._logger.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
         req = requests.get(Config.HGNC_ORTHOLOGS)
-        logging.info("Ortholog parsing - response code %s" % req.status_code)
+        self._logger.info("Ortholog parsing - response code %s" % req.status_code)
         req.raise_for_status()
 
         # io.BytesIO is StringIO.StringIO in python 2
@@ -29,7 +32,7 @@ class Orthologs(IPlugin):
             if row['human_ensembl_gene'] in genes:
                 self.add_ortholog_data_to_gene(gene=genes[row['human_ensembl_gene']], data=row)
 
-        logging.info("STATS AFTER HGNC ortholog PARSING:\n" + genes.get_stats())
+        self._logger.info("STATS AFTER HGNC ortholog PARSING:\n" + genes.get_stats())
 
     def add_ortholog_data_to_gene(self, gene, data):
         '''loads data from the HCOP ortholog table

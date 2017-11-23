@@ -38,7 +38,6 @@ __maintainer__ = "Gautier Koscielny"
 __email__ = "gautierk@opentargets.org"
 __status__ = "Production"
 
-from logging.config import fileConfig
 
 logger = logging.getLogger(__name__)
 

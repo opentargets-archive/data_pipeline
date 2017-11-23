@@ -140,11 +140,11 @@ class EfoProcess():
                 efo.children = self.disease_ontology.children[uri]
             self.efos[id] = efo
 
-    def _remove_duplicates(self, list):
+    def _remove_duplicates(self, xs):
 
         newlist = []
 
-        for item in list:
+        for item in xs:
             if item not in newlist:
                 newlist.append(item)
         return newlist

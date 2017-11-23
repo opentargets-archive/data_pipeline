@@ -10,8 +10,11 @@ logging.basicConfig(level=logging.INFO)
 
 class Ensembl(IPlugin):
 
+    def __init__(self, *args, **kwargs):
+        self._logger = logging.getLogger(__name__)
+
     def print_name(self):
-        logging.info("ENSEMBL gene data plugin")
+        self._logger.info("ENSEMBL gene data plugin")
 
     def merge_data(self, genes, loader, r_server, tqdm_out):
 
@@ -20,7 +23,7 @@ class Ensembl(IPlugin):
         try:
             count = esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
         except NotFoundError as ex:
-            logging.error('no Ensembl index in ES. Skipping. Has the --ensembl step been run? Are you pointing to the correct index? %s' % ex)
+            self._logger.error('no Ensembl index in ES. Skipping. Has the --ensembl step been run? Are you pointing to the correct index? %s' % ex)
             raise ex
 
 
@@ -42,7 +45,7 @@ class Ensembl(IPlugin):
 
         self._clean_non_reference_genes(genes)
 
-        logging.info("STATS AFTER ENSEMBL PARSING:\n" + genes.get_stats())
+        self._logger.info("STATS AFTER ENSEMBL PARSING:\n" + genes.get_stats())
 
     def _clean_non_reference_genes(self, genes):
         for geneid, gene in genes.iterate():
