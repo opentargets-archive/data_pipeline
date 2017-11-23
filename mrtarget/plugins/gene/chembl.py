@@ -7,7 +7,6 @@ import logging
 
 class ChEMBL(IPlugin):
     def __init__(self, *args, **kwargs):
-        super(ChEMBL, self).__init__(*args, **kwargs)
         self._logger = logging.getLogger(__name__)
 
     def _gen_chembl_map(self, chembl_id, synonyms):

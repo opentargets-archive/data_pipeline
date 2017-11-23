@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG)
 class Hallmarks(IPlugin):
 
     def __init__(self):
-        super(Hallmarks, self).__init__()
+        self._logger = logging.getLogger(__name__)
         self.loader = None
         self.r_server = None
         self.esquery = None
@@ -18,9 +18,8 @@ class Hallmarks(IPlugin):
         self.hallmarks = {}
         self.tqdm_out = None
 
-
     def print_name(self):
-        logging.info("Hallmarks of cancer gene data plugin")
+        self._logger.info("Hallmarks of cancer gene data plugin")
 
     def merge_data(self, genes, loader, r_server, tqdm_out):
 
@@ -39,13 +38,13 @@ class Hallmarks(IPlugin):
                 ''' extend gene with related Hallmark data '''
                 if gene.approved_symbol in self.hallmarks:
                         gene.hallmarks = dict()
-                        logging.info("Adding Hallmark data to gene %s" % (gene.approved_symbol))
+                        self._logger.info("Adding Hallmark data to gene %s" % (gene.approved_symbol))
                         gene.hallmarks = self.hallmarks[gene.approved_symbol]
 
         except Exception as ex:
             tb = traceback.format_exc()
-            logging.error(tb)
-            logging.error('Error %s' % ex)
+            self._logger.error(tb)
+            self._logger.error('Error %s' % ex)
             raise ex
 
     def build_json(self, filename=Config.HALLMARK_FILENAME):
