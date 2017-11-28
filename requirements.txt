@@ -1,7 +1,6 @@
 future
 redislite
 addict==2.1.0
-argparse==1.3.0
 dateutils==0.6.6
 decorator==3.4.2
 envparse
@@ -51,6 +50,6 @@ mock
 toolz
 cement==2.10.2
 yapsy==1.11.223
-git+https://github.com/opentargets/data_model.git@v1.2.6#egg=data-model
+git+https://github.com/opentargets/data_model.git@v1.2.7#egg=data-model
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz
 -e .
