@@ -150,7 +150,7 @@ def main():
                         action='append', default=[])
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
-                        action='store', default='INFO')
+                        action='store', default='WARNING')
     parser.add_argument("--do-nothing", dest='do_nothing',
                         help="to be used just for test",
                         action='store_true', default=False)
@@ -200,6 +200,7 @@ def main():
             logger.setLevel(logging.getLevelName(args.loglevel))
         except Exception, e:
             root_logger.exception(e)
+            sys.exit(1)
 
     if args.do_nothing:
         print("Exiting. I pity the fool that tells me to 'do nothing'",
