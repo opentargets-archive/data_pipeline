@@ -13,6 +13,15 @@ complete the pipeline are here refactored into a python package.
 We are also building a container with all the python (and nonpython) 
 dependencies that allows you to run each step of the pipeline.
 
+
+### How do I decide which data sources to include?
+Sources of evidence strings that are processed by the `--evs` steps by default are specified in a [config file](https://github.com/opentargets/data_pipeline/blob/master/mrtarget/resources/evidences_sources.txt)
+
+We save them in a gs:// bucket, so to make up the file you can just run:
+```sh
+gsutil ls gs://ot-releases/17.12 | sed 's/gs/http/' | sed 's/\/\//\/\/storage.googleapis.com\//' | sed '1d'
+```
+
 ## Installation instructions
 
 ### Useful prep
