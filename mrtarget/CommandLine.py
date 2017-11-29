@@ -198,6 +198,8 @@ def main():
             root_logger = logging.getLogger()
             root_logger.setLevel(logging.getLevelName(args.loglevel))
             logger.setLevel(logging.getLevelName(args.loglevel))
+            logger.info('main log level set to: '+ str(args.loglevel))
+            root_logger.info('root log level set to: '+ str(args.loglevel))
         except Exception, e:
             root_logger.exception(e)
             sys.exit(1)
