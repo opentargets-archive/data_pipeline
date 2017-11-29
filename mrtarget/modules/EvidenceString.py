@@ -221,13 +221,14 @@ class ExtendedInfoLiterature(ExtendedInfo):
 
 class EvidenceManager():
     def __init__(self, lookup_data):
+        self.logger = logging.getLogger(__name__)
         self.available_genes = lookup_data.available_genes
         self.available_efos = lookup_data.available_efos
         self.available_ecos = lookup_data.available_ecos
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
         self._get_eco_scoring_values()
-        # logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
+        # self.logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
         # self.gene_retriever = GeneLookUpTable(self.es)
@@ -239,7 +240,7 @@ class EvidenceManager():
             self.available_publications = lookup_data.available_publications
 
 
-            # logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
+            # self.logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
 
     # @do_profile()#follow=[])
     def fix_evidence(self, evidence):
@@ -314,7 +315,7 @@ class EvidenceManager():
                         fixed = True
             else:
                 if evidence['sourceID'] not in ['uniprot_literature', 'gene2phenotype']:
-                    logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
+                    self.logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
         # '''use just one mutation per somatic data'''
         # if 'known_mutations' in evidence['evidence'] and evidence['evidence']['known_mutations']:
@@ -363,12 +364,12 @@ class EvidenceManager():
             code = get_ontology_code_from_url(idorg_eco_uri.strip())
             if code is not None:
                 # if len(code.split('_')) != 2:
-                # logger.warning("could not recognize evidence code: %s in id %s | added anyway" %(evidence['id'],
+                # self.logger.warning("could not recognize evidence code: %s in id %s | added anyway" %(evidence['id'],
                 # idorg_eco_uri))
                 new_eco_ids.append(code)
         evidence['evidence']['evidence_codes'] = list(set(new_eco_ids))
         if not new_eco_ids:
-            logger.warning("No valid ECO could be found in evidence: %s. original ECO mapping: %s" % (
+            self.logger.warning("No valid ECO could be found in evidence: %s. original ECO mapping: %s" % (
                 evidence['id'], str(eco_ids)[:100]))
 
         return Evidence(evidence), fixed
@@ -403,7 +404,7 @@ class EvidenceManager():
         return new_target_id, id_not_in_ensembl
 
     @staticmethod
-    def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes) :
+    def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
         target_id = evidence['target']['id']
 
         try:
@@ -417,13 +418,13 @@ class EvidenceManager():
             new_target_id = target_id
 
         if id_not_in_ensembl:
-            logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s" % (
-                evidence['id'], target_id))
+            logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s",
+                            evidence['target']['id'], target_id)
 
         evidence['target']['id'] = new_target_id
 
     @staticmethod
-    def fix_disease_id(evidence):
+    def fix_disease_id(evidence, logger=logging.getLogger(__name__)):
         disease_id = evidence['disease']['id']
         new_disease_id = get_ontology_code_from_url(disease_id)
         if len(new_disease_id.split('_')) != 2:
@@ -440,24 +441,24 @@ class EvidenceManager():
         evidence_id = ev['id']
 
         if not ev['target']['id']:
-            logger.error("%s Evidence %s has no valid gene in target.id" % (datasource, evidence_id))
+            self.logger.error("%s Evidence %s has no valid gene in target.id" % (datasource, evidence_id))
             return False
         gene_id = ev['target']['id']
         if gene_id not in self.available_genes:
-            logger.error(
+            self.logger.error(
                 "%s Evidence %s has an invalid gene id in target.id: %s" % (datasource, evidence_id, gene_id))
             return False
         if not ev['disease']['id']:
-            logger.error("%s Evidence %s has no valid efo id in disease.id" % (datasource, evidence_id))
+            self.logger.error("%s Evidence %s has no valid efo id in disease.id" % (datasource, evidence_id))
             return False
         efo_id = ev['disease']['id']
         if efo_id not in self.available_efos:
-            logger.error(
+            self.logger.error(
                 "%s Evidence %s has an invalid efo id in disease.id: %s" % (datasource, evidence_id, efo_id))
             return False
         # for eco_id in ev['evidence']['evidence_codes']:
         #     if eco_id not in self.available_ecos:
-        #         logger.error(
+        #         self.logger.error(
         #             "%s Evidence %s has an invalid eco id in evidence.evidence_codes: %s" % (
         #             datasource, evidence_id, eco_id))
         #         return False
@@ -489,7 +490,7 @@ class EvidenceManager():
             pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
             pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
             # except Exception:
-            #     logger.warning("Cannot get generic info for gene: %s" % aboutid)
+            #     self.logger.warning("Cannot get generic info for gene: %s" % aboutid)
         if gene.go:
             for go in gene.go:
                 go_code, data = go['id'], go['value']
@@ -527,7 +528,7 @@ class EvidenceManager():
         efo = self._get_efo_obj(diseaseid)
         efo_info = ExtendedInfoEFO(efo)
         # except Exception:
-        #     logger.warning("Cannot get generic info for efo: %s" % aboutid)
+        #     self.logger.warning("Cannot get generic info for efo: %s" % aboutid)
         if efo_info:
             for path in efo_info.data['path']:
                 all_efo_codes.extend(path)
@@ -548,7 +549,7 @@ class EvidenceManager():
                 if eco is not None:
                     ecos_info.append(ExtendedInfoECO(eco))
                 else:
-                    logger.warning("Cannot get generic info for eco: %s" % eco_id)
+                    self.logger.warning("Cannot get generic info for eco: %s" % eco_id)
 
             if ecos_info:
                 data = []
@@ -558,7 +559,7 @@ class EvidenceManager():
         except Exception as e:
             extended_evidence['evidence'][ExtendedInfoECO.root] = None
             all_eco_codes = []
-            logger.exception("Cannot get generic info for eco: %s:"%str(e))
+            self.logger.exception("Cannot get generic info for eco: %s:"%str(e))
 
         '''Add private objects used just for faceting'''
 
@@ -596,7 +597,7 @@ class EvidenceManager():
                             if pub_dict:
                                 pub = pub_dict[pmid]
                         except KeyError as e:
-                            logger.warning('Cannot find publication %s in elasticsearch. Not injecting data' % pmid)
+                            self.logger.warning('Cannot find publication %s in elasticsearch. Not injecting data' % pmid)
 
                     if pub is not None:
                         literature_info = ExtendedInfoLiterature(pub)
@@ -630,7 +631,7 @@ class EvidenceManager():
                             'keywords')
 
                 except Exception:
-                    logger.exception(
+                    self.logger.exception(
                         'Error in publication data injection - skipped for evidence id: ' + extended_evidence['id'])
 
         return Evidence(extended_evidence)
@@ -651,7 +652,7 @@ class EvidenceManager():
             eco.load_json(self.available_ecos[ecoid])
             return eco
         except KeyError:
-            logger.debug('data for ECO code %s could not be injected'%ecoid)
+            self.logger.debug('data for ECO code %s could not be injected'%ecoid)
             return
 
     def _get_non_reference_gene_mappings(self):
@@ -670,7 +671,7 @@ class EvidenceManager():
                 self.non_reference_genes[symbol]['alternative'].append(ensg)
 
     @staticmethod
-    def _map_to_reference_ensembl_gene(ensg, non_reference_genes):
+    def _map_to_reference_ensembl_gene(ensg, non_reference_genes, logger=logging.getLogger(__name__)):
         for symbol, data in non_reference_genes.items():
             if ensg in data['alternative']:
                 logger.warning(
@@ -690,7 +691,7 @@ class EvidenceManager():
                 uri.rstrip()
                 self.eco_scores[uri] = float(score)
             except:
-                logger.error("cannot parse line in eco_scores.tsv: %s" % (line.strip()))
+                self.logger.error("cannot parse line in eco_scores.tsv: %s" % (line.strip()))
 
     def _get_score_modifiers(self):
         self.score_modifiers = {}
@@ -841,7 +842,7 @@ class Evidence(JSONSerializable):
                 self.evidence['scores']['association_score'] = score
 
         except Exception as e:
-            logger.error(
+            self.logger.error(
                 "Cannot score evidence %s of type %s. Error: %s" % (self.evidence['id'], self.evidence['type'], e))
 
         '''check for minimum score '''
@@ -906,7 +907,7 @@ class Evidence(JSONSerializable):
 
         score = normalised_pvalue * normalised_sample_size * severity
 
-        # logger.debug("gwas score: %f | pvalue %f %f | sample size%f %f |severity %f" % (score, pvalue,
+        # self.logger.debug("gwas score: %f | pvalue %f %f | sample size%f %f |severity %f" % (score, pvalue,
         # normalised_pvalue, sample_size,normalised_sample_size, severity))
         return score
 
@@ -1140,7 +1141,7 @@ class EvidenceStringProcess():
                                       dry_run=False,
                                       inject_literature=False):
 
-        logger.debug("Starting Evidence Manager")
+        self.logger.debug("Starting Evidence Manager")
         '''get lookup data and stats'''
         lookup_data_types = [LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
         if inject_literature:
@@ -1162,7 +1163,7 @@ class EvidenceStringProcess():
             global_stats = self.get_global_stats(lookup_data.uni2ens,
                                                  lookup_data.available_genes,
                                                  lookup_data.non_reference_genes)
-            if logger.level == logging.DEBUG:
+            if self.logger.level == logging.DEBUG:
                 pickle.dump(global_stats, open(global_stat_cache,'w'), protocol=pickle.HIGHEST_PROTOCOL)
 
         # lookup_data.available_genes.load_uniprot2ensembl()
@@ -1181,7 +1182,7 @@ class EvidenceStringProcess():
         loader.prepare_for_bulk_indexing(loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' +
                                                                     Config.DATASOURCE_TO_INDEX_KEY_MAPPING['default']))
         if datasources and overwrite_indices:
-            self.logger.info('deleting data for datasources %s' % ','.join(datasources))
+            self.self.logger.info('deleting data for datasources %s' % ','.join(datasources))
             self.es_query.delete_evidence_for_datasources(datasources)
 
         '''create queues'''
@@ -1255,12 +1256,12 @@ class EvidenceStringProcess():
         loaders.join()
 
 
-        logger.info('flushing data to index')
+        self.logger.info('flushing data to index')
         self.es.indices.flush('%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME),
                               wait_if_ongoing=True)
 
-        logger.info('Processed data for %i targets' % len(targets_with_data))
-        logger.info("DONE")
+        self.logger.info('Processed data for %i targets' % len(targets_with_data))
+        self.logger.info("DONE")
 
         return list(targets_with_data)
 
@@ -1272,9 +1273,9 @@ class EvidenceStringProcess():
         for row in self.es_query.get_validated_evidence_strings(size=page_size, datasources=datasources):
             c += 1
             if c % 1e5 == 0:
-                logger.debug("loaded %i ev from db to process" % c)
+                self.logger.debug("loaded %i ev from db to process" % c)
             yield row
-        logger.info("loaded %i ev from db to process" % c)
+        self.logger.info("loaded %i ev from db to process" % c)
 
     def get_global_stats(self, uni2ens, available_genes, non_reference_genes, page_size=5000,):
         global_stats = EvidenceGlobalCounter()
