@@ -6,6 +6,8 @@ from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.common.connection import new_redis_client, PipelineConnectors
 from mrtarget.Settings import Config
 from mrtarget.common import TqdmToLogger
+from mrtarget.modules.Literature import Publication
+
 
 class HPALookUpTable(object):
     """
@@ -446,7 +448,8 @@ class LiteratureLookUpTable(object):
                  es = None,
                  namespace = None,
                  r_server = None,
-                 ttl = 60*60*24+7):
+                 ttl = 60*60*24+7,
+                 preload = False):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = r_server,
                                             ttl = ttl)
@@ -461,21 +464,22 @@ class LiteratureLookUpTable(object):
         self.r_server = r_server if r_server else new_redis_client()
 
         if r_server is not None and (not self._table.lt_reuse):
-            self._load_literature_data(r_server)
+            if preload:
+                self._load_literature_data(r_server)
         self._logger = logging.getLogger(__name__)
 
     def _load_literature_data(self, r_server = None):
-        # for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
-        #                 desc='loading publications',
-        #                 unit=' publication',
-        #                 unit_scale=True,
-        #                 leave=False,
-        #                 ):
-        #     pub = Publication()
-        #     pub.load_json(pub_source)
-        #
-        #     self.set_literature(pub,self._get_r_server(
-        #             r_server))# TODO can be improved by sending elements in batches
+        for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
+                        desc='loading publications',
+                        unit=' publication',
+                        unit_scale=True,
+                        leave=False,
+                        ):
+            pub = Publication()
+            pub.load_json(pub_source)
+
+            self.set_literature(pub,self._get_r_server(
+                    r_server))# TODO can be improved by sending elements in batches
         return
 
     def get_literature(self, pmid, r_server = None):
@@ -493,7 +497,7 @@ class LiteratureLookUpTable(object):
             return pub
 
     def set_literature(self, literature, r_server = None):
-        self._table.set((literature.pub_id), literature, r_server=self._get_r_server(
+        self._table.set(literature.id, literature, r_server=self._get_r_server(
             r_server))
 
     def get_available_literature_ids(self, r_server = None):
