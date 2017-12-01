@@ -6,8 +6,6 @@ from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.common.connection import new_redis_client, PipelineConnectors
 from mrtarget.Settings import Config
 from mrtarget.common import TqdmToLogger
-from mrtarget.modules.Literature import Publication
-
 
 class HPALookUpTable(object):
     """
@@ -33,15 +31,14 @@ class HPALookUpTable(object):
             self._load_hpa_data(self.r_server)
 
     def _load_hpa_data(self, r_server=None):
-        if not self._table.lt_reuse:
-            for el in tqdm(self._es_query.get_all_hpa(),
-                           desc='loading hpa',
-                           unit=' hpa',
-                           unit_scale=True,
-                           total=self._es_query.count_all_hpa(),
-                           file=self.tqdm_out,
-                           leave=False):
-                self.set_hpa(el, r_server=self._get_r_server(r_server))
+        for el in tqdm(self._es_query.get_all_hpa(),
+                       desc='loading hpa',
+                       unit=' hpa',
+                       unit_scale=True,
+                       total=self._es_query.count_all_hpa(),
+                       file=self.tqdm_out,
+                       leave=False):
+            self.set_hpa(el, r_server=self._get_r_server(r_server))
 
     def get_hpa(self, idx, r_server=None):
         return self._table.get(idx, r_server=self._get_r_server(r_server))
@@ -91,7 +88,7 @@ class GeneLookUpTable(object):
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
         self.uniprot2ensembl = {}
-        if self.r_server and autoload and (not self._table.lt_reuse):
+        if self.r_server and autoload:
             self.load_gene_data(self.r_server, targets)
 
     def load_gene_data(self, r_server = None, targets = []):
@@ -116,27 +113,27 @@ class GeneLookUpTable(object):
             for accession in target['uniprot_accessions']:
                 self.uniprot2ensembl[accession] = target['id']
 
-#     def load_uniprot2ensembl(self, targets = []):
-#         uniprot_fields = ['uniprot_id','uniprot_accessions', 'id']
-#         if targets:
-#             data = self._es_query.get_targets_by_id(targets,
-#                                                     fields= uniprot_fields)
-#             total = len(targets)
-#         else:
-#             data = self._es_query.get_all_targets(fields= uniprot_fields)
-#             total = self._es_query.count_all_targets()
-#         for target in tqdm(data,
-#                            desc='loading mappings from uniprot to ensembl',
-#                            unit=' gene mapping',
-#                            unit_scale=True,
-#                            file=self.tqdm_out,
-#                            total=total,
-#                            leave=False,
-#                            ):
-#             if target['uniprot_id']:
-#                 self.uniprot2ensembl[target['uniprot_id']] = target['id']
-#             for accession in target['uniprot_accessions']:
-#                 self.uniprot2ensembl[accession] = target['id']
+    def load_uniprot2ensembl(self, targets = []):
+        uniprot_fields = ['uniprot_id','uniprot_accessions', 'id']
+        if targets:
+            data = self._es_query.get_targets_by_id(targets,
+                                                    fields= uniprot_fields)
+            total = len(targets)
+        else:
+            data = self._es_query.get_all_targets(fields= uniprot_fields)
+            total = self._es_query.count_all_targets()
+        for target in tqdm(data,
+                           desc='loading mappings from uniprot to ensembl',
+                           unit=' gene mapping',
+                           unit_scale=True,
+                           file=self.tqdm_out,
+                           total=total,
+                           leave=False,
+                           ):
+            if target['uniprot_id']:
+                self.uniprot2ensembl[target['uniprot_id']] = target['id']
+            for accession in target['uniprot_accessions']:
+                self.uniprot2ensembl[accession] = target['id']
 
     def get_gene(self, target_id, r_server = None):
         try:
@@ -205,7 +202,7 @@ class ECOLookUpTable(object):
         self.r_server = r_server
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-        if r_server is not None and (not self._table.lt_reuse):
+        if r_server is not None:
             self._load_eco_data(r_server)
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
@@ -279,7 +276,7 @@ class EFOLookUpTable(object):
                                             ttl = ttl)
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-        if self.r_server is not None and (not self._table.lt_reuse):
+        if self.r_server is not None:
             self._load_efo_data(r_server)
 
     def _load_efo_data(self, r_server = None):
@@ -339,7 +336,7 @@ class MPLookUpTable(object):
                                             r_server = self.r_server,
                                             ttl = ttl)
 
-        if self.r_server is not None and autoload and (not self._table.lt_reuse):
+        if self.r_server is not None and autoload:
             self._load_mp_data(r_server)
 
     def _load_mp_data(self, r_server = None):
@@ -397,9 +394,8 @@ class HPOLookUpTable(object):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = self.r_server,
                                             ttl = ttl)
-
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-        if self.r_server is not None and (not self._table.lt_reuse):
+        if self.r_server is not None:
             self._load_hpo_data(r_server)
 
     def _load_hpo_data(self, r_server = None):
@@ -448,8 +444,7 @@ class LiteratureLookUpTable(object):
                  es = None,
                  namespace = None,
                  r_server = None,
-                 ttl = 60*60*24+7,
-                 preload = False):
+                 ttl = 60*60*24+7):
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = r_server,
                                             ttl = ttl)
@@ -463,23 +458,22 @@ class LiteratureLookUpTable(object):
         self._es_query = ESQuery(self._es)
         self.r_server = r_server if r_server else new_redis_client()
 
-        if r_server is not None and (not self._table.lt_reuse):
-            if preload:
-                self._load_literature_data(r_server)
+        if r_server is not None:
+            self._load_literature_data(r_server)
         self._logger = logging.getLogger(__name__)
 
     def _load_literature_data(self, r_server = None):
-        for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
-                        desc='loading publications',
-                        unit=' publication',
-                        unit_scale=True,
-                        leave=False,
-                        ):
-            pub = Publication()
-            pub.load_json(pub_source)
-
-            self.set_literature(pub,self._get_r_server(
-                    r_server))# TODO can be improved by sending elements in batches
+        # for pub_source in tqdm(self._es_query.get_all_pub_from_validated_evidence(datasources=['europepmc']),
+        #                 desc='loading publications',
+        #                 unit=' publication',
+        #                 unit_scale=True,
+        #                 leave=False,
+        #                 ):
+        #     pub = Publication()
+        #     pub.load_json(pub_source)
+        #
+        #     self.set_literature(pub,self._get_r_server(
+        #             r_server))# TODO can be improved by sending elements in batches
         return
 
     def get_literature(self, pmid, r_server = None):
@@ -497,7 +491,7 @@ class LiteratureLookUpTable(object):
             return pub
 
     def set_literature(self, literature, r_server = None):
-        self._table.set(literature.id, literature, r_server=self._get_r_server(
+        self._table.set((literature.pub_id), literature, r_server=self._get_r_server(
             r_server))
 
     def get_available_literature_ids(self, r_server = None):
