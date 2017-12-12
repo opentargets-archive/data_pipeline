@@ -128,7 +128,7 @@ class RedisQueue(object):
                            default) jsonpickle (use ujson) else will use pickle
         :return:
         '''
-        logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__)
         if not queue_id:
             queue_id = uuid.uuid4().hex
         self.queue_id = queue_id
