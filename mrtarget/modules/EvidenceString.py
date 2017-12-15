@@ -806,10 +806,14 @@ class Evidence(JSONSerializable):
 
                         if self.evidence['sourceID'] == 'gwas_catalog':
                             sample_size = self.evidence['evidence']['variant2disease']['gwas_sample_size']
-                            score = self._score_gwascatalog(
-                                self.evidence['evidence']['variant2disease']['resource_score']['value'],
-                                sample_size,
-                                g2v_score)
+                            p_value = self.evidence['evidence']['variant2disease']['resource_score']['value']
+
+                            # this is something to take into account for postgap data when I refactor this
+                            r2_value = float(1)
+                            if 'r2' in self.evidence['unique_association_fields']:
+                                r2_value = float(self.evidence['unique_association_fields']['r2'])
+
+                            score = self._score_gwascatalog(p_value, sample_size, g2v_score, r2_value)
                         else:
                             score = g2v_score * v2d_score
 
@@ -913,13 +917,13 @@ class Evidence(JSONSerializable):
         score = get_log(pvalue)
         return DataNormaliser.renormalize(score, [min_score, max_score], [0., 1.])
 
-    def _score_gwascatalog(self, pvalue, sample_size, severity):
+    def _score_gwascatalog(self, pvalue, sample_size, g2v_value, r2_value):
 
         normalised_pvalue = self._get_score_from_pvalue_linear(pvalue, range_min=1, range_max=1e-15)
 
         normalised_sample_size = DataNormaliser.renormalize(sample_size, [0, 5000], [0, 1])
 
-        score = normalised_pvalue * normalised_sample_size * severity
+        score = normalised_pvalue * normalised_sample_size * g2v_value * r2_value
 
         # self.logger.debug("gwas score: %f | pvalue %f %f | sample size%f %f |severity %f" % (score, pvalue,
         # normalised_pvalue, sample_size,normalised_sample_size, severity))
