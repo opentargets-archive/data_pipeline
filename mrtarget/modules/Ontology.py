@@ -12,12 +12,13 @@ import opentargets.model.core as opentargets
 import logging
 import json
 import rdflib
+import requests
 from rdflib import URIRef
 from rdflib.namespace import Namespace, NamespaceManager
 from rdflib.namespace import OWL, RDF, RDFS
 from mrtarget.common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 from datetime import date
 from mrtarget.Settings import Config
@@ -54,6 +55,38 @@ EFO_TAS = [
     'http://www.ebi.ac.uk/efo/EFO_0000701', # skin disease
     'http://www.ebi.ac.uk/efo/EFO_0001421', # liver disease
 ]
+
+HPO_TAS = [
+    "http://purl.obolibrary.org/obo/HP_0005386", #"behavior/neurological phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005375", #"adipose tissue phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005385", #"cardiovascular system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005384", #"cellular phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005382", #"craniofacial phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005381", #"digestive/alimentary phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005380", #"embryo phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005379", #"endocrine/exocrine phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005378", #"growth/size/body region phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005377", #"hearing/vestibular/ear phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005397", #"hematopoietic system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005376", #"homeostasis/metabolism phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005387", #"immune system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0010771", #"integument phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005371", #"limbs/digits/tail phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005370", #"liver/biliary system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0010768", #"mortality/aging",
+    "http://purl.obolibrary.org/obo/HP_0005369", #"muscle phenotype",
+    "http://purl.obolibrary.org/obo/HP_0002006", #"neoplasm",
+    "http://purl.obolibrary.org/obo/HP_0003631", #"nervous system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0002873", #"normal phenotype",
+    "http://purl.obolibrary.org/obo/HP_0001186", #"pigmentation phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005367", #"renal/urinary system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005389", #"reproductive system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005388", #"respiratory system phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005390", #"skeleton phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005394", #"taste/olfaction phenotype",
+    "http://purl.obolibrary.org/obo/HP_0005391", #"vision/eye phenotype"
+]
+
 
 TOP_LEVELS = '''
 PREFIX obo: <http://purl.obolibrary.org/obo/>
@@ -228,6 +261,86 @@ class OntologyClassReader():
         """
         self.rdf_graph.parse(uri, format='xml')
 
+    def get_deprecated_classes(self, obsoleted_in_version=False):
+
+        count = 0
+
+        # do this once
+        if len(self.obsoletes) == 0:
+
+            sparql_query = '''
+            SELECT DISTINCT ?ont_node ?label ?label ?ont_new
+             {
+                ?ont_node owl:deprecated true .
+                ?ont_node obo:IAO_0100001 ?ont_new_id .
+                ?ont_new oboInOwl:id ?ont_new_id .
+                ?ont_node rdfs:label ?label
+             }
+            '''
+
+            if obsoleted_in_version:
+
+                sparql_query = '''
+                                SELECT DISTINCT ?ont_node ?label ?reason ?ont_new_id
+                                 {
+                                    ?ont_node rdfs:subClassOf oboInOwl:ObsoleteClass . 
+                                    ?ont_node obo:IAO_0100001 ?ont_new_id .
+                                    ?ont_node rdfs:label ?label . 
+                                    ?ont_node efo:reason_for_obsolescence ?reason
+                                 }
+                                '''
+
+
+                '''
+                <rdfs:subClassOf rdf:resource="http://www.geneontology.org/formats/oboInOwl#ObsoleteClass"/>
+                <obo:IAO_0100001 rdf:datatype="http://www.w3.org/2001/XMLSchema#string">http://www.ebi.ac.uk/efo/EFO_0002067</obo:IAO_0100001>
+                <efo:obsoleted_in_version>2.44</efo:obsoleted_in_version>
+                <efo:reason_for_obsolescence>Duplicate with class K562 http://www.ebi.ac.uk/efo/EFO_0002067</efo:reason_for_obsolescence>
+                '''
+
+            qres = self.rdf_graph.query(sparql_query)
+
+            for (ont_node, ont_label, ont_reason, ont_new_id) in qres:
+                uri = str(ont_node)
+                label = str(ont_label)
+                reason_for_obsolescence = str(ont_reason)
+                # unfortunately there may be some trailing spaces!
+                new_uri = str(ont_new_id).strip()
+                # point to the new URI
+                self.obsoletes[uri] = {'label': label,
+                                       'new_uri': new_uri,
+                                       'reason_for_obsolescence': reason_for_obsolescence,
+                                       'processed': False}
+                count +=1
+                logger.debug("WARNING: Obsolete %s %s '%s' %s" % (uri, label, reason_for_obsolescence, new_uri))
+
+        """
+        Still need to loop over to find the next new class to replace the
+        old URI with the latest URI (some intermediate classes can be obsolete too)
+        """
+
+        for old_uri, record in self.obsoletes.items():
+            if not record['processed']:
+                next_uri = self.obsoletes[old_uri]['new_uri']
+                next_reason = self.obsoletes[old_uri]['reason_for_obsolescence']
+                while next_uri in self.obsoletes.keys():
+                    prev_uri = next_uri
+                    next_uri = self.obsoletes[prev_uri]['new_uri']
+                    if next_uri == prev_uri:
+                        break
+                    next_reason = self.obsoletes[prev_uri]['reason_for_obsolescence']
+                if next_uri in self.current_classes:
+                    new_label = self.current_classes[next_uri]
+                    logger.warn("%s => %s" % (old_uri, self.obsoletes[old_uri]))
+                    self.obsolete_classes[old_uri] = "Use %s label:%s (reason: %s)" % (next_uri, new_label, next_reason)
+                else:
+                    # load the class
+                    self.obsolete_classes[old_uri] = next_reason
+                # mark the record as processed
+                record['processed'] = True
+
+        return count
+
     def load_ontology_classes(self, base_class=None):
         """Loads all current and obsolete classes from an ontology stored in RDFLib
 
@@ -270,43 +383,7 @@ class OntologyClassReader():
             # logger.debug("RDFLIB '%s' '%s'" % (uri, label))
         logger.debug("parsed %i classes"%count)
 
-        sparql_query = '''
-        SELECT DISTINCT ?ont_node ?label ?id ?ont_new
-         {
-            ?ont_node owl:deprecated true .
-            ?ont_node oboInOwl:id ?id .
-            ?ont_node obo:IAO_0100001 ?ont_new_id .
-            ?ont_new oboInOwl:id ?ont_new_id .
-            ?ont_node rdfs:label ?label
-         }
-        '''
-
-        qres = self.rdf_graph.query(sparql_query)
-        for (ont_node, ont_label, ont_id, ont_new) in qres:
-            uri = str(ont_node)
-            label = str(ont_label)
-            id = str(ont_id)
-            new_uri = str(ont_new)
-            # point to the new URI
-            self.obsoletes[uri] = { 'label': label, 'new_uri' : new_uri }
-            count +=1
-            logger.debug("WARNING: Obsolete %s '%s' %s" % (uri, label, new_uri))
-
-        """
-        Still need to loop over to find the next new class to replace the
-        old URI with the latest URI (some intermediate classes can be obsolete too)
-        """
-
-        for old_uri in self.obsoletes.keys():
-            next_uri = self.obsoletes[old_uri]['new_uri']
-            while next_uri in self.obsoletes.keys():
-                next_uri = self.obsoletes[next_uri]['new_uri']
-            if next_uri in self.current_classes:
-                new_label = self.current_classes[next_uri]
-                logger.warn("%s => %s" % (old_uri, self.obsoletes[old_uri]))
-                self.obsolete_classes[old_uri] = "Use %s label:%s" % (next_uri, new_label)
-            else:
-                self.obsolete_classes[old_uri] = "Obsolete class"
+    def get_top_levels(self, base_class=None):
 
         sparql_query = '''
         select DISTINCT ?top_level ?top_level_label
@@ -322,9 +399,8 @@ class OntologyClassReader():
             label = str(row[1])
             self.top_level_classes[uri] = label
 
-        return
-
     def get_children(self, uri):
+
         disease_uri = URIRef(uri)
         if uri not in self.children:
             self.children[uri] = []
@@ -435,6 +511,8 @@ class OntologyClassReader():
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
         base_class = 'http://purl.obolibrary.org/obo/HP_0000118'
         self.load_ontology_classes(base_class=base_class)
+        self.get_deprecated_classes()
+        self.get_top_levels(base_class= base_class)
 
     def load_mp_classes(self):
         """Loads the HPO graph and extracts the current and obsolete classes.
@@ -444,6 +522,8 @@ class OntologyClassReader():
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
         base_class = 'http://purl.obolibrary.org/obo/MP_0000001'
         self.load_ontology_classes(base_class= base_class)
+        self.get_deprecated_classes()
+        self.get_top_levels(base_class= base_class)
 
         #self.get_ontology_top_levels(base_class, top_level_map=self.phenotype_top_levels)
 
@@ -454,7 +534,6 @@ class OntologyClassReader():
         """
         logger.debug("load_efo_classes...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
-
         # load disease, phenotype, measurement, biological process, function and injury and mental health
         for base_class in [ 'http://www.ebi.ac.uk/efo/EFO_0000408',
                             'http://www.ebi.ac.uk/efo/EFO_0000651',
@@ -464,6 +543,9 @@ class OntologyClassReader():
                             'http://www.ebi.ac.uk/efo/EFO_0000546',
                             'http://www.ebi.ac.uk/efo/EFO_0003935' ]:
             self.load_ontology_classes(base_class=base_class)
+            self.get_top_levels(base_class=base_class)
+        self.get_deprecated_classes()
+
 
     def load_open_targets_disease_ontology(self):
         """Loads the EFO graph and extracts the current and obsolete classes.
@@ -474,6 +556,14 @@ class OntologyClassReader():
         """
         logger.debug("load_open_targets_disease_ontology...")
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
+        all_ns = [n for n in self.rdf_graph.namespace_manager.namespaces()]
+
+        self.get_deprecated_classes(obsoleted_in_version=True)
+
+        '''
+        get the original top_levels from EFO
+        '''
+        self.get_top_levels(base_class='http://www.ebi.ac.uk/efo/EFO_0000408')
 
         '''
         Detach the TAs from the disease node
@@ -494,6 +584,9 @@ class OntologyClassReader():
         # namespace_manager = NamespaceManager(self.rdf_graph)
         self.rdf_graph.namespace_manager.bind('cttv', cttv)
 
+        '''
+        Some diseases have no categories, let's create a category for them
+        '''
         other_disease_uri = URIRef('http://www.targetvalidation.org/disease/other')
         self.rdf_graph.add((other_disease_uri, RDF.type, rdflib.term.URIRef(u'http://www.w3.org/2002/07/owl#Class')))
         self.rdf_graph.add([other_disease_uri, RDFS.label, rdflib.Literal('other disease')])
@@ -519,12 +612,67 @@ class OntologyClassReader():
                             'http://www.ebi.ac.uk/efo/EFO_0001444',
                             'http://purl.obolibrary.org/obo/GO_0008150',
                             'http://www.ifomis.org/bfo/1.1/snap#Function']:
+
             self.load_ontology_classes(base_class=base_class)
             self.get_classes_paths(root_uri=base_class, level=0)
 
+    def load_human_phenotype_ontology(self):
+        """
+            Loads the HPO graph and extracts the current and obsolete classes.
+            Status: production
+        """
+        logger.debug("load_human_phenotype_ontology...")
+        #self.load_hpo_classes()
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+
+        all_ns = [n for n in self.rdf_graph.namespace_manager.namespaces()]
+
         '''
-        Add all phenotypes to the EFO classes
+        Detach the anatomical system from the phenotypic abnormality node
+        and load all the classes
         '''
+
+        phenotypic_abnormality_uri = 'http://purl.obolibrary.org/obo/HP_0000118'
+        phenotypic_abnormality_uriref = URIRef(phenotypic_abnormality_uri)
+        self.get_children(phenotypic_abnormality_uri)
+
+        for child in self.children[phenotypic_abnormality_uri]:
+            print "%s %s..."%(child['code'], child['label'])
+            uri = "http://purl.obolibrary.org/obo/" + child['code']
+            uriref = URIRef(uri)
+            self.rdf_graph.remove((uriref, None, phenotypic_abnormality_uriref))
+            self.load_ontology_classes(base_class=uri)
+            self.get_classes_paths(root_uri=uri, level=0)
+            self.get_deprecated_classes()
+            print len(self.current_classes)
+
+    def load_mammalian_phenotype_ontology(self):
+        """
+            Loads the MP graph and extracts the current and obsolete classes.
+            Status: production
+        """
+        logger.debug("load_mammalian_phenotype_ontology...")
+        self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+
+        all_ns = [n for n in self.rdf_graph.namespace_manager.namespaces()]
+
+        '''
+        Detach the anatomical system from the mammalian phenotype node
+        and load all the classes
+        '''
+
+        mp_root_uri = 'http://purl.obolibrary.org/obo/MP_0000001'
+        mp_root_uriref = URIRef(mp_root_uri)
+        self.get_children(mp_root_uri)
+
+        for child in self.children[mp_root_uri]:
+            print "%s %s..."%(child['code'], child['label'])
+            uri = "http://purl.obolibrary.org/obo/" + child['code']
+            uriref = URIRef(uri)
+            self.rdf_graph.remove((uriref, None, mp_root_uriref))
+            self.load_ontology_classes(base_class=uri)
+            self.get_classes_paths(root_uri=uri, level=0)
+            print len(self.current_classes)
 
     def load_efo_omim_xrefs(self):
         '''
@@ -739,8 +887,8 @@ class PhenotypeSlim():
         self.phenotype_excluded = set()
 
         self._remote_filenames = dict()
-        self.logger = logging.getLogger(self.__class__.__name__)
-        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
+        self._logger = logging.getLogger(self.__class__.__name__)
+        tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
 
 
     def get_ontology_path(self, base_class, term):
@@ -764,7 +912,7 @@ class PhenotypeSlim():
                         n = 3
                     except SPARQLWrapper.SPARQLExceptions.EndPointNotFound, e:
                         print e
-                        self.logger.error(e)
+                        self._logger.error(e)
                         if n > 2:
                             raise e
                         else:
@@ -826,10 +974,10 @@ class PhenotypeSlim():
 
     def _store_remote_filename(self, filename):
         # print "%s" % filename
-        self.logger.debug("%s" % filename)
+        self._logger.debug("%s" % filename)
         if filename.startswith('/upload/submissions/') and \
             filename.endswith('.json.gz'):
-            self.logger.debug("%s" % filename)
+            self._logger.debug("%s" % filename)
             if True:
                 version_name = filename.split('/')[3].split('.')[0]
                 # print "%s" % filename
@@ -862,16 +1010,26 @@ class PhenotypeSlim():
             #    self.logger.debug('error getting remote file%s'%filename)
 
     def _callback_not_used(self, path):
-        self.logger.debug("skipped "+path)
+        self._logger.debug("skipped " + path)
 
-    def create_phenotype_slim(self, local_files = []):
+    def create_phenotype_slim_from_selection(self):
+
+        for url in Config.PHENOTYPE_SLIM_INPUT_URLS:
+            response = requests.get(url)
+            self._logger.info("Read url %s - response code %s" % (url, response.code))
+            lines = response.readlines()
+
+            for line in lines:
+                self._logger.info(line.rstrip())
+
+    def create_phenotype_slim_from_evidence(self, local_files = []):
 
         self.load_all_phenotypes()
 
         if local_files:
 
             for file_path in local_files:
-                self.logger.info("Parsing file %s" % (file_path))
+                self._logger.info("Parsing file %s" % (file_path))
                 file_size, file_mod_time = os.path.getsize(file_path), os.path.getmtime(file_path)
                 with open(file_path, mode='rb') as f:
                     self.parse_gzipfile(filename=file_path, mode='rb', fileobj=f, mtime=file_mod_time)
@@ -879,11 +1037,11 @@ class PhenotypeSlim():
 
             for u in tqdm(Config.ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS,
                              desc='scanning ftp accounts',
-                             file=tqdm_out,
+                             # file=tqdm_out,
                              leave=False):
                 try:
                     p = Config.EVIDENCEVALIDATION_FTP_ACCOUNTS[u]
-                    self.logger.info("%s %s"%(u, p))
+                    self._logger.info("%s %s" % (u, p))
                     cnopts = pysftp.CnOpts()
                     cnopts.hostkeys = None  # disable host key checking.
                     with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],
@@ -896,14 +1054,14 @@ class PhenotypeSlim():
                         srv.close()
                         for datasource, file_data in tqdm(self._remote_filenames[u].items(),
                                                           desc='scanning available datasource for account %s'%u,
-                                                          file=tqdm_out,
+                                                          # file=tqdm_out,
                                                           leave=False,):
                             latest_file = file_data['file_path']
                             file_version = file_data['file_version']
-                            self.logger.info("found latest file %s for datasource %s"%(latest_file, datasource))
+                            self._logger.info("found latest file %s for datasource %s" % (latest_file, datasource))
                             self.parse_gzipfile(latest_file, u, p)
                 except AuthenticationException:
-                    self.logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
+                    self._logger.error('cannot connect with credentials: user:%s password:%s' % (u, p))
 
         for uri, p in self.phenotype_map.iteritems():
             logger.debug(uri)
@@ -916,7 +1074,7 @@ class PhenotypeSlim():
                            fileobj=fileobj,
                            mtime=mtime) as fh:
 
-            self.logger.info('Starting parsing %s' % filename)
+            self._logger.info('Starting parsing %s' % filename)
 
             line_buffer = []
             offset = 0
@@ -957,7 +1115,7 @@ class PhenotypeSlim():
 
     def parse_sftp_gzipfile(self, file_path, u, p):
         # print "---->%s"%file_path
-        self.logger.info("%s %s" % (u, p))
+        self._logger.info("%s %s" % (u, p))
         cnopts = pysftp.CnOpts()
         cnopts.hostkeys = None  # disable host key checking.
         with pysftp.Connection(host=Config.EVIDENCEVALIDATION_FTP_HOST['host'],

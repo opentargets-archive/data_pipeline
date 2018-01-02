@@ -140,6 +140,8 @@ def generate_validators_from_schemas(schemas_map):
     validators = {}
     for schema_name, schema_uri in schemas_map.iteritems():
         # per kv we create the validator and instantiate it
+        _l.info('generate_validator_from_schema %s using the uri %s',
+                schema_name, schema_uri)
         validators[schema_name] = generate_validator_from_schema(schema_uri)
 
     return validators
@@ -147,6 +149,9 @@ def generate_validators_from_schemas(schemas_map):
 
 class LogAccum(object):
     def __init__(self, logger_o, elem_limit=1024):
+        if not logger_o:
+            raise TypeError('logger_o cannot have None value')
+
         self._logger = logger_o
         self._accum = {'counter': 0}
         self._limit = elem_limit
@@ -158,7 +163,10 @@ class LogAccum(object):
             for k in keys:
                 for msg in self._accum[k]:
                     self._logger.log(k, msg[0], *msg[1])
+                    del self._accum[k][:]
+
             # reset the accum
+            del(self._accum)
             self._accum = {'counter': 0}
 
     def flush(self, force=True):

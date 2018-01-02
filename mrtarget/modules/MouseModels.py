@@ -2,7 +2,7 @@ import requests
 import httplib
 import time
 import optparse
-from tqdm import tqdm 
+from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 import logging
 import os
@@ -291,7 +291,7 @@ class Phenodigm():
                     #else:
                     #    self._logger.error("Never heard of this '%s' type of documents in PhenoDigm. Exiting..."%(doc['type']))
                     #    sys.exit(1)
-            myfile.close()    
+            myfile.close()
 
     def generate_phenodigm_evidence_strings(self, upper_limit=0):
         '''
@@ -320,12 +320,12 @@ class Phenodigm():
                  Retrieve mouse models
                 '''
                 for marker_symbol in self.hgnc2mgis[hgnc_gene_id]:
-                
+
                     #if not marker_symbol == "Il13":
                     #    continue;
                     print marker_symbol;
                     self._logger.info("\tProcessing mouse gene symbol %s" % (marker_symbol))
-                    
+
                     '''
                     Some mouse symbol are not mapped in Ensembl
                     '''
@@ -384,7 +384,7 @@ class Phenodigm():
                                             self._logger.info("\t\t\tdisease: %s %s"%(disease_id, disease['disease_term']))
                                         else:
                                             self._logger.info("\t\t\tdisease: %s"%(disease_id))
-                                        
+
                                         '''
                                         Map the disease ID to EFO
                                         Can be a one to many mapping
@@ -408,7 +408,7 @@ class Phenodigm():
                                                     #    else:
                                                     #        self._logger.info("{0} => {1} (no EFO mapping)".format(disease_id, disease_term['efo_uri']))
                                                     disease_terms = efoMapping[disease_id]
-                                                        
+
                                             elif matchORPHANET:
                                                     suffix = matchORPHANET.groups()[0]
                                                     orphanetId = "Orphanet:{0}".format(suffix)
@@ -418,7 +418,7 @@ class Phenodigm():
                                                         disease_terms = efoMapping[disease_id]
                                         else:
                                             disease_terms = efoMapping[disease_id]
-                                            
+
                                         '''
                                         OK, we have a disease mapped to EFO
                                         we can proceed to the next stage
@@ -435,9 +435,9 @@ class Phenodigm():
                                                 '''
                                                 Create a new evidence string
                                                 '''
-                                            
 
-                                            
+
+
                                                 # 1.2.6 create an Animal_Models class
                                                 evidenceString = cttv.Animal_Models()
                                                 evidenceString.validated_against_schema_version = '1.2.6'
@@ -628,11 +628,11 @@ class Phenodigm():
                                         else:
 
                                             self._logger.error("Unable to incorpate this strain for this disease: {0}".format(disease_id))
-                                            self._logger.error("No disease id {0}".format(disease_term_uris == None))
-                                            self._logger.error("model_to_disease_score in mouse_model2disease: {0}".format( 'model_to_disease_score' in mouse_model2disease) )    
+                                            # self._logger.error("No disease id {0}".format(disease_term_uris == None))
+                                            self._logger.error("model_to_disease_score in mouse_model2disease: {0}".format( 'model_to_disease_score' in mouse_model2disease) )
                                             self._logger.error("disease_id in disease_gene_locus: {0}".format(disease_id in self.disease_gene_locus))
-                                            self._logger.error("hs_symbol in disease_gene_locus[disease_id]: {0}".format(not disease_term_uris == None and disease_id in self.disease_gene_locus and hgnc_gene_id in self.disease_gene_locus[disease_id]))
-                                            self._logger.error("marker_symbol in disease_gene_locus[disease_id][hgnc_gene_id]): {0}".format(disease_term_uris is not None and disease_id in self.disease_gene_locus and marker_symbol in self.disease_gene_locus[disease_id][hgnc_gene_id]))
+                                            # self._logger.error("hs_symbol in disease_gene_locus[disease_id]: {0}".format(not disease_term_uris == None and disease_id in self.disease_gene_locus and hgnc_gene_id in self.disease_gene_locus[disease_id]))
+                                            # self._logger.error("marker_symbol in disease_gene_locus[disease_id][hgnc_gene_id]): {0}".format(disease_term_uris is not None and disease_id in self.disease_gene_locus and marker_symbol in self.disease_gene_locus[disease_id][hgnc_gene_id]))
 
     def write_phenodigm_evidence_strings(self, path):
         cttvFile = open(os.path.join(path, "phenodigm.json"), "wb")
@@ -642,9 +642,9 @@ class Phenodigm():
         for hashkey in self.hashkeys:
             self._logger.info("Processing key %s"%(hashkey))
             evidenceString = self.hashkeys[hashkey]
-            
+
             error = evidenceString.validate(self._logger)
-            
+
             if error == 0:
     #        and (evidenceString.evidence.association_score.probability.value >= 0.5 || evidenceString.evidence.in_locus):
                 #print(evidenceString.to_JSON())
@@ -661,7 +661,8 @@ class Phenodigm():
         bar = tqdm(desc='Generate PhenoDigm evidence strings',
                    total=8,
                    unit='steps',
-                   file=tqdm_out)
+                   # file=tqdm_out,
+                   )
 
         self._logger.info("Load MP classes")
         self.mp.load_mp_classes()

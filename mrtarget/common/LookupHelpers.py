@@ -6,13 +6,14 @@ import pickle
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.connection import PipelineConnectors
 from mrtarget.modules.ChEMBL import ChEMBLLookup
-from mrtarget.modules.ECO import ECOLookUpTable
-from mrtarget.modules.EFO import EFOLookUpTable
-from mrtarget.modules.HPA import HPALookUpTable
-from mrtarget.modules.GeneData import GeneLookUpTable
-from mrtarget.modules.Literature import LiteratureLookUpTable
+from mrtarget.common.LookupTables import ECOLookUpTable
+from mrtarget.common.LookupTables import EFOLookUpTable
+# from mrtarget.common.LookupTables import HPOLookUpTable
+from mrtarget.common.LookupTables import MPLookUpTable
+from mrtarget.common.LookupTables import HPALookUpTable
+from mrtarget.common.LookupTables import GeneLookUpTable
+from mrtarget.common.LookupTables import LiteratureLookUpTable
 from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
@@ -21,10 +22,12 @@ from mrtarget.common import require_all
 class LookUpData():
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        
+
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
+        # self.available_hpos = None
+        # self.available_mps = None
         self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
@@ -33,15 +36,21 @@ class LookUpData():
         self.available_eco_objects = None
         self.chembl = None
         self.available_publications = None
-        
+
     def set_r_server(self, r_server):
         self.logger.debug('setting r_server to all lookup tables from external r_server')
         if self.available_ecos:
             self.available_ecos.r_server = r_server
-            self.available_ecos._table.set_r_server(r_server)            
+            self.available_ecos._table.set_r_server(r_server)
         if self.available_efos:
             self.available_efos.r_server = r_server
             self.available_efos._table.set_r_server(r_server)
+        # if self.available_hpos:
+        #     self.available_hpos.r_server = r_server
+        #     self.available_hpos._table.set_r_server(r_server)
+        # if self.available_mps:
+        #     self.available_mps.r_server = r_server
+        #     self.available_mps._table.set_r_server(r_server)
         if self.available_hpa:
             self.available_hpa.r_server = r_server
             self.available_hpa._table.set_r_server(r_server)
@@ -51,16 +60,17 @@ class LookUpData():
         if self.available_publications:
             self.available_publications.r_server = r_server
             self.available_publications._table.set_r_server(r_server)
-        
+
 
 class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
     EFO = 'efo'
+    HPO = 'hpo'
     ECO = 'eco'
     PUBLICATION = 'publication'
     MP = 'mp'
-    HPO = 'hpo'
+    MP_LOOKUP = 'mp_lookup'
     CHEMBL_DRUGS = 'chembl_drugs'
     HPA = 'hpa'
 
@@ -82,14 +92,16 @@ class LookUpDataRetriever(object):
         self.r_server = r_server
 
         self.esquery = ESQuery(self.es)
-        
+
         require_all(self.es is not None, self.r_server is not None)
-        
+
         self.lookup = LookUpData()
-        self.logger = logging.getLogger(__name__)
-        tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
+        self._logger = logging.getLogger(__name__)
+        tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
 
         # TODO: run the steps in parallel to speedup loading times
+        for dt in data_types:
+            self._logger.info("get %s info"%dt)
         for dt in tqdm(data_types,
                        desc='loading lookup data',
                        unit=' steps',
@@ -102,11 +114,16 @@ class LookUpDataRetriever(object):
                 self._get_available_efos()
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
+            elif dt == LookUpDataType.MP_LOOKUP:
+                self._get_available_mps()
             elif dt == LookUpDataType.MP:
+                self._logger.debug("get MP info")
                 self._get_mp()
             elif dt == LookUpDataType.HPO:
+                self._logger.debug("get HPO info")
                 self._get_hpo()
             elif dt == LookUpDataType.EFO:
+                self._logger.debug("get EFO info")
                 self._get_efo()
             elif dt == LookUpDataType.PUBLICATION:
                 self._get_available_publications()
@@ -115,7 +132,7 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.HPA:
                 self._get_available_hpa()
 
-            self.logger.info("finished loading %s data into redis, took %ss" %(dt, str(time.time() - start_time)))
+            self._logger.info("finished loading %s data into redis, took %ss" % (dt, str(time.time() - start_time)))
 
     def set_r_server(self, r_server):
         self.r_server = r_server
@@ -123,16 +140,25 @@ class LookUpDataRetriever(object):
         self.esquery = ESQuery()
 
     def _get_available_efos(self):
-        self.logger.info('getting efos')
+        self._logger.info('getting efos')
         self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
 
+    # def _get_available_hpos(self):
+    #     self._logger.info('getting hpos')
+    #     self.lookup.available_efos = HPOLookUpTable(self.es, 'HPO_LOOKUP', self.r_server)
+    #
+
+    def _get_available_mps(self, autoload=True):
+         self._logger.info('getting mps info from ES')
+         self.lookup.available_mps = MPLookUpTable(self.es, 'MP_LOOKUP',self.r_server)
+
     def _get_available_ecos(self):
-        self.logger.info('getting ecos')
+        self._logger.info('getting ecos')
         self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
 
 
     def _get_gene_info(self, targets=[], autoload = True):
-        self.logger.info('getting gene info')
+        self._logger.info('getting gene info')
         self.lookup.available_genes = GeneLookUpTable(self.es,
                                                       'GENE_LOOKUP',
                                                       self.r_server,
@@ -176,6 +202,7 @@ class LookUpDataRetriever(object):
         :return:
         '''
         cache_file = 'processed_mp_lookup'
+        obj = None
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
@@ -195,14 +222,14 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_efo_classes()
+            obj.load_open_targets_disease_ontology()
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.efo_ontology = obj
 
 
     def _get_available_publications(self):
-        self.logger.info('getting literature/publications')
+        self._logger.info('getting literature/publications')
         self.lookup.available_publications = LiteratureLookUpTable(self.es_pub, 'LITERATURE_LOOKUP', self.r_server)
 
 
@@ -231,6 +258,10 @@ class LookUpDataRetriever(object):
         self.lookup.chembl = chembl_handler
 
     def _get_available_hpa(self):
-        self.logger.info('getting expressions')
+        self._logger.info('getting expressions')
         self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP',
                                                    self.r_server)
+
+
+
+

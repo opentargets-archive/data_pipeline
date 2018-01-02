@@ -1,18 +1,20 @@
 import logging
-from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
 
+from tqdm import tqdm
+
+from mrtarget.Settings import Config
 from mrtarget.common import Actions
+from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable, denormDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter
+from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer
 from mrtarget.modules.EFO import EFO
-from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
-from mrtarget.Settings import Config
+from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger,level=logging.INFO)
@@ -22,12 +24,6 @@ class AssociationActions(Actions):
     EXTRACT = 'extract'
     PROCESS = 'process'
     UPLOAD = 'upload'
-
-
-class ScoringMethods():
-    HARMONIC_SUM = 'harmonic-sum'
-    SUM = 'sum'
-    MAX = 'max'
 
 
 class AssociationScore(JSONSerializable):
@@ -204,125 +200,54 @@ class EvidenceScore():
             self.datasource = datasource
         self.is_direct = is_direct
 
-class HarmonicSumScorer():
-
-    def __init__(self, buffer=100):
-        """
-        An HarmonicSumScorer will ingest any number of numeric score, keep in memory the top max number
-        defined by the buffer and calculate an harmonic sum of those
-        Args:
-            buffer: number of element to keep in memory to compute the harmonic sum
-        """
-        self.buffer = buffer
-        self.data = []
-        self.refresh()
-
-    def add(self, score):
-        """
-        add a score to the pool of values
-        Args:
-            score (float):  a number to add to the pool ov values. is converted to float
-
-        """
-        score = float(score)
-        if len(self.data)>= self.buffer:
-            if score >self.min:
-                self.data[self.data.index(self.min)] = score
-                self.refresh()
-        else:
-            self.data.append(score)
-            self.refresh()
-
-
-    def refresh(self):
-        """
-        Store the minimum value of the pool
-
-        """
-        if self.data:
-            self.min = min(self.data)
-        else:
-            self.min = 0.
-
-    def score(self, *args,**kwargs):
-        """
-        Returns an harmonic sum for the pool of values
-        Args:
-            *args: forwarded to HarmonicSumScorer.harmonic_sum
-        Keyword Args
-            **kwargs: forwarded to HarmonicSumScorer.harmonic_sum
-        Returns:
-            harmonic_sum (float): the harmonic sum of the pool of values
-        """
-        return self.harmonic_sum(self.data, *args, **kwargs)
-
-    @staticmethod
-    def harmonic_sum(data,
-                     scale_factor = 1,
-                     cap = None):
-        """
-        Returns an harmonic sum for the data passed
-        Args:
-            data (list): list of floats to compute the harmonic sum from
-            scale_factor (float): a scaling factor to multiply to each datapoint. Defaults to 1
-            cap (float): if not None, never return an harmonic sum higher than the cap value.
-
-        Returns:
-            harmonic_sum (float): the harmonic sum of the data passed
-        """
-        data.sort(reverse=True)
-        harmonic_sum = sum(s / ((i+1) ** scale_factor) for i, s in enumerate(data))
-        if cap is not None and \
-                        harmonic_sum > cap:
-            return cap
-        return harmonic_sum
-
-
-
-
 
 class Scorer():
-
+    '''
+    Aggregates evidence for a given target-disease pair
+    '''
     def __init__(self):
         pass
 
     def score(self,target, disease, evidence_scores, is_direct, method  = None):
 
-        ass = Association(target, disease, is_direct)
+        association = Association(target, disease, is_direct)
 
         # set evidence counts
         for e in evidence_scores:
             # make sure datatype is constrained
-            if all([e.datatype in ass.evidence_count['datatypes'],
-                    e.datasource in ass.evidence_count['datasources']]):
-                ass.evidence_count['total']+=1
-                ass.evidence_count['datatypes'][e.datatype]+=1
-                ass.evidence_count['datasources'][e.datasource]+=1
+            if all([e.datatype in association.evidence_count['datatypes'],
+                    e.datasource in association.evidence_count['datasources']]):
+                association.evidence_count['total']+=1
+                association.evidence_count['datatypes'][e.datatype]+=1
+                association.evidence_count['datasources'][e.datasource]+=1
 
                 # set facet data
-                ass.set_available_datatype(e.datatype)
-                ass.set_available_datasource(e.datasource)
+                association.set_available_datatype(e.datatype)
+                association.set_available_datasource(e.datasource)
 
         # compute scores
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
-            self._harmonic_sum(evidence_scores, ass, scale_factor=2)
+            '''computing harmonic sum with quadratic (scale_factor) degradation'''
+            self._harmonic_sum(evidence_scores, association, scale_factor=2)
         if (method == ScoringMethods.SUM) or (method is None):
-            self._sum(evidence_scores, ass)
+            self._sum(evidence_scores, association)
         if (method == ScoringMethods.MAX) or (method is None):
-            self._max(evidence_scores, ass)
+            self._max(evidence_scores, association)
 
-        return ass
+        return association
 
-    def _harmonic_sum(self, evidence_scores, ass, max_entries = 100, scale_factor = 1):
-        har_sum_score = ass.get_scoring_method(ScoringMethods.HARMONIC_SUM)
+    def _harmonic_sum(self, evidence_scores, association, max_entries = 100, scale_factor = 1):
+        har_sum_score = association.get_scoring_method(ScoringMethods.HARMONIC_SUM)
         datasource_scorers = {}
         for e in evidence_scores:
             if e.datasource not in datasource_scorers:
-                datasource_scorers[e.datasource]=HarmonicSumScorer(buffer=max_entries)
+                datasource_scorers[e.datasource]= HarmonicSumScorer(buffer=max_entries)
             datasource_scorers[e.datasource].add(e.score)
         '''compute datasource scores'''
         overall_scorer = HarmonicSumScorer(buffer=max_entries)
         for datasource in datasource_scorers:
+            '''cap datasource scores at this level so very big scores 
+            do not take over smaller score around the range of 1'''
             har_sum_score.datasources[datasource]=datasource_scorers[datasource].score(scale_factor=scale_factor, cap=1)
             overall_scorer.add(har_sum_score.datasources[datasource])
         '''compute datatype scores'''
@@ -330,14 +255,14 @@ class Scorer():
         for ds in har_sum_score.datasources:
             dt = Config.DATASOURCE_TO_DATATYPE_MAPPING[ds]
             if dt not in datatypes_scorers:
-                datatypes_scorers[dt]=HarmonicSumScorer(buffer=max_entries)
+                datatypes_scorers[dt]= HarmonicSumScorer(buffer=max_entries)
             datatypes_scorers[dt].add(har_sum_score.datasources[ds])
         for datatype in datatypes_scorers:
             har_sum_score.datatypes[datatype]=datatypes_scorers[datatype].score(scale_factor=scale_factor)
         '''compute overall scores'''
         har_sum_score.overall = overall_scorer.score(scale_factor=scale_factor)
 
-        return ass
+        return association
 
     def _sum(self, evidence_scores, ass):
         sum_score = ass.get_scoring_method(ScoringMethods.SUM)
@@ -409,10 +334,17 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
     def produce_pairs(self):
         for key,evidence in self.data_cache.items():
             is_direct = False
+            direct_datasources = []
             for e in evidence:
                 if e.is_direct:
-                    is_direct = True
-                    break
+                    if e.datasource not in Config.IS_DIRECT_DO_NOT_PROPAGATE:
+                        is_direct = True
+                        break
+                    else:
+                        direct_datasources.append(e.datasource)
+            if is_direct is False and direct_datasources:
+                '''set is_direct to true if '''
+                is_direct = True
             self.put_into_queue_out((key[0],key[1], evidence, is_direct))
         self.init_data_cache()
 
@@ -552,8 +484,6 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 
 
     def process(self, data):
-        if data is None:
-            pass
 
         target, disease, score = data
         element_id = '%s-%s' % (target, disease)

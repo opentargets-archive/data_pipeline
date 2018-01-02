@@ -1,0 +1,9 @@
+[Core]
+Name = Hallmarks
+Module = hallmarks
+
+[Documentation]
+Author = Open Targets Core Team
+Version = 0.1
+Website = http://github.com/opentargets
+Description = Load Hallmarks of cancer information

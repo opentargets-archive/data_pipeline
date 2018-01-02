@@ -22,6 +22,8 @@ def json_serialize(obj):
         return obj.isoformat(' ')
     elif isinstance(obj, date):
         return obj.isoformat()
+    if isinstance(obj, set):
+        return list(obj)
     else:
         try:
             return obj.__dict__
@@ -78,21 +80,6 @@ class TreeNode(object):
             self.ancestors = ancestors
             self.parents = parents
             self.is_root = is_root
-
-
-class OntologyNode(TreeNode):
-
-        def __init__(self,
-                     uri='',
-                     uri_code='',
-                     ontology_name='',
-                     **kwargs
-                     ):
-            super(OntologyNode, self).__init__(**kwargs)
-
-            self.uri = uri
-            self.uri_code = uri_code
-            self.ontology_name = ontology_name
 
 
 class SparseFloatDict(UserDict):

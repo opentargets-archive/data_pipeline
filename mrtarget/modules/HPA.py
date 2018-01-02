@@ -15,7 +15,7 @@ from mrtarget.common import URLZSource
 
 from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
-from mrtarget.common.Redis import RedisLookupTablePickle, RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
+from mrtarget.common.Redis import RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 
 from mrtarget.Settings import Config
 from addict import Dict
@@ -116,6 +116,7 @@ class HPAExpression(Dict, JSONSerializable):
 
         if 'protein' not in tissue:
             tissue.protein = HPAExpression.new_tissue_protein()
+
         if 'rna' not in tissue:
             tissue.rna = HPAExpression.new_tissue_rna()
 
@@ -298,19 +299,28 @@ def hpa2tissues(hpa=None):
                                       'level': e} if v['rna'] else {},
                            xrange(0, rna_level + 1) if rna_level >= 0 else xrange(-1, 0)))
 
+        zscore_level = v['rna']['zscore'] if v['rna'] else -1
+        '''from tissue dict to rna and protein dicts pair'''
+        zscore = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+                                      'level': e} if v['rna'] else {},
+                           xrange(0, zscore_level + 1) if zscore_level >= 0 else xrange(-1, 0)))
+
+
         pro_level = v['protein']['level'] if v['protein'] else -1
         protein = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
                                           'level': e} if v['protein'] else {},
                                xrange(0, pro_level + 1) if pro_level >= 0 else xrange(-1, 0)))
 
-        return (rna, protein)
+        return (rna, protein, zscore)
 
-    # generate a list with rna, protein pairs per tissue
+    # generate a list with (rna, protein, zscore) tuple pairs per tissue
     splitted_tissues = [_split_tissue(t['efo_code'], t) for t in hpa.tissues
                         if hpa is not None]
 
     rnas = []
     proteins = []
+    zscores = []
+
     for tissue in splitted_tissues:
         if tissue[0]:
             rnas += tissue[0]
@@ -318,8 +328,12 @@ def hpa2tissues(hpa=None):
         if tissue[1]:
             proteins += tissue[1]
 
+        if tissue[2]:
+            zscores += tissue[2]
+
     return {'rna': rnas,
-            'protein': proteins}
+            'protein': proteins,
+            'zscore': zscores}
 
 
 class HPAActions(Actions):
@@ -354,7 +368,7 @@ class HPADataDownloader():
         """
         self.logger.info('get normal tissue rows into dicts')
         table = (
-            petl.fromcsv(URLZSource(Config.HPA_NORMAL_TISSUE_URL))
+            petl.fromcsv(URLZSource(Config.HPA_NORMAL_TISSUE_URL), delimiter='\t')
             .rename({'Tissue': 'tissue',
                      'Cell type': 'cell_type',
                      'Level': 'level',
@@ -561,7 +575,13 @@ class HPAProcess():
         self.logger.info('store_data called')
 
         self.logger.debug('calling to create new expression index')
-        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+        overwrite_indices = not dry_run
+        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                                     recreate=overwrite_indices)
+        self.loader.prepare_for_bulk_indexing(
+            self.loader.get_versioned_index(
+                Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
+
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
                            r_server=self.r_server,
                            serialiser='json',
@@ -599,63 +619,3 @@ class HPAProcess():
 #             pass
 #         if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
 #             pass
-
-
-class HPALookUpTable(object):
-    """
-    A redis-based pickable hpa look up table using gene id as table
-    id
-    """
-
-    def __init__(self,
-                 es=None,
-                 namespace=None,
-                 r_server=None,
-                 ttl=(60 * 60 * 24 + 7)):
-        self._es = es
-        self.r_server = r_server
-        self._es_query = ESQuery(self._es)
-        self._table = RedisLookupTablePickle(namespace=namespace,
-                                             r_server=self.r_server,
-                                             ttl=ttl)
-        self._logger = logging.getLogger(__name__)
-        self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-
-        if self.r_server:
-            self._load_hpa_data(self.r_server)
-
-    def _load_hpa_data(self, r_server=None):
-        for el in tqdm(self._es_query.get_all_hpa(),
-                       desc='loading hpa',
-                       unit=' hpa',
-                       unit_scale=True,
-                       total=self._es_query.count_all_hpa(),
-                       file=self.tqdm_out,
-                       leave=False):
-            self.set_hpa(el, r_server=self._get_r_server(r_server))
-
-    def get_hpa(self, idx, r_server=None):
-        return self._table.get(idx, r_server=self._get_r_server(r_server))
-
-    def set_hpa(self, hpa, r_server=None):
-        self._table.set(hpa['gene'], hpa,
-                        r_server=self._get_r_server(r_server))
-
-    def get_available_hpa_ids(self, r_server=None):
-        return self._table.keys(self._get_r_server(r_server))
-
-    def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key,
-                                        r_server=self._get_r_server(r_server))
-
-    def __getitem__(self, key, r_server=None):
-        return self.get_hpa(key, r_server=self._get_r_server(r_server))
-
-    def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
-
-    def keys(self, r_server=None):
-        return self._table.keys(self._get_r_server(r_server))
-
-    def _get_r_server(self, r_server=None):
-        return r_server if r_server else self.r_server

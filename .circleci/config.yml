@@ -62,22 +62,7 @@ jobs:
                 docker tag ${GCR_REPO}:${CIRCLE_BRANCH} ${GCR_REPO}:latest
                 docker push ${GCR_REPO}:latest
             fi
-      - run:
-          name: Push to Quay
-          command: |
-            docker login -u="opentargets+quaybot" -p="${QUAYBOT_PASSWORD}" quay.io
-            ## branch tag and push
-            docker tag circle-${CIRCLE_SHA1} ${QUAY_REPO}:${CIRCLE_BRANCH}
-            docker push ${QUAY_REPO}:${CIRCLE_BRANCH}
-            ## sha commit push
-            docker tag ${QUAY_REPO}:${CIRCLE_BRANCH} ${QUAY_REPO}:circle-${CIRCLE_SHA1}
-            docker push ${QUAY_REPO}:circle-${CIRCLE_SHA1}
-            ## push latest if master
-            if [ "$CIRCLE_BRANCH" = "master" ]
-              then
-                docker tag ${QUAY_REPO}:${CIRCLE_BRANCH} ${QUAY_REPO}:latest
-                docker push ${QUAY_REPO}:latest
-            fi
+      
 
 # using a workflow allows better separation of steps and rerunning them,
 # however it was slower when i tested it (Jun 2017)

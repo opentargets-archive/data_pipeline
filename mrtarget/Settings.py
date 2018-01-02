@@ -110,8 +110,9 @@ def read_option(option, cast=None, ini=ini, section='dev',
 def update_schema_version(config, schema_version_string):
     config.EVIDENCEVALIDATION_SCHEMA = schema_version_string
     for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS:
-        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
-                                                              schema_version_string)
+        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el] = \
+            config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
+                                                                    schema_version_string)
 
 
 class Config():
@@ -133,6 +134,8 @@ class Config():
         PROXY_PASSWORD = ini.get('proxy', 'password')
         PROXY_HOST = ini.get('proxy', 'host')
         PROXY_PORT = int(ini.get('proxy', 'port'))
+
+    TEMP_DIR = os.path.sep + 'tmp'
 
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     # TODO: an ontology section in the main db.ini file should suffice
@@ -169,6 +172,10 @@ class Config():
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
     ELASTICSEARCH_EFO_LABEL_DOC_NAME = 'efo'
+    ELASTICSEARCH_HPO_LABEL_INDEX_NAME = 'hpo-data'
+    ELASTICSEARCH_HPO_LABEL_DOC_NAME = 'hpo'
+    ELASTICSEARCH_MP_LABEL_INDEX_NAME = 'mp-data'
+    ELASTICSEARCH_MP_LABEL_DOC_NAME = 'mp'
     ELASTICSEARCH_ECO_INDEX_NAME = 'eco-data'
     ELASTICSEARCH_ECO_DOC_NAME = 'eco'
     ELASTICSEARCH_GENE_NAME_INDEX_NAME = 'gene-data'
@@ -198,7 +205,10 @@ class Config():
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
 
+    GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
+    GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks' ]
 
+    HALLMARK_FILENAME = file_or_resource(fname='census_annot.tsv')
     HGNC_COMPLETE_SET = 'http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
     HGNC_ORTHOLOGS_SPECIES = {
@@ -293,24 +303,25 @@ class Config():
     # TODO remove refs to user directories
     MOUSEMODELS_CACHE_DIRECTORY = '/Users/otvisitor/.phenodigmcache'
 
-    # hardcoded folder of json file to be preprocessed to extract
-    # HP and MP terms not in EFO but that will be combined in a SLIM
-    ONTOLOGY_PREPROCESSING_DATASOURCES = [
-        'cttv008-14-03-2016.json.gz',
-        ''
+    # put the path to the file where you want to get the list of HP terms to be included in our ontology
+    PHENOTYPE_SLIM_INPUT_URLS = [
+        'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/eva/hpo_mappings.txt'
     ]
-
-    ONTOLOGY_PREPROCESSING_FTP_ACCOUNTS = ["cttv008", "cttv012"]
-
-    # put the path to the file where you want to write the SLIM file (turtle format)
-    # TODO remove refs to user directories
-    ONTOLOGY_SLIM_FILE = '/Users/koscieln/Documents/work/gitlab/remote_reference_data_import/bin_import_nonEFO_terms/opentargets_disease_phenotype_slim.ttl'
+    #  put the path to the file where you want to write the SLIM file (turtle format)
+    PHENOTYPE_SLIM_OUTPUT_FILE = TEMP_DIR + os.path.sep + 'opentargets_disease_phenotype_slim.ttl'
 
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
     CHEMBL_PROTEIN_CLASS = ini.get(INI_SECTION, 'chembl_protein')
     CHEMBL_TARGET_COMPONENT = ini.get(INI_SECTION, 'chembl_component')
+
+    # Mouse/Human Orthology with Phenotype Annotations (tab-delimited)
+    GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY = "http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt"
+    # All Genotypes and Mammalian Phenotype Annotations (tab-delimited)
+    GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES = "http://www.informatics.jax.org/downloads/reports/MGI_PhenoGenoMP.rpt"
+    # data dump location if you want to merge the data without running all the steps again
+    GENOTYPE_PHENOTYPE_OUTPUT = TEMP_DIR + os.path.sep + 'genotype_phenotype.json'
 
     DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
         # gwas_catalog=2.5
@@ -347,6 +358,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
     DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
+    DATASOURCE_TO_DATATYPE_MAPPING['postgap'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
@@ -366,18 +378,21 @@ class Config():
     SCORING_WEIGHTS['phenodigm'] = 0.2
     SCORING_WEIGHTS['expression_atlas'] = 0.5
     SCORING_WEIGHTS['europepmc'] = 0.2
+    SCORING_WEIGHTS['slapenrich'] = 0.5
     # SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
     # setup a minimum score value for an evidence string to be accepted.
     SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
+    IS_DIRECT_DO_NOT_PROPAGATE = ['europepmc']
+
 
     ENSEMBL_RELEASE_VERSION = 90
     ENSEMBL_CHUNK_SIZE = 100
 
-    TEMP_DIR = os.path.sep + 'tmp'
-
+    LT_REUSE = False
+    LT_NAMESPACE = ""
     REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
                                    cast=bool, default=False)
     REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
@@ -412,10 +427,10 @@ class Config():
 
     # GE Pipeline
 
-    GE_EVIDENCE_STRING = '/tmp/genomics_england_evidence_string.json'
+    GE_EVIDENCE_STRING = TEMP_DIR + os.path.sep + 'genomics_england_evidence_string.json'
     GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
-    GE_ZOOMA_DISEASE_MAPPING = '/tmp/zooma_disease_mapping.csv'
-    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = '/tmp/zooma_disease_mapping_low_confidence.csv'
+    GE_ZOOMA_DISEASE_MAPPING = TEMP_DIR + os.path.sep + 'zooma_disease_mapping.csv'
+    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = TEMP_DIR + os.path.sep + 'zooma_disease_mapping_low_confidence.csv'
 
     # for developers
     DRY_RUN_OUTPUT = read_option('DRY_RUN_OUTPUT_ENABLE',

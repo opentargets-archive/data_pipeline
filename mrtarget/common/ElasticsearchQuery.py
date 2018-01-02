@@ -1,18 +1,18 @@
+import base64
 import collections
 import json
 import logging
 import time
-import addict
 from collections import Counter
 
+import addict
 import jsonpickle
-import base64
 from elasticsearch import helpers, TransportError
 
+from mrtarget.Settings import Config
 from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import new_es_client
-from mrtarget.Settings import Config
 
 
 class AssociationSummary(object):
@@ -103,6 +103,51 @@ class ESQuery(object):
     def count_all_diseases(self):
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
+
+    def get_all_human_phenotypes(self, fields = None):
+        source = self._get_source_from_fields(fields)
+
+        res = helpers.scan(client=self.handler,
+                            query={"query": {
+                                      "match_all": {}
+                                    },
+                                   '_source': source,
+                                   'size': 1000,
+                                   },
+                            scroll='12h',
+                            doc_type=Config.ELASTICSEARCH_HPO_LABEL_DOC_NAME,
+                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_HPO_LABEL_INDEX_NAME,True),
+                            timeout="10m",
+                            )
+        for hit in res:
+            yield hit['_source']
+
+    def count_all_human_phenotypes(self):
+
+        return self.count_elements_in_index(Config.ELASTICSEARCH_HPO_LABEL_INDEX_NAME)
+
+    def get_all_mammalian_phenotypes(self, fields = None):
+        source = self._get_source_from_fields(fields)
+
+        res = helpers.scan(client=self.handler,
+                            query={"query": {
+                                      "match_all": {}
+                                    },
+                                   '_source': source,
+                                   'size': 1000,
+                                   },
+                            scroll='12h',
+                            doc_type=Config.ELASTICSEARCH_MP_LABEL_DOC_NAME,
+                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME,True),
+                            timeout="10m",
+                            )
+        for hit in res:
+            yield hit['_source']
+
+    def count_all_mammalian_phenotypes(self):
+
+        return self.count_elements_in_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME)
+
 
     def get_all_eco(self, fields=None):
         source = self._get_source_from_fields(fields)
@@ -267,7 +312,16 @@ class ESQuery(object):
             doc_type = datasources
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '*',
-                                            doc_type = doc_type)
+                                            doc_type=doc_type,
+                                            query={
+                                                "match": {
+                                                    "is_valid": {
+                                                        "query": True,
+                                                        "type": "phrase"
+                                                    }
+                                                }
+
+                                            })
 
 
     def get_all_ensembl_genes(self):
@@ -317,9 +371,18 @@ class ESQuery(object):
         for hit in res['hits']['hits']:
             return hit['_source']
 
-    def get_disease_to_targets_vectors(self):
-        #TODO: look at the multiquery api
-
+    def get_disease_to_targets_vectors(self,
+                                       treshold=0.1,
+                                       evidence_count = 3):
+        '''
+        Get all the association objects that are:
+        - direct -> to avoid ontology inflation
+        - > 3 evidence count -> remove noise
+        - overall score > threshold -> remove very lo quality noise
+        :param treshold: minimum overall score threshold to consider for fetching association data
+        :param evidence_count: minimum number of evidence consider for fetching association data
+        :return: two dictionaries mapping target to disease  and the reverse
+        '''
         self.logger.debug('scan es to get all diseases and targets')
         res = helpers.scan(client=self.handler,
                            query={"query": {
@@ -327,7 +390,7 @@ class ESQuery(object):
                                    "is_direct": True,
                                }
                            },
-                               '_source': {'includes':["target.id", 'disease.id', 'harmonic-sum.overall']},
+                               '_source': {'includes':["target.id", 'disease.id', 'harmonic-sum', 'evidence_count']},
                                'size': 1000,
                            },
                            scroll='12h',
@@ -343,18 +406,22 @@ class ESQuery(object):
         for hit in res:
             c+=1
             hit = hit['_source']
-            '''store target associations'''
-            if hit['target']['id'] not in target_results:
-                target_results[hit['target']['id']] = SparseFloatDict()
-            target_results[hit['target']['id']][hit['disease']['id']]=hit['harmonic-sum']['overall']
+            if hit['evidence_count']['total']>=evidence_count and \
+                hit['harmonic-sum']['overall'] >=treshold:
+                '''store target associations'''
+                if hit['target']['id'] not in target_results:
+                    target_results[hit['target']['id']] = SparseFloatDict()
+                #TODO: return all counts and scores up to datasource level
+                target_results[hit['target']['id']][hit['disease']['id']]=hit['harmonic-sum']['overall']
 
-            '''store disease associations'''
-            if hit['disease']['id'] not in disease_results:
-                disease_results[hit['disease']['id']] = SparseFloatDict()
-            disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
+                '''store disease associations'''
+                if hit['disease']['id'] not in disease_results:
+                    disease_results[hit['disease']['id']] = SparseFloatDict()
+                # TODO: return all counts and scores up to datasource level
+                disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
 
-            if c%10000 == 0:
-                self.logger.debug('%d elements gotten', c)
+                if c%10000 == 0:
+                    self.logger.debug('%d elements retrieved', c)
 
         return target_results, disease_results
 
@@ -394,12 +461,12 @@ class ESQuery(object):
 
         return dict((hit['_id'],hit['_source']['label']) for hit in res)
 
-    def count_elements_in_index(self, index_name, doc_type=None):
+    def count_elements_in_index(self, index_name, doc_type=None, query = None):
+        if query is None:
+            query =  {"match_all": {}}
         res = self.handler.search(index=Loader.get_versioned_index(index_name,True),
                                   doc_type=doc_type,
-                                  body={"query": {
-                                      "match_all": {}
-                                  },
+                                  body={"query": query,
                                       '_source': False,
                                       'size': 0,
                                   }
@@ -692,8 +759,8 @@ class ESQuery(object):
     def get_all_pub_from_validated_evidence(self,datasources= None, batch_size=1000):
         batch = []
         for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
-                                                                    size=batch_size,
-                                                   datasources=datasources)):
+                                                                   size=batch_size,
+                                                                   datasources=datasources)):
             if hit:
                 try:
                     ev = json.loads(hit['evidence_string'])

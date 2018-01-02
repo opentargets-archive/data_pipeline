@@ -1,9 +1,9 @@
 from __future__ import print_function
-import argparse
 import logging
+import argparse
 import sys
 import itertools as it
-import atexit
+from logging.config import fileConfig
 
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common import Actions
@@ -15,7 +15,9 @@ from mrtarget.modules.DataDrivenRelation import DataDrivenRelationActions, DataD
 from mrtarget.modules.Dump import DumpActions, DumpGenerator
 from mrtarget.modules.ECO import EcoActions, EcoProcess
 from mrtarget.modules.EFO import EfoActions, EfoProcess
-from mrtarget.modules.Ensembl import  EnsemblActions, EnsemblProcess
+from mrtarget.modules.HPO import HpoActions, HpoProcess
+from mrtarget.modules.MP import MpActions, MpProcess
+from mrtarget.modules.Ensembl import EnsemblActions, EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneActions, GeneManager
@@ -30,7 +32,6 @@ from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.modules.G2P import G2PActions, G2P
-from mrtarget.modules.GE import GenomicsEnglandActions, GE
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 
@@ -42,7 +43,7 @@ def load_nlp_corpora():
 
 def main():
 
-    logging.config.fileConfig(file_or_resource('logging.ini'),
+    fileConfig(file_or_resource('logging.ini'),
                               disable_existing_loggers=False)
     logger = logging.getLogger(__name__)
 
@@ -56,12 +57,18 @@ def main():
                         action="append_const", const = HPAActions.ALL)
     parser.add_argument("--rea", dest='rea', help="download reactome data, process it and upload it to elasticsearch",
                         action="append_const", const = ReactomeActions.ALL)
-    parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in postgresql",
+    parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in elasticsearch",
                         action="append_const", const = UniProtActions.CACHE)
-    parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in elasticsearch",
                         action="append_const", const = GeneActions.ALL)
-    parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in postgres and upload them in elasticsearch",
+    parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in elasticsearch",
                         action="append_const", const = EfoActions.ALL)
+    parser.add_argument("--hpo", dest='hpo',
+                         help="process the Human Phenotype Ontology (HPO), store the resulting json objects in elasticsearch",
+                         action="append_const", const=HpoActions.ALL)
+    parser.add_argument("--mp", dest='mp',
+                         help="process the Mammalian Phenotype ontology (MP), store the resulting json objects in elasticsearch",
+                         action="append_const", const=MpActions.ALL)
     parser.add_argument("--eco", dest='eco', help="process the eco information, store the resulting json objects in postgres and upload them in elasticsearch",
                         action="append_const", const = EcoActions.ALL)
     parser.add_argument("--evs", dest='evs', help="process and validate the available evidence strings, store the resulting json objects in postgres and upload them in elasticsearch",
@@ -93,8 +100,6 @@ def main():
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
-    parser.add_argument("--gel", dest='gel', help="update genomics england data",
-                        action="append_const", const = GenomicsEnglandActions.ALL)
     parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
                         action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
     parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
@@ -128,6 +133,11 @@ def main():
     parser.add_argument("--redis-port", dest='redis_port',
                         help="redis port",
                         action='store', default='')
+    parser.add_argument("--lt-reuse", dest='lt_reuse', help="reuse the current lookuptable",
+                        action='store_true', default=False)
+    parser.add_argument("--lt-namespace", dest='lt_namespace',
+                        help="lookuptable namespace to reuse",
+                        action='store', default='')
     parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
                         action='store_true', default=False)
     parser.add_argument("--profile", dest='profile', help="magically profiling process() per process",
@@ -136,11 +146,11 @@ def main():
                         help="add new evidence from a data source but does not delete existing evidence. Works only for the validation step",
                         action='store_true', default=False)
     parser.add_argument("--input-file", dest='input_file',
-                        help="pass the path to a local gzipped file to use as input for the data validation step",
+                        help="pass the path to a gzipped file to use as input for the data validation step",
                         action='append', default=[])
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
-                        action='store', default='INFO')
+                        action='store', default='WARNING')
     parser.add_argument("--do-nothing", dest='do_nothing',
                         help="to be used just for test",
                         action='store_true', default=False)
@@ -158,6 +168,12 @@ def main():
         Config.RELEASE_VERSION = args.release_tag
 
     targets = args.targets
+
+    if args.lt_namespace:
+        Config.LT_NAMESPACE = args.lt_namespace
+
+    if args.lt_reuse:
+        Config.LT_REUSE = True
 
     if args.redis_remote:
         Config.REDISLITE_REMOTE = args.redis_remote
@@ -182,8 +198,11 @@ def main():
             root_logger = logging.getLogger()
             root_logger.setLevel(logging.getLevelName(args.loglevel))
             logger.setLevel(logging.getLevelName(args.loglevel))
+            logger.info('main log level set to: '+ str(args.loglevel))
+            root_logger.info('root log level set to: '+ str(args.loglevel))
         except Exception, e:
             root_logger.exception(e)
+            sys.exit(1)
 
     if args.do_nothing:
         print("Exiting. I pity the fool that tells me to 'do nothing'",
@@ -234,6 +253,14 @@ def main():
             do_all = (EfoActions.ALL in args.efo) or run_full_pipeline
             if (EfoActions.PROCESS in args.efo) or do_all:
                 EfoProcess(loader).process_all()
+        if args.hpo or run_full_pipeline:
+             do_all = (HpoActions.ALL in args.hpo) or run_full_pipeline
+             if (HpoActions.PROCESS in args.hpo) or do_all:
+                 HpoProcess(loader).process_all()
+        if args.mp or run_full_pipeline:
+             do_all = (MpActions.ALL in args.mp) or run_full_pipeline
+             if (MpActions.PROCESS in args.mp) or do_all:
+                 MpProcess(loader).process_all()
         if args.eco or run_full_pipeline:
             do_all = (EcoActions.ALL in args.eco) or run_full_pipeline
             if (EcoActions.PROCESS in args.eco) or do_all:
@@ -246,13 +273,6 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
-
-        if args.gel or run_full_pipeline:
-            do_all = (GenomicsEnglandActions.ALL in args.gel) or run_full_pipeline
-            if (GenomicsEnglandActions.GENERATE_EVIDENCE in args.gel) or do_all:
-                logger.warning("GenomicsEnglandActions...")
-                GE(es=connectors.es, r_server=connectors.r_server).process_all()
-
         if args.g2p or run_full_pipeline:
             do_all = (G2PActions.ALL in args.g2p) or run_full_pipeline
             if (G2PActions.GENERATE_EVIDENCE in args.g2p) or do_all:
@@ -274,7 +294,13 @@ def main():
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
                 PhenotypeSlim().create_phenotype_slim(args.input_file)
 
-        input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
+        if args.input_file:
+            input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
+        else:
+            #default behaviour: use all the data sources listed in the evidences_sources.txt file
+            logger.debug('reading the evidences sources URLs from evidence_sources.txt')
+            with open(file_or_resource('evidences_sources.txt')) as f:
+                input_files = [x.rstrip() for x in f.readlines()]
 
         if args.val or run_full_pipeline:
             do_all = (ValidationActions.ALL in args.val) or run_full_pipeline
