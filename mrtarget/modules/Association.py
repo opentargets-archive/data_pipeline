@@ -202,39 +202,42 @@ class EvidenceScore():
 
 
 class Scorer():
-
+    '''
+    Aggregates evidence for a given target-disease pair
+    '''
     def __init__(self):
         pass
 
     def score(self,target, disease, evidence_scores, is_direct, method  = None):
 
-        ass = Association(target, disease, is_direct)
+        association = Association(target, disease, is_direct)
 
         # set evidence counts
         for e in evidence_scores:
             # make sure datatype is constrained
-            if all([e.datatype in ass.evidence_count['datatypes'],
-                    e.datasource in ass.evidence_count['datasources']]):
-                ass.evidence_count['total']+=1
-                ass.evidence_count['datatypes'][e.datatype]+=1
-                ass.evidence_count['datasources'][e.datasource]+=1
+            if all([e.datatype in association.evidence_count['datatypes'],
+                    e.datasource in association.evidence_count['datasources']]):
+                association.evidence_count['total']+=1
+                association.evidence_count['datatypes'][e.datatype]+=1
+                association.evidence_count['datasources'][e.datasource]+=1
 
                 # set facet data
-                ass.set_available_datatype(e.datatype)
-                ass.set_available_datasource(e.datasource)
+                association.set_available_datatype(e.datatype)
+                association.set_available_datasource(e.datasource)
 
         # compute scores
         if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
-            self._harmonic_sum(evidence_scores, ass, scale_factor=2)
+            '''computing harmonic sum with quadratic (scale_factor) degradation'''
+            self._harmonic_sum(evidence_scores, association, scale_factor=2)
         if (method == ScoringMethods.SUM) or (method is None):
-            self._sum(evidence_scores, ass)
+            self._sum(evidence_scores, association)
         if (method == ScoringMethods.MAX) or (method is None):
-            self._max(evidence_scores, ass)
+            self._max(evidence_scores, association)
 
-        return ass
+        return association
 
-    def _harmonic_sum(self, evidence_scores, ass, max_entries = 100, scale_factor = 1):
-        har_sum_score = ass.get_scoring_method(ScoringMethods.HARMONIC_SUM)
+    def _harmonic_sum(self, evidence_scores, association, max_entries = 100, scale_factor = 1):
+        har_sum_score = association.get_scoring_method(ScoringMethods.HARMONIC_SUM)
         datasource_scorers = {}
         for e in evidence_scores:
             if e.datasource not in datasource_scorers:
@@ -243,6 +246,8 @@ class Scorer():
         '''compute datasource scores'''
         overall_scorer = HarmonicSumScorer(buffer=max_entries)
         for datasource in datasource_scorers:
+            '''cap datasource scores at this level so very big scores 
+            do not take over smaller score around the range of 1'''
             har_sum_score.datasources[datasource]=datasource_scorers[datasource].score(scale_factor=scale_factor, cap=1)
             overall_scorer.add(har_sum_score.datasources[datasource])
         '''compute datatype scores'''
@@ -257,7 +262,7 @@ class Scorer():
         '''compute overall scores'''
         har_sum_score.overall = overall_scorer.score(scale_factor=scale_factor)
 
-        return ass
+        return association
 
     def _sum(self, evidence_scores, ass):
         sum_score = ass.get_scoring_method(ScoringMethods.SUM)

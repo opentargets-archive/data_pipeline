@@ -8,15 +8,17 @@ import unittest
 
 DRY_RUN=True
 
+_logger = logging.getLogger(__name__)
+
 def init_services_connections():
     '''
     Use this if you want to test against ElasticSearch
     :return: a PipelineConnectors instance
     '''
-    logging.info("init_services_connections")
+    _logger.info("init_services_connections")
     connectors = PipelineConnectors()
     m = connectors.init_services_connections()
-    logging.debug('Attempting to establish connection to the backend... %s',
+    _logger.debug('Attempting to establish connection to the backend... %s',
                        str(m))
     return connectors
 

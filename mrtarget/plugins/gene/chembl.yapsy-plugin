@@ -1,6 +1,6 @@
 [Core]
 Name = ChEMBL
-Module = ChEMBL
+Module = chembl
 
 [Documentation]
 Author = Open Targets Core Team

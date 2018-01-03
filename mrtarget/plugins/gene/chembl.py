@@ -3,22 +3,27 @@ from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from tqdm import tqdm
 import logging
-logging.basicConfig(level=logging.INFO)
+
 
 class ChEMBL(IPlugin):
+    def __init__(self, *args, **kwargs):
+        self._logger = logging.getLogger(__name__)
+
+    def _gen_chembl_map(self, chembl_id, synonyms):
+        return {'id': chembl_id, 'synonyms': synonyms}
+
     def print_name(self):
-        logging.info("ChEMBL gene data plugin")
+        self._logger.info("ChEMBL gene data plugin")
 
     def merge_data(self, genes, loader, r_server, tqdm_out):
-    
-        logging.info("Retrieving ChEMBL Drug")
+        self._logger.info("Retrieving ChEMBL Drug")
         chembl_handler = ChEMBLLookup()
         chembl_handler.download_molecules_linked_to_target()
-        logging.info("Retrieving ChEMBL Target Class ")
+        self._logger.info("Retrieving ChEMBL Target Class ")
         chembl_handler.download_protein_classification()
-        logging.info("Adding ChEMBL data to genes ")
+        self._logger.info("Adding ChEMBL data to genes ")
 
-        for gene_id, gene in tqdm(genes.iterate(),
+        for _, gene in tqdm(genes.iterate(),
                                   desc='Adding drug data from ChEMBL',
                                   unit=' gene',
                                   file=tqdm_out):
@@ -33,7 +38,7 @@ class ChEMBL(IPlugin):
                             for mol in molecules:
                                 if mol in chembl_handler.molecule2synonyms:
                                     synonyms = chembl_handler.molecule2synonyms[mol]
-                                    target_drugnames.extend(synonyms)
+                                    target_drugnames.extend([self._gen_chembl_map(chembl_id, synonyms)])
                         if a in chembl_handler.protein_classification:
                             gene.protein_classification['chembl'] = chembl_handler.protein_classification[a]
                         break

@@ -108,6 +108,7 @@ class DistanceComputationWorker(RedisQueueWorkerProcess):
                           }
         '''sort shared items by idf score'''
         weighted_shared_labels = sorted([(idf[self.column_ids[i]],self.column_ids[i])  for i in intersection])
+        '''sort shared entities by significance'''
         shared_labels = [i[1] for i in weighted_shared_labels]
         if self.type == RelationType.SHARED_TARGET:
             subject['links']['targets_count'] = subject_data.getnnz()
@@ -119,62 +120,6 @@ class DistanceComputationWorker(RedisQueueWorkerProcess):
             body['shared_diseases'] = shared_labels
         r = Relation(subject, object, dist, self.type, **body)
         return r
-
-    # def old_run(self):
-    #     while not self.queue_in.is_done(r_server=self.r_server):
-    #         job = self.queue_in.get(r_server=self.r_server, timeout=1)
-    #         if job is not None:
-    #             key, data = job
-    #             error = False
-    #             try:
-    #                 subject_id, subject_data, subject_label, object_id, object_data, object_label = data
-    #                 subject = dict(id=subject_id,
-    #                                label = subject_label,
-    #                                links={})
-    #                 object = dict(id=object_id,
-    #                               label=object_label,
-    #                               links={})
-    #                 union_keys = set(subject_data.keys()) | set(object_data.keys())
-    #                 shared_keys = set(subject_data.keys()) & set(object_data.keys())
-    #                 if self.filtered_keys:
-    #                     union_keys = union_keys - self.filtered_keys # remove filtered keys if needed
-    #                     shared_keys = shared_keys - self.filtered_keys
-    #                 shared_keys = self._get_ordered_keys(subject_data, object_data, shared_keys)
-    #                 if union_keys:
-    #                     w_neg = sum([1./self.weights[i] for i in union_keys])
-    #                     w_pos = sum([1./self.weights[i] for i in shared_keys])
-    #                     pos = len(shared_keys)
-    #                     neg = len(union_keys)
-    #                     jackard, jackard_weighted = 0., 0.
-    #                     if neg:
-    #                         jackard = float(pos)/neg
-    #                         jackard_weighted = float(w_pos)/w_neg
-    #                     dist = {
-    #                             'jaccard': jackard,
-    #                             'jackard_weighted': jackard_weighted,
-    #                             }
-    #                     dist.update(self._compute_vector_based_distances(subject_data, object_data, union_keys))
-    #                     body = dict()
-    #                     body['counts'] = {'shared_count': pos,
-    #                                       'union_count': neg,
-    #                                       }
-    #                     if self.type == RelationType.SHARED_TARGET:
-    #                         subject['links']['targets_count'] =len(subject_data)
-    #                         object['links']['targets_count'] = len(object_data)
-    #                         body['shared_targets'] = list(shared_keys)
-    #                     elif self.type == RelationType.SHARED_DISEASE:
-    #                         subject['links']['diseases_count'] = len(subject_data)
-    #                         object['links']['diseases_count'] = len(object_data)
-    #                         body['shared_diseases'] = list(shared_keys)
-    #                     r = Relation(subject, object, dist, self.type, **body)
-    #                     self.queue_out.put(r, self.r_server)#TODO: create an object here
-    #             except Exception, e:
-    #                 error = True
-    #                 logger.exception('Error processing key %s' % key)
-    #
-    #             self.queue_in.done(key, error=error, r_server=self.r_server)
-
-        # logger.info('%s done processing'%self.name)
 
     def _get_ordered_keys(self, subject_data, object_data, keys):
         ordered_keys = sorted([(max(subject_data[key], object_data[key]), key) for key in keys], reverse=True)
@@ -364,7 +309,7 @@ class RedisRelationHandler(object):
 
 class RelationHandler(object):
     '''
-    A Redis backend to optimise storage and lookup ot target-disease relations
+
 
     '''
 
@@ -396,6 +341,7 @@ class RelationHandler(object):
         self.use_quantitiative_scores = use_quantitiative_scores
 
     def produce_d2d_pairs(self, subject_analysis_queue=None, produced_pairs_queue=None, redis_path=None):
+        '''trigger production of disease to disease distances using carefully selected euristics threshold'''
 
         # produce disease pairs
         self._produce_pairs(self.disease_data,
@@ -408,6 +354,7 @@ class RelationHandler(object):
                                      redis_path = redis_path)
 
     def produce_t2t_pairs(self,  subject_analysis_queue=None, produced_pairs_queue=None, redis_path=None):
+        '''trigger production of target to target distances using carefully selected euristics threshold'''
 
         # #produce target pairs
         self._produce_pairs(self.target_data,
@@ -464,7 +411,7 @@ class OverlapDistance(object):
         """
         Computes a similarity measure between vectors x and y using idf stats as weight. Returns float.
         0 if no match, 1 if perfect match
-        
+
         idf_: inverted idf frequency (1 infrequent, 0 in all positions)
         """
 
@@ -484,7 +431,7 @@ class OverlapDistance(object):
         return distance, x_nz, y_nz, xy_intersection, xy_union
 
     @staticmethod
-    def estimate_below_threshold( x_sum, y_sum, threshold = 0.2):
+    def estimate_above_threshold(x_sum, y_sum, threshold = 0.19):
         shared_wc=float(min(x_sum, y_sum))
         union_wc = max(x_sum, y_sum)
         # union_wc = (x_sum+y_sum)/2.
@@ -507,12 +454,9 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
             data_vector = data_vector > 0
             data_vector = data_vector.astype(int)
         transformed_data = tdidf_transformer.fit_transform(data_vector)
-        sums_vector = np.squeeze(np.asarray(transformed_data.sum(1)).ravel())
-        limit = -1  # debugging
+        sums_vector = np.squeeze(np.asarray(transformed_data.sum(1)).ravel())#sum by row
+        limit = -1  # use for faster debug
         buckets_number = sample_size
-        tot = 0
-        optimised_nn = 0
-        really_above_threshold = 0
         '''put vectors in buckets'''
         buckets = {}
         for i in range(buckets_number):
@@ -526,9 +470,7 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
             for bucket in digested:
                 buckets[bucket].append(i)
             vector_hashes[i]=digested
-        # print 'Data distribution in buckets'
-        # for k,v in sorted(buckets.items()):
-        #     print k, len(v)
+
 
 
         pair_producers = [RelationHandlerEuristicOverlapEstimationPairProducer(subject_analysis_queue,
@@ -592,8 +534,8 @@ class RelationHandlerEuristicOverlapEstimationPairProducer(RedisQueueWorkerProce
             for j in self.buckets[bucket]:
                 if j not in compared:
                     if i > j:
-                        # if OverlapDistance.estimate_below_threshold(self.sums_vector[i], self.sums_vector[j],#only works with binary data, not floats
-                        #                                             threshold=self.threshold):
+                        if OverlapDistance.estimate_above_threshold(self.sums_vector[i], self.sums_vector[j],  #only works with binary data, not floats
+                                                                    threshold=self.threshold):
                             self.put_into_queue_out((i, self.data_vector[i], j, self.data_vector[j], self.idf, self.idf_))
                 compared.add(j)
 
@@ -662,6 +604,7 @@ class DataDrivenRelationProcess(object):
         logger.info('target data length: %s size in memory: %f Kb'%(len(target_data),sys.getsizeof(target_data)/1024.))
         logger.info('disease data length: %s size in memory: %f Kb' % (len(disease_data),sys.getsizeof(disease_data)/1024.))
 
+        '''sort the lists and keep using always the same order in all the steps'''
         disease_keys = sorted(disease_data.keys())
         target_keys = sorted(target_data.keys())
 
@@ -669,14 +612,7 @@ class DataDrivenRelationProcess(object):
         number_of_storers = number_of_workers / 2
         queue_per_worker =150
 
-        logger.debug('call relationhandlereuristicoverlapestimation')
-        # rel_handler = RelationHandlerProduceAll(target_data=target_data,
-        rel_handler = RelationHandlerEuristicOverlapEstimation(target_data=target_data,
-                                                               disease_data=disease_data,
-                                                               ordered_target_keys=target_keys,
-                                                               ordered_disease_keys=disease_keys,
-                                                               r_server=self.r_server,
-                                                               use_quantitiative_scores=False)
+
         logger.info('getting disese labels')
         disease_id_to_label = self.es_query.get_disease_labels(disease_keys)
         disease_labels = [disease_id_to_label[hit_id] for hit_id in disease_keys]
@@ -759,9 +695,17 @@ class DataDrivenRelationProcess(object):
         for w in d2d_workers:
             w.start()
 
-        #
+        logger.debug('call relationhandlereuristicoverlapestimation')
+        # rel_handler = RelationHandlerProduceAll(target_data=target_data,
+        rel_handler = RelationHandlerEuristicOverlapEstimation(target_data=target_data,
+                                                               disease_data=disease_data,
+                                                               ordered_target_keys=target_keys,
+                                                               ordered_disease_keys=disease_keys,
+                                                               r_server=self.r_server,
+                                                               use_quantitiative_scores=False)
         ''' compute disease to disease distances'''
         logger.info('Starting to push pairs for disease to disease distances computation')
+        '''use cartesian product'''
         rel_handler.produce_d2d_pairs(d2d_pair_producing, d2d_queue_processing, self.r_server)
 
         logger.info('disease to disease distances pair push done')

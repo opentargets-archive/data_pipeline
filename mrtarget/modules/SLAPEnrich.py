@@ -246,7 +246,7 @@ class SLAPEnrich():
                     ensembl_gene_id = None
 
                     if gene_symbol in SYMBOL_MAPPING:
-                      gene_symbol = SYMBOL_MAPPING[gene_symbol]
+                        gene_symbol = SYMBOL_MAPPING[gene_symbol]
 
                     '''
                         build target object,

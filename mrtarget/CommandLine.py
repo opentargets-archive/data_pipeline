@@ -133,6 +133,11 @@ def main():
     parser.add_argument("--redis-port", dest='redis_port',
                         help="redis port",
                         action='store', default='')
+    parser.add_argument("--lt-reuse", dest='lt_reuse', help="reuse the current lookuptable",
+                        action='store_true', default=False)
+    parser.add_argument("--lt-namespace", dest='lt_namespace',
+                        help="lookuptable namespace to reuse",
+                        action='store', default='')
     parser.add_argument("--dry-run", dest='dry_run', help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
                         action='store_true', default=False)
     parser.add_argument("--profile", dest='profile', help="magically profiling process() per process",
@@ -145,7 +150,7 @@ def main():
                         action='append', default=[])
     parser.add_argument("--log-level", dest='loglevel',
                         help="set the log level",
-                        action='store', default='INFO')
+                        action='store', default='WARNING')
     parser.add_argument("--do-nothing", dest='do_nothing',
                         help="to be used just for test",
                         action='store_true', default=False)
@@ -163,6 +168,12 @@ def main():
         Config.RELEASE_VERSION = args.release_tag
 
     targets = args.targets
+
+    if args.lt_namespace:
+        Config.LT_NAMESPACE = args.lt_namespace
+
+    if args.lt_reuse:
+        Config.LT_REUSE = True
 
     if args.redis_remote:
         Config.REDISLITE_REMOTE = args.redis_remote
@@ -187,8 +198,11 @@ def main():
             root_logger = logging.getLogger()
             root_logger.setLevel(logging.getLevelName(args.loglevel))
             logger.setLevel(logging.getLevelName(args.loglevel))
+            logger.info('main log level set to: '+ str(args.loglevel))
+            root_logger.info('root log level set to: '+ str(args.loglevel))
         except Exception, e:
             root_logger.exception(e)
+            sys.exit(1)
 
     if args.do_nothing:
         print("Exiting. I pity the fool that tells me to 'do nothing'",

@@ -371,9 +371,18 @@ class ESQuery(object):
         for hit in res['hits']['hits']:
             return hit['_source']
 
-    def get_disease_to_targets_vectors(self, treshold = 0.1):
-        #TODO: look at the multiquery api
-
+    def get_disease_to_targets_vectors(self,
+                                       treshold=0.1,
+                                       evidence_count = 3):
+        '''
+        Get all the association objects that are:
+        - direct -> to avoid ontology inflation
+        - > 3 evidence count -> remove noise
+        - overall score > threshold -> remove very lo quality noise
+        :param treshold: minimum overall score threshold to consider for fetching association data
+        :param evidence_count: minimum number of evidence consider for fetching association data
+        :return: two dictionaries mapping target to disease  and the reverse
+        '''
         self.logger.debug('scan es to get all diseases and targets')
         res = helpers.scan(client=self.handler,
                            query={"query": {
@@ -397,8 +406,8 @@ class ESQuery(object):
         for hit in res:
             c+=1
             hit = hit['_source']
-            if hit['evidence_count']['total']>=3 and \
-                hit['harmonic-sum']['overall'] >=0.1:
+            if hit['evidence_count']['total']>=evidence_count and \
+                hit['harmonic-sum']['overall'] >=treshold:
                 '''store target associations'''
                 if hit['target']['id'] not in target_results:
                     target_results[hit['target']['id']] = SparseFloatDict()
@@ -750,8 +759,8 @@ class ESQuery(object):
     def get_all_pub_from_validated_evidence(self,datasources= None, batch_size=1000):
         batch = []
         for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
-                                                                    size=batch_size,
-                                                   datasources=datasources)):
+                                                                   size=batch_size,
+                                                                   datasources=datasources)):
             if hit:
                 try:
                     ev = json.loads(hit['evidence_string'])

@@ -23,6 +23,8 @@ np.seterr(divide='warn', invalid='warn')
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
+from mrtarget.Settings import Config
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -126,6 +128,7 @@ class RedisQueue(object):
                            default) jsonpickle (use ujson) else will use pickle
         :return:
         '''
+        logger = logging.getLogger(__name__)
         if not queue_id:
             queue_id = uuid.uuid4().hex
         self.queue_id = queue_id
@@ -256,7 +259,7 @@ class RedisQueue(object):
             timeout = self.job_timeout
         timedout_jobs = [i[0] for i in r_server.zrange(self.processing_key, 0, -1, withscores=True) if time.time() - i[1] > timeout]
         if timedout_jobs:
-            logger.debug('%i jobs timedout jobs in queue %s'%(len(timedout_jobs), self.queue_id))
+            self.logger.debug('%i jobs timedout jobs in queue %s'%(len(timedout_jobs), self.queue_id))
         return timedout_jobs
 
     def put_back(self, key, r_server=None, ):
@@ -272,9 +275,9 @@ class RedisQueue(object):
             if time.time()-key[1]>timeout:
                 if r_server.zrem(self.processing_key, key[0]):
                     r_server.lpush(self.main_queue, key[0])
-                    logger.debug('%s job is timedout and was put back in queue %s' %(key[0],self.queue_id))
+                    self.logger.debug('%s job is timedout and was put back in queue %s' %(key[0],self.queue_id))
                 else:
-                    logger.debug('%s job is timedout and was NOT put back in queue %s' % (key[0], self.queue_id))
+                    self.logger.debug('%s job is timedout and was NOT put back in queue %s' % (key[0], self.queue_id))
 
     def __str__(self):
         return self.queue_id
@@ -891,8 +894,10 @@ class RedisLookupTable(object):
                  namespace = None,
                  r_server = None,
                  ttl = 60*60*24+2):
+        self.lt_reuse = Config.LT_REUSE
         if namespace is None:
-            namespace = uuid.uuid4()
+            namespace = uuid.uuid4() if (not Config.LT_NAMESPACE) else Config.LT_NAMESPACE
+
         self.namespace = self.LOOK_UPTABLE_NAMESPACE % {'namespace': namespace}
         self.r_server = new_redis_client() if not r_server else r_server
         self.default_ttl = ttl
@@ -903,9 +908,10 @@ class RedisLookupTable(object):
         # if not (isinstance(obj, str) or isinstance(obj, unicode)):
         #     raise AttributeError('Only str and unicode types are accepted as object value. Use the \
         #     RedisLookupTablePickle subclass for generic objects.')
-        self._get_r_server(r_server).setex(self._get_key_namespace(key),
-                              self._encode(obj),
-                              ttl or self.default_ttl)
+        if not self.lt_reuse:
+            self._get_r_server(r_server).setex(self._get_key_namespace(key),
+                                  self._encode(obj),
+                                  ttl or self.default_ttl)
 
     def get(self, key, r_server = None):
         server = self._get_r_server(r_server)
@@ -943,8 +949,9 @@ class RedisLookupTable(object):
                  r_server=self._get_r_server(r_server))
 
     def __setitem__(self, key, value,  r_server=None):
-        self.set(self._get_key_namespace(key), value,
-                 r_server=self._get_r_server(r_server))
+        if not self.lt_reuse:
+            self.set(self._get_key_namespace(key), value,
+                     r_server=self._get_r_server(r_server))
 
 
 class RedisLookupTableJson(RedisLookupTable):

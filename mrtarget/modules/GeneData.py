@@ -452,10 +452,14 @@ class GeneManager():
                 plugin = self.simplePluginManager.getPluginByName(plugin_name)
                 plugin.plugin_object.print_name()
                 plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server, tqdm_out=self.tqdm_out)
+
+            except AttributeError:
+                self._logger.exception("the current plugin %s wasn't loaded", plugin_name)
+
             except Exception as error:
-                self._logger.error('The following gene index merging procedure failed: %s. Please check that the previous steps of the pipeline have been executed properly.'%(plugin_name))
-                tb = traceback.format_exc()
-                self._logger.error(tb)
+                self._logger.error('plugin %s failed with an exception', plugin_name)
+                self._logger.exception(str(error))
+
             finally:
                 bar.update()
 
