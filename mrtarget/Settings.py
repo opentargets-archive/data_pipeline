@@ -341,7 +341,7 @@ class Config():
                                                          cttv005 = 'rare2common',
                                                          cttv010 = 'expression_atlas',
                                                          cttv026 = 'phewas_catalog',
-                                                         cttv027 = '23andme'
+                                                         cttv027 = 'twentythreeandme'
 
                                                 )
 
