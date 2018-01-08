@@ -776,7 +776,8 @@ class Evidence(JSONSerializable):
             elif self.evidence['type'] == 'genetic_association':
                 score = 0.
                 if 'gene2variant' in self.evidence['evidence']:
-                    if self.evidence['sourceID'] in ['phewas_catalog', '23andme']:
+
+                    if self.evidence['sourceID'] in ['phewas_catalog','twentythreeandme']:
                         no_of_cases = self.evidence['unique_association_fields']['cases']
                         score = self._score_phewas_data(self.evidence['sourceID'],
                                                         self.evidence['evidence']['variant2disease']['resource_score'][
@@ -916,7 +917,7 @@ class Evidence(JSONSerializable):
             max_cases = 8800
             range_min = 0.05
             range_max = 1e-25
-        elif source == '23andme':
+        elif source == 'twentythreeandme':
             max_cases = 297901
             range_min = 0.05
             range_max = 1e-30
