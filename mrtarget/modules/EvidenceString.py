@@ -94,6 +94,7 @@ class EvidenceStringActions(Actions):
 
 class DataNormaliser(object):
     def __init__(self, min_value, max_value, old_min_value=0., old_max_value=1., cap=True):
+        '''just set all initial values and ranges'''
         self.min = float(min_value)
         self.max = float(max_value)
         self.old_min = old_min_value
@@ -101,6 +102,7 @@ class DataNormaliser(object):
         self.cap = cap
 
     def __call__(self, value):
+        '''apply method to wrap the normalization function'''
         return self.renormalize(value,
                                 (self.old_min, self.old_max),
                                 (self.min, self.max),
@@ -108,6 +110,11 @@ class DataNormaliser(object):
 
     @staticmethod
     def renormalize(n, start_range, new_range, cap=True):
+        '''apply the function f(x) to n using and old (start_range) and a new range
+
+        where f(x) = (dNewRange / dOldRange * (n - old_range_lower_bound)) + new_lower
+        if cap is True then f(n) will be capped to new range boundaries
+        '''
         n = float(n)
         max_new_range = max(new_range)
         min_new_range = min(new_range)
@@ -142,6 +149,7 @@ class ExtendedInfo():
 
 
 class ExtendedInfoGene(ExtendedInfo):
+    '''minimal info from Gene class'''
     root = "gene_info"
 
     def __init__(self, gene):
@@ -157,6 +165,9 @@ class ExtendedInfoGene(ExtendedInfo):
 
 
 class ExtendedInfoEFO(ExtendedInfo):
+    '''getting from and EFO obj label id and building 2 sets of area codes
+    and area labels
+    '''
     root = "efo_info"
 
     def __init__(self, efo):
@@ -583,8 +594,7 @@ class EvidenceManager():
         ''' Add literature data '''
         if inject_literature:
             if 'literature' in extended_evidence and \
-                            'references' in extended_evidence['literature'] and \
-                    extended_evidence['literature']['references']:
+                            'references' in extended_evidence['literature']:
                 try:
                     pmid_url = extended_evidence['literature']['references'][0]['lit_id']
                     pmid = pmid_url.split('/')[-1]
@@ -785,6 +795,7 @@ class Evidence(JSONSerializable):
                                                         no_of_cases)
                     else:
                         g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
+
                         if self.evidence['evidence']['variant2disease']['resource_score']['type'] == 'pvalue':
                             v2d_score = self._get_score_from_pvalue_linear(
                                 self.evidence['evidence']['variant2disease']['resource_score']['value'])
@@ -793,20 +804,27 @@ class Evidence(JSONSerializable):
                         else:
                             '''this should not happen?'''
                             v2d_score = 0.
+
                         if self.evidence['sourceID'] == 'gwas_catalog':
                             sample_size = self.evidence['evidence']['variant2disease']['gwas_sample_size']
-                            score = self._score_gwascatalog(
-                                self.evidence['evidence']['variant2disease']['resource_score']['value'],
-                                sample_size,
-                                g2v_score)
+                            p_value = self.evidence['evidence']['variant2disease']['resource_score']['value']
+
+                            # this is something to take into account for postgap data when I refactor this
+                            r2_value = float(1)
+                            if 'r2' in self.evidence['unique_association_fields']:
+                                r2_value = float(self.evidence['unique_association_fields']['r2'])
+
+                            score = self._score_gwascatalog(p_value, sample_size, g2v_score, r2_value)
                         else:
                             score = g2v_score * v2d_score
+
                 else:
                     if self.evidence['evidence']['resource_score']['type'] == 'probability':
                         score = self.evidence['evidence']['resource_score']['value']
                     elif self.evidence['evidence']['resource_score']['type'] == 'pvalue':
                         score = self._get_score_from_pvalue_linear(self.evidence['evidence']['resource_score']['value'])
                 self.evidence['scores']['association_score'] = score
+
             elif self.evidence['type'] == 'animal_model':
                 self.evidence['scores']['association_score'] = float(
                     self.evidence['evidence']['disease_model_association']['resource_score']['value'])
@@ -900,17 +918,54 @@ class Evidence(JSONSerializable):
         score = get_log(pvalue)
         return DataNormaliser.renormalize(score, [min_score, max_score], [0., 1.])
 
-    def _score_gwascatalog(self, pvalue, sample_size, severity):
+    def _score_gwascatalog(self, pvalue, sample_size, g2v_value, r2_value):
 
         normalised_pvalue = self._get_score_from_pvalue_linear(pvalue, range_min=1, range_max=1e-15)
 
         normalised_sample_size = DataNormaliser.renormalize(sample_size, [0, 5000], [0, 1])
 
-        score = normalised_pvalue * normalised_sample_size * severity
+        score = normalised_pvalue * normalised_sample_size * g2v_value * r2_value
 
         # self.logger.debug("gwas score: %f | pvalue %f %f | sample size%f %f |severity %f" % (score, pvalue,
         # normalised_pvalue, sample_size,normalised_sample_size, severity))
         return score
+
+    # def _score_postgap(self):
+    #     """Calculate the variant-to-gene score for a row.
+    #
+    #     Arguments:
+    #     r       -- A row from a pandas DataFrame of the POSTGAP data.
+    #     vep_map -- A dict of numeric values associated with VEP terms
+    #
+    #     Returns:
+    #     v2g     -- The variant-to-gene score.
+    #     """
+    #     GTEX_CUTOFF = 0.999975
+    #     # K = 0.1 / 0.35
+    #     # VEP_THRESHOLD = 0.65
+    #
+    #     # stage 1 cannot being implemented on the evs because evs doesn't contain vep defs
+    #     # if not pd.isnull(r.vep_terms):
+    #     #     vep_terms = r.vep_terms.split(',')
+    #     #     vep_score = max([
+    #     #         0 if t == 'start_retained_variant' else vep_map[t]  # start_retained_variant needs adding to map
+    #     #         for t in vep_terms
+    #     #     ])
+    #     #     if vep_score >= VEP_THRESHOLD:
+    #     #         return (K * (vep_score - VEP_THRESHOLD)) + 0.9
+    #
+    #     # stage 2
+    #     if (r.GTEx > GTEX_CUTOFF) or (r.PCHiC > 0) or (r.DHS > 0) or (r.Fantom5 > 0):
+    #         gtex = 1 if (r.GTEx > GTEX_CUTOFF) else 0
+    #         pchic = 1 if (r.PCHiC > 0) else 0
+    #         dhs = 1 if (r.DHS > 0) else 0
+    #         fantom5 = 1 if (r.Fantom5 > 0) else 0
+    #         vep_score = ((gtex * 13) + (fantom5 * 3) + (dhs * 1.5) + (pchic * 1.5)) / 19
+    #         return vep_score * 0.4 + 0.5
+    #
+    #     # stage 3
+    #     if (r.Nearest > 0):
+    #         return 0.5
 
     def _score_phewas_data(self, source, pvalue, no_of_cases):
         if source == 'phewas_catalog':
