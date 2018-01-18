@@ -876,8 +876,10 @@ class Evidence(JSONSerializable):
                                                                                                            'sourceID']]
                                                                                                    ))
 
-        '''scale score according to global stats'''
-        if global_stats is not None:
+        # scale score according to global stats IFF sourceID is included
+        # in sources to apply from Config class in Settings.py
+        if (global_stats is not None) and \
+                (self.evidence['sourceID'] in Config.GLOBAL_STATS_SOURCES_TO_APPLY):
             evidence_pmids = EvidenceGlobalCounter.get_literature(self.evidence)
 
             experiment_id = EvidenceGlobalCounter.get_experiment(self.evidence)
@@ -1344,6 +1346,11 @@ class EvidenceStringProcess():
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence
             EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)
             EvidenceManager.fix_disease_id(ev)
-            global_stats.digest(ev=ev)
+
+            # only include into global stats computation the evidences coming from configuration
+            # Config class in Settings.py
+            if ev["sourceID"] in Config.GLOBAL_STATS_SOURCES_TO_INCLUDE:
+                global_stats.digest(ev=ev)
+
         global_stats.compress()
         return global_stats
