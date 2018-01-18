@@ -298,7 +298,7 @@ class ESQuery(object):
                            scroll='12h',
                            doc_type=doc_type,
                            index=index_name,
-                           timeout="10m",
+                           timeout="20m",
                            )
 
         # res = list(res)

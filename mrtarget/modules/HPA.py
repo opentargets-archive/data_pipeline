@@ -37,11 +37,12 @@ def level_from_text(key):
 
 def reliability_from_text(key):
     reliability_translation = {'Supportive': True,
-                                    'Uncertain': False,
-                                    # # new types for hpa v16
-                                    'Approved' : True,
-                                    'Supported': True,
-                                    }
+                                'Uncertain': False,
+                                # # new types for hpa v16
+                                'Approved' : True,
+                                'Supported': True,
+                                'Enhanced': True
+                                }
     return reliability_translation[key]
 
 
