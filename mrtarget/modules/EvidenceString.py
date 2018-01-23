@@ -1244,7 +1244,8 @@ class EvidenceStringProcess():
             self.es_query.delete_evidence_for_datasources(datasources)
 
         '''create queues'''
-        number_of_workers = Config.WORKERS_NUMBER
+        self.logger.info('limiting the number or workers to a max of 16 or cpucount')
+        number_of_workers = max(16, Config.WORKERS_NUMBER)
         # too many storers
         number_of_storers = min(16, number_of_workers / 2 + 1,)
         queue_per_worker = 250
@@ -1269,30 +1270,26 @@ class EvidenceStringProcess():
                                               )
         q_reporter.start()
 
-        '''create workers'''
+        self.logger.info('evidence processer process with %d processes', number_of_workers)
+        self.logger.info('trying with less workers because global stats')
+        scorers = [EvidenceProcesser(evidence_q,
+                                    None,
+                                    store_q,
+                                    lookup_data=lookup_data,
+                                    inject_literature=inject_literature,
+                                    global_stats=global_stats)
+                                    for _ in range(number_of_workers)]
+        for w in scorers:
+            w.start()
 
-        scorers = WhiteCollarWorker(target=EvidenceProcesser,
-                                    pool_size=number_of_workers,
-                                    queue_in=evidence_q,
-                                    redis_path=None,
-                                    queue_out=store_q,
-                                    kwargs=dict(
-                                        lookup_data=lookup_data,
-                                        inject_literature=inject_literature,
-                                        global_stats=global_stats
-                                    )
-                                    )
-        scorers.start()
-
-        loaders = WhiteCollarWorker(target=LoaderWorker,
-                                    pool_size=number_of_storers,
-                                    queue_in=store_q,
-                                    redis_path=None,
-                                    kwargs=dict(dry_run=dry_run))
-
-        loaders.start()
-
-
+        self.logger.info('loader worker process with %d processes', number_of_storers)
+        loaders = [LoaderWorker(store_q,
+                                None,
+                                chunk_size=1000 / number_of_storers,
+                                dry_run=dry_run
+                                ) for _ in range(number_of_storers)]
+        for w in loaders:
+            w.start()
 
         targets_with_data = set()
         for row in tqdm(self.get_evidence(page_size=get_evidence_page_size, datasources=datasources),
@@ -1309,9 +1306,16 @@ class EvidenceStringProcess():
 
         evidence_q.set_submission_finished()
 
-        '''wait for all workers to finish'''
-        scorers.join()
-        loaders.join()
+        self.logger.info('collecting loaders')
+        for w in loaders:
+            w.join()
+
+        self.logger.info('collecting scorers')
+        for w in scorers:
+            w.join()
+
+        self.logger.info('collecting reporter')
+        q_reporter.join()
 
 
         self.logger.info('flushing data to index')
