@@ -1042,7 +1042,7 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         self.evidence_manager.available_efos._table.set_r_server(self.get_r_server())
         self.evidence_manager.available_genes._table.set_r_server(self.get_r_server())
         self.pub_fetcher = PublicationFetcher(new_es_client(hosts=Config.ELASTICSEARCH_NODES_PUB))
-        self.es = new_es_client()
+        // self.es = new_es_client()
 
 
     def process(self, data):
