@@ -15,8 +15,8 @@ from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, WhiteCollarWorker
-from mrtarget.common.connection import PipelineConnectors
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common.connection import new_es_client
 from mrtarget.modules import GeneData
 from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO
@@ -26,7 +26,6 @@ from mrtarget.modules.Literature import Publication, PublicationFetcher
 
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger, level=logging.INFO)
-# logger = multiprocessing.get_logger()
 
 
 '''line profiler code'''
@@ -1038,14 +1037,13 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
     def init(self):
         super(EvidenceProcesser, self).init()
         self.logger = logging.getLogger(__name__)
-        connector = PipelineConnectors()
-        connector.init_services_connections()
-        self.lookup_data.set_r_server(connector.r_server)
-        self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
-        self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
-        self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
-        self.pub_fetcher = PublicationFetcher(connector.es_pub)
-        self.es = connector.es
+        self.lookup_data.set_r_server(self.get_r_server())
+        self.evidence_manager.available_ecos._table.set_r_server(self.get_r_server())
+        self.evidence_manager.available_efos._table.set_r_server(self.get_r_server())
+        self.evidence_manager.available_genes._table.set_r_server(self.get_r_server())
+        self.pub_fetcher = PublicationFetcher(new_es_client(hosts=Config.ELASTICSEARCH_NODES_PUB))
+        self.es = new_es_client()
+
 
     def process(self, data):
         idev, ev_raw = data
