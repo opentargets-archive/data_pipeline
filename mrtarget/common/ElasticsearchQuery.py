@@ -276,7 +276,7 @@ class ESQuery(object):
 
 
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
         doc_type = None
 
         if datasources:
@@ -311,7 +311,7 @@ class ESQuery(object):
         if datasources:
             doc_type = datasources
 
-        return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '*',
+        return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
                                             doc_type=doc_type,
                                             query={
                                                 "match": {
