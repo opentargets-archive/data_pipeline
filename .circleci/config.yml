@@ -84,7 +84,7 @@ jobs:
     steps:
       - run:
           name: Decode Google Cloud Credentials
-          command: echo ${GCR_JSON_KEY_FILE} | base64 -i --decode > ${HOME}/gcp-key.json
+          command: echo ${GOOGLE_AUTH} | base64 -i --decode > ${HOME}/gcp-key.json
       - run:
           name: Authenticate to Google Cloud
           command: |
