@@ -311,7 +311,7 @@ class ESQuery(object):
         if datasources:
             doc_type = datasources
 
-        return self.count_elements_in_index(Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True),
+        return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
                                             doc_type=doc_type,
                                             query={
                                                 "match": {
