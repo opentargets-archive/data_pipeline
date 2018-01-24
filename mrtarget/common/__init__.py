@@ -163,7 +163,9 @@ class LogAccum(object):
             for k in keys:
                 for msg in self._accum[k]:
                     self._logger.log(k, msg[0], *msg[1])
-                    del self._accum[k][:]
+
+                # python indentation playing truth or dare
+                del self._accum[k][:]
 
             # reset the accum
             del(self._accum)
