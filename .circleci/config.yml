@@ -82,6 +82,7 @@ jobs:
     docker:
       - image: google/cloud-sdk
     steps:
+      - checkout
       - run:
           name: Decode Google Cloud Credentials
           command: echo ${GOOGLE_AUTH} | base64 -i --decode > ${HOME}/gcp-key.json
