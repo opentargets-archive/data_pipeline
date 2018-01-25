@@ -98,11 +98,10 @@ jobs:
             if [[ $GIT_COMMIT_DESC == *"[hannibal]"* ]]; then
               echo "I like when a plan comes together :cigar:"
               git clone https://github.com/opentargets/hannibal-luigi.git
-              cd hannibal-luigi
               if [ -n "${CIRCLE_TAG:+1}" ]; then
-                ./launch_gce.sh $CIRCLE_TAG
+                cd hannibal-luigi && ./launch_gce.sh $CIRCLE_TAG
               elif [ -n "${CIRCLE_BRANCH:+1}" ]; then
-                ./launch_gce.sh $CIRCLE_BRANCH
+                cd hannibal-luigi && ./launch_gce.sh $CIRCLE_BRANCH
               else
               echo -e "### No CIRCLE_TAG or CIRCLE_BRANCH defined"
               exit 1
