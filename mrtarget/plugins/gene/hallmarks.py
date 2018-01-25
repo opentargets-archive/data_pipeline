@@ -88,7 +88,8 @@ class Hallmarks(IPlugin):
                              "label": Description_1,
                              "description": Description,
                              "promote": promote,
-                             "suppress": suppress
+                             "suppress": suppress,
+                             "pmid": PMID
                             }
 
                     try:
@@ -114,10 +115,10 @@ class Hallmarks(IPlugin):
                            }
 
                     try:
-                        self.hallmarks[GeneSymbol]["attribute"].append(line)
+                        self.hallmarks[GeneSymbol]["attributes"].append(line)
                     except KeyError:
-                        self.hallmarks[GeneSymbol]["attribute"] = list()
-                        self.hallmarks[GeneSymbol]["attribute"].append(line)
+                        self.hallmarks[GeneSymbol]["attributes"] = list()
+                        self.hallmarks[GeneSymbol]["attributes"].append(line)
 
 
 
