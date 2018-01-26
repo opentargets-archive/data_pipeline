@@ -413,6 +413,33 @@ class EvidenceManager():
 
         return new_target_id, id_not_in_ensembl
 
+    def inject_loci(self, ev):
+        gene_id = ev['target']['id']
+
+        if gene_id in self.available_genes:
+            # setting gene loci info
+            gene_obj = self.available_genes[gene_id]
+            chr = gene_obj['chromosome']
+            pos_begin = gene_obj['gene_start']
+            pos_end = gene_obj['gene_end']
+            ev['loci']['gene'][chr]['begin'] = pos_begin
+            ev['loci']['gene'][chr]['end'] = pos_end
+
+        else:
+            self.logger.error('inject_loci cannot find gene id %s', gene_id)
+
+        # setting variant loci info if any
+        if 'variant' in ev:
+            vchr = ev['variant']['chromosome']
+
+            # only snps are supported at the moment
+            if 'pos' in ev['variant']:
+                vpos_begin = ev['variant']['pos']
+                vpos_end = ev['variant']['pos']
+
+                ev['loci']['variant'][vchr]['begin'] = vpos_begin
+                ev['loci']['variant'][vchr]['end'] = vpos_end
+
     @staticmethod
     def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
         target_id = evidence['target']['id']
@@ -1029,7 +1056,8 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         self.es = None
         self.loader = None
         self.lookup_data = lookup_data
-        self.evidence_manager = EvidenceManager(lookup_data)
+        # self.evidence_manager = EvidenceManager(lookup_data)
+        self.evidence_manager = None
         self.inject_literature = inject_literature
         self.pub_fetcher = None
         self.global_stats = global_stats
@@ -1038,12 +1066,10 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         super(EvidenceProcesser, self).init()
         self.logger = logging.getLogger(__name__)
         self.lookup_data.set_r_server(self.get_r_server())
-        self.evidence_manager.available_ecos._table.set_r_server(self.get_r_server())
-        self.evidence_manager.available_efos._table.set_r_server(self.get_r_server())
-        self.evidence_manager.available_genes._table.set_r_server(self.get_r_server())
         self.pub_fetcher = PublicationFetcher(new_es_client(hosts=Config.ELASTICSEARCH_NODES_PUB))
-        # self.es = new_es_client()
 
+        # moved from __init__ as this is executed on a process so it should need be process mem
+        self.evidence_manager = EvidenceManager(self.lookup_data)
 
     def process(self, data):
         idev, ev_raw = data
@@ -1060,6 +1086,7 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         else:
             raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
 
+        self.evidence_manager.inject_loci(ev)
         loader_args = (
             Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
             ev.get_doc_name(),
@@ -1346,6 +1373,7 @@ class EvidenceStringProcess():
                         file=tqdm_out,
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence
+
             EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)
             EvidenceManager.fix_disease_id(ev)
 
