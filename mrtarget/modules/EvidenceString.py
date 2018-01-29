@@ -414,7 +414,7 @@ class EvidenceManager():
         return new_target_id, id_not_in_ensembl
 
     def inject_loci(self, ev):
-        gene_id = ev['target']['id']
+        gene_id = ev.evidence['target']['id']
 
         if gene_id in self.available_genes:
             # setting gene loci info
@@ -422,23 +422,23 @@ class EvidenceManager():
             chr = gene_obj['chromosome']
             pos_begin = gene_obj['gene_start']
             pos_end = gene_obj['gene_end']
-            ev['loci']['gene'][chr]['begin'] = pos_begin
-            ev['loci']['gene'][chr]['end'] = pos_end
+            ev.evidence['loci']['gene'][chr]['begin'] = pos_begin
+            ev.evidence['loci']['gene'][chr]['end'] = pos_end
 
         else:
             self.logger.error('inject_loci cannot find gene id %s', gene_id)
 
         # setting variant loci info if any
-        if 'variant' in ev:
-            vchr = ev['variant']['chromosome']
+        if 'variant' in ev.evidence:
+            vchr = ev.evidence['variant']['chromosome']
 
             # only snps are supported at the moment
-            if 'pos' in ev['variant']:
-                vpos_begin = ev['variant']['pos']
-                vpos_end = ev['variant']['pos']
+            if 'pos' in ev.evidence['variant']:
+                vpos_begin = ev.evidence['variant']['pos']
+                vpos_end = ev.evidence['variant']['pos']
 
-                ev['loci']['variant'][vchr]['begin'] = vpos_begin
-                ev['loci']['variant'][vchr]['end'] = vpos_end
+                ev.evidence['loci']['variant'][vchr]['begin'] = vpos_begin
+                ev.evidence['loci']['variant'][vchr]['end'] = vpos_end
 
     @staticmethod
     def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
