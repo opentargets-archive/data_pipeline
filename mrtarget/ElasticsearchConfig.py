@@ -48,28 +48,13 @@ def _get_evidence_string_generic_mapping():
     dscores.scores.path_match = 'scores.*'
     dscores.scores.mapping.type = 'float'
 
-    loci = Dict()
-    loci.loci_begin.path_match = "loci.*.begin"
-    loci.loci_begin.mapping.type = "int_range"
-    loci.loci_end.path_match = "loci.*.end"
-    loci.loci_end.mapping.type = "int_range"
+    locib = Dict()
+    locib.loci_begin.path_match = "loci.*.begin"
+    locib.loci_begin.mapping.type = "int_range"
 
-
-    target_loci_begin = Dict()
-    target_loci_begin.loci_ranges_begin.path_match = "target.loc.*.begin"
-    target_loci_begin.loci_ranges_begin.mapping.type = "int_range"
-
-    target_loci_end = Dict()
-    target_loci_end.loci_ranges_end.path_match = "target.loc.*.end"
-    target_loci_end.loci_ranges_end.mapping.type = "int_range"
-
-    evidence_loci_begin = Dict()
-    evidence_loci_begin.loci_ranges_begin.path_match = "evidence.loc.*.begin"
-    evidence_loci_begin.loci_ranges_begin.mapping.type = "int_range"
-
-    evidence_loci_end = Dict()
-    evidence_loci_end.loci_ranges_end.path_match = "evidence.loc.*.end"
-    evidence_loci_end.loci_ranges_end.mapping.type = "int_range"
+    locie = Dict()
+    locie.loci_end.path_match = "loci.*.end"
+    locie.loci_end.mapping.type = "int_range"
 
     devs = Dict()
     devs.do_not_index_evidence.path_match = 'evidence.*'
@@ -89,7 +74,8 @@ def _get_evidence_string_generic_mapping():
         devs,
         ddrug,
         dass,
-        loci
+        locib,
+        locie
         ]
 
     return mmap.to_dict()
