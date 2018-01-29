@@ -4,6 +4,7 @@ import logging
 import math
 import os
 from collections import Counter
+import addict
 
 import pickle
 from tqdm import tqdm
@@ -422,8 +423,13 @@ class EvidenceManager():
             chr = gene_obj['chromosome']
             pos_begin = gene_obj['gene_start']
             pos_end = gene_obj['gene_end']
-            ev.evidence['loci']['gene'][chr]['begin'] = pos_begin
-            ev.evidence['loci']['gene'][chr]['end'] = pos_end
+
+            loc = addict.Dict()
+
+            loc.gene[chr].begin = pos_begin
+            loc.gene[chr].end = pos_end
+
+            ev.evidence['loci'] = loc.to_dict()
 
         else:
             self.logger.error('inject_loci cannot find gene id %s', gene_id)
@@ -437,8 +443,12 @@ class EvidenceManager():
                 vpos_begin = ev.evidence['variant']['pos']
                 vpos_end = ev.evidence['variant']['pos']
 
-                ev.evidence['loci']['variant'][vchr]['begin'] = vpos_begin
-                ev.evidence['loci']['variant'][vchr]['end'] = vpos_end
+                loc = addict.Dict()
+
+                loc.variant[vchr]['begin'] = vpos_begin
+                loc.variant[vchr]['end'] = vpos_end
+
+                ev.evidence['loci'] = loc.to_dict()
 
     @staticmethod
     def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
