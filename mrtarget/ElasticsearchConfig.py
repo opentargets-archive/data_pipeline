@@ -48,21 +48,21 @@ def _get_evidence_string_generic_mapping():
     dscores.scores.path_match = 'scores.*'
     dscores.scores.mapping.type = 'float'
 
-    locib = Dict()
-    locib.loci_begin.path_match = "loci.gene.*.begin"
-    locib.loci_begin.mapping.type = "long"
-
-    locie = Dict()
-    locie.loci_end.path_match = "loci.gene.*.end"
-    locie.loci_end.mapping.type = "long"
-
-    locibv = Dict()
-    locibv.loci_begin.path_match = "loci.variant.*.begin"
-    locibv.loci_begin.mapping.type = "long"
-
-    lociev = Dict()
-    lociev.loci_end.path_match = "loci.variant.*.end"
-    lociev.loci_end.mapping.type = "long"
+    # locib = Dict()
+    # locib.loci_begin.path_match = "loci.*.*"
+    # locib.loci_begin.mapping.type = "long"
+    #
+    # locie = Dict()
+    # locie.loci_end.path_match = "loci.gene.*.end"
+    # locie.loci_end.mapping.type = "long"
+    #
+    # locibv = Dict()
+    # locibv.loci_begin.path_match = "loci.variant.*.begin"
+    # locibv.loci_begin.mapping.type = "long"
+    #
+    # lociev = Dict()
+    # lociev.loci_end.path_match = "loci.variant.*.end"
+    # lociev.loci_end.mapping.type = "long"
 
     devs = Dict()
     devs.do_not_index_evidence.path_match = 'evidence.*'
@@ -82,10 +82,10 @@ def _get_evidence_string_generic_mapping():
         devs,
         ddrug,
         dass,
-        locib,
-        locie,
-        locibv,
-        lociev
+        # locib,
+        # locie,
+        # locibv,
+        # lociev
         ]
 
     return mmap.to_dict()
