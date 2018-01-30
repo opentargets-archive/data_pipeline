@@ -416,6 +416,7 @@ class EvidenceManager():
 
     def inject_loci(self, ev):
         gene_id = ev.evidence['target']['id']
+        loc = addict.Dict()
 
         if gene_id in self.available_genes:
             # setting gene loci info
@@ -424,31 +425,27 @@ class EvidenceManager():
             pos_begin = gene_obj['gene_start']
             pos_end = gene_obj['gene_end']
 
-            loc = addict.Dict()
-
             loc.gene[chr].begin = pos_begin
             loc.gene[chr].end = pos_end
 
+            # setting variant loci info if any
+            if 'variant' in ev.evidence:
+                vchr = ev.evidence['variant']['chrom']
+
+                # only snps are supported at the moment
+                if 'pos' in ev.evidence['variant']:
+                    vpos_begin = ev.evidence['variant']['pos']
+                    vpos_end = ev.evidence['variant']['pos']
+
+                    loc.variant[vchr]['begin'] = vpos_begin
+                    loc.variant[vchr]['end'] = vpos_end
+
+            # setting all loci into the evidence
             ev.evidence['loci'] = loc.to_dict()
 
         else:
             self.logger.error('inject_loci cannot find gene id %s', gene_id)
 
-        # setting variant loci info if any
-        if 'variant' in ev.evidence:
-            vchr = ev.evidence['variant']['chrom']
-
-            # only snps are supported at the moment
-            if 'pos' in ev.evidence['variant']:
-                vpos_begin = ev.evidence['variant']['pos']
-                vpos_end = ev.evidence['variant']['pos']
-
-                loc = addict.Dict()
-
-                loc.variant[vchr]['begin'] = vpos_begin
-                loc.variant[vchr]['end'] = vpos_end
-
-                ev.evidence['loci'] = loc.to_dict()
 
     @staticmethod
     def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
