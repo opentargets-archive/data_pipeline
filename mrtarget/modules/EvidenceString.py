@@ -436,7 +436,7 @@ class EvidenceManager():
 
         # setting variant loci info if any
         if 'variant' in ev.evidence:
-            vchr = ev.evidence['variant']['chromosome']
+            vchr = ev.evidence['variant']['chrom']
 
             # only snps are supported at the moment
             if 'pos' in ev.evidence['variant']:

@@ -50,11 +50,11 @@ def _get_evidence_string_generic_mapping():
 
     locib = Dict()
     locib.loci_begin.path_match = "loci.*.begin"
-    locib.loci_begin.mapping.type = "int_range"
+    locib.loci_begin.mapping.type = "long_range"
 
     locie = Dict()
     locie.loci_end.path_match = "loci.*.end"
-    locie.loci_end.mapping.type = "int_range"
+    locie.loci_end.mapping.type = "long_range"
 
     devs = Dict()
     devs.do_not_index_evidence.path_match = 'evidence.*'
