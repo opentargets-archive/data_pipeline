@@ -4,7 +4,12 @@ from addict import Dict
 
 def _get_evidence_string_generic_mapping():
     mmap = Dict()
-    mmap._routing.required = True
+    # it was previously required True
+    # better approach
+    # mmap._routing.required = True
+    # mmap._routing.path = "<target_path>" # to change to a real path
+
+    mmap._routing.required = False
     mmap.properties.target.properties.id.type = 'keyword'
     mmap.properties.target.properties.target_type.type = 'keyword'
     mmap.properties.target.properties.activity.type = 'keyword'

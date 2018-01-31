@@ -425,8 +425,8 @@ class EvidenceManager():
             pos_begin = gene_obj['gene_start']
             pos_end = gene_obj['gene_end']
 
-            loc.gene[chr].begin = pos_begin
-            loc.gene[chr].end = pos_end
+            loc[chr].gene_begin = pos_begin
+            loc[chr].gene_end = pos_end
 
             # setting variant loci info if any
             if 'variant' in ev.evidence:
@@ -437,8 +437,8 @@ class EvidenceManager():
                     vpos_begin = ev.evidence['variant']['pos']
                     vpos_end = ev.evidence['variant']['pos']
 
-                    loc.variant[vchr]['begin'] = vpos_begin
-                    loc.variant[vchr]['end'] = vpos_end
+                    loc[vchr].variant_begin = vpos_begin
+                    loc[vchr].variant_end = vpos_end
 
             # setting all loci into the evidence
             ev.evidence['loci'] = loc.to_dict()
@@ -1100,8 +1100,11 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
             idev,
             ev.to_json(),
         )
-        loader_kwargs = dict(create_index=False,
-                             routing=ev.evidence['target']['id'])
+        # remove routing doesnt make sense with one node
+        # loader_kwargs = dict(create_index=False,
+        #                      routing=ev.evidence['target']['id'])
+
+        loader_kwargs = {"create_index": False}
         return loader_args, loader_kwargs
 
 
