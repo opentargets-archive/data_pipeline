@@ -429,16 +429,17 @@ class EvidenceManager():
             loc[chr].gene_end = pos_end
 
             # setting variant loci info if any
-            if 'variant' in ev.evidence:
+            # only snps are supported at the moment
+            if 'variant' in ev.evidence and \
+                    'chrom' in ev.evidence['variant'] and \
+                    'pos' in ev.evidence['variant']:
                 vchr = ev.evidence['variant']['chrom']
 
-                # only snps are supported at the moment
-                if 'pos' in ev.evidence['variant']:
-                    vpos_begin = ev.evidence['variant']['pos']
-                    vpos_end = ev.evidence['variant']['pos']
+                vpos_begin = ev.evidence['variant']['pos']
+                vpos_end = ev.evidence['variant']['pos']
 
-                    loc[vchr].variant_begin = vpos_begin
-                    loc[vchr].variant_end = vpos_end
+                loc[vchr].variant_begin = vpos_begin
+                loc[vchr].variant_end = vpos_end
 
             # setting all loci into the evidence
             ev.evidence['loci'] = loc.to_dict()
