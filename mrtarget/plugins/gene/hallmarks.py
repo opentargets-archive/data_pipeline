@@ -93,10 +93,10 @@ class Hallmarks(IPlugin):
                             }
 
                     try:
-                        self.hallmarks[GeneSymbol]["hallmarks"].append(line)
+                        self.hallmarks[GeneSymbol]["cancer_hallmarks"].append(line)
                     except KeyError:
-                        self.hallmarks[GeneSymbol]["hallmarks"] = list()
-                        self.hallmarks[GeneSymbol]["hallmarks"].append(line)
+                        self.hallmarks[GeneSymbol]["cancer_hallmarks"] = list()
+                        self.hallmarks[GeneSymbol]["cancer_hallmarks"].append(line)
 
                 elif Description_1 == 'function summary':
                     line = {"pmid": PMID, "description": Description}
