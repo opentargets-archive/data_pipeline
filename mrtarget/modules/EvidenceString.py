@@ -4,6 +4,7 @@ import logging
 import math
 import os
 from collections import Counter
+import addict
 
 import pickle
 from tqdm import tqdm
@@ -412,6 +413,40 @@ class EvidenceManager():
             id_not_in_ensembl = True
 
         return new_target_id, id_not_in_ensembl
+
+    def inject_loci(self, ev):
+        gene_id = ev.evidence['target']['id']
+        loc = addict.Dict()
+
+        if gene_id in self.available_genes:
+            # setting gene loci info
+            gene_obj = self.available_genes[gene_id]
+            chr = gene_obj['chromosome']
+            pos_begin = gene_obj['gene_start']
+            pos_end = gene_obj['gene_end']
+
+            loc[chr].gene_begin = pos_begin
+            loc[chr].gene_end = pos_end
+
+            # setting variant loci info if any
+            # only snps are supported at the moment
+            if 'variant' in ev.evidence and \
+                    'chrom' in ev.evidence['variant'] and \
+                    'pos' in ev.evidence['variant']:
+                vchr = ev.evidence['variant']['chrom']
+
+                vpos_begin = ev.evidence['variant']['pos']
+                vpos_end = ev.evidence['variant']['pos']
+
+                loc[vchr].variant_begin = vpos_begin
+                loc[vchr].variant_end = vpos_end
+
+            # setting all loci into the evidence
+            ev.evidence['loci'] = loc.to_dict()
+
+        else:
+            self.logger.error('inject_loci cannot find gene id %s', gene_id)
+
 
     @staticmethod
     def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
@@ -1029,7 +1064,8 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         self.es = None
         self.loader = None
         self.lookup_data = lookup_data
-        self.evidence_manager = EvidenceManager(lookup_data)
+        # self.evidence_manager = EvidenceManager(lookup_data)
+        self.evidence_manager = None
         self.inject_literature = inject_literature
         self.pub_fetcher = None
         self.global_stats = global_stats
@@ -1038,12 +1074,10 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         super(EvidenceProcesser, self).init()
         self.logger = logging.getLogger(__name__)
         self.lookup_data.set_r_server(self.get_r_server())
-        self.evidence_manager.available_ecos._table.set_r_server(self.get_r_server())
-        self.evidence_manager.available_efos._table.set_r_server(self.get_r_server())
-        self.evidence_manager.available_genes._table.set_r_server(self.get_r_server())
         self.pub_fetcher = PublicationFetcher(new_es_client(hosts=Config.ELASTICSEARCH_NODES_PUB))
-        # self.es = new_es_client()
 
+        # moved from __init__ as this is executed on a process so it should need be process mem
+        self.evidence_manager = EvidenceManager(self.lookup_data)
 
     def process(self, data):
         idev, ev_raw = data
@@ -1060,14 +1094,18 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         else:
             raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
 
+        self.evidence_manager.inject_loci(ev)
         loader_args = (
             Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
             ev.get_doc_name(),
             idev,
             ev.to_json(),
         )
-        loader_kwargs = dict(create_index=False,
-                             routing=ev.evidence['target']['id'])
+        # remove routing doesnt make sense with one node
+        # loader_kwargs = dict(create_index=False,
+        #                      routing=ev.evidence['target']['id'])
+
+        loader_kwargs = {"create_index": False}
         return loader_args, loader_kwargs
 
 
@@ -1346,6 +1384,7 @@ class EvidenceStringProcess():
                         file=tqdm_out,
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence
+
             EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)
             EvidenceManager.fix_disease_id(ev)
 
