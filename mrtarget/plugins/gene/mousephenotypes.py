@@ -237,7 +237,7 @@ class MousePhenotypes(IPlugin):
                                         "mp_label": mp_label
                                     })
                 else:
-                    self._logger.debug("could not process %i %s"%(len(array), line)
+                    self._logger.debug("could not process %i %s", len(array), line)
 
             self._logger.info("Count symbols %i / %i with phenotypes", len(count_accepted_symbols), len(count_symbols))
 
