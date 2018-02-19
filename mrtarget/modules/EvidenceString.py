@@ -4,6 +4,7 @@ import logging
 import math
 import os
 from collections import Counter
+import addict
 
 import pickle
 from tqdm import tqdm
@@ -15,8 +16,8 @@ from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess, WhiteCollarWorker
-from mrtarget.common.connection import PipelineConnectors
+from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common.connection import new_es_client
 from mrtarget.modules import GeneData
 from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO
@@ -26,7 +27,6 @@ from mrtarget.modules.Literature import Publication, PublicationFetcher
 
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger, level=logging.INFO)
-# logger = multiprocessing.get_logger()
 
 
 '''line profiler code'''
@@ -413,6 +413,40 @@ class EvidenceManager():
             id_not_in_ensembl = True
 
         return new_target_id, id_not_in_ensembl
+
+    def inject_loci(self, ev):
+        gene_id = ev.evidence['target']['id']
+        loc = addict.Dict()
+
+        if gene_id in self.available_genes:
+            # setting gene loci info
+            gene_obj = self.available_genes[gene_id]
+            chr = gene_obj['chromosome']
+            pos_begin = gene_obj['gene_start']
+            pos_end = gene_obj['gene_end']
+
+            loc[chr].gene_begin = pos_begin
+            loc[chr].gene_end = pos_end
+
+            # setting variant loci info if any
+            # only snps are supported at the moment
+            if 'variant' in ev.evidence and \
+                    'chrom' in ev.evidence['variant'] and \
+                    'pos' in ev.evidence['variant']:
+                vchr = ev.evidence['variant']['chrom']
+
+                vpos_begin = ev.evidence['variant']['pos']
+                vpos_end = ev.evidence['variant']['pos']
+
+                loc[vchr].variant_begin = vpos_begin
+                loc[vchr].variant_end = vpos_end
+
+            # setting all loci into the evidence
+            ev.evidence['loci'] = loc.to_dict()
+
+        else:
+            self.logger.error('inject_loci cannot find gene id %s', gene_id)
+
 
     @staticmethod
     def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
@@ -1030,7 +1064,8 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         self.es = None
         self.loader = None
         self.lookup_data = lookup_data
-        self.evidence_manager = EvidenceManager(lookup_data)
+        # self.evidence_manager = EvidenceManager(lookup_data)
+        self.evidence_manager = None
         self.inject_literature = inject_literature
         self.pub_fetcher = None
         self.global_stats = global_stats
@@ -1038,14 +1073,11 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
     def init(self):
         super(EvidenceProcesser, self).init()
         self.logger = logging.getLogger(__name__)
-        connector = PipelineConnectors()
-        connector.init_services_connections()
-        self.lookup_data.set_r_server(connector.r_server)
-        self.evidence_manager.available_ecos._table.set_r_server(connector.r_server)
-        self.evidence_manager.available_efos._table.set_r_server(connector.r_server)
-        self.evidence_manager.available_genes._table.set_r_server(connector.r_server)
-        self.pub_fetcher = PublicationFetcher(connector.es_pub)
-        self.es = connector.es
+        self.lookup_data.set_r_server(self.get_r_server())
+        self.pub_fetcher = PublicationFetcher(new_es_client(hosts=Config.ELASTICSEARCH_NODES_PUB))
+
+        # moved from __init__ as this is executed on a process so it should need be process mem
+        self.evidence_manager = EvidenceManager(self.lookup_data)
 
     def process(self, data):
         idev, ev_raw = data
@@ -1062,14 +1094,18 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         else:
             raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
 
+        self.evidence_manager.inject_loci(ev)
         loader_args = (
             Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
             ev.get_doc_name(),
             idev,
             ev.to_json(),
         )
-        loader_kwargs = dict(create_index=False,
-                             routing=ev.evidence['target']['id'])
+        # remove routing doesnt make sense with one node
+        # loader_kwargs = dict(create_index=False,
+        #                      routing=ev.evidence['target']['id'])
+
+        loader_kwargs = {"create_index": False}
         return loader_args, loader_kwargs
 
 
@@ -1244,7 +1280,8 @@ class EvidenceStringProcess():
             self.es_query.delete_evidence_for_datasources(datasources)
 
         '''create queues'''
-        number_of_workers = Config.WORKERS_NUMBER
+        self.logger.info('limiting the number or workers to a max of 16 or cpucount')
+        number_of_workers = max(16, Config.WORKERS_NUMBER)
         # too many storers
         number_of_storers = min(16, number_of_workers / 2 + 1,)
         queue_per_worker = 250
@@ -1269,30 +1306,26 @@ class EvidenceStringProcess():
                                               )
         q_reporter.start()
 
-        '''create workers'''
+        self.logger.info('evidence processer process with %d processes', number_of_workers)
+        self.logger.info('trying with less workers because global stats')
+        scorers = [EvidenceProcesser(evidence_q,
+                                    None,
+                                    store_q,
+                                    lookup_data=lookup_data,
+                                    inject_literature=inject_literature,
+                                    global_stats=global_stats)
+                                    for _ in range(number_of_workers)]
+        for w in scorers:
+            w.start()
 
-        scorers = WhiteCollarWorker(target=EvidenceProcesser,
-                                    pool_size=number_of_workers,
-                                    queue_in=evidence_q,
-                                    redis_path=None,
-                                    queue_out=store_q,
-                                    kwargs=dict(
-                                        lookup_data=lookup_data,
-                                        inject_literature=inject_literature,
-                                        global_stats=global_stats
-                                    )
-                                    )
-        scorers.start()
-
-        loaders = WhiteCollarWorker(target=LoaderWorker,
-                                    pool_size=number_of_storers,
-                                    queue_in=store_q,
-                                    redis_path=None,
-                                    kwargs=dict(dry_run=dry_run))
-
-        loaders.start()
-
-
+        self.logger.info('loader worker process with %d processes', number_of_storers)
+        loaders = [LoaderWorker(store_q,
+                                None,
+                                chunk_size=1000 / number_of_storers,
+                                dry_run=dry_run
+                                ) for _ in range(number_of_storers)]
+        for w in loaders:
+            w.start()
 
         targets_with_data = set()
         for row in tqdm(self.get_evidence(page_size=get_evidence_page_size, datasources=datasources),
@@ -1309,9 +1342,16 @@ class EvidenceStringProcess():
 
         evidence_q.set_submission_finished()
 
-        '''wait for all workers to finish'''
-        scorers.join()
-        loaders.join()
+        self.logger.info('collecting loaders')
+        for w in loaders:
+            w.join()
+
+        self.logger.info('collecting scorers')
+        for w in scorers:
+            w.join()
+
+        self.logger.info('collecting reporter')
+        q_reporter.join()
 
 
         self.logger.info('flushing data to index')
@@ -1344,6 +1384,7 @@ class EvidenceStringProcess():
                         file=tqdm_out,
                         unit_scale=True):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence
+
             EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)
             EvidenceManager.fix_disease_id(ev)
 
