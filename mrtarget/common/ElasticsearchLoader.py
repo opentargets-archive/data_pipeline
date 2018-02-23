@@ -124,7 +124,7 @@ class Loader():
             submission_dict['_parent']=parent
         self.cache.append(submission_dict)
 
-        print "CACHE SIZE %i"%len(self.cache)
+        self.logger.debug("CACHE SIZE %i"%len(self.cache))
         if self.cache and ((len(self.cache) == self.chunk_size) or
                 (time.time() - self._last_flush_time >= self.max_flush_interval)):
             self.flush()

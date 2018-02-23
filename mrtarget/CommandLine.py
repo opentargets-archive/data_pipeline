@@ -331,7 +331,7 @@ def main():
         if args.sea or run_full_pipeline:
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
-                SearchObjectProcess(loader, connectors.r_server).process_all(skip_drugs=True, skip_targets=True, skip_diseases=False, limit=10)
+                SearchObjectProcess(loader, connectors.r_server).process_all(skip_drugs=False, skip_targets=False, skip_diseases=False, limit=0)
         if args.qc or run_full_pipeline:
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:

@@ -197,7 +197,7 @@ class ChEMBLLookup(object):
                 molecule_id=molecule_ids[0]
                 self._logger.info(molecule_id)
                 if c % 200 == 0:
-                    print('retrieving ChEMBL evidence... %s' % molecule_id)
+                    self._logger.debug('retrieving ChEMBL evidence... %s' % molecule_id)
                 disease_id = e['disease']['id']
                 target_id = e['target']['id']
                 if disease_id not in self.disease2molecule:

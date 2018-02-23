@@ -200,12 +200,13 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
         self.es_query = None
         self.chunk_size = chunk_size
         self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
 
     def init(self):
         super(SearchObjectAnalyserWorker, self).init()
         self.lookup.set_r_server(self.r_server)
         if self.chunk_size > 0:
-            print "CHUNK SIZE = %i"%self.chunk_size
+            self.logger.debug("CHUNK SIZE = %i"%self.chunk_size)
             self.loader = Loader(dry_run = self.dry_run, chunk_size=self.chunk_size)
         else:
             self.loader = Loader(dry_run = self.dry_run)
@@ -235,7 +236,6 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
                 so.drugs['evidence_data'] = list(drugs_synonyms)
 
         elif data[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
-            print 'Process disease from queue'
             ass_data = self.es_query.get_associations_for_disease(data['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
             so.set_associations(self._summarise_association(ass_data.top_associations),
                                 ass_data.associations_count)
@@ -334,4 +334,3 @@ class SearchObjectProcess(object):
 
         self.logger.info(queue.get_status(r_server=self.r_server))
         self.logger.info('ALL DONE! Execution time: %s'%(datetime.now()-start_time))
-        print 'ALL DONE! Execution time: %s'%(datetime.now()-start_time)
