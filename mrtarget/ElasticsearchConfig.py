@@ -144,7 +144,7 @@ class ElasticSearchConfiguration():
     efom.settings.refresh_interval = '60s'
     efom.settings.analysis.filter.edgeNGram_filter.type = 'edgeNGram'
     efom.settings.analysis.filter.edgeNGram_filter.min_gram = '2'
-    efom.settings.analysis.filter.edgeNGram_filter.max_gram = '20'
+    efom.settings.analysis.filter.edgeNGram_filter.max_gram = '40'
     efom.settings.analysis.filter.edgeNGram_filter.token_chars = ['letter', 'digit']
     efom.settings.analysis.filter.simple_filter.type = 'standard'
     efom.settings.analysis.filter.simple_filter.token_chars = ['letter', 'digit']
@@ -576,7 +576,7 @@ class ElasticSearchConfiguration():
                     "edgeNGram_filter": {
                         "type": "edgeNGram",
                         "min_gram": "2",
-                        "max_gram": "20",
+                        "max_gram": "40",
                         "token_chars": [
                             "letter",
                             "digit"

@@ -185,6 +185,7 @@ class ChEMBLLookup(object):
 
     def get_molecules_from_evidence(self):
         self._logger.debug('get_molecules_from_evidence')
+        c = 0
         for e in self.es_query.get_all_evidence_for_datasource(['chembl'],
                                                                fields=['target.id',
                                                                        'disease.id',
@@ -195,7 +196,8 @@ class ChEMBLLookup(object):
             if molecule_ids:
                 molecule_id=molecule_ids[0]
                 self._logger.info(molecule_id)
-                print('retrieving ChEMBL evidence... %s' % molecule_id)
+                if c % 200 == 0:
+                    print('retrieving ChEMBL evidence... %s' % molecule_id)
                 disease_id = e['disease']['id']
                 target_id = e['target']['id']
                 if disease_id not in self.disease2molecule:
