@@ -92,6 +92,44 @@ def _get_relation_generic_mapping():
     return mmap.to_dict()
 
 
+def _generate_ngram_filter():
+    '''generate a edge ngram filter and return the dictionary to add
+    as a filter for an analyzer filter list
+    '''
+    ngram = Dict()
+    ngram.type = 'edgeNGram'
+    ngram.min_gram = '2'
+    ngram.max_gram = '40'
+    ngram.token_chars = ['letter', 'digit']
+
+    return ngram.to_dict()
+
+
+def _generate_word_delimiter_filter():
+    '''generate a edge ngram filter and return the dictionary to add
+    as a filter for an analyzer filter list
+    '''
+    wordd = Dict()
+    wordd.type = 'word_delimiter'
+    wordd.generate_word_parts = False
+    wordd.split_on_case_change = False
+    wordd.split_on_numerics = False
+
+    return wordd.to_dict()
+
+
+def _generate_ngram_analyzer(withFilters=[]):
+    '''generate a custom analyzer ready to inject in a dict of
+    analizers
+    '''
+    ngram = Dict()
+    ngram.type = 'custom'
+    ngram.tokenizer = 'whitespace'
+    ngram.filter = withFilters
+
+    return ngram.to_dict()
+
+
 class ElasticSearchConfiguration():
     available_databases = Config().DATASOURCE_TO_DATATYPE_MAPPING.keys()
     available_databases.append('other')
@@ -142,17 +180,15 @@ class ElasticSearchConfiguration():
     efom.settings.number_of_shards = generic_shard_number
     efom.settings.number_of_replicas = generic_replicas_number
     efom.settings.refresh_interval = '60s'
-    efom.settings.analysis.filter.edgeNGram_filter.type = 'edgeNGram'
-    efom.settings.analysis.filter.edgeNGram_filter.min_gram = '2'
-    efom.settings.analysis.filter.edgeNGram_filter.max_gram = '40'
-    efom.settings.analysis.filter.edgeNGram_filter.token_chars = ['letter', 'digit']
+    efom.settings.analysis.filter.edgeNGram_filter = _generate_ngram_filter()
+    efom.settings.analysis.filter.wordDelimiter_filter = _generate_word_delimiter_filter()
+
     efom.settings.analysis.filter.simple_filter.type = 'standard'
     efom.settings.analysis.filter.simple_filter.token_chars = ['letter', 'digit']
-    efom.settings.analysis.analyzer.edgeNGram_analyzer.type = 'custom'
-    efom.settings.analysis.analyzer.edgeNGram_analyzer.tokenizer = 'whitespace'
-    efom.settings.analysis.analyzer.edgeNGram_analyzer.filter = ["lowercase",
-                                                                 "asciifolding",
-                                                                 "edgeNGram_filter"]
+
+    efom.settings.analysis.analyzer.edgeNGram_analyzer = \
+        _generate_ngram_analyzer(withFilters=['lowercase', 'asciifolding', 'wordDelimiter_filter', 'edgeNGram_filter'])
+
     efom.settings.analysis.analyzer.whitespace_analyzer.type = 'custom'
     efom.settings.analysis.analyzer.whitespace_analyzer.tokenizer = 'whitespace'
     efom.settings.analysis.analyzer.whitespace_analyzer.filter = ["lowercase",
@@ -168,33 +204,20 @@ class ElasticSearchConfiguration():
             "refresh_interval": "60s",
             "analysis": {
                 "filter": {
-                    "edgeNGram_filter": {
-                        "type": "edgeNGram",
-                        "min_gram": "2",
-                        "max_gram": "20",
-                        "token_chars": [
-                            "letter",
-                            "digit"
-                        ]
-                    },
+                    "edgeNGram_filter": _generate_ngram_filter(),
                     "simple_filter": {
                         "type": "standard",
                         "token_chars": [
                             "letter",
                             "digit"
                         ]
-                    }
+                    },
+                    "wordDelimiter_filter": _generate_word_delimiter_filter()
                 },
                 "analyzer": {
-                    "edgeNGram_analyzer": {
-                        "type": "custom",
-                        "tokenizer": "whitespace",
-                        "filter": [
-                            "lowercase",
-                            "asciifolding",
-                            "edgeNGram_filter"
-                        ]
-                    },
+                    "edgeNGram_analyzer":
+                        _generate_ngram_analyzer(withFilters=['lowercase', 'asciifolding',
+                                                              'wordDelimiter_filter', 'edgeNGram_filter']),
                     "whitespace_analyzer": {
                         "type": "custom",
                         "tokenizer": "whitespace",
@@ -573,33 +596,19 @@ class ElasticSearchConfiguration():
             "refresh_interval": "60s",
             "analysis": {
                 "filter": {
-                    "edgeNGram_filter": {
-                        "type": "edgeNGram",
-                        "min_gram": "2",
-                        "max_gram": "40",
-                        "token_chars": [
-                            "letter",
-                            "digit"
-                        ]
-                    },
+                    "edgeNGram_filter": _generate_ngram_filter(),
                     "simple_filter": {
                         "type": "standard",
                         "token_chars": [
                             "letter",
                             "digit"
                         ]
-                    }
+                    },
+                    "wordDelimiter_filter": _generate_word_delimiter_filter()
                 },
                 "analyzer": {
-                    "edgeNGram_analyzer": {
-                        "type": "custom",
-                        "tokenizer": "whitespace",
-                        "filter": [
-                            "lowercase",
-                            "asciifolding",
-                            "edgeNGram_filter"
-                        ]
-                    },
+                    "edgeNGram_analyzer": _generate_ngram_analyzer(withFilters=['lowercase', 'asciifolding',
+                                                                                'wordDelimiter_filter', 'edgeNGram_filter']),
                     "whitespace_analyzer": {
                         "type": "custom",
                         "tokenizer": "whitespace",

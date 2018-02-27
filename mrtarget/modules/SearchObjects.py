@@ -213,6 +213,7 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
         self.es_query = ESQuery(self.loader.es)
 
     def close(self):
+        self.loader.flush()
         super(SearchObjectAnalyserWorker, self).close()
 
     def process(self, data):
@@ -283,7 +284,7 @@ class SearchObjectProcess(object):
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self, dry_run=False, skip_drugs=False, skip_targets=False, skip_diseases=False, limit=0):
+    def process_all(self, dry_run=False, skip_targets=False, skip_diseases=False):
         ''' process all the objects that needs to be returned by the search method
         :return:
         '''
@@ -297,33 +298,25 @@ class SearchObjectProcess(object):
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
         lookup_data = LookUpDataRetriever(self.loader.es,self.r_server,data_types=[LookUpDataType.CHEMBL_DRUGS]).lookup
-        chunk_size = 0
-        if limit > 0 and limit < 1000:
-            m = int(limit/Config.WORKERS_NUMBER)
-            if m == 0:
-                chunk_size = 1
-            else:
-                chunk_size = m
 
         workers = [SearchObjectAnalyserWorker(queue,
                                               None,
                                               lookup=lookup_data,
-                                              dry_run=dry_run,
-                                              chunk_size = chunk_size) for i in range(Config.WORKERS_NUMBER)]
-        # workers = [SearchObjectAnalyserWorker(queue)]
+                                              dry_run=dry_run) for i in range(Config.WORKERS_NUMBER)]
+
         for w in workers:
             w.start()
 
         if not skip_targets:
             '''get gene simplified objects and push them to the processing queue'''
-            for i,target in enumerate(self.esquery.get_all_targets(limit=limit)):
+            for i,target in enumerate(self.esquery.get_all_targets()):
                 target[SearchObjectTypes.__ROOT__] = SearchObjectTypes.TARGET
                 queue.put(target, self.r_server)
 
         if not skip_diseases:
             '''get disease objects  and push them to the processing queue'''
             self.logger.info('get disease objects and push them to the processing queue')
-            for i,disease in enumerate(self.esquery.get_all_diseases(limit=limit)):
+            for i,disease in enumerate(self.esquery.get_all_diseases()):
                 disease[SearchObjectTypes.__ROOT__] = SearchObjectTypes.DISEASE
                 queue.put(disease, self.r_server)
 

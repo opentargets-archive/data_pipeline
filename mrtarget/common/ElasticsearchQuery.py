@@ -82,7 +82,7 @@ class ESQuery(object):
 
         return self.count_elements_in_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
 
-    def get_all_diseases(self, limit=0, fields = None):
+    def get_all_diseases(self, fields = None):
         source = self._get_source_from_fields(fields)
         count = -1
 
@@ -98,16 +98,8 @@ class ESQuery(object):
                             index=Loader.get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,True),
                             timeout="10m",
                             )
-
-        if limit > 0:
-            for hit in res:
-                if count < limit:
-                    count += 1
-                    print "Yield disease"
-                    yield hit['_source']
-        else:
-            for hit in res:
-                yield hit['_source']
+        for hit in res:
+            yield hit['_source']
 
     def count_all_diseases(self):
 
@@ -1017,7 +1009,7 @@ class ESQuery(object):
 
 
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*', check_custom_idxs=True)
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*', True)
         doc_type = None
 
         if datasources:
