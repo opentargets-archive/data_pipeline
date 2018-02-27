@@ -84,8 +84,6 @@ class ESQuery(object):
 
     def get_all_diseases(self, fields = None):
         source = self._get_source_from_fields(fields)
-        count = -1
-
         res = helpers.scan(client=self.handler,
                             query={"query": {
                                       "match_all": {}
