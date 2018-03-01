@@ -116,6 +116,7 @@ def _generate_word_delimiter_filter():
     wordd.generate_word_parts = False
     wordd.split_on_case_change = False
     wordd.split_on_numerics = False
+    wordd.preserve_original = True
 
     return wordd.to_dict()
 
