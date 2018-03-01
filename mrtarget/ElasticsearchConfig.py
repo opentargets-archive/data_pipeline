@@ -98,9 +98,9 @@ def _generate_ngram_filter():
     '''
     ngram = Dict()
     ngram.type = 'edgeNGram'
-    ngram.min_gram = '2'
-    ngram.max_gram = '40'
-    ngram.token_chars = ['letter', 'digit']
+    ngram.min_gram = '1'
+    ngram.max_gram = '10'
+    ngram.token_chars = ['letter', 'digit', 'punctuation']
 
     return ngram.to_dict()
 
@@ -196,7 +196,8 @@ class ElasticSearchConfiguration():
     efom.settings.analysis.analyzer.whitespace_analyzer.tokenizer = 'whitespace'
     efom.settings.analysis.analyzer.whitespace_analyzer.filter = ["lowercase",
                                                                  "asciifolding",
-                                                                 "simple_filter"]
+                                                                 "simple_filter",
+                                                                  "fingerprint"]
 
     efo_data_mapping = efom.to_dict()
 
@@ -228,6 +229,7 @@ class ElasticSearchConfiguration():
                             "lowercase",
                             "asciifolding",
                             "simple_filter",
+                            "fingerprint"
                         ]
                     }
                 }
@@ -619,6 +621,7 @@ class ElasticSearchConfiguration():
                             "lowercase",
                             "asciifolding",
                             "simple_filter",
+                            "fingerprint"
                         ]
                     }
                 }
