@@ -111,12 +111,15 @@ def _generate_word_delimiter_filter():
     '''
     wordd = Dict()
     wordd.type = 'word_delimiter'
-    wordd.catenate_words = True
-    wordd.catenate_numbers = True
+    wordd.catenate_words = False
+    wordd.catenate_numbers = False
     wordd.generate_word_parts = True
+    wordd.generate_number_parts = True
+    wordd.catenate_all = False
     wordd.split_on_case_change = False
     wordd.split_on_numerics = False
     wordd.preserve_original = True
+    wordd.stem_english_possessive = True
 
     return wordd.to_dict()
 
