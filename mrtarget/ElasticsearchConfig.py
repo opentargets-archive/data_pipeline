@@ -209,8 +209,7 @@ class ElasticSearchConfiguration():
     efom.settings.analysis.analyzer.whitespace_analyzer.tokenizer = 'whitespace'
     efom.settings.analysis.analyzer.whitespace_analyzer.filter = ["lowercase",
                                                                  "asciifolding",
-                                                                 "simple_filter",
-                                                                  "fingerprint"]
+                                                                 "simple_filter"]
 
     efo_data_mapping = efom.to_dict()
 
@@ -241,9 +240,7 @@ class ElasticSearchConfiguration():
                         "filter": [
                             "lowercase",
                             "asciifolding",
-                            "simple_filter",
-                            "fingerprint"
-                        ]
+                            "simple_filter"]
                     },
                     "onechunk_analyzer": _generate_1chunk_analyzer()
                 }
@@ -634,9 +631,7 @@ class ElasticSearchConfiguration():
                         "filter": [
                             "lowercase",
                             "asciifolding",
-                            "simple_filter",
-                            "fingerprint"
-                        ]
+                            "simple_filter"]
                     },
                     "onechunk_analyzer": _generate_1chunk_analyzer()
                 }
