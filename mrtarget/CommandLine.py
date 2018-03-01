@@ -154,6 +154,12 @@ def main():
     parser.add_argument("--do-nothing", dest='do_nothing',
                         help="to be used just for test",
                         action='store_true', default=False)
+    parser.add_argument("--skip-diseases", dest='skip_diseases',
+                        help="Skip adding diseases to the search index",
+                        action='store_true', default=False)
+    parser.add_argument("--skip-targets", dest='skip_targets',
+                        help="Skip adding targets to the search index",
+                        action='store_true', default=False)
     parser.add_argument("--schema-version", dest='schema_version',
                         help="set the schema version aka 'branch' name",
                         action='store', default='master')
@@ -183,6 +189,9 @@ def main():
 
     if args.redis_port:
         Config.REDISLITE_DB_PORT = args.redis_port
+
+    Config.SEA_SKIP_DISEASES = args.skip_diseases
+    Config.SEA_SKIP_TARGETS = args.skip_targets
 
     enable_profiling(args.profile)
 
@@ -331,7 +340,8 @@ def main():
         if args.sea or run_full_pipeline:
             do_all = (SearchObjectActions.ALL in args.sea) or run_full_pipeline
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
-                SearchObjectProcess(loader, connectors.r_server).process_all()
+                SearchObjectProcess(loader, connectors.r_server).process_all(skip_targets=args.skip_targets,
+                                                                             skip_diseases=args.skip_diseases)
         if args.qc or run_full_pipeline:
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:
