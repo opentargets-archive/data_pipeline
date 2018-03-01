@@ -133,6 +133,18 @@ def _generate_ngram_analyzer(withFilters=[]):
     return ngram.to_dict()
 
 
+def _generate_1chunk_analyzer():
+    '''generate a custom analyzer ready to inject in a dict of
+    analizers
+    '''
+    ochunk = Dict()
+    ochunk.type = 'custom'
+    ochunk.tokenizer = 'keyword'
+    ochunk.filter = ["lowercase", "asciifolding", "simple_filter", "fingerprint"]
+
+    return ochunk.to_dict()
+
+
 class ElasticSearchConfiguration():
     available_databases = Config().DATASOURCE_TO_DATATYPE_MAPPING.keys()
     available_databases.append('other')
@@ -192,6 +204,7 @@ class ElasticSearchConfiguration():
     efom.settings.analysis.analyzer.edgeNGram_analyzer = \
         _generate_ngram_analyzer(withFilters=['lowercase', 'asciifolding', 'wordDelimiter_filter', 'edgeNGram_filter'])
 
+    efom.settings.analysis.analyzer.onechunk_analyzer = _generate_1chunk_analyzer()
     efom.settings.analysis.analyzer.whitespace_analyzer.type = 'custom'
     efom.settings.analysis.analyzer.whitespace_analyzer.tokenizer = 'whitespace'
     efom.settings.analysis.analyzer.whitespace_analyzer.filter = ["lowercase",
@@ -231,7 +244,8 @@ class ElasticSearchConfiguration():
                             "simple_filter",
                             "fingerprint"
                         ]
-                    }
+                    },
+                    "onechunk_analyzer": _generate_1chunk_analyzer()
                 }
             }
         },
@@ -623,7 +637,8 @@ class ElasticSearchConfiguration():
                             "simple_filter",
                             "fingerprint"
                         ]
-                    }
+                    },
+                    "onechunk_analyzer": _generate_1chunk_analyzer()
                 }
             }
         },
