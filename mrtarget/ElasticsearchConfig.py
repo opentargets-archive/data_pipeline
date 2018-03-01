@@ -113,7 +113,7 @@ def _generate_word_delimiter_filter():
     wordd.type = 'word_delimiter'
     wordd.catenate_words = True
     wordd.catenate_numbers = True
-    wordd.generate_word_parts = False
+    wordd.generate_word_parts = True
     wordd.split_on_case_change = False
     wordd.split_on_numerics = False
     wordd.preserve_original = True
