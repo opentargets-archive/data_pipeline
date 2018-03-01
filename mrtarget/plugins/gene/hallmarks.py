@@ -18,6 +18,18 @@ class Hallmarks(IPlugin):
         self.hallmarks = {}
         self.tqdm_out = None
 
+        self.hallmarks_labels = ["escaping programmed cell death",
+                                  "angiogenesis",
+                                  "genome instability and mutations",
+                                  "change of cellular energetics",
+                                  "cell replicative immortality",
+                                  "invasion and metastasis",
+                                  "tumour promoting inflammation",
+                                  "suppression of growth",
+                                  "escaping immunic response to cancer",
+                                  "proliferative signalling",
+                                 ]
+
     def print_name(self):
         self._logger.info("Hallmarks of cancer gene data plugin")
 
@@ -59,57 +71,54 @@ class Hallmarks(IPlugin):
                 Short = re.sub(r'^"|"$', '', Short)
                 GeneSymbol = re.sub(r'^"|"$', '', GeneSymbol)
                 Description_1 = re.sub(r'^"|"$', '', Description_1)
+                Description_1.rstrip()
                 Description = re.sub(r'^"|"$', '', Description)
-                Description = PMID + ":" + Description
 
                 if GeneSymbol not in self.hallmarks:
                     self.hallmarks[GeneSymbol] = dict()
 
-                '''
-                    Census Hallmark Sections:
-                        "Function summary"
-                        "Cell division control"
-                        "Types of alteration in cancer"
-                        "Role in cancer"
-                        "Senescence"
-                '''
-                if Description_1 == 'function summary':
-                    try:
-                        self.hallmarks[GeneSymbol]["function_summary"].append(Description)
-                    except KeyError:
-                        self.hallmarks[GeneSymbol]["function_summary"] = list()
-                        self.hallmarks[GeneSymbol]["function_summary"].append(Description)
-                elif Description_1 == 'cell division control':
-                    try:
-                        self.hallmarks[GeneSymbol]["cell_division_control"].append(Description)
-                    except KeyError:
-                        self.hallmarks[GeneSymbol]["cell_division_control"] = list()
-                        self.hallmarks[GeneSymbol]["cell_division_control"].append(Description)
-                elif Description_1 == 'types of alteration in cancer':
-                    try:
-                        self.hallmarks[GeneSymbol]["alteration_in_cancer"].append(Description)
-                    except KeyError:
-                        self.hallmarks[GeneSymbol]["alteration_in_cancer"] = list()
-                        self.hallmarks[GeneSymbol]["alteration_in_cancer"].append(Description)
-                elif Description_1 == 'role in cancer':
-                    try:
-                        self.hallmarks[GeneSymbol]["role_in_cancer"].append(Description)
-                    except KeyError:
-                        self.hallmarks[GeneSymbol]["role_in_cancer"] = list()
-                        self.hallmarks[GeneSymbol]["role_in_cancer"].append(Description)
-                elif Description_1 == 'senescence':
-                    try:
-                        self.hallmarks[GeneSymbol]["senescence"].append(Description)
-                    except KeyError:
-                        self.hallmarks[GeneSymbol]["senescense"] = list()
-                        self.hallmarks[GeneSymbol]["senescense"].append(Description)
-                # Should be then the Hallmarks
-                else:
-                    # "Short"=> 'a' & 's'
-                    h = {Description_1: Description, "Short": Short}
+                if Description_1 in self.hallmarks_labels:
+                    promote  = False
+                    suppress = False
+
+                    if Short == 'a': promote = True
+                    if Short == 's': suppress = True
+
+                    line = {
+                             "label": Description_1,
+                             "description": Description,
+                             "promote": promote,
+                             "suppress": suppress,
+                             "pmid": PMID
+                            }
 
                     try:
-                        self.hallmarks[GeneSymbol]["info"].append(h)
+                        self.hallmarks[GeneSymbol]["cancer_hallmarks"].append(line)
                     except KeyError:
-                        self.hallmarks[GeneSymbol]["info"] = list()
-                        self.hallmarks[GeneSymbol]["info"].append(h)
+                        self.hallmarks[GeneSymbol]["cancer_hallmarks"] = list()
+                        self.hallmarks[GeneSymbol]["cancer_hallmarks"].append(line)
+
+                elif Description_1 == 'function summary':
+                    line = {"pmid": PMID, "description": Description}
+
+                    try:
+                        self.hallmarks[GeneSymbol]["function_summary"].append(line)
+                    except KeyError:
+                        self.hallmarks[GeneSymbol]["function_summary"] = list()
+                        self.hallmarks[GeneSymbol]["function_summary"].append(line)
+
+                else:
+                    line = {
+                             "attribute_name": Description_1,
+                             "description": Description,
+                             "pmid": PMID
+                           }
+
+                    try:
+                        self.hallmarks[GeneSymbol]["attributes"].append(line)
+                    except KeyError:
+                        self.hallmarks[GeneSymbol]["attributes"] = list()
+                        self.hallmarks[GeneSymbol]["attributes"].append(line)
+
+
+
