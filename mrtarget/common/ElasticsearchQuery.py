@@ -84,7 +84,6 @@ class ESQuery(object):
 
     def get_all_diseases(self, fields = None):
         source = self._get_source_from_fields(fields)
-
         res = helpers.scan(client=self.handler,
                             query={"query": {
                                       "match_all": {}
@@ -1008,7 +1007,7 @@ class ESQuery(object):
 
 
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*', True)
         doc_type = None
 
         if datasources:

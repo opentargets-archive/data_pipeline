@@ -502,6 +502,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 
     def close(self):
         super(ScoreStorerWorker, self).close()
+        self.loader.flush()
         self.loader.close()
 
 

@@ -191,21 +191,29 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
                  queue,
                  redis_path,
                  dry_run = False,
+                 chunk_size = 0,
                  lookup = None):
         super(SearchObjectAnalyserWorker, self).__init__(queue,redis_path)
         self.queue = queue
         self.lookup = lookup
         self.loader = None
         self.es_query = None
+        self.chunk_size = chunk_size
         self.dry_run = dry_run
+        self.logger = logging.getLogger(__name__)
 
     def init(self):
         super(SearchObjectAnalyserWorker, self).init()
         self.lookup.set_r_server(self.r_server)
-        self.loader = Loader(dry_run = self.dry_run)
+        if self.chunk_size > 0:
+            self.logger.debug("CHUNK SIZE = %i"%self.chunk_size)
+            self.loader = Loader(dry_run = self.dry_run, chunk_size=self.chunk_size)
+        else:
+            self.loader = Loader(dry_run = self.dry_run)
         self.es_query = ESQuery(self.loader.es)
 
     def close(self):
+        self.loader.flush()
         super(SearchObjectAnalyserWorker, self).close()
 
     def process(self, data):
@@ -244,6 +252,7 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
 
 
         '''store search objects'''
+        #print so.to_json()
         self.loader.put(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
                    Config.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
                    so.id,
@@ -275,7 +284,7 @@ class SearchObjectProcess(object):
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self, dry_run = False):
+    def process_all(self, dry_run=False, skip_targets=False, skip_diseases=False):
         ''' process all the objects that needs to be returned by the search method
         :return:
         '''
@@ -289,23 +298,27 @@ class SearchObjectProcess(object):
         q_reporter = RedisQueueStatusReporter([queue])
         q_reporter.start()
         lookup_data = LookUpDataRetriever(self.loader.es,self.r_server,data_types=[LookUpDataType.CHEMBL_DRUGS]).lookup
+
         workers = [SearchObjectAnalyserWorker(queue,
                                               None,
                                               lookup=lookup_data,
                                               dry_run=dry_run) for i in range(Config.WORKERS_NUMBER)]
-        # workers = [SearchObjectAnalyserWorker(queue)]
+
         for w in workers:
             w.start()
 
-        '''get gene simplified objects and push them to the processing queue'''
-        for i,target in enumerate(self.esquery.get_all_targets()):
-            target[SearchObjectTypes.__ROOT__] = SearchObjectTypes.TARGET
-            queue.put(target, self.r_server)
+        if not skip_targets:
+            '''get gene simplified objects and push them to the processing queue'''
+            for i,target in enumerate(self.esquery.get_all_targets()):
+                target[SearchObjectTypes.__ROOT__] = SearchObjectTypes.TARGET
+                queue.put(target, self.r_server)
 
-        '''get disease objects  and push them to the processing queue'''
-        for i,disease in enumerate(self.esquery.get_all_diseases()):
-            disease[SearchObjectTypes.__ROOT__] = SearchObjectTypes.DISEASE
-            queue.put(disease, self.r_server)
+        if not skip_diseases:
+            '''get disease objects  and push them to the processing queue'''
+            self.logger.info('get disease objects and push them to the processing queue')
+            for i,disease in enumerate(self.esquery.get_all_diseases()):
+                disease[SearchObjectTypes.__ROOT__] = SearchObjectTypes.DISEASE
+                queue.put(disease, self.r_server)
 
         queue.set_submission_finished(r_server=self.r_server)
 
