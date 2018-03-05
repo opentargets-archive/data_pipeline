@@ -50,11 +50,23 @@ jobs:
           name: Push to GCR
           command: |
             docker login -u _json_key -p "${GCR_JSON_KEY_FILE}" https://eu.gcr.io
-            ## branch tag and push
-            docker tag circle-${CIRCLE_SHA1} ${GCR_REPO}:${CIRCLE_BRANCH}
-            docker push ${GCR_REPO}:${CIRCLE_BRANCH}
-            ## SHA commit push
-            docker tag ${GCR_REPO}:${CIRCLE_BRANCH} ${GCR_REPO}:circle-${CIRCLE_SHA1}
+            if [ -n "${CIRCLE_TAG:+1}" ]; then
+              ## tag tag :) and push
+              echo -e "building for tag ${CIRCLE_TAG}"
+              docker tag circle-${CIRCLE_SHA1} "${GCR_REPO}:${CIRCLE_TAG}"
+              docker push "${GCR_REPO}:${CIRCLE_TAG}"
+              docker tag ${GCR_REPO}:${CIRCLE_TAG} ${GCR_REPO}:circle-${CIRCLE_SHA1}
+            elif [ -n "${CIRCLE_BRANCH:+1}" ]; then
+              ## branch tag and push
+              echo -e "building for branch"
+              docker tag circle-${CIRCLE_SHA1} ${GCR_REPO}:${CIRCLE_BRANCH}
+              docker push ${GCR_REPO}:${CIRCLE_BRANCH}
+              docker tag ${GCR_REPO}:${CIRCLE_BRANCH} ${GCR_REPO}:circle-${CIRCLE_SHA1}
+            else
+              echo -e "### No CIRCLE_TAG or CIRCLE_BRANCH defined"
+              exit 1
+            fi
+            ## sha commit push
             docker push ${GCR_REPO}:circle-${CIRCLE_SHA1}
             ## push latest if master
             if [ "$CIRCLE_BRANCH" = "master" ]
@@ -62,18 +74,51 @@ jobs:
                 docker tag ${GCR_REPO}:${CIRCLE_BRANCH} ${GCR_REPO}:latest
                 docker push ${GCR_REPO}:latest
             fi
-      
 
-# using a workflow allows better separation of steps and rerunning them,
-# however it was slower when i tested it (Jun 2017)
-# workflows:
-#   version: 2
-#   build_and_push:
-#     jobs:
-#       - build
-#       - push_containers:
-#           requires:
-#             - build
+
+
+  launch-hannibal:
+    working_directory: ~/circulate
+    docker:
+      - image: google/cloud-sdk
+    steps:
+      - checkout
+      - run:
+          name: Decode Google Cloud Credentials
+          command: echo ${GOOGLE_AUTH} | base64 -i --decode > ${HOME}/gcp-key.json
+      - run:
+          name: Authenticate to Google Cloud
+          command: |
+            gcloud auth activate-service-account --key-file ${HOME}/gcp-key.json
+      - run:
+          name: Clone hannibal and spin the machine
+          command: |
+            GIT_COMMIT_DESC=$(git log --format=oneline -n 1 $CIRCLE_SHA1)
+            echo $GIT_COMMIT_DESC
+            if [[ $GIT_COMMIT_DESC == *"[hannibal]"* ]]; then
+              echo "I like when a plan comes together :cigar:"
+              git clone https://github.com/opentargets/hannibal-luigi.git
+              if [ -n "${CIRCLE_TAG:+1}" ]; then
+                cd hannibal-luigi && ./launch_gce.sh $CIRCLE_TAG
+              elif [ -n "${CIRCLE_BRANCH:+1}" ]; then
+                cd hannibal-luigi && ./launch_gce.sh $CIRCLE_BRANCH
+              else
+              echo -e "### No CIRCLE_TAG or CIRCLE_BRANCH defined"
+              exit 1
+              fi
+            else
+              echo "plan aborted."
+            fi 
+            
+
+workflows:
+  version: 2
+  build_and_push:
+    jobs:
+      - build
+      - launch-hannibal:
+          requires:
+            - build
 
 
 # Ideally, we would fan these out, but we would need to persist the docker image
