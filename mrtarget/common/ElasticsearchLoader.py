@@ -367,4 +367,5 @@ class LoaderWorker(RedisQueueWorkerProcess):
 
     def close(self):
         super(LoaderWorker, self).close()
+        self.loader.flush()
         self.loader.close()

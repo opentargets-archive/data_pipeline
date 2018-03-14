@@ -408,8 +408,8 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
 
     def close(self):
         super(GeneObjectStorer, self).close()
+        self.loader.flush()
         self.loader.close()
-
 
 
 class GeneManager():
@@ -482,7 +482,6 @@ class GeneManager():
                                     None,
                                     queue,
                                     dry_run=dry_run) for i in range(4)]
-        # workers = [SearchObjectAnalyserWorker(queue)]
         for w in workers:
             w.start()
 
@@ -491,8 +490,13 @@ class GeneManager():
 
         queue.set_submission_finished(r_server=self.r_server)
 
+        self._logger.info('join workers')
         for w in workers:
             w.join()
+
+        # any queue process should join at the end using inverse order
+        self._logger.info('join queue reporter')
+        q_reporter.join()
 
         self._logger.info('all gene objects pushed to elasticsearch')
 

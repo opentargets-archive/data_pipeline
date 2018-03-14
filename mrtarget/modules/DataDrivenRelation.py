@@ -194,6 +194,7 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
 
         def close(self):
             super(DistanceStorageWorker, self).close()
+            self.loader.flush()
             self.loader.close()
 
 
@@ -744,6 +745,7 @@ class DataDrivenRelationProcess(object):
 
         logger.info('flushing data to index')
 
+        self.loader.flush()
         self.loader.close()
         self.es.indices.flush(
             '%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME),

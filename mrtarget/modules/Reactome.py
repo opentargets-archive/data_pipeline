@@ -120,6 +120,7 @@ class ReactomeProcess():
 
     def process_all(self):
         self._process_pathway_hierarchy()
+        self.loader.flush()
         self.loader.close()
 
     def _process_pathway_hierarchy(self):

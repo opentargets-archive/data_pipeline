@@ -257,6 +257,7 @@ class FileReaderProcess(RedisQueueWorkerProcess):
 
     def close(self):
         super(FileReaderProcess, self).close()
+        self.loader.flush()
         self.loader.close()
 
 

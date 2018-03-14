@@ -389,6 +389,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
 
     def close(self):
         super(ScoreProducer, self).close()
+        self.loader.flush()
         self.loader.close()
 
     def process(self, data):

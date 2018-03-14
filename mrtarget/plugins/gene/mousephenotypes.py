@@ -1,13 +1,9 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.modules.GeneData import Gene
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.Settings import Config
-import sys
 import urllib2
-import httplib
 import ujson as json
 from tqdm import tqdm
-import traceback
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -48,17 +44,17 @@ class MousePhenotypes(IPlugin):
         self._logger = logging.getLogger(__name__)
         self.loader = None
         self.r_server = None
-        self.mouse_genes = dict()
-        self.ancestors = dict()
+        self.mouse_genes = {}
+        self.ancestors = {}
         self.lookup_data = None
-        self.mps = dict()
-        self.mp_labels = dict()
-        self.mp_to_label = dict()
-        self.top_levels = dict()
-        self.homologs = dict()
-        self.human_genes = dict()
-        self.not_found_genes = dict()
-        self.human_ensembl_gene_ids = dict()
+        self.mps = {}
+        self.mp_labels = {}
+        self.mp_to_label = {}
+        self.top_levels = {}
+        self.homologs = {}
+        self.human_genes = {}
+        self.not_found_genes = {}
+        self.human_ensembl_gene_ids = {}
         self.tqdm_out = None
 
     def print_name(self):
@@ -104,7 +100,7 @@ class MousePhenotypes(IPlugin):
             self.mps[mp_id] = mp_class
             self.mp_labels[mp_class["label"]] = mp_id
             self.mp_to_label[mp_id] = mp_class["label"]
-            paths = list()
+            paths = []
             for path in mp_class["path"]:
                 item = path[0]
                 paths.append(item)
@@ -115,24 +111,24 @@ class MousePhenotypes(IPlugin):
 
     def assign_to_human_genes(self):
 
-        self._logger.debug("Assigning %i entries to human genes "%(len(self.mouse_genes)))
-        '''
-        for any mouse gene...
-        '''
-        for id, obj in self.mouse_genes.items():
-            '''
-            retrieve the human orthologs...
-            '''
-            for ortholog in obj["human_orthologs"]:
+        self._logger.debug("Assigning %i entries to human genes ", len(self.mouse_genes))
+
+        # for any mouse gene...
+        for _, gene in self.mouse_genes.iteritems():
+
+            self._logger.debug('retrieve the human orthologs...')
+            for ortholog in gene["human_orthologs"]:
                 human_gene_symbol = ortholog["gene_symbol"]
-                #self._logger.debug("Assign %i phenotype categories to from mouse %s to human %s"%(len(obj["phenotypes"].values()), obj["gene_symbol"], human_gene_symbol))
-                '''
-                assign all the phenotypes for this specific gene
-                all phenotypes are classified per category
-                '''
-                self.human_genes[human_gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : obj["gene_id"],
-                                                                          "mouse_gene_symbol" : obj["gene_symbol"],
-                                                                          "phenotypes" : obj["phenotypes"].values()})
+
+                self._logger.debug("Assign %i phenotype categories from mouse %s to human %s",
+                                    len(gene["phenotypes"]),
+                                    gene["gene_symbol"],
+                                    human_gene_symbol)
+                # assign all the phenotypes for this specific gene
+                # all phenotypes are classified per category
+                self.human_genes[human_gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : gene["gene_id"],
+                                                                          "mouse_gene_symbol" : gene["gene_symbol"],
+                                                                          "phenotypes" : gene["phenotypes"].values()})
 
                 #print json.dumps(self.human_genes[gene_symbol]["mouse_orthologs"], indent=2)
 
@@ -176,14 +172,14 @@ class MousePhenotypes(IPlugin):
                         mouse_gene_symbol = mouse_gene_symbol.strip()
                         if mouse_gene_id not in self.mouse_genes:
                             self.mouse_genes[mouse_gene_id] = {"gene_id": mouse_gene_id, "gene_symbol": mouse_gene_symbol,
-                                                         "phenotypes": dict(), "human_orthologs": list(), "phenotypes_summary" : list(phenotypes_raw.strip().split("\s+"))}
+                                                         "phenotypes": {}, "human_orthologs": [], "phenotypes_summary" : list(phenotypes_raw.strip().split("\s+"))}
                         self.mouse_genes[mouse_gene_id]["human_orthologs"].append(
                             {"gene_symbol": human_gene_symbol, "gene_id": None})
 
                         if human_gene_symbol not in self.human_genes:
                             self.human_genes[human_gene_symbol] = {"gene_symbol": human_gene_symbol, "ensembl_gene_id": None,
                                                              "gene_id": None,
-                                                             "mouse_orthologs": list()}
+                                                             "mouse_orthologs": []}
             self._logger.info("Retrieved %i mouse genes"%(len(self.mouse_genes.keys())))
             self._logger.info("get %s" % (Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES))
             req = urllib2.Request(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES)
