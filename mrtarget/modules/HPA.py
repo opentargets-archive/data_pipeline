@@ -534,6 +534,7 @@ class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
     def close(self):
         super(ExpressionObjectStorer, self).close()
+        self.loader.flush()
         self.loader.close()
 
 
@@ -554,6 +555,7 @@ class HPAProcess():
         self.hpa_merged_table = self.process_join()
 
         self.store_data(dry_run=dry_run)
+        self.loader.flush()
         self.loader.close()
 
     def process_normal_tissue(self):
