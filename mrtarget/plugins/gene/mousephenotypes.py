@@ -92,7 +92,7 @@ class MousePhenotypes(IPlugin):
                                                data_types=lookup_data_types,
                                                autoload=True
                                                ).lookup
-        mp_class = None
+
         for mp_id in self.lookup_data.available_mps.get_available_mp_ids():
             self._logger.debug(mp_id)
             mp_class = self.lookup_data.available_mps.get_mp(mp_id,
@@ -104,9 +104,11 @@ class MousePhenotypes(IPlugin):
             for path in mp_class["path"]:
                 item = path[0]
                 paths.append(item)
+
             self.top_levels[mp_id] = paths
 
-        #print json.dumps(mp_class, indent=2)
+            self._logger.debug("top_levels paths %d for mp_id %s and class label %s",
+                               len(paths), mp_id, mp_class['label'])
 
 
     def assign_to_human_genes(self):

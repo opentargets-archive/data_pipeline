@@ -339,7 +339,7 @@ class GeneSet():
 
 
     def iterate(self):
-        for k, v in self.genes.items():
+        for k, v in self.genes.iteritems():
             yield k, v
 
     def __len__(self):
