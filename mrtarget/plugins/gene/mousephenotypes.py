@@ -138,7 +138,7 @@ class MousePhenotypes(IPlugin):
     def write_all_to_file(self, filename=None):
 
         with open(filename, "wb") as fh:
-            for k,v in self.human_genes.items():
+            for k,v in self.human_genes.iteritems():
                 raw = json.dumps({ k: v })
                 fh.write("%s\n"%(raw))
 
@@ -158,7 +158,6 @@ class MousePhenotypes(IPlugin):
                     unit_scale=True,
                     leave=False,
                     file=self.tqdm_out):
-                self._logger.debug(line)
                 array = line.rstrip().split("\t")
                 if len(array) == 7:
                     (human_gene_symbol, a, b, c, mouse_gene_symbol, mouse_gene_id, phenotypes_raw) = array
@@ -182,12 +181,20 @@ class MousePhenotypes(IPlugin):
                             self.human_genes[human_gene_symbol] = {"gene_symbol": human_gene_symbol, "ensembl_gene_id": None,
                                                              "gene_id": None,
                                                              "mouse_orthologs": []}
-            self._logger.info("Retrieved %i mouse genes"%(len(self.mouse_genes.keys())))
-            self._logger.info("get %s" % (Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES))
+                        self._logger.debug("phenotype mouse structure for gene %s %s", human_gene_symbol,
+                                           str(self.mouse_genes[mouse_gene_id]))
+                        self._logger.debug("phenotype human structure for gene %s %s", human_gene_symbol,
+                                           str(self.human_genes[human_gene_symbol]) )
+
+            self._logger.info("Retrieved %i mouse genes", len(self.mouse_genes))
+
+            self._logger.info("get %s", Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES)
             req = urllib2.Request(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES)
             response = urllib2.urlopen(req)
+
+            del lines[:]
             lines = response.readlines()
-            self._logger.debug("get %i lines" % len(lines))
+            self._logger.debug("get %i lines from mgi report phenotyes file" % len(lines))
             count_symbols = set()
             count_accepted_symbols = set()
             for line in tqdm(
@@ -198,9 +205,10 @@ class MousePhenotypes(IPlugin):
                     unit_scale=True,
                     leave=False,
                     file=self.tqdm_out):
-                self._logger.debug(line)
                 # Allelic Composition	Allele Symbol(s)	Genetic Background	Mammalian Phenotype ID	PubMed ID	MGI Marker Accession ID
                 array = line.rstrip().split("\t")
+                self._logger.debug('mouse KO array %s', str(array))
+
                 if len(array) == 6:
                     (allelic_composition, allele_symbol, genetic_background, mp_id, pmid, mouse_gene_ids) = array
                     # check for double-mutant but exclude duplicates
@@ -208,12 +216,13 @@ class MousePhenotypes(IPlugin):
                         # exclude heritable phenotypic marker like http://www.debugrmatics.jax.org/marker/MGI:97446
                         count_symbols.add(mouse_gene_id)
                         if mouse_gene_id in self.mouse_genes:
+                            self._logger.debug('process mouse KO gene %s', mouse_gene_id)
                             count_accepted_symbols.add(mouse_gene_id)
                             self._logger.debug('get class for %s'% mp_id)
                             mp_class = self.mps[mp_id.replace(":", "_")]
                             mp_label = mp_class["label"]
 
-                            for k, v in PHENOTYPE_CATEGORIES.items():
+                            for k, v in PHENOTYPE_CATEGORIES.iteritems():
                                 if k not in self.mouse_genes[mouse_gene_id]["phenotypes"]:
                                     self.mouse_genes[mouse_gene_id]["phenotypes"][k] = \
                                         {
@@ -224,7 +233,7 @@ class MousePhenotypes(IPlugin):
 
                             # it's possible that there are multiple paths to the same root.
                             mp_category_ids = set(map(lambda x: x[0], mp_class["path_codes"]))
-                            for i, category_id in enumerate(mp_category_ids):
+                            for category_id in mp_category_ids:
                                 mp_category_id = category_id.replace("_", ":")
                                 self.mouse_genes[mouse_gene_id]["phenotypes"][mp_category_id]["genotype_phenotype"].append(
                                     {
@@ -234,10 +243,15 @@ class MousePhenotypes(IPlugin):
                                         "mp_identifier": mp_id,
                                         "mp_label": mp_label
                                     })
+                            self._logger.debug('process mouse KO gene %s with phenotypes list %s',
+                                mouse_gene_id, self.mouse_genes[mouse_gene_id]["phenotypes"])
+                        else:
+                            self._logger.debug('process mouse KO gene %s failed because not in self.mouse_genes set',
+                                               mouse_gene_id)
                 else:
                     self._logger.debug("could not process %i %s", len(array), line)
 
             self._logger.info("Count symbols %i / %i with phenotypes", len(count_accepted_symbols), len(count_symbols))
 
         except Exception as ex:
-            self._logger.exception(str(ex))
+            self._logger.exception(ex.message)
