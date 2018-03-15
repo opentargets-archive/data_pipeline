@@ -1,13 +1,10 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.modules.GeneData import Gene
+from mrtarget.common import url_to_tmpfile
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.Settings import Config
-import sys
 import urllib2
-import httplib
 import ujson as json
 from tqdm import tqdm
-import traceback
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -48,17 +45,17 @@ class MousePhenotypes(IPlugin):
         self._logger = logging.getLogger(__name__)
         self.loader = None
         self.r_server = None
-        self.mouse_genes = dict()
-        self.ancestors = dict()
+        self.mouse_genes = {}
+        self.ancestors = {}
         self.lookup_data = None
-        self.mps = dict()
-        self.mp_labels = dict()
-        self.mp_to_label = dict()
-        self.top_levels = dict()
-        self.homologs = dict()
-        self.human_genes = dict()
-        self.not_found_genes = dict()
-        self.human_ensembl_gene_ids = dict()
+        self.mps = {}
+        self.mp_labels = {}
+        self.mp_to_label = {}
+        self.top_levels = {}
+        self.homologs = {}
+        self.human_genes = {}
+        self.not_found_genes = {}
+        self.human_ensembl_gene_ids = {}
         self.tqdm_out = None
 
     def print_name(self):
@@ -96,7 +93,7 @@ class MousePhenotypes(IPlugin):
                                                data_types=lookup_data_types,
                                                autoload=True
                                                ).lookup
-        mp_class = None
+
         for mp_id in self.lookup_data.available_mps.get_available_mp_ids():
             self._logger.debug(mp_id)
             mp_class = self.lookup_data.available_mps.get_mp(mp_id,
@@ -104,35 +101,37 @@ class MousePhenotypes(IPlugin):
             self.mps[mp_id] = mp_class
             self.mp_labels[mp_class["label"]] = mp_id
             self.mp_to_label[mp_id] = mp_class["label"]
-            paths = list()
+            paths = []
             for path in mp_class["path"]:
                 item = path[0]
                 paths.append(item)
+
             self.top_levels[mp_id] = paths
 
-        #print json.dumps(mp_class, indent=2)
+            self._logger.debug("top_levels paths %d for mp_id %s and class label %s",
+                               len(paths), mp_id, mp_class['label'])
 
 
     def assign_to_human_genes(self):
 
-        self._logger.debug("Assigning %i entries to human genes "%(len(self.mouse_genes)))
-        '''
-        for any mouse gene...
-        '''
-        for id, obj in self.mouse_genes.items():
-            '''
-            retrieve the human orthologs...
-            '''
-            for ortholog in obj["human_orthologs"]:
+        self._logger.debug("Assigning %i entries to human genes ", len(self.mouse_genes))
+
+        # for any mouse gene...
+        for _, gene in self.mouse_genes.iteritems():
+
+            self._logger.debug('retrieve the human orthologs...')
+            for ortholog in gene["human_orthologs"]:
                 human_gene_symbol = ortholog["gene_symbol"]
-                #self._logger.debug("Assign %i phenotype categories to from mouse %s to human %s"%(len(obj["phenotypes"].values()), obj["gene_symbol"], human_gene_symbol))
-                '''
-                assign all the phenotypes for this specific gene
-                all phenotypes are classified per category
-                '''
-                self.human_genes[human_gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : obj["gene_id"],
-                                                                          "mouse_gene_symbol" : obj["gene_symbol"],
-                                                                          "phenotypes" : obj["phenotypes"].values()})
+
+                self._logger.debug("Assign %i phenotype categories from mouse %s to human %s",
+                                    len(gene["phenotypes"]),
+                                    gene["gene_symbol"],
+                                    human_gene_symbol)
+                # assign all the phenotypes for this specific gene
+                # all phenotypes are classified per category
+                self.human_genes[human_gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : gene["gene_id"],
+                                                                          "mouse_gene_symbol" : gene["gene_symbol"],
+                                                                          "phenotypes" : gene["phenotypes"].values()})
 
                 #print json.dumps(self.human_genes[gene_symbol]["mouse_orthologs"], indent=2)
 
@@ -140,104 +139,111 @@ class MousePhenotypes(IPlugin):
     def write_all_to_file(self, filename=None):
 
         with open(filename, "wb") as fh:
-            for k,v in self.human_genes.items():
+            for k,v in self.human_genes.iteritems():
                 raw = json.dumps({ k: v })
                 fh.write("%s\n"%(raw))
 
     def get_genotype_phenotype(self):
         self._logger.debug("get_genotype_phenotype")
         try:
-            self._logger.debug("get %s"% Config.GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY)
-            req = urllib2.Request(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY)
-            response = urllib2.urlopen(req)
-            lines = response.readlines()
-            self._logger.info("get %i lines" % len(lines))
-            for line in tqdm(
-                    lines,
-                    desc='Reading mouse phenotypes for human orthologs',
-                    unit='line',
-                    total=len(lines),
-                    unit_scale=True,
-                    leave=False,
-                    file=self.tqdm_out):
-                self._logger.debug(line)
-                array = line.rstrip().split("\t")
-                if len(array) == 7:
-                    (human_gene_symbol, a, b, c, mouse_gene_symbol, mouse_gene_id, phenotypes_raw) = array
-                    '''
-                    There are phenotypes for this gene
-                    '''
-                    if len(phenotypes_raw) > 0:
-                        self._logger.debug("get phenotypes for %s" % (human_gene_symbol))
-                        #ensembl_gene_id = self._get_human_gene_ensembl_id(human_gene_symbol)
-                        #if ensembl_gene_id is not None:
-                        #    print ensembl_gene_id
-                        mouse_gene_id = mouse_gene_id.strip()
-                        mouse_gene_symbol = mouse_gene_symbol.strip()
-                        if mouse_gene_id not in self.mouse_genes:
-                            self.mouse_genes[mouse_gene_id] = {"gene_id": mouse_gene_id, "gene_symbol": mouse_gene_symbol,
-                                                         "phenotypes": dict(), "human_orthologs": list(), "phenotypes_summary" : list(phenotypes_raw.strip().split("\s+"))}
-                        self.mouse_genes[mouse_gene_id]["human_orthologs"].append(
-                            {"gene_symbol": human_gene_symbol, "gene_id": None})
+            with url_to_tmpfile(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY) as fi:
+                self._logger.debug("get %s", Config.GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY)
 
-                        if human_gene_symbol not in self.human_genes:
-                            self.human_genes[human_gene_symbol] = {"gene_symbol": human_gene_symbol, "ensembl_gene_id": None,
-                                                             "gene_id": None,
-                                                             "mouse_orthologs": list()}
-            self._logger.info("Retrieved %i mouse genes"%(len(self.mouse_genes.keys())))
-            self._logger.info("get %s" % (Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES))
-            req = urllib2.Request(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES)
-            response = urllib2.urlopen(req)
-            lines = response.readlines()
-            self._logger.debug("get %i lines" % len(lines))
+                for li, line in enumerate(fi):
+                    # a way too many false spaces just to bother people
+                    array = map(str.strip, line.strip().split("\t"))
+                    if len(array) == 7:
+                        (human_gene_symbol, a, b, c, mouse_gene_symbol, mouse_gene_id, phenotypes_raw) = array
+
+                        # at least 1 phenotype in phenotypes_raw
+                        if len(phenotypes_raw) > 0:
+                            try:
+                                self._logger.debug("get phenotypes for %s in line %d", human_gene_symbol, li)
+                                #ensembl_gene_id = self._get_human_gene_ensembl_id(human_gene_symbol)
+                                #if ensembl_gene_id is not None:
+                                #    print ensembl_gene_id
+                                mouse_gene_id = mouse_gene_id.strip()
+                                mouse_gene_symbol = mouse_gene_symbol.strip()
+                                if mouse_gene_id not in self.mouse_genes:
+                                    self.mouse_genes[mouse_gene_id] = {"gene_id": mouse_gene_id, "gene_symbol": mouse_gene_symbol,
+                                                                 "phenotypes": {}, "human_orthologs": [], "phenotypes_summary" : list(phenotypes_raw.strip().split("\s+"))}
+                                self.mouse_genes[mouse_gene_id]["human_orthologs"].append(
+                                    {"gene_symbol": human_gene_symbol, "gene_id": None})
+
+                                if human_gene_symbol not in self.human_genes:
+                                    self.human_genes[human_gene_symbol] = {"gene_symbol": human_gene_symbol, "ensembl_gene_id": None,
+                                                                     "gene_id": None,
+                                                                     "mouse_orthologs": []}
+                                # self._logger.debug("phenotype mouse structure for gene %s %s", human_gene_symbol,
+                                #                    str(self.mouse_genes[mouse_gene_id]))
+                                # self._logger.debug("phenotype human structure for gene %s %s", human_gene_symbol,
+                                #                    str(self.human_genes[human_gene_symbol]) )
+                            except Exception as e:
+                                self._logger.debug("exception processing a line %d: %s", li, str(e))
+
+            self._logger.info("Retrieved %i mouse genes", len(self.mouse_genes))
+
             count_symbols = set()
             count_accepted_symbols = set()
-            for line in tqdm(
-                    lines,
-                    desc='Reading mouse KO phenotypes',
-                    unit='line',
-                    total=len(lines),
-                    unit_scale=True,
-                    leave=False,
-                    file=self.tqdm_out):
-                self._logger.debug(line)
+
+            with url_to_tmpfile(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES) as fi:
+                # lines = response.readlines()
+                self._logger.debug("get lines from mgi report phenotyes file",
+                                   Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES)
+
                 # Allelic Composition	Allele Symbol(s)	Genetic Background	Mammalian Phenotype ID	PubMed ID	MGI Marker Accession ID
-                array = line.rstrip().split("\t")
-                if len(array) == 6:
-                    (allelic_composition, allele_symbol, genetic_background, mp_id, pmid, mouse_gene_ids) = array
-                    # check for double-mutant but exclude duplicates
-                    for mouse_gene_id in set(mouse_gene_ids.split(",")):
-                        # exclude heritable phenotypic marker like http://www.debugrmatics.jax.org/marker/MGI:97446
-                        count_symbols.add(mouse_gene_id)
-                        if mouse_gene_id in self.mouse_genes:
-                            count_accepted_symbols.add(mouse_gene_id)
-                            self._logger.debug('get class for %s'% mp_id)
-                            mp_class = self.mps[mp_id.replace(":", "_")]
-                            mp_label = mp_class["label"]
+                for li, line in enumerate(fi):
+                    # a way too many false spaces just to bother people
+                    array = map(str.strip, line.strip().split("\t"))
 
-                            for k, v in PHENOTYPE_CATEGORIES.items():
-                                if k not in self.mouse_genes[mouse_gene_id]["phenotypes"]:
-                                    self.mouse_genes[mouse_gene_id]["phenotypes"][k] = \
-                                        {
-                                            "category_mp_identifier": k,
-                                            "category_mp_label": v,
-                                            "genotype_phenotype": []
-                                        }
+                    self._logger.debug('mouse KO array %s in line %d', str(array), li)
 
-                            # it's possible that there are multiple paths to the same root.
-                            mp_category_ids = set(map(lambda x: x[0], mp_class["path_codes"]))
-                            for i, category_id in enumerate(mp_category_ids):
-                                mp_category_id = category_id.replace("_", ":")
-                                self.mouse_genes[mouse_gene_id]["phenotypes"][mp_category_id]["genotype_phenotype"].append(
-                                    {
-                                        "subject_allelic_composition": allelic_composition,
-                                        "subject_background": genetic_background,
-                                        "pmid" : pmid,
-                                        "mp_identifier": mp_id,
-                                        "mp_label": mp_label
-                                    })
-                else:
-                    self._logger.debug("could not process %i %s", len(array), line)
+                    if len(array) == 6:
+                        try:
+                            (allelic_composition, allele_symbol, genetic_background, mp_id, pmid, mouse_gene_ids) = array
+                            # check for double-mutant but exclude duplicates
+                            for mouse_gene_id in set(mouse_gene_ids.split(",")):
+                                # exclude heritable phenotypic marker like http://www.debugrmatics.jax.org/marker/MGI:97446
+                                count_symbols.add(mouse_gene_id)
+                                mp_id_key = mp_id.replace(":", "_")
+                                if mouse_gene_id in self.mouse_genes and mp_id_key in self.mps:
+                                    self._logger.debug('process mouse KO gene %s', mouse_gene_id)
+                                    count_accepted_symbols.add(mouse_gene_id)
+                                    self._logger.debug('get class for %s'% mp_id)
+                                    mp_class = self.mps[mp_id_key]
+                                    mp_label = mp_class["label"]
+
+                                    for k, v in PHENOTYPE_CATEGORIES.iteritems():
+                                        if k not in self.mouse_genes[mouse_gene_id]["phenotypes"]:
+                                            self.mouse_genes[mouse_gene_id]["phenotypes"][k] = \
+                                                {
+                                                    "category_mp_identifier": k,
+                                                    "category_mp_label": v,
+                                                    "genotype_phenotype": []
+                                                }
+
+                                    # it's possible that there are multiple paths to the same root.
+                                    mp_category_ids = set(map(lambda x: x[0], mp_class["path_codes"]))
+                                    for category_id in mp_category_ids:
+                                        mp_category_id = category_id.replace("_", ":")
+                                        self.mouse_genes[mouse_gene_id]["phenotypes"][mp_category_id]["genotype_phenotype"].append(
+                                            {
+                                                "subject_allelic_composition": allelic_composition,
+                                                "subject_background": genetic_background,
+                                                "pmid" : pmid,
+                                                "mp_identifier": mp_id,
+                                                "mp_label": mp_label
+                                            })
+                                    # self._logger.debug('process mouse KO gene %s with phenotypes list %s line %d',
+                                    #    mouse_gene_id, self.mouse_genes[mouse_gene_id]["phenotypes"], li)
+                                else:
+                                    self._logger.debug('process mouse KO gene %s failed because not in self.mouse_genes set in line %d',
+                                                       mouse_gene_id, li)
+                        except Exception as e:
+                            self._logger.debug("exception processing a line %d: %s",li, str(e))
+
+                    else:
+                        self._logger.debug("could not process %i %s", len(array), line)
 
             self._logger.info("Count symbols %i / %i with phenotypes", len(count_accepted_symbols), len(count_symbols))
 
