@@ -22,16 +22,12 @@ from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStrin
 from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneActions, GeneManager
 from mrtarget.modules.HPA import HPAActions, HPAProcess
-from mrtarget.modules.IntOGen import IntOGenActions, IntOGen
-from mrtarget.modules.SLAPEnrich import SLAPEnrichActions, SLAPEnrich
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
-from mrtarget.modules.Hallmarks import HallmarksActions, Hallmarks
 from mrtarget.modules.Ontology import OntologyActions, PhenotypeSlim
 from mrtarget.modules.QC import QCActions, QCRunner
 from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
-from mrtarget.modules.G2P import G2PActions, G2P
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 
@@ -100,14 +96,6 @@ def main():
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
-    parser.add_argument("--intogen", dest='intogen', help="parse intogen driver gene evidence",
-                        action="append_const", const=IntOGenActions.GENERATE_EVIDENCE)
-    parser.add_argument("--g2p", dest='g2p', help="parse gene2phenotype evidence",
-                        action="append_const", const=G2PActions.GENERATE_EVIDENCE)
-    parser.add_argument("--slapenrich", dest='slapenrich', help="parse SLAPEnrich pathway evidence",
-                        action="append_const", const=SLAPEnrichActions.GENERATE_EVIDENCE)
-    parser.add_argument("--hallmark", dest='hallmark', help="generate Hallmark Json",
-                        action="append_const", const=HallmarksActions.GENERATE_JSON)
     parser.add_argument("--ontos", dest='onto', help="create phenotype slim",
                         action="append_const", const = OntologyActions.PHENOTYPESLIM)
     parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
@@ -282,22 +270,6 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
-        if args.g2p or run_full_pipeline:
-            do_all = (G2PActions.ALL in args.g2p) or run_full_pipeline
-            if (G2PActions.GENERATE_EVIDENCE in args.g2p) or do_all:
-                G2P(connectors.es).process_g2p()
-        if args.intogen or run_full_pipeline:
-            do_all = (IntOGenActions.ALL in args.intogen) or run_full_pipeline
-            if (IntOGenActions.GENERATE_EVIDENCE in args.intogen) or do_all:
-                IntOGen(connectors.es, connectors.r_server).process_intogen()
-        if args.slapenrich or run_full_pipeline:
-            do_all = (SLAPEnrichActions.ALL in args.slapenrich) or run_full_pipeline
-            if (SLAPEnrichActions.GENERATE_EVIDENCE in args.slapenrich) or do_all:
-                SLAPEnrich(connectors.es, connectors.r_server).process_slapenrich()
-        if args.hallmark or run_full_pipeline:
-            do_all = (HallmarksActions.ALL in args.hallmark) or run_full_pipeline
-            if (HallmarksActions.GENERATE_JSON in args.hallmark) or do_all:
-                Hallmarks(loader, connectors.es, connectors.r_server).process_hallmarks()
         if args.onto or run_full_pipeline:
             do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
             if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
