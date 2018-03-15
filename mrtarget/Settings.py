@@ -274,10 +274,10 @@ class Config():
     MAILGUN_DOMAIN = "https://api.mailgun.net/v3/mg.targetvalidation.org"
     MAILGUN_MESSAGES = MAILGUN_DOMAIN+'/messages'
     MAILGUN_API_KEY = "key-b7986f9a29fe234733b0af3b1206b146"
-    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'andreap@targetvalidation.org', ]
+    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'data@opentargets.org', ]
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'ckong@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'data@opentargets.org' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'zs1@sanger.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
