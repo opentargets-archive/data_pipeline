@@ -192,8 +192,8 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
-    ELASTICSEARCH_HALLMARK_INDEX_NAME = 'hallmark-data'
-    ELASTICSEARCH_HALLMARK_DOC_NAME = 'hallmark-gene'
+#    ELASTICSEARCH_HALLMARK_INDEX_NAME = 'hallmark-data'
+#    ELASTICSEARCH_HALLMARK_DOC_NAME = 'hallmark-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
@@ -208,7 +208,6 @@ class Config():
     GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
     GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks' ]
 
-    HALLMARK_FILENAME = file_or_resource(fname='census_annot.tsv')
     HGNC_COMPLETE_SET = 'http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
     HGNC_ORTHOLOGS_SPECIES = {
@@ -226,8 +225,8 @@ class Config():
         '4932':'yeast'
     }
 
-    OMIM_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/xref_mappings/omim_to_efo.txt'
-    ZOOMA_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/zooma/cttv_indications_3.txt'
+#    OMIM_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/xref_mappings/omim_to_efo.txt'
+#    ZOOMA_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/zooma/cttv_indications_3.txt'
 
     # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
     # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
@@ -432,11 +431,10 @@ class Config():
     DISEASE_LEXICON_JSON_LOCN = 'disease_lexicon.json'
 
     # GE Pipeline
-
-    GE_EVIDENCE_STRING = TEMP_DIR + os.path.sep + 'genomics_england_evidence_string.json'
-    GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
-    GE_ZOOMA_DISEASE_MAPPING = TEMP_DIR + os.path.sep + 'zooma_disease_mapping.csv'
-    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = TEMP_DIR + os.path.sep + 'zooma_disease_mapping_low_confidence.csv'
+#    GE_EVIDENCE_STRING = TEMP_DIR + os.path.sep + 'genomics_england_evidence_string.json'
+#    GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
+#    GE_ZOOMA_DISEASE_MAPPING = TEMP_DIR + os.path.sep + 'zooma_disease_mapping.csv'
+#    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = TEMP_DIR + os.path.sep + 'zooma_disease_mapping_low_confidence.csv'
 
     # for developers
     DRY_RUN_OUTPUT = read_option('DRY_RUN_OUTPUT_ENABLE',
