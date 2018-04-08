@@ -225,6 +225,8 @@ class Config():
         '4932':'yeast'
     }
 
+    HALLMARK_FILENAME = file_or_resource('hallmarks_20_genes.txt')
+
 #    OMIM_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/xref_mappings/omim_to_efo.txt'
 #    ZOOMA_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/zooma/cttv_indications_3.txt'
 
@@ -361,7 +363,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
-
+    DATASOURCE_TO_DATATYPE_MAPPING['progeny'] = 'affected_pathway'
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
