@@ -192,8 +192,6 @@ class Config():
     ELASTICSEARCH_ENSEMBL_DOC_NAME = 'ensembl-gene'
     ELASTICSEARCH_UNIPROT_INDEX_NAME = 'uniprot-data'
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
-    ELASTICSEARCH_HALLMARK_INDEX_NAME = 'hallmark-data'
-    ELASTICSEARCH_HALLMARK_DOC_NAME = 'hallmark-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
@@ -206,9 +204,8 @@ class Config():
     ERROR_IDS_FILE = 'errors.txt'
 
     GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
-    GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks' ]
+    GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks', 'CancerBiomarkers' ]
 
-    HALLMARK_FILENAME = file_or_resource(fname='census_annot.tsv')
     HGNC_COMPLETE_SET = 'http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
     HGNC_ORTHOLOGS_SPECIES = {
@@ -226,11 +223,9 @@ class Config():
         '4932':'yeast'
     }
 
-    OMIM_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/xref_mappings/omim_to_efo.txt'
-    ZOOMA_TO_EFO_MAP_URL = 'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/zooma/cttv_indications_3.txt'
+    HALLMARK_FILENAME = file_or_resource(fname='census_annot.tsv')
+    BIOMARKER_FILENAME = file_or_resource(fname='cgi_biomarkers_per_variant.tsv')
 
-    # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'
-    # TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/mappings/dev/expression_uberon_mapping.csv'
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
 
@@ -274,10 +269,10 @@ class Config():
     MAILGUN_DOMAIN = "https://api.mailgun.net/v3/mg.targetvalidation.org"
     MAILGUN_MESSAGES = MAILGUN_DOMAIN+'/messages'
     MAILGUN_API_KEY = "key-b7986f9a29fe234733b0af3b1206b146"
-    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'andreap@targetvalidation.org', ]
+    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'data@opentargets.org', ]
     # Change this if you want to change the list of recipients
     EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'gautier.x.koscielny@gsk.com', 'andreap@targetvalidation.org', 'ckong@ebi.ac.uk' ]
+    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'data@opentargets.org' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'zs1@sanger.ac.uk' ]
     EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
@@ -362,7 +357,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
-
+    DATASOURCE_TO_DATATYPE_MAPPING['progeny'] = 'affected_pathway'
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
@@ -430,13 +425,6 @@ class Config():
     BIOLEXICON_DISEASE_XML_LOCN = 'umlsDisease.xml'
     GENE_LEXICON_JSON_LOCN = 'gene_lexicon.json'
     DISEASE_LEXICON_JSON_LOCN = 'disease_lexicon.json'
-
-    # GE Pipeline
-
-    GE_EVIDENCE_STRING = TEMP_DIR + os.path.sep + 'genomics_england_evidence_string.json'
-    GE_LINKOUT_URL = 'https://bioinfo.extge.co.uk/crowdsourcing/PanelApp/GeneReview'
-    GE_ZOOMA_DISEASE_MAPPING = TEMP_DIR + os.path.sep + 'zooma_disease_mapping.csv'
-    GE_ZOOMA_DISEASE_MAPPING_NOT_HIGH_CONFIDENT = TEMP_DIR + os.path.sep + 'zooma_disease_mapping_low_confidence.csv'
 
     # for developers
     DRY_RUN_OUTPUT = read_option('DRY_RUN_OUTPUT_ENABLE',
