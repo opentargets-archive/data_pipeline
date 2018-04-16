@@ -205,15 +205,13 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
     def init(self):
         super(SearchObjectAnalyserWorker, self).init()
         self.lookup.set_r_server(self.r_server)
-        if self.chunk_size > 0:
-            self.logger.debug("CHUNK SIZE = %i"%self.chunk_size)
-            self.loader = Loader(dry_run = self.dry_run, chunk_size=self.chunk_size)
-        else:
-            self.loader = Loader(dry_run = self.dry_run)
+        self.loader = Loader(chunk_size=self.chunk_size,
+                             dry_run=self.dry_run)
         self.es_query = ESQuery(self.loader.es)
 
     def close(self):
         self.loader.flush()
+        self.loader.close()
         super(SearchObjectAnalyserWorker, self).close()
 
     def process(self, data):
@@ -325,5 +323,9 @@ class SearchObjectProcess(object):
         for w in workers:
             w.join()
 
-        self.logger.info(queue.get_status(r_server=self.r_server))
-        self.logger.info('ALL DONE! Execution time: %s'%(datetime.now()-start_time))
+        self.logger.info('flushing data to index')
+        self.loader.es.indices.flush('%s*' % (Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME),),
+                                        wait_if_ongoing =True)
+
+
+        self.logger.info("DONE")
