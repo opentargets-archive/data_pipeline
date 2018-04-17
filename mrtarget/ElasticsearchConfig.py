@@ -100,7 +100,7 @@ def _generate_ngram_filter():
     ngram.type = 'edgeNGram'
     ngram.min_gram = '3'
     ngram.max_gram = '10'
-    ngram.token_chars = ['letter', 'digit', 'punctuation']
+    # ngram.token_chars = ['letter', 'digit', 'punctuation']
 
     return ngram.to_dict()
 
@@ -205,14 +205,12 @@ class ElasticSearchConfiguration():
     efom.settings.analysis.filter.simple_filter.token_chars = ['letter', 'digit']
 
     efom.settings.analysis.analyzer.edgeNGram_analyzer = \
-        _generate_ngram_analyzer(withFilters=['lowercase', 'asciifolding', 'wordDelimiter_filter', 'edgeNGram_filter'])
+        _generate_ngram_analyzer(withFilters=['lowercase', 'wordDelimiter_filter', 'edgeNGram_filter'])
 
     efom.settings.analysis.analyzer.onechunk_analyzer = _generate_1chunk_analyzer()
     efom.settings.analysis.analyzer.whitespace_analyzer.type = 'custom'
     efom.settings.analysis.analyzer.whitespace_analyzer.tokenizer = 'whitespace'
-    efom.settings.analysis.analyzer.whitespace_analyzer.filter = ["lowercase",
-                                                                 "asciifolding",
-                                                                    "wordDelimiter_filter"]
+    efom.settings.analysis.analyzer.whitespace_analyzer.filter = ["lowercase", "wordDelimiter_filter"]
                                                                  #"simple_filter"]
 
     efo_data_mapping = efom.to_dict()
