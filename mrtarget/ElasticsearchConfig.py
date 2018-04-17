@@ -634,7 +634,8 @@ class ElasticSearchConfiguration():
                         "filter": [
                             "lowercase",
                             "asciifolding",
-                            "simple_filter"]
+                            "wordDelimiter_filter"]
+                            # "simple_filter"]
                     },
                     "onechunk_analyzer": _generate_1chunk_analyzer()
                 }
