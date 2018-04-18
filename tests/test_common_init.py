@@ -22,7 +22,7 @@ class DataStructureTests(unittest.TestCase):
         lines4 = \
             list(take(4, common.url_to_stream("http://www.google.com/robots.txt")))
 
-        self.assertGreaterEqual(1, len(lines4), "Failed to get more than 0 lines")
+        self.assertGreaterEqual(len(lines4), 1, "Failed to get more than 0 lines")
 
     def test_url_to_tempfile(self):
         file_exists = False
@@ -60,7 +60,7 @@ class DataStructureTests(unittest.TestCase):
                  "Allow: /search/howsearchworks"]
 
         print(str(lines4))
-        self.assertGreaterEqual(1, len(lines4),
+        self.assertGreaterEqual(len(lines4), 1,
                               "Failed to get more than 0 lines")
 
     def test_log_accum(self):
