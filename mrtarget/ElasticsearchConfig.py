@@ -97,10 +97,11 @@ def _generate_ngram_filter():
     as a filter for an analyzer filter list
     '''
     ngram = Dict()
-    ngram.type = 'edgeNGram'
-    ngram.min_gram = '3'
+    # ngram.type = 'edgeNGram'
+    ngram.type = 'ngram'
+    ngram.min_gram = '4'
     ngram.max_gram = '10'
-    # ngram.token_chars = ['letter', 'digit', 'punctuation']
+    ngram.token_chars = ['letter', 'digit', 'punctuation', 'symbol']
 
     return ngram.to_dict()
 
@@ -616,46 +617,32 @@ class ElasticSearchConfiguration():
             "analysis": {
                 "filter": {
                     "edgeNGram_filter": _generate_ngram_filter(),
-                    "simple_filter": {
-                        "type": "standard",
-                        "token_chars": [
-                            "letter",
-                            "digit"
-                        ]
-                    },
                     "wordDelimiter_filter": _generate_word_delimiter_filter()
-                },
+                    }
+                ,
                 "analyzer": {
-                    "edgeNGram_analyzer": _generate_ngram_analyzer(withFilters=['lowercase', 'asciifolding',
+                    "edgeNGram_analyzer": _generate_ngram_analyzer(withFilters=['lowercase', #'asciifolding',
                                                                                 'wordDelimiter_filter', 'edgeNGram_filter']),
                     "whitespace_analyzer": {
                         "type": "custom",
                         "tokenizer": "whitespace",
                         "filter": [
                             "lowercase",
-                            "asciifolding",
+                            # "asciifolding",
                             "wordDelimiter_filter"]
-                            # "simple_filter"]
                     },
-                    "onechunk_analyzer": _generate_1chunk_analyzer()
+                    "default": {
+                        "type": "custom",
+                        "tokenizer": "whitespace",
+                        "filter": [
+                            "lowercase",
+                            "wordDelimiter_filter"]
+                    }
                 }
             }
         },
         "mappings": {
             '_default_': {
-                # "properties": {
-                #     "private": {
-                #         # "type" : "object",
-                #         "properties": {
-                #             "suggestions": {
-                #                 "type": "completion",
-                #                 "analyzer": "whitespace_analyzer",
-                #                 "search_analyzer": "whitespace_analyzer",
-                #                 "payloads": True
-                #             }
-                #         }
-                #     }
-                # },
                 "dynamic_templates": [
                     {
                         "do_not_analyze_ortholog": {
@@ -668,8 +655,8 @@ class ElasticSearchConfiguration():
                         }
                     }
                 ]
-            },
-        },
+            }
+        }
     }
 
     publication_data_mapping = {
