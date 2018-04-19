@@ -3,8 +3,12 @@ import hashlib
 import json
 from collections import OrderedDict
 from difflib import Differ
+import logging
 
 import sys
+
+
+logger = logging.getLogger(__name__)
 
 
 def assertJSONEqual(a, b, msg='Values are not equal', keys = []):
@@ -20,10 +24,10 @@ def assertJSONEqual(a, b, msg='Values are not equal', keys = []):
     result = list(
         d.compare(a.splitlines(1),
                   b.splitlines(1)))
-    for line in result:
-        if line[0] != ' ':
-            sys.stderr.writelines(result)
-            raise ValueError(msg)
+
+    diffLines = [line for line in result if line[0] != ' ']
+    logger.warning("there is a difference between the previous index mapping and the new one \n%s", "\n".join(diffLines))
+
     return True
 
 class DatatStructureFlattener:

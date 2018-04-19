@@ -323,7 +323,7 @@ class SearchObjectProcess(object):
         for w in workers:
             w.join()
 
-        self.logger.info('flushing data to index')
+        self.logger.info('flushing data to index and wait until is finished and stop fuffing around')
         self.loader.es.indices.flush('%s*' % (Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME),),
                                         wait_if_ongoing =True)
 
