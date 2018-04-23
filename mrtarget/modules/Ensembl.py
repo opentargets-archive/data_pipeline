@@ -1,4 +1,5 @@
 import json
+import logging
 
 import mysql.connector
 import requests
@@ -10,6 +11,9 @@ from mrtarget.Settings import Config, build_ensembl_sql
 '''
 
 '''
+
+__log__ = logging.getLogger(__name__)
+
 class EnsemblActions(Actions):
     PROCESS='process'
 
@@ -142,6 +146,9 @@ class EnsemblGeneInfo(object):
                        '17', '18', '19', '20', '21', '22', 'X', 'Y', 'MT']
         new_gene_info_json_map = {}
         for ensembl_gene_id, ensembl_rest_json in gene_info_json_map.items():
+            if not ensembl_rest_json:
+                __log__.error('No JSON response for %s', ensembl_gene_id)
+                continue
             ensembl_rest_json['ensembl_release'] = self.ensembl_release
             if ensembl_rest_json['seq_region_name'] in chromosomes:
                 ensembl_rest_json['is_reference'] = True
