@@ -389,7 +389,7 @@ class Config():
     IS_DIRECT_DO_NOT_PROPAGATE = ['europepmc']
 
 
-    ENSEMBL_RELEASE_VERSION = 91
+    ENSEMBL_RELEASE_VERSION = 92
     ENSEMBL_CHUNK_SIZE = 100
 
     LT_REUSE = False
