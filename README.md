@@ -76,12 +76,7 @@ Using docker:
 
 For ES>5, you can use the official [docker images](https://www.elastic.co/guide/en/kibana/current/_pulling_the_image.html)
 ```sh
-docker run docker.elastic.co/kibana/kibana:5.5.2 -e "ELASTICSEARCH_URL=http://localhost:9200"
-```
-
-For ES2.4:
-```sh
-docker run kibana:4.6 -e "ELASTICSEARCH_URL=http://localhost:9200"
+docker run -d --name=kibana-es -e "ELASTICSEARCH_URL=http://localhost:9200" --net="host" docker.elastic.co/kibana/kibana:5.6.4
 ```
 
 Once kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
@@ -181,6 +176,19 @@ Here the recipe to start coding on it:
 ```bash
 $ git clone ${this_repo}
 $ cd ${this_repo}
+```
+Add a file `mrtarget/resources/db.ini` with contents similar to: 
+```bash
+[dev]
+ELASTICSEARCH_NODES = [
+     "http://127.0.0.1:9200/"
+    ]
+ELASTICSEARCH_NODES_PUB = [
+     "http://127.0.0.1:39200"
+    ]
+```
+Install python dependencies and test run:
+```bash
 $ # create a new virtualenv 2.7.x (you know how to do it, right?)
 $ pip install -r requirements.txt
 $ python setup.py install
