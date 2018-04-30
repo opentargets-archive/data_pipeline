@@ -126,7 +126,7 @@ CTTV_REDIS_SERVER=127.0.0.1:8888
 ### Container users
 
 ```sh
-docker run eu.gcr.io/open-targets/mrtarget:master mrtarget --dry-run
+docker run --net=host eu.gcr.io/open-targets/mrtarget:master mrtarget --log-level DEBUG 18.02 --dry-run
 ```
 Here some instructions to pull from eu.gcr.io: https://cloud.google.com/container-registry/docs/pushing-and-pulling 
 
