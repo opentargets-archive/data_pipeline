@@ -127,9 +127,9 @@ CTTV_REDIS_SERVER=127.0.0.1:8888
 
 ```sh
 docker run eu.gcr.io/open-targets/mrtarget:master mrtarget --dry-run
-## or using quay.io
-docker run quay.io/opentargets/mrtarget:master mrtarget --dry-run
 ```
+Here some instructions to pull from eu.gcr.io: https://cloud.google.com/container-registry/docs/pushing-and-pulling 
+
 You probably want to mount log files, etc like we do in our [backend machine](https://github.com/opentargets/infrastructure/blob/master/gcp/cloud-config/be-worker-cos.yaml):
 
 ```sh
