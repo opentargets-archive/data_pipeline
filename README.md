@@ -76,12 +76,7 @@ Using docker:
 
 For ES>5, you can use the official [docker images](https://www.elastic.co/guide/en/kibana/current/_pulling_the_image.html)
 ```sh
-docker run docker.elastic.co/kibana/kibana:5.5.2 -e "ELASTICSEARCH_URL=http://localhost:9200"
-```
-
-For ES2.4:
-```sh
-docker run kibana:4.6 -e "ELASTICSEARCH_URL=http://localhost:9200"
+docker run -d --name=kibana-es -e "ELASTICSEARCH_URL=http://localhost:9200" --net="host" docker.elastic.co/kibana/kibana:5.6.4
 ```
 
 Once kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
@@ -131,10 +126,10 @@ CTTV_REDIS_SERVER=127.0.0.1:8888
 ### Container users
 
 ```sh
-docker run eu.gcr.io/open-targets/mrtarget:master mrtarget --dry-run
-## or using quay.io
-docker run quay.io/opentargets/mrtarget:master mrtarget --dry-run
+docker run --net=host eu.gcr.io/open-targets/mrtarget:master mrtarget --log-level DEBUG 18.02 --dry-run
 ```
+Here some instructions to pull from eu.gcr.io: https://cloud.google.com/container-registry/docs/pushing-and-pulling 
+
 You probably want to mount log files, etc like we do in our [backend machine](https://github.com/opentargets/infrastructure/blob/master/gcp/cloud-config/be-worker-cos.yaml):
 
 ```sh
@@ -181,6 +176,19 @@ Here the recipe to start coding on it:
 ```bash
 $ git clone ${this_repo}
 $ cd ${this_repo}
+```
+Add a file `mrtarget/resources/db.ini` with contents similar to: 
+```bash
+[dev]
+ELASTICSEARCH_NODES = [
+     "http://127.0.0.1:9200/"
+    ]
+ELASTICSEARCH_NODES_PUB = [
+     "http://127.0.0.1:39200"
+    ]
+```
+Install python dependencies and test run:
+```bash
 $ # create a new virtualenv 2.7.x (you know how to do it, right?)
 $ pip install -r requirements.txt
 $ python setup.py install
