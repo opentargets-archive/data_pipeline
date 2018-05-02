@@ -44,8 +44,6 @@ BIOMARKER_SOURCE_MAPPINGS = {
     "JCO Precision Oncology (PO.16.00055)" : { 'url' : "http://ascopubs.org/doi/full/10.1200/PO.16.00055", 'label' : "DOI: 10.1200/PO.16.00055 JCO Precision Oncology (published online June 27, 2017)" }
 }
 
-
-
 class CancerBiomarkers(IPlugin):
 
     '''
@@ -75,13 +73,6 @@ class CancerBiomarkers(IPlugin):
              Parse cancer biomarker data into self.cancerbiomarkers
             '''
             self.build_json(filename=Config.BIOMARKER_FILENAME)
-
-            '''
-             Testing: Find out which genes in self.cancerbiomarkers cannot be mapped
-            '''
-            #for gene in self.cancerbiomarkers:
-            #    print(gene)
-
             '''
              Iterate through all genes and add cancer biomarkers data if gene symbol is present
             '''
@@ -114,14 +105,12 @@ class CancerBiomarkers(IPlugin):
                  Split Primary Tumor Acronym, Gene and Source
                  to separate out multiple entries in these
                 '''
-                #mPrimaryTumorAcronym = PrimaryTumorAcronym.split(";")
                 mGene = Gene.split(";")
                 mSource = Source.split(";")
-
                 '''
                  Iterate through tumor types, genes and sources
                 '''
-                #for singleTumor in mPrimaryTumorAcronym:
+                # For singleTumor in mPrimaryTumorAcronym:
                 for singleGene in mGene:
                     '''
                     If gene has not appeared in biomarker list yet,
@@ -129,46 +118,22 @@ class CancerBiomarkers(IPlugin):
                     '''
                     if Gene not in self.cancerbiomarkers:
                         self.cancerbiomarkers[Gene] = []
-                        #self.cancerbiomarkers[Gene] = dict()
                     '''
                      Create empty dictionaries for PMIDs and other references
                     '''
                     pubmed = []
                     other = []
-                    #pmidCounter = 1
-                    #otherCounter = 1
                     '''
                      Go through the references/sources
                     '''
                     for singleSource in mSource:
-                    # print(Biomarker + " | "  + DrugFullName + " | " + Association + " | " + singleTumor + " | " + singleGene + " | " + singleSource)
-                        '''
-                         Assign values to PMID or Reference field(s)
-                        '''
-                        # TODO currReference link needs putting together
-
-                        # If the source is a PMID
-                        if "PMID" in singleSource:
+                        if "PMID" in singleSource: # If the source is a PMID
                             currPMID = singleSource[5:] # Remove 'PMID:' if necessary
-                            #pubmed[pmidCounter] = {}
-                            #pubmed[pmidCounter]['pmid'] = currPMID
                             pubmed.append({'pmid': currPMID})
-                            #pmidCounter = pmidCounter + 1
-
                         else: # Else: the source is either a clinical trial or a conference abstract
                             if 'NCT' in singleSource:
-                                #other[otherCounter] = {}
-                                #other[otherCounter]['referencename'] = singleSource
-                                #other[otherCounter]['referencelink'] = 'https://clinicaltrials.gov/ct2/show/' + singleSource
-                                #other[otherCounter]['referencedescription'] = 'Clinical Trial'
-                                #otherCounter = otherCounter + 1
                                 other.append({'name' : singleSource, 'link' : 'https://clinicaltrials.gov/ct2/show/' + singleSource, 'description': 'Clinical Trial'})
                             elif singleSource.split(" (")[0] in BIOMARKER_SOURCE_MAPPINGS:
-                                #other[otherCounter] = {}
-                                #other[otherCounter]['referencename'] = singleSource
-                                #other[otherCounter]['referencelink'] = BIOMARKER_SOURCE_MAPPINGS[singleSource.split(" (")[0]]['url']
-                                #other[otherCounter]['referencedescription'] = BIOMARKER_SOURCE_MAPPINGS[singleSource.split(" (")[0]]['label']
-                                #otherCounter = otherCounter + 1
                                 other.append({'name': singleSource, 'link': BIOMARKER_SOURCE_MAPPINGS[singleSource.split(" (")[0]]['url'], 'description': BIOMARKER_SOURCE_MAPPINGS[singleSource.split(" (")[0]]['label']})
                     '''
                      Put the reference info together for each biomarker
@@ -188,21 +153,11 @@ class CancerBiomarkers(IPlugin):
                         "diseaseID": PrimaryTumorAcronym,
                         "evidencelevel": EvidenceLevel,
                         "references": myReferences
-                        #"PMID": currPMID,
-                        #"reference": currReference,
-                        #"referencelink": currReferenceLink
                     }
-
                     '''
                      Add data for current biomarker
                      to self.cancerbiomarkers
                     '''
-                    #old:
-                    #try:
-                    #    self.cancerbiomarkers[Gene][cancer_biomarker].append(line)
-                    #except KeyError:
-                    #    self.cancerbiomarkers[Gene][cancer_biomarker] = list()
-                    #    self.cancerbiomarkers[Gene][cancer_biomarker].append(line)
                     try:
                         self.cancerbiomarkers[Gene].append(line)
                     except KeyError:
