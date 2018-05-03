@@ -3,6 +3,7 @@ from mrtarget.Settings import Config
 from tqdm import tqdm
 import traceback
 import logging
+import itertools as itt
 logging.basicConfig(level=logging.DEBUG)
 
 BIOMARKER_SOURCE_MAPPINGS = {
@@ -76,6 +77,7 @@ class CancerBiomarkers(IPlugin):
             '''
              Iterate through all genes and add cancer biomarkers data if gene symbol is present
             '''
+            self._logger.info("Generating Cancer Biomarker data injection")
             for gene_id, gene in tqdm(genes.iterate(),
                                       desc='Adding Cancer Biomarker data',
                                       unit=' gene',
@@ -84,40 +86,43 @@ class CancerBiomarkers(IPlugin):
                    extend gene with related Cancer Biomarker data
                 '''
                 if gene.approved_symbol in self.cancerbiomarkers:
-                        gene.cancerbiomarkers = list()
-                        self._logger.info("Adding Cancer Biomarker data to gene %s" % (gene.approved_symbol))
-                        gene.cancerbiomarkers.append(self.cancerbiomarkers[gene.approved_symbol])
+                    gene.cancerbiomarkers = list()
+                    self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.approved_symbol)
+                    gene.cancerbiomarkers.append(self.cancerbiomarkers[gene.approved_symbol])
 
         except Exception as ex:
-            tb = traceback.format_exc()
-            self._logger.error(tb)
-            self._logger.error('Error %s' % ex)
+            self._logger.exception(str(ex), exc_info=1)
             raise ex
 
     def build_json(self, filename=Config.BIOMARKER_FILENAME):
 
         with open(filename, 'r') as input:
-            n = 0
-            for row in input:
-                n += 1
-                (Alteration, AlterationType, AssayType, Association, Biomarker, Comments, CurationDate, Curator, Drug, DrugFamily, DrugFullName, DrugStatus, EvidenceLevel, Gene, MetastaticTumorType, PrimaryTumorAcronym, PrimaryTumorTypeFullName, Source, TCGIincluded, Targeting, cDNA, gDNA, IndividualMutation, Info, Region, Strand, Transcript, PrimaryTumorType) = tuple(row.rstrip().split('\t'))
-                '''
-                 Split Primary Tumor Acronym, Gene and Source
-                 to separate out multiple entries in these
-                '''
-                mGene = Gene.split(";")
-                mSource = Source.split(";")
-                '''
-                 Iterate through tumor types, genes and sources
-                '''
+            for n, row in enumerate(input, start=1):
+
+                (Alteration, AlterationType, AssayType, Association, Biomarker, Comments, CurationDate,
+                 Curator, Drug, DrugFamily, DrugFullName, DrugStatus, EvidenceLevel,
+                 Gene, MetastaticTumorType, PrimaryTumorAcronym, PrimaryTumorTypeFullName,
+                 Source, TCGIincluded, Targeting, cDNA, gDNA, IndividualMutation, Info,
+                 Region, Strand, Transcript, PrimaryTumorType) = \
+                    tuple(row.rstrip().split('\t'))
+
+                # Split Primary Tumor Acronym, Gene and Source
+                # to separate out multiple entries in these
+
+                geneList = map(str.strip, Gene.split(";"))
+                mSource = map(str.strip, Source.split(";"))
+
+                # Iterate through tumor types, genes and sources
                 # For singleTumor in mPrimaryTumorAcronym:
-                for singleGene in mGene:
+
+                for singleGene in geneList:
                     '''
                     If gene has not appeared in biomarker list yet,
                      initialise self.cancerbiomarkers with an empty hash table
                     '''
-                    if Gene not in self.cancerbiomarkers:
-                        self.cancerbiomarkers[Gene] = []
+                    if singleGene not in self.cancerbiomarkers:
+                        self.cancerbiomarkers[singleGene] = []
+
                     '''
                      Create empty dictionaries for PMIDs and other references
                     '''
@@ -158,8 +163,4 @@ class CancerBiomarkers(IPlugin):
                      Add data for current biomarker
                      to self.cancerbiomarkers
                     '''
-                    try:
-                        self.cancerbiomarkers[Gene].append(line)
-                    except KeyError:
-                        self.cancerbiomarkers[Gene] = list()
-                        self.cancerbiomarkers[Gene].append(line)
+                    self.cancerbiomarkers[singleGene].append(line)
