@@ -3,7 +3,6 @@ from mrtarget.Settings import Config
 from tqdm import tqdm
 import traceback
 import logging
-import itertools as itt
 logging.basicConfig(level=logging.DEBUG)
 
 BIOMARKER_SOURCE_MAPPINGS = {
@@ -47,9 +46,7 @@ BIOMARKER_SOURCE_MAPPINGS = {
 
 class CancerBiomarkers(IPlugin):
 
-    '''
-      Initiate CancerBiomarker object
-    '''
+    # Initiate CancerBiomarker object
     def __init__(self):
         self._logger = logging.getLogger(__name__)
         self.loader = None
@@ -70,21 +67,16 @@ class CancerBiomarkers(IPlugin):
         self.tqdm_out = tqdm_out
 
         try:
-            '''
-             Parse cancer biomarker data into self.cancerbiomarkers
-            '''
+            # Parse cancer biomarker data into self.cancerbiomarkers
             self.build_json(filename=Config.BIOMARKER_FILENAME)
-            '''
-             Iterate through all genes and add cancer biomarkers data if gene symbol is present
-            '''
+
+            # Iterate through all genes and add cancer biomarkers data if gene symbol is present
             self._logger.info("Generating Cancer Biomarker data injection")
             for gene_id, gene in tqdm(genes.iterate(),
                                       desc='Adding Cancer Biomarker data',
                                       unit=' gene',
                                       file=self.tqdm_out):
-                '''
-                   extend gene with related Cancer Biomarker data
-                '''
+                # Extend gene with related Cancer Biomarker data
                 if gene.approved_symbol in self.cancerbiomarkers:
                     gene.cancerbiomarkers = list()
                     self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.approved_symbol)
@@ -106,31 +98,27 @@ class CancerBiomarkers(IPlugin):
                  Region, Strand, Transcript, PrimaryTumorType) = \
                     tuple(row.rstrip().split('\t'))
 
-                # Split Primary Tumor Acronym, Gene and Source
-                # to separate out multiple entries in these
-
-                geneList = map(str.strip, Gene.split(";"))
+                # Split Primary Tumor Acronym, Gene and Source to separate out multiple entries
                 mSource = map(str.strip, Source.split(";"))
+                geneList = list(map(str.strip, Gene.split(";")))
+                # If the two genes are identical, only keep one copy to prevent duplication of current biomarker
+                if len(geneList)>1:
+                    if geneList[0] == geneList[1]:
+                        geneList = [geneList[0]]
 
-                # Iterate through tumor types, genes and sources
-                # For singleTumor in mPrimaryTumorAcronym:
-
+                # Iterate through genes and sources
                 for singleGene in geneList:
-                    '''
-                    If gene has not appeared in biomarker list yet,
-                     initialise self.cancerbiomarkers with an empty hash table
-                    '''
+
+                    # If gene has not appeared in biomarker list yet,
+                    # initialise self.cancerbiomarkers with an empty list
                     if singleGene not in self.cancerbiomarkers:
                         self.cancerbiomarkers[singleGene] = []
 
-                    '''
-                     Create empty dictionaries for PMIDs and other references
-                    '''
+                    # Create empty dictionaries for PMIDs and other references
                     pubmed = []
                     other = []
-                    '''
-                     Go through the references/sources
-                    '''
+
+                    # Go through the references/sources
                     for singleSource in mSource:
                         if "PMID" in singleSource: # If the source is a PMID
                             currPMID = singleSource[5:] # Remove 'PMID:' if necessary
@@ -140,9 +128,8 @@ class CancerBiomarkers(IPlugin):
                                 other.append({'name' : singleSource, 'link' : 'https://clinicaltrials.gov/ct2/show/' + singleSource, 'description': 'Clinical Trial'})
                             elif singleSource.split(" (")[0] in BIOMARKER_SOURCE_MAPPINGS:
                                 other.append({'name': singleSource, 'link': BIOMARKER_SOURCE_MAPPINGS[singleSource.split(" (")[0]]['url'], 'description': BIOMARKER_SOURCE_MAPPINGS[singleSource.split(" (")[0]]['label']})
-                    '''
-                     Put the reference info together for each biomarker
-                    '''
+
+                    # Put the reference info together for each biomarker
                     myReferences = {"pubmed": pubmed, "other": other}
 
                     #TODO tumor acronym needs mapping to EFO
@@ -159,8 +146,6 @@ class CancerBiomarkers(IPlugin):
                         "evidencelevel": EvidenceLevel,
                         "references": myReferences
                     }
-                    '''
-                     Add data for current biomarker
-                     to self.cancerbiomarkers
-                    '''
+
+                    # Add data for current biomarker to self.cancerbiomarkers
                     self.cancerbiomarkers[singleGene].append(line)
