@@ -309,7 +309,7 @@ def main():
                                                 connectors.r_server,
                                                 es_pub=connectors.es_pub).process_all(datasources = args.datasource,
                                                                                       dry_run=args.dry_run,
-                                                                                      inject_literature=True)
+                                                                                      inject_literature=False)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:
