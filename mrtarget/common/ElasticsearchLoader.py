@@ -48,10 +48,7 @@ class Loader():
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
         self._tmp_fd = None
-        self._tmp_fd_enable = Config.DRY_RUN_OUTPUT
-        self._tmp_fd_delete = Config.DRY_RUN_OUTPUT_DELETE
-        self._tmp_fd_count = Config.DRY_RUN_OUTPUT_COUNT
-
+        self._tmp_fd_path = Config.OUTPUT_DIR
     @staticmethod
     def get_versioned_index(index_name, check_custom_idxs=False):
         '''get a composed real name of the index
@@ -110,8 +107,14 @@ class Loader():
         versioned_index_name = self.get_versioned_index(index_name)
         if auto_optimise and (versioned_index_name not in self.indexes_optimised):
             self.prepare_for_bulk_indexing(versioned_index_name)
+
         if isinstance(body, JSONSerializable):
+            body.doc_id = ID
             body = body.to_json()
+        else:
+            body['doc_id'] = ID
+            body = json.dumps(body)
+
         submission_dict = dict(_index=versioned_index_name,
                                _type=doc_type,
                                _id=ID,
@@ -142,7 +145,8 @@ class Loader():
                         break
                     else:
                         time_to_wait = 5*retry
-                        self.logger.warning("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
+                        self.logger.warning("push to elasticsearch failed for chunk: %s.  retrying in %is...",
+                                            str(e),time_to_wait)
                         time.sleep(time_to_wait)
 
             del self.cache[:]
@@ -161,25 +165,26 @@ class Loader():
                  stats_only=True)
         else:
             # create a temporal file if necessary
-            if self._tmp_fd_enable and self._tmp_fd_count > 0:
-                if self._tmp_fd is None:
-                    self._tmp_fd = tempfile.NamedTemporaryFile(
-                        delete=self._tmp_fd_delete)
-                    self.logger.info('create temporary file to output '
-                                     'generated index docs while dry_run '
-                                     'is activated with file %s',
-                                     self._tmp_fd.name)
+            if self._tmp_fd is None and self._tmp_fd_path is not None:
+                import uuid
+
+                self._tmp_fd = open(self._tmp_fd_path + '/' + str(uuid.uuid4()) + '.json', 'w+')
+                self.logger.info('create temporary file to output '
+                                 'generated index docs while dry_run '
+                                 'is activated with file %s',
+                                 self._tmp_fd.name)
 
 
-                # flush self.cache into temp file converted as text lines
-                self._tmp_fd.writelines([json.dumps(el) + '\n'
+            # flush self.cache into temp file converted as text lines
+            if self._tmp_fd_path is not None:
+                self._tmp_fd.writelines([el["_source"] + '\n'
                                          for el in self.cache])
-                self._tmp_fd_count = self._tmp_fd_count - len(self.cache) if \
-                    self._tmp_fd_count > 0 else 0
 
     def close(self):
         self.flush()
         self.restore_after_bulk_indexing()
+        if self._tmp_fd is not None:
+            self._tmp_fd.close()
 
     def __enter__(self):
         return self
@@ -231,6 +236,13 @@ class Loader():
                                              body=self.indexes_optimised[index_name]['settings_to_restore'])
                 self.optimize_index(index_name)
 
+
+    def _file_create_index(self, index_name, body={}):
+        import os
+        filename = self._tmp_fd_path + '/' + index_name + '.json'
+        self.logger.info("creating index %s", filename)
+        with open(filename, 'w+') as f:
+            f.writelines([json.dumps(body) + '\n'])
 
     def _safe_create_index(self, index_name, body={}, ignore=400):
         if not self.dry_run:
@@ -301,6 +313,21 @@ class Loader():
                 self.logger.warning('Index %s created without explicit mappings' % index_name)
             self.logger.info("%s index created" % index_name)
             return
+        else:
+            self.logger.info("generating index configuration for index %s ", index_name)
+            v_index_name = self.get_versioned_index(index_name)
+            index_created = False
+            for index_root, mapping in ElasticSearchConfiguration.INDEX_MAPPPINGS.items():
+                if index_root in v_index_name:
+                    self._file_create_index(index_name, mapping)
+                    index_created
+                    break
+
+            if not index_created:
+                self._safe_create_index(index_name)
+                self.logger.warning('Index %s created without explicit mappings' % index_name)
+
+            self.logger.info("%s index created" % index_name)
 
     def _enforce_mapping(self, index_name):
         for index_root in ElasticSearchConfiguration.INDEX_MAPPPINGS:

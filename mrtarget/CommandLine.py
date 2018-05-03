@@ -113,6 +113,11 @@ def main():
                         action='append', default=[])
     parser.add_argument("--targets", dest='targets', help="just process data for this target. Does not work with all the steps!!",
                         action='append', default=[])
+
+    parser.add_argument("--output-dir", dest='output_dir',
+                        help="output dir to save the index data instead elasticsearch",
+                        action='store', default='')
+
     parser.add_argument("--redis-remote", dest='redis_remote', help="connect to a remote redis",
                         action='store_true', default=False)
     parser.add_argument("--redis-host", dest='redis_host',
@@ -162,6 +167,11 @@ def main():
         Config.RELEASE_VERSION = args.release_tag
 
     targets = args.targets
+
+    # dry_run is set when we have a output_dir
+    if args.output_dir:
+        Config.OUTPUT_DIR = args.output_dir
+        args.dry_run = True
 
     if args.lt_namespace:
         Config.LT_NAMESPACE = args.lt_namespace
@@ -299,7 +309,7 @@ def main():
                                                 connectors.r_server,
                                                 es_pub=connectors.es_pub).process_all(datasources = args.datasource,
                                                                                       dry_run=args.dry_run,
-                                                                                      inject_literature=True)
+                                                                                      inject_literature=False)
         if args.ass or run_full_pipeline:
             do_all = (AssociationActions.ALL in args.ass) or run_full_pipeline
             if (AssociationActions.PROCESS in args.ass) or do_all:

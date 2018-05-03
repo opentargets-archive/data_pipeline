@@ -16,7 +16,7 @@ class ReactomeActions(Actions):
     PROCESS = 'process'
 
 
-class ReactomeNode(TreeNode, JSONSerializable):
+class ReactomeNode(TreeNode):
     def __init__(self, **kwargs):
         super(ReactomeNode, self).__init__(**kwargs)
 

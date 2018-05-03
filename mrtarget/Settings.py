@@ -159,6 +159,8 @@ class Config():
     # verify_certs=True
     # )
 
+    # folder to output each index creation
+    OUTPUT_DIR = None
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=[])
     ELASTICSEARCH_NODES_PUB = read_option('ELASTICSEARCH_NODES_PUB', cast=list,

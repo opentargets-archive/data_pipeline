@@ -54,7 +54,7 @@ class JSONSerializable(object):
         self.__dict__['data_release'] = Config.RELEASE_VERSION.split('-')[-1]
 
 
-class TreeNode(object):
+class TreeNode(JSONSerializable):
 
         def __init__(self,
                      id='',

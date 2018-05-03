@@ -773,6 +773,42 @@ class ElasticSearchConfiguration():
             }
     }
 
+    reactome_data_mapping = {
+        "settings": {
+            "number_of_shards": generic_shard_number,
+            "number_of_replicas": generic_replicas_number,
+            "refresh_interval": "10s",
+        },
+        "mappings": {
+            "__default__": {
+            }
+        }
+    }
+
+    hpo_data_mapping = {
+        "settings": {
+            "number_of_shards": generic_shard_number,
+            "number_of_replicas": generic_replicas_number,
+            "refresh_interval": "10s",
+        },
+        "mappings": {
+            "__default__": {
+            }
+        }
+    }
+
+    mp_data_mapping = {
+        "settings": {
+            "number_of_shards": generic_shard_number,
+            "number_of_replicas": generic_replicas_number,
+            "refresh_interval": "10s",
+        },
+        "mappings": {
+            "__default__": {
+            }
+        }
+    }
+
     INDEX_MAPPPINGS = {Config.ELASTICSEARCH_DATA_INDEX_NAME: evidence_data_mapping,
                        Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME: association_data_mapping,
                        Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME: efo_data_mapping,
@@ -786,4 +822,7 @@ class ElasticSearchConfiguration():
                        Config.ELASTICSEARCH_RELATION_INDEX_NAME: relation_data_mapping,
                        Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME: publication_data_mapping,
                        Config.ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME: literature_ent_mapping,
+                       Config.ELASTICSEARCH_REACTOME_INDEX_NAME: reactome_data_mapping,
+                       Config.ELASTICSEARCH_HPO_LABEL_INDEX_NAME: hpo_data_mapping,
+                       Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME: mp_data_mapping,
                        }
