@@ -60,7 +60,7 @@ class PipelineConnectors():
         self.es = None
 
         ''' elasticsearch publication connection'''
-        self.es_pub = None
+        # self.es_pub = None
 
         ''' Redis '''
         self.r_server = None
