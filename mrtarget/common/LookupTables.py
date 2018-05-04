@@ -183,12 +183,6 @@ class GeneLookUpTable(object):
         return r_server if r_server else self.r_server
 
 
-ecoltloader = LTLoader('eco')
-ecoltloader.load()
-
-eclotq ) LTQuery('eco')
-eclot.['asdf']
-
 class ECOLookUpTable(object):
     """
     A redis-based pickable gene look up table
