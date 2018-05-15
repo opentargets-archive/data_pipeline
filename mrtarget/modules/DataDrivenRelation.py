@@ -745,6 +745,8 @@ class DataDrivenRelationProcess(object):
 
         logger.info('flushing data to index')
 
+        q_reporter.join()
+
         self.loader.flush()
         self.loader.close()
         self.es.indices.flush(

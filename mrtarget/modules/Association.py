@@ -634,6 +634,7 @@ class ScoringProcess():
             w.join()
 #         for w in storers:
 #             w.join()
+        q_reporter.join()
 
         logger.info('flushing data to index')
         self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
