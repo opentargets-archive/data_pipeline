@@ -192,36 +192,36 @@ class ESQuery(object):
         return self.count_elements_in_index(
             Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
 
-    def get_publications_with_analyzed_data(self,ids, fields=None):
-        source = self._get_source_from_fields(fields)
-        # inner hits to get child documents containing abstract_lemmas , along with parent publications
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                                     "has_child": {
-                                        "type": "publication-analysis-spacy",
-                                            "query": {
-                                                        "ids": {"values": ids}
+    # def get_publications_with_analyzed_data(self,ids, fields=None):
+    #     source = self._get_source_from_fields(fields)
+    #     # inner hits to get child documents containing abstract_lemmas , along with parent publications
+    #     res = helpers.scan(client=self.handler,
+    #                        query={"query": {
+    #                                  "has_child": {
+    #                                     "type": "publication-analysis-spacy",
+    #                                         "query": {
+    #                                                     "ids": {"values": ids}
 
-                                                    },"inner_hits": {}
-                                        }
-                                     },
+    #                                                 },"inner_hits": {}
+    #                                     }
+    #                                  },
 
-                               '_source': source,
-                               'size': 1000
-                           },
-                           scroll='2h',
-                           doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,True),
-                           timeout="10m",
-                           )
-        for hit in res:
-            parent_publication = hit['_source']
-            analyzed_publication = hit['inner_hits']['publication-analysis-spacy']['hits']['hits'][0]['_source']
-            yield parent_publication, analyzed_publication
+    #                            '_source': source,
+    #                            'size': 1000
+    #                        },
+    #                        scroll='2h',
+    #                        doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+    #                        index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,True),
+    #                        timeout="10m",
+    #                        )
+    #     for hit in res:
+    #         parent_publication = hit['_source']
+    #         analyzed_publication = hit['inner_hits']['publication-analysis-spacy']['hits']['hits'][0]['_source']
+    #         yield parent_publication, analyzed_publication
 
-    def count_all_publications(self):
+    # def count_all_publications(self):
 
-        return self.count_elements_in_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
+    #     return self.count_elements_in_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
 
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
@@ -737,10 +737,10 @@ class ESQuery(object):
 
 
 
-    def get_publications_by_id(self, ids):
-        return self.get_objects_by_id(ids,
-                                      Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-                                      Config.ELASTICSEARCH_PUBLICATION_DOC_NAME)
+    # def get_publications_by_id(self, ids):
+    #     return self.get_objects_by_id(ids,
+    #                                   Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+    #                                   Config.ELASTICSEARCH_PUBLICATION_DOC_NAME)
 
     def get_all_pub_ids_from_validated_evidence(self, datasources= None):
         for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
@@ -755,77 +755,77 @@ class ESQuery(object):
                     pass
 
 
-    def get_all_pub_from_validated_evidence(self,datasources= None, batch_size=1000):
-        batch = []
-        for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
-                                                                   size=batch_size,
-                                                                   datasources=datasources)):
-            if hit:
-                try:
-                    ev = json.loads(hit['evidence_string'])
-                    for lit in ev['literature']['references']:
-                        batch.append(lit['lit_id'].split('/')[-1])
-                except KeyError:
-                    pass
-            if len(batch)>=batch_size:
-                for pub in self.get_publications_by_id(batch):
-                    yield pub
-                batch =[]
-        if batch:
-            for pub in self.get_publications_by_id(batch):
-                yield pub
+    # def get_all_pub_from_validated_evidence(self,datasources= None, batch_size=1000):
+    #     batch = []
+    #     for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
+    #                                                                size=batch_size,
+    #                                                                datasources=datasources)):
+    #         if hit:
+    #             try:
+    #                 ev = json.loads(hit['evidence_string'])
+    #                 for lit in ev['literature']['references']:
+    #                     batch.append(lit['lit_id'].split('/')[-1])
+    #             except KeyError:
+    #                 pass
+    #         if len(batch)>=batch_size:
+    #             for pub in self.get_publications_by_id(batch):
+    #                 yield pub
+    #             batch =[]
+    #     if batch:
+    #         for pub in self.get_publications_by_id(batch):
+    #             yield pub
 
-    def get_all_publications(self,batch_size=1000):
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                           },
-                               '_source': True,
-                               'size': batch_size,
-                           },
-                           scroll='1h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-                           timeout="10m",
-                           )
-        for hit in res:
-            yield hit['_source']
+    # def get_all_publications(self,batch_size=1000):
+    #     res = helpers.scan(client=self.handler,
+    #                        query={"query": {
+    #                            "match_all": {}
+    #                        },
+    #                            '_source': True,
+    #                            'size': batch_size,
+    #                        },
+    #                        scroll='1h',
+    #                        index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
+    #                        timeout="10m",
+    #                        )
+    #     for hit in res:
+    #         yield hit['_source']
 
-    def get_abstracts_from_val_ev(self,batch_size=1000):
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "constant_score" : {
-                                 "filter" : {
-                                    "exists" : {
-                                       "field" : "literature.abstract"
-                                    }
-                                 }
-                              }
-                           },
-                               '_source': True,
-                               'size': batch_size,
-                           },
-                           scroll='1h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-generic'),
-                           timeout="10m",
-                           )
-        for hit in res:
-            yield hit['_source']
+    # def get_abstracts_from_val_ev(self,batch_size=1000):
+    #     res = helpers.scan(client=self.handler,
+    #                        query={"query": {
+    #                            "constant_score" : {
+    #                              "filter" : {
+    #                                 "exists" : {
+    #                                    "field" : "literature.abstract"
+    #                                 }
+    #                              }
+    #                           }
+    #                        },
+    #                            '_source': True,
+    #                            'size': batch_size,
+    #                        },
+    #                        scroll='1h',
+    #                        index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-generic'),
+    #                        timeout="10m",
+    #                        )
+    #     for hit in res:
+    #         yield hit['_source']
 
-    def count_publications_for_file(self, filename):
-        query_body = {
-            "query": {
-                "term": {"filename": filename}
-            },
-            '_source': False,
-            'size': 0
+    # def count_publications_for_file(self, filename):
+    #     query_body = {
+    #         "query": {
+    #             "term": {"filename": filename}
+    #         },
+    #         '_source': False,
+    #         'size': 0
 
-        }
+    #     }
 
-        res = self.handler.search(index=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-                           doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-                           body=query_body,
-                            )
-        return res['hits']['total']
+    #     res = self.handler.search(index=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
+    #                        doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
+    #                        body=query_body,
+    #                         )
+    #     return res['hits']['total']
 
 
     def get_all_associations_ids(self,):
