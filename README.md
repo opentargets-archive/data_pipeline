@@ -10,7 +10,7 @@ and [eu.gcr.io](https://console.cloud.google.com/gcr/images/open-targets/EU/mrta
 All code related with the computation of the process needed to
 complete the pipeline are here refactored into a python package.
 
-We are also building a container with all the python (and nonpython) 
+We are also building a container with all the python (and nonpython)
 dependencies that allows you to run each step of the pipeline.
 
 
@@ -28,16 +28,16 @@ gsutil ls gs://ot-releases/17.12 | sed 's/gs/http/' | sed 's/\/\//\/\/storage.go
 
 #### Elasticsearch
 
-You should have an elasticsearch instance running to use the pipeline code. 
+You should have an elasticsearch instance running to use the pipeline code.
 You can run an instance locally using docker containers. You can use our ES v2.4 docker containers ([repo](https://github.com/opentargets/docker-elasticsearch-singlenode) | [![Docker Repository on Quay](https://quay.io/repository/opentargets/docker-elasticsearch-singlenode/status "Docker Repository on Quay")](https://quay.io/repository/opentargets/docker-elasticsearch-singlenode) )
 ```sh
 docker run -p 9200:9200 -e NUMBER_OF_REPLICAS=0 quay.io/opentargets/docker-elasticsearch-singlenode:v2.4.1
 ```
-Do take a look at the repo for other options you can pass to the container. 
-If this is anything more than a test, you will want to change the ES_HEAP, etc. 
+Do take a look at the repo for other options you can pass to the container.
+If this is anything more than a test, you will want to change the ES_HEAP, etc.
 
-After deploying elasticsearch, you should check that you can query its API. 
-Typing `curl localhost:9200` should show something like: 
+After deploying elasticsearch, you should check that you can query its API.
+Typing `curl localhost:9200` should show something like:
 ```json
 {
   "name": "Kenneth Crichton",
@@ -57,15 +57,15 @@ Typing `curl localhost:9200` should show something like:
 
 Kibana, marvel and sense are useful tools to monitor the performance of mrTarget, and to browse the output/input of the various steps.
 
-You can install kibana in a variety of ways. **Important:** your version of kibana [must be compatible](https://www.elastic.co/support/matrix#show_compatibility) with the version of ES we are using. 
+You can install kibana in a variety of ways. **Important:** your version of kibana [must be compatible](https://www.elastic.co/support/matrix#show_compatibility) with the version of ES we are using.
 
-On mac: 
+On mac:
 ```sh
 brew install kibana
 
 #Install the sense plugin
 kibana plugin --install elastic/sense
-#Install marvel 
+#Install marvel
 kibana plugin --install elasticsearch/marvel
 
 #start the service
@@ -108,7 +108,7 @@ ELASTICSEARCH_NODES = [
     ]
 ```
 
-Normally mrT-arget uses a local instance of redis, thanks to redislite. 
+Normally mrT-arget uses a local instance of redis, thanks to redislite.
 To make it connect to any given redis you can specify the parameter `--redis-remote`
 and point to the right host and port:
 ```sh
@@ -128,7 +128,7 @@ CTTV_REDIS_SERVER=127.0.0.1:8888
 ```sh
 docker run --net=host eu.gcr.io/open-targets/mrtarget:master mrtarget --log-level DEBUG 18.02 --dry-run
 ```
-Here some instructions to pull from eu.gcr.io: https://cloud.google.com/container-registry/docs/pushing-and-pulling 
+Here some instructions to pull from eu.gcr.io: https://cloud.google.com/container-registry/docs/pushing-and-pulling
 
 You probably want to mount log files, etc like we do in our [backend machine](https://github.com/opentargets/infrastructure/blob/master/gcp/cloud-config/be-worker-cos.yaml):
 
@@ -177,14 +177,11 @@ Here the recipe to start coding on it:
 $ git clone ${this_repo}
 $ cd ${this_repo}
 ```
-Add a file `mrtarget/resources/db.ini` with contents similar to: 
+Add a file `mrtarget/resources/db.ini` with contents similar to:
 ```bash
 [dev]
 ELASTICSEARCH_NODES = [
      "http://127.0.0.1:9200/"
-    ]
-ELASTICSEARCH_NODES_PUB = [
-     "http://127.0.0.1:39200"
     ]
 ```
 Install python dependencies and test run:
@@ -208,7 +205,7 @@ pytest tests/test_score.py
 To skip running tests in the CI when pushing append `[skip ci]` to the commit message.
 
 The elasticsearch guide can be very useful: https://www.elastic.co/guide/en/elasticsearch/guide/2.x/getting-started.html
-The important bits to run/understand the data pipeline are the `getting started`, `search in depth`, `aggregations`, and `modeling your data`. You can probably ignore the others. 
+The important bits to run/understand the data pipeline are the `getting started`, `search in depth`, `aggregations`, and `modeling your data`. You can probably ignore the others.
 
 ### Internal features for developers
 

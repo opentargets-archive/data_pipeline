@@ -23,7 +23,7 @@ from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
-from mrtarget.modules.Literature import Publication, PublicationFetcher
+# from mrtarget.modules.Literature import Publication, PublicationFetcher
 
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger, level=logging.INFO)
@@ -204,30 +204,30 @@ class ExtendedInfoECO(ExtendedInfo):
                          label=eco.label),
 
 
-class ExtendedInfoLiterature(ExtendedInfo):
-    root = "literature"
+# class ExtendedInfoLiterature(ExtendedInfo):
+#     root = "literature"
 
-    def __init__(self, literature):
-        if isinstance(literature, Publication):
-            self.extract_info(literature)
-        else:
-            raise AttributeError("you need to pass a Publication not a: " + str(type(literature)))
+#     def __init__(self, literature):
+#         if isinstance(literature, Publication):
+#             self.extract_info(literature)
+#         else:
+#             raise AttributeError("you need to pass a Publication not a: " + str(type(literature)))
 
-    def extract_info(self, literature):
+#     def extract_info(self, literature):
 
-        self.data = dict(abstract=literature.abstract,
-                         journal=literature.journal,
-                         title=literature.title,
-                         authors=literature.authors,
-                         doi=literature.doi,
-                         pub_type=literature.pub_type,
-                         mesh_headings=literature.mesh_headings,
-                         keywords=literature.keywords,
-                         chemicals=literature.chemicals,
-                         noun_chunks=literature.text_mined_entities['nlp'].get('chunks'),
-                         top_chunks=literature.text_mined_entities['nlp'].get('top_chunks'),
-                         date=literature.pub_date,
-                         journal_reference=literature.journal_reference)
+#         self.data = dict(abstract=literature.abstract,
+#                          journal=literature.journal,
+#                          title=literature.title,
+#                          authors=literature.authors,
+#                          doi=literature.doi,
+#                          pub_type=literature.pub_type,
+#                          mesh_headings=literature.mesh_headings,
+#                          keywords=literature.keywords,
+#                          chemicals=literature.chemicals,
+#                          noun_chunks=literature.text_mined_entities['nlp'].get('chunks'),
+#                          top_chunks=literature.text_mined_entities['nlp'].get('top_chunks'),
+#                          date=literature.pub_date,
+#                          journal_reference=literature.journal_reference)
 
 
 class EvidenceManager():
@@ -510,7 +510,7 @@ class EvidenceManager():
 
         return True
 
-    def get_extended_evidence(self, evidence, pub_fetcher, inject_literature):
+    def get_extended_evidence(self, evidence):
 
         extended_evidence = copy.copy(evidence.evidence)
         extended_evidence['private'] = dict()
@@ -625,58 +625,58 @@ class EvidenceManager():
         if target_class['level1']:
             extended_evidence['private']['facets']['target_class'] = target_class
 
-        ''' Add literature data '''
-        if inject_literature:
-            if 'literature' in extended_evidence and \
-                            'references' in extended_evidence['literature']:
-                try:
-                    pmid_url = extended_evidence['literature']['references'][0]['lit_id']
-                    pmid = pmid_url.split('/')[-1]
-                    pub = None
-                    if pmid in self.available_publications:
-                        pub = self.available_publications[pmid]
-                    else:
-                        try:
-                            pub_dict = pub_fetcher.get_publications(pmid)
-                            if pub_dict:
-                                pub = pub_dict[pmid]
-                        except KeyError as e:
-                            self.logger.warning('Cannot find publication %s in elasticsearch. Not injecting data' % pmid)
+        # ''' Add literature data '''
+        # if inject_literature:
+        #     if 'literature' in extended_evidence and \
+        #                     'references' in extended_evidence['literature']:
+        #         try:
+        #             pmid_url = extended_evidence['literature']['references'][0]['lit_id']
+        #             pmid = pmid_url.split('/')[-1]
+        #             pub = None
+        #             if pmid in self.available_publications:
+        #                 pub = self.available_publications[pmid]
+        #             else:
+        #                 try:
+        #                     pub_dict = pub_fetcher.get_publications(pmid)
+        #                     if pub_dict:
+        #                         pub = pub_dict[pmid]
+        #                 except KeyError as e:
+        #                     self.logger.warning('Cannot find publication %s in elasticsearch. Not injecting data' % pmid)
 
-                    if pub is not None:
-                        literature_info = ExtendedInfoLiterature(pub)
-                        extended_evidence['literature']['date'] = literature_info.data['date']
-                        extended_evidence['literature']['abstract'] = literature_info.data['abstract']
-                        extended_evidence['literature']['journal_data'] = literature_info.data['journal']
-                        extended_evidence['literature']['title'] = literature_info.data['title']
-                        journal_reference = ''
-                        if 'journal_reference' in literature_info.data and  literature_info.data['journal_reference']:
-                            if 'volume' in literature_info.data['journal_reference']:
-                                journal_reference += literature_info.data['journal_reference']['volume']
-                            if 'issue' in literature_info.data['journal_reference']:
-                                journal_reference += "(%s)" % literature_info.data['journal_reference']['issue']
-                            if  'pgn' in literature_info.data['journal_reference']:
-                                journal_reference += ":%s" % literature_info.data['journal_reference']['pgn']
-                        extended_evidence['literature']['journal_reference'] = journal_reference
-                        extended_evidence['literature']['authors'] = literature_info.data['authors']
-                        extended_evidence['private']['facets']['literature'] = {}
-                        extended_evidence['literature']['doi'] = literature_info.data.get('doi')
-                        extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
-                        extended_evidence['private']['facets']['literature'][
-                            'mesh_headings'] = literature_info.data.get(
-                            'mesh_headings')
-                        extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
-                            'chemicals')
-                        extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
-                            'noun_chunks')
-                        extended_evidence['private']['facets']['literature']['top_chunks'] = literature_info.data.get(
-                            'top_chunks')
-                        extended_evidence['private']['facets']['literature']['keywords'] = literature_info.data.get(
-                            'keywords')
+        #             if pub is not None:
+        #                 literature_info = ExtendedInfoLiterature(pub)
+        #                 extended_evidence['literature']['date'] = literature_info.data['date']
+        #                 extended_evidence['literature']['abstract'] = literature_info.data['abstract']
+        #                 extended_evidence['literature']['journal_data'] = literature_info.data['journal']
+        #                 extended_evidence['literature']['title'] = literature_info.data['title']
+        #                 journal_reference = ''
+        #                 if 'journal_reference' in literature_info.data and  literature_info.data['journal_reference']:
+        #                     if 'volume' in literature_info.data['journal_reference']:
+        #                         journal_reference += literature_info.data['journal_reference']['volume']
+        #                     if 'issue' in literature_info.data['journal_reference']:
+        #                         journal_reference += "(%s)" % literature_info.data['journal_reference']['issue']
+        #                     if  'pgn' in literature_info.data['journal_reference']:
+        #                         journal_reference += ":%s" % literature_info.data['journal_reference']['pgn']
+        #                 extended_evidence['literature']['journal_reference'] = journal_reference
+        #                 extended_evidence['literature']['authors'] = literature_info.data['authors']
+        #                 extended_evidence['private']['facets']['literature'] = {}
+        #                 extended_evidence['literature']['doi'] = literature_info.data.get('doi')
+        #                 extended_evidence['literature']['pub_type'] = literature_info.data.get('pub_type')
+        #                 extended_evidence['private']['facets']['literature'][
+        #                     'mesh_headings'] = literature_info.data.get(
+        #                     'mesh_headings')
+        #                 extended_evidence['private']['facets']['literature']['chemicals'] = literature_info.data.get(
+        #                     'chemicals')
+        #                 extended_evidence['private']['facets']['literature']['noun_chunks'] = literature_info.data.get(
+        #                     'noun_chunks')
+        #                 extended_evidence['private']['facets']['literature']['top_chunks'] = literature_info.data.get(
+        #                     'top_chunks')
+        #                 extended_evidence['private']['facets']['literature']['keywords'] = literature_info.data.get(
+        #                     'keywords')
 
-                except Exception:
-                    self.logger.exception(
-                        'Error in publication data injection - skipped for evidence id: ' + extended_evidence['id'])
+        #         except Exception:
+        #             self.logger.exception(
+        #                 'Error in publication data injection - skipped for evidence id: ' + extended_evidence['id'])
 
         return Evidence(extended_evidence)
 
@@ -1054,7 +1054,7 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
                  chunk_size=1e4,
                  dry_run=False,
                  lookup_data=None,
-                 inject_literature=False,
+                #  inject_literature=False,
                  global_stats = None,
                  ):
         super(EvidenceProcesser, self).__init__(score_q, r_path, loader_q, ignore_errors=[AttributeError])
@@ -1066,15 +1066,15 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         self.lookup_data = lookup_data
         # self.evidence_manager = EvidenceManager(lookup_data)
         self.evidence_manager = None
-        self.inject_literature = inject_literature
-        self.pub_fetcher = None
+        # self.inject_literature = inject_literature
+        # self.pub_fetcher = None
         self.global_stats = global_stats
 
     def init(self):
         super(EvidenceProcesser, self).init()
         self.logger = logging.getLogger(__name__)
         self.lookup_data.set_r_server(self.get_r_server())
-        self.pub_fetcher = PublicationFetcher(new_es_client(hosts=Config.ELASTICSEARCH_NODES_PUB))
+        # self.pub_fetcher = PublicationFetcher(new_es_client(hosts=Config.ELASTICSEARCH_NODES_PUB))
 
         # moved from __init__ as this is executed on a process so it should need be process mem
         self.evidence_manager = EvidenceManager(self.lookup_data)
@@ -1088,9 +1088,7 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
                                     self.global_stats)
             '''extend data in evidencestring'''
 
-            ev = self.evidence_manager.get_extended_evidence(fixed_ev,
-                                                             self.pub_fetcher,
-                                                             self.inject_literature)
+            ev = self.evidence_manager.get_extended_evidence(fixed_ev)
         else:
             raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
 
@@ -1216,38 +1214,35 @@ class EvidenceGlobalCounter():
 class EvidenceStringProcess():
     def __init__(self,
                  es,
-                 r_server,
-                 es_pub):
+                 r_server):
         self.loaded_entries_to_pg = 0
         self.es = es
         self.es_query = ESQuery(es)
         self.r_server = r_server
-        self.es_pub = es_pub
+        # self.es_pub = es_pub
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self, datasources=[], dry_run=False, inject_literature=False):
+    def process_all(self, datasources=[], dry_run=False):
         return self._process_evidence_string_data(datasources=datasources,
-                                                  dry_run=dry_run,
-                                                  inject_literature=inject_literature)
+                                                  dry_run=dry_run)
 
     def _process_evidence_string_data(self,
                                       datasources=[],
-                                      dry_run=False,
-                                      inject_literature=False):
+                                      dry_run=False):
 
         self.logger.debug("Starting Evidence Manager")
         '''get lookup data and stats'''
         lookup_data_types = [LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO]
-        if inject_literature:
-            lookup_data_types = [LookUpDataType.PUBLICATION, LookUpDataType.TARGET, LookUpDataType.DISEASE,
-                                 LookUpDataType.ECO]
-            # lookup_data_types.append(LookUpDataType.PUBLICATION)
+        # if inject_literature:
+        #     lookup_data_types = [LookUpDataType.PUBLICATION, LookUpDataType.TARGET, LookUpDataType.DISEASE,
+        #                          LookUpDataType.ECO]
+        #     # lookup_data_types.append(LookUpDataType.PUBLICATION)
 
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           data_types=lookup_data_types,
                                           autoload=True,
-                                          es_pub=self.es_pub,
+                                        #   es_pub=self.es_pub,
                                           ).lookup
 
         global_stat_cache= 'global_stats.pkl'
@@ -1312,7 +1307,7 @@ class EvidenceStringProcess():
                                     None,
                                     store_q,
                                     lookup_data=lookup_data,
-                                    inject_literature=inject_literature,
+                                    # inject_literature=inject_literature,
                                     global_stats=global_stats)
                                     for _ in range(number_of_workers)]
         for w in scorers:

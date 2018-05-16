@@ -161,8 +161,8 @@ class Config():
 
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=[])
-    ELASTICSEARCH_NODES_PUB = read_option('ELASTICSEARCH_NODES_PUB', cast=list,
-                                      default=[])
+    # ELASTICSEARCH_NODES_PUB = read_option('ELASTICSEARCH_NODES_PUB', cast=list,
+    #                                   default=[])
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -194,11 +194,11 @@ class Config():
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
-    ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
-    ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
-    ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
-    ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME = '!lit-entities-test'
-    ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME = 'litentity'
+    # ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
+    # ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
+    # ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
+    # ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME = '!lit-entities-test'
+    # ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME = 'litentity'
     DEBUG = True
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
@@ -415,12 +415,12 @@ class Config():
     DUMP_REMOTE_API_APPNAME = read_option('DUMP_REMOTE_API_APPNAME')
 
     # Literature Pipeline -- Pubmed/Medline FTP server
-    PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
-    PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
-    PUBMED_XML_LOCN = os.path.join(PUBMED_TEMP_DIR, 'baseline')
-    PUBMED_XML_UPDATE_LOCN = os.path.join(PUBMED_TEMP_DIR, 'update')
+    # PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
+    # PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
+    # PUBMED_XML_LOCN = os.path.join(PUBMED_TEMP_DIR, 'baseline')
+    # PUBMED_XML_UPDATE_LOCN = os.path.join(PUBMED_TEMP_DIR, 'update')
 
-    PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
+    # PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
     BIOLEXICON_GENE_XML_LOCN = 'geneProt (1).xml'
     BIOLEXICON_DISEASE_XML_LOCN = 'umlsDisease.xml'
     GENE_LEXICON_JSON_LOCN = 'gene_lexicon.json'

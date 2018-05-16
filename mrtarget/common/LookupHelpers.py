@@ -13,7 +13,7 @@ from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
-from mrtarget.common.LookupTables import LiteratureLookUpTable
+# from mrtarget.common.LookupTables import LiteratureLookUpTable
 from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
@@ -68,7 +68,7 @@ class LookUpDataType(object):
     EFO = 'efo'
     HPO = 'hpo'
     ECO = 'eco'
-    PUBLICATION = 'publication'
+    # PUBLICATION = 'publication'
     MP = 'mp'
     MP_LOOKUP = 'mp_lookup'
     CHEMBL_DRUGS = 'chembl_drugs'
@@ -84,11 +84,11 @@ class LookUpDataRetriever(object):
                              LookUpDataType.DISEASE,
                              LookUpDataType.ECO),
                  autoload=True,
-                 es_pub=None,
+                #  es_pub=None,
                  ):
 
         self.es = es
-        self.es_pub = es_pub
+        # self.es_pub = es_pub
         self.r_server = r_server
 
         self.esquery = ESQuery(self.es)
@@ -125,8 +125,8 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.EFO:
                 self._logger.debug("get EFO info")
                 self._get_efo()
-            elif dt == LookUpDataType.PUBLICATION:
-                self._get_available_publications()
+            # elif dt == LookUpDataType.PUBLICATION:
+            #     self._get_available_publications()
             elif dt == LookUpDataType.CHEMBL_DRUGS:
                 self._get_available_chembl_mappings()
             elif dt == LookUpDataType.HPA:
@@ -228,9 +228,9 @@ class LookUpDataRetriever(object):
         self.lookup.efo_ontology = obj
 
 
-    def _get_available_publications(self):
-        self._logger.info('getting literature/publications')
-        self.lookup.available_publications = LiteratureLookUpTable(self.es_pub, 'LITERATURE_LOOKUP', self.r_server)
+    # def _get_available_publications(self):
+    #     self._logger.info('getting literature/publications')
+    #     self.lookup.available_publications = LiteratureLookUpTable(self.es_pub, 'LITERATURE_LOOKUP', self.r_server)
 
 
     def _get_from_pickled_file_cache(self, file_id):
