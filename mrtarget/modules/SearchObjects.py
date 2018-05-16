@@ -24,7 +24,7 @@ class SearchObjectTypes(object):
     DISEASE = 'disease'
     GO_TERM = 'go'
     PROTEIN_FEATURE = 'protein_feature'
-    PUBLICATION = 'pub'
+    # PUBLICATION = 'pub'
     SNP = 'snp'
     GENERIC = 'generic'
 

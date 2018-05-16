@@ -31,7 +31,7 @@ jobs:
           command: |
             mrtarget --dry-run citest
       - run:
-          name: Run Scoring tests
+          name: Run tests
           command: |
             pytest tests/
   # uncomment this to use workflows (see below)
@@ -108,8 +108,8 @@ jobs:
               fi
             else
               echo "plan aborted."
-            fi 
-            
+            fi
+
 
 workflows:
   version: 2
