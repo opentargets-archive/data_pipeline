@@ -744,15 +744,16 @@ class DataDrivenRelationProcess(object):
             w.join()
 
         logger.info('flushing data to index')
-
-        q_reporter.join()
-
-        self.loader.flush()
-        self.loader.close()
         self.es.indices.flush(
             '%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME),
             wait_if_ongoing=True)
 
+        logger.info("flush loader")
+        self.loader.flush()
+        self.loader.close()
+
+        self.logger.info('collecting reporter')
+        q_reporter.join()
 
     def get_hot_node_blacklist(self, data):
         c = Counter()
