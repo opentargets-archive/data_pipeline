@@ -78,9 +78,8 @@ class CancerBiomarkers(IPlugin):
                                       file=self.tqdm_out):
                 # Extend gene with related Cancer Biomarker data
                 if gene.approved_symbol in self.cancerbiomarkers:
-                    gene.cancerbiomarkers = list()
                     self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.approved_symbol)
-                    gene.cancerbiomarkers.append(self.cancerbiomarkers[gene.approved_symbol])
+                    gene.cancerbiomarkers=self.cancerbiomarkers[gene.approved_symbol]
 
         except Exception as ex:
             self._logger.exception(str(ex), exc_info=1)
@@ -108,7 +107,13 @@ class CancerBiomarkers(IPlugin):
 
                 # Iterate through genes and sources
                 for singleGene in geneList:
-
+                    # Replace 3 gene symbols with their approved_symbol (C15orf55=NUTM1, MLL=KMT2A, MLL2=KMT2D)
+                    if singleGene == 'C15orf55':
+                        singleGene = 'NUTM1'
+                    elif singleGene == 'MLL':
+                        singleGene = 'KMT2A'
+                    elif singleGene == 'MLL2':
+                        singleGene = 'KMT2D'
                     # If gene has not appeared in biomarker list yet,
                     # initialise self.cancerbiomarkers with an empty list
                     if singleGene not in self.cancerbiomarkers:
@@ -146,6 +151,5 @@ class CancerBiomarkers(IPlugin):
                         "evidencelevel": EvidenceLevel,
                         "references": myReferences
                     }
-
                     # Add data for current biomarker to self.cancerbiomarkers
                     self.cancerbiomarkers[singleGene].append(line)
