@@ -97,13 +97,17 @@ class CancerBiomarkers(IPlugin):
                  Region, Strand, Transcript, PrimaryTumorType) = \
                     tuple(row.rstrip().split('\t'))
 
-                # Split Primary Tumor Acronym, Gene and Source to separate out multiple entries
+                # Split Source and Gene to separate out multiple entries
                 mSource = map(str.strip, Source.split(";"))
                 geneList = list(map(str.strip, Gene.split(";")))
                 # If the two genes are identical, only keep one copy to prevent duplication of current biomarker
                 if len(geneList)>1:
                     if geneList[0] == geneList[1]:
                         geneList = [geneList[0]]
+                # Edit IndividualMutation from eg. FGFR3:V555M to FGFR3 (V555M)
+                # Replace ':' with ' (' and add ')' at the end
+                if ":" in IndividualMutation:
+                    IndividualMutation = IndividualMutation.replace(':',' (')+')'
 
                 # Iterate through genes and sources
                 for singleGene in geneList:
