@@ -1,47 +1,44 @@
 import logging
-from collections import Counter
-from pprint import pprint
-
-from elasticsearch import helpers
-from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 from mrtarget.common import Actions
-from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 
 class Metrics(Actions):
     def __init__(self, es):
         self.logger = logging.getLogger(__name__)
-        self.es = es
         self.esquery = ESQuery(es)
         self.filename = Config.METRICS_FILENAME
         tqdm_out = TqdmToLogger(self.logger, level=logging.INFO)
 
     def generate_metrics(self):
-        self.logger.info("Generating data release metrics")
+        self.logger.info("Producing data release metrics")
 
-        self.logger.info("Producing 'drugs (unique) with evidence'...")
-        drug_count_with_evidence = self.esquery.count_drug_with_evidence()
+        # TODO the index name is hardcoded with 18.04, needs to be parametized
+        count_drug_w_evidence = self.esquery.count_drug_w_evidence()
+        count_entity_w_association = self.esquery.count_entity_w_association()
+        count_target_w_symbol = self.esquery.count_target_w_symbol()
+        count_target_w_mp = self.esquery.count_target_w_mp()
+        count_target_w_hallmark = self.esquery.count_target_w_hallmark()
+        count_target_w_biomarker = self.esquery.count_target_w_biomarker()
 
-        self.logger.info("Producing 'evidence link to withdrawn drug'...")
-        evidence_count_withdrawn_drug = self.esquery.count_evidence_with_withdrawn_drug()
+        count_evidence_withdrawn_drug = self.esquery.count_evidence_w_withdrawn_drug()
 
         with open(self.filename, 'w') as metrics_output:
 
             metrics_output.write(
-                "drugs(unique) with evidence:\t" + str(drug_count_with_evidence['aggregations']['general_drug']['value']) + "\n")
-            metrics_output.write(
-                "evidence link to withdrawn drug:\t" + str(evidence_count_withdrawn_drug['hits']['total']) + "\n")
+                "drugs(unique) with evidence:\t" + str(count_drug_w_evidence['aggregations']['general_drug']['value']) + "\n" +
+                "diseases(unique) with association:\t" + str(count_entity_w_association['aggregations']['general_disease']['value']) + "\n" +
+                "targets(unique) with association:\t" + str(count_entity_w_association['aggregations']['general_target']['value']) + "\n" +
+                "targets with approved symbol:\t" + str(count_target_w_symbol['hits']['total']) + "\n" +
+                "targets with mouse phenotype:\t" + str(count_target_w_mp['hits']['total']) + "\n" +
+                "targets with cancer hallmark:\t" + str(count_target_w_hallmark['hits']['total']) + "\n" +
+                "targets with cancer biomarker:\t" + str(count_target_w_biomarker['hits']['total']) + "\n" +
+
+                "evidence link to withdrawn drug:\t" + str(count_evidence_withdrawn_drug['hits']['total']) + "\n"
+                )
 
         metrics_output.close()
-
-
-def main():
-    m = Metrics()
-
-if __name__ == "__main__":
-    main()
 
 
 
