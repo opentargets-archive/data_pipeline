@@ -45,8 +45,8 @@ class ESQuery(object):
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 
-
     @staticmethod
+
     def _get_source_from_fields(fields = None):
         if not fields:
             return True
@@ -1031,6 +1031,32 @@ class ESQuery(object):
         # res = list(res)
         for hit in res:
             yield hit['_source']
+
+    # Queries used to generate the page https://github.com/opentargets/data_release/wiki/Data-Metrics-&-Plots
+    def count_drug_with_evidence(self):
+        res = self.handler.search(
+                index = "18.04_evidence-data-generic",
+                doc_type="evidencestring-chembl",
+                body={"query": {"match_all":{}},
+                      "aggs":
+                            {"general_drug":
+                                {"cardinality":
+                                     {"field":"drug.id"}}}
+                    })
+        return res
+
+    def count_evidence_with_withdrawn_drug(self):
+        res = self.handler.search(
+                index = "18.04_evidence-data-generic",
+                body={"query": {
+                            "exists": {"field": "drug.withdrawn_country"},
+                      }
+                    })
+
+        return res
+        # index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',True),
+
+    ######
 
     @staticmethod
     def flatten(d, parent_key='', separator='.'):
