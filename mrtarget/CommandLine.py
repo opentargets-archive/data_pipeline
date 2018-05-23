@@ -29,7 +29,7 @@ from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
 from mrtarget.modules.Uniprot import UniProtActions, UniprotDownloader
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
-
+from mrtarget.modules.Metrics import Metrics
 
 def load_nlp_corpora():
     '''load here all the corpora needed by nlp steps'''
@@ -100,6 +100,9 @@ def main():
                         action="append_const", const = OntologyActions.PHENOTYPESLIM)
     parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
                         action="append_const", const = OntologyActions.ALL)
+    parser.add_argument("--metric", dest='metric',
+                        help="Run metrics generation",
+                        action="append_const", const=str)
     parser.add_argument("--qc", dest='qc',
                         help="Run quality control scripts",
                         action="append_const", const=QCActions.ALL)
@@ -313,6 +316,8 @@ def main():
             if (SearchObjectActions.PROCESS in args.sea) or do_all:
                 SearchObjectProcess(loader, connectors.r_server).process_all(skip_targets=args.skip_targets,
                                                                              skip_diseases=args.skip_diseases)
+        if args.metric or run_full_pipeline:
+            Metrics(connectors.es).generate_metrics()
         if args.qc or run_full_pipeline:
             do_all = (QCActions.ALL in args.qc) or run_full_pipeline
             if (QCActions.QC in args.qc) or do_all:
