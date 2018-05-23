@@ -1033,25 +1033,64 @@ class ESQuery(object):
             yield hit['_source']
 
     # Queries used to generate the page https://github.com/opentargets/data_release/wiki/Data-Metrics-&-Plots
-    def count_drug_with_evidence(self):
+    #TODO the index name needs to be parametized
+    def count_drug_w_evidence(self):
         res = self.handler.search(
                 index = "18.04_evidence-data-generic",
                 doc_type="evidencestring-chembl",
                 body={"query": {"match_all":{}},
                       "aggs":
-                            {"general_drug":
-                                {"cardinality":
-                                     {"field":"drug.id"}}}
-                    })
+                            {"general_drug":{"cardinality": {"field":"drug.id"}}}
+                     })
         return res
 
-    def count_evidence_with_withdrawn_drug(self):
+    def count_entity_w_association(self):
+        res = self.handler.search(
+                index = "18.04_association-data",
+                body={"query": {"match_all":{}},
+                      "aggs": {
+                        "general_target": {"cardinality":{"field":"target.id"}},
+                        "general_disease": {"cardinality":{"field": "disease.id"}}
+                      }})
+        return res
+
+    def count_target_w_symbol(self):
+        res = self.handler.search(
+                index = "18.04_gene-data",
+                body={"query": {"exists": {"field": "approved_symbol"}}
+            })
+
+        return res
+
+    def count_target_w_mp(self):
+        res = self.handler.search(
+                index = "18.04_gene-data",
+                body={"query": {"exists": {"field": "mouse_phenotypes.phenotypes"}}
+            })
+
+        return res
+
+    def count_target_w_hallmark(self):
+        res = self.handler.search(
+                index = "18.04_gene-data",
+                body={"query": {"exists": {"field": "hallmarks"}}
+            })
+
+        return res
+
+    def count_target_w_biomarker(self):
+        res = self.handler.search(
+                index = "18.04_gene-data",
+                body={"query": {"exists": {"field": "cancerbiomarkers"}}
+            })
+
+        return res
+
+    def count_evidence_w_withdrawn_drug(self):
         res = self.handler.search(
                 index = "18.04_evidence-data-generic",
-                body={"query": {
-                            "exists": {"field": "drug.withdrawn_country"},
-                      }
-                    })
+                body={"query": {"exists": {"field": "drug.withdrawn_country"}}
+            })
 
         return res
         # index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',True),
