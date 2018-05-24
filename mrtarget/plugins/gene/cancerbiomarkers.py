@@ -44,6 +44,98 @@ BIOMARKER_SOURCE_MAPPINGS = {
     "JCO Precision Oncology (PO.16.00055)" : { 'url' : "http://ascopubs.org/doi/full/10.1200/PO.16.00055", 'label' : "DOI: 10.1200/PO.16.00055 JCO Precision Oncology (published online June 27, 2017)" }
 }
 
+BIOMARKER_DISEASE_MAPPINGS = {
+    "Acute_lymphoblastic_leukemia" : { 'label' : "Acute lymphoblastic leukemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000220" },
+    "Acute_myeloid_leukemia" : { 'label' : "Acute myeloid leukemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000222" },
+    "Acute_promyelocytic_leukemia" : { 'label' : "Acute promyelocytic leukemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000224" },
+    "Adenoid_cystic_carcinoma" : { 'label' : "Adenoid cystic carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000231" },
+    "Anaplastic_oligodendroglioma" : { 'label' : "Anaplastic oligodendroglioma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0002501" },
+    "Angiosarcoma" : { 'label' : "Angiosarcoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0003968" },
+    "Basal_cell_carcinoma" : { 'label' : "Basal cell carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0004193" },
+    "Breast_adenocarcinoma" : { 'label' : "Breast adenocarcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000304" },
+    "Cholangiocarcinoma" : { 'label' : "Cholangiocarcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0005221" },
+    "Chronic_lymphocytic_leukemia" : { 'label' : "Chronic lymphocytic leukemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000095" },
+    "Chronic_myeloid_leukemia" : { 'label' : "Chronic myeloid leukemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000339" },
+    "Colorectal_adenocarcinoma" : { 'label' : "Colorectal adenocarcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000365" },
+    "Cutaneous_melanoma" : { 'label' : "Cutaneous melanoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000389" },
+    "Glioblastoma_multiforme" : { 'label' : "Glioblastoma multiforme", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000519" },
+    "Glioma" : { 'label' : "Glioma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0005543" },
+    "Leukemia" : { 'label' : "Leukemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000565" },
+    "Liposarcoma" : { 'label' : "Liposarcoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000569" },
+    "Lung_adenocarcinoma" : { 'label' : "Lung adenocarcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000571" },
+    "Lymphoma" : { 'label' : "Lymphoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000574" },
+    "Medulloblastoma" : { 'label' : "Medulloblastoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0002939" },
+    "Mesothelioma" : { 'label' : "Mesothelioma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000588" },
+    "Multiple_myeloma" : { 'label' : "Multiple myeloma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0001378" },
+    "Neuroblastoma" : { 'label' : "Neuroblastoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000621" },
+    "Neurofibroma" : { 'label' : "Neurofibroma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000622" },
+    "Osteosarcoma" : { 'label' : "Osteosarcoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000637" },
+    "Pancreas_adenocarcinoma" : { 'label' : "Pancreatic adenocarcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_1000044" },
+    "Plexiform_neurofibroma" : { 'label' : "Plexiform neurofibroma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000658" },
+    "Prostate_adenocarcinoma" : { 'label' : "Prostate adenocarcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000673" },
+    "Rhabdomyosarcoma" : { 'label' : "Rhabdomyosarcoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0002918" },
+    "Sarcoma" : { 'label' : "Sarcoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000691" },
+    "Schwannoma" : { 'label' : "Schwannoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000693" },
+    "Adrenal_adenoma" : { 'label' : "Adrenocortical adenoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0003104" },
+    "Any_cancer_type" : { 'label' : "Any cancer type", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000311" },
+    "Atypical_chronic_myeloid_leukemia" : { 'label' : "Atypical chronic myeloid leukemia", 'url' : "http://purl.obolibrary.org/obo/MONDO_0020312" },
+    "Biliary_tract_cancer" : { 'label' : "Biliary tract cancer", 'url' : "http://www.ebi.ac.uk/efo/EFO_0003891" },
+    "Cervical_squamous_cell_carcinoma" : { 'label' : "Cervical squamous cell carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_1000172" },
+    "Dermatofibrosarcoma" : { 'label' : "Dermatofibrosarcome protuberans", 'url' : "http://www.orpha.net/ORDO/Orphanet_31112" },
+    "Eosinophilic_chronic_leukemia" : { 'label' : "Chronic Eosinophilic Leukemia, Not Otherwise Specified", 'url' : "http://www.ebi.ac.uk/efo/EFO_1000178" },
+    "Erdheim_Chester_histiocytosis" : { 'label' : "Erdheim-Chester disease", 'url' : "http://www.ebi.ac.uk/efo/EFO_1000926" },
+    "Female_germ_cell_tumor" : { 'label' : "Ovarian germ cell tumor", 'url' : "http://www.ebi.ac.uk/efo/EFO_1000419" },
+    "Fibrous_histiocytoma" : { 'label' : "Malignant fibrous histiocytoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0005561" },
+    "Gastrointestinal_stromal" : { 'label' : "Gastrointestinal stromal tumor", 'url' : "http://www.orpha.net/ORDO/Orphanet_44890" },
+    "Giant_cell_astrocytoma" : { 'label' : "Subependymal giant cell astrocytoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000272" },
+    "Hairy_Cell_leukemia" : { 'label' : "Hairy cell leukemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_1000956" },
+    "Head_and_neck_cancer" : { 'label' : "Head and neck cancer", 'url' : "http://www.ebi.ac.uk/efo/EFO_0006859" },
+    "Head_and_neck_squamous_cell_carcinoma" : { 'label' : "Head and neck squamous cell carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000181" },
+    "Hematologic_malignancies" : { 'label' : "Hematological system disease", 'url' : "http://www.ebi.ac.uk/efo/EFO_0005803" },
+    "Hepatic_carcinoma" : { 'label' : "Hepatocellular carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000182" },
+    "Hyper_eosinophilic_advanced_snydrome" : { 'label' : "Hypereosinophilic syndrome", 'url' : "http://www.ebi.ac.uk/efo/EFO_1001467" },
+    "Inflammatory_myofibroblastic" : { 'label' : "Inflammatory myofibroblastic tumor", 'url' : "http://www.orpha.net/ORDO/Orphanet_178342" },
+    "Lagerhans_cell_histiocytosis" : { 'label' : "Langerhans Cell Histiocytosis", 'url' : "http://www.ebi.ac.uk/efo/EFO_1000318" },
+    "Squamous_cell_lung_carcinoma" : { 'label' : "Squamous cell lung carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000708" },
+    "Lymphangioleiomyomatosis" : { 'label' : "Lymphangioleiomyomatosis", 'url' : "http://www.orpha.net/ORDO/Orphanet_538" },
+    "Male_germ_cell_tumor" : { 'label' : "Germ cell tumor", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000514" },
+    "Malignant_astrocytoma" : { 'label' : "Astrocytoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000272" },
+    "Malignant_peripheral_nerve_sheat_tumor" : { 'label' : "Malignant peripheral nerve sheath tumor", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000760" },
+    "Malignant_rhabdoid_tumor" : { 'label' : "Malignant rhabdoid tumour", 'url' : "http://www.ebi.ac.uk/efo/EFO_0005701" },
+    "Megakaryoblastic_leukemia" : { 'label' : "Adult acute megakaryoblastic leukemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_1001932" },
+    "Myelodisplasic_proliferative_syndrome" : { 'label' : "Myelodisplasic proliferative syndrome", 'url' : "" },
+    "Myelodisplasic_syndrome" : { 'label' : "Myelodisplasic syndrome", 'url' : "" },
+    "Neuroendocrine_tumor" : { 'label' : "Neuroendocrine tumor", 'url' : "http://www.ebi.ac.uk/efo/EFO_1001901" },
+    "Non_small_cell_lung_cancer" : { 'label' : "Non-small cell lung cancer", 'url' : "http://www.ebi.ac.uk/efo/EFO_0003060" },
+    "NUT_midline_carcinoma" : { 'label' : "NUT midline carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0005783" },
+    "Pediatric_glioma" : { 'label' : "Pediatric glioma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0005543" },
+    "Renal_carcinoma" : { 'label' : "Renal carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0002890" },
+    "Salivary_glands_tumor" : { 'label' : "Salivary gland tumor", 'url' : "http://purl.obolibrary.org/obo/NCIT_C3361" },
+    "Systemic_mastocytosis" : { 'label' : "Systemic mastocytosis", 'url' : "http://purl.obolibrary.org/obo/NCIT_C9235" },
+    "Thymic_carcinoma" : { 'label' : "Thymic carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_1000576" },
+    "Urinary_tract_carcinoma" : { 'label' : "Urothelial carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0008528" },
+    "Waldenstroem_macroglobulinemia" : { 'label' : "Waldenstroem macroglobulinemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_0002616" },
+    "B_cell_lymphoma" : { 'label' : "B-cell lymphoma", 'url' : "http://purl.obolibrary.org/obo/HP_0012191" },
+    "Myelofibrosis" : { 'label' : "Myelofibrosis", 'url' : "http://purl.obolibrary.org/obo/HP_0011974" },
+    "Renal_angiomyolipoma" : { 'label' : "Renal angiomyolipoma", 'url' : "http://purl.obolibrary.org/obo/HP_0006772" },
+    "Glioblastoma" : { 'label' : "Glioblastoma multiforme", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000519" },
+    "Meningioma" : { 'label' : "Meningioma", 'url' : "http://www.orpha.net/ORDO/Orphanet_2495" },
+    "Retinoblastoma" : { 'label' : "Retinoblastoma", 'url' : "http://www.orpha.net/ORDO/Orphanet_790" },
+    "Mantle_cell_lymphoma" : { 'label' : "Mantle cell lymphoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_1001469" },
+    "Myeloma" : { 'label' : "Myeloma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0001378" },
+    "Bladder_carcinoma" : { 'label' : "Bladder carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000292" },
+    "Cervical_carcinoma" : { 'label' : "Cervical carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0001061" },
+    "Endometrial_carcinoma" : { 'label' : "Endometrial carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_1001512" },
+    "Gastroesophageal_junction_adenocarcinoma" : { 'label' : "Gastroesophageal junction adenocarcinoma", 'url' : "http://purl.obolibrary.org/obo/NCIT_C9296" },
+    "Lung_carcinoma" : { 'label' : "Lung carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0001071" },
+    "Ovarian_carcinoma" : { 'label' : "Ovarian carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0001075" },
+    "Pancreatic_carcinoma" : { 'label' : "Pancreatic carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0002618" },
+    "Solid_tumors" : { 'label' : "Solid tumors", 'url' : "http://purl.obolibrary.org/obo/NCIT_C9292" },
+    "Gastric_carcinoma" : { 'label' : "Gastric carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000178" },
+    "Thyroid_carcinoma" : { 'label' : "Thyroid carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0002892" }
+}
+
+
 class CancerBiomarkers(IPlugin):
 
     # Initiate CancerBiomarker object
@@ -88,7 +180,8 @@ class CancerBiomarkers(IPlugin):
     def build_json(self, filename=Config.BIOMARKER_FILENAME):
 
         with open(filename, 'r') as input:
-            for n, row in enumerate(input, start=1):
+            next(input)
+            for row in input:
 
                 (Alteration, AlterationType, AssayType, Association, Biomarker, Comments, CurationDate,
                  Curator, Drug, DrugFamily, DrugFullName, DrugStatus, EvidenceLevel,
@@ -104,10 +197,24 @@ class CancerBiomarkers(IPlugin):
                 if len(geneList)>1:
                     if geneList[0] == geneList[1]:
                         geneList = [geneList[0]]
+
                 # Edit IndividualMutation from eg. FGFR3:V555M to FGFR3 (V555M)
                 # Replace ':' with ' (' and add ')' at the end
                 if ":" in IndividualMutation:
                     IndividualMutation = IndividualMutation.replace(':',' (')+')'
+
+                # Get Tumor type names and EFO IDs/links
+                PrimaryTumorTypeFullName = PrimaryTumorTypeFullName.replace(' ', '_')
+                PrimaryTumorTypeFullName = PrimaryTumorTypeFullName.replace('-', '_')
+                TumorNames=""
+                TumorIDs=""
+                if ";" in PrimaryTumorTypeFullName:
+                    TumorTypes = PrimaryTumorTypeFullName.split(";")
+                    diseases = []
+                    for TumorType in TumorTypes:
+                        diseases.append({'label': BIOMARKER_DISEASE_MAPPINGS[TumorType]['label'], 'id': (BIOMARKER_DISEASE_MAPPINGS[TumorType]['url']).split('/')[-1]})
+                else:
+                    diseases = [{'label':BIOMARKER_DISEASE_MAPPINGS[PrimaryTumorTypeFullName]['label'], 'id': (BIOMARKER_DISEASE_MAPPINGS[PrimaryTumorTypeFullName]['url']).split('/')[-1]}]
 
                 # Iterate through genes and sources
                 for singleGene in geneList:
@@ -123,7 +230,7 @@ class CancerBiomarkers(IPlugin):
                     if singleGene not in self.cancerbiomarkers:
                         self.cancerbiomarkers[singleGene] = []
 
-                    # Create empty dictionaries for PMIDs and other references
+                    # Create empty lists for PMIDs and other references
                     pubmed = []
                     other = []
 
@@ -141,7 +248,6 @@ class CancerBiomarkers(IPlugin):
                     # Put the reference info together for each biomarker
                     myReferences = {"pubmed": pubmed, "other": other}
 
-                    #TODO tumor acronym needs mapping to EFO
                     line = {
                         "gene": singleGene,
                         "biomarker": Biomarker,
@@ -150,8 +256,7 @@ class CancerBiomarkers(IPlugin):
                         "drug": Drug,
                         "drugfamily": DrugFamily,
                         "drugfullname": DrugFullName,
-                        "disease": PrimaryTumorTypeFullName,
-                        "diseaseID": PrimaryTumorAcronym,
+                        "diseases": diseases,
                         "evidencelevel": EvidenceLevel,
                         "references": myReferences
                     }
