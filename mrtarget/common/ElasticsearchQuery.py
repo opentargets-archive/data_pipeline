@@ -1086,14 +1086,57 @@ class ESQuery(object):
 
         return res
 
-    def count_evidence_w_withdrawn_drug(self):
+    def count_BRAF_evidence(self):
+        res = self.handler.search(
+                index = "18.04_evidence-data-generic",
+                body={"query": {"match": {"target.gene_info.symbol": "BRAF"}}
+            })
+
+        return res
+
+    def count_withdrawn_drug_evidence(self):
         res = self.handler.search(
                 index = "18.04_evidence-data-generic",
                 body={"query": {"exists": {"field": "drug.withdrawn_country"}}
             })
 
         return res
-        # index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',True),
+
+    def count_abstracted_evidence(self):
+        res = self.handler.search(
+                index = "18.04_evidence-data-generic",
+                body={"query": {"exists": {"field": "literature.abstract"}}
+            })
+
+        return res
+
+    def count_trinucleotide_evidence(self):
+        res = self.handler.search(
+                index = "18.04_evidence-data-generic",
+                body={"query": {"bool": {"must": [
+                    {"term": {"evidence.evidence_codes": {"value": "SO_0002165"}}},
+                    {"term": {"private.datasource": {"value": "eva"}}}
+                ]}}
+            })
+
+        return res
+
+    def count_datasource_evidence(self, doc_type):
+
+        doc_type = Config.ELASTICSEARCH_DATA_DOC_NAME + "-" + doc_type
+
+        res = self.handler.search(
+                index="18.04_evidence-data-generic",
+                doc_type=doc_type
+                )
+                #body={"query": {"bool": {"must": [
+                #    {"term": {"evidence.evidence_codes": {"value": "SO_0002165"}}},
+                #    {"term": {"private.datasource": {"value": "eva"}}}
+                #]}}
+            #})
+
+        return res
+# index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',True),
 
     ######
 
