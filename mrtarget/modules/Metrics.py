@@ -21,11 +21,12 @@ class Metrics(Actions):
         count_target_w_mp = self.esquery.count_target_w_mp()
         count_target_w_hallmark = self.esquery.count_target_w_hallmark()
         count_target_w_biomarker = self.esquery.count_target_w_biomarker()
-
-        count_evidence_withdrawn_drug = self.esquery.count_evidence_w_withdrawn_drug()
+        count_BRAF_evidence = self.esquery.count_BRAF_evidence()
+        count_withdrawn_drug_evidence = self.esquery.count_withdrawn_drug_evidence()
+        count_abstracted_evidence = self.esquery.count_abstracted_evidence()
+        count_trinucleotide_evidence = self.esquery.count_trinucleotide_evidence()
 
         with open(self.filename, 'w') as metrics_output:
-
             metrics_output.write(
                 "drugs(unique) with evidence:\t" + str(count_drug_w_evidence['aggregations']['general_drug']['value']) + "\n" +
                 "diseases(unique) with association:\t" + str(count_entity_w_association['aggregations']['general_disease']['value']) + "\n" +
@@ -34,9 +35,17 @@ class Metrics(Actions):
                 "targets with mouse phenotype:\t" + str(count_target_w_mp['hits']['total']) + "\n" +
                 "targets with cancer hallmark:\t" + str(count_target_w_hallmark['hits']['total']) + "\n" +
                 "targets with cancer biomarker:\t" + str(count_target_w_biomarker['hits']['total']) + "\n" +
+                "evidence link to BRAF:\t" + str(count_BRAF_evidence['hits']['total']) + "\n" +
+                "evidence link to withdrawn drug:\t" + str(count_withdrawn_drug_evidence['hits']['total']) + "\n"
+                "evidence with abstract injected:\t" + str(count_abstracted_evidence['hits']['total']) + "\n"
+                "evidence link to trinucleotide expansion:\t" + str(count_trinucleotide_evidence['hits']['total']) + "\n"
+            )
 
-                "evidence link to withdrawn drug:\t" + str(count_evidence_withdrawn_drug['hits']['total']) + "\n"
-                )
+            for datasource in Config.DATASOURCE_TO_DATATYPE_MAPPING.iterkeys():
+                count_datasource_evidence = self.esquery.count_datasource_evidence(datasource)
+
+                metrics_output.write(
+                    "evidence from " + datasource + ":\t" + str(count_datasource_evidence['hits']['total']) + "\n")
 
         metrics_output.close()
 
