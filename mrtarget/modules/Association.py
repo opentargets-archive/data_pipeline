@@ -627,13 +627,15 @@ class ScoringProcess():
             target_q.put(target)
         target_q.set_submission_finished()
 
-        '''wait for all workers to finish'''
+        self.logger.info("collecting readers and scorers")
         for w in readers:
             w.join()
         for w in scorers:
             w.join()
 #         for w in storers:
 #             w.join()
+        self.logger.info('collecting reporter')
+        q_reporter.join()
 
         logger.info('flushing data to index')
         self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),

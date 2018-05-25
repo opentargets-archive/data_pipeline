@@ -1,5 +1,10 @@
 #!/usr/local/bin/python
 # -*- coding: UTF-8 -*-
+
+'''DEPRECATED - the intention is to remove this code from the pipeline
+'''
+
+
 import logging
 import requests
 from mrtarget.common import TqdmToLogger

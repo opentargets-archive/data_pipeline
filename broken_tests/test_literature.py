@@ -27,7 +27,7 @@ class LiteratureTestCase(unittest.TestCase):
 
         p = PipelineConnectors()
         p.init_services_connections()
-        EvidenceStringProcess(p.es, p.r_server).process_all(datasources=['europepmc'],inject_literature=True)
+        EvidenceStringProcess(p.es, p.r_server).process_all(datasources=['europepmc'])
 
 
     def test_medline_parser(self):
