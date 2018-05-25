@@ -26,6 +26,9 @@ class Metrics(Actions):
         count_abstracted_evidence = self.esquery.count_abstracted_evidence()
         count_trinucleotide_evidence = self.esquery.count_trinucleotide_evidence()
 
+        count_datatype_evidence = self.esquery.count_datatype_evidence()
+        count_datatype_association = self.esquery.count_datatype_association()
+
         with open(self.filename, 'w') as metrics_output:
             metrics_output.write(
                 "drugs(unique) with evidence:\t" + str(count_drug_w_evidence['aggregations']['general_drug']['value']) + "\n" +
@@ -41,16 +44,23 @@ class Metrics(Actions):
                 "evidence link to trinucleotide expansion:\t" + str(count_trinucleotide_evidence['hits']['total']) + "\n"
             )
 
-            for datasource in Config.DATASOURCE_TO_DATATYPE_MAPPING.iterkeys():
-                count_datasource_evidence = self.esquery.count_datasource_evidence(datasource)
+            for ds in Config.DATASOURCE_TO_DATATYPE_MAPPING.iterkeys():
+                count_datasource_evidence = self.esquery.count_datasource_evidence(ds)
+                metrics_output.write("evidence from datasource " + ds + ":\t" + str(count_datasource_evidence['hits']['total']) + "\n")
 
-                metrics_output.write(
-                    "evidence from " + datasource + ":\t" + str(count_datasource_evidence['hits']['total']) + "\n")
 
-        self.logger.info("Producing data release metrics - Completed")
+            for item in count_datatype_evidence['aggregations']['datatypes']['buckets']:
+                datatype = item['key']
+                evidence_count = item['doc_count']
+                metrics_output.write("evidence from datatype " + datatype + ":\t" + str(evidence_count) + "\n")
+
+            for item in count_datatype_association['aggregations']['datatypes']['buckets']:
+                datatype = item['key']
+                association_count = item['doc_count']
+                metrics_output.write("association from datatype " + datatype + ":\t" + str(association_count) + "\n")
 
         metrics_output.close()
-
+        self.logger.info("Producing data release metrics - Completed")
 
 
 
