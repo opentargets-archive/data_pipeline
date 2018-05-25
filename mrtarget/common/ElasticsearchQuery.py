@@ -1,3 +1,4 @@
+import os
 import base64
 import collections
 import json
@@ -1034,8 +1035,10 @@ class ESQuery(object):
 
     # Queries used to generate the page https://github.com/opentargets/data_release/wiki/Data-Metrics-&-Plots
     #TODO the index name needs to be parametized
+
     def count_drug_w_evidence(self):
         res = self.handler.search(
+                #index = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
                 index = "18.04_evidence-data-generic",
                 doc_type="evidencestring-chembl",
                 body={"query": {"match_all":{}},
@@ -1129,13 +1132,31 @@ class ESQuery(object):
                 index="18.04_evidence-data-generic",
                 doc_type=doc_type
                 )
-                #body={"query": {"bool": {"must": [
-                #    {"term": {"evidence.evidence_codes": {"value": "SO_0002165"}}},
-                #    {"term": {"private.datasource": {"value": "eva"}}}
-                #]}}
-            #})
 
         return res
+
+    def count_datatype_evidence(self):
+        res = self.handler.search(
+                index = "18.04_evidence-data-generic",
+                body={"query": {"match_all":{}},
+                      "aggs": {
+                        "datatypes": {"terms":{"field":"private.datatype.keyword"}}
+                      }})
+
+        return res
+
+    def count_datatype_association(self):
+        res = self.handler.search(
+                index = "18.04_association-data",
+                body={"query": {"match_all":{}},
+                      "aggs": {
+                        "datatypes": {"terms":{"field":"private.facets.datatype.keyword"}}
+                      }})
+
+        return res
+
+
+
 # index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',True),
 
     ######
