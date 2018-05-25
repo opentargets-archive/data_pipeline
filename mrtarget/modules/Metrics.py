@@ -47,6 +47,8 @@ class Metrics(Actions):
                 metrics_output.write(
                     "evidence from " + datasource + ":\t" + str(count_datasource_evidence['hits']['total']) + "\n")
 
+        self.logger.info("Producing data release metrics - Completed")
+
         metrics_output.close()
 
 
