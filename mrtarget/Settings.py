@@ -223,7 +223,7 @@ class Config():
         '4932':'yeast'
     }
 
-    HALLMARK_FILENAME = file_or_resource(fname='census_annot.tsv')
+    HALLMARK_FILENAME = file_or_resource(fname='v85_hallmark_export.tsv')
     BIOMARKER_FILENAME = file_or_resource(fname='cgi_biomarkers_per_variant.tsv')
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
@@ -450,3 +450,6 @@ class Config():
                                  default=False, cast=bool)
 
     ES_CUSTOM_IDXS_INI = ini if ES_CUSTOM_IDXS else None
+
+    # metrics
+    METRICS_FILENAME = '/Users/ckong/Desktop/release_metrics.txt'
