@@ -17,6 +17,7 @@ from mrtarget.modules.ECO import EcoActions, EcoProcess
 from mrtarget.modules.EFO import EfoActions, EfoProcess
 from mrtarget.modules.HPO import HpoActions, HpoProcess
 from mrtarget.modules.MP import MpActions, MpProcess
+from mrtarget.modules.Compound import CompoundActions, CompoundProcess
 from mrtarget.modules.Ensembl import EnsemblActions, EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringActions, EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValidationFileChecker
@@ -55,6 +56,8 @@ def main():
                         action="append_const", const = ReactomeActions.ALL)
     parser.add_argument("--unic", dest='uni', help="cache the live version of uniprot human entries in elasticsearch",
                         action="append_const", const = UniProtActions.CACHE)
+    parser.add_argument("--cpd", dest='cpd', help="generate compound index in elasticsearch",
+                        action="append_const", const = CompoundActions.ALL)
     parser.add_argument("--gen", dest='gen', help="merge the available gene information, store the resulting json objects in elasticsearch",
                         action="append_const", const = GeneActions.ALL)
     parser.add_argument("--efo", dest='efo', help="process the efo information, store the resulting json objects in elasticsearch",
@@ -241,7 +244,10 @@ def main():
             do_all = (EnsemblActions.ALL in args.ens) or run_full_pipeline
             if (EnsemblActions.PROCESS in args.ens) or do_all:
                 EnsemblProcess(loader).process()
-
+        if args.cpd or run_full_pipeline:
+            do_all = (CompoundActions.ALL in args.cpd) or run_full_pipeline
+            if (CompoundActions.PROCESS in args.cpd) or do_all:
+                CompoundProcess(loader).process()
         if args.gen or run_full_pipeline:
             do_all = (GeneActions.ALL in args.gen) or run_full_pipeline
             if (GeneActions.MERGE in args.gen) or do_all:
