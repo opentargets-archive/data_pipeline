@@ -194,6 +194,9 @@ class Config():
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
+    ELASTICSEARCH_COMPOUND_INDEX_NAME = 'compound-data'
+    ELASTICSEARCH_COMPOUND_DOC_NAME = 'compound'
+
     # ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
     # ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
     # ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
@@ -307,6 +310,7 @@ class Config():
     PHENOTYPE_SLIM_OUTPUT_FILE = TEMP_DIR + os.path.sep + 'opentargets_disease_phenotype_slim.ttl'
 
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
+    CHEMBL_INDICATION = ini.get(INI_SECTION, 'chembl_indication')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
     CHEMBL_PROTEIN_CLASS = ini.get(INI_SECTION, 'chembl_protein')
