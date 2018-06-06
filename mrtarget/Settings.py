@@ -220,6 +220,7 @@ class Config():
 
     HALLMARK_FILENAME = file_or_resource(fname='v85_hallmark_export.tsv')
     BIOMARKER_FILENAME = file_or_resource(fname='cgi_biomarkers_per_variant.tsv')
+    CHEMICALPROBES_FILENAME = file_or_resource(fname='Chemicalprobes_alldata2.tsv')
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
