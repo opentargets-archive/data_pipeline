@@ -194,11 +194,6 @@ class Config():
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
-    # ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
-    # ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
-    # ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
-    # ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME = '!lit-entities-test'
-    # ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME = 'litentity'
     DEBUG = True
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
