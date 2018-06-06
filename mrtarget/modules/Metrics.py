@@ -14,7 +14,6 @@ class Metrics(Actions):
     def generate_metrics(self):
         self.logger.info("Producing data release metrics")
 
-        # TODO the index name is hardcoded with 18.04, needs to be parametized
         count_drug_w_evidence = self.esquery.count_drug_w_evidence()
         count_entity_w_association = self.esquery.count_entity_w_association()
         count_target_w_symbol = self.esquery.count_target_w_symbol()
@@ -23,7 +22,6 @@ class Metrics(Actions):
         count_target_w_biomarker = self.esquery.count_target_w_biomarker()
         count_BRAF_evidence = self.esquery.count_BRAF_evidence()
         count_withdrawn_drug_evidence = self.esquery.count_withdrawn_drug_evidence()
-        count_abstracted_evidence = self.esquery.count_abstracted_evidence()
         count_trinucleotide_evidence = self.esquery.count_trinucleotide_evidence()
 
         count_datatype_evidence = self.esquery.count_datatype_evidence()
@@ -40,14 +38,12 @@ class Metrics(Actions):
                 "targets with cancer biomarker:\t" + str(count_target_w_biomarker['hits']['total']) + "\n" +
                 "evidence link to BRAF:\t" + str(count_BRAF_evidence['hits']['total']) + "\n" +
                 "evidence link to withdrawn drug:\t" + str(count_withdrawn_drug_evidence['hits']['total']) + "\n"
-                "evidence with abstract injected:\t" + str(count_abstracted_evidence['hits']['total']) + "\n"
                 "evidence link to trinucleotide expansion:\t" + str(count_trinucleotide_evidence['hits']['total']) + "\n"
             )
 
             for ds in Config.DATASOURCE_TO_DATATYPE_MAPPING.iterkeys():
                 count_datasource_evidence = self.esquery.count_datasource_evidence(ds)
                 metrics_output.write("evidence from datasource " + ds + ":\t" + str(count_datasource_evidence['hits']['total']) + "\n")
-
 
             for item in count_datatype_evidence['aggregations']['datatypes']['buckets']:
                 datatype = item['key']
