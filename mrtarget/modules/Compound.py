@@ -23,7 +23,7 @@ class CompoundProcess():
     def __init__(self, loader):
         self._logger = logging.getLogger(__name__)
         self.loader = loader
-        self.es_query = ESQuery()
+        #self.es_query = ESQuery()
         self.cpd2indication = {}
 
 
@@ -51,28 +51,46 @@ class CompoundProcess():
             disease_max_phase = row['max_phase_for_ind']
             reference = row['indication_refs']
 
-            key = cpd_id + "_" + disease_id
-
-            # get info from molecule mechanism API end point
-            # MOA of a drug (get their targets)
-
             #self._logger("Extract compound attributes for %s", cpd_id)
             cpd_attrib = self.download_cpd_attributes(cpd_id)
 
             cpd_type = cpd_attrib['molecule_type']
             trade_name = cpd_attrib['pref_name']
 
-            self.cpd2indication[key] =\
+            indication = \
                 {
-                  'compound_id': cpd_id,
-                  'compound_type': cpd_type,
-                  'trade_name': trade_name,
-                  'disease_id': disease_id,
-                  'disease_term': disease_label,
-                  'disease_max_phase': disease_max_phase,
-                  'ref': reference,
-                  'attributes': cpd_attrib
-                 }
+                 'disease_id': disease_id,
+                 'disease_label': disease_label,
+                 'disease_max_phase': disease_max_phase,
+                 'reference': reference,
+                 'cpd_type': cpd_type,
+                 'trade_name': trade_name
+                }
+
+            #self.cpd2indication[cpd_id] = []
+            #self.cpd2indication[cpd_id] = {'indication': indication}
+            #self.cpd2indication[cpd_id] = {'attributes': cpd_attrib}
+
+            try:
+                self.cpd2indication[cpd_id]["indication"].append(indication)
+            except KeyError:
+                self.cpd2indication[cpd_id]["indication"] = list()
+                self.cpd2indication[cpd_id]["indication"].append(indication)
+
+
+            #self.cpd2indication[cpd_id] =\
+            #{
+            #  'compound_id': cpd_id,
+            #  'compound_type': cpd_type,
+            #  'trade_name': trade_name,
+            #  'disease_id': disease_id,
+            #  'disease_term': disease_label,
+            #  'disease_max_phase': disease_max_phase,
+            #  'ref': reference,
+            #  'attributes': cpd_attrib
+            # }
+
+            # get info from molecule mechanism API end point MOA of a drug (get their targets)
 
 
     def download_cpd_attributes(self, compound_id):
@@ -85,8 +103,8 @@ class CompoundProcess():
 
     def store_to_elasticsearch(self):
 
-        for k,v in self.cpd2indication.items():
-            print(json.dumps(v, indent=4))
+        #for k,v in self.cpd2indication.items():
+        #    print(json.dumps(v, indent=4))
 
         for compound, data in self.cpd2indication.items():
             self.loader.put(Config.ELASTICSEARCH_COMPOUND_INDEX_NAME,
