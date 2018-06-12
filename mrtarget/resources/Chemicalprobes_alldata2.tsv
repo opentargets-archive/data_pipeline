@@ -1,3 +1,4 @@
+Probe;Target;SGC Link;Probes Portal Link;Open Science Probes Link;Note
 BAY-850;ATAD2;www.thesgc.org/chemical-probes/BAY-850;;;none
 GSK8814;ATAD2;www.thesgc.org/chemical-probes/GSK8814;;;Protein targets: ATAD2, ATAD2B
 GSK8814;ATAD2B;www.thesgc.org/chemical-probes/GSK8814;;;Protein targets: ATAD2, ATAD2B
@@ -23,12 +24,12 @@ LP99;BRD7;www.thesgc.org/chemical-probes/LP99;;;Protein targets: BRD9, BRD7
 TP-472;BRD9;www.thesgc.org/chemical-probes/TP-472;;;Protein targets: BRD9, BRD7
 TP-472;BRD7;www.thesgc.org/chemical-probes/TP-472;;;Protein targets: BRD9, BRD7
 GSK6853;BRPF1;www.thesgc.org/chemical-probes/GSK6853;;;none
-NI-57;BRPF1;www.thesgc.org/chemical-probes/NI-57;;;Protein targets: BRPF1, BRPF2, BRPF3
-NI-57;BRPF2;www.thesgc.org/chemical-probes/NI-57;;;Protein targets: BRPF1, BRPF2, BRPF3
-NI-57;BRPF3;www.thesgc.org/chemical-probes/NI-57;;;Protein targets: BRPF1, BRPF2, BRPF3
-OF-1;BRPF1;www.thesgc.org/chemical-probes/OF-1;;;Protein targets: BRPF1, BRPF2, BRPF3
-OF-1;BRPF2;www.thesgc.org/chemical-probes/OF-1;;;Protein targets: BRPF1, BRPF2, BRPF3
-OF-1;BRPF3;www.thesgc.org/chemical-probes/OF-1;;;Protein targets: BRPF1, BRPF2, BRPF3
+NI-57;BRPF1;www.thesgc.org/chemical-probes/NI-57;;;Protein targets: BRPF1, BRD1 (=BRPF2), BRPF3
+NI-57;BRD1;www.thesgc.org/chemical-probes/NI-57;;;Protein targets: BRPF1, BRD1 (=BRPF2), BRPF3
+NI-57;BRPF3;www.thesgc.org/chemical-probes/NI-57;;;Protein targets: BRPF1, BRD1 (=BRPF2), BRPF3
+OF-1;BRPF1;www.thesgc.org/chemical-probes/OF-1;;;Protein targets: BRPF1, BRD1 (=BRPF2), BRPF3
+OF-1;BRD1;www.thesgc.org/chemical-probes/OF-1;;;Protein targets: BRPF1, BRD1 (=BRPF2), BRPF3
+OF-1;BRPF3;www.thesgc.org/chemical-probes/OF-1;;;Protein targets: BRPF1, BRD1 (=BRPF2), BRPF3
 PFI-4;BRPF1;www.thesgc.org/chemical-probes/PFI-4;;;BRPF1 has two isoforms BRPF1A & BRPF1B, only BRPF1B is bound
 NVS-CECR2-1;CECR2;www.thesgc.org/chemical-probes/NVS-CECR2-1;;;none
 I-CBP112;CREBBP;www.thesgc.org/chemical-probes/I-CBP112;www.chemicalprobes.org/I-CBP112;;Protein targets: CREBBP, EP300
@@ -64,10 +65,10 @@ GSK484;PADI4;www.thesgc.org/chemical-probes/GSK484;www.chemicalprobes.org/GSK484
 NVS-PAK1-1;PAK1;www.thesgc.org/chemical-probes/NVS-PAK1-1;www.chemicalprobes.org/NVS-PAK1-1;;none
 IOX1;pan-2-OG;www.thesgc.org/chemical-probes/IOX1;;;Tool compound
 Bromosporine;pan-Bromodomain;www.thesgc.org/chemical-probes/Bromosporine;;;Tool compound
-GSK4027;KAT2B;www.thesgc.org/chemical-probes/GSK4027;;;Protein targets: PCAF, GCN5
-GSK4027;GCN5;www.thesgc.org/chemical-probes/GSK4027;www.chemicalprobes.org/GSK4027;;Protein targets: PCAF, GCN5
-L-Moses;KAT2B;www.thesgc.org/chemical-probes/L-Moses;;;Protein targets: PCAF, GCN5
-L-Moses;GCN5;www.thesgc.org/chemical-probes/L-Moses;;;Protein targets: PCAF, GCN5
+GSK4027;KAT2B;www.thesgc.org/chemical-probes/GSK4027;;;Protein targets: KAT2B, GCN5
+GSK4027;GCN5;www.thesgc.org/chemical-probes/GSK4027;www.chemicalprobes.org/GSK4027;;Protein targets: KAT2B, GCN5
+L-Moses;KAT2B;www.thesgc.org/chemical-probes/L-Moses;;;Protein targets: KAT2B, GCN5
+L-Moses;GCN5;www.thesgc.org/chemical-probes/L-Moses;;;Protein targets: KAT2B, GCN5
 IOX2;EGLN1;www.thesgc.org/chemical-probes/IOX2;;;none
 SGC707;PRMT3;www.thesgc.org/chemical-probes/SGC707;www.chemicalprobes.org/SGC707;;none
 SKI-73;CARM1;www.thesgc.org/chemical-probes/SKI-73;;;none
@@ -89,211 +90,211 @@ A-196;KMT5B;www.thesgc.org/chemical-probes/A-196;www.chemicalprobes.org/A-196;;P
 A-196;KMT5C;www.thesgc.org/chemical-probes/A-196;www.chemicalprobes.org/A-196;;Protein targets: KMT5B, KMT5C
 MS023;PRMT1;www.thesgc.org/chemical-probes/MS023;www.chemicalprobes.org/MS023;;Protein targets are Type I PRMTs: PRMT1, PRMT3, CARM1 (=PRMT4), PRMT6, PRMT8
 MS023;PRMT3;www.thesgc.org/chemical-probes/MS023;www.chemicalprobes.org/MS023;;Protein targets are Type I PRMTs: PRMT1, PRMT3, CARM1 (=PRMT4), PRMT6, PRMT8
-MS023;CARM1;www.thesgc.org/chemical-probes/MS023;;;Protein targets are Type I PRMTs: PRMT1, PRMT3, CARM1 (=PRMT4), PRMT6, PRMT8
+MS023;CARM1;www.thesgc.org/chemical-probes/MS023;www.chemicalprobes.org/MS023;;Protein targets are Type I PRMTs: PRMT1, PRMT3, CARM1 (=PRMT4), PRMT6, PRMT8
 MS023;PRMT6;www.thesgc.org/chemical-probes/MS023;www.chemicalprobes.org/MS023;;Protein targets are Type I PRMTs: PRMT1, PRMT3, CARM1 (=PRMT4), PRMT6, PRMT8
 MS023;PRMT8;www.thesgc.org/chemical-probes/MS023;www.chemicalprobes.org/MS023;;Protein targets are Type I PRMTs: PRMT1, PRMT3, CARM1 (=PRMT4), PRMT6, PRMT8
 OICR-9429;WDR5;www.thesgc.org/chemical-probes/OICR-9429;www.chemicalprobes.org/OICR-9429;;none
-A-1155463;BCL2L1;;www.chemicalprobes.org/1155463;;none
-WEHI-539;BCL2L1;;www.chemicalprobes.org/WEHI-539;;none
-BMX-IN-1;BMX;;www.chemicalprobes.org/BMX-IN-1;;none
-KH-CB19;CLK1;;www.chemicalprobes.org/KH-CB19;;Protein targets: CLK1, CLK4, DYRK1A
-KH-CB19;CLK4;;www.chemicalprobes.org/KH-CB19;;Protein targets: CLK1, CLK4, DYRK1A
-KH-CB19;DYRK1A;;www.chemicalprobes.org/KH-CB19;;Protein targets: CLK1, CLK4, DYRK1A
-AZ191;DYRK1B;;www.chemicalprobes.org/AZ191;;none
-RGFP966;HDAC3;;www.chemicalprobes.org/RGFP966;;none
-ACY-738;HDAC6;;www.chemicalprobes.org/ACY-738;;none
-GSK-J4;KDM6A;;www.chemicalprobes.org/GSK-J4;;Protein targets: KDM6A, KDM6B
-GSK-J4;KDM6B;;www.chemicalprobes.org/GSK-J4;;Protein targets: KDM6A, KDM6B
-KI-696;KEAP1;;www.chemicalprobes.org/KI-696;;none
-GNE7915;LRRK2;;www.chemicalprobes.org/GNE7915;;none
-GW3965;NR1H2;;www.chemicalprobes.org/GW3965;;Protein targets: NR1H2, NR1H3
-GW3965;NR1H3;;www.chemicalprobes.org/GW3965;;Protein targets: NR1H2, NR1H3
-BIX-02188;MAP2K5;;www.chemicalprobes.org/BIX-02188;;none
-MI-888;MDM2;;www.chemicalprobes.org/MI-888;;none
-RG7112;MDM2;;www.chemicalprobes.org/RG7112;;none
-UNC2025;MERTK;;www.chemicalprobes.org/UNC2025;;Protein targets: MERTK, FLT3
-UNC2025;FLT3;;www.chemicalprobes.org/UNC2025;;Protein targets: MERTK, FLT3
-eCF309;MTOR;;www.chemicalprobes.org/eCF309;;none
-Pevonedistat;UBA3;;www.chemicalprobes.org/Pevonedistat;;none
-WZ4003;NUAK1;;www.chemicalprobes.org/WZ4003;;Protein targets: NUAK1, NUAK2
-WZ4003;NUAK2;;www.chemicalprobes.org/WZ4003;;Protein targets: NUAK1, NUAK2
-Salvinorin A;OPRK1;;www.chemicalprobes.org/Salvinorin;;none
-PF-3758309;PAK1;;www.chemicalprobes.org/PF-3758309;;Protein targets: PAK1, PAK4, PAK5, PAK6
-PF-3758309;PAK4;;www.chemicalprobes.org/PF-3758309;;Protein targets: PAK1, PAK4, PAK5, PAK6
-PF-3758309;PAK5;;www.chemicalprobes.org/PF-3758309;;Protein targets: PAK1, PAK4, PAK5, PAK6
-PF-3758309;PAK6;;www.chemicalprobes.org/PF-3758309;;Protein targets: PAK1, PAK4, PAK5, PAK6
-E7449;PARP1;;www.chemicalprobes.org/E7449;;Protein targets: PARP1, PARP2, TNKS, TNKS2
-E7449;PARP2;;www.chemicalprobes.org/E7449;;Protein targets: PARP1, PARP2, TNKS, TNKS2
-E7449;TNKS;;www.chemicalprobes.org/E7449;;Protein targets: PARP1, PARP2, TNKS, TNKS2
-E7449;TNKS2;;www.chemicalprobes.org/E7449;;Protein targets: PARP1, PARP2, TNKS, TNKS2
-Olaparib;PARP1;;www.chemicalprobes.org/Olaparib;;Protein targets: PARP1, PARP2
-Olaparib;PARP2;;www.chemicalprobes.org/Olaparib;;Protein targets: PARP1, PARP2
-Cotransin;SEC61A1;;www.chemicalprobes.org/Cotransin;;SEC61 complex (SEC61A1, SEC61A2, SEC61B, SEC61G), precise interactions have not been identified
-Cotransin;SEC61A2;;www.chemicalprobes.org/Cotransin;;SEC61 complex (SEC61A1, SEC61A2, SEC61B, SEC61G), precise interactions have not been identified
-Cotransin;SEC61B;;www.chemicalprobes.org/Cotransin;;SEC61 complex (SEC61A1, SEC61A2, SEC61B, SEC61G), precise interactions have not been identified
-Cotransin;SEC61G;;www.chemicalprobes.org/Cotransin;;SEC61 complex (SEC61A1, SEC61A2, SEC61B, SEC61G), precise interactions have not been identified
-HG-9-91-01;SIK1;;www.chemicalprobes.org/HG-9-91-01;;Protein targets: SIK1, SIK2, SIK3
-HG-9-91-01;SIK2;;www.chemicalprobes.org/HG-9-91-01;;Protein targets: SIK1, SIK2, SIK3
-HG-9-91-01;SIK3;;www.chemicalprobes.org/HG-9-91-01;;Protein targets: SIK1, SIK2, SIK3
-eCF506;SRC;;www.chemicalprobes.org/eCF506;;none
-AZ6102;TNKS;;www.chemicalprobes.org/AZ6102;;Protein targets: TNKS, TNKS2
-AZ6102;TNKS2;;www.chemicalprobes.org/AZ6102;;Protein targets: TNKS, TNKS2
-BiBET;BRD4;;www.chemicalprobes.org/BiBET;;Protein targets: BRD4, BRD3, BRD2, BRDT
-BiBET;BRD3;;www.chemicalprobes.org/BiBET;;Protein targets: BRD4, BRD3, BRD2, BRDT
-BiBET;BRD2;;www.chemicalprobes.org/BiBET;;Protein targets: BRD4, BRD3, BRD2, BRDT
-BiBET;BRDT;;www.chemicalprobes.org/BiBET;;Protein targets: BRD4, BRD3, BRD2, BRDT
-THZ1;CDK7;;www.chemicalprobes.org/THZ1;;none
-CCT244747;CHEK1;;www.chemicalprobes.org/CCT244747;;none
-AMG-18;ERN1;;www.chemicalprobes.org/AMG-18;;none
-EPZ-6438;EZH2;;www.chemicalprobes.org/EPZ-6438;;none
-AC220;FLT3;;www.chemicalprobes.org/AC220;;none
-Tubacin;HDAC6;;www.chemicalprobes.org/Tubacin;;none
-NVP-AEW541;IGF1R;;www.chemicalprobes.org/NVP-AEW541;;none
-Filgotinib;JAK1;;www.chemicalprobes.org/Filgotinib;;none
-Selumetinib;MAP2K1;;www.chemicalprobes.org/Selumetinib;;none
-JNK-IN-8;MAPK8;;www.chemicalprobes.org/JNK-IN-8;;Protein targets: MAPK8, MAPK9, MAPK10
-JNK-IN-8;MAPK9;;www.chemicalprobes.org/JNK-IN-8;;Protein targets: MAPK8, MAPK9, MAPK10
-JNK-IN-8;MAPK10;;www.chemicalprobes.org/JNK-IN-8;;Protein targets: MAPK8, MAPK9, MAPK10
-PF3644022;MAPKAPK2;;www.chemicalprobes.org/PF3644022;;none
-Rapamycin;MTOR;;www.chemicalprobes.org/Rapamycin;;none
-PDD00017273;PARG;;www.chemicalprobes.org/PDD00017273;;none
-Talazoparib;PARP1;;www.chemicalprobes.org/Talazoparib;;Protein targets: PARP1, PARP2
-Talazoparib;PARP2;;www.chemicalprobes.org/Talazoparib;;Protein targets: PARP1, PARP2
-ML323;USP1;;www.chemicalprobes.org/ML323;;Protein targets: USP1, WDR48
-ML323;WDR48;;www.chemicalprobes.org/ML323;;Protein targets: USP1, WDR48
-GNF-5;ABL1;;www.chemicalprobes.org/GNF-5;;Protein targets: ABL1, ABL2, BCR-APL fusion protein
-GNF-5;ABL2;;www.chemicalprobes.org/GNF-5;;Protein targets: ABL1, ABL2, BCR-APL fusion protein
-MZ1;BRD4;;www.chemicalprobes.org/MZ1;;none
-AMG900;AURKA;;www.chemicalprobes.org/AMG900;;Protein targets: AURKA, AURKB, AURKC
-AMG900;AURKB;;www.chemicalprobes.org/AMG900;;Protein targets: AURKA, AURKB, AURKC
-AMG900;AURKC;;www.chemicalprobes.org/AMG900;;Protein targets: AURKA, AURKB, AURKC
-AZD1152;AURKB;;www.chemicalprobes.org/AZD1152;;none
-GDC-0879;BRAF V600E;;www.chemicalprobes.org/GDC-0879;;BRAF Mutant V600E
-PF-477736;CHEK1;;www.chemicalprobes.org/PF-477736;;none
-CCT241533;CHEK2;;www.chemicalprobes.org/CCT241533;;none
-PF-CBP1;CREBBP;;www.chemicalprobes.org/PF-CBP1;;none
-EPZ-5676;DOT1L;;www.chemicalprobes.org/EPZ-5676;;none
-EPZ011989;EZH1;;www.chemicalprobes.org/EPZ011989;;Protein targets: EZH1, EZH2
-EPZ011989;EZH2;;www.chemicalprobes.org/EPZ011989;;Protein targets: EZH1, EZH2
-EI1;EZH2;;www.chemicalprobes.org/EI1;;none
-BGJ-398;FGFR1;;www.chemicalprobes.org/BGJ-398;;Protein targets: FGFR1, FGFR2, FGFR3, FGFR4
-BGJ-398;FGFR2;;www.chemicalprobes.org/BGJ-398;;Protein targets: FGFR1, FGFR2, FGFR3, FGFR4
-BGJ-398;FGFR3;;www.chemicalprobes.org/BGJ-398;;Protein targets: FGFR1, FGFR2, FGFR3, FGFR4
-BGJ-398;FGFR4;;www.chemicalprobes.org/BGJ-398;;Protein targets: FGFR1, FGFR2, FGFR3, FGFR4
-BLU9931;FGFR4;;www.chemicalprobes.org/BLU9931;;none
-CHIR-99021;GSK3A;;www.chemicalprobes.org/CHIR-99021;;Protein targets: GSK3A, GSK3B
-CHIR-99021;GSK3B;;www.chemicalprobes.org/CHIR-99021;;Protein targets: GSK3A, GSK3B
-Romidepsin;HDAC1;;www.chemicalprobes.org/Romidepsin;;Protein targets: HDAC1, HDAC2, HDAC3, HDAC8
-Romidepsin;HDAC2;;www.chemicalprobes.org/Romidepsin;;Protein targets: HDAC1, HDAC2, HDAC3, HDAC8
-Romidepsin;HDAC3;;www.chemicalprobes.org/Romidepsin;;Protein targets: HDAC1, HDAC2, HDAC3, HDAC8
-Romidepsin;HDAC8;;www.chemicalprobes.org/Romidepsin;;Protein targets: HDAC1, HDAC2, HDAC3, HDAC8
-Tofacitinib;JAK1;;www.chemicalprobes.org/Tofacitinib;;Protein targets: JAK1, JAK2, JAK3
-Tofacitinib;JAK2;;www.chemicalprobes.org/Tofacitinib;;Protein targets: JAK1, JAK2, JAK3
-Tofacitinib;JAK3;;www.chemicalprobes.org/Tofacitinib;;Protein targets: JAK1, JAK2, JAK3
-BMS-911543;JAK2;;www.chemicalprobes.org/BMS-911543;;none
-Skepinone-L;MAPK14;;www.chemicalprobes.org/Skepinone-L;;none
-SGX-523;MET;;www.chemicalprobes.org/SGX-523;;none
-AZD2014;MTOR;;www.chemicalprobes.org/AZD2014;;none
-G-5555;PAK1;;www.chemicalprobes.org/G-5555;;Protein targets: PAK1, PAK2, PAK3
-G-5555;PAK2;;www.chemicalprobes.org/G-5555;;Protein targets: PAK1, PAK2, PAK3
-G-5555;PAK3;;www.chemicalprobes.org/G-5555;;Protein targets: PAK1, PAK2, PAK3
-KZR-504;PSMB9;;www.chemicalprobes.org/KZR-504;;none
-GSK583;RIPK2;;www.chemicalprobes.org/GSK583;;none
-P505-15;SYK;;www.chemicalprobes.org/P505-15;;none
-VH298;VHL;;www.chemicalprobes.org/VH298;;none
-EED226;EED;;www.chemicalprobes.org/EED226;;none
-GSK4027;PCAF;;www.chemicalprobes.org/GSK4027;;Protein targets: PCAF, GCN5
-CH5424802;ALK;;www.chemicalprobes.org/CH5424802;;none
-MK-5108;AURKA;;www.chemicalprobes.org/MK-5108;;none
-Venetoclax;BCL2;;www.chemicalprobes.org/Venetoclax;;none
-Taxol;TUBB;;www.chemicalprobes.org/Taxol;;beta tubulin, precise interactions have not been identified
-Taxol;TUBB1;;www.chemicalprobes.org/Taxol;;beta tubulin, precise interactions have not been identified
-Taxol;TUBB2A;;www.chemicalprobes.org/Taxol;;beta tubulin, precise interactions have not been identified
-Taxol;TUBB2B;;www.chemicalprobes.org/Taxol;;beta tubulin, precise interactions have not been identified
-Taxol;TUBB3;;www.chemicalprobes.org/Taxol;;beta tubulin, precise interactions have not been identified
-Taxol;TUBB4A;;www.chemicalprobes.org/Taxol;;beta tubulin, precise interactions have not been identified
-Taxol;TUBB4B;;www.chemicalprobes.org/Taxol;;beta tubulin, precise interactions have not been identified
-Taxol;TUBB6;;www.chemicalprobes.org/Taxol;;beta tubulin, precise interactions have not been identified
-Taxol;TUBB8;;www.chemicalprobes.org/Taxol;;beta tubulin, precise interactions have not been identified
-CPI-0610;BRD2;;www.chemicalprobes.org/CPI-0610;;Protein targets: BRD2, BRD3, BRD4, BRDT
-CPI-0610;BRD3;;www.chemicalprobes.org/CPI-0610;;Protein targets: BRD2, BRD3, BRD4, BRDT
-CPI-0610;BRD4;;www.chemicalprobes.org/CPI-0610;;Protein targets: BRD2, BRD3, BRD4, BRDT
-CPI-0610;BRDT;;www.chemicalprobes.org/CPI-0610;;Protein targets: BRD2, BRD3, BRD4, BRDT
-MT1;BRD2;;www.chemicalprobes.org/MT1;;Protein targets: BRD2, BRD3, BRD4, BRDT
-MT1;BRD3;;www.chemicalprobes.org/MT1;;Protein targets: BRD2, BRD3, BRD4, BRDT
-MT1;BRD4;;www.chemicalprobes.org/MT1;;Protein targets: BRD2, BRD3, BRD4, BRDT
-MT1;BRDT;;www.chemicalprobes.org/MT1;;Protein targets: BRD2, BRD3, BRD4, BRDT
-CGI1746;BTK;;www.chemicalprobes.org/CGI1746;;none
-PD0332991;CDK4;;www.chemicalprobes.org/PD0332991;;Protein targets: CDK4, CDK6
-PD0332991;CDK6;;www.chemicalprobes.org/PD0332991;;Protein targets: CDK4, CDK6
-CCT251545;CDK8;;www.chemicalprobes.org/CCT251545;;Protein targets: CDK8, CDK19
-CCT251545;CDK19;;www.chemicalprobes.org/CCT251545;;Protein targets: CDK8, CDK19
-EPZ004777;DOT1L;;www.chemicalprobes.org/EPZ004777;;none
-CP-724714;ERBB2;;www.chemicalprobes.org/CP-724714;;none
-CPI-169;EZH1;;www.chemicalprobes.org/CPI-169;;Protein targets: EZH1, EZH2
-CPI-169;EZH2;;www.chemicalprobes.org/CPI-169;;Protein targets: EZH1, EZH2
-CPI-360;EZH2;;www.chemicalprobes.org/CPI-360;;none
-Linsitinib;IGF1R;;www.chemicalprobes.org/Linsitinib;;Protein targets: IGF1R, INSR, INSRR
-Linsitinib;INSR;;www.chemicalprobes.org/Linsitinib;;Protein targets: IGF1R, INSR, INSRR
-Linsitinib;INSRR;;www.chemicalprobes.org/Linsitinib;;Protein targets: IGF1R, INSR, INSRR
-Ruxolitinib;JAK1;;www.chemicalprobes.org/Ruxolitinib;;Protein targets: JAK1, JAK2
-Ruxolitinib;JAK2;;www.chemicalprobes.org/Ruxolitinib;;Protein targets: JAK1, JAK2
-SCH772984;MAPK1;;www.chemicalprobes.org/SCH772984;;Protein targets: MAPK1, MAPK3
-SCH772984;MAPK3;;www.chemicalprobes.org/SCH772984;;Protein targets: MAPK1, MAPK3
-VX-745;MAPK14;;www.chemicalprobes.org/VX-745;;none
-AX15836;MAPK7;;www.chemicalprobes.org/AX15836;;none
-S63845;MCL1;;www.chemicalprobes.org/S63845;;none
-AM-6761;MDM2;;www.chemicalprobes.org/AM-6761;;none
-AMG232;MDM2;;www.chemicalprobes.org/AMG232;;none
-MI-77301;MDM2;;www.chemicalprobes.org/MI-77301;;none
-RG7388;MDM2;;www.chemicalprobes.org/RG7388;;none
-RO5353;MDM2;;www.chemicalprobes.org/RO5353;;none
-Niraparib;PARP1;;www.chemicalprobes.org/Niraparib;;Protein targets: PARP1, PARP2
-Niraparib;PARP2;;www.chemicalprobes.org/Niraparib;;Protein targets: PARP1, PARP2
-Veliparib;PARP1;;www.chemicalprobes.org/Veliparib;;Protein targets: PARP1, PARP2
-Veliparib;PARP2;;www.chemicalprobes.org/Veliparib;;Protein targets: PARP1, PARP2
-GSK2334470;PDK1;;www.chemicalprobes.org/GSK2334470;;none
-BYL-719;PIK3CA;;www.chemicalprobes.org/BYL-719;;none
-CCT251236;PIR;;www.chemicalprobes.org/CCT251236;;none
-MS023;PRMT4;;www.chemicalprobes.org/MS023;;Protein targets: PRMT1, PRMT3, PRMT4, PRMT6, PRMT8
-EPZ015666;PRMT5;;www.chemicalprobes.org/EPZ015666;;none
-GSK481;RIPK1;;www.chemicalprobes.org/GSK481;;none
-(R)-PFI-2;SETD7;;www.chemicalprobes.org/R-PFI-2;;none
-GSM1;APH1A;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;gamma secretase complex, precise interactions have not been identified
-GSM1;APH1B;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;gamma secretase complex, precise interactions have not been identified
-GSM1;PSEN1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;gamma secretase complex, precise interactions have not been identified
-GSM1;NCSTN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;gamma secretase complex, precise interactions have not been identified
-GSM1;PSENEN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;gamma secretase complex, precise interactions have not been identified
-PF-05105679;TRPM8;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-05105679;none
-PF-04457845;FAAH;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-04457845;none
-PF-04418948;PTGER2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-04418948;none
-MRL-SYKi;SYK;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRL-SYKi;none
-MRL-650;CNR1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRL-650;none
-MRK-560;APH1A;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;gamma secretase complex, precise interactions have not been identified
-MRK-560;APH1B;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;gamma secretase complex, precise interactions have not been identified
-MRK-560;PSEN1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;gamma secretase complex, precise interactions have not been identified
-MRK-560;NCSTN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;gamma secretase complex, precise interactions have not been identified
-MRK-560;PSENEN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;gamma secretase complex, precise interactions have not been identified
-ERKi;MAPK3;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ERKi;Protein targts: MAPK3, MAPK1
-ERKi;MAPK1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ERKi;Protein targts: MAPK3, MAPK1
-CRTH2 antagonist;PTGDR2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/CRTH%3Csub%3E2%3C/sub%3E%20antagonist;none
-ABT-100;FNTB;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ABT-100;none
-ABT-546;EDNRA;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ABT-546;none
-BAY-826;TIE1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-826;Protein targets: TIE1, TEK, DDR1, DDR2
-BAY-826;TEK;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-826;Protein targets: TIE1, TEK, DDR1, DDR2
-BAY-826;DDR1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-826;Protein targets: TIE1, TEK, DDR1, DDR2
-BAY-826;DDR2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-826;Protein targets: TIE1, TEK, DDR1, DDR2
-PF-04554878;PTK2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-04554878;Protein targets: PTK2, PTK2B
-PF-04554878;PTK2B;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-04554878;Protein targets: PTK2, PTK2B
-ABT-724;DRD4;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ABT-724;none
-BI 99179;FASN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BI%2099179;none
-TP-004;METAP2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/TP-004;none
-BI-9627;SLC9A1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BI-9627;none
-BI 665915;ALOX5AP;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BI%20665915;none
-BI-1935;EPHX2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BI-1935;none
-BAY-386;F2R;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-386;none
-BAY-7598;MMP12;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-7598;none
-KISS1-305;KISS1R;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/KISS1-305;none
-BAY-707;NUDT1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-707;none
-BAY-474;MET;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-474;none
-(R)-9s;ADRA1D;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/(R)-9s;none
+A-1155463;BCL2L1;;www.chemicalprobes.org/1155463;;
+WEHI-539;BCL2L1;;www.chemicalprobes.org/WEHI-539;;
+BMX-IN-1;BMX;;www.chemicalprobes.org/BMX-IN-1;;
+KH-CB19;CLK1;;www.chemicalprobes.org/KH-CB19;;
+KH-CB19;CLK4;;www.chemicalprobes.org/KH-CB19;;
+KH-CB19;DYRK1A;;www.chemicalprobes.org/KH-CB19;;
+AZ191;DYRK1B;;www.chemicalprobes.org/AZ191;;
+RGFP966;HDAC3;;www.chemicalprobes.org/RGFP966;;
+ACY-738;HDAC6;;www.chemicalprobes.org/ACY-738;;
+GSK-J4;KDM6A;;www.chemicalprobes.org/GSK-J4;;
+GSK-J4;KDM6B;;www.chemicalprobes.org/GSK-J4;;
+KI-696;KEAP1;;www.chemicalprobes.org/KI-696;;
+GNE7915;LRRK2;;www.chemicalprobes.org/GNE7915;;
+GW3965;NR1H2;;www.chemicalprobes.org/GW3965;;
+GW3965;NR1H3;;www.chemicalprobes.org/GW3965;;
+BIX-02188;MAP2K5;;www.chemicalprobes.org/BIX-02188;;
+MI-888;MDM2;;www.chemicalprobes.org/MI-888;;
+RG7112;MDM2;;www.chemicalprobes.org/RG7112;;
+UNC2025;MERTK;;www.chemicalprobes.org/UNC2025;;
+UNC2025;FLT3;;www.chemicalprobes.org/UNC2025;;
+eCF309;MTOR;;www.chemicalprobes.org/eCF309;;
+Pevonedistat;UBA3;;www.chemicalprobes.org/Pevonedistat;;
+WZ4003;NUAK1;;www.chemicalprobes.org/WZ4003;;
+WZ4003;NUAK2;;www.chemicalprobes.org/WZ4003;;
+Salvinorin A;OPRK1;;www.chemicalprobes.org/Salvinorin;;
+PF-3758309;PAK1;;www.chemicalprobes.org/PF-3758309;;
+PF-3758309;PAK4;;www.chemicalprobes.org/PF-3758309;;
+PF-3758309;PAK5;;www.chemicalprobes.org/PF-3758309;;
+PF-3758309;PAK6;;www.chemicalprobes.org/PF-3758309;;
+E7449;PARP1;;www.chemicalprobes.org/E7449;;
+E7449;PARP2;;www.chemicalprobes.org/E7449;;
+E7449;TNKS;;www.chemicalprobes.org/E7449;;
+E7449;TNKS2;;www.chemicalprobes.org/E7449;;
+Olaparib;PARP1;;www.chemicalprobes.org/Olaparib;;
+Olaparib;PARP2;;www.chemicalprobes.org/Olaparib;;
+Cotransin;SEC61A1;;www.chemicalprobes.org/Cotransin;;
+Cotransin;SEC61A2;;www.chemicalprobes.org/Cotransin;;
+Cotransin;SEC61B;;www.chemicalprobes.org/Cotransin;;
+Cotransin;SEC61G;;www.chemicalprobes.org/Cotransin;;
+HG-9-91-01;SIK1;;www.chemicalprobes.org/HG-9-91-01;;
+HG-9-91-01;SIK2;;www.chemicalprobes.org/HG-9-91-01;;
+HG-9-91-01;SIK3;;www.chemicalprobes.org/HG-9-91-01;;
+eCF506;SRC;;www.chemicalprobes.org/eCF506;;
+AZ6102;TNKS;;www.chemicalprobes.org/AZ6102;;
+AZ6102;TNKS2;;www.chemicalprobes.org/AZ6102;;
+BiBET;BRD4;;www.chemicalprobes.org/BiBET;;
+BiBET;BRD3;;www.chemicalprobes.org/BiBET;;
+BiBET;BRD2;;www.chemicalprobes.org/BiBET;;
+BiBET;BRDT;;www.chemicalprobes.org/BiBET;;
+THZ1;CDK7;;www.chemicalprobes.org/THZ1;;
+CCT244747;CHEK1;;www.chemicalprobes.org/CCT244747;;
+AMG-18;ERN1;;www.chemicalprobes.org/AMG-18;;
+EPZ-6438;EZH2;;www.chemicalprobes.org/EPZ-6438;;
+AC220;FLT3;;www.chemicalprobes.org/AC220;;
+Tubacin;HDAC6;;www.chemicalprobes.org/Tubacin;;
+NVP-AEW541;IGF1R;;www.chemicalprobes.org/NVP-AEW541;;
+Filgotinib;JAK1;;www.chemicalprobes.org/Filgotinib;;
+Selumetinib;MAP2K1;;www.chemicalprobes.org/Selumetinib;;
+JNK-IN-8;MAPK8;;www.chemicalprobes.org/JNK-IN-8;;
+JNK-IN-8;MAPK9;;www.chemicalprobes.org/JNK-IN-8;;
+JNK-IN-8;MAPK10;;www.chemicalprobes.org/JNK-IN-8;;
+PF3644022;MAPKAPK2;;www.chemicalprobes.org/PF3644022;;
+Rapamycin;MTOR;;www.chemicalprobes.org/Rapamycin;;
+PDD00017273;PARG;;www.chemicalprobes.org/PDD00017273;;
+Talazoparib;PARP1;;www.chemicalprobes.org/Talazoparib;;
+Talazoparib;PARP2;;www.chemicalprobes.org/Talazoparib;;
+ML323;USP1;;www.chemicalprobes.org/ML323;;
+ML323;WDR48;;www.chemicalprobes.org/ML323;;
+GNF-5;ABL1;;www.chemicalprobes.org/GNF-5;;
+GNF-5;ABL2;;www.chemicalprobes.org/GNF-5;;
+MZ1;BRD4;;www.chemicalprobes.org/MZ1;;
+AMG900;AURKA;;www.chemicalprobes.org/AMG900;;
+AMG900;AURKB;;www.chemicalprobes.org/AMG900;;
+AMG900;AURKC;;www.chemicalprobes.org/AMG900;;
+AZD1152;AURKB;;www.chemicalprobes.org/AZD1152;;
+GDC-0879;BRAF;;www.chemicalprobes.org/GDC-0879;;Protein target: BRAF V600E
+PF-477736;CHEK1;;www.chemicalprobes.org/PF-477736;;
+CCT241533;CHEK2;;www.chemicalprobes.org/CCT241533;;
+PF-CBP1;CREBBP;;www.chemicalprobes.org/PF-CBP1;;
+EPZ-5676;DOT1L;;www.chemicalprobes.org/EPZ-5676;;
+EPZ011989;EZH1;;www.chemicalprobes.org/EPZ011989;;
+EPZ011989;EZH2;;www.chemicalprobes.org/EPZ011989;;
+EI1;EZH2;;www.chemicalprobes.org/EI1;;
+BGJ-398;FGFR1;;www.chemicalprobes.org/BGJ-398;;
+BGJ-398;FGFR2;;www.chemicalprobes.org/BGJ-398;;
+BGJ-398;FGFR3;;www.chemicalprobes.org/BGJ-398;;
+BGJ-398;FGFR4;;www.chemicalprobes.org/BGJ-398;;
+BLU9931;FGFR4;;www.chemicalprobes.org/BLU9931;;
+CHIR-99021;GSK3A;;www.chemicalprobes.org/CHIR-99021;;
+CHIR-99021;GSK3B;;www.chemicalprobes.org/CHIR-99021;;
+Romidepsin;HDAC1;;www.chemicalprobes.org/Romidepsin;;
+Romidepsin;HDAC2;;www.chemicalprobes.org/Romidepsin;;
+Romidepsin;HDAC3;;www.chemicalprobes.org/Romidepsin;;
+Romidepsin;HDAC8;;www.chemicalprobes.org/Romidepsin;;
+Tofacitinib;JAK1;;www.chemicalprobes.org/Tofacitinib;;
+Tofacitinib;JAK2;;www.chemicalprobes.org/Tofacitinib;;
+Tofacitinib;JAK3;;www.chemicalprobes.org/Tofacitinib;;
+BMS-911543;JAK2;;www.chemicalprobes.org/BMS-911543;;
+Skepinone-L;MAPK14;;www.chemicalprobes.org/Skepinone-L;;
+SGX-523;MET;;www.chemicalprobes.org/SGX-523;;
+AZD2014;MTOR;;www.chemicalprobes.org/AZD2014;;
+G-5555;PAK1;;www.chemicalprobes.org/G-5555;;
+G-5555;PAK2;;www.chemicalprobes.org/G-5555;;
+G-5555;PAK3;;www.chemicalprobes.org/G-5555;;
+KZR-504;PSMB9;;www.chemicalprobes.org/KZR-504;;
+GSK583;RIPK2;;www.chemicalprobes.org/GSK583;;
+P505-15;SYK;;www.chemicalprobes.org/P505-15;;
+VH298;VHL;;www.chemicalprobes.org/VH298;;
+EED226;EED;;www.chemicalprobes.org/EED226;;
+GSK4027;KAT2B;;www.chemicalprobes.org/GSK4027;;
+CH5424802;ALK;;www.chemicalprobes.org/CH5424802;;
+MK-5108;AURKA;;www.chemicalprobes.org/MK-5108;;
+Venetoclax;BCL2;;www.chemicalprobes.org/Venetoclax;;
+Taxol;TUBB;;www.chemicalprobes.org/Taxol;;
+Taxol;TUBB1;;www.chemicalprobes.org/Taxol;;
+Taxol;TUBB2A;;www.chemicalprobes.org/Taxol;;
+Taxol;TUBB2B;;www.chemicalprobes.org/Taxol;;
+Taxol;TUBB3;;www.chemicalprobes.org/Taxol;;
+Taxol;TUBB4A;;www.chemicalprobes.org/Taxol;;
+Taxol;TUBB4B;;www.chemicalprobes.org/Taxol;;
+Taxol;TUBB6;;www.chemicalprobes.org/Taxol;;
+Taxol;TUBB8;;www.chemicalprobes.org/Taxol;;
+CPI-0610;BRD2;;www.chemicalprobes.org/CPI-0610;;
+CPI-0610;BRD3;;www.chemicalprobes.org/CPI-0610;;
+CPI-0610;BRD4;;www.chemicalprobes.org/CPI-0610;;
+CPI-0610;BRDT;;www.chemicalprobes.org/CPI-0610;;
+MT1;BRD2;;www.chemicalprobes.org/MT1;;
+MT1;BRD3;;www.chemicalprobes.org/MT1;;
+MT1;BRD4;;www.chemicalprobes.org/MT1;;
+MT1;BRDT;;www.chemicalprobes.org/MT1;;
+CGI1746;BTK;;www.chemicalprobes.org/CGI1746;;
+PD0332991;CDK4;;www.chemicalprobes.org/PD0332991;;
+PD0332991;CDK6;;www.chemicalprobes.org/PD0332991;;
+CCT251545;CDK8;;www.chemicalprobes.org/CCT251545;;
+CCT251545;CDK19;;www.chemicalprobes.org/CCT251545;;
+EPZ004777;DOT1L;;www.chemicalprobes.org/EPZ004777;;
+CP-724714;ERBB2;;www.chemicalprobes.org/CP-724714;;
+CPI-169;EZH1;;www.chemicalprobes.org/CPI-169;;
+CPI-169;EZH2;;www.chemicalprobes.org/CPI-169;;
+CPI-360;EZH2;;www.chemicalprobes.org/CPI-360;;
+Linsitinib;IGF1R;;www.chemicalprobes.org/Linsitinib;;
+Linsitinib;INSR;;www.chemicalprobes.org/Linsitinib;;
+Linsitinib;INSRR;;www.chemicalprobes.org/Linsitinib;;
+Ruxolitinib;JAK1;;www.chemicalprobes.org/Ruxolitinib;;
+Ruxolitinib;JAK2;;www.chemicalprobes.org/Ruxolitinib;;
+SCH772984;MAPK1;;www.chemicalprobes.org/SCH772984;;
+SCH772984;MAPK3;;www.chemicalprobes.org/SCH772984;;
+VX-745;MAPK14;;www.chemicalprobes.org/VX-745;;
+AX15836;MAPK7;;www.chemicalprobes.org/AX15836;;
+S63845;MCL1;;www.chemicalprobes.org/S63845;;
+AM-6761;MDM2;;www.chemicalprobes.org/AM-6761;;
+AMG232;MDM2;;www.chemicalprobes.org/AMG232;;
+MI-77301;MDM2;;www.chemicalprobes.org/MI-77301;;
+RG7388;MDM2;;www.chemicalprobes.org/RG7388;;
+RO5353;MDM2;;www.chemicalprobes.org/RO5353;;
+Niraparib;PARP1;;www.chemicalprobes.org/Niraparib;;
+Niraparib;PARP2;;www.chemicalprobes.org/Niraparib;;
+Veliparib;PARP1;;www.chemicalprobes.org/Veliparib;;
+Veliparib;PARP2;;www.chemicalprobes.org/Veliparib;;
+GSK2334470;PDK1;;www.chemicalprobes.org/GSK2334470;;
+BYL-719;PIK3CA;;www.chemicalprobes.org/BYL-719;;
+CCT251236;PIR;;www.chemicalprobes.org/CCT251236;;
+EPZ015666;PRMT5;;www.chemicalprobes.org/EPZ015666;;
+GSK481;RIPK1;;www.chemicalprobes.org/GSK481;;
+(R)-PFI-2;SETD7;;www.chemicalprobes.org/R-PFI-2;;
+GSM1;APH1A;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;
+GSM1;APH1B;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;
+GSM1;PSEN1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;
+GSM1;NCSTN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;
+GSM1;PSENEN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/GSM1;
+PF-05105679;TRPM8;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-05105679;
+PF-04457845;FAAH;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-04457845;
+PF-04418948;PTGER2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-04418948;
+MRL-SYKi;SYK;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRL-SYKi;
+MRL-650;CNR1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRL-650;
+MRK-560;APH1A;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;
+MRK-560;APH1B;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;
+MRK-560;PSEN1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;
+MRK-560;NCSTN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;
+MRK-560;PSENEN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/MRK-560;
+ERKi;MAPK3;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ERKi;
+ERKi;MAPK1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ERKi;
+CRTH2 antagonist;PTGDR2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/CRTH%3Csub%3E2%3C/sub%3E%20antagonist;
+ABT-100;FNTB;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ABT-100;
+ABT-546;EDNRA;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ABT-546;
+BAY-826;TIE1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-826;
+BAY-826;TEK;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-826;
+BAY-826;DDR1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-826;
+BAY-826;DDR2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-826;
+PF-04554878;PTK2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-04554878;
+PF-04554878;PTK2B;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/PF-04554878;
+ABT-724;DRD4;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/ABT-724;
+BI 99179;FASN;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BI%2099179;
+TP-004;METAP2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/TP-004;
+BI-9627;SLC9A1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BI-9627;
+BI 665915;ALOX5AP;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BI%20665915;
+BI-1935;EPHX2;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BI-1935;
+BAY-386;F2R;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-386;
+BAY-7598;MMP12;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-7598;
+KISS1-305;KISS1R;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/KISS1-305;
+BAY-707;NUDT1;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-707;
+BAY-474;MET;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BAY-474;
+(R)-9s;ADRA1D;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/(R)-9s;
+BTZO-1;MIF;;;http://www.sgc-ffm.uni-frankfurt.de/#!specificprobeoverview/BTZO-1;
