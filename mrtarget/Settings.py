@@ -447,5 +447,4 @@ class Config():
 
     ES_CUSTOM_IDXS_INI = ini if ES_CUSTOM_IDXS else None
 
-    # metrics
-    METRICS_FILENAME = '/Users/ckong/Desktop/release_metrics.txt'
+    METRICS_FILENAME = {HOME} + '/Desktop/release_metrics.txt'
