@@ -153,25 +153,26 @@ class ElasticSearchConfiguration():
     available_databases = Config().DATASOURCE_TO_DATATYPE_MAPPING.keys()
     available_databases.append('other')
 
-    generic_shard_number = '1'
+    generic_shard_number = '9'
     generic_replicas_number = '0'
-    evidence_shard_number = '1'
+    evidence_shard_number = '9'
     evidence_replicas_number = '0'
-    relation_shard_number = '1'
+    relation_shard_number = '9'
     relation_replicas_number = '0'
-    publication_shard_number = '5'
+    publication_shard_number = '9'
     publication_replicas_number = '0'
     validation_shard_number = '1'
     validation_replicas_number = '0'
     submission_audit_shard_number = '1'
     submission_audit_replicas_number = '0'
+    index_storage_type = "niofs"
     bulk_load_chunk = 1000
 
     unip = Dict()
     unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.type = 'binary'
     unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.index = False
     unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.store = True
-    unip.settings.number_of_shards = '1'
+    unip.settings.number_of_shards = generic_shard_number
     unip.settings.number_of_replicas = generic_replicas_number
     unip.settings.refresh_interval = '60s'
 
@@ -220,6 +221,7 @@ class ElasticSearchConfiguration():
         "settings": {
             "number_of_shards": generic_shard_number,
             "number_of_replicas": generic_replicas_number,
+            "index.storage.type": index_storage_type,
             "refresh_interval": "60s",
             "analysis": {
                 "filter": {
@@ -455,6 +457,7 @@ class ElasticSearchConfiguration():
     evidence_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
                                           "number_of_replicas": evidence_replicas_number,
                                           # "index.store.type": "memory",
+                                          "index.storage.type": index_storage_type,
                                           "refresh_interval": "60s",
                                           "max_result_window": str(int(10e6)),
                                           },
@@ -471,6 +474,7 @@ class ElasticSearchConfiguration():
     relation_data_mapping = {"settings": {"number_of_shards": relation_shard_number,
                                           "number_of_replicas": relation_replicas_number,
                                           # "index.store.type": "memory",
+                                          "index.storage.type": index_storage_type,
                                           "refresh_interval": "60s",
                                           },
                              "mappings": relation_mappings,
@@ -499,6 +503,7 @@ class ElasticSearchConfiguration():
     association_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
                                              "number_of_replicas": evidence_replicas_number,
                                              # "index.store.type": "memory",
+                                             "index.storage.type": index_storage_type,
                                              "refresh_interval": "60s",
                                              "max_result_window": str(int(5e6)),
                                              },
@@ -613,6 +618,7 @@ class ElasticSearchConfiguration():
         "settings": {
             "number_of_shards": generic_shard_number,
             "number_of_replicas": generic_replicas_number,
+            "index.storage.type": index_storage_type,
             "refresh_interval": "60s",
             "analysis": {
                 "filter": {
