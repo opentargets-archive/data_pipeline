@@ -270,10 +270,6 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
-        if args.onto or run_full_pipeline:
-            do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
-            if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
-                PhenotypeSlim().create_phenotype_slim(args.input_file)
 
         if args.input_file:
             input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))

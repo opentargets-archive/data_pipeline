@@ -1132,15 +1132,3 @@ class PhenotypeSlim():
                 self.parse_gzipfile(filename=file_path.split('/')[1], mode='rb', filepbj=f, mtime=file_mod_time)
             srv.close()
         return
-
-def main():
-    #obj = DiseasePhenotypes()
-    #obj.parse_owl_url()
-
-    obj = PhenotypeSlim()
-    #obj.load_all_phenotypes()
-    obj.create_phenotype_slim(local_files=['/Users/koscieln/Documents/work/gitlab/data_pipeline/samples/cttv008-22-07-2016.json.gz'])
-
-
-if __name__ == "__main__":
-    main()
