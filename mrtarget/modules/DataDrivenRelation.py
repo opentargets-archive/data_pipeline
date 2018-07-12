@@ -752,7 +752,7 @@ class DataDrivenRelationProcess(object):
         self.loader.flush()
         self.loader.close()
 
-        self.logger.info('collecting reporter')
+        logger.info('collecting reporter')
         q_reporter.join()
 
     def get_hot_node_blacklist(self, data):
