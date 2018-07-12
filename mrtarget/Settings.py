@@ -135,6 +135,8 @@ class Config():
         PROXY_HOST = ini.get('proxy', 'host')
         PROXY_PORT = int(ini.get('proxy', 'port'))
 
+    HOME = os.getenv("HOME")
+
     TEMP_DIR = os.path.sep + 'tmp'
 
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
@@ -161,8 +163,6 @@ class Config():
 
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=[])
-    # ELASTICSEARCH_NODES_PUB = read_option('ELASTICSEARCH_NODES_PUB', cast=list,
-    #                                   default=[])
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -384,7 +384,6 @@ class Config():
 
     IS_DIRECT_DO_NOT_PROPAGATE = ['europepmc']
 
-
     ENSEMBL_RELEASE_VERSION = 92
     ENSEMBL_CHUNK_SIZE = 100
 
@@ -396,7 +395,6 @@ class Config():
         read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
-
 
     # dump file names
     DUMP_FILE_FOLDER = read_option('CTTV_DUMP_FOLDER', default=TEMP_DIR)
@@ -447,4 +445,4 @@ class Config():
 
     ES_CUSTOM_IDXS_INI = ini if ES_CUSTOM_IDXS else None
 
-    METRICS_FILENAME = {HOME} + '/Desktop/release_metrics.txt'
+    METRICS_FILENAME = HOME + '/release_metrics.txt'
