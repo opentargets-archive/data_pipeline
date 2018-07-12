@@ -23,7 +23,6 @@ from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValid
 from mrtarget.modules.GeneData import GeneActions, GeneManager
 from mrtarget.modules.HPA import HPAActions, HPAProcess
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
-from mrtarget.modules.Ontology import OntologyActions, PhenotypeSlim
 from mrtarget.modules.QC import QCActions, QCRunner
 from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
@@ -96,8 +95,6 @@ def main():
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
-    parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
-                        action="append_const", const = OntologyActions.ALL)
     parser.add_argument("--qc", dest='qc',
                         help="Run quality control scripts",
                         action="append_const", const=QCActions.ALL)
