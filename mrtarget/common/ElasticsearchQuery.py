@@ -1,3 +1,4 @@
+import os
 import base64
 import collections
 import json
@@ -45,8 +46,8 @@ class ESQuery(object):
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 
-
     @staticmethod
+
     def _get_source_from_fields(fields = None):
         if not fields:
             return True
@@ -1031,6 +1032,142 @@ class ESQuery(object):
         # res = list(res)
         for hit in res:
             yield hit['_source']
+
+    # Queries used to generate the page https://github.com/opentargets/data_release/wiki/Data-Metrics-&-Plots
+    def count_drug_w_evidence(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+
+        res = self.handler.search(
+                index = index,
+                doc_type="evidencestring-chembl",
+                body={"query": {"match_all":{}},
+                      "aggs":
+                            {"general_drug":{"cardinality": {"field":"drug.id"}}}
+                     })
+        return res
+
+    def count_entity_w_association(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME
+
+        res = self.handler.search(
+                index = index,
+                body={"query": {"match_all":{}},
+                      "aggs": {
+                        "general_target": {"cardinality":{"field":"target.id"}},
+                        "general_disease": {"cardinality":{"field": "disease.id"}}
+                      }})
+        return res
+
+    def count_target_w_symbol(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME
+
+        res = self.handler.search(
+                index = index,
+                body={"query": {"exists": {"field": "approved_symbol"}}
+            })
+
+        return res
+
+    def count_target_w_mp(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME
+
+        res = self.handler.search(
+                index = index,
+                body={"query": {"exists": {"field": "mouse_phenotypes.phenotypes"}}
+            })
+
+        return res
+
+    def count_target_w_hallmark(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME
+
+        res = self.handler.search(
+                index = index,
+                body={"query": {"exists": {"field": "hallmarks"}}
+            })
+
+        return res
+
+    def count_target_w_biomarker(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME
+
+        res = self.handler.search(
+                index = index ,
+                body={"query": {"exists": {"field": "cancerbiomarkers"}}
+            })
+
+        return res
+
+    def count_BRAF_evidence(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+
+        res = self.handler.search(
+                index = index,
+                body={"query": {"match": {"target.gene_info.symbol": "BRAF"}}
+            })
+
+        return res
+
+    def count_withdrawn_drug_evidence(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+
+        res = self.handler.search(
+                index = index ,
+                body={"query": {"exists": {"field": "drug.withdrawn_country"}}
+            })
+
+        return res
+
+    def count_trinucleotide_evidence(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+
+        res = self.handler.search(
+                index = index,
+                body={"query": {"bool": {"must": [
+                    {"term": {"evidence.evidence_codes": {"value": "SO_0002165"}}},
+                    {"term": {"private.datasource": {"value": "eva"}}}
+                ]}}
+            })
+
+        return res
+
+    def count_datasource_evidence(self, doc_type):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+
+        doc_type = Config.ELASTICSEARCH_DATA_DOC_NAME + "-" + doc_type
+
+        res = self.handler.search(
+                index= index,
+                doc_type=doc_type
+                )
+
+        return res
+
+    def count_datatype_evidence(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+
+        res = self.handler.search(
+                index = index,
+                body={"query": {"match_all":{}},
+                      "aggs": {
+                        "datatypes": {"terms":{"field":"private.datatype.keyword"}}
+                      }})
+
+        return res
+
+    def count_datatype_association(self):
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME
+
+        res = self.handler.search(
+                index = index,
+                body={"query": {"match_all":{}},
+                      "aggs": {
+                        "datatypes": {"terms":{"field":"private.facets.datatype.keyword"}}
+                      }})
+
+        return res
+
+    ######
 
     @staticmethod
     def flatten(d, parent_key='', separator='.'):
