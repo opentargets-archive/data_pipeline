@@ -627,14 +627,14 @@ class ScoringProcess():
             target_q.put(target)
         target_q.set_submission_finished()
 
-        self.logger.info("collecting readers and scorers")
+        logger.info("collecting readers and scorers")
         for w in readers:
             w.join()
         for w in scorers:
             w.join()
 #         for w in storers:
 #             w.join()
-        self.logger.info('collecting reporter')
+        logger.info('collecting reporter')
         q_reporter.join()
 
         logger.info('flushing data to index')
