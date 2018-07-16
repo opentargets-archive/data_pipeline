@@ -401,6 +401,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                     # generate fantabulous dict from addict
                     evidence_obj = Dict(parsed_line)
 
+                    evidence_obj.unique_association_fields['datasource'] = data_source_name
+
                     if evidence_obj.target.id:
                         target_id = evidence_obj.target.id
                     if evidence_obj.disease.id:

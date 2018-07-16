@@ -135,6 +135,8 @@ class Config():
         PROXY_HOST = ini.get('proxy', 'host')
         PROXY_PORT = int(ini.get('proxy', 'port'))
 
+    HOME = os.getenv("HOME")
+
     TEMP_DIR = os.path.sep + 'tmp'
 
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
@@ -161,8 +163,6 @@ class Config():
 
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=[])
-    # ELASTICSEARCH_NODES_PUB = read_option('ELASTICSEARCH_NODES_PUB', cast=list,
-    #                                   default=[])
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
@@ -194,17 +194,12 @@ class Config():
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
-    # ELASTICSEARCH_PUBLICATION_INDEX_NAME = '!publication-data'
-    # ELASTICSEARCH_PUBLICATION_DOC_NAME = 'publication'
-    # ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME = 'publication-analysis-spacy'
-    # ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME = '!lit-entities-test'
-    # ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME = 'litentity'
     DEBUG = True
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
 
     GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
-    GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks', 'CancerBiomarkers' ]
+    GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks', 'CancerBiomarkers', 'ChemicalProbes']
 
     HGNC_COMPLETE_SET = 'http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
@@ -223,7 +218,7 @@ class Config():
         '4932':'yeast'
     }
 
-    HALLMARK_FILENAME = file_or_resource(fname='census_annot.tsv')
+    HALLMARK_FILENAME = file_or_resource(fname='v85_hallmark_export.tsv')
     BIOMARKER_FILENAME = file_or_resource(fname='cgi_biomarkers_per_variant.tsv')
     CHEMICALPROBES_FILENAME = file_or_resource(fname='Chemicalprobes_alldata2.tsv')
 
@@ -389,7 +384,6 @@ class Config():
 
     IS_DIRECT_DO_NOT_PROPAGATE = ['europepmc']
 
-
     ENSEMBL_RELEASE_VERSION = 92
     ENSEMBL_CHUNK_SIZE = 100
 
@@ -401,7 +395,6 @@ class Config():
         read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
-
 
     # dump file names
     DUMP_FILE_FOLDER = read_option('CTTV_DUMP_FOLDER', default=TEMP_DIR)
@@ -451,3 +444,5 @@ class Config():
                                  default=False, cast=bool)
 
     ES_CUSTOM_IDXS_INI = ini if ES_CUSTOM_IDXS else None
+
+    METRICS_FILENAME = HOME + '/release_metrics.txt'
