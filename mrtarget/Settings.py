@@ -307,6 +307,7 @@ class Config():
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_INDICATION = ini.get(INI_SECTION, 'chembl_indication')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
+    CHEMBL_MOLECULE = ini.get(INI_SECTION, 'chembl_molecule')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
     CHEMBL_PROTEIN_CLASS = ini.get(INI_SECTION, 'chembl_protein')
     CHEMBL_TARGET_COMPONENT = ini.get(INI_SECTION, 'chembl_component')
