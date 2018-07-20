@@ -53,6 +53,6 @@ echo "uploading new dataset to gcloud"
 gsutil rsync -d output gs://ot-input-dev
 gsutil acl ch -u AllUsers:R gs://ot-input-dev/*
 
-rm -Rf output
-rm -Rf data
+#rm -Rf output
+#rm -Rf data
 
