@@ -17,6 +17,105 @@ __email__      = ["data@targetvalidation.org"]
 __status__     = "Production"
 
 
+class CompoundActions(Actions):
+    PROCESS = 'process'
+
+class CompoundProcess():
+
+    def __init__(self, loader):
+        self._logger = logging.getLogger(__name__)
+        self.loader = loader
+
+        self.CHEMBL_COMPOUND = 'https://www.ebi.ac.uk/chembl/api/data/molecule.json'
+        self.cpd = {}
+
+    def process(self):
+        self.parse_compound_data()
+        self.store_to_elasticsearch()
+
+    def parse_compound_data(self):
+        ct = 0
+        compounds = get_chembl_data(self.CHEMBL_COMPOUND)
+
+        for i in tqdm(compounds,
+                      desc='Downloading compound/drug attributes, indications & mechanisms from ChEMBL API',
+                      unit=' compound'):
+
+            cpd_id = i['molecule_chembl_id']
+            cpd_attrib = i
+            cpd_indication = self.download_from_uri(cpd_id, Config.CHEMBL_INDICATION)
+            cpd_mechanism = self.download_from_uri(cpd_id, Config.CHEMBL_MECHANISM)
+
+            if cpd_indication is None and cpd_mechanism is None:
+                break
+
+            #if ct == 10000:
+            #    break
+            if cpd_id not in self.cpd:
+                self.cpd[cpd_id] = \
+                    {
+                        'attributes': cpd_attrib,
+                        'indications': [],
+                        'mechanism': []
+                    }
+
+            '''
+            Parse compound/drug-disease indications
+            '''
+            if cpd_indication:
+                for row in cpd_indication['drug_indications']:
+
+                    line = \
+                        {
+                            'disease_id': row['efo_id'],
+                            'disease_label': row['efo_term'],
+                            'disease_max_phase': row['max_phase_for_ind'],
+                            'reference': row['indication_refs'],
+                            'mesh_heading': row['mesh_heading'],
+                            'mesh_id': row['mesh_id']
+                        }
+
+                    try:
+                        self.cpd[cpd_id]['indications'].append(line)
+                    except KeyError:
+                        self.cpd[cpd_id]['indications'] = list()
+                        self.cpd[cpd_id]['indications'].append(line)
+
+            '''
+            Parse compound/drug-gene mechanisms of action
+            '''
+            if cpd_mechanism:
+                for row in cpd_mechanism['mechanisms']:
+
+                    try:
+                        self.cpd[cpd_id]['mechanisms'].append(row)
+                    except KeyError:
+                        self.cpd[cpd_id]['mechanisms'] = list()
+                        self.cpd[cpd_id]['mechanisms'].append(row)
+            ct += 1
+
+    def download_from_uri(self, compound_id, uri):
+        url = uri + '?molecule_chembl_id=' + compound_id
+
+        try:
+            r = requests.get(url, timeout=300)
+            if r.status_code == 200:
+                return r.json()
+            else:
+                raise IOError('failed to get data from ChEMBL API')
+
+        except (ConnectionError, Timeout, HTTPError) as e:
+            raise IOError(e)
+
+    def store_to_elasticsearch(self):
+
+        for key, data in self.cpd.items():
+            self.loader.put(Config.ELASTICSEARCH_COMPOUND_INDEX_NAME,
+                            Config.ELASTICSEARCH_COMPOUND_DOC_NAME,
+                            key,
+                            json.dumps(data),
+                            True)
+
 def get_chembl_data(uri):
     '''return to json from uri'''
     next_get = True
@@ -44,104 +143,3 @@ def get_chembl_data(uri):
 
         for el in chunk[data_key]:
             yield el
-
-class CompoundActions(Actions):
-    PROCESS = 'process'
-
-class CompoundProcess():
-
-    def __init__(self, loader):
-        self._logger = logging.getLogger(__name__)
-        self.loader = loader
-
-        self.CHEMBL_COMPOUND = 'https://www.ebi.ac.uk/chembl/api/data/molecule.json'
-        self.cpd = {}
-
-    def process(self):
-        self.process_data()
-        self.store_to_elasticsearch()
-
-    def process_data(self):
-        ct = 0
-        compounds = get_chembl_data(self.CHEMBL_COMPOUND)
-
-        for i in tqdm(compounds,
-                      desc= 'Downloading compound/drug attributes, indications & mechanisms from ChEMBL API',
-                      unit= ' compound'):
-
-            if ct == 10000:
-                break
-
-            cpd_id = i['molecule_chembl_id']
-            cpd_attrib = i
-
-            if cpd_id not in self.cpd:
-                self.cpd[cpd_id] = \
-                    {
-                        'attributes': cpd_attrib,
-                        'indications': [],
-                        'mechanism': []
-                    }
-
-            '''
-            Download compound/drug-disease indications
-            '''
-            cpd_indication = self.download_from_uri(cpd_id, Config.CHEMBL_INDICATION)
-
-            if cpd_indication:
-                for row in cpd_indication['drug_indications']:
-
-                    line = \
-                        {
-                            'disease_id': row['efo_id'],
-                            'disease_label': row['efo_term'],
-                            'disease_max_phase': row['max_phase_for_ind'],
-                            'reference': row['indication_refs'],
-                            'mesh_heading': row['mesh_heading'],
-                            'mesh_id': row['mesh_id']
-                        }
-
-                    try:
-                        self.cpd[cpd_id]['indications'].append(line)
-                    except KeyError:
-                        self.cpd[cpd_id]['indications'] = list()
-                        self.cpd[cpd_id]['indications'].append(line)
-
-            '''
-            Download compound/drug-gene mechanisms of action
-            '''
-            cpd_mechanism = self.download_from_uri(cpd_id, Config.CHEMBL_MECHANISM)
-
-            if cpd_mechanism:
-                for row in cpd_mechanism['mechanisms']:
-
-                    try:
-                        self.cpd[cpd_id]['mechanisms'].append(row)
-                    except KeyError:
-                        self.cpd[cpd_id]['mechanisms'] = list()
-                        self.cpd[cpd_id]['mechanisms'].append(row)
-            ct += 1
-
-    def download_from_uri(self, compound_id, uri):
-
-        url = uri + '?molecule_chembl_id=' + compound_id
-
-        try:
-            r = requests.get(url, timeout=300)
-            if r.status_code == 200:
-                return r.json()
-            else:
-                raise IOError('cannot get data from ChEMBL')
-        except (ConnectionError, Timeout, HTTPError) as e:
-            raise IOError(e)
-
-    def store_to_elasticsearch(self):
-
-        for key, data in self.cpd.items():
-            self.loader.put(Config.ELASTICSEARCH_COMPOUND_INDEX_NAME,
-                            Config.ELASTICSEARCH_COMPOUND_DOC_NAME,
-                            key,
-                            json.dumps(data),
-                            True)
-
-
