@@ -33,7 +33,8 @@ class CompoundProcess():
         self.cpd_data = {}
 
     def process(self):
-        self.get_cpd_data()
+        self.get_indication_cpd_data()
+        self.get_mechanism_cpd_data()
         self.store_to_elasticsearch()
 
         #data = (["A", 5], ["B", 2], ["C", 1], ["D", 3])
@@ -63,68 +64,84 @@ class CompoundProcess():
                 tasks_that_are_done(task + ' complete by ' + current_process().name)
                 time.sleep(5)
 
-    def get_cpd_data(self):
+    # Get info for compounds with indication(s) in ChEMBL
+    # Call indication API - save all compounds into a dictionary with cpd_id as key
+    # Call molecule API to get info for each new compound
+    def get_indication_cpd_data(self):
 
         ct = 0
-        data = self.query_rest_api(Config.CHEMBL_MOLECULE)
+        data = self.query_rest_api(Config.CHEMBL_INDICATION)
 
-        for i in tqdm(data,
-                  desc='Extract compound data from ChEMBL API',
+        for cpd in tqdm(data,
+                  desc='Extract indication compound data from ChEMBL API',
                   unit=' compound(s)'):
 
-            if ct == 15000:
+            if ct == 30000: # 15000
                 break
 
-            cpd_id = i['molecule_chembl_id']
+            cpd_id = cpd['molecule_chembl_id']
+            # Create entry for molecule if not in cpd_data already
+            if cpd_id not in self.cpd_data:
+                cpd_attributes = self.download_from_uri(cpd_id, Config.CHEMBL_MOLECULE)
+                self.cpd_data[cpd_id] = {
+                        'attributes': cpd_attributes,
+                        'indications': [],
+                        'mechanisms': []
+                    }
+            line = {
+                    'disease_id': cpd['efo_id'],
+                    'disease_label': cpd['efo_term'],
+                    'disease_max_phase': cpd['max_phase_for_ind'],
+                    'reference': cpd['indication_refs'],
+                    'mesh_heading': cpd['mesh_heading'],
+                    'mesh_id': cpd['mesh_id']
+                }
 
-            cpd_attributes = i
-            cpd_indication = self.download_from_uri(cpd_id, Config.CHEMBL_INDICATION)
-            cpd_mechanism = self.download_from_uri(cpd_id, Config.CHEMBL_MECHANISM)
+            try:
+                self.cpd_data[cpd_id]['indications'].append(line)
+            except KeyError:
+                self.cpd_data[cpd_id]['indications'] = list()
+                self.cpd_data[cpd_id]['indications'].append(line)
+            #print(cpd_id)
+            ct += 1
 
-            if cpd_indication or cpd_mechanism:
+    # Get info for compounds with indication(s) in ChEMBL
+    # Call indication API - save all compounds into a dictionary with cpd_id as key
+    # Call molecule API to get info for each new compound
+    def get_mechanism_cpd_data(self):
 
-                if cpd_id not in self.cpd_data:
-                    self.cpd_data[cpd_id] = \
-                        {
-                            'attributes': cpd_attributes,
-                            'indications': [],
-                            'mechanisms': []
-                        }
+        ct = 0
+        data = self.query_rest_api(Config.CHEMBL_MECHANISM)
 
-                if cpd_indication:
-                    for row in cpd_indication['drug_indications']:
+        for cpd in tqdm(data,
+                  desc='Extract mechanism compound data from ChEMBL API',
+                  unit=' compound(s)'):
 
-                        line = \
-                            {
-                                'disease_id': row['efo_id'],
-                                'disease_label': row['efo_term'],
-                                'disease_max_phase': row['max_phase_for_ind'],
-                                'reference': row['indication_refs'],
-                                'mesh_heading': row['mesh_heading'],
-                                'mesh_id': row['mesh_id']
-                            }
+            if ct == 5000: # 15000
+                break
 
-                        try:
-                            self.cpd_data[cpd_id]['indications'].append(line)
-                        except KeyError:
-                            self.cpd_data[cpd_id]['indications'] = list()
-                            self.cpd_data[cpd_id]['indications'].append(line)
+            cpd_id = cpd['molecule_chembl_id']
+            # Create entry for molecule if not in cpd_data already
+            if cpd_id not in self.cpd_data:
+                cpd_attributes = self.download_from_uri(cpd_id, Config.CHEMBL_MOLECULE)
+                self.cpd_data[cpd_id] = {
+                        'attributes': cpd_attributes,
+                        'indications': [],
+                        'mechanisms': []
+                    }
 
-                if cpd_mechanism:
-                    for row in cpd_mechanism['mechanisms']:
-
-                        try:
-                            self.cpd_data[cpd_id]['mechanisms'].append(row)
-                        except KeyError:
-                            self.cpd_data[cpd_id]['mechanisms'] = list()
-                            self.cpd_data[cpd_id]['mechanisms'].append(row)
-
+            try:
+                self.cpd_data[cpd_id]['mechanisms'].append(cpd)
+            except KeyError:
+                self.cpd_data[cpd_id]['mechanisms'] = list()
+                self.cpd_data[cpd_id]['mechanisms'].append(cpd)
+            #print(cpd_id)
             ct += 1
 
     def query_rest_api(self, uri):
-        '''return to json from uri'''
+        '''return json from uri'''
         next_get = True
-        limit = 1000000
+        limit = 1000 # 1000000
         offset = 0
 
         def _fmt(**kwargs):
