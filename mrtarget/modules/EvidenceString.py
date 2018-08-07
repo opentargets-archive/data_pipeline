@@ -901,14 +901,9 @@ class Evidence(JSONSerializable):
         '''check for minimum score '''
         if self.evidence['scores']['association_score'] < Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]:
             raise AttributeError(
-                "Evidence String Rejected since score is too low: %s. score: %f, min score: %f" % (self.get_id(),
-                                                                                                   self.evidence[
-                                                                                                       'scores'][
-                                                                                                       'association_score'],
-                                                                                                   Config.SCORING_MIN_VALUE_FILTER[
-                                                                                                       self.evidence[
-                                                                                                           'sourceID']]
-                                                                                                   ))
+                "Evidence String datasource:%s rejected since score is too low: %s. score: %f, min score: %f" % (
+                    self.evidence['sourceID'], self.get_id(), self.evidence['scores']['association_score'],
+                    Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]))
 
         # scale score according to global stats IFF sourceID is included
         # in sources to apply from Config class in Settings.py
