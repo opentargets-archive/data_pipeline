@@ -220,7 +220,8 @@ class Config():
 
     HALLMARK_FILENAME = file_or_resource(fname='v85_hallmark_export.tsv')
     BIOMARKER_FILENAME = file_or_resource(fname='cgi_biomarkers_per_variant.tsv')
-    CHEMICALPROBES_FILENAME = file_or_resource(fname='Chemicalprobes_alldata2.tsv')
+    CHEMICALPROBES_FILENAME1 = file_or_resource(fname='chemicalprobes_portalprobes.tsv')
+    CHEMICALPROBES_FILENAME2 = file_or_resource(fname='chemicalprobes_probeminer.tsv')
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
@@ -384,7 +385,7 @@ class Config():
 
     IS_DIRECT_DO_NOT_PROPAGATE = ['europepmc']
 
-    ENSEMBL_RELEASE_VERSION = 92
+    ENSEMBL_RELEASE_VERSION = 93
     ENSEMBL_CHUNK_SIZE = 100
 
     LT_REUSE = False
