@@ -21,7 +21,7 @@ limitations under the License.
 
 from __future__ import absolute_import, print_function
 from nose.tools.nontrivial import with_setup
-from mrtarget.modules.Ontology import OntologyClassReader, PhenotypeSlim, DiseaseUtils, EFO_TAS
+from mrtarget.modules.Ontology import OntologyClassReader, DiseaseUtils, EFO_TAS
 from rdflib import URIRef
 from SPARQLWrapper import SPARQLWrapper, JSON
 from mrtarget.Settings import Config
@@ -267,14 +267,3 @@ def test_get_disease_tas():
     obj = DiseaseUtils()
     assert not obj == None
     obj.get_disease_tas(filename="/Users/koscieln/.ontologycache/efo/disease_tas.txt")
-
-
-@with_setup(my_setup_function, my_teardown_function)
-def test_parse_local_files():
-    sparql = SPARQLWrapper(Config.SPARQL_ENDPOINT_URL)
-    assert not sparql == None
-    obj = PhenotypeSlim(sparql)
-    assert not obj == None
-    local_files = [ os.path.join(os.path.abspath(os.path.dirname(__file__)), '../samples/cttv008-22-07-2016.json.gz') ]
-    obj.create_phenotype_slim(local_files=local_files)
-

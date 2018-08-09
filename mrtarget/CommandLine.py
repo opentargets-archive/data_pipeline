@@ -23,7 +23,6 @@ from mrtarget.modules.EvidenceValidation import ValidationActions, EvidenceValid
 from mrtarget.modules.GeneData import GeneActions, GeneManager
 from mrtarget.modules.HPA import HPAActions, HPAProcess
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
-from mrtarget.modules.Ontology import OntologyActions, PhenotypeSlim
 from mrtarget.modules.QC import QCActions, QCRunner
 from mrtarget.modules.Reactome import ReactomeActions, ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectActions, SearchObjectProcess
@@ -96,10 +95,6 @@ def main():
                         action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
     parser.add_argument("--mus", dest='mus', help="update mouse models data",
                         action="append_const", const = MouseModelsActions.ALL)
-    parser.add_argument("--ontos", dest='onto', help="create phenotype slim",
-                        action="append_const", const = OntologyActions.PHENOTYPESLIM)
-    parser.add_argument("--onto", dest='onto', help="all ontology processing steps (phenotype slim, disease phenotypes)",
-                        action="append_const", const = OntologyActions.ALL)
     parser.add_argument("--metric", dest='metric',
                         help="Run metrics generation",
                         action="append_const", const=str)
@@ -273,10 +268,6 @@ def main():
                 Phenodigm(connectors.es, connectors.r_server).update_genes()
             if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
                 Phenodigm(connectors.es, connectors.r_server).generate_evidence()
-        if args.onto or run_full_pipeline:
-            do_all = (OntologyActions.ALL in args.onto) or run_full_pipeline
-            if (OntologyActions.PHENOTYPESLIM in args.onto) or do_all:
-                PhenotypeSlim().create_phenotype_slim(args.input_file)
 
         if args.input_file:
             input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
