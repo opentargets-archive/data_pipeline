@@ -26,7 +26,7 @@ class Hallmarks(IPlugin):
                                   "invasion and metastasis",
                                   "tumour promoting inflammation",
                                   "suppression of growth",
-                                  "escaping immunic response to cancer",
+                                  "escaping immune response to cancer",
                                   "proliferative signalling",
                                  ]
 
