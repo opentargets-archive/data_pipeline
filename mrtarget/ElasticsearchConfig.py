@@ -221,7 +221,7 @@ class ElasticSearchConfiguration():
         "settings": {
             "number_of_shards": generic_shard_number,
             "number_of_replicas": generic_replicas_number,
-            "index.store.type": index_storage_type,
+            # "index.store.type": index_storage_type,
             "refresh_interval": "60s",
             "analysis": {
                 "filter": {
@@ -457,7 +457,7 @@ class ElasticSearchConfiguration():
     evidence_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
                                           "number_of_replicas": evidence_replicas_number,
                                           # "index.store.type": "memory",
-                                          "index.store.type": index_storage_type,
+                                          # "index.store.type": index_storage_type,
                                           "refresh_interval": "60s",
                                           "max_result_window": str(int(10e6)),
                                           },
@@ -474,7 +474,7 @@ class ElasticSearchConfiguration():
     relation_data_mapping = {"settings": {"number_of_shards": relation_shard_number,
                                           "number_of_replicas": relation_replicas_number,
                                           # "index.store.type": "memory",
-                                          "index.store.type": index_storage_type,
+                                          # "index.store.type": index_storage_type,
                                           "refresh_interval": "60s",
                                           },
                              "mappings": relation_mappings,
@@ -503,7 +503,7 @@ class ElasticSearchConfiguration():
     association_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
                                              "number_of_replicas": evidence_replicas_number,
                                              # "index.store.type": "memory",
-                                             "index.store.type": index_storage_type,
+                                             # "index.store.type": index_storage_type,
                                              "refresh_interval": "60s",
                                              "max_result_window": str(int(5e6)),
                                              },
@@ -618,7 +618,7 @@ class ElasticSearchConfiguration():
         "settings": {
             "number_of_shards": generic_shard_number,
             "number_of_replicas": generic_replicas_number,
-            "index.store.type": index_storage_type,
+            # "index.store.type": index_storage_type,
             "refresh_interval": "60s",
             "analysis": {
                 "filter": {
