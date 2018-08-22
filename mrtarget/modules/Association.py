@@ -396,8 +396,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
         target, disease, evidence, is_direct = data
         if evidence:
             score = self.scorer.score(target, disease, evidence, is_direct)
-            if score.get_scoring_method(
-                    ScoringMethods.HARMONIC_SUM).overall != 0:  # skip associations only with data with score 0
+            if score: # skip associations only with data with score 0
 
                 # look for the gene in the lru cache
                 gene_data = None
@@ -454,17 +453,17 @@ class ScoreProducer(RedisQueueWorkerProcess):
 
                 score.set_disease_data(disease_data)
 
-                if score: #bypass associations with overall score=0
-                    element_id = '%s-%s' % (target, disease)
-                    self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-                                           Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                           element_id,
-                                           score,
-                                           create_index=False)
-                                           # routing=score.target['id']
 
-                else:
-                    logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
+                element_id = '%s-%s' % (target, disease)
+                self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+                                       Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
+                                       element_id,
+                                       score,
+                                       create_index=False)
+                                       # routing=score.target['id']
+
+            else:
+                logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
 
 
 
@@ -548,6 +547,11 @@ class ScoringProcess():
         if not targets:
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
+
+        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
+        self.es_loader.prepare_for_bulk_indexing(
+            self.es_loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
+
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER
         # too many storers
@@ -583,16 +587,6 @@ class ScoringProcess():
         q_reporter.start()
 
 
-#         '''create data storage workers'''
-#         storers = [ScoreStorerWorker(score_data_q,
-#                                      None,
-#                                      chunk_size=1000,
-#                                      dry_run = dry_run,
-#                                      ) for _ in range(number_of_storers)]
-#
-#         for w in storers:
-#             w.start()
-
         # storage is located inside this code because the serialisation time
         scorers = [ScoreProducer(target_disease_pair_q,
                                  None,
@@ -613,12 +607,6 @@ class ScoringProcess():
         for w in readers:
             w.start()
 
-
-        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
-        self.es_loader.prepare_for_bulk_indexing(self.es_loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
-
-
-
         for target in tqdm(targets,
                            desc='fetching evidence for targets',
                            unit=' targets',
@@ -632,14 +620,12 @@ class ScoringProcess():
             w.join()
         for w in scorers:
             w.join()
-#         for w in storers:
-#             w.join()
-        logger.info('collecting reporter')
-        q_reporter.join()
 
         logger.info('flushing data to index')
         self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                         wait_if_ongoing =True)
 
+        logger.info('collecting reporter')
+        q_reporter.join()
 
         logger.info("DONE")
