@@ -172,8 +172,7 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
                        Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
                        r.id,
                        r.to_json(),
-                       create_index=False,
-                       routing=r.subject['id'])
+                       create_index=False)
             subj = copy(r.subject)
             obj = copy(r.object)
             if subj['id'] != obj['id']:
@@ -184,8 +183,7 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
                            Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
                            r.id,
                            r.to_json(),
-                           create_index=False,
-                           routing=r.subject['id'])
+                           create_index=False)
 
         def init(self):
             super(DistanceStorageWorker, self).init()

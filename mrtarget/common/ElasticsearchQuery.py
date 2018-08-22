@@ -574,29 +574,30 @@ class ESQuery(object):
             yield hit['_source']
 
     def get_evidence_for_target_simple(self, target, expected = None):
-        query_body = {"query": {
-                                "constant_score": {
-                                  "filter": {
-                                    "term": {
-                                      "target.id": target
-                                    }
-                                  }
-                                }
-                            },
-            '_source': {"includes": ["target.id",
-                                    "private.efo_codes",
-                                    "disease.id",
-                                    "scores.association_score",
-                                    "sourceID",
-                                    "id",
-                                    ]},
-            }
+        query_body = {
+            "query": {
+                "constant_score": {
+                    "filter": {
+                        "term": {
+                            "target.id": target
+                        }
+                    }
+                }
+            },
+            '_source': {
+                "includes": ["target.id",
+                             "private.efo_codes",
+                             "disease.id",
+                             "scores.association_score",
+                             "sourceID",
+                             "id",
+                             ]},
+        }
 
         if expected is not None and expected <10000:
             query_body['size']=10000
             res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
-                                      body=query_body,
-                                      routing=target,
+                                      body=query_body
                                       )
             for hit in res['hits']['hits']:
                 yield hit['_source']
@@ -607,8 +608,7 @@ class ESQuery(object):
                                index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
                                timeout="1h",
                                request_timeout=2 * 60 * 60,
-                               size=1000,
-                               routing=target,
+                               size=1000
                                )
             for hit in res:
                 yield hit['_source']
@@ -625,10 +625,9 @@ class ESQuery(object):
                                               }
                                             }
                                         },
-                                        '_source': False,
-                                        'size': 0,
-                                    },
-                                  routing=target,
+                                        '_source': [],
+                                        'size': 0
+                                    }
                                   )
         return res['hits']['total']
 
@@ -958,8 +957,6 @@ class ESQuery(object):
                     '_type': hit['_type'],
                     '_id': hit['_id'],
                 }
-                if '_routing' in hit:
-                    action['_routing'] = hit['_routing']
                 batch.append(action)
                 flat_source = self.flatten(hit['_source'])
                 for key in altered_keys:
