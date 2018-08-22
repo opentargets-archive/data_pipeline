@@ -1094,9 +1094,6 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
             idev,
             ev.to_json(),
         )
-        # remove routing doesnt make sense with one node
-        # loader_kwargs = dict(create_index=False,
-        #                      routing=ev.evidence['target']['id'])
 
         loader_kwargs = {"create_index": False}
         return loader_args, loader_kwargs

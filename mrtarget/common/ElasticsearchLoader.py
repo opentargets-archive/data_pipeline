@@ -118,8 +118,6 @@ class Loader():
                                _source=body)
         if operation is not None:
             submission_dict['_op_type']=operation
-        if routing is not None:
-            submission_dict['_routing']=routing
         if parent is not None:
             submission_dict['_parent']=parent
         self.cache.append(submission_dict)

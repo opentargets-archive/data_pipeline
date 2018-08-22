@@ -76,7 +76,7 @@ def _get_evidence_string_generic_mapping():
 
 def _get_relation_generic_mapping():
     mmap = Dict()
-    mmap._routing.required = True
+    mmap._routing.required = False
     mmap.properties.subject.properties.id.type = 'keyword'
     mmap.properties.object.properties.id.type = 'keyword'
     mmap.properties.type.type = 'keyword'

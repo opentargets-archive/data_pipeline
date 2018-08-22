@@ -460,7 +460,6 @@ class ScoreProducer(RedisQueueWorkerProcess):
                                        element_id,
                                        score,
                                        create_index=False)
-                                       # routing=score.target['id']
 
             else:
                 logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
@@ -491,8 +490,7 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
                                Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                element_id,
                                score,
-                               create_index=False,
-                               # routing=score.target['id'],
+                               create_index=False
                             )
 
     def init(self):
