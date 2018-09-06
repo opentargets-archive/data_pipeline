@@ -41,6 +41,14 @@ def main():
     parser.add_argument('release_tag', nargs='?', default=Config.RELEASE_VERSION,
                         help='The prefix to prepend default: %s' % \
                         Config.RELEASE_VERSION)
+    
+    #handle stage-specific QC
+    parser.add_argument("--qc-out", help="TSV file to write/update qc information",
+                        action="store")
+    parser.add_argument("--qc-in", help="TSV file to read qc information for comparison",
+                        action="store")
+    parser.add_argument("--qc-only", help="only run the qc and not the stage itself",
+                        action="store_true")
 
     #load supplemental and genetic informtaion from various external resources
     parser.add_argument("--hpa", help="download human protein atlas, process, and store in elasticsearch",
@@ -197,6 +205,8 @@ def main():
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
+    #create a single query object for future use
+    esquery = ESQuery(connectors.es)
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
@@ -205,6 +215,11 @@ def main():
         # get the schema version and change all needed resources
         update_schema_version(Config,args.schema_version)
         logger.info('setting schema version string to %s', args.schema_version)
+
+        #create an empty dictionary that we can accumulate qc metrics into over 
+        #the various steps
+        qc_metrics = dict()
+
 
         if args.rea:
             ReactomeProcess(loader).process_all()
@@ -221,7 +236,9 @@ def main():
         if args.mp:
             MpProcess(loader).process_all()
         if args.efo:
-            EfoProcess(loader).process_all()
+            process = EfoProcess(loader)
+            process.process_all()
+            qc_metrics.update(process.qc())
         if args.eco:
             EcoProcess(loader).process_all()
         if args.hpo:

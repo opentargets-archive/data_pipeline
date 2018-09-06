@@ -87,7 +87,7 @@ class EFO(JSONSerializable):
 class EfoProcess():
 
     def __init__(self,
-                 loader,):
+                 loader):
         self.loader = loader
         self.efos = OrderedDict()
 
@@ -151,6 +151,32 @@ class EfoProcess():
                             doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                             ID=efo_id,
                             body = efo_obj)
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+        #number of EFO terms
+        efo_term_count = 0
+
+        #loop over all efo terms and calculate the metrics
+        #Note: try to avoid doing this more than once!
+        for efo_term in esquery.get_all_diseases():
+            efo_term_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["efo.count"] = efo_term_count
+
+        #print the metrics to console
+        for key in metrics:
+            logger.info("%s  = %s"% (key, metrics[key])
+
+        #return the metrics to the caller so they can write to file or further compare
+        return metrics
+ 
+
+
 
 class DiseaseGraph:
     """
