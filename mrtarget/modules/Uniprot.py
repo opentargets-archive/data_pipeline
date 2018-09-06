@@ -2,7 +2,6 @@ from StringIO import StringIO
 import logging
 from xml.etree import cElementTree as ElementTree
 import requests
-from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.UniprotIO import UniprotIterator, Parser
 from requests.exceptions import Timeout, HTTPError, ConnectionError
@@ -21,10 +20,6 @@ def sanitise_dict_for_json(d):
             d[k_sane] = v
             del d[k]
     return d
-
-
-class UniProtActions(Actions):
-    CACHE='cache'
 
 class OLDUniprotDownloader():
     """ this class is deprecated

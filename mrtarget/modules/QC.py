@@ -7,16 +7,11 @@ from elasticsearch import helpers
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
-from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger,level=logging.INFO)
-
-class QCActions(Actions):
-    QC='qc'
-    CGC_ANALYSIS='cancer_gene_census_analysis'
 
 
 def defauldict(param):

@@ -1,10 +1,9 @@
 import logging
 from mrtarget.common import TqdmToLogger
-from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 
-class Metrics(Actions):
+class Metrics:
     def __init__(self, es):
         self.logger = logging.getLogger(__name__)
         self.esquery = ESQuery(es)

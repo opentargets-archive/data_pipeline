@@ -13,7 +13,6 @@ from mrtarget.common import TqdmToLogger
 import petl
 from mrtarget.common import URLZSource
 
-from mrtarget.common import Actions
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
 from mrtarget.common.Redis import RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 
@@ -335,11 +334,6 @@ def hpa2tissues(hpa=None):
     return {'rna': rnas,
             'protein': proteins,
             'zscore': zscores}
-
-
-class HPAActions(Actions):
-    PROCESS = 'process'
-
 
 class HPADataDownloader():
     def __init__(self):

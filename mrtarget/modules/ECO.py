@@ -3,7 +3,6 @@ from collections import OrderedDict
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 from mrtarget.common.LookupTables import ECOLookUpTable
-from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.modules.Ontology import OntologyClassReader
 from mrtarget.Settings import Config
@@ -15,12 +14,6 @@ logger = logging.getLogger(__name__)
 Module to Fetch the ECO ontology and store it in ElasticSearch to be used in evidence and association processing. 
 WHenever an evidence or association has an ECO code, we use this module to decorate and expand the information around the code and ultimately save it in the objects.
 '''
-
-
-class EcoActions(Actions):
-    PROCESS='process'
-    UPLOAD='upload'
-
 class ECO(JSONSerializable):
     def __init__(self,
                  code='',

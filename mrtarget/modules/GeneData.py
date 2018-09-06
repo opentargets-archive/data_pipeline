@@ -3,7 +3,6 @@ from collections import OrderedDict
 from tqdm import tqdm
 import traceback
 from mrtarget.common import TqdmToLogger
-from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -15,10 +14,6 @@ from yapsy.PluginManager import PluginManager
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
 ENS_ID_ORG_PREFIX = 'http://identifiers.org/ensembl/'
-
-class GeneActions(Actions):
-    MERGE='merge'
-    UPLOAD='upload'
 
 class Gene(JSONSerializable):
     def __init__(self, id=None):

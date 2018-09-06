@@ -5,7 +5,6 @@ sys.setdefaultencoding("utf8")
 import logging
 import json
 import ConfigParser
-from mrtarget.common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
 from mrtarget.Settings import file_or_resource
 
