@@ -10,6 +10,7 @@ import pickle
 from tqdm import tqdm
 
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.common import Actions
 from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
@@ -62,6 +63,9 @@ except ImportError:
         return inner
 '''end of line profiler code'''
 
+class EvidenceStringActions(Actions):
+    PROCESS = 'process'
+    UPLOAD = 'upload'
 
 # def evs_lookup(dic, key, *keys):
 #     '''
