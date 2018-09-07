@@ -79,8 +79,8 @@ class QCMetrics(object):
             with open(filename, 'rb') as csvfile:
                 csvreader = csv.reader(csvfile, delimiter='\t')
                 for row in csvreader:
-                    if row[0] not in self.metrics:
-                        self.metrics[row[0]] = row[1:]
+                    if row[0] not in metrics:
+                        metrics[row[0]] = row[1:]
         
         with open(filename, 'wb') as csvfile:
 
