@@ -223,28 +223,53 @@ def main():
 
 
         if args.rea:
-            ReactomeProcess(loader).process_all()
+            process = ReactomeProcess(loader)
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))
         if args.ens:
-            EnsemblProcess(loader).process()
+            process = EnsemblProcess(loader)
+            if not args.qc_only:
+                process.process()
+            qc_metrics.update(process.qc(esquery))
         if args.unic:
-            UniprotDownloader(loader).cache_human_entries()
+            process = UniprotDownloader(loader)
+            if not args.qc_only:
+                process.cache_human_entries()
+            qc_metrics.update(process.qc(esquery))            
         if args.hpa:
-            HPAProcess(loader,connectors.r_server).process_all(dry_run=args.dry_run)
+            process = HPAProcess(loader,connectors.r_server)
+            if not args.qc_only:
+                process.process_all(dry_run=args.dry_run)
+            qc_metrics.update(process.qc(esquery))     
 
         if args.gen:
-            GeneManager(loader,connectors.r_server).merge_all(dry_run=args.dry_run)
+            process = GeneManager(loader,connectors.r_server)
+            if not args.qc_only:
+                process.merge_all(dry_run=args.dry_run)
+            qc_metrics.update(process.qc(esquery))     
 
         if args.mp:
-            MpProcess(loader).process_all()
+            process = MpProcess(loader)
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))    
         if args.efo:
             process = EfoProcess(loader)
             if not args.qc_only:
                 process.process_all()
             qc_metrics.update(process.qc(esquery))
         if args.eco:
-            EcoProcess(loader).process_all()
+            process = EcoProcess(loader)
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))
         if args.hpo:
-            HpoProcess(loader).process_all()
+            process = HpoProcess(loader)
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))
+
 
         if args.mus:
             do_all = (MouseModelsActions.ALL in args.mus)
@@ -264,6 +289,7 @@ def main():
                 logger.debug('reading the evidences sources URLs from evidence_sources.txt')
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
+                    
             EvidenceValidationFileChecker(connectors.es, connectors.r_server, 
                 dry_run=args.dry_run).check_all(input_files=input_files, 
                     increment=args.increment)
@@ -294,12 +320,12 @@ def main():
             DumpGenerator().dump()
 
     if args.qc_in:
-        pass
-        #TODO handle reading in previous qc from filename provided, and adding comparitive metrics
+        #handle reading in previous qc from filename provided, and adding comparitive metrics
+        qc_metrics.compare_with(args.qc_in)
 
     if args.qc_out:
         #handle writing out to a tsv file
-        qc_metrics.qc_write_out(args.qc_out)
+        qc_metrics.write_out(args.qc_out)
 
     logger.debug('close connectors')
     connectors.close()

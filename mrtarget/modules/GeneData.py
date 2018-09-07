@@ -495,3 +495,21 @@ class GeneManager():
 
         self._logger.info('all gene objects pushed to elasticsearch')
 
+
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of gene entries
+        gene_count = 0
+        #Note: try to avoid doing this more than once!
+        for gene_entry in esquery.get_all_targets():
+            gene_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["gene.count"] = gene_count
+
+        return metrics

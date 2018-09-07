@@ -97,12 +97,20 @@ class QCMetrics(object):
                 else:
                     #convert to a tuple
                     value = tuple(value)
-                    
+
                 row = (metric,)+value
 
                 logging.debug("Writing to row %s", row)
 
                 csvwriter.writerow(row)
+
+    """
+    Compare the metrics in this object with some of the same metrics from the provided file.
+
+    Produces new metrics, which are not automatically added to this object
+    """
+    def compare_with(self, filename):
+        raise NotImplementedError
 
 
 

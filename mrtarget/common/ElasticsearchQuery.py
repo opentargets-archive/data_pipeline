@@ -355,6 +355,21 @@ class ESQuery(object):
         for hit in res:
             yield jsonpickle.decode(base64.b64decode(hit['_source']['entry']))
 
+    def get_all_reactions(self):
+        res = helpers.scan(client=self.handler,
+                           query={"query": {
+                               "match_all": {}
+                           },
+                               '_source': True,
+                               'size': 1000,
+                           },
+                           scroll='1h',
+                            doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_REACTOME_INDEX_NAME,True),
+                           timeout="10m",
+                           )
+        for hit in res:
+            yield hit['_source']
 
     def get_reaction(self, reaction_id):
         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_REACTOME_INDEX_NAME,True),

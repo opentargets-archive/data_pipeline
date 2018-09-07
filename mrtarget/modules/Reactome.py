@@ -147,6 +147,24 @@ class ReactomeProcess():
                                           is_root=node == root,
                                           ancestors=list(ancestors)
                                           ))
+                                          
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of reactions
+        reaction_count = 0
+        #Note: try to avoid doing this more than once!
+        for reaction in esquery.get_all_reactions():
+            reaction_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["reactome.count"] = reaction_count
+
+        return metrics
 
 
 
