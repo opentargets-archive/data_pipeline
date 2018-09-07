@@ -4,7 +4,6 @@ import sys
 reload(sys)
 sys.setdefaultencoding("utf8")
 import os
-import pysftp
 import gzip
 import pickle
 from paramiko import AuthenticationException
