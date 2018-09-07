@@ -193,37 +193,6 @@ class ESQuery(object):
         return self.count_elements_in_index(
             Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
 
-    # def get_publications_with_analyzed_data(self,ids, fields=None):
-    #     source = self._get_source_from_fields(fields)
-    #     # inner hits to get child documents containing abstract_lemmas , along with parent publications
-    #     res = helpers.scan(client=self.handler,
-    #                        query={"query": {
-    #                                  "has_child": {
-    #                                     "type": "publication-analysis-spacy",
-    #                                         "query": {
-    #                                                     "ids": {"values": ids}
-
-    #                                                 },"inner_hits": {}
-    #                                     }
-    #                                  },
-
-    #                            '_source': source,
-    #                            'size': 1000
-    #                        },
-    #                        scroll='2h',
-    #                        doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-    #                        index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,True),
-    #                        timeout="10m",
-    #                        )
-    #     for hit in res:
-    #         parent_publication = hit['_source']
-    #         analyzed_publication = hit['inner_hits']['publication-analysis-spacy']['hits']['hits'][0]['_source']
-    #         yield parent_publication, analyzed_publication
-
-    # def count_all_publications(self):
-
-    #     return self.count_elements_in_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME)
-
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
 
@@ -270,27 +239,18 @@ class ESQuery(object):
                                   )
         return AssociationSummary(res)
 
-
-    def get_validated_evidence_strings(self,  size=1000, datasources = []):
-
-
-
+    def get_all_validated_evidence_strings(self,  size=1000, datasources = []):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
-        doc_type = None
 
+        doc_type = None
         if datasources:
             doc_type = datasources
+
         res = helpers.scan(client=self.handler,
                            query={
                                "query": {
-                                   "match": {
-                                       "is_valid": {
-                                           "query": True,
-                                           "type": "phrase"
-                                       }
-                                   }
-
+                                    "match_all": {},
                                },
                                '_source': True,
                                'size': size,
@@ -301,11 +261,39 @@ class ESQuery(object):
                            timeout="20m",
                            )
 
-        # res = list(res)
         for hit in res:
             yield hit['_source']
 
-    def count_validated_evidence_strings(self, datasources = []):
+    def get_validated_evidence_strings(self,  size=1000, datasources = [], is_valid=True):
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
+
+        doc_type = None
+        if datasources:
+            doc_type = datasources
+
+        res = helpers.scan(client=self.handler,
+                           query={
+                               "query": {
+                                    "match_phase": {
+                                        "is_valid": is_valid
+                                    }
+                               },
+                               '_source': True,
+                               'size': size,
+                           },
+                           scroll='12h',
+                           doc_type=doc_type,
+                           index=index_name,
+                           timeout="20m",
+                           )
+
+        for hit in res:
+            yield hit['_source']
+
+
+
+    def count_validated_evidence_strings(self, datasources = [], is_valid=True):
 
         doc_type = None
         if datasources:
@@ -314,13 +302,9 @@ class ESQuery(object):
         return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
                                             doc_type=doc_type,
                                             query={
-                                                "match": {
-                                                    "is_valid": {
-                                                        "query": True,
-                                                        "type": "phrase"
-                                                    }
+                                                "match_phase": {
+                                                    "is_valid": is_valid
                                                 }
-
                                             })
 
 
@@ -488,71 +472,6 @@ class ESQuery(object):
                                   )
         return res['hits']['total']
 
-    def get_evidence_simple(self, targets = None):
-
-        def get_ids(ids):
-            return self.handler.mget(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
-                                   body={'docs': ids},
-                                   _source= {"includes": ["target.id",
-                                                        "private.efo_codes",
-                                                        "disease.id",
-                                                        "scores.association_score",
-                                                        "sourceID",
-                                                        "id",
-                                                        ],
-                                            })
-
-        if targets is None:
-            targets = self.get_all_target_ids_with_evidence_data()
-
-
-        for target in targets:
-            query_body = {
-                "query": { "constant_score": {
-                                       "filter": {
-                                           "terms": {"target.id": target}
-                                       }
-                                   }},
-                '_source':  {"includes": ["target.id",
-                                        "disease.id",
-                            ]},
-                "sort": ["target.id", "disease.id"],
-            }
-
-            res = helpers.scan(client=self.handler,
-                               query=query_body,
-                               scroll='1h',
-                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
-                               timeout="1h",
-                               request_timeout=2 * 60 * 60,
-                               size=5000,
-                               preserve_order=True
-                               )
-            ids = []
-            for hit in res:
-                ids.append({"_index": hit["_index"],
-                                "_id" : hit["_id"]
-                                },)
-            id_buffer = []
-            for doc_id in ids:
-                id_buffer.append(doc_id)
-                if len(id_buffer) == 1000:
-                    res_get = get_ids(id_buffer)
-                    for doc in res_get['docs']:
-                        if doc['found']:
-                            yield doc['_source']
-                        else:
-                            raise KeyError('document with id %s not found'%(doc['_id']))
-                    id_buffer = []
-            if id_buffer:
-                res_get = get_ids(id_buffer)
-                for doc in res_get['docs']:
-                    if doc['found']:
-                        yield doc['_source']
-                    else:
-                        raise KeyError('document with id %s not found' % (doc['_id']))
-
-
     def get_all_target_ids_with_evidence_data(self):
         #TODO: use an aggregation to get those with just data
         res = helpers.scan(client=self.handler,
@@ -647,34 +566,6 @@ class ESQuery(object):
         return res['hits']['total']
 
 
-    # def get_publications_by_id(self, ids):
-    #     query_body = {"query": {
-    #                            "ids": {
-    #                                "values": ids,
-    #                            }
-    #                        },
-    #                            '_source': True,
-    #                            'size': 100,
-    #                        }
-    #     if len(ids) <10000:
-    #         query_body['size']=10000
-    #         res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,True),
-    #                                   doc_type = Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-    #                                   body=query_body,
-    #                                   )
-    #         for hit in res['hits']['hits']:
-    #             yield hit['_source']
-    #     else:
-    #         res = helpers.scan(client=self.handler,
-    #                            query=query_body,
-    #                            scroll='12h',
-    #                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,True),
-    #                            doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-    #                            timeout="10m",
-    #                            )
-    #         for hit in res:
-    #             yield hit['_source']
-
     def get_objects_by_doc(self, docs,
                            fields=[],
                            realtime = False):
@@ -750,13 +641,6 @@ class ESQuery(object):
                 if te.status_code == 404:
                     raise KeyError('object with id %s not found' % ids)
 
-
-
-    # def get_publications_by_id(self, ids):
-    #     return self.get_objects_by_id(ids,
-    #                                   Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-    #                                   Config.ELASTICSEARCH_PUBLICATION_DOC_NAME)
-
     def get_all_pub_ids_from_validated_evidence(self, datasources= None):
         for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
                                                                     size=1000,
@@ -770,77 +654,6 @@ class ESQuery(object):
                     pass
 
 
-    # def get_all_pub_from_validated_evidence(self,datasources= None, batch_size=1000):
-    #     batch = []
-    #     for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
-    #                                                                size=batch_size,
-    #                                                                datasources=datasources)):
-    #         if hit:
-    #             try:
-    #                 ev = json.loads(hit['evidence_string'])
-    #                 for lit in ev['literature']['references']:
-    #                     batch.append(lit['lit_id'].split('/')[-1])
-    #             except KeyError:
-    #                 pass
-    #         if len(batch)>=batch_size:
-    #             for pub in self.get_publications_by_id(batch):
-    #                 yield pub
-    #             batch =[]
-    #     if batch:
-    #         for pub in self.get_publications_by_id(batch):
-    #             yield pub
-
-    # def get_all_publications(self,batch_size=1000):
-    #     res = helpers.scan(client=self.handler,
-    #                        query={"query": {
-    #                            "match_all": {}
-    #                        },
-    #                            '_source': True,
-    #                            'size': batch_size,
-    #                        },
-    #                        scroll='1h',
-    #                        index=Loader.get_versioned_index(Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME),
-    #                        timeout="10m",
-    #                        )
-    #     for hit in res:
-    #         yield hit['_source']
-
-    # def get_abstracts_from_val_ev(self,batch_size=1000):
-    #     res = helpers.scan(client=self.handler,
-    #                        query={"query": {
-    #                            "constant_score" : {
-    #                              "filter" : {
-    #                                 "exists" : {
-    #                                    "field" : "literature.abstract"
-    #                                 }
-    #                              }
-    #                           }
-    #                        },
-    #                            '_source': True,
-    #                            'size': batch_size,
-    #                        },
-    #                        scroll='1h',
-    #                        index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'-generic'),
-    #                        timeout="10m",
-    #                        )
-    #     for hit in res:
-    #         yield hit['_source']
-
-    # def count_publications_for_file(self, filename):
-    #     query_body = {
-    #         "query": {
-    #             "term": {"filename": filename}
-    #         },
-    #         '_source': False,
-    #         'size': 0
-
-    #     }
-
-    #     res = self.handler.search(index=Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME,
-    #                        doc_type=Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-    #                        body=query_body,
-    #                         )
-    #     return res['hits']['total']
 
 
     def get_all_associations_ids(self,):
@@ -1016,9 +829,6 @@ class ESQuery(object):
                                 stats_only=True)
 
     def get_all_evidence_for_datasource(self, datasources=None, fields = None, ):
-
-
-
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*', True)
         doc_type = None

@@ -1293,3 +1293,21 @@ class EvidenceStringProcess():
 
         global_stats.compress()
         return global_stats
+
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of eco entries
+        evidence_count = 0
+        #Note: try to avoid doing this more than once!
+        for evidence in esquery.get_all_evidence_for_datasource("generic"):
+            evidence_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["evidence.count"] = evidence_count
+
+        return metrics

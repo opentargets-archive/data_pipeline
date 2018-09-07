@@ -289,18 +289,23 @@ def main():
                 logger.debug('reading the evidences sources URLs from evidence_sources.txt')
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
-                    
-            EvidenceValidationFileChecker(connectors.es, connectors.r_server, 
-                dry_run=args.dry_run).check_all(input_files=input_files, 
-                    increment=args.increment)
+
+            process = EvidenceValidationFileChecker(connectors.es, connectors.r_server, 
+                dry_run=args.dry_run)
+            if not args.qc_only:
+                process.check_all(input_files=input_files, increment=False)
+            qc_metrics.update(process.qc(esquery, input_files))
+
+
         if args.valreset:
             EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
 
         if args.evs:
-            targets = EvidenceStringProcess(connectors.es,
-                                                connectors.r_server,
-                                                ).process_all(datasources = args.datasource,
-                                                                                      dry_run=args.dry_run)
+            process = EvidenceStringProcess(connectors.es, connectors.r_server)
+            if not args.qc_only:
+                process.process_all(datasources = args.datasource, dry_run=args.dry_run)
+            qc_metrics.update(process.qc(esquery))
+
         if args.ass:
             ScoringProcess(loader, connectors.r_server).process_all(targets = targets,
                                                              dry_run=args.dry_run)

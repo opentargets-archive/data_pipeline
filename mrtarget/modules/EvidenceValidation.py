@@ -274,7 +274,6 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         self.lookup_data = lookup_data
 
         self.start_time = time.time()
-        self.audit = list()
         self.logger = None
         self.validators = None
 
@@ -567,14 +566,10 @@ class EvidenceValidationFileChecker():
         store_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_store_q',
                              max_size=MAX_NB_EVIDENCE_CHUNKS*loaders_number*5,
                              job_timeout=1200)
-        # audit_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|validation_audit_q',
-        #                      max_size=MAX_NB_EVIDENCE_CHUNKS,
-        #                      job_timeout=1200)
 
         q_reporter = RedisQueueStatusReporter([file_q,
                                                evidence_q,
-                                               store_q,
-                                               # audit_q
+                                               store_q
                                                ],
                                               interval=30)
         q_reporter.start()
@@ -617,17 +612,7 @@ class EvidenceValidationFileChecker():
                                 ) for _ in range(loaders_number)]
         for w in loaders:
             w.start()
-        #
-        # 'Audit the whole process and send e-mails'
-        # auditor = AuditTrailProcess(
-        #     audit_q,
-        #     None,
-        #     self.es,
-        #     lookup_data=lookup_data,
-        #     dry_run=dry_run,
-        #     )
-        #
-        # auditor.start()
+
 
         self.logger.info('file processer started')
         'Start crawling the files'
@@ -653,16 +638,10 @@ class EvidenceValidationFileChecker():
         self.logger.info('collecting readers')
         for w in readers:
             w.join()
-        # audit_q.set_submission_finished(self.r_server)
 
-        # auditor.join()
 
         if not dry_run:
             file_processer.loader.restore_after_bulk_indexing()
-            # for datasource in processed_datasources:
-            #     self.logger.debug('flushing index for dataource %s'%datasource)
-            #     self.es.indices.flush(self.es_loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'-'+datasource),
-            #                           wait_if_ongoing=True)
 
         self.logger.info('collecting reporter')
         q_reporter.join()
@@ -675,3 +654,44 @@ class EvidenceValidationFileChecker():
         data_indices = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*')
         self.es.indices.delete(data_indices)
         self.logger.info('Validation data deleted')
+
+    
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery, input_files):
+
+        #put the metrics into a single dict
+        metrics = dict()
+
+        #loop over the input files
+        for input_file in input_files:
+            #get prefix
+            filename_tokens = FileProcesser._tokens_from_filename(input_file)
+            if not filename_tokens:
+                self.logger.error('failed to parse and get tokens from'
+                                  ' filename %s and must to match %s',
+                                  input_file,
+                                  Config.EVIDENCEVALIDATION_FILENAME_REGEX)
+                raise ValueError
+
+            prefix = filename_tokens['datasource']
+
+            #number of val entries
+            evidence_count = 0
+            evidence_valid_count = 0
+            evidence_invalid_count = 0
+            #Note: try to avoid doing this more than once!
+            for evidence in esquery.get_all_validated_evidence_strings(datasources=(prefix,)):
+                evidence_count += 1
+                if evidence["is_valid"]:
+                    evidence_valid_count += 1
+                else:
+                    evidence_invalid_count += 1
+
+            metrics["val."+prefix+".count"] = evidence_count
+            metrics["val."+prefix+".valid.count"] = evidence_valid_count
+            metrics["val."+prefix+".invalid.count"] = evidence_invalid_count
+
+        return metrics
