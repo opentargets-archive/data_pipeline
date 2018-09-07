@@ -159,18 +159,32 @@ class EfoProcess():
         #number of EFO terms
         efo_term_count = 0
 
+        #top level terms (i.e. categories)
+        efo_top_levels = []
+
+        #terms without a description
+        efo_missing_description_count = 0
+
         #loop over all efo terms and calculate the metrics
         #Note: try to avoid doing this more than once!
         for efo_term in esquery.get_all_diseases():
             efo_term_count += 1
 
+            #path_labels is a list of lists of all paths to the root
+            #top level terms will be those with one list of one item that is itself
+            if len(efo_term["path_labels"]) == 1:
+                if len(efo_term["path_labels"][0]) == 1:
+                    efo_top_levels.append(efo_term["label"])
+
+            if efo_term["definition"] == None or len(efo_term["definition"].strip()):
+                efo_missing_description_count += 1
+
         #put the metrics into a single dict
         metrics = dict()
         metrics["efo.count"] = efo_term_count
-
-        #print the metrics to console
-        for key in metrics:
-            logger.info("%s  = %s"% (key, metrics[key])
+        metrics["efo.top"] = sorted(efo_top_levels)
+        metrics["efo.top.count"] = len(efo_top_levels)
+        metrics["efo.missing_description.count"] = efo_missing_description_count
 
         #return the metrics to the caller so they can write to file or further compare
         return metrics

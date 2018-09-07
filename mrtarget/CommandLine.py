@@ -2,11 +2,12 @@ from __future__ import print_function
 import logging
 import argparse
 import sys
-import itertools as it
+import itertools
 from logging.config import fileConfig
 
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 from mrtarget.modules.Association import ScoringProcess
@@ -22,7 +23,7 @@ from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneManager
 from mrtarget.modules.HPA import HPAProcess
 from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
-from mrtarget.modules.QC import QCRunner
+from mrtarget.modules.QC import QCRunner, QCMetrics
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
 from mrtarget.modules.Uniprot import UniprotDownloader
@@ -208,6 +209,9 @@ def main():
     #create a single query object for future use
     esquery = ESQuery(connectors.es)
 
+    #create something to accumulate qc metrics into over various steps
+    qc_metrics = QCMetrics()
+
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
                 dry_run = args.dry_run) as loader:
@@ -216,9 +220,6 @@ def main():
         update_schema_version(Config,args.schema_version)
         logger.info('setting schema version string to %s', args.schema_version)
 
-        #create an empty dictionary that we can accumulate qc metrics into over 
-        #the various steps
-        qc_metrics = dict()
 
 
         if args.rea:
@@ -237,8 +238,9 @@ def main():
             MpProcess(loader).process_all()
         if args.efo:
             process = EfoProcess(loader)
-            process.process_all()
-            qc_metrics.update(process.qc())
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))
         if args.eco:
             EcoProcess(loader).process_all()
         if args.hpo:
@@ -256,7 +258,7 @@ def main():
 
         if args.val:
             if args.input_file:
-                input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
+                input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
             else:
                 #default behaviour: use all the data sources listed in the evidences_sources.txt file
                 logger.debug('reading the evidences sources URLs from evidence_sources.txt')
@@ -291,11 +293,20 @@ def main():
         if args.dump:
             DumpGenerator().dump()
 
+    if args.qc_in:
+        pass
+        #TODO handle reading in previous qc from filename provided, and adding comparitive metrics
+
+    if args.qc_out:
+        #handle writing out to a tsv file
+        qc_metrics.qc_write_out(args.qc_out)
+
     logger.debug('close connectors')
     connectors.close()
 
     logger.info('`'+" ".join(sys.argv)+'` - finished')
     return 0
+
 
 
 if __name__ == '__main__':
