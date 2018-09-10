@@ -15,7 +15,8 @@ dependencies that allows you to run each step of the pipeline.
 
 
 ### How do I decide which data sources to include?
-Sources of evidence strings that are processed by the `--evs` steps by default are specified in a [config file](https://github.com/opentargets/data_pipeline/blob/master/mrtarget/resources/evidences_sources.txt)
+Sources of evidence strings that are processed by the `--evs` steps by 
+default are specified in a [config file](https://github.com/opentargets/data_pipeline/blob/master/mrtarget/resources/evidences_sources.txt)
 
 We save them in a gs:// bucket, so to make up the file you can just run:
 ```sh
@@ -28,26 +29,23 @@ gsutil ls gs://ot-releases/17.12 | sed 's/gs/http/' | sed 's/\/\//\/\/storage.go
 
 #### Elasticsearch
 
-You should have an elasticsearch instance running to use the pipeline code.
-You can run an instance locally using docker containers. You can use our ES v2.4 docker containers ([repo](https://github.com/opentargets/docker-elasticsearch-singlenode) | [![Docker Repository on Quay](https://quay.io/repository/opentargets/docker-elasticsearch-singlenode/status "Docker Repository on Quay")](https://quay.io/repository/opentargets/docker-elasticsearch-singlenode) )
-```sh
-docker run -p 9200:9200 -e NUMBER_OF_REPLICAS=0 quay.io/opentargets/docker-elasticsearch-singlenode:v2.4.1
-```
-Do take a look at the repo for other options you can pass to the container.
-If this is anything more than a test, you will want to change the ES_HEAP, etc.
+You should have an elasticsearch instance running to use the pipeline code. Note that v6 is not 
+currently supported, and therefore 5.6 is the latest version (as of writing)
+You can run an instance locally using docker containers. 
 
 After deploying elasticsearch, you should check that you can query its API.
 Typing `curl localhost:9200` should show something like:
 ```json
 {
-  "name": "Kenneth Crichton",
-  "cluster_name": "open-targets-dev",
+  "name": "Wr5vnJs",
+  "cluster_name": "elasticsearch",
+  "cluster_uuid": "6BlykLd8Sj2mxswcump2wA",
   "version": {
-    "number": "2.4",
-    "build_hash": "218bdf10790eef486ff2c41a3df5cfa32dadcfde",
-    "build_timestamp": "2016-05-17T15:40:04Z",
+    "number": "5.6.11",
+    "build_hash": "bc3eef4",
+    "build_date": "2018-08-16T15:25:17.293Z",
     "build_snapshot": false,
-    "lucene_version": "5.5.0"
+    "lucene_version": "6.6.1"
   },
   "tagline": "You Know, for Search"
 }
@@ -55,31 +53,13 @@ Typing `curl localhost:9200` should show something like:
 
 #### Kibana
 
-Kibana, marvel and sense are useful tools to monitor the performance of mrTarget, and to browse the output/input of the various steps.
+Kibana is useful to browse the output/input of the various steps.
 
-You can install kibana in a variety of ways. **Important:** your version of kibana [must be compatible](https://www.elastic.co/support/matrix#show_compatibility) with the version of ES we are using.
+You can install Kibana in a variety of ways, including via [docker](https://www.elastic.co/guide/en/kibana/5.6/docker.html)
 
-On mac:
-```sh
-brew install kibana
+**Important:** Kibana version [must be compatible](https://www.elastic.co/support/matrix#show_compatibility) with Elasticsearch.
 
-#Install the sense plugin
-kibana plugin --install elastic/sense
-#Install marvel
-kibana plugin --install elasticsearch/marvel
-
-#start the service
-brew services start kibana
-```
-
-Using docker:
-
-For ES>5, you can use the official [docker images](https://www.elastic.co/guide/en/kibana/current/_pulling_the_image.html)
-```sh
-docker run -d --name=kibana-es -e "ELASTICSEARCH_URL=http://localhost:9200" --net="host" docker.elastic.co/kibana/kibana:5.6.4
-```
-
-Once kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
+Once Kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
 
 
 ### Package users
@@ -126,7 +106,7 @@ CTTV_REDIS_SERVER=127.0.0.1:8888
 ### Container users
 
 ```sh
-docker run --net=host eu.gcr.io/open-targets/mrtarget:master mrtarget --log-level DEBUG 18.02 --dry-run
+docker run --net=host eu.gcr.io/open-targets/mrtarget:master mrtarget --log-level DEBUG 18.08 --dry-run
 ```
 Here some instructions to pull from eu.gcr.io: https://cloud.google.com/container-registry/docs/pushing-and-pulling
 
@@ -188,9 +168,6 @@ Install python dependencies and test run:
 ```bash
 $ # create a new virtualenv 2.7.x (you know how to do it, right?)
 $ pip install -r requirements.txt
-$ python setup.py install
-$ python -m spacy.en.download
-$ python -m nltk.downloader all-corpora
 $ mrtarget -h
 ```
 
@@ -226,14 +203,6 @@ $ bash generate_minimal_dataset.sh
 
 It should upload to gcloud storage and enable public link to files but you need to be logged
 in the gcloud account.
-
-#### Dry-run to file
-
-TBD
-
-#### Custom read indexes
-
-TBD
 
 #### Redislite and/or remote redis
 
