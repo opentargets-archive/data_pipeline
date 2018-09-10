@@ -11,7 +11,7 @@ from addict import Dict
 
 import logging as l
 from mrtarget.Settings import Config
-from mrtarget.common import Actions, URLZSource, generate_validators_from_schemas, LogAccum
+from mrtarget.common import URLZSource, generate_validators_from_schemas, LogAccum
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
@@ -81,11 +81,6 @@ class FileTypes():
     S3='s3'
     HTTP='http'
 
-class ValidationActions(Actions):
-    CHECKFILES = 'checkfiles'
-    VALIDATE = 'validate'
-    GENEMAPPING = 'genemapping'
-    RESET = 'reset'
 
 
 class FileProcesser():

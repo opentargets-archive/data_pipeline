@@ -4,17 +4,9 @@ import networkx as nx
 import requests
 from networkx.algorithms import all_simple_paths
 
-from mrtarget.common import Actions
 from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
-
-
-
-
-class ReactomeActions(Actions):
-    PROCESS = 'process'
-
 
 class ReactomeNode(TreeNode, JSONSerializable):
     def __init__(self, **kwargs):

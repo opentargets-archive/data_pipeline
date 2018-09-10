@@ -15,7 +15,6 @@ import requests
 from rdflib import URIRef
 from rdflib.namespace import Namespace, NamespaceManager
 from rdflib.namespace import OWL, RDF, RDFS
-from mrtarget.common import Actions
 from SPARQLWrapper import SPARQLWrapper, JSON
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger

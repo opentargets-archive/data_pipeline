@@ -4,7 +4,6 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 
-from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -13,9 +12,6 @@ from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQue
 
 from mrtarget.Settings import Config
 
-
-class SearchObjectActions(Actions):
-    PROCESS = 'process'
 
 
 class SearchObjectTypes(object):

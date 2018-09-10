@@ -429,8 +429,6 @@ class Config():
     DRY_RUN_OUTPUT_COUNT = read_option('DRY_RUN_OUTPUT_COUNT',
                                        cast=int, default=10000)
 
-    SEA_SKIP_DISEASES = False
-    SEA_SKIP_TARGETS = False
 
     # This config file is like this and no prefixes or version will be
     # appended

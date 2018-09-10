@@ -15,7 +15,6 @@ from sklearn.feature_extraction.text import TfidfTransformer, _document_frequenc
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 
-from mrtarget.common import Actions
 from mrtarget.common.DataStructure import JSONSerializable, RelationType
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -59,10 +58,6 @@ class T2TRelation(JSONSerializable):
 
 class D2DRelation(JSONSerializable):
     type = RelationType.SHARED_TARGET
-
-
-class DataDrivenRelationActions(Actions):
-    PROCESS='process'
 
 class DistanceComputationWorker(RedisQueueWorkerProcess):
     def __init__(self,

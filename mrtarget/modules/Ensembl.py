@@ -5,7 +5,6 @@ import mysql.connector
 import requests
 import time
 
-from mrtarget.common import Actions
 from mrtarget.Settings import Config, build_ensembl_sql
 
 '''
@@ -13,9 +12,6 @@ from mrtarget.Settings import Config, build_ensembl_sql
 '''
 
 __log__ = logging.getLogger(__name__)
-
-class EnsemblActions(Actions):
-    PROCESS='process'
 
 class EnsemblMysqlGene(object):
     '''

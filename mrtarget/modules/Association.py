@@ -3,7 +3,6 @@ import logging
 from tqdm import tqdm
 
 from mrtarget.Settings import Config
-from mrtarget.common import Actions
 from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable, denormDict
 from mrtarget.common.ElasticsearchLoader import Loader
@@ -18,13 +17,6 @@ from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 
 logger = logging.getLogger(__name__)
 tqdm_out = TqdmToLogger(logger,level=logging.INFO)
-
-
-class AssociationActions(Actions):
-    EXTRACT = 'extract'
-    PROCESS = 'process'
-    UPLOAD = 'upload'
-
 
 class AssociationScore(JSONSerializable):
 

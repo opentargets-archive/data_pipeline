@@ -2,14 +2,10 @@ import json
 from tqdm import tqdm 
 from mrtarget.common import TqdmToLogger
 
-from mrtarget.common import Actions
 import gzip, time, logging
 
 from mrtarget.Settings import Config
 from opentargets import OpenTargetsClient
-
-class DumpActions(Actions):
-    DUMP='dump'
 
 
 class DumpGenerator(object):
