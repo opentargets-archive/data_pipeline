@@ -4,13 +4,11 @@ from contextlib import contextmanager
 import gzip
 import zipfile
 import logging
-import petl as p
 import io
 import tempfile as tmp
 import requests as r
 import jsonschema as jss
 import json
-# import urllib2 as u2
 
 _l = logging.getLogger(__name__)
 
@@ -104,7 +102,7 @@ class URLZSource(object):
     @contextmanager
     def open(self, mode='r'):
         if not mode.startswith('r'):
-            raise p.errors.ArgumentError('source is read-only')
+            raise ValueError('source is read-only')
 
         zf = None
 
