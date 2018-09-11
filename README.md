@@ -105,27 +105,18 @@ CTTV_REDIS_SERVER=127.0.0.1:8888
 
 ### Container users
 
+
+If you have [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/) then you can start Elasticsearch and Kibana with:
+
 ```sh
-docker run --net=host eu.gcr.io/open-targets/mrtarget:master mrtarget --log-level DEBUG 18.08 --dry-run
+docker-compose up elasticsearch kibana
 ```
-Here some instructions to pull from eu.gcr.io: https://cloud.google.com/container-registry/docs/pushing-and-pulling
 
-You probably want to mount log files, etc like we do in our [backend machine](https://github.com/opentargets/infrastructure/blob/master/gcp/cloud-config/be-worker-cos.yaml):
+You can run the pipeline with a command like:
 
 ```sh
-docker run -d --name mrtarget_master \
-        -e TERM=xterm-256color \
-        -v `pwd`/data:/tmp/data \
-        -v `pwd`/output_master.log:/usr/src/app/output.log \
-        -v `pwd`/third_party_master.log:/usr/src/app/thirdparty.log \
-        -v `pwd`/db.ini:/usr/src/app/db.ini \
-        -v `pwd`/es_custom_idxs.ini:/usr/src/app/es_custom_idxs.ini \
-        -e CTTV_EL_LOADER=dev \
-        -e CTTV_DATA_VERSION=<dataversion> \
-        -e CTTV_DUMP_FOLDER=/tmp/data \
-        -e CTTV_ES_CUSTOM_IDXS=true \
-        eu.gcr.io/open-targets/mrtarget:master \
-        mrtarget --dry-run
+ES_PREIFX=my-elasticsearch-prefix
+docker-compose run --rm mrtarget python -m mrtarget.CommandLine --dry-run $ES_PREFIX
 ```
 
 
