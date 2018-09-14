@@ -246,8 +246,7 @@ def main():
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
             EvidenceValidationFileChecker(connectors.es, connectors.r_server, 
-                dry_run=args.dry_run).check_all(input_files=input_files, 
-                    increment=args.increment)
+                dry_run=args.dry_run).check_all(input_files=input_files)
         if args.valreset:
             EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
 
