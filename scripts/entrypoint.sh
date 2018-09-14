@@ -1,4 +1,6 @@
 #!/bin/sh
 
-python -m mrtarget.CommandLine $@
+echo "Running mrtarget with parameters $*"
+python -m mrtarget.CommandLine "$@"
+
 exit $!
