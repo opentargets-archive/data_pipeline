@@ -342,8 +342,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 json_doc_hashdig = hashlib.md5(line).hexdigest()
                 explanation['unparsable_json'] = True
 
-            if all([parsed_line is not None,
-                    (any(k in parsed_line for k in ('label', 'type')))]):
+            if parsed_line is not None and ('label' in parsed_line or 'type' in parsed_line):
                 # setting type from label in case we have label??
                 if 'label' in parsed_line:
                     parsed_line['type'] = parsed_line.pop('label', None)
