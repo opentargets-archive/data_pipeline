@@ -199,7 +199,7 @@ class Config():
     ERROR_IDS_FILE = 'errors.txt'
 
     GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
-    GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks', 'CancerBiomarkers', 'ChemicalProbes']
+    GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks', 'CancerBiomarkers', 'ChemicalProbes', 'Tractability']
 
     HGNC_COMPLETE_SET = 'http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json'
     HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
@@ -218,10 +218,11 @@ class Config():
         '4932':'yeast'
     }
 
-    HALLMARK_FILENAME = file_or_resource(fname='v85_hallmark_export.tsv')
     BIOMARKER_FILENAME = file_or_resource(fname='cgi_biomarkers_per_variant.tsv')
     CHEMICALPROBES_FILENAME1 = file_or_resource(fname='chemicalprobes_portalprobes.tsv')
     CHEMICALPROBES_FILENAME2 = file_or_resource(fname='chemicalprobes_probeminer.tsv')
+    HALLMARK_FILENAME = file_or_resource(fname='v85_hallmark_export.tsv')
+    TRACTABILITY_FILENAME = file_or_resource(fname='tractability_buckets_05-09-2018.tsv')
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
