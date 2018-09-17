@@ -229,7 +229,9 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             # we seek the file back to reuse it again
             f_handler.seek(0)
 
-            for i, line in enumerate(f_handler):
+            #decode any UTF-8 on the fly
+            #note that any invalid UTF-8 will be silently replaced with ? or similar
+            for i, line in enumerate(codecs.iterdecode(f_handler, encoding='utf-8', errors='replace')):
                 self.put_into_queue_out(
                     (file_path, file_version, provider_id, data_source_name,
                      md5_hash, logfile,
