@@ -222,7 +222,7 @@ class Config():
     CHEMICALPROBES_FILENAME1 = file_or_resource(fname='chemicalprobes_portalprobes.tsv')
     CHEMICALPROBES_FILENAME2 = file_or_resource(fname='chemicalprobes_probeminer.tsv')
     HALLMARK_FILENAME = file_or_resource(fname='v85_hallmark_export.tsv')
-    TRACTABILITY_FILENAME = file_or_resource(fname='tractability_buckets_05-09-2018.tsv')
+    TRACTABILITY_FILENAME = file_or_resource(fname='tractability_buckets.tsv')
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
