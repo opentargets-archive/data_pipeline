@@ -6,6 +6,7 @@ import logging
 import re
 from time import strftime
 import time
+import codecs
 
 from addict import Dict
 
