@@ -6,6 +6,7 @@ import logging
 import re
 from time import strftime
 import time
+import codecs
 
 from addict import Dict
 
@@ -229,7 +230,9 @@ class FileReaderProcess(RedisQueueWorkerProcess):
             # we seek the file back to reuse it again
             f_handler.seek(0)
 
-            for i, line in enumerate(f_handler):
+            #decode any UTF-8 on the fly
+            #note that any invalid UTF-8 will be silently replaced with ? or similar
+            for i, line in enumerate(codecs.iterdecode(f_handler, encoding='utf-8', errors='replace')):
                 self.put_into_queue_out(
                     (file_path, file_version, provider_id, data_source_name,
                      md5_hash, logfile,
@@ -340,8 +343,7 @@ class ValidatorProcess(RedisQueueWorkerProcess):
                 json_doc_hashdig = hashlib.md5(line).hexdigest()
                 explanation['unparsable_json'] = True
 
-            if all([parsed_line is not None,
-                    (any(k in parsed_line for k in ('label', 'type')))]):
+            if parsed_line is not None and ('label' in parsed_line or 'type' in parsed_line):
                 # setting type from label in case we have label??
                 if 'label' in parsed_line:
                     parsed_line['type'] = parsed_line.pop('label', None)
