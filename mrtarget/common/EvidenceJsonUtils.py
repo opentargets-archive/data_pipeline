@@ -25,8 +25,8 @@ def assertJSONEqual(a, b, msg='Values are not equal', keys = []):
         d.compare(a.splitlines(1),
                   b.splitlines(1)))
 
-    diffLines = [line for line in result if line[0] != ' ']
-    logger.warning("there is a difference between the previous index mapping and the new one \n%s", "\n".join(diffLines))
+    diffLines = [line.strip() for line in result if line[0] != ' ']
+    logger.warning(msg+"\n%s", "\t".join(diffLines))
 
     return True
 
