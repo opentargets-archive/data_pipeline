@@ -116,7 +116,7 @@ You can run the pipeline with a command like:
 
 ```sh
 ES_PREIFX=my-elasticsearch-prefix
-docker-compose run --rm mrtarget python -m mrtarget.CommandLine --dry-run $ES_PREFIX
+docker-compose run --rm mrtarget --dry-run $ES_PREFIX
 ```
 
 
