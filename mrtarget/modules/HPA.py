@@ -242,7 +242,7 @@ def name_from_tissue(tissue_name, t2m):
         if curated not in _missing_tissues['names']:
             _missing_tissues['names'][tname] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.debug('the tissue name %s was not found in the mapping', curated)
+            logger.warn('the tissue name %s was not found in the mapping', curated)
 
     return tname.strip()
 
@@ -262,7 +262,7 @@ def code_from_tissue(tissue_name, t2m):
         if tid not in _missing_tissues['codes']:
             _missing_tissues['codes'][tid] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.debug('the tissue code %s was not found in the mapping', curated)
+            logger.warn('the tissue code %s was not found in the mapping', curated)
 
     return tid.strip()
 
