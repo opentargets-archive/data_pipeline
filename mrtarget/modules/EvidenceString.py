@@ -63,10 +63,6 @@ except ImportError:
         return inner
 '''end of line profiler code'''
 
-class EvidenceStringActions(Actions):
-    PROCESS = 'process'
-    UPLOAD = 'upload'
-
 # def evs_lookup(dic, key, *keys):
 #     '''
 #     use like evs_lookup(d, *key1.key2.key3.split('.'))
