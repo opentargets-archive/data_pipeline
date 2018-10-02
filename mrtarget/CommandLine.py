@@ -21,7 +21,6 @@ from mrtarget.modules.EvidenceString import EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneManager
 from mrtarget.modules.HPA import HPAProcess
-from mrtarget.modules.MouseModels import MouseModelsActions, Phenodigm
 from mrtarget.modules.QC import QCRunner
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
@@ -107,16 +106,6 @@ def main():
     #quality control steps
     parser.add_argument("--qc", help="Run quality control scripts",
                         action="store_true")
-
-    #phenodigm related processes
-    parser.add_argument("--musu", dest='mus', help="update mouse model data",
-                        action="append_const", const = MouseModelsActions.UPDATE_CACHE)
-    parser.add_argument("--musg", dest='mus', help="update mus musculus and home sapiens gene list",
-                        action="append_const", const = MouseModelsActions.UPDATE_GENES)
-    parser.add_argument("--muse", dest='mus', help="generate mouse model evidence",
-                        action="append_const", const = MouseModelsActions.GENERATE_EVIDENCE)
-    parser.add_argument("--mus", dest='mus', help="update mouse models data",
-                        action="append_const", const = MouseModelsActions.ALL)
                        
     #use an external redis rather than spawning one ourselves
     parser.add_argument("--persist-redis", help="the temporary file wont be deleted if True default: False",
@@ -226,15 +215,6 @@ def main():
             EcoProcess(loader).process_all()
         if args.hpo:
             HpoProcess(loader).process_all()
-
-        if args.mus:
-            do_all = (MouseModelsActions.ALL in args.mus)
-            if (MouseModelsActions.UPDATE_CACHE in args.mus) or do_all:
-                Phenodigm(connectors.es, connectors.r_server).update_cache()
-            if (MouseModelsActions.UPDATE_GENES in args.mus) or do_all:
-                Phenodigm(connectors.es, connectors.r_server).update_genes()
-            if (MouseModelsActions.GENERATE_EVIDENCE in args.mus) or do_all:
-                Phenodigm(connectors.es, connectors.r_server).generate_evidence()
 
 
         if args.val:
