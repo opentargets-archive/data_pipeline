@@ -76,6 +76,7 @@ class EcoProcess():
         #number of eco entries
         eco_count = 0
         #Note: try to avoid doing this more than once!
+        #for some reason, only the ECO get all need to explicitly be told to get all sources
         for eco_entry in esquery.get_all_eco(True):
             eco_count += 1
 
