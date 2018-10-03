@@ -6,6 +6,7 @@ jobs:
       - image: quay.io/opentargets/mrtarget_build_base:circleci-build-base-0.1
     environment:
       CTTV_MINIMAL: True
+      ELASTICSEARCH_NODES: http://elasticsearch:9200
     steps:
       - checkout
       - restore_cache:
