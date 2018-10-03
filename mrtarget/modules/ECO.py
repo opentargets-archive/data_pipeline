@@ -76,7 +76,7 @@ class EcoProcess():
         #number of eco entries
         eco_count = 0
         #Note: try to avoid doing this more than once!
-        for eco_entry in esquery.get_all_eco():
+        for eco_entry in esquery.get_all_eco(True):
             eco_count += 1
 
         #put the metrics into a single dict
