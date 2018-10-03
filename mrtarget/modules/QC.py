@@ -15,16 +15,13 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 
-logger = logging.getLogger(__name__)
-tqdm_out = TqdmToLogger(logger,level=logging.INFO)
-
 class QCRunner(object):
 
     def __init__(self, es):
 
         self.es = es
         self.esquery = ESQuery(es)
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger(__name__+".QCRunner")
 
     def run_associationQC(self):
         self.run_evidence2associationQC()
@@ -33,7 +30,7 @@ class QCRunner(object):
         computed_assocations_ids = set(self.esquery.get_all_associations_ids())
         missing_assocations_ids = set()
         total_evidence = self.esquery.count_elements_in_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
-        logger.info('Starting to analyse %i evidence'%total_evidence)
+        self._logger.info('Starting to analyse %i evidence'%total_evidence)
         for as_id in tqdm(self.esquery.get_all_target_disease_pair_from_evidence(),
                            desc = 'checking t-d pairs in evidence data',
                            unit=' t-d pairs',
@@ -43,19 +40,20 @@ class QCRunner(object):
                            leave=True,
                            ):
             if as_id not in computed_assocations_ids:
-                logger.error('Association id %s was not computed or stored'%as_id)
+                self._logger.error('Association id %s was not computed or stored'%as_id)
                 missing_assocations_ids.add(as_id)
 
         if missing_assocations_ids:
-            logger.error('%i associations not found'%len(missing_assocations_ids))
-            logger.error('\n'.join(list(missing_assocations_ids)))
+            self._logger.error('%i associations not found'%len(missing_assocations_ids))
+            self._logger.error('\n'.join(list(missing_assocations_ids)))
         else:
-            logger.info('no missing annotation found')
+            self._logger.info('no missing annotation found')
 
 
 class QCMetrics(object):
     def __init__(self):
         self.metrics = dict()
+        self._logger = logging.getLogger(__name__+".QCMetrics")
 
     """
     Update the metrics stored here with a dictionary of additional information
@@ -110,7 +108,52 @@ class QCMetrics(object):
     Produces new metrics, which are not automatically added to this object
     """
     def compare_with(self, filename):
-        raise NotImplementedError
+        #read old file
+        with open(filename, 'rb') as csvfile:
+            csvreader = csv.reader(csvfile, delimiter='\t')
+            for row in csvreader:
+                old_metric = row[0]
+                old_value = row[1:]
+                #if the metric exists
+                if old_metric in self.metrics:
+                    new_value = self.metrics[old_metric]
+                    #work out what type it is
+                    #new value is a number and old value is a single thing
+                    if isinstance(new_value, Number) and len(old_value) == 1:
+                        #single number
+                        old_value_number = None
+                        #convert old value to an int or a float if possible
+                        try:
+                            old_value_number = int(old_value[0])
+                        except ValueError:
+                            try:
+                                old_value_number = float(old_value[0])
+                            except ValueError:
+                                old_value_number = None
+
+                        #should have converted numbers at this point
+                        if old_value_number is not None:
+                            metric_diff = old_metric+".difference"
+                            diff = old_value_number-new_value
+                            self.metrics[metric_diff] = diff
+                        else:
+                            #ignore if we cant turn it into a number
+                            self._logger.debug
+                            pass
+                    else:
+                        #list/set/similar?
+                        added = []
+                        removed = []
+                        for thing in old_value:
+                            if thing not in new_value:
+                                removed.append(thing)
+                        for thing in new_value:
+                            if thing not in old_value:
+                                added.append(thing)
+                        if len(added):
+                            self.metrics[old_metric+".added"] = added
+                        if len(removed):
+                            self.metrics[old_metric+".removed"] = removed
 
 
 
