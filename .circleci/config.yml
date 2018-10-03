@@ -4,9 +4,12 @@ jobs:
     working_directory: /usr/src/app
     docker:
       - image: quay.io/opentargets/mrtarget_build_base:circleci-build-base-0.1
+      #specify a second image that will run
+      #note that this wont have any commands and will be "localhost"
+      - image: elasticsearch:5.6.11
     environment:
       CTTV_MINIMAL: True
-      ELASTICSEARCH_NODES: http://elasticsearch:9200
+      ELASTICSEARCH_NODES: http://localhost:9200
     steps:
       - checkout
       - restore_cache:
