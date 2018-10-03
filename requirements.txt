@@ -5,7 +5,8 @@ envparse
 certifi
 elasticsearch-dsl>=5.0.0,<6.0.0
 networkx==1.9.1
-requests>=2.11.1,<3.0
+requests
+requests-futures
 ujson==1.35
 iso8601>=0.1.11 #required by opentargets
 opentargets
@@ -33,4 +34,3 @@ toolz
 yapsy==1.11.223
 git+https://github.com/opentargets/data_model.git@v1.2.7#egg=data-model
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz
--e .
