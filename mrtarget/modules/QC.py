@@ -98,7 +98,7 @@ class QCMetrics(object):
 
                 row = (metric,)+value
 
-                logging.debug("Writing to row %s", row)
+                self._logger.debug("Writing to row %s", row)
 
                 csvwriter.writerow(row)
 

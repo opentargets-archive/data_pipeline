@@ -525,7 +525,7 @@ class EvidenceValidationFileChecker():
         self.cache = {}
         self.counter = 0
         self.symbols = {}
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__+".EvidenceValidationFileChecker")
 
     def check_all(self,
                   input_files=[],
@@ -685,6 +685,9 @@ class EvidenceValidationFileChecker():
             evidence_valid_count = 0
             evidence_invalid_count = 0
             #Note: try to avoid doing this more than once!
+            
+            self.logger.info('QC on prefix %s', prefix)
+            
             for evidence in esquery.get_all_validated_evidence_strings(datasources=(prefix,)):
                 evidence_count += 1
                 if evidence["is_valid"]:
