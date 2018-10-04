@@ -22,7 +22,7 @@ from mrtarget.modules.EvidenceString import EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneManager
 from mrtarget.modules.HPA import HPAProcess
-from mrtarget.modules.QC import QCRunner
+from mrtarget.modules.QC import QCRunner,QCMetrics
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
 from mrtarget.modules.Uniprot import UniprotDownloader
@@ -33,7 +33,7 @@ def main():
 
     #set up logging
     fileConfig(file_or_resource('logging.ini'),  disable_existing_loggers=False)
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__+".main()")
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
 
