@@ -307,20 +307,28 @@ def main():
             qc_metrics.update(process.qc(esquery))
 
         if args.ass:
-            ScoringProcess(loader, connectors.r_server).process_all(targets = targets,
-                                                             dry_run=args.dry_run)
+            process = ScoringProcess(loader, connectors.r_server)
+            if not args.qc_only:
+                process.process_all(targets = targets, dry_run=args.dry_run)
+            #TODO qc
+            
         if args.ddr:
-            DataDrivenRelationProcess(connectors.es, connectors.r_server).process_all(dry_run = args.dry_run)
+            process = DataDrivenRelationProcess(connectors.es, connectors.r_server)
+            if not args.qc_only:
+                process.process_all(dry_run = args.dry_run)
+            #TODO qc
 
         if args.sea:
-            SearchObjectProcess(loader, connectors.r_server).process_all(skip_targets=args.skip_targets,
-                                                                             skip_diseases=args.skip_diseases)
+            process = SearchObjectProcess(loader, connectors.r_server)
+            if not args.qc_only:
+                process.process_all(skip_targets=args.skip_targets, skip_diseases=args.skip_diseases)
+            #TODO qc
+
         if args.metric:
-            Metrics(connectors.es).generate_metrics()
+            process = Metrics(connectors.es).generate_metrics()
 
         if args.qc:
             QCRunner(connectors.es).run_associationQC()
-
         if args.dump:
             DumpGenerator().dump()
 
