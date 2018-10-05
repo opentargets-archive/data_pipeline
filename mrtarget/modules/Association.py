@@ -91,6 +91,7 @@ class Association(JSONSerializable):
         # inject tractability data from the gene into the assoc
         trac_fields = ["smallmolecule", "antibody"]
         trac_subfields = ["buckets", "categories"]
+
         #TODO: handle domains
         genes_info=ExtendedInfoGene(gene)
 
@@ -100,6 +101,8 @@ class Association(JSONSerializable):
                     for subel in trac_subfields:
                         if subel in gene.tractability[el]:
                             self.private['facets'][el][subel] = copy.deepcopy(gene.tractability[el][subel])
+                            if subel == "buckets":
+                                self.target["tractability"][el][subel] = copy.deepcopy(gene.tractability[el][subel])
 
         '''collect data to use for free text search'''
 

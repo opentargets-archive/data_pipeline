@@ -41,7 +41,6 @@ class Tractability(IPlugin):
                                       desc='Adding Tractability data',
                                       unit=' gene',
                                       file=self.tqdm_out):
-                # Extend gene with related Cancer Biomarker data
                 if gene.ensembl_gene_id in self.tractability:
                     self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.ensembl_gene_id)
                     gene.tractability=self.tractability[gene.ensembl_gene_id]
