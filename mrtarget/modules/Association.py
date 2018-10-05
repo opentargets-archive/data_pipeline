@@ -1,4 +1,5 @@
 import logging
+import copy
 
 from tqdm import tqdm
 
@@ -86,8 +87,20 @@ class Association(JSONSerializable):
                             level2=[])
 
         uniprot_keywords = []
+
+        # inject tractability data from the gene into the assoc
+        trac_fields = ["smallmolecule", "antibody"]
+        trac_subfields = ["buckets", "categories"]
         #TODO: handle domains
         genes_info=ExtendedInfoGene(gene)
+
+        if gene.tractability:
+            for el in trac_fields:
+                if el in gene.tractability:
+                    for subel in trac_subfields:
+                        if subel in gene.tractability[el]:
+                            self.private['facets'][el][subel] = copy.deepcopy(gene.tractability[el][subel])
+
         '''collect data to use for free text search'''
 
         for el in ['geneid', 'name', 'symbol']:
