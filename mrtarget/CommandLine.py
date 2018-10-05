@@ -266,7 +266,7 @@ def main():
                 input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
             else:
                 #default behaviour: use all the data sources listed in the evidences_sources.txt file
-                logger.debug('reading the evidences sources URLs from evidence_sources.txt')
+                logger.info('reading the evidences sources URLs from evidence_sources.txt')
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
 
