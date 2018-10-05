@@ -134,7 +134,7 @@ class QCMetrics(object):
                         #should have converted numbers at this point
                         if old_value_number is not None:
                             metric_diff = old_metric+".difference"
-                            diff = old_value_number-new_value
+                            diff = new_value-old_value_number
                             self.metrics[metric_diff] = diff
                         else:
                             #ignore if we cant turn it into a number
