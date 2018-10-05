@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 
-class CancerBiomarkers(IPlugin):
+class Tractability(IPlugin):
 
     # Initiate Tractability object
     def __init__(self):
