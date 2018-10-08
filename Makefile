@@ -5,7 +5,7 @@
 ES_PREFIX = gp-makefile
 ELASTICSEARCH_NODES = http://localhost:9200
 LOG_LEVEL = DEBUG
-SCHEMA_VERSION = 18.08
+SCHEMA_VERSION = 1.2.8
 PERCENTAGE_TO_KEEP = 2
 
 # Internal variables
