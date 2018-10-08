@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 
-class CancerBiomarkers(IPlugin):
+class Tractability(IPlugin):
 
     # Initiate Tractability object
     def __init__(self):
@@ -41,7 +41,6 @@ class CancerBiomarkers(IPlugin):
                                       desc='Adding Tractability data',
                                       unit=' gene',
                                       file=self.tqdm_out):
-                # Extend gene with related Cancer Biomarker data
                 if gene.ensembl_gene_id in self.tractability:
                     self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.ensembl_gene_id)
                     gene.tractability=self.tractability[gene.ensembl_gene_id]
@@ -82,9 +81,9 @@ class CancerBiomarkers(IPlugin):
                 line['smallmolecule'] = {
                     'buckets': sm_buckets,  # list of buckets
                     'categories': {
-                        'clinical_precedence': Clinical_Precedence,
-                        'discovery_precedence': Discovery_Precedence,
-                        'predicted_precedence': Predicted_Tractable
+                        'clinical_precedence': float(Clinical_Precedence),
+                        'discovery_precedence': float(Discovery_Precedence),
+                        'predicted_tractable': float(Predicted_Tractable)
                     },
                     'top_category': Category,
                     'ensemble': ensemble,
@@ -94,9 +93,9 @@ class CancerBiomarkers(IPlugin):
                 line['antibody'] = {
                     'buckets': ab_buckets,
                     'categories': {
-                        'clinical_precedence': Clinical_Precedence_ab,
-                        'predicted_tractable_high_confidence': Predicted_Tractable__High_confidence,
-                        'predicted_tractable_med_low_confidence': Predicted_Tractable__Medium_to_low_confidence
+                        'clinical_precedence': float(Clinical_Precedence_ab),
+                        'predicted_tractable_high_confidence': float(Predicted_Tractable__High_confidence),
+                        'predicted_tractable_med_low_confidence': float(Predicted_Tractable__Medium_to_low_confidence)
                     },
                     'top_category': Category_ab
                 }
