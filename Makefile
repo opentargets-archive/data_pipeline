@@ -11,7 +11,7 @@ PERCENTAGE_TO_KEEP = 2
 # Internal variables
 MRTARGET_CMD = python -m mrtarget.CommandLine --log-level=$(LOG_LEVEL) $(ES_PREFIX)
 INDEX_CMD = python scripts/check_index.py --elasticsearch $(ELASTICSEARCH_NODES) --zero-fail --index
-
+DOWNLOAD_CMD = ./scripts/download_and_trim.sh
 
 # Main command for invoking mrtarget; note that $STAGE needs to be defined for this work.
 # Also note that $@ expands to the name of the current Makefile target so saves a lot of boilerplate
@@ -75,101 +75,97 @@ gene_merge:
 	$(eval STAGE = gen)
 	$(TEMPLATE_CMD)
 
-#TODO - what about downloading?
-
 .PHONY: validate_indices
 validate_indices:
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
 
 .PHONY: validate_atlas
 validate_atlas: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/atlas-14-02-2018.json.gz atlas.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/atlas-14-02-2018.json.gz atlas.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = atlas)
 	$(VALIDATE_CMD)
 
-# @TODO others
-
 .PHONY: validate_chembl
 validate_chembl: validate_indices
-	./scripts/download_and_trim.sh  https://storage.googleapis.com/ot-releases/18.08/chembl-02-08-2018.json.gz chembl.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD)  https://storage.googleapis.com/ot-releases/18.08/chembl-02-08-2018.json.gz chembl.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = chembl)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_cosmic
 validate_cosmic: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/cosmic-24-05-2018.json.gz cosmic.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/cosmic-24-05-2018.json.gz cosmic.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = cosmic)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_europepmc
 validate_europepmc: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/europepmc-27-07-2018.json.gz europepmc.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/europepmc-27-07-2018.json.gz europepmc.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = europepmc)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_eva
 validate_eva: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/eva-02-08-2018.json.gz eva.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/eva-02-08-2018.json.gz eva.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = eva)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_gene2phenotype
 validate_gene2phenotype: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/gene2phenotype-27-07-2018.json.gz gene2phenotype.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/gene2phenotype-27-07-2018.json.gz gene2phenotype.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = gene2phenotype)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_genomics_england
 validate_genomics_england: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/genomics_england-23-07-2018.json.gz genomics_england.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/genomics_england-23-07-2018.json.gz genomics_england.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = genomics_england)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_gwas
 validate_gwas: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/gwas-06-08-2018.json.gz gwas.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/gwas-06-08-2018.json.gz gwas.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = gwas)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_intogen
 validate_intogen: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/intogen-23-07-2018.json.gz intogen.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/intogen-23-07-2018.json.gz intogen.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = intogen)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_phenodigm
 validate_phenodigm: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/phenodigm-17-08-2018.json.gz phenodigm.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/phenodigm-17-08-2018.json.gz phenodigm.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = phenodigm)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_phewas_catalog
 validate_phewas_catalog: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/phewas_catalog-11-09-2017.json.gz phewas_catalog.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/phewas_catalog-11-09-2017.json.gz phewas_catalog.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = phewas_catalog)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_progeny
 validate_progeny: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/progeny-23-07-2018.json.gz progeny.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/progeny-23-07-2018.json.gz progeny.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = progeny)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_reactome
 validate_reactome: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/reactome-19-07-2018.json.gz reactome.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/reactome-19-07-2018.json.gz reactome.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = reactome)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_slapenrich
 validate_slapenrich: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/slapenrich-27-07-2018.json.gz slapenrich.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/slapenrich-27-07-2018.json.gz slapenrich.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = slapenrich)
 	$(VALIDATE_CMD)
 
 .PHONY: validate_uniprot
 validate_uniprot: validate_indices
-	./scripts/download_and_trim.sh https://storage.googleapis.com/ot-releases/18.08/uniprot-30-07-2018.json.gz uniprot.json.gz $PERCENTAGE_TO_KEEP
+	$(DOWNLOAD_CMD) https://storage.googleapis.com/ot-releases/18.08/uniprot-30-07-2018.json.gz uniprot.json.gz $PERCENTAGE_TO_KEEP
 	$(eval STAGE = uniprot)
 	$(VALIDATE_CMD)
 
