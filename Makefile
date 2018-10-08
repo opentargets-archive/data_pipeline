@@ -186,25 +186,25 @@ association_scores:
 
 .PHONY: association_qc
 association_qc:
-	$(INDEX_CMD) $(ES_PREFIX)_association_scores
+	$(INDEX_CMD) $(ES_PREFIX)_association-data
 	$(eval STAGE = qc)
 	$(TEMPLATE_CMD)
 
 .PHONY: search_data
 search_data:
-	$(INDEX_CMD) $(ES_PREFIX)_association_scores
+	$(INDEX_CMD) $(ES_PREFIX)_association-data
 	$(eval STAGE = sea)
 	$(TEMPLATE_CMD)
 
 .PHONY: relationship_data
 relationship_data:
-	$(INDEX_CMD) $(ES_PREFIX)_association_scores
+	$(INDEX_CMD) $(ES_PREFIX)_association-data
 	$(eval STAGE = ddr)
 	$(TEMPLATE_CMD)
 
 .PHONY: metrics
 metrics:
-	$(INDEX_CMD) $(ES_PREFIX)_association_scores
+	$(INDEX_CMD) $(ES_PREFIX)_association-data
 	$(eval STAGE = metric)
 	$(TEMPLATE_CMD)
 
