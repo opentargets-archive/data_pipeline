@@ -119,8 +119,45 @@ ES_PREIFX=my-elasticsearch-prefix
 docker-compose run --rm mrtarget --dry-run $ES_PREFIX
 ```
 
+---
+## Using the Makefile
 
-## Environment variables and howto use them
+There is a Makefile which can be used to run all or parts of the pipeline, including checking for the existence of required indices.
+
+### Usage
+
+Customise the variables at the top of `Makefile` to suit your needs, then run
+
+`make <target>`
+
+Note that the variables can also be overridden on the command-line.
+
+There are several targets, one for each stage of the pipeline, as well as composite targets, such as 
+
+ * `all`
+ * `load_data`
+ * `validate_all`
+ 
+ (see the actual Makefile for the full list)
+
+Each target checks that the required Elasticsearch indices exist (via `scripts/check_index.py`) before execution.
+
+There are several targets which speed up common tasks, such as 
+ * `list_indices`
+ * `delete_indices`
+ * `clean` (see also `clean_json` and `clean_logs`)
+
+### Notes
+
+*Shell completion*: most shells will complete the list of targets when `<TAB>` is pressed. This is a useful way of seeing which targets or available.
+
+*Parallel execution*: `make -j` will run all the dependencies of a target in parallel. Useful for the `load_data` and `validate_all` stages.
+ 
+*Target expansion*: The Makefile makes use of the `$@` symbol, which expands to the name of the current target. This allows significant reduction in boilerplate code and should be considered when modifying or extending the Makefile.
+
+---
+
+## Environment variables and how to use them
 
 Here the list to change, enable or disable functionality:
 
