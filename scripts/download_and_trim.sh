@@ -10,11 +10,17 @@ if [ $# -ne 3 ]; then
     echo "$0  <source_url> <filename> <percentage>"
 fi
 
-
 if [ ! -f "$2" ]
 then
     echo "Downloading from $1 to $2"
     curl --silent --output /tmp/$2 $1
+
+    if [ $3 -eq 100 ]; then
+        echo "100% specified, downloading only"
+        mv /tmp/$2 .
+        exit
+    fi
+
     LINES=$( gunzip -c /tmp/$2 | wc -l | tr -s ' ')
     KEEP=$(($LINES*$3/100))
     echo "Keeping only $KEEP lines (${3}% of $LINES)"
