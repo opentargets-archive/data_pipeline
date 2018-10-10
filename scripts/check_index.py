@@ -47,7 +47,7 @@ def main():
             if not args.silent:
                 print "Required index %s does not exist" % index
 
-    sys.exit(exit_code)
+    return exit_code
 
 
 if __name__ == '__main__':
