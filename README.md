@@ -153,7 +153,7 @@ There are several targets which speed up common tasks, such as
 
 *Parallel execution*: `make -j` will run all the dependencies of a target in parallel. Useful for the `load_data` and `validate_all` stages.
 
-*Variables*: the default values for the variables set at the top of the `Makefile` can be overridden on the command-line, e.g. `make "ES_PREFIX=test" ens` Note that there is a `MRTARGET_ARGS` variable which can be used to specify arbitrary additional parameters at run time. 
+*Variables*: the default values for the variables set at the top of the `Makefile` can be overridden on the command-line, e.g. `make "ES_PREFIX=test" ens` Note that if any of these are already specified by environment variables, those values will take precedence. There is a `MRTARGET_ARGS` variable which can be used to specify arbitrary additional parameters at run time. 
  
 *Target expansion*: The Makefile makes use of the `$@` symbol, which expands to the name of the current target. This allows significant reduction in boilerplate code and should be considered when modifying or extending the Makefile.
 

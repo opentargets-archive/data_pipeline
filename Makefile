@@ -1,15 +1,15 @@
 # Makefile for Open Targets data pipeline
 # Based on steps in https://github.com/opentargets/data_release/wiki/OT011-Data-Processing-(Backend)
 
-# These variables can be overridden on the command-line
-ES_PREFIX = gp-makefile
-ELASTICSEARCH_NODES = http://localhost:9200
-LOG_LEVEL = DEBUG
-SCHEMA_VERSION = 1.2.8
-PERCENTAGE_TO_KEEP = 2
+# These variables can be overridden on the command-line. Note that if any of these are already specified by environment variables, those values will take precedence
+ES_PREFIX ?= gp-makefile
+ELASTICSEARCH_NODES ?= http://localhost:9200
+LOG_LEVEL ?= DEBUG
+SCHEMA_VERSION ?= 1.2.8
+PERCENTAGE_TO_KEEP ?= 2
 
 # Allow specification of additional arguments for each stage on the command-line
-MRTARGET_ARGS =
+MRTARGET_ARGS ?=
 
 # Internal variables
 MRTARGET_CMD = python -m mrtarget.CommandLine --log-level=$(LOG_LEVEL) $(MRTARGET_ARGS) $(ES_PREFIX)
