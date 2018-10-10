@@ -1299,12 +1299,15 @@ class EvidenceStringProcess():
     of string test names and result objects
     """
     def qc(self, esquery):
+        self.logger.debug('starting qc')
 
-        #number of eco entries
+        #number of entries
         evidence_count = 0
         #Note: try to avoid doing this more than once!
-        for evidence in esquery.get_all_evidence_for_datasource("generic"):
+        for evidence in esquery.get_all_evidence(True):
             evidence_count += 1
+            if evidence_count % 1000 == 0:
+                self.logger.debug("checking %d", evidence_count)
 
         #put the metrics into a single dict
         metrics = dict()

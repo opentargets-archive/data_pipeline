@@ -828,6 +828,25 @@ class ESQuery(object):
                                 batch,
                                 stats_only=True)
 
+    def get_all_evidence(self, fields = None):
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*', True)
+        doc_type = None
+        res = helpers.scan(client=self.handler,
+                           query={"query":  {"match_all": {}},
+                               '_source': self._get_source_from_fields(fields),
+                               'size': 1000,
+                           },
+                           scroll='12h',
+                           index=index_name,
+                           timeout="10m",
+                           )
+
+        # res = list(res)
+        for hit in res:
+            yield hit['_source']
+
+
+
     def get_all_evidence_for_datasource(self, datasources=None, fields = None, ):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*', True)
@@ -836,7 +855,7 @@ class ESQuery(object):
         if datasources:
             if isinstance(datasources, str):
                 doc_type='evidencestring-'+datasources
-            elif isinstance(datasources, list):
+            elif isinstance(datasources, list) or isinstance(datasources, tuple):
                 doc_type=['evidencestring-'+ds for ds in datasources]
             else:
                 raise AttributeError()

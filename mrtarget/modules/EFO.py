@@ -176,7 +176,7 @@ class EfoProcess():
                 if len(efo_term["path_labels"][0]) == 1:
                     efo_top_levels.append(efo_term["label"])
 
-            if efo_term["definition"] == None or len(efo_term["definition"].strip()):
+            if efo_term["definition"] == None or len(efo_term["definition"].strip()) == 0:
                 efo_missing_description_count += 1
 
         #put the metrics into a single dict
