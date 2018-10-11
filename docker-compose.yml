@@ -2,14 +2,18 @@ version: "3.6"
 services:
       
   elasticsearch:
-    image: elasticsearch:5.6.11
+    #image: elasticsearch:5.6.11
+    #note that the docker hub version doesn't allow restores for some reason...
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.11
     ports:
       - 9200:9200
     environment:
       # assign more memory to JVM 
-      - ES_JAVA_OPTS=-Xms12g -Xmx12g
-      - xpack.security.enabled=false
-      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms12g -Xmx12g"
+      - "xpack.security.enabled=false"
+      - "bootstrap.memory_lock=true"
+      #allow downloading from google buckets
+      - repositories.url.allowed_urls=https://storage.googleapis.com/*,https://*.amazonaws.com/*
     volumes:
       #use a volume for persistence / performance
       - esdata:/usr/share/elasticsearch/data
