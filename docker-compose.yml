@@ -12,8 +12,8 @@ services:
       - "ES_JAVA_OPTS=-Xms12g -Xmx12g"
       - "xpack.security.enabled=false"
       - "bootstrap.memory_lock=true"
-      #allow downloading from open targets google buckets
-      - repositories.url.allowed_urls=https://storage.googleapis.com/open-targets-data-releases/*,https://*.amazonaws.com/*
+      #allow downloading from google buckets
+      - repositories.url.allowed_urls=https://storage.googleapis.com/*,https://*.amazonaws.com/*
     volumes:
       #use a volume for persistence / performance
       - esdata:/usr/share/elasticsearch/data
