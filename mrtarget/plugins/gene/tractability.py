@@ -1,5 +1,6 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
+from mrtarget.common import str_to_boolean
 from tqdm import tqdm
 from itertools import compress
 
@@ -32,17 +33,17 @@ class Tractability(IPlugin):
         self.tqdm_out = tqdm_out
 
         try:
-            # Parse cancer biomarker data into self.cancerbiomarkers
+            # Parse tractability data into self.tractability
             self.build_json(filename=Config.TRACTABILITY_FILENAME)
 
-            # Iterate through all genes and add cancer biomarkers data if gene symbol is present
+            # Iterate through all genes and add tractability data if gene symbol is present
             self._logger.info("Tractability data injection")
             for gene_id, gene in tqdm(genes.iterate(),
                                       desc='Adding Tractability data',
                                       unit=' gene',
                                       file=self.tqdm_out):
                 if gene.ensembl_gene_id in self.tractability:
-                    self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.ensembl_gene_id)
+                    self._logger.debug("Adding tractability data to gene %s", gene.ensembl_gene_id)
                     gene.tractability=self.tractability[gene.ensembl_gene_id]
 
         except Exception as ex:
@@ -86,9 +87,9 @@ class Tractability(IPlugin):
                         'predicted_tractable': float(Predicted_Tractable)
                     },
                     'top_category': Category,
-                    'ensemble': ensemble,
-                    'high_quality_compounds': High_Quality_ChEMBL_compounds,
-                    'small_molecule_genome_member': Small_Molecule_Druggable_Genome_Member
+                    'ensemble': float(ensemble), # drugebility score not used at the moment but in a future
+                    'high_quality_compounds': int(High_Quality_ChEMBL_compounds),
+                    'small_molecule_genome_member': str_to_boolean(Small_Molecule_Druggable_Genome_Member)
                 }
                 line['antibody'] = {
                     'buckets': ab_buckets,
@@ -100,5 +101,5 @@ class Tractability(IPlugin):
                     'top_category': Category_ab
                 }
 
-                # Add data for current biomarker to self.cancerbiomarkers
+                # Add data for current gene to self.tractability
                 self.tractability[ensembl_gene_id] = line

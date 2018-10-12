@@ -218,3 +218,14 @@ class TqdmToLogger(io.StringIO):
         self.buf = buf.strip('\r\n\t ')
     def flush(self):
         self.logger.log(self.level, self.buf)
+
+
+def str_to_boolean(s):
+    sl = s.lower()
+    if sl in ['true', '1', 't', 'y', 'yes']:
+        True
+    elif sl in ['false', '0', 'f', 'n', 'no']:
+        False
+    else:
+        False
+
