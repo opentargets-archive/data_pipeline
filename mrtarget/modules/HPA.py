@@ -472,10 +472,6 @@ class HPADataDownloader():
 
         return t_join
 
-<<<<<<< HEAD
-=======
-
->>>>>>> master
 class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
     def __init__(self, es, r_server, queue, dry_run=False):
