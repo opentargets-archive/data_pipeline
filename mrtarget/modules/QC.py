@@ -131,29 +131,35 @@ class QCMetrics(object):
                             except ValueError:
                                 old_value_number = None
 
-                        #should have converted numbers at this point
-                        if old_value_number is not None:
-                            metric_diff = old_metric+".difference"
-                            diff = new_value-old_value_number
-                            self.metrics[metric_diff] = diff
-                        else:
-                            #ignore if we cant turn it into a number
-                            self._logger.debug
-                            pass
+
+                        #dont work out differences of differences
+                        if not old_metric.endswith(".difference"):
+                            #should have converted numbers at this point
+                            if old_value_number is not None:
+                                metric_diff = old_metric+".difference"
+                                diff = new_value-old_value_number
+                                self.metrics[metric_diff] = diff
+                            else:
+                                #ignore if we cant turn it into a number
+                                pass
                     else:
                         #list/set/similar?
-                        added = []
-                        removed = []
-                        for thing in old_value:
-                            if thing not in new_value:
-                                removed.append(thing)
-                        for thing in new_value:
-                            if thing not in old_value:
-                                added.append(thing)
-                        if len(added):
-                            self.metrics[old_metric+".added"] = added
-                        if len(removed):
-                            self.metrics[old_metric+".removed"] = removed
+
+                        #dont work out differences of differences
+                        if not old_metric.endswith(".added") and not old_metric.endswith(".removed"):
+
+                            added = []
+                            removed = []
+                            for thing in old_value:
+                                if thing not in new_value:
+                                    removed.append(thing)
+                            for thing in new_value:
+                                if thing not in old_value:
+                                    added.append(thing)
+                            if len(added):
+                                self.metrics[old_metric+".added"] = added
+                            if len(removed):
+                                self.metrics[old_metric+".removed"] = removed
 
 
 
