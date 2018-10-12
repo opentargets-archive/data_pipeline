@@ -220,6 +220,15 @@ class TqdmToLogger(io.StringIO):
         self.logger.log(self.level, self.buf)
 
 
+def str_to_int(s):
+    n = 0
+    try:
+        n = int(s)
+    except Exception as ex:
+        _l.exception("this should be a number but an exception was thrown " + str(ex))
+    finally:
+        return n
+
 def str_to_boolean(s):
     sl = s.lower()
     if sl in ['true', '1', 't', 'y', 'yes']:

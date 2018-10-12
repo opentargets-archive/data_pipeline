@@ -1,6 +1,6 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
-from mrtarget.common import str_to_boolean
+from mrtarget.common import str_to_boolean, str_to_int
 from tqdm import tqdm
 from itertools import compress
 
@@ -88,7 +88,7 @@ class Tractability(IPlugin):
                     },
                     'top_category': Category,
                     'ensemble': float(ensemble), # drugebility score not used at the moment but in a future
-                    'high_quality_compounds': int(High_Quality_ChEMBL_compounds),
+                    'high_quality_compounds': str_to_int(High_Quality_ChEMBL_compounds),
                     'small_molecule_genome_member': str_to_boolean(Small_Molecule_Druggable_Genome_Member)
                 }
                 line['antibody'] = {
