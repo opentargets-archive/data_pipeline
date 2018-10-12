@@ -73,6 +73,32 @@ class Association(JSONSerializable):
     def set_id(self):
         self.id = '%s-%s' % (self.target['id'], self.disease['id'])
 
+
+    def _inject_tractability_in_target(self, gene_obj):
+        if gene_obj:
+            # inject tractability data from the gene into the assoc
+            trac_fields = ["smallmolecule", "antibody"]
+            trac_subfields = ["buckets", "categories"]
+
+            if 'tractability' not in self.target:
+                self.target['tractability'] = {}
+
+            for el in trac_fields:
+                if el in gene_obj.tractability:
+                    for subel in trac_subfields:
+                        if subel in gene_obj.tractability[el]:
+                            if el not in self.private['facets']:
+                                self.private['facets'][el] = {}
+
+                            if el not in self.target['tractability']:
+                                self.target['tractability'][el] = {}
+
+                            self.private['facets'][el][subel] = copy.deepcopy(gene_obj.tractability[el][subel])
+
+                            if subel == "buckets":
+                                self.target['tractability'][el][subel] = copy.deepcopy(gene_obj.tractability[el][subel])
+
+
     def set_target_data(self, gene):
         """get generic gene info"""
         pathway_data = dict(pathway_type_code=[],
@@ -88,32 +114,12 @@ class Association(JSONSerializable):
 
         uniprot_keywords = []
 
-        # inject tractability data from the gene into the assoc
-        trac_fields = ["smallmolecule", "antibody"]
-        trac_subfields = ["buckets", "categories"]
-
         #TODO: handle domains
         genes_info=ExtendedInfoGene(gene)
 
-        if 'tractability' not in self.target:
-            self.target['tractability'] = {}
-
-        for el in trac_fields:
-            if el in gene.tractability:
-                for subel in trac_subfields:
-                    if subel in gene.tractability[el]:
-                        if el not in self.private['facets']:
-                            self.private['facets'][el] = {}
-                        if el not in self.target['tractability']:
-                            self.target['tractability'][el] = {}
-
-                        self.private['facets'][el][subel] = copy.deepcopy(gene.tractability[el][subel])
-
-                        if subel == "buckets":
-                            self.target['tractability'][el][subel] = copy.deepcopy(gene.tractability[el][subel])
+        self._inject_tractability_in_target(gene)
 
         '''collect data to use for free text search'''
-
         for el in ['geneid', 'name', 'symbol']:
             self.private['facets']['free_text_search'].append(
                 genes_info.data[el])
