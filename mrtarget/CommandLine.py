@@ -132,7 +132,10 @@ def main():
                         action='store_true', default=False)
     parser.add_argument("--log-level", help="set the log level",
                         action='store', default='WARNING')
-                        
+
+    parser.add_argument("--log-http", help="log all HTTP protocol requests to the specified file",
+                        action='store', default='http-requests.log')
+
     args = parser.parse_args()
 
     if not args.release_tag:
@@ -178,6 +181,14 @@ def main():
         except Exception, e:
             root_logger.exception(e)
             return 1
+
+    if args.log_http:
+        logger.info("Will log all HTTP requests to %s" % args.log_http)
+        requests_log = logging.getLogger("urllib3")
+        requests_log.setLevel(logging.DEBUG)
+        requests_log.propagate = False  # Change to True to log to main log as well
+        requests_log.addHandler(logging.FileHandler(args.log_http))
+
 
     connected = connectors.init_services_connections(redispersist=args.persist_redis)
 

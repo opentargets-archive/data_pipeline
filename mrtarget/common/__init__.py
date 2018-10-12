@@ -197,10 +197,6 @@ def require_any(*predicates):
         _l.error('requre_any failed checking at least one predicate true')
 
 
-class Actions():
-    ALL = 'all'
-
-
 # with thanks to: https://stackoverflow.com/questions/14897756/python-progress-bar-through-logging-module/41224909#41224909
 class TqdmToLogger(io.StringIO):
     """

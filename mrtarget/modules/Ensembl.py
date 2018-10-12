@@ -27,7 +27,7 @@ class EnsemblMysqlGene(object):
         '''
         dbname = 'homo_sapiens_core_%d_38' % ensembl_release
         try:
-            self.conn = mysql.connector.connect(host='ensembldb.ensembl.org', user='anonymous', port=5306, db=dbname, passwd='')
+            self.conn = mysql.connector.connect(host='ensembldb.ensembl.org', user='anonymous', port=3306, db=dbname, passwd='')
         except mysql.connector.OperationalError as mysql_ex:
             raise mysql_ex
 
