@@ -275,7 +275,7 @@ class ESQuery(object):
         res = helpers.scan(client=self.handler,
                            query={
                                "query": {
-                                    "match_phase": {
+                                    "match_phrase": {
                                         "is_valid": is_valid
                                     }
                                },
@@ -302,7 +302,7 @@ class ESQuery(object):
         return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
                                             doc_type=doc_type,
                                             query={
-                                                "match_phase": {
+                                                "match_phrase": {
                                                     "is_valid": is_valid
                                                 }
                                             })
