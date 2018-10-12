@@ -472,7 +472,6 @@ class HPADataDownloader():
 
         return t_join
 
-
 class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
     def __init__(self, es, r_server, queue, dry_run=False):
@@ -579,3 +578,21 @@ class HPAProcess():
 
         self.logger.info('missing tissues %s', str(_missing_tissues))
         self.logger.info('all expressions objects pushed to elasticsearch')
+
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of hpa entries
+        hpa_count = 0
+        #Note: try to avoid doing this more than once!
+        for hpa_entry in esquery.get_all_hpa():
+            hpa_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["hpa.count"] = hpa_count
+
+        return metrics

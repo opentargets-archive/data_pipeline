@@ -16,8 +16,6 @@ from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, Extended
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 
-logger = logging.getLogger(__name__)
-tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 class AssociationScore(JSONSerializable):
 
@@ -394,6 +392,8 @@ class ScoreProducer(RedisQueueWorkerProcess):
         super(ScoreProducer, self).__init__(queue_in=evidence_data_q,
                                             redis_path=r_path,
                                             queue_out=score_q)
+
+
         self.evidence_data_q = evidence_data_q
         self.score_q = score_q
         self.lookup_data = lookup_data
@@ -484,7 +484,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                                        create_index=False)
 
             else:
-                logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
+                self.logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
 
 
 
@@ -531,6 +531,10 @@ class ScoringProcess():
     def __init__(self,
                  loader,
                  r_server):
+
+        self.logger = logging.getLogger(__name__)
+        self.tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
+
         self.es_loader = loader
         self.es = loader.es
         self.es_query = ESQuery(loader.es)
@@ -630,22 +634,42 @@ class ScoringProcess():
         for target in tqdm(targets,
                            desc='fetching evidence for targets',
                            unit=' targets',
-                           file=tqdm_out,
+                           file=self.tqdm_out,
                            unit_scale=True):
             target_q.put(target)
         target_q.set_submission_finished()
 
-        logger.info("collecting readers and scorers")
+        self.logger.info("collecting readers and scorers")
         for w in readers:
             w.join()
         for w in scorers:
             w.join()
 
-        logger.info('flushing data to index')
+        self.logger.info('flushing data to index')
         self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                         wait_if_ongoing =True)
 
-        logger.info('collecting reporter')
+        self.logger.info('collecting reporter')
         q_reporter.join()
 
-        logger.info("DONE")
+        self.logger.info("DONE")
+
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of eco entries
+        association_count = 0
+        #Note: try to avoid doing this more than once!
+        for association in esquery.get_all_associations():
+            association_count += 1
+            if association_count % 1000 == 0:
+                self.logger.debug("checking %d", association_count)
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["association.count"] = association_count
+
+        return metrics

@@ -60,44 +60,6 @@ class EcoProcess():
             id = self.evidence_ontology.classes_paths[uri]['ids'][0][-1]
             self.ecos[id] = eco
 
-    # def _process_eco_data(self):
-    #
-    #     for row in self.session.query(ECOPath).yield_per(1000):
-    #         # if row.uri_id_org:
-    #             # idorg2ecos[row.uri_id_org] = row.uri
-    #             path_codes = []
-    #             path_labels = []
-    #             # tree_path = convert_tree_path(row.tree_path)
-    #             for node in row.tree_path:
-    #                 if isinstance(node, list):
-    #                     for node_element in node:
-    #                         path_codes.append(get_ontology_code_from_url(node_element['uri']))
-    #                         path_labels.append(node_element['label'])
-    #                         # break#TODO: just taking the first one, change this and all the dependent code to handle multiple paths
-    #                 else:
-    #                     path_codes.append(get_ontology_code_from_url(node['uri']))
-    #                     path_labels.append(node['label'])
-    #             eco = ECO(row.uri,
-    #                       path_labels[-1],
-    #                       row.tree_path,
-    #                       path_codes,
-    #                       path_labels,
-    #                       # id_org=row.uri_id_org,
-    #                       )
-    #             self.ecos[get_ontology_code_from_url(row.uri)] = eco
-    #     #TEMP FIX FOR MISSING ECO
-    #     missing_uris =['http://www.targevalidation.org/literature_mining']
-    #     for uri in missing_uris:
-    #         code = get_ontology_code_from_url(uri)
-    #         if code not in self.ecos:
-    #             eco = ECO(uri,
-    #                       [code],
-    #                       [{"uri": uri, "label":code}],
-    #                       [code],
-    #                       [code],
-    #                       )
-    #             self.ecos[code] = eco
-
     def _store_eco(self):
         for eco_id, eco_obj in self.ecos.items():
             self.loader.put(index_name=Config.ELASTICSEARCH_ECO_INDEX_NAME,
@@ -105,4 +67,21 @@ class EcoProcess():
                             ID=eco_id,
                             body=eco_obj)
 
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
 
+        #number of eco entries
+        eco_count = 0
+        #Note: try to avoid doing this more than once!
+        #for some reason, only the ECO get all need to explicitly be told to get all sources
+        for eco_entry in esquery.get_all_eco(True):
+            eco_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["eco.count"] = eco_count
+
+        return metrics
