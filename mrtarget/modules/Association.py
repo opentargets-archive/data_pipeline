@@ -95,11 +95,13 @@ class Association(JSONSerializable):
         #TODO: handle domains
         genes_info=ExtendedInfoGene(gene)
 
-        if gene.tractability:
+        if 'tractability' in gene:
             for el in trac_fields:
                 if el in gene.tractability:
                     for subel in trac_subfields:
                         if subel in gene.tractability[el]:
+                            if el not in self.private['facets']:
+                                self.private['facets'][el] = {}
                             self.private['facets'][el][subel] = copy.deepcopy(gene.tractability[el][subel])
                             if subel == "buckets":
                                 self.target["tractability"][el][subel] = copy.deepcopy(gene.tractability[el][subel])
