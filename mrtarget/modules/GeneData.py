@@ -75,6 +75,7 @@ class Gene(JSONSerializable):
         self.drugs = {}
         self.mouse_phenotypes = {}
         self.protein_classification = {}
+        self.tractability = {}
 
     def _set_id(self):
         if self.ensembl_gene_id:

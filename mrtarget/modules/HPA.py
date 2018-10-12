@@ -239,10 +239,10 @@ def name_from_tissue(tissue_name, t2m):
         # TODO the id has to be one word to not get splitted by the analyser
         tname = curated
 
-        if curated not in _missing_tissues:
+        if curated not in _missing_tissues['names']:
             _missing_tissues['names'][tname] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.debug('the tissue name %s was not found in the mapping', curated)
+            logger.warn('the tissue name %s was not found in the mapping', curated)
 
     return tname.strip()
 
@@ -258,10 +258,11 @@ def code_from_tissue(tissue_name, t2m):
         tid = tissue_name.strip().replace(' ', '_')
         tid = re.sub('[^0-9a-zA-Z_]+', '', tid)
 
-        if tid not in _missing_tissues:
+        #try to ensure each missing tissue is only logged once
+        if tid not in _missing_tissues['codes']:
             _missing_tissues['codes'][tid] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.debug('the tissue name %s was not found in the mapping', curated)
+            logger.warn('the tissue code %s was not found in the mapping', curated)
 
     return tid.strip()
 
@@ -471,6 +472,10 @@ class HPADataDownloader():
 
         return t_join
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> master
 class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
     def __init__(self, es, r_server, queue, dry_run=False):
