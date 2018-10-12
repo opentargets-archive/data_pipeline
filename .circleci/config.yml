@@ -19,13 +19,17 @@ jobs:
       - run:
           name: Install requirements.txt
           command: |
-            pip install -r requirements.txt .
+            pip install -r requirements.txt
       - save_cache:
           key: mrt-py27-b-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
             - "/usr/local/lib/python2.7/site-packages"
             - "/usr/local/bin"
             - "/usr/local/include/python2.7"
+      - run:
+          name: Install mrtarget after cache saving
+          command: |
+            pip install -e .
       - run:
           name: Dry run to check imports
           command: |
