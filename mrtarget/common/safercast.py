@@ -1,5 +1,6 @@
 import logging
 
+_l = logging.getLogger(__name__)
 
 class SaferCast(object):
     """
@@ -24,6 +25,8 @@ class SaferCast(object):
             try:
                 v = func(value)
             except:
+                _l.warning("fallback '%s' was used as the str value to cast was '%s' but caused an exception",
+                           v, value)
                 pass
             finally:
                 return v
@@ -47,7 +50,7 @@ class SaferCast(object):
 
         else:
             msg = "constructor parameter must be a callable, function or method (lambda included)"
-            self._logger.debug(msg + ", but you passed ", str(type(func)))
+            self._logger.debug(msg + ", but you passed %s", str(type(func)))
             raise TypeError(msg)
 
     def __call__(self, value):
