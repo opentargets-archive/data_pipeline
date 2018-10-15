@@ -7,7 +7,6 @@ import os
 import gzip
 import pickle
 from paramiko import AuthenticationException
-import opentargets.model.core as opentargets
 import logging
 import json
 import rdflib
