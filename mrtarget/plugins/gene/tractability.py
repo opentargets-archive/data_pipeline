@@ -1,17 +1,12 @@
+import logging
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
 from mrtarget.common.safercast import SaferBool, SaferFloat, SaferInt
 from tqdm import tqdm
 from itertools import compress
 
-import traceback
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-
 
 class Tractability(IPlugin):
-
     # Initiate Tractability object
     def __init__(self):
         self._logger = logging.getLogger(__name__)
@@ -51,12 +46,13 @@ class Tractability(IPlugin):
             raise ex
 
     def build_json(self, filename=Config.TRACTABILITY_FILENAME):
-        self._logger.info("data from TSV file comes in non standard way as bool comes as a categorical data "
+        self._logger.info("data from TSV file comes in non standard ways, by ex. bool comes as a categ. data Y/N"
                           "so casting to bool, int and float with default fallback values instead of "
-                          "throwing exceptions as we are parsing a TSV file")
+                          "throwing exceptions as we are parsing a TSV file where types are inexistent")
         to_bool = SaferBool(with_fallback=False)
         to_int = SaferInt(with_fallback=0)
         to_float = SaferFloat(with_fallback=0.)
+
         sm_bucketList = [1, 2, 3, 4, 5, 6, 7, 8]
         ab_bucketList = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -83,6 +79,8 @@ class Tractability(IPlugin):
                                                          Bucket_5_ab, Bucket_6_ab, Bucket_7_ab, Bucket_8_ab,
                                                          Bucket_9_ab]]))
 
+                # struct is built inline as the most pythonic way is preferable and more explicit
+                #
                 line = {
                     'smallmolecule': {
                         'buckets': sm_buckets,  # list of buckets
