@@ -2,11 +2,12 @@ from __future__ import print_function
 import logging
 import argparse
 import sys
-import itertools as it
+import itertools
 from logging.config import fileConfig
 
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common.ElasticsearchLoader import Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 from mrtarget.modules.Association import ScoringProcess
@@ -21,7 +22,7 @@ from mrtarget.modules.EvidenceString import EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneManager
 from mrtarget.modules.HPA import HPAProcess
-from mrtarget.modules.QC import QCRunner
+from mrtarget.modules.QC import QCRunner,QCMetrics
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
 from mrtarget.modules.Uniprot import UniprotDownloader
@@ -32,7 +33,7 @@ def main():
 
     #set up logging
     fileConfig(file_or_resource('logging.ini'),  disable_existing_loggers=False)
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__+".main()")
 
     parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
 
@@ -40,6 +41,14 @@ def main():
     parser.add_argument('release_tag', nargs='?', default=Config.RELEASE_VERSION,
                         help='The prefix to prepend default: %s' % \
                         Config.RELEASE_VERSION)
+    
+    #handle stage-specific QC
+    parser.add_argument("--qc-out", help="TSV file to write/update qc information",
+                        action="store")
+    parser.add_argument("--qc-in", help="TSV file to read qc information for comparison",
+                        action="store")
+    parser.add_argument("--qc-only", help="only run the qc and not the stage itself",
+                        action="store_true")
 
     #load supplemental and genetic informtaion from various external resources
     parser.add_argument("--hpa", help="download human protein atlas, process, and store in elasticsearch",
@@ -132,7 +141,10 @@ def main():
                         action='store_true', default=False)
     parser.add_argument("--log-level", help="set the log level",
                         action='store', default='WARNING')
-                        
+
+    parser.add_argument("--log-http", help="log all HTTP protocol requests to the specified file",
+                        action='store', default='http-requests.log')
+
     args = parser.parse_args()
 
     if not args.release_tag:
@@ -179,6 +191,14 @@ def main():
             root_logger.exception(e)
             return 1
 
+    if args.log_http:
+        logger.info("Will log all HTTP requests to %s" % args.log_http)
+        requests_log = logging.getLogger("urllib3")
+        requests_log.setLevel(logging.DEBUG)
+        requests_log.propagate = False  # Change to True to log to main log as well
+        requests_log.addHandler(logging.FileHandler(args.log_http))
+
+
     connected = connectors.init_services_connections(redispersist=args.persist_redis)
 
     logger.debug('Attempting to establish connection to the backend... %s',
@@ -186,6 +206,11 @@ def main():
 
     logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
+    #create a single query object for future use
+    esquery = ESQuery(connectors.es)
+
+    #create something to accumulate qc metrics into over various steps
+    qc_metrics = QCMetrics()
 
     with Loader(connectors.es,
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
@@ -195,69 +220,123 @@ def main():
         update_schema_version(Config,args.schema_version)
         logger.info('setting schema version string to %s', args.schema_version)
 
+
+
         if args.rea:
-            ReactomeProcess(loader).process_all()
+            process = ReactomeProcess(loader)
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))
         if args.ens:
-            EnsemblProcess(loader).process()
+            process = EnsemblProcess(loader)
+            if not args.qc_only:
+                process.process()
+            qc_metrics.update(process.qc(esquery))
         if args.unic:
-            UniprotDownloader(loader).cache_human_entries()
+            process = UniprotDownloader(loader)
+            if not args.qc_only:
+                process.cache_human_entries()
+            qc_metrics.update(process.qc(esquery))            
         if args.hpa:
-            HPAProcess(loader,connectors.r_server).process_all(dry_run=args.dry_run)
+            process = HPAProcess(loader,connectors.r_server)
+            if not args.qc_only:
+                process.process_all(dry_run=args.dry_run)
+            qc_metrics.update(process.qc(esquery))     
 
         if args.gen:
-            GeneManager(loader,connectors.r_server).merge_all(dry_run=args.dry_run)
+            process = GeneManager(loader,connectors.r_server)
+            if not args.qc_only:
+                process.merge_all(dry_run=args.dry_run)
+            qc_metrics.update(process.qc(esquery))     
 
         if args.mp:
-            MpProcess(loader).process_all()
+            process = MpProcess(loader)
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))    
         if args.efo:
-            EfoProcess(loader).process_all()
+            process = EfoProcess(loader)
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))
         if args.eco:
-            EcoProcess(loader).process_all()
+            process = EcoProcess(loader)
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))
         if args.hpo:
-            HpoProcess(loader).process_all()
+            process = HpoProcess(loader)
+            if not args.qc_only:
+                process.process_all()
+            qc_metrics.update(process.qc(esquery))
+
 
 
         if args.val:
             if args.input_file:
-                input_files = list(it.chain.from_iterable([el.split(",") for el in args.input_file]))
+                input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
             else:
                 #default behaviour: use all the data sources listed in the evidences_sources.txt file
-                logger.debug('reading the evidences sources URLs from evidence_sources.txt')
+                logger.info('reading the evidences sources URLs from evidence_sources.txt')
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
-            EvidenceValidationFileChecker(connectors.es, connectors.r_server, 
-                dry_run=args.dry_run).check_all(input_files=input_files)
+
+            process = EvidenceValidationFileChecker(connectors.es, connectors.r_server, 
+                dry_run=args.dry_run)
+            if not args.qc_only:
+                process.check_all(input_files=input_files, increment=False)
+            qc_metrics.update(process.qc(esquery, input_files))
+
+
         if args.valreset:
             EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
 
         if args.evs:
-            targets = EvidenceStringProcess(connectors.es,
-                                                connectors.r_server,
-                                                ).process_all(datasources = args.datasource,
-                                                                                      dry_run=args.dry_run)
+            process = EvidenceStringProcess(connectors.es, connectors.r_server)
+            if not args.qc_only:
+                process.process_all(datasources = args.datasource, dry_run=args.dry_run)
+            qc_metrics.update(process.qc(esquery))
+
         if args.ass:
-            ScoringProcess(loader, connectors.r_server).process_all(targets = targets,
-                                                             dry_run=args.dry_run)
+            process = ScoringProcess(loader, connectors.r_server)
+            if not args.qc_only:
+                process.process_all(targets = targets, dry_run=args.dry_run)
+            qc_metrics.update(process.qc(esquery))
+            
         if args.ddr:
-            DataDrivenRelationProcess(connectors.es, connectors.r_server).process_all(dry_run = args.dry_run)
+            process = DataDrivenRelationProcess(connectors.es, connectors.r_server)
+            if not args.qc_only:
+                process.process_all(dry_run = args.dry_run)
+            #TODO qc
 
         if args.sea:
-            SearchObjectProcess(loader, connectors.r_server).process_all(skip_targets=args.skip_targets,
-                                                                             skip_diseases=args.skip_diseases)
+            process = SearchObjectProcess(loader, connectors.r_server)
+            if not args.qc_only:
+                process.process_all(skip_targets=args.skip_targets, skip_diseases=args.skip_diseases)
+            #TODO qc
+
         if args.metric:
-            Metrics(connectors.es).generate_metrics()
+            process = Metrics(connectors.es).generate_metrics()
 
         if args.qc:
             QCRunner(connectors.es).run_associationQC()
-
         if args.dump:
             DumpGenerator().dump()
+
+    if args.qc_in:
+        #handle reading in previous qc from filename provided, and adding comparitive metrics
+        qc_metrics.compare_with(args.qc_in)
+
+    if args.qc_out:
+        #handle writing out to a tsv file
+        qc_metrics.write_out(args.qc_out)
 
     logger.debug('close connectors')
     connectors.close()
 
     logger.info('`'+" ".join(sys.argv)+'` - finished')
     return 0
+
 
 
 if __name__ == '__main__':

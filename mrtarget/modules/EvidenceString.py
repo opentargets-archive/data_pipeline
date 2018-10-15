@@ -10,7 +10,6 @@ import pickle
 from tqdm import tqdm
 
 from mrtarget.Settings import Config, file_or_resource
-from mrtarget.common import Actions
 from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
@@ -62,10 +61,6 @@ except ImportError:
 
         return inner
 '''end of line profiler code'''
-
-class EvidenceStringActions(Actions):
-    PROCESS = 'process'
-    UPLOAD = 'upload'
 
 # def evs_lookup(dic, key, *keys):
 #     '''
@@ -1293,3 +1288,24 @@ class EvidenceStringProcess():
 
         global_stats.compress()
         return global_stats
+
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+        self.logger.debug('starting qc')
+
+        #number of entries
+        evidence_count = 0
+        #Note: try to avoid doing this more than once!
+        for evidence in esquery.get_all_evidence(True):
+            evidence_count += 1
+            if evidence_count % 1000 == 0:
+                self.logger.debug("checking %d", evidence_count)
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["evidence.count"] = evidence_count
+
+        return metrics

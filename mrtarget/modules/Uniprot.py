@@ -106,10 +106,27 @@ class UniprotDownloader():
                     result = Parser(xml, return_raw_comments=True).parse()
                     self._save_to_elasticsearch(result.id, result)
 
-
     def _save_to_elasticsearch(self, uniprotid, seqrec):
         json_seqrec = base64.b64encode(jsonpickle.encode(seqrec))
         self.loader.put(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME,
                         Config.ELASTICSEARCH_UNIPROT_DOC_NAME,
                         uniprotid,
                         dict(entry =json_seqrec))
+
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of uniprot entries
+        uniprot_count = 0
+        #Note: try to avoid doing this more than once!
+        for unprot_entry in esquery.get_all_uniprot_entries():
+            uniprot_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["uniprot.count"] = uniprot_count
+
+        return metrics

@@ -4,8 +4,12 @@ jobs:
     working_directory: /usr/src/app
     docker:
       - image: quay.io/opentargets/mrtarget_build_base:circleci-build-base-0.1
+      #specify a second image that will run
+      #note that this wont have any commands and will be "localhost"
+      - image: elasticsearch:5.6.11
     environment:
       CTTV_MINIMAL: True
+      ELASTICSEARCH_NODES: http://localhost:9200
     steps:
       - checkout
       - restore_cache:
@@ -19,13 +23,17 @@ jobs:
       - run:
           name: Install requirements.txt
           command: |
-            pip install -r requirements.txt .
+            pip install -r requirements.txt
       - save_cache:
           key: mrt-py27-b-{{ .Branch }}-{{ checksum "requirements.txt" }}
           paths:
             - "/usr/local/lib/python2.7/site-packages"
             - "/usr/local/bin"
             - "/usr/local/include/python2.7"
+      - run:
+          name: Install mrtarget after cache saving
+          command: |
+            pip install -e .
       - run:
           name: Dry run to check imports
           command: |

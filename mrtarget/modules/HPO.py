@@ -102,8 +102,6 @@ class HpoProcess():
             exact_synonyms = []
             narrow_synonyms = []
             broad_synonyms = []
-            # oboInOwl:hasExactSynonym
-            # http://www.geneontology.org/formats/oboInOwl#hasExactSynonym
             if 'http://www.geneontology.org/formats/oboInOwl#hasExactSynonym' in properties:
                 exact_synonyms = properties['http://www.geneontology.org/formats/oboInOwl#hasExactSynonym']
             if 'http://www.geneontology.org/formats/oboInOwl#hasBroadSynonym' in properties:
@@ -134,3 +132,21 @@ class HpoProcess():
                             doc_type=Config.ELASTICSEARCH_HPO_LABEL_DOC_NAME,
                             ID=hpo_id,
                             body = hpo_obj)
+
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of hpo entries
+        hpo_count = 0
+        #Note: try to avoid doing this more than once!
+        for hpo_entry in esquery.get_all_human_phenotypes():
+            hpo_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["hpo.count"] = hpo_count
+
+        return metrics

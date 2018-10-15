@@ -239,10 +239,10 @@ def name_from_tissue(tissue_name, t2m):
         # TODO the id has to be one word to not get splitted by the analyser
         tname = curated
 
-        if curated not in _missing_tissues:
+        if curated not in _missing_tissues['names']:
             _missing_tissues['names'][tname] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.debug('the tissue name %s was not found in the mapping', curated)
+            logger.warn('the tissue name %s was not found in the mapping', curated)
 
     return tname.strip()
 
@@ -258,10 +258,11 @@ def code_from_tissue(tissue_name, t2m):
         tid = tissue_name.strip().replace(' ', '_')
         tid = re.sub('[^0-9a-zA-Z_]+', '', tid)
 
-        if tid not in _missing_tissues:
+        #try to ensure each missing tissue is only logged once
+        if tid not in _missing_tissues['codes']:
             _missing_tissues['codes'][tid] = tissue_name
             logger = logging.getLogger(__name__)
-            logger.debug('the tissue name %s was not found in the mapping', curated)
+            logger.warn('the tissue code %s was not found in the mapping', curated)
 
     return tid.strip()
 
@@ -471,40 +472,6 @@ class HPADataDownloader():
 
         return t_join
 
-#     def retrieve_cancer_data(self):
-#         self.logger.info('retrieve cancer data from HPA')
-#         table = (
-#             petl.fromcsv(URLZSource(Config.HPA_CANCER_URL))
-#             .rename({'Tumor': 'tumor',
-#                      'Level': 'level',
-#                      'Count patients': 'count_patients',
-#                      'Total patients': 'total_patients',
-#                      'Gene': 'gene',
-#                      'Expression type': 'expression_type'})
-#             .cut('tumor', 'count_patients', 'level', 'total_patients', 'gene',
-#                  'expression_type')
-#             )
-#
-#         for d in petl.dicts(table):
-#             yield d
-#
-#     def retrieve_subcellular_location_data(self):
-#         self.logger.info('retrieve subcellular location data from HPA')
-#         table = (
-#             petl.fromcsv(URLZSource(Config.HPA_SUBCELLULAR_LOCATION_URL))
-#             .rename({'Main location': 'main_location',
-#                      'Other location': 'other_location',
-#                      'Gene': 'gene',
-#                      'Reliability': 'reliability',
-#                      'Expression type': 'expression_type'})
-#             .cut('main_location', 'other_location', 'gene', 'reliability',
-#                  'expression_type')
-#             )
-#
-#         for d in table.dicts():
-#             yield d
-
-
 class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
     def __init__(self, es, r_server, queue, dry_run=False):
@@ -612,7 +579,20 @@ class HPAProcess():
         self.logger.info('missing tissues %s', str(_missing_tissues))
         self.logger.info('all expressions objects pushed to elasticsearch')
 
-#         if self.data.values()[0]['cancer']:  # if there is cancer data
-#             pass
-#         if self.data.values()[0]['subcellular_location']:  # if there is subcellular location data
-#             pass
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of hpa entries
+        hpa_count = 0
+        #Note: try to avoid doing this more than once!
+        for hpa_entry in esquery.get_all_hpa():
+            hpa_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["hpa.count"] = hpa_count
+
+        return metrics

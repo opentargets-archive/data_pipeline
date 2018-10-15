@@ -27,7 +27,7 @@ class EnsemblMysqlGene(object):
         '''
         dbname = 'homo_sapiens_core_%d_38' % ensembl_release
         try:
-            self.conn = mysql.connector.connect(host='ensembldb.ensembl.org', user='anonymous', port=5306, db=dbname, passwd='')
+            self.conn = mysql.connector.connect(host='ensembldb.ensembl.org', user='anonymous', port=3306, db=dbname, passwd='')
         except mysql.connector.OperationalError as mysql_ex:
             raise mysql_ex
 
@@ -186,3 +186,21 @@ class EnsemblProcess(object):
                             ens_id,
                             json.dumps(data),
                             True)
+
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of reactions
+        ensemble_count = 0
+        #Note: try to avoid doing this more than once!
+        for ensemble in esquery.get_all_ensembl_genes():
+            ensemble_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["ensemble.count"] = ensemble_count
+
+        return metrics
