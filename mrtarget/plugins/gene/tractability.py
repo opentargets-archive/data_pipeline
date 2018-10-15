@@ -1,6 +1,6 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
-from mrtarget.common import str_to_boolean, str_to_int
+from mrtarget.common.safercast import SaferBool, SaferFloat, SaferInt
 from tqdm import tqdm
 from itertools import compress
 
@@ -51,7 +51,12 @@ class Tractability(IPlugin):
             raise ex
 
     def build_json(self, filename=Config.TRACTABILITY_FILENAME):
-
+        self._logger.info("data from TSV file comes in non standard way as bool comes as a categorical data "
+                          "so casting to bool, int and float with default fallback values instead of "
+                          "throwing exceptions as we are parsing a TSV file")
+        to_bool = SaferBool(with_fallback=False)
+        to_int = SaferInt(with_fallback=0)
+        to_float = SaferFloat(with_fallback=0.)
         sm_bucketList = [1, 2, 3, 4, 5, 6, 7, 8]
         ab_bucketList = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -78,27 +83,28 @@ class Tractability(IPlugin):
                                                          Bucket_5_ab, Bucket_6_ab, Bucket_7_ab, Bucket_8_ab,
                                                          Bucket_9_ab]]))
 
-                line = {'smallmolecule': {}, 'antibody': {}}
-                line['smallmolecule'] = {
-                    'buckets': sm_buckets,  # list of buckets
-                    'categories': {
-                        'clinical_precedence': float(Clinical_Precedence),
-                        'discovery_precedence': float(Discovery_Precedence),
-                        'predicted_tractable': float(Predicted_Tractable)
+                line = {
+                    'smallmolecule': {
+                        'buckets': sm_buckets,  # list of buckets
+                        'categories': {
+                            'clinical_precedence': to_float(Clinical_Precedence),
+                            'discovery_precedence': to_float(Discovery_Precedence),
+                            'predicted_tractable': to_float(Predicted_Tractable)
+                        },
+                        'top_category': Category,
+                        'ensemble': to_float(ensemble), # drugebility score not used at the moment but in a future
+                        'high_quality_compounds': to_int(High_Quality_ChEMBL_compounds),
+                        'small_molecule_genome_member': to_bool(Small_Molecule_Druggable_Genome_Member)
                     },
-                    'top_category': Category,
-                    'ensemble': float(ensemble), # drugebility score not used at the moment but in a future
-                    'high_quality_compounds': str_to_int(High_Quality_ChEMBL_compounds),
-                    'small_molecule_genome_member': str_to_boolean(Small_Molecule_Druggable_Genome_Member)
-                }
-                line['antibody'] = {
-                    'buckets': ab_buckets,
-                    'categories': {
-                        'clinical_precedence': float(Clinical_Precedence_ab),
-                        'predicted_tractable_high_confidence': float(Predicted_Tractable__High_confidence),
-                        'predicted_tractable_med_low_confidence': float(Predicted_Tractable__Medium_to_low_confidence)
-                    },
-                    'top_category': Category_ab
+                    'antibody': {
+                        'buckets': ab_buckets,
+                        'categories': {
+                            'clinical_precedence': to_float(Clinical_Precedence_ab),
+                            'predicted_tractable_high_confidence': to_float(Predicted_Tractable__High_confidence),
+                            'predicted_tractable_med_low_confidence': to_float(Predicted_Tractable__Medium_to_low_confidence)
+                        },
+                        'top_category': Category_ab
+                    }
                 }
 
                 # Add data for current gene to self.tractability
