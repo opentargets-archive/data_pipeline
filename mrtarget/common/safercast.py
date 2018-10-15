@@ -1,4 +1,5 @@
 import logging
+from distutils.util import strtobool
 
 _l = logging.getLogger(__name__)
 
@@ -72,13 +73,7 @@ class SaferBool(SaferCast):
     """
     @staticmethod
     def _str_to_boolean(s):
-        sl = s.lower()
-        if sl in ['true', '1', 't', 'y', 'yes']:
-            return True
-        elif sl in ['false', '0', 'f', 'n', 'no']:
-            return False
-        else:
-            raise ValueError("%s is not a str in the domain of a bool as true, 1, t, y, yes or false, 0, f, n, no" % s)
+        strtobool(s.lower())
 
     def __init__(self, with_fallback):
         super(SaferBool, self).__init__(SaferBool._str_to_boolean, with_fallback=with_fallback)
