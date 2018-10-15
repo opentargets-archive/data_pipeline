@@ -93,7 +93,16 @@ MS023;CARM1;www.thesgc.org/chemical-probes/MS023;www.chemicalprobes.org/MS023;;P
 MS023;PRMT6;www.thesgc.org/chemical-probes/MS023;www.chemicalprobes.org/MS023;;Protein targets are Type I PRMTs: PRMT1, PRMT3, CARM1 (=PRMT4), PRMT6, PRMT8
 MS023;PRMT8;www.thesgc.org/chemical-probes/MS023;www.chemicalprobes.org/MS023;;Protein targets are Type I PRMTs: PRMT1, PRMT3, CARM1 (=PRMT4), PRMT6, PRMT8
 OICR-9429;WDR5;www.thesgc.org/chemical-probes/OICR-9429;www.chemicalprobes.org/OICR-9429;;none
-MRK-740;PRDM9;https://www.thesgc.org/chemical-probes/MRK-740;;;none
+MRK-740;PRDM9;www.thesgc.org/chemical-probes/MRK-740;;;none
+BI-9321;NSD3;www.thesgc.org/node/633667;;;Binds to PWWP1 domain of NSD3, but not NSD2-PWWP1 and NSD3-PWWP2
+VinSpinIn;Spin1;www.thesgc.org/chemical-probes/VinSpinIn;;;none
+TP-238;CECR2;www.thesgc.org/chemical-probes/TP-238;;;Protein targets: CECR2, BPTF
+TP-238;BPTF;www.thesgc.org/chemical-probes/TP-238;;;Protein targets: CECR2, BPTF
+DDR-TRK-1;DDR1;www.thesgc.org/chemical-probes/DDR-TRK-1;;;Protein targets: DDR1, DDR2, NTRK1, NTRK2, NTRK3
+DDR-TRK-1;DDR2;www.thesgc.org/chemical-probes/DDR-TRK-1;;;Protein targets: DDR1, DDR2, NTRK1, NTRK2, NTRK3
+DDR-TRK-1;NTRK1;www.thesgc.org/chemical-probes/DDR-TRK-1;;;Protein targets: DDR1, DDR2, NTRK1, NTRK2, NTRK3
+DDR-TRK-1;NTRK2;www.thesgc.org/chemical-probes/DDR-TRK-1;;;Protein targets: DDR1, DDR2, NTRK1, NTRK2, NTRK3
+DDR-TRK-1;NTRK3;www.thesgc.org/chemical-probes/DDR-TRK-1;;;Protein targets: DDR1, DDR2, NTRK1, NTRK2, NTRK3
 (R)-PFI-2;SETD7;;www.chemicalprobes.org/R-PFI-2;;none
 A-1155463;BCL2L1;;www.chemicalprobes.org/1155463;;none
 AC220;FLT3;;www.chemicalprobes.org/AC220;;none
