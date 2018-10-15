@@ -73,7 +73,7 @@ class SaferBool(SaferCast):
     """
     @staticmethod
     def _str_to_boolean(s):
-        strtobool(s.lower())
+        bool(strtobool(s.lower()))
 
     def __init__(self, with_fallback):
         super(SaferBool, self).__init__(SaferBool._str_to_boolean, with_fallback=with_fallback)
