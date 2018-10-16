@@ -1,16 +1,12 @@
+import logging
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
+from mrtarget.common.safercast import SaferBool, SaferFloat, SaferInt
 from tqdm import tqdm
 from itertools import compress
 
-import traceback
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-
 
 class Tractability(IPlugin):
-
     # Initiate Tractability object
     def __init__(self):
         self._logger = logging.getLogger(__name__)
@@ -32,17 +28,17 @@ class Tractability(IPlugin):
         self.tqdm_out = tqdm_out
 
         try:
-            # Parse cancer biomarker data into self.cancerbiomarkers
+            # Parse tractability data into self.tractability
             self.build_json(filename=Config.TRACTABILITY_FILENAME)
 
-            # Iterate through all genes and add cancer biomarkers data if gene symbol is present
+            # Iterate through all genes and add tractability data if gene symbol is present
             self._logger.info("Tractability data injection")
             for gene_id, gene in tqdm(genes.iterate(),
                                       desc='Adding Tractability data',
                                       unit=' gene',
                                       file=self.tqdm_out):
                 if gene.ensembl_gene_id in self.tractability:
-                    self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.ensembl_gene_id)
+                    self._logger.debug("Adding tractability data to gene %s", gene.ensembl_gene_id)
                     gene.tractability=self.tractability[gene.ensembl_gene_id]
 
         except Exception as ex:
@@ -50,6 +46,12 @@ class Tractability(IPlugin):
             raise ex
 
     def build_json(self, filename=Config.TRACTABILITY_FILENAME):
+        self._logger.info("data from TSV file comes in non standard ways, by ex. bool comes as a categ. data Y/N"
+                          "so casting to bool, int and float with default fallback values instead of "
+                          "throwing exceptions as we are parsing a TSV file where types are inexistent")
+        to_bool = SaferBool(with_fallback=False)
+        to_int = SaferInt(with_fallback=0)
+        to_float = SaferFloat(with_fallback=0.)
 
         sm_bucketList = [1, 2, 3, 4, 5, 6, 7, 8]
         ab_bucketList = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -77,28 +79,31 @@ class Tractability(IPlugin):
                                                          Bucket_5_ab, Bucket_6_ab, Bucket_7_ab, Bucket_8_ab,
                                                          Bucket_9_ab]]))
 
-                line = {'smallmolecule': {}, 'antibody': {}}
-                line['smallmolecule'] = {
-                    'buckets': sm_buckets,  # list of buckets
-                    'categories': {
-                        'clinical_precedence': float(Clinical_Precedence),
-                        'discovery_precedence': float(Discovery_Precedence),
-                        'predicted_tractable': float(Predicted_Tractable)
+                # struct is built inline as the most pythonic way is preferable and more explicit
+                #
+                line = {
+                    'smallmolecule': {
+                        'buckets': sm_buckets,  # list of buckets
+                        'categories': {
+                            'clinical_precedence': to_float(Clinical_Precedence),
+                            'discovery_precedence': to_float(Discovery_Precedence),
+                            'predicted_tractable': to_float(Predicted_Tractable)
+                        },
+                        'top_category': Category,
+                        'ensemble': to_float(ensemble), # drugebility score not used at the moment but in a future
+                        'high_quality_compounds': to_int(High_Quality_ChEMBL_compounds),
+                        'small_molecule_genome_member': to_bool(Small_Molecule_Druggable_Genome_Member)
                     },
-                    'top_category': Category,
-                    'ensemble': ensemble,
-                    'high_quality_compounds': High_Quality_ChEMBL_compounds,
-                    'small_molecule_genome_member': Small_Molecule_Druggable_Genome_Member
-                }
-                line['antibody'] = {
-                    'buckets': ab_buckets,
-                    'categories': {
-                        'clinical_precedence': float(Clinical_Precedence_ab),
-                        'predicted_tractable_high_confidence': float(Predicted_Tractable__High_confidence),
-                        'predicted_tractable_med_low_confidence': float(Predicted_Tractable__Medium_to_low_confidence)
-                    },
-                    'top_category': Category_ab
+                    'antibody': {
+                        'buckets': ab_buckets,
+                        'categories': {
+                            'clinical_precedence': to_float(Clinical_Precedence_ab),
+                            'predicted_tractable_high_confidence': to_float(Predicted_Tractable__High_confidence),
+                            'predicted_tractable_med_low_confidence': to_float(Predicted_Tractable__Medium_to_low_confidence)
+                        },
+                        'top_category': Category_ab
+                    }
                 }
 
-                # Add data for current biomarker to self.cancerbiomarkers
+                # Add data for current gene to self.tractability
                 self.tractability[ensembl_gene_id] = line
