@@ -133,3 +133,22 @@ class MpProcess():
                             doc_type=Config.ELASTICSEARCH_MP_LABEL_DOC_NAME,
                             ID=mp_id,
                             body = mp_obj)
+
+
+    """
+    Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
+    of string test names and result objects
+    """
+    def qc(self, esquery):
+
+        #number of mp entries
+        mp_count = 0
+        #Note: try to avoid doing this more than once!
+        for mp_entry in esquery.get_all_mammalian_phenotypes():
+            mp_count += 1
+
+        #put the metrics into a single dict
+        metrics = dict()
+        metrics["mp.count"] = mp_count
+
+        return metrics

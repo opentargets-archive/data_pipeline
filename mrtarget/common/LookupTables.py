@@ -214,7 +214,7 @@ class ECOLookUpTable(object):
     def _load_eco_data(self, r_server=None):
         self._logger = logging.getLogger(__name__)
         self.tqdm_out = TqdmToLogger(self._logger, level=logging.INFO)
-        for eco in tqdm(self._es_query.get_all_eco(),
+        for eco in tqdm(self._es_query.get_all_eco(True),
                         desc='loading eco',
                         unit=' eco',
                         unit_scale=True,
