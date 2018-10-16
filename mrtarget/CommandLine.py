@@ -143,7 +143,7 @@ def main():
                         action='store', default='WARNING')
 
     parser.add_argument("--log-http", help="log all HTTP protocol requests to the specified file",
-                        action='store', default='http-requests.log')
+                        action='store')
 
     args = parser.parse_args()
 
