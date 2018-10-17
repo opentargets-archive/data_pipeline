@@ -24,7 +24,11 @@ branches:
   only:
   - master
   - "/\\d+\\.\\d+\\.\\d+/"
-  - mk-dockermakefile
+  - "/mk.*/"
+  - "/af.*/"
+  - "/ck.*/"
+  - "/ms.*/"
+  - "/MS./"
 #deploy:
 #  provider: releases
 #  api_key: ${GITHUB_KEY}
@@ -45,7 +49,7 @@ after_success:
   - codecov
   - docker pull "${QUAY_REPO}:${TRAVIS_BRANCH}" || true
   - docker build --pull --cache-from "${QUAY_REPO}:${TRAVIS_BRANCH}" --tag "${QUAY_REPO}" .
-  - docker login -u "${QUAY_USER}" -p "${QUAY_PASSWORD}" quay.io
+  - docker login -u="${QUAY_USER}" -p="${QUAY_PASSWORD}" quay.io
 #   - git_sha="$(git rev-parse --short HEAD)"
   - git_sha="${TRAVIS_COMMIT}"
   - docker tag "${QUAY_REPO}" "${QUAY_REPO}:${TRAVIS_BRANCH}"
