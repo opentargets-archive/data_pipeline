@@ -6,7 +6,6 @@ sys.setdefaultencoding("utf8")
 import os
 import gzip
 import pickle
-from paramiko import AuthenticationException
 import logging
 import json
 import rdflib
