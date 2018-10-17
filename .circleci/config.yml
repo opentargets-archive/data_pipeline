@@ -41,7 +41,7 @@ jobs:
       - run:
           name: Run tests
           command: |
-            nosetests
+            py.test --cov=mrtarget tests/
       - run:
           name: Codecov report submission
           command: |
