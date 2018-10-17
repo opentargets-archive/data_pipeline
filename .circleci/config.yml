@@ -41,7 +41,11 @@ jobs:
       - run:
           name: Run tests
           command: |
-            pytest tests/
+            nosetests
+      - run:
+          name: Codecov report submission
+          command: |
+            codecov
   # uncomment this to use workflows (see below)
   # push_containers:
   #   working_directory: /usr/src/app

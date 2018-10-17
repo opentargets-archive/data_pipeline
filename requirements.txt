@@ -39,6 +39,7 @@ colorama
 psutil
 pylru
 toolz
+codecov
 yapsy==1.11.223
 
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz
