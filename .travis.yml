@@ -1,0 +1,48 @@
+sudo: false
+language: python
+cache:
+  directories:
+    - "$HOME/google-cloud-sdk/"
+services:
+  - docker
+python:
+  - 2.7
+install:
+  - pip install -r requirements.txt
+  - pip install -e .
+script:
+  - mrtarget --dry-run citest
+  - pytest --cov=mrtarget --cov-report term tests/ --fulltrace
+branches:
+  only:
+  - master
+  - "/\\d+\\.\\d+\\.\\d+/"
+  - mk-dockermakefile
+#deploy:
+#  provider: releases
+#  api_key: ${GITHUB_KEY}
+#  file_glob: true
+#  file:
+#    - "target/universal/ot-genetics-api-latest.zip"
+#  on:
+#    repo: opentargets/genetics-api
+#    tags: true
+#  skip_cleanup: true
+notifications:
+  email:
+    recipients:
+    - ops@opentargets.org
+    on_success: never
+    on_failure: always
+after_success:
+  - codecov
+  - if [ ! -d "google-cloud-sdk/bin" ]; then rm -rf "google-cloud-sdk"; curl 'https://sdk.cloud.google.com' | bash; fi
+  - source google-cloud-sdk/path.bash.inc
+  - gcloud version
+  - gcloud --quiet components update
+#  - echo $GCLOUD_KEY | base64 --decode > gcloud.p12
+#  - gcloud auth activate-service-account $GCLOUD_EMAIL --key-file gcloud.p12
+#  - ssh-keygen -f ~/.ssh/google_compute_engine -N ""
+#  # Push to Google container registry
+#  - docker build -t gcr.io/$CLOUDSDK_CORE_PROJECT/$CLOUDSDK_CORE_PROJECT:v1 .
+#  - gcloud docker push gcr.io/$CLOUDSDK_CORE_PROJECT/$CLOUDSDK_CORE_PROJECT:v1 > /dev/null
