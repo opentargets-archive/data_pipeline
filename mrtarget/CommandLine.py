@@ -12,7 +12,6 @@ from mrtarget.common.connection import PipelineConnectors
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
-from mrtarget.modules.Dump import DumpGenerator
 from mrtarget.modules.ECO import EcoProcess
 from mrtarget.modules.EFO import EfoProcess
 from mrtarget.modules.HPO import HpoProcess
@@ -320,8 +319,6 @@ def main():
 
         if args.qc:
             QCRunner(connectors.es).run_associationQC()
-        if args.dump:
-            DumpGenerator().dump()
 
     if args.qc_in:
         #handle reading in previous qc from filename provided, and adding comparitive metrics
