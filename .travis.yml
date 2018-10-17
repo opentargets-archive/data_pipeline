@@ -18,7 +18,7 @@ install:
   - pip install -r requirements.txt
   - pip install -e .
 script:
-  - make dry_run travisci
+  - make dry_run
   - pytest --cov=mrtarget --cov-report term tests/ --fulltrace
 branches:
   only:
@@ -46,7 +46,8 @@ after_success:
   - docker pull "${QUAY_REPO}:${TRAVIS_BRANCH}" || true
   - docker build --pull --cache-from "${QUAY_REPO}:${TRAVIS_BRANCH}" --tag "${QUAY_REPO}" .
   - docker login -u "${QUAY_USER}" -p "${QUAY_PASSWORD}" quay.io
-  - git_sha="$(git rev-parse --short HEAD)"
+#   - git_sha="$(git rev-parse --short HEAD)"
+  - git_sha="${TRAVIS_COMMIT}"
   - docker tag "${QUAY_REPO}" "${QUAY_REPO}:${TRAVIS_BRANCH}"
   - docker tag "${QUAY_REPO}" "${QUAY_REPO}:${git_sha}-${TRAVIS_BRANCH}"
   - docker push "${QUAY_REPO}:${TRAVIS_BRANCH}" && docker push "${QUAY_REPO}:${git_sha}-${TRAVIS_BRANCH}"
