@@ -39,12 +39,12 @@ class UniprotDownloader():
         self.urlparams["compress"] = "yes"
 
         #size of chunks to get from uniprot
-        self.chunk_size = 1000
+        self.chunk_size = 100
         #timeout for queries to uniprot
         self.timeout = 300
 
         #number of concurrent requests
-        self.workers = 32
+        self.workers = min([16, Config.WORKERS_NUMBER])
 
         self.loader = loader
         self.NS = "{http://uniprot.org/uniprot}"
@@ -87,14 +87,13 @@ class UniprotDownloader():
                 elem.clear()
 
     def _get_data_from_remote(self, session, limit, offset):
-        #make a local copy for this query of the parameters
+        # make a local copy for this query of the parameters
         params = dict(self.urlparams)
-        #set the paging
-        if limit:
-            params["limit"] = limit
-        if offset:
-            self.logger.debug("using param 'skip' instead 'offset' to fix a potential uniprot issue")
-            params["skip"] = offset
+        # set the paging
+        # if you dont use offset uniprot will return everything! so
+        # make sure you use an initial offset=0 as well
+        params["limit"] = limit
+        params["offset"] = offset
 
         self.logger.debug('querying url %s with params %s', self.url, params)
         return session.get(self.url, params=params, timeout=self.timeout, background_callback=self._cb_get)
