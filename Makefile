@@ -215,6 +215,24 @@ metrics:
 all: load_data gene_merge validate_all evidence_strings association_scores association_qc search_data relationship_data metrics
 
 # Utility targets
+# thanks to https://stackoverflow.com/a/15058900
+.PHONY: no_targets__ list
+no_targets__:
+list:
+	@sh -c "$(MAKE) -p no_targets__ | awk -F':' '/^[a-zA-Z0-9][^\$$#\/\\t=]*:([^=]|$$)/ {split(\$$1,A,/ /);for(i in A)print A[i]}' | grep -v '__\$$' | sort"
+
+
+MRTARGET_ARGS ?=
+.PHONY: no_targets__ shell
+no_targets__:
+shell:
+	@ES_PREFIX=$(ES_PREFIX) \
+	    ELASTICSEARCH_NODES=$(ELASTICSEARCH_NODES) \
+	    LOG_LEVEL=$(LOG_LEVEL) \
+	    SCHEMA_VERSION=$(SCHEMA_VERSION) \
+	    PERCENTAGE_TO_KEEP=$(PERCENTAGE_TO_KEEP) \
+	    MRTARGET_CMD="$(MRTARGET_CMD)" \
+	    bash
 
 .PHONY: list_indices
 list_indices:
