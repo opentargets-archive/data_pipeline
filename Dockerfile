@@ -10,5 +10,5 @@ COPY . /usr/src/app
 RUN pip install --no-cache-dir -e .
 
 # point to the entrypoint script
-# ENTRYPOINT [ "scripts/entrypoint.sh" ]
-ENTRYPOINT [ "make" ]
+ENTRYPOINT [ "scripts/entrypoint.sh" ]
+# ENTRYPOINT [ "make" ]
