@@ -31,6 +31,7 @@ branches:
   - "/MS.*/"
   - "/gp.*/"
   - "/pl.*/"
+  - "/gk.*/"
 #deploy:
 #  provider: releases
 #  api_key: ${GITHUB_KEY}
