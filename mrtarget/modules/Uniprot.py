@@ -16,11 +16,11 @@ class UniprotDownloader():
         self.loader = loader
         self.NS = "{http://uniprot.org/uniprot}"
 
-    def cache_human_entries(self):
+    def cache_human_entries(self, uri=Config.UNIPROT_URI):
         if not self.dry_run:
             self.logger.debug("download uniprot uri %s", Config.UNIPROT_URI)
 
-            with URLZSource(Config.UNIPROT_URI).open() as r_file:
+            with URLZSource(uri).open() as r_file:
                 self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
                 self.loader.create_new_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
 
