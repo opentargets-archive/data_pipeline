@@ -27,7 +27,7 @@ class UniprotDownloader():
 
                 self.logger.debug("iterate through the whole uniprot xml file")
                 entries = 0
-                for i, xml in enumerate(self._iterate_xml(r_file, self.NS)):
+                for i, xml in enumerate(self._iterate_xml(r_file, self.NS), start=1):
                     result = Parser(xml, return_raw_comments=True).parse()
                     self._save_to_elasticsearch(result.id, result)
                     entries = i
