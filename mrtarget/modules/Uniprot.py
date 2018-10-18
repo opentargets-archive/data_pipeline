@@ -54,7 +54,7 @@ class UniprotDownloader():
         with FuturesSession(executor=ThreadPoolExecutor(max_workers=self.workers)) as session:
 
             # set the index properly in order to insert in bulk mode
-            self.loader.create_new_index(Config.Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
+            self.loader.create_new_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
 
             #query to get hoe many to retrieve
             future = self._get_data_from_remote(session, 1,0)
