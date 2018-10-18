@@ -27,10 +27,10 @@ def sanitise_dict_for_json(d):
 
 
 class UniprotDownloader():
-    def __init__(self,
-                 loader):
+    def __init__(self, loader, dry_run=False):
         #the trailing slash is required by uniprot
         self.url = "http://www.uniprot.org/uniprot/"
+        self.dry_run = dry_run
         self.urlparams = dict()
         self.urlparams["query"] = build_uniprot_query(Config.MINIMAL_ENSEMBL) if Config.MINIMAL else "reviewed:yes+AND+organism:9606"
         self.urlparams["format"] = "xml"
@@ -53,6 +53,9 @@ class UniprotDownloader():
     def cache_human_entries(self):
         with FuturesSession(executor=ThreadPoolExecutor(max_workers=self.workers)) as session:
 
+            # set the index properly in order to insert in bulk mode
+            self.loader.create_new_index(Config.Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
+
             #query to get hoe many to retrieve
             future = self._get_data_from_remote(session, 1,0)
             total = int(future.result().headers['X-Total-Results'])
@@ -73,6 +76,8 @@ class UniprotDownloader():
             for future in futures:
                 future.result()
 
+            self.loader.flush()
+            self.loader.close()
             self.logger.info('downloaded %i entries from uniprot'%total)
 
     def _iterate_xml(self, handle):
@@ -88,7 +93,8 @@ class UniprotDownloader():
         if limit:
             params["limit"] = limit
         if offset:
-            params["offset"] = offset
+            self.logger.debug("using param 'skip' instead 'offset' to fix a potential uniprot issue")
+            params["skip"] = offset
 
         self.logger.debug('querying url %s with params %s', self.url, params)
         return session.get(self.url, params=params, timeout=self.timeout, background_callback=self._cb_get)
@@ -114,7 +120,8 @@ class UniprotDownloader():
         self.loader.put(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME,
                         Config.ELASTICSEARCH_UNIPROT_DOC_NAME,
                         uniprotid,
-                        dict(entry =json_seqrec))
+                        dict(entry =json_seqrec),
+                        create_index=False)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
