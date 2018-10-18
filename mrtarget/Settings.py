@@ -198,6 +198,7 @@ class Config():
     PROFILE = False
     ERROR_IDS_FILE = 'errors.txt'
 
+    UNIPROT_URI = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/uniprot-20181018.xml.gz"
     GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
     GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks', 'CancerBiomarkers', 'ChemicalProbes', 'Tractability']
 

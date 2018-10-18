@@ -232,7 +232,7 @@ def main():
                 process.process()
             qc_metrics.update(process.qc(esquery))
         if args.unic:
-            process = UniprotDownloader(loader)
+            process = UniprotDownloader(loader, dry_run=args.dry_run)
             if not args.qc_only:
                 process.cache_human_entries()
             qc_metrics.update(process.qc(esquery))            
