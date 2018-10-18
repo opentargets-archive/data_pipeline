@@ -193,6 +193,7 @@ class EnsemblProcess(object):
     """
     def qc(self, esquery):
 
+        self.logger.info("Starting QC")
         #number of reactions
         ensemble_count = 0
         #Note: try to avoid doing this more than once!
@@ -203,4 +204,5 @@ class EnsemblProcess(object):
         metrics = dict()
         metrics["ensemble.count"] = ensemble_count
 
+        self.logger.info("Finished QC")
         return metrics

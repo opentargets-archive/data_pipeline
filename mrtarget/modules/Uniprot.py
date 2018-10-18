@@ -48,7 +48,7 @@ class UniprotDownloader():
 
         self.loader = loader
         self.NS = "{http://uniprot.org/uniprot}"
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__+".UniprotDownloader")
 
     def cache_human_entries(self):
         with FuturesSession(executor=ThreadPoolExecutor(max_workers=self.workers)) as session:
@@ -97,8 +97,10 @@ class UniprotDownloader():
         try:
             self.logger.debug('Got response for %s',response.url)
             if response.status_code is not 200:
+                self.logger.error("unable to get data from uniprot.org ("+response.status_code+")")
                 raise IOError('unable to get data from uniprot.org ('+response.status_code+')')
         except (ConnectionError, Timeout, HTTPError) as e:
+            self.logger.error("unable to get data from "+response.url)
             raise IOError(e)
         if response is not None:
             with gzip.GzipFile(fileobj=StringIO(response.content)) as gzipfile:
@@ -107,6 +109,7 @@ class UniprotDownloader():
                     self._save_to_elasticsearch(result.id, result)
 
     def _save_to_elasticsearch(self, uniprotid, seqrec):
+        self.logger.debug("saving %s",uniprotid)
         json_seqrec = base64.b64encode(jsonpickle.encode(seqrec))
         self.loader.put(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME,
                         Config.ELASTICSEARCH_UNIPROT_DOC_NAME,
@@ -118,15 +121,19 @@ class UniprotDownloader():
     of string test names and result objects
     """
     def qc(self, esquery):
-
+        self.logger.info("Starting QC")
         #number of uniprot entries
         uniprot_count = 0
         #Note: try to avoid doing this more than once!
         for unprot_entry in esquery.get_all_uniprot_entries():
             uniprot_count += 1
 
+            if uniprot_count % 1000 == 0:
+                self.logger.debug("QC of %d uniprot entries", uniprot_count)
+
         #put the metrics into a single dict
         metrics = dict()
         metrics["uniprot.count"] = uniprot_count
 
+        self.logger.info("Finished QC")
         return metrics

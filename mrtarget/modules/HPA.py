@@ -584,6 +584,7 @@ class HPAProcess():
     of string test names and result objects
     """
     def qc(self, esquery):
+        self.logger.info("Starting QC")
 
         #number of hpa entries
         hpa_count = 0
@@ -595,4 +596,5 @@ class HPAProcess():
         metrics = dict()
         metrics["hpa.count"] = hpa_count
 
+        self.logger.info("Finished QC")
         return metrics
