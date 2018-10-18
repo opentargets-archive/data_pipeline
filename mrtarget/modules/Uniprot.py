@@ -20,6 +20,8 @@ class UniprotDownloader():
     def cache_human_entries(self, uri=Config.UNIPROT_URI):
         if not self.dry_run:
             self.logger.debug("download uniprot uri %s", Config.UNIPROT_URI)
+            self.logger.debug("to generate this file you have to call this url "
+                              "https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml")
 
             with URLZSource(uri).open() as r_file:
                 self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
