@@ -9,12 +9,13 @@ from mrtarget.Settings import Config
 
 
 class UniprotDownloader():
+    NS = "{http://uniprot.org/uniprot}"
+
     def __init__(self, loader, dry_run=False):
         self.logger = logging.getLogger(__name__)
         self.dry_run = dry_run
 
         self.loader = loader
-        self.NS = "{http://uniprot.org/uniprot}"
 
     def cache_human_entries(self, uri=Config.UNIPROT_URI):
         if not self.dry_run:
@@ -26,7 +27,7 @@ class UniprotDownloader():
 
                 self.logger.debug("iterate through the whole uniprot xml file")
                 entries = 0
-                for i, xml in enumerate(self._iterate_xml(r_file)):
+                for i, xml in enumerate(self._iterate_xml(r_file, self.NS)):
                     result = Parser(xml, return_raw_comments=True).parse()
                     self._save_to_elasticsearch(result.id, result)
                     entries = i
@@ -36,9 +37,10 @@ class UniprotDownloader():
         else:
             self.logger.debug("skipping uniprot as --dry-run was activated")
 
-    def _iterate_xml(self, handle):
+    @staticmethod
+    def _iterate_xml(handle, ns):
         for event, elem in ElementTree.iterparse(handle, events=("start", "end")):
-            if event == "end" and elem.tag == self.NS + "entry":
+            if event == "end" and elem.tag == ns + "entry":
                 yield elem
                 elem.clear()
 
