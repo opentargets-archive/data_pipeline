@@ -153,6 +153,7 @@ class ReactomeProcess():
     of string test names and result objects
     """
     def qc(self, esquery):
+        self.logger.info("Starting QC")
 
         #number of reactions
         reaction_count = 0
@@ -164,6 +165,7 @@ class ReactomeProcess():
         metrics = dict()
         metrics["reactome.count"] = reaction_count
 
+        self.logger.info("Finished QC")
         return metrics
 
 

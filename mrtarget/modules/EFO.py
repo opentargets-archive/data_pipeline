@@ -56,6 +56,7 @@ class EFO(JSONSerializable):
         # self.id_org = id_org
         self.definition = definition
         self.children=[]
+        self.logger = logging.getLogger(__name__+".EFO")
 
     def get_id(self):
         return self.code
@@ -156,6 +157,7 @@ class EfoProcess():
     of string test names and result objects
     """
     def qc(self, esquery):
+        self.logger.info("Starting QC")
         #number of EFO terms
         efo_term_count = 0
 
@@ -187,6 +189,7 @@ class EfoProcess():
         metrics["efo.missing_description.count"] = efo_missing_description_count
 
         #return the metrics to the caller so they can write to file or further compare
+        self.logger.info("Finished QC")
         return metrics
  
 

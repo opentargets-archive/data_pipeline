@@ -81,7 +81,7 @@ class MpProcess():
                  loader,):
         self.loader = loader
         self.mps = OrderedDict()
-        self._logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__+".MpProcess")
 
     def process_all(self):
         self._process_ontology_data()
@@ -140,6 +140,7 @@ class MpProcess():
     of string test names and result objects
     """
     def qc(self, esquery):
+        self.logger.info("Starting QC")
 
         #number of mp entries
         mp_count = 0
@@ -150,5 +151,6 @@ class MpProcess():
         #put the metrics into a single dict
         metrics = dict()
         metrics["mp.count"] = mp_count
-
+        
+        self.logger.info("Finished QC")
         return metrics
