@@ -14,7 +14,6 @@ ujson==1.35
 iso8601>=0.1.11 #required by opentargets
 
 SPARQLWrapper>=1.7.6
-paramiko>=2.0.9
 jsonpickle
 jsonschema==2.6.0
 simplejson
