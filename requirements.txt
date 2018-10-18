@@ -1,3 +1,4 @@
+requests
 future
 redislite
 addict==2.1.0
@@ -11,10 +12,8 @@ requests-futures
 ujson==1.35
 
 iso8601>=0.1.11 #required by opentargets
-opentargets
 
 SPARQLWrapper>=1.7.6
-paramiko==1.17.0
 jsonpickle
 jsonschema==2.6.0
 simplejson
@@ -39,6 +38,7 @@ colorama
 psutil
 pylru
 toolz
+codecov
 yapsy==1.11.223
 
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz

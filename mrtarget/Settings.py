@@ -398,18 +398,6 @@ class Config():
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 
-    # dump file names
-    DUMP_FILE_FOLDER = read_option('CTTV_DUMP_FOLDER', default=TEMP_DIR)
-    DUMP_FILE_EVIDENCE = RELEASE_VERSION+'_evidence_data.json.gz'
-    DUMP_FILE_ASSOCIATION = RELEASE_VERSION + '_association_data.json.gz'
-    DUMP_PAGE_SIZE = 10000
-    DUMP_BATCH_SIZE = 10
-
-    DUMP_REMOTE_API = read_option('DUMP_REMOTE_API_URL', default='http://beta.opentargets.io')
-    DUMP_REMOTE_API_PORT = read_option('DUMP_REMOTE_API_PORT', default='80')
-    DUMP_REMOTE_API_SECRET = read_option('DUMP_REMOTE_API_SECRET')
-    DUMP_REMOTE_API_APPNAME = read_option('DUMP_REMOTE_API_APPNAME')
-
     # Literature Pipeline -- Pubmed/Medline FTP server
     # PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
     # PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
