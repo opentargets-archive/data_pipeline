@@ -41,3 +41,7 @@ yapsy
 codecov
 
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz
+
+#when installing from GitHub, a specific commit must be used for consistency
+#and to ensure dependency caching works as intended
+git+https://github.com/opentargets/ontology-utils.git@654edcee6222e5bc3ff9ee26a5f3a68e3cc77392#egg=ontologyutils
