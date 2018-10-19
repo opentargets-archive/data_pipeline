@@ -1,8 +1,10 @@
 FROM python:2.7-slim
 
 #need make gcc etc for requirements later
+#need git to pip install from git
 RUN apt-get update && apt-get install -y \
-    build-essential
+    build-essential \
+    git
 
 # install fresh these requirements.
 # do this before copying the code to minimize image layer rebuild for dev
