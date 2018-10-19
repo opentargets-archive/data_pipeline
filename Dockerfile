@@ -1,4 +1,9 @@
-FROM python:2.7
+FROM python:2.7-slim
+
+#need make gcc etc for requirements later
+RUN apt-get update && apt-get install -y \
+    build-essential
+
 # install fresh these requirements.
 # do this before copying the code to minimize image layer rebuild for dev
 COPY ./requirements.txt /usr/src/app/
