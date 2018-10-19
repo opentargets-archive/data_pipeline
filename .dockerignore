@@ -1,4 +1,32 @@
 .git
+*.log
+*.tar.gz
 doc/
 docs/
 samples/
+
+### Python template
+# Byte-compiled / optimized / DLL files
+**/__pycache__/
+**.pyc
+**.pyo
+**.pyd
+
+# Distribution / packaging
+.Python
+env/
+venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
