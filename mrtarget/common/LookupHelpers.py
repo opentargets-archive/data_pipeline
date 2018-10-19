@@ -9,12 +9,10 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
-# from mrtarget.common.LookupTables import HPOLookUpTable
 from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
-# from mrtarget.common.LookupTables import LiteratureLookUpTable
-from mrtarget.modules.Ontology import OntologyClassReader
+from ontologyutils.rdf_utils import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
 

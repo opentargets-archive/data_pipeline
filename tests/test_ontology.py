@@ -1,4 +1,4 @@
-from mrtarget.modules.Ontology import OntologyClassReader
+from ontologyutils.rdf_utils import OntologyClassReader
 import logging
 import unittest
 
