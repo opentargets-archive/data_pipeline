@@ -1,4 +1,5 @@
 FROM python:2.7
+LABEL maintainer="ops@opentargets.org"
 # install fresh these requirements.
 # do this before copying the code to minimize image layer rebuild for dev
 COPY ./requirements.txt /usr/src/app/
