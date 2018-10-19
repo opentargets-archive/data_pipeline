@@ -6,8 +6,7 @@ envparse
 elasticsearch-dsl>=5.0.0,<6.0.0
 networkx==1.9.1
 
-requests-futures
-#transitively includes requests
+requests
 
 ujson==1.35
 
