@@ -294,13 +294,13 @@ def main():
             process = EvidenceStringProcess(connectors.es, connectors.r_server)
             if not args.qc_only:
                 process.process_all(datasources = args.datasource, dry_run=args.dry_run)
-            qc_metrics.update(process.qc(esquery))
+            #qc_metrics.update(process.qc(esquery))
 
         if args.ass:
             process = ScoringProcess(loader, connectors.r_server)
             if not args.qc_only:
                 process.process_all(targets = targets, dry_run=args.dry_run)
-            qc_metrics.update(process.qc(esquery))
+            #qc_metrics.update(process.qc(esquery))
             
         if args.ddr:
             process = DataDrivenRelationProcess(connectors.es, connectors.r_server)
