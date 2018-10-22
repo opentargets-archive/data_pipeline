@@ -8,8 +8,6 @@ from collections import Counter
 from pprint import pprint
 
 from elasticsearch import helpers
-from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
 
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -31,14 +29,7 @@ class QCRunner(object):
         missing_assocations_ids = set()
         total_evidence = self.esquery.count_elements_in_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
         self._logger.info('Starting to analyse %i evidence'%total_evidence)
-        for as_id in tqdm(self.esquery.get_all_target_disease_pair_from_evidence(),
-                           desc = 'checking t-d pairs in evidence data',
-                           unit=' t-d pairs',
-                           file=tqdm_out,
-                           unit_scale=True,
-                           total= total_evidence*5,# estimate t-d pairs
-                           leave=True,
-                           ):
+        for as_id in self.esquery.get_all_target_disease_pair_from_evidence():
             if as_id not in computed_assocations_ids:
                 self._logger.error('Association id %s was not computed or stored'%as_id)
                 missing_assocations_ids.add(as_id)
