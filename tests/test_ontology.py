@@ -1,4 +1,5 @@
 from ontologyutils.rdf_utils import OntologyClassReader
+from mrtarget.Settings import Config
 import logging
 import unittest
 
@@ -13,7 +14,7 @@ class OntologyTestCase(unittest.TestCase):
 
         self._logger.debug("test_mp_reader")
         ontology = OntologyClassReader()
-        ontology.load_mp_classes()
+        ontology.load_mp_classes(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
         self.assertIsNotNone(ontology)
         self.assertIsNotNone(ontology.current_classes)
         self.assertTrue(len(ontology.current_classes) > 8000)
@@ -27,7 +28,7 @@ class OntologyTestCase(unittest.TestCase):
 
         self._logger.debug("test_hpo_reader")
         ontology = OntologyClassReader()
-        ontology.load_hpo_classes()
+        ontology.load_hpo_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
         self.assertIsNotNone(ontology)
         self.assertIsNotNone(ontology.current_classes)
         self.assertTrue(len(ontology.current_classes) > 8000)

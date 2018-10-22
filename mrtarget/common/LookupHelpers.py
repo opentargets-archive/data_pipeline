@@ -189,7 +189,7 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_hpo_classes()
+            obj.load_hpo_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.hpo_ontology = obj
@@ -204,12 +204,10 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_mp_classes()
+            obj.load_mp_classes(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.mp_ontology = obj
-
-
 
     def _get_efo(self):
         '''
@@ -220,16 +218,10 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_open_targets_disease_ontology()
+            obj.load_open_targets_disease_ontology(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.efo_ontology = obj
-
-
-    # def _get_available_publications(self):
-    #     self._logger.info('getting literature/publications')
-    #     self.lookup.available_publications = LiteratureLookUpTable(self.es_pub, 'LITERATURE_LOOKUP', self.r_server)
-
 
     def _get_from_pickled_file_cache(self, file_id):
         file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
