@@ -78,7 +78,9 @@ class Tractability(IPlugin):
         ab_bucket_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
         with URLZSource(filename).open() as r_file:
-            for i, el in enumerate(csv.DictReader(r_file, fieldnames=tractability_columns, delimiter='\t'), start=1):
+            for i, el in enumerate(csv.DictReader(r_file,
+                                                  fieldnames=tractability_columns,
+                                                    dialect='excel-tab'), start=1):
                 try:
                     # Get lists of small molecule and antibody buckets
                     buckets = list(el[k] for k in
