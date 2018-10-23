@@ -8,7 +8,8 @@ from itertools import compress
 import csv
 
 
-tractability_columns = ("ensembl_gene_id",
+tractability_columns = ("id",
+                        "ensembl_gene_id",
                         "accession",
                         "Bucket_1", "Bucket_2", "Bucket_3", "Bucket_4", "Bucket_5",
                         "Bucket_6", "Bucket_7", "Bucket_8", "Bucket_sum",
@@ -33,8 +34,6 @@ tractability_columns = ("ensembl_gene_id",
 class Tractability(IPlugin):
     # Initiate Tractability object
     def __init__(self):
-        super(Tractability, self).__init__()
-
         self._logger = logging.getLogger(__name__)
         self.loader = None
         self.r_server = None
@@ -59,19 +58,16 @@ class Tractability(IPlugin):
 
             # Iterate through all genes and add tractability data if gene symbol is present
             self._logger.info("Tractability data injection")
-            for gene_id, gene in tqdm(genes.iterate(),
-                                      desc='Adding Tractability data',
-                                      unit=' gene',
-                                      file=self.tqdm_out):
-                if gene.ensembl_gene_id in self.tractability:
-                    self._logger.debug("Adding tractability data to gene %s", gene.ensembl_gene_id)
-                    gene.tractability=self.tractability[gene.ensembl_gene_id]
+
+            for gene_id, gene in genes.iterate():
+                if gene_id in self.tractability:
+                    gene.tractability = self.tractability[gene_id]
 
         except Exception as ex:
             self._logger.exception(str(ex), exc_info=1)
             raise ex
 
-    def build_json(self, filename=Config.TRACTABILITY_FILENAME):
+    def build_json(self, filename):
         self._logger.info("data from TSV file comes in non standard ways, by ex. bool comes as a categ. data Y/N"
                           "so casting to bool, int and float with default fallback values instead of "
                           "throwing exceptions as we are parsing a TSV file where types are inexistent")
@@ -82,8 +78,8 @@ class Tractability(IPlugin):
         sm_bucket_list = [1, 2, 3, 4, 5, 6, 7, 8]
         ab_bucket_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-        with URLZSource(Config.TISSUE_CURATION_MAP_URL).open() as r_file:
-            for i, el in enumerate(csv.DictReader(r_file, fieldnames=['name', 'canonical'], delimiter='\t'), start=1):
+        with URLZSource(filename).open() as r_file:
+            for i, el in enumerate(csv.DictReader(r_file, fieldnames=tractability_columns, delimiter='\t'), start=1):
                 try:
                     # Get lists of small molecule and antibody buckets
                     buckets = list(el[k] for k in
@@ -131,5 +127,5 @@ class Tractability(IPlugin):
                     self.tractability[el["ensembl_gene_id"]] = line
 
                 except Exception as k_ex:
-                    self._logger.error("this line %d won't be inserted %s", i, str(el))
-                    self._logger.exception(k_ex)
+                    self._logger.exception("this line %d won't be inserted %s with ex: %s",
+                                           i, str(el), str(k_ex))
