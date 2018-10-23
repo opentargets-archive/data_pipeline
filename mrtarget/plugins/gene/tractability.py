@@ -8,8 +8,7 @@ from itertools import compress
 import csv
 
 
-tractability_columns = ("id",
-                        "ensembl_gene_id",
+tractability_columns = ("ensembl_gene_id",
                         "accession",
                         "Bucket_1", "Bucket_2", "Bucket_3", "Bucket_4", "Bucket_5",
                         "Bucket_6", "Bucket_7", "Bucket_8", "Bucket_sum",
