@@ -56,7 +56,6 @@ class EFO(JSONSerializable):
         # self.id_org = id_org
         self.definition = definition
         self.children=[]
-        self.logger = logging.getLogger(__name__+".EFO")
 
     def get_id(self):
         return self.code
@@ -91,6 +90,7 @@ class EfoProcess():
                  loader):
         self.loader = loader
         self.efos = OrderedDict()
+        self.logger = logging.getLogger(__name__+".EfoProcess")
 
     def process_all(self):
         self._process_ontology_data()
