@@ -137,7 +137,8 @@ class ReactomeProcess():
                     for p in path:
                         ancestors.add(p)
 
-                #ensure these are 
+                #ensure these are real tuples, not generators
+                #otherwise they can't be serialized to json
                 children = tuple(self.g.successors(node))
                 parents = tuple(self.g.predecessors(node))
 
