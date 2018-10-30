@@ -136,14 +136,19 @@ class ReactomeProcess():
                 for path in paths:
                     for p in path:
                         ancestors.add(p)
+
+                #ensure these are 
+                children = tuple(self.g.successors(node))
+                parents = tuple(self.g.predecessors(node))
+
                 self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
                                 doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
                                 ID=node,
                                 body=dict(id=node,
                                           label=node_data['name'],
                                           path=paths,
-                                          children=self.g.successors(node),
-                                          parents=self.g.predecessors(node),
+                                          children=children,
+                                          parents=parents,
                                           is_root=node == root,
                                           ancestors=list(ancestors)
                                           ))
