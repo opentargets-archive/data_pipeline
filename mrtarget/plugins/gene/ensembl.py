@@ -3,7 +3,6 @@ from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from elasticsearch.exceptions import NotFoundError
-from tqdm import tqdm
 import sys
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +15,7 @@ class Ensembl(IPlugin):
     def print_name(self):
         self._logger.info("ENSEMBL gene data plugin")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
+    def merge_data(self, genes, loader, r_server):
 
         esquery = ESQuery(loader.es)
 
@@ -27,13 +26,7 @@ class Ensembl(IPlugin):
             raise ex
 
 
-        for row in tqdm(esquery.get_all_ensembl_genes(),
-                        desc='loading genes from Ensembl',
-                        unit_scale=True,
-                        unit='genes',
-                        file=tqdm_out,
-                        leave=False,
-                        total=esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)):
+        for row in esquery.get_all_ensembl_genes():
             if row['id'] in genes:
                 gene = genes.get_gene(row['id'])
                 gene.load_ensembl_data(row)

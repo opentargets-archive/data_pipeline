@@ -1,7 +1,5 @@
 from collections import OrderedDict
 
-from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.modules.Ontology import OntologyClassReader

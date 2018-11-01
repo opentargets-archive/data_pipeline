@@ -1,7 +1,6 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
 import re
-from tqdm import tqdm
 import traceback
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -16,7 +15,6 @@ class Hallmarks(IPlugin):
         self.ensembl_current = {}
         self.symbols = {}
         self.hallmarks = {}
-        self.tqdm_out = None
 
         self.hallmarks_labels = ["escaping programmed cell death",
                                   "angiogenesis",
@@ -33,20 +31,16 @@ class Hallmarks(IPlugin):
     def print_name(self):
         self._logger.info("Hallmarks of cancer gene data plugin")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
+    def merge_data(self, genes, loader, r_server):
 
         self.loader = loader
         self.r_server = r_server
-        self.tqdm_out = tqdm_out
 
         try:
 
             self.build_json(filename=Config.HALLMARK_FILENAME)
 
-            for gene_id, gene in tqdm(genes.iterate(),
-                                      desc='Adding Hallmarks of cancer data',
-                                      unit=' gene',
-                                      file=self.tqdm_out):
+            for gene_id, gene in genes.iterate():
                 ''' extend gene with related Hallmark data '''
                 if gene.approved_symbol in self.hallmarks:
                         gene.hallmarks = dict()

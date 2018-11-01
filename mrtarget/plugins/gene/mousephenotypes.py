@@ -4,7 +4,6 @@ from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.Settings import Config
 import urllib2
 import ujson as json
-from tqdm import tqdm
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -56,16 +55,14 @@ class MousePhenotypes(IPlugin):
         self.human_genes = {}
         self.not_found_genes = {}
         self.human_ensembl_gene_ids = {}
-        self.tqdm_out = None
 
     def print_name(self):
         self._logger.debug("MousePhenotypes gene data plugin")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
+    def merge_data(self, genes, loader, r_server):
 
         self.loader = loader
         self.r_server = r_server
-        self.tqdm_out = tqdm_out
 
         self._get_mp_classes()
 
@@ -75,10 +72,7 @@ class MousePhenotypes(IPlugin):
 
         self.write_all_to_file(filename=Config.GENOTYPE_PHENOTYPE_OUTPUT)
 
-        for gene_id, gene in tqdm(genes.iterate(),
-                                  desc='Adding phenotype data from MGI',
-                                  unit=' gene',
-                                  file=self.tqdm_out):
+        for gene_id, gene in genes.iterate():
             ''' extend gene with related mouse phenotype data '''
             if gene.approved_symbol in self.human_genes:
                     self._logger.debug("Adding %i phenotype data from MGI to gene %s" % (len(self.human_genes[gene.approved_symbol]["mouse_orthologs"][0]["phenotypes"]), gene.approved_symbol))
@@ -188,7 +182,7 @@ class MousePhenotypes(IPlugin):
 
             with url_to_tmpfile(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES) as fi:
                 # lines = response.readlines()
-                self._logger.debug("get lines from mgi report phenotyes file",
+                self._logger.debug("get lines from mgi report phenotyes file %s",
                                    Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES)
 
                 # Allelic Composition	Allele Symbol(s)	Genetic Background	Mammalian Phenotype ID	PubMed ID	MGI Marker Accession ID

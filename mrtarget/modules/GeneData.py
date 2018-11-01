@@ -1,12 +1,10 @@
 import logging
 from collections import OrderedDict
-from tqdm import tqdm
 import traceback
-from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 
 from mrtarget.Settings import Config
 
@@ -432,22 +430,16 @@ class GeneManager():
         # Load all plugins
         self.simplePluginManager.collectPlugins()
 
-        self.tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
-
 
     def merge_all(self, dry_run = False):
 
         plugin_count = len(self.simplePluginManager.getAllPlugins())
-        bar = tqdm(desc='Merging data from available databases',
-                   total=plugin_count,
-                   unit='steps',
-                   file=self.tqdm_out)
 
         for plugin_name in Config.GENE_DATA_PLUGIN_ORDER:
             try:
                 plugin = self.simplePluginManager.getPluginByName(plugin_name)
                 plugin.plugin_object.print_name()
-                plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server, tqdm_out=self.tqdm_out)
+                plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server)
 
             except AttributeError:
                 self._logger.exception("the current plugin %s wasn't loaded", plugin_name)
@@ -456,11 +448,8 @@ class GeneManager():
                 self._logger.error('plugin %s failed with an exception', plugin_name)
                 self._logger.exception(str(error))
 
-            finally:
-                bar.update()
 
         self._store_data(dry_run=dry_run)
-        bar.update()
 
     def _store_data(self, dry_run = False):
 
@@ -470,9 +459,6 @@ class GeneManager():
                            serialiser='jsonpickle',
                            max_size=10000,
                            job_timeout=600)
-
-        q_reporter = RedisQueueStatusReporter([queue])
-        q_reporter.start()
 
         workers = [GeneObjectStorer(self.loader.es,
                                     None,
@@ -489,10 +475,6 @@ class GeneManager():
         self._logger.info('join workers')
         for w in workers:
             w.join()
-
-        # any queue process should join at the end using inverse order
-        self._logger.info('join queue reporter')
-        q_reporter.join()
 
         self._logger.info('all gene objects pushed to elasticsearch')
 

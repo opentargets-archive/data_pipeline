@@ -1,6 +1,5 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
-from tqdm import tqdm
 import traceback
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -16,16 +15,14 @@ class ChemicalProbes(IPlugin):
         self.ensembl_current = {}
         self.symbols = {}
         self.chemicalprobes = {}
-        self.tqdm_out = None
 
     def print_name(self):
         self._logger.info("Chemical Probes plugin")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
+    def merge_data(self, genes, loader, r_server):
 
         self.loader = loader
         self.r_server = r_server
-        self.tqdm_out = tqdm_out
 
         try:
             # Parse chemical probes data into self.chemicalprobes
@@ -33,10 +30,7 @@ class ChemicalProbes(IPlugin):
 
             # Iterate through all genes and add chemical probes data if gene symbol is present
             self._logger.info("Generating Chemical Probes data injection")
-            for gene_id, gene in tqdm(genes.iterate(),
-                                      desc='Adding Chemical Probes data',
-                                      unit=' gene',
-                                      file=self.tqdm_out):
+            for gene_id, gene in genes.iterate():
                 # Extend gene with related chemical probe data
                 if gene.approved_symbol in self.chemicalprobes:
                     self._logger.debug("Adding Chemical Probe data to gene %s", gene.approved_symbol)

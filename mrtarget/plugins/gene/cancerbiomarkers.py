@@ -1,6 +1,5 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
-from tqdm import tqdm
 import traceback
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -147,16 +146,14 @@ class CancerBiomarkers(IPlugin):
         self.ensembl_current = {}
         self.symbols = {}
         self.cancerbiomarkers = {}
-        self.tqdm_out = None
 
     def print_name(self):
         self._logger.info("Cancer Biomarkers plugin")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
+    def merge_data(self, genes, loader, r_server):
 
         self.loader = loader
         self.r_server = r_server
-        self.tqdm_out = tqdm_out
 
         try:
             # Parse cancer biomarker data into self.cancerbiomarkers
@@ -164,10 +161,7 @@ class CancerBiomarkers(IPlugin):
 
             # Iterate through all genes and add cancer biomarkers data if gene symbol is present
             self._logger.info("Generating Cancer Biomarker data injection")
-            for gene_id, gene in tqdm(genes.iterate(),
-                                      desc='Adding Cancer Biomarker data',
-                                      unit=' gene',
-                                      file=self.tqdm_out):
+            for gene_id, gene in genes.iterate():
                 # Extend gene with related Cancer Biomarker data
                 if gene.approved_symbol in self.cancerbiomarkers:
                     self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.approved_symbol)

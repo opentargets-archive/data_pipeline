@@ -21,7 +21,6 @@ scipy
 #used by data driven relations
 scikit-learn
 
-tqdm
 biopython
 petl
 

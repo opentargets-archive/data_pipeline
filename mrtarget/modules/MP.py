@@ -1,15 +1,12 @@
 import logging
 import ujson as json
 from collections import OrderedDict
-from tqdm import tqdm 
-from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.modules.Ontology import OntologyClassReader, DiseaseUtils
 from rdflib import URIRef
 from mrtarget.Settings import Config
 
 logger = logging.getLogger(__name__)
-tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 '''
 Module to Fetch the MP ontology and store it in ElasticSearch as a lookup table

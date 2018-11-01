@@ -4,7 +4,6 @@ from mrtarget.Settings import Config
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from elasticsearch.exceptions import NotFoundError
 from mrtarget.modules.Reactome import ReactomeRetriever
-from tqdm import tqdm
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -16,7 +15,7 @@ class Uniprot(IPlugin):
     def print_name(self):
         self._logger.info("Uniprot (and Reactome) gene data plugin")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
+    def merge_data(self, genes, loader, r_server):
 
         esquery = ESQuery(loader.es)
         reactome_retriever = ReactomeRetriever(loader.es)
@@ -28,13 +27,7 @@ class Uniprot(IPlugin):
             raise ex
 
         c = 0
-        for seqrec in tqdm(esquery.get_all_uniprot_entries(),
-                           desc='loading genes from UniProt',
-                           unit_scale=True,
-                           unit='genes',
-                           leave=False,
-                           file=tqdm_out,
-                           total=esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)):
+        for seqrec in esquery.get_all_uniprot_entries():
             c += 1
             if c % 1000 == 0:
                 self._logger.info("%i entries retrieved for uniprot" % c)

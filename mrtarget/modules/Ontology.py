@@ -14,8 +14,6 @@ from rdflib import URIRef
 from rdflib.namespace import Namespace, NamespaceManager
 from rdflib.namespace import OWL, RDF, RDFS
 from SPARQLWrapper import SPARQLWrapper, JSON
-from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
 from datetime import date
 from mrtarget.Settings import Config
 
