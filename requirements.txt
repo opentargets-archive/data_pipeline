@@ -12,8 +12,11 @@ ujson
 
 SPARQLWrapper>=1.7.6
 jsonpickle
-jsonschema
 simplejson
+
+#when installing from GitHub, a specific commit must be used for consistency
+#and to ensure dependency caching works as intended
+git+https://github.com/opentargets/validator.git@91fc3977d837eaf04aa586d2644dc77f0b631d1d#egg=opentargets_validator
 
 numpy
 scipy

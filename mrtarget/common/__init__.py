@@ -7,7 +7,6 @@ import logging
 import io
 import tempfile as tmp
 import requests as r
-import jsonschema as jss
 import json
 
 _l = logging.getLogger(__name__)
@@ -121,28 +120,6 @@ class URLZSource(object):
 
             yield zf
         zf.close()
-
-
-def generate_validator_from_schema(schema_uri):
-    '''load a uri, build and return a jsonschema validator'''
-    with URLZSource(schema_uri).open() as r_file:
-        js_schema = json.load(r_file)
-
-    validator = jss.validators.validator_for(js_schema)
-    return validator(schema=js_schema)
-
-
-def generate_validators_from_schemas(schemas_map):
-    '''return a dict of schema names and validators using the function
-    `generate_validator_from_schema`'''
-    validators = {}
-    for schema_name, schema_uri in schemas_map.iteritems():
-        # per kv we create the validator and instantiate it
-        _l.info('generate_validator_from_schema %s using the uri %s',
-                schema_name, schema_uri)
-        validators[schema_name] = generate_validator_from_schema(schema_uri)
-
-    return validators
 
 
 class LogAccum(object):
