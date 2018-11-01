@@ -66,7 +66,7 @@ class QCMetrics(object):
         #ensure the directory for the log file exists
         qcdir = os.path.dirname(os.path.abspath(filename))
         if not os.path.isdir(qcdir):
-            logger.debug("log directory %s does not exist, creating", qcdir)
+            self._logger.debug("log directory %s does not exist, creating", qcdir)
             os.makedirs(qcdir)
 
 
