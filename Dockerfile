@@ -4,6 +4,7 @@ LABEL maintainer="ops@opentargets.org"
 #need make gcc etc for requirements later
 RUN apt-get update && apt-get install -y \
     build-essential \
+    git \
     curl
 
 # install fresh these requirements.
