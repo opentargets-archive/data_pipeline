@@ -197,7 +197,10 @@ def main():
         requests_log.setLevel(logging.DEBUG)
         requests_log.propagate = False  # Change to True to log to main log as well
         #ensure the directory for the log file exists
-        os.makedirs(os.path.dirname(os.path.abspath(args.log_http)))
+        logdir = os.path.dirname(os.path.abspath(args.log_http))
+        if not os.path.isdir(logdir):
+            logger.debug("log directory %s does not exist, creating", logdir)
+            os.makedirs(logdir)
         requests_log.addHandler(logging.FileHandler(args.log_http))
 
 
