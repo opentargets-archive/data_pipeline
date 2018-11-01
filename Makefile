@@ -196,7 +196,7 @@ $(JSON_PATH)/genomics_england.json.gz :
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log : $(JSON_PATH)/genomics_england.json.gz
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/genomics_england.json.gz 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log
+	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/genomics_england.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log
 
 
 .PHONY: validate_gwas
