@@ -31,7 +31,7 @@ MRTARGET_ARGS ?=
 
 # Internal variables
 #command to run mrtarget with various logging
-MRTARGET_CMD = python -m mrtarget.CommandLine --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --qc-in=$(QC_FILE_OLD) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
+MRTARGET_CMD = python -m mrtarget.CommandLine --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
 
 
 INDEX_CMD = python scripts/check_index.py --elasticsearch $(ELASTICSEARCH_NODES) --zero-fail --index
@@ -120,7 +120,7 @@ base: base_gene mp efo eco
 validate_atlas : $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log
 
 $(JSON_PATH)/atlas.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/atlas-14-02-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/atlas.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/atlas-14-02-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/atlas.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log: $(JSON_PATH)/atlas.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -131,7 +131,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log: $(JSON_PATH)/atlas.json.gz $(LOG_PAT
 validate_chembl : $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log
 
 $(JSON_PATH)/chembl.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/chembl-02-08-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/chembl.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/chembl-02-08-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/chembl.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log : $(JSON_PATH)/chembl.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -143,7 +143,7 @@ validate_cosmic : $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/cosmic.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/cosmic-24-05-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/cosmic.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/cosmic-24-05-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/cosmic.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log : $(JSON_PATH)/cosmic.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -155,7 +155,7 @@ validate_europepmc : $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/europepmc.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/europepmc-27-07-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/europepmc.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/europepmc-27-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/europepmc.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log : $(JSON_PATH)/europepmc.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -167,7 +167,7 @@ validate_eva : $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/eva.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/eva-02-08-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/eva.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/eva-02-08-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/eva.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log : $(JSON_PATH)/eva.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -180,7 +180,7 @@ validate_gene2phenotype : $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/gene2phenotype.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/gene2phenotype-27-07-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/gene2phenotype.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/gene2phenotype-27-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gene2phenotype.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log :  $(JSON_PATH)/gene2phenotype.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -192,7 +192,7 @@ validate_genomics_england : $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.lo
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/genomics_england.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/genomics_england-23-07-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/genomics_england.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/genomics_england-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/genomics_england.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log : $(JSON_PATH)/genomics_england.json.gz
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -204,7 +204,7 @@ validate_gwas : $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/gwas.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/gwas-06-08-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/gwas.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/gwas-06-08-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gwas.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log : $(JSON_PATH)/gwas.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -216,7 +216,7 @@ validate_intogen : $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/intogen.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/intogen-23-07-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/intogen.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/intogen-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/intogen.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log : $(JSON_PATH)/intogen.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -228,7 +228,7 @@ validate_phenodigm: $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/phenodigm.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/phenodigm-17-08-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/phenodigm.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/phenodigm-17-08-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phenodigm.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log : $(JSON_PATH)/phenodigm.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -240,7 +240,7 @@ validate_phewas_catalog : $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/phewas_catalog.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/phewas_catalog-11-09-2017.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/phewas_catalog-11-09-2017.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log : $(JSON_PATH)/phewas_catalog.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -252,7 +252,7 @@ validate_progeny : $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/progeny.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/progeny-23-07-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/progeny.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/progeny-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/progeny.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log : $(JSON_PATH)/progeny.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -264,7 +264,7 @@ validate_reactome : $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/reactome.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/reactome-19-07-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/reactome.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/reactome-19-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/reactome.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log : $(JSON_PATH)/reactome.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -276,7 +276,7 @@ validate_slapenrich : $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/slapenrich.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/slapenrich-27-07-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/slapenrich.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/slapenrich-27-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/slapenrich.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log : $(JSON_PATH)/slapenrich.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
@@ -288,12 +288,14 @@ validate_uniprot : $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
 	$(VALIDATE_CMD)
 
 $(JSON_PATH)/uniprot.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/uniprot-30-07-2018.json.gz | gunzip -c -- | shuf -n $(PERCENTAGE_TO_KEEP) | gzip > $(JSON_PATH)/uniprot.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.08/uniprot-30-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/uniprot.json.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log : $(JSON_PATH)/uniprot.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
 	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/uniprot.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
 
+.PHONY: validate_all
+validate_all : validate_uniprot validate_slapenrich validate_reactome validate_progeny validate_phewas_catalog validate_phenodigm validate_intogen validate_gwas validate_genomics_england validate_gene2phenotype validate_eva validate_europepmc validate_cosmic validate_chembl validate_atlas
 
 .PHONY: evidence_strings
 evidence_strings: $(LOG_PATH)/out.$(ES_PREFIX).evs.log
@@ -355,7 +357,7 @@ shell:
 	    ELASTICSEARCH_NODES="$(ELASTICSEARCH_NODES)" \
 	    LOG_LEVEL="$(LOG_LEVEL)" \
 	    SCHEMA_VERSION="$(SCHEMA_VERSION)" \
-	    PERCENTAGE_TO_KEEP="$(PERCENTAGE_TO_KEEP)" \
+	    NUMBER_TO_KEEP="$(NUMBER_TO_KEEP)" \
 	    MRTARGET_CMD="$(MRTARGET_CMD)" \
 	    bash
 
