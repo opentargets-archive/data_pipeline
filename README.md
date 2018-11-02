@@ -1,25 +1,258 @@
+
+The code in this repository is used to process different data files that provide evidence for the target-disease 
+associations in the [Open Targets Platform](https://www.targetvalidation.org). Documentation on how to use the 
+platform can be found [here](https://docs.targetvalidation.org) and the evidence and association data dumps can be 
+ found [here](https://www.targetvalidation.org/downloads/data). Please contact support [at] targetvalidation.org for 
+ feedback.
+ 
+ This page contains the following information:
+- Overview of the pipeline
+- Running the pipeline locally
+- Running the pipeline using Docker
+- (Installation Instructions)
+- Using the Makefile
+- Using the Makefile within Docker
+- (Environment variables and how to use them)
+- Contributing
+- Copyright
+
+
 [![Build Status](https://travis-ci.com/opentargets/data_pipeline.svg?branch=master)](https://travis-ci.com/opentargets/data_pipeline)
 [quay.io](https://quay.io/repository/opentargets/mrtarget)
 
-## MrT-arget
+---
 
-All code related with the computation of the process needed to
-complete the pipeline are here refactored into a python package.
+## Overview of the pipeline
 
-We are also building a container with all the python (and nonpython)
-dependencies that allows you to run each step of the pipeline.
+TO DO: Add overview diagram here
 
+#### 1. Loading the Base Data
+- All steps in this section are independent of each other and can be run in parallel and in any order as needed.
+- Each step will download, process and create indices in Elasticsearch for the different datasets (see diagram above).
+#### 2. Gene merging
+- Pre-requisites: Step 1 needs to be completed because Elasticsearch indices created for Expression Atlas, Reactome, 
+Uniprot and Ensembl are needed.
+- This step creates the index `${DATA_RELEASE_VERSION}_gene-data`.
+#### 3. Evidence Data Validation
+- Pre-requisites: Steps 1 and 2 need to be completed because Elasticsearch indices for efo, eco and gene-data indices 
+are needed. Any JSON schema changes that are required need to be finalised.
+- This step will create a new index per datasource e.g. `${DATA_RELEASE_VERSION}_validated-data-reactome`.
+- Data sources to include are specified in a 
+[config file.](https://github.com/opentargets/data_pipeline/blob/master/mrtarget/resources/evidences_sources.txt)
+This file can be edited to remove or add data sources.
+#### 4. Evidence String Processing
+- Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
+- This step will create the index `${DATA_RELEASE_VERSION}_evidence_data_generic`
+#### 5. Association Score Calculation
+- Note: this step is run on 32 vCPUs, 208 GB memory Google Cloud machine
+- This step will create a new index `${DATA_RELEASE_VERSION}_association-data`
+#### 6. Association QC
+- This step will get all target-disease pairs from all evidence, and check if they are found in the computed association. 
+A list of associations expected but NOT found will be logged.
+#### 7. Search Data Processing
+- This step will create the index `${DATA_RELEASE_VERSION}_search-data` which is used for the search function in the platform.
+#### 8. Relationship Data Computation
+- Note: this step is run on 32 vCPUs, 208 GB memory Google Cloud machine.
+- This step will compute the target-to-target and disease-to-disease relationships that are stored in the `${DATA_RELEASE_VERSION}_relation-data` index.
+#### 9. Generation of Data Metrics (WIP)
+- This step produces a flat file with metrics of the current data release which is used to update this 
+[page.](https://github.com/opentargets/data_release/wiki/OT011a-Data-Metrics-&-Plots)
 
-### How do I decide which data sources to include?
-Sources of evidence strings that are processed by the `--evs` steps by 
-default are specified in a [config file](https://github.com/opentargets/data_pipeline/blob/master/mrtarget/resources/evidences_sources.txt)
+--- 
+### Running the pipeline locally
+Please note that if steps 4, 5, 7 and 8 are run on the full data sets, they are best run on a 32 vCPU, 208 GB Google Cloud machine.
 
-We save them in a gs:// bucket, so to make up the file you can just run:
+#### 0. Setting up
+- Ensure the data_pipeline/db.ini file points to the correct Elasticsearch server: 
+`ELASTICSEARCH_NODES = ["http://xxx.xxx.xxx:xxxx"]`
+- Ensure the `data_pipeline` branch is corrrect.
+- Update the cofiguration files as required (`mrtarget/Settings.py`, `mrtarget/resources/ontology_config.ini` & `mrtarget/resources/uris.ini`)
+
+mrtarget/Settings.py:
 ```sh
-gsutil ls gs://ot-releases/17.12 | sed 's/gs/http/' | sed 's/\/\//\/\/storage.googleapis.com\//' | sed '1d'
+...
+ENSEMBL_RELEASE_VERSION = 93
+...
 ```
 
+#### 1. Loading the Base Data
+> \#Setting Data release version
+```sh
+DATA_RELEASE_VERSION=18.10
+```
+> \#Reactome: For input files see `mrtarget/resources/uris.ini`
+```sh
+python -m mrtarget.CommandLine --rea --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+> \# Ensembl: Extract via querying the public MySQL database
+```sh
+python -m mrtarget.CommandLine --ens --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+>\# Uniprot: Extract via querying the REST API (currently changing to downloaded file), return and store in XML format
+```sh
+python -m mrtarget.CommandLine --unic --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+>\# Baseline Expression: For input files see `mrtarget/resources/uris.ini`
+
+>\#  RNA: MetaAnalysis provided by the Expression Atlas Team, Protein: Human Protein Atlas
+```sh
+python -m mrtarget.CommandLine --hpa --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+>\# Mamalian Phenotype Ontology: For input files see `mrtarget/resources/ontology_config.ini`
+```sh
+python -m mrtarget.CommandLine --mp --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+>\# EFO: For input files see `mrtarget/resources/ontology_config.ini`
+```sh
+python -m mrtarget.CommandLine --efo --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+>\# ECO: For input files see `mrtarget/resources/ontology_config.ini`
+```sh
+python -m mrtarget.CommandLine --eco --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+#### 2. Gene merging
+```sh
+python -m mrtarget.CommandLine --gen --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+#### 3. Evidence Data Validation
+> \# Specify JSON Schema Version
+```sh
+SCHEMA_VERSION=1.2.8
+```
+> \# Validate all data sources specified in mrtarget/resources/evidences_sources.txt
+```sh
+python -m mrtarget.CommandLine --val --log-level DEBUG ${DATA_RELEASE_VERSION} \
+--schema-version ${SCHEMA_VERSION}
+```
+> \# Validate a specific data source
+```sh
+python -m mrtarget.CommandLine --val --log-level DEBUG ${DATA_RELEASE_VERSION} \
+--schema-version ${SCHEMA_VERSION} --input-file [PATH_TO_JSON_EVIDENCE_FILE.json.gz]
+```
+#### 4. Evidence String Processing
+> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
+```sh
+./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --evs   
+```
+#### 5. Association Score Calculation
+> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
+```sh
+./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --as
+```
+#### 6. Association QC
+```sh
+python -m mrtarget.CommandLine --qc --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+#### 7. Search Data Processing
+> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
+```sh
+./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --sea
+```
+#### 8. Relationship Data Computation
+> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
+```sh
+./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --ddr   
+```
+#### 9. Generate Data Metrics
+```sh
+python -m mrtarget.CommandLine --metric --log-level DEBUG ${DATA_RELEASE_VERSION}
+```
+
+---
+### Running the pipeline using Docker
+Only steps 1, 2, 3, 6 and 9 can be run locally on the complete data. All steps can be run with `--log-level DEBUG`
+> \# Setting Data release version
+```sh
+DATA_RELEASE_VERSION=18.08
+```
+#### 1. Loading the Base Data
+> \#Reactome: For input files see `mrtarget/resources/uris.ini`
+```python
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --rea
+```
+> \# Ensembl: Extract via querying the public MySQL database
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --ens
+```
+>\# Uniprot: Extract via querying the REST API (currently changing to downloaded file), return and store in XML format
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --unic
+```
+>\# Baseline Expression: For input files see `mrtarget/resources/uris.ini`
+
+>\#  RNA: MetaAnalysis provided by the Expression Atlas Team, Protein: Human Protein Atlas
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --hpa
+```
+>\# Mamalian Phenotype Ontology: For input files see `mrtarget/resources/ontology_config.ini`
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --mp
+```
+>\# EFO: For input files see `mrtarget/resources/ontology_config.ini`
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --efo
+```
+>\# ECO: For input files see `mrtarget/resources/ontology_config.ini`
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --eco
+```
+#### 2. Gene merging
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --gen
+```
+#### 3. Evidence Data Validation
+> \# Specify JSON Schema Version
+```sh
+SCHEMA_VERSION=1.2.8
+```
+> \# Validate all data sources specified in mrtarget/resources/evidences_sources.txt
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --val --schema-version ${SCHEMA_VERSION}
+```
+> \# Validate a specific data source
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --val 
+--schema-version ${SCHEMA_VERSION} --input-file [PATH_TO_JSON_EVIDENCE_FILE.json.gz]
+```
+> \# Validate one or more data source(s)
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --val 
+--schema-version ${SCHEMA_VERSION} --input-file [PATH_TO_JSON_EVIDENCE_FILE.json.gz] 
+--input-file [PATH_TO_JSON_EVIDENCE_FILE_2.json.gz]
+```
+#### 4. Evidence String Processing
+> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
+```sh
+./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --evs   
+```
+#### 5. Association Score Calculation
+> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
+```sh
+./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --as
+```
+#### 6. Association QC
+```sh
+./launch_mrtarget.sh [container_run_name] [container_branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --qc
+```
+#### 7. Search Data Processing
+> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
+```sh
+./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --sea
+```
+#### 8. Relationship Data Computation
+> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
+```sh
+./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --ddr   
+```
+#### 9. Generate Data Metrics
+```sh
+./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --metric
+```
+
+---
+
 ## Installation instructions
+TO DO: Move these to the relevant sections.
 
 ### Useful prep
 
@@ -97,10 +330,7 @@ CTTV_REDIS_REMOTE=true
 CTTV_REDIS_SERVER=127.0.0.1:8888
 ```
 
-
-
-### Container/Docker users
-
+## Running the Pipeline using Container/Docker
 
 If you have [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/) then you can start Elasticsearch and Kibana in the background with:
 
@@ -185,6 +415,8 @@ docker-compose run --rm --entrypoint make mrtarget -j -l 8 -r -R -k all
 
 ## Environment variables and how to use them
 
+TO DO: Check if these are still correct and relevant.
+
 Here the list to change, enable or disable functionality:
 
 * `CTTV_EV_LIMIT` string `true` to enable otherwise `false` or delete (WIP)
@@ -242,21 +474,21 @@ The important bits to run/understand the data pipeline are the `getting started`
 
 #### Evidence Validation (--val step) limit (WIP)
 
-It will give up if too many evidences were failed under schema validation. 1000 docs will be a
-rasonable upper bound limit per launched process.
+It will give up if too many evidence strings failed the JSON schema validation. 1000 docs will be a
+reasonable limit per launched process.
 
 #### Minimal dataset
 
-In case you want to run steps with a minimal dataset you should `export CTTV_MINIMAL=true`. If you want
-to regenerate used data source files:
+In case you want to run steps with a minimal dataset you should specify `export CTTV_MINIMAL=true`. If you want
+to regenerate the data source files used, then run:
 
 ```bash
 $ cd scripts/
 $ bash generate_minimal_dataset.sh
 ```
 
-It should upload to gcloud storage and enable public link to files but you need to be logged
-in the gcloud account.
+It should upload to gcloud storage and enable public links to files but you need to be logged
+in to the gcloud account.
 
 #### Redislite and/or remote redis
 
@@ -267,12 +499,12 @@ in the gcloud account.
 CTTV_REDIS_REMOTE=true
 CTTV_REDIS_SERVER=127.0.0.1:8888
 
-if you dont specify remote then it will try to bind to that host and port and the
+If you do not specify remote then it will try to bind to that host and port and the
 overwrite rule is env var then arguments overwrite
 
 # Copyright
 
-Copyright 2014-2018 Biogen, Celgene Corporation, EMBL - European Bioinformatics Institute, GlaxoSmithKline, Takeda Pharmaceutical Company and Wellcome Sanger Institute
+Copyright 2014-2018 Biogen, Celgene Corporation, EMBL - European Bioinformatics Institute, GlaxoSmithKline, Sanofi, Takeda Pharmaceutical Company and Wellcome Sanger Institute
 
 This software was developed as part of the Open Targets project. For more information please see: http://www.opentargets.org
 
@@ -284,7 +516,7 @@ You may obtain a copy of the License at
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
