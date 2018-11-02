@@ -12,7 +12,7 @@ from addict import Dict
 
 import logging as l
 from mrtarget.Settings import Config
-from mrtarget.common import URLZSource, generate_validators_from_schemas, LogAccum
+from mrtarget.common import URLZSource, LogAccum
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
@@ -21,6 +21,7 @@ from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQue
 from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
 import ujson as json
+import opentargets_validator.helpers
 
 
 BLOCKSIZE = 65536
@@ -76,6 +77,7 @@ messageFailed = '''-----------------
 VALIDATION FAILED
 -----------------
 '''
+
 
 class FileTypes():
     LOCAL='local'
@@ -288,8 +290,22 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         # log accumulator
         self.log_acc = LogAccum(self.logger, 128)
         # generate all validators once
-        self.validators = \
-            generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
+        self.generate_validators_from_schemas()
+
+
+    def generate_validators_from_schemas(self):
+        schemas_map = Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS
+        '''return a dict of schema names and validators using the function
+        `generate_validator_from_schema`'''
+        self.validators = {}
+        for schema_name, schema_uri in schemas_map.iteritems():
+            # per kv we create the validator and instantiate it
+            self.logger.info('generate_validator_from_schema %s using the uri %s',
+                    schema_name, schema_uri)
+            self.validators[schema_name] = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
+        #TODO do this better
+        #we don't need all validators to be created up front - should use lazy initialization
+        #we can create only 1 validator per uri - no need to duplicate
 
 
     def close(self):

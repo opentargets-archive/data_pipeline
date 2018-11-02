@@ -99,20 +99,29 @@ CTTV_REDIS_SERVER=127.0.0.1:8888
 
 
 
-### Container users
+### Container/Docker users
 
 
-If you have [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/) then you can start Elasticsearch and Kibana with:
+If you have [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/) then you can start Elasticsearch and Kibana in the background with:
 
 ```sh
-docker-compose up elasticsearch kibana
+docker-compose up -d elasticsearch kibana
 ```
+
+By default, these will be accessible on http://localhost:9200 and http://localhost:5601 for Elasticsearch and Kibana respectively.
+
+
 
 You can run the pipeline with a command like:
 
 ```sh
-ES_PREIFX=my-elasticsearch-prefix
-docker-compose run --rm mrtarget --dry-run $ES_PREFIX
+docker-compose run --rm mrtarget --dry-run my-elasticsearch-prefix
+```
+
+or:
+
+```sh
+docker-compose run --rm mrtarget --help
 ```
 
 ---
@@ -131,27 +140,46 @@ Note that the variables can also be overridden on the command-line.
 There are several targets, one for each stage of the pipeline, as well as composite targets, such as 
 
  * `all`
- * `load_data`
+ * `base`
  * `validate_all`
  
- (see the actual Makefile for the full list)
+ (see the actual Makefile for the full list, or the output of `make -r -R -p`)
 
 Each target checks that the required Elasticsearch indices exist (via `scripts/check_index.py`) before execution.
 
 There are several targets which speed up common tasks, such as 
  * `list_indices`
- * `delete_indices`
- * `clean` (see also `clean_json` and `clean_logs`)
+ * `clean` (see also `clean_json`, `clean_logs`, `clean_indice`)
+ * `shell`
+ * `dry_run`
 
 ### Notes
 
-*Shell completion*: most shells will complete the list of targets when `<TAB>` is pressed. This is a useful way of seeing which targets or available.
+*Shell completion*: most shells will complete the list of targets when `<TAB>` is pressed. This is a useful way of seeing which target(s) are available.
 
-*Parallel execution*: `make -j` will run all the dependencies of a target in parallel. Useful for the `load_data` and `validate_all` stages.
+*Parallel execution*: `make -j` will run all the dependencies of a target in parallel. Useful for the `load_data` and `validate_all` stages. Using a value will limit to only that number of jobs e.g. `-j 4` will limit to 4. Using `-l x` will only create new jobs if the total load on the machine is below that threashold - usefuul as several of the stages themselves run over multiple processess. These can be combined - for example `make -j 8 -l 4` will spawn up to 8 jobs at the same time as long as the load is less than 4 when creating them. Note that when commands that use Redis are run in parallel, they will each try to start an embedded Redis on the same port and all fail; to solve this, use an shared external Redis instance.
 
 *Variables*: the default values for the variables set at the top of the `Makefile` can be overridden on the command-line, e.g. `make "ES_PREFIX=test" ens` Note that if any of these are already specified by environment variables, those values will take precedence. There is a `MRTARGET_ARGS` variable which can be used to specify arbitrary additional parameters at run time. 
- 
-*Target expansion*: The Makefile makes use of the `$@` symbol, which expands to the name of the current target. This allows significant reduction in boilerplate code and should be considered when modifying or extending the Makefile.
+
+*Partial execution*: the targets inside the makefile use absolute paths. While this is useful for running the makefile from a directory outside of the root of the project,
+when only a partial execution is desired (e.g. for testing) then the full path will be required.
+
+*Parital data*: By default, the makefile will only download and process up to 1000 evidence strings per data source. This is useful to keep the data processing to a manageable size and duration, but when used in production it is necessary to set it to a much higher value e.g. 
+`make "NUMBER_TO_KEEP=10000000" all`
+
+*Recovery*: Make is designed around files, and regneerating them when out of date. To work with the OpenTargets pipeline, the files it is based on are the log files produced by the various stages. This means that if you need to rerun a stage (e.g. to regenerate an Elasticsearch index) you will need to delete the appropriate log file and re-run make.
+
+
+## Using the Makefile within Docker
+
+It is possible to use both docker and the makefile together. You will need to override the default entrypoint of the docker image. For example:
+
+```sh
+docker-compose run --rm --entrypoint make mrtarget -j -l 8 -r -R -k all
+```
+
+
+
 
 ---
 

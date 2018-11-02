@@ -63,6 +63,13 @@ class QCMetrics(object):
         #make a copy of the current metrics to avoid side effects
         metrics = dict(self.metrics)
 
+        #ensure the directory for the log file exists
+        qcdir = os.path.dirname(os.path.abspath(filename))
+        if not os.path.isdir(qcdir):
+            self._logger.debug("log directory %s does not exist, creating", qcdir)
+            os.makedirs(qcdir)
+
+
         #if the file exists, read it and add the contents to the metrics
         if os.path.isfile(filename):
             with open(filename, 'rb') as csvfile:

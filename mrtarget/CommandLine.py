@@ -2,6 +2,7 @@ from __future__ import print_function
 import logging
 import argparse
 import sys
+import os
 import itertools
 from logging.config import fileConfig
 
@@ -195,6 +196,11 @@ def main():
         requests_log = logging.getLogger("urllib3")
         requests_log.setLevel(logging.DEBUG)
         requests_log.propagate = False  # Change to True to log to main log as well
+        #ensure the directory for the log file exists
+        logdir = os.path.dirname(os.path.abspath(args.log_http))
+        if not os.path.isdir(logdir):
+            logger.debug("log directory %s does not exist, creating", logdir)
+            os.makedirs(logdir)
         requests_log.addHandler(logging.FileHandler(args.log_http))
 
 
