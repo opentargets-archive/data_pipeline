@@ -76,176 +76,138 @@ ENSEMBL_RELEASE_VERSION = 93
 ```
 
 #### 1. Loading the Base Data
-> \#Setting Data release version
-```sh
+```bash
+#Setting Data release version
 DATA_RELEASE_VERSION=18.10
-```
-> \#Reactome: For input files see `mrtarget/resources/uris.ini`
-```sh
+#Reactome: For input files see `mrtarget/resources/uris.ini`
 python -m mrtarget.CommandLine --rea --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
-> \# Ensembl: Extract via querying the public MySQL database
-```sh
+# Ensembl: Extract via querying the public MySQL database
 python -m mrtarget.CommandLine --ens --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
->\# Uniprot: Extract via querying the REST API (currently changing to downloaded file), return and store in XML format
-```sh
+# Uniprot: Extract via querying the REST API (currently changing to downloaded file), return and store in XML format
 python -m mrtarget.CommandLine --unic --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
->\# Baseline Expression: For input files see `mrtarget/resources/uris.ini`
-
->\#  RNA: MetaAnalysis provided by the Expression Atlas Team, Protein: Human Protein Atlas
-```sh
+# Baseline Expression: For input files see `mrtarget/resources/uris.ini`
+#  RNA: MetaAnalysis provided by the Expression Atlas Team, Protein: Human Protein Atlas
 python -m mrtarget.CommandLine --hpa --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
->\# Mamalian Phenotype Ontology: For input files see `mrtarget/resources/ontology_config.ini`
-```sh
+# Mamalian Phenotype Ontology: For input files see `mrtarget/resources/ontology_config.ini`
 python -m mrtarget.CommandLine --mp --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
->\# EFO: For input files see `mrtarget/resources/ontology_config.ini`
-```sh
+EFO: For input files see `mrtarget/resources/ontology_config.ini`
 python -m mrtarget.CommandLine --efo --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
->\# ECO: For input files see `mrtarget/resources/ontology_config.ini`
-```sh
+# ECO: For input files see `mrtarget/resources/ontology_config.ini`
 python -m mrtarget.CommandLine --eco --log-level DEBUG ${DATA_RELEASE_VERSION}
 ```
 #### 2. Gene merging
-```sh
+```bash
 python -m mrtarget.CommandLine --gen --log-level DEBUG ${DATA_RELEASE_VERSION}
 ```
 #### 3. Evidence Data Validation
-> \# Specify JSON Schema Version
-```sh
+```bash
+# Specify JSON Schema Version
 SCHEMA_VERSION=1.2.8
-```
-> \# Validate all data sources specified in mrtarget/resources/evidences_sources.txt
-```sh
+# Validate ALL data sources specified in mrtarget/resources/evidences_sources.txt
 python -m mrtarget.CommandLine --val --log-level DEBUG ${DATA_RELEASE_VERSION} \
 --schema-version ${SCHEMA_VERSION}
-```
-> \# Validate a specific data source
-```sh
+# Validate ONE specific data source
 python -m mrtarget.CommandLine --val --log-level DEBUG ${DATA_RELEASE_VERSION} \
 --schema-version ${SCHEMA_VERSION} --input-file [PATH_TO_JSON_EVIDENCE_FILE.json.gz]
 ```
 #### 4. Evidence String Processing
 > Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```sh
+```bash
 ./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --evs   
 ```
 #### 5. Association Score Calculation
 > Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```sh
+```bash
 ./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --as
 ```
 #### 6. Association QC
-```sh
+```bash
 python -m mrtarget.CommandLine --qc --log-level DEBUG ${DATA_RELEASE_VERSION}
 ```
 #### 7. Search Data Processing
 > Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```sh
+```bash
 ./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --sea
 ```
 #### 8. Relationship Data Computation
 > Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```sh
+```bash
 ./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --ddr   
 ```
 #### 9. Generate Data Metrics
-```sh
+```bash
 python -m mrtarget.CommandLine --metric --log-level DEBUG ${DATA_RELEASE_VERSION}
 ```
 
 ---
 ### Running the pipeline using Docker
 Only steps 1, 2, 3, 6 and 9 can be run locally on the complete data. All steps can be run with `--log-level DEBUG`
-> \# Setting Data release version
 ```sh
+# Setting Data release version
 DATA_RELEASE_VERSION=18.08
 ```
 #### 1. Loading the Base Data
-> \#Reactome: For input files see `mrtarget/resources/uris.ini`
-```python
+```bash
+#Reactome: For input files see `mrtarget/resources/uris.ini`
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --rea
-```
-> \# Ensembl: Extract via querying the public MySQL database
-```sh
+# Ensembl: Extract via querying the public MySQL database
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --ens
-```
->\# Uniprot: Extract via querying the REST API (currently changing to downloaded file), return and store in XML format
-```sh
+# Uniprot: Extract via querying the REST API (currently changing to downloaded file), return and store in XML format
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --unic
-```
->\# Baseline Expression: For input files see `mrtarget/resources/uris.ini`
-
->\#  RNA: MetaAnalysis provided by the Expression Atlas Team, Protein: Human Protein Atlas
-```sh
+# Baseline Expression: For input files see `mrtarget/resources/uris.ini`
+#  RNA: MetaAnalysis provided by the Expression Atlas Team, Protein: Human Protein Atlas
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --hpa
-```
->\# Mamalian Phenotype Ontology: For input files see `mrtarget/resources/ontology_config.ini`
-```sh
+# Mamalian Phenotype Ontology: For input files see `mrtarget/resources/ontology_config.ini`
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --mp
-```
->\# EFO: For input files see `mrtarget/resources/ontology_config.ini`
-```sh
+# EFO: For input files see `mrtarget/resources/ontology_config.ini`
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --efo
-```
->\# ECO: For input files see `mrtarget/resources/ontology_config.ini`
-```sh
+# ECO: For input files see `mrtarget/resources/ontology_config.ini`
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --eco
 ```
 #### 2. Gene merging
-```sh
+```bash
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --gen
 ```
 #### 3. Evidence Data Validation
-> \# Specify JSON Schema Version
-```sh
+```bash
+# Specify JSON Schema Version
 SCHEMA_VERSION=1.2.8
-```
-> \# Validate all data sources specified in mrtarget/resources/evidences_sources.txt
-```sh
+# Validate ALL data sources specified in mrtarget/resources/evidences_sources.txt
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --val --schema-version ${SCHEMA_VERSION}
-```
-> \# Validate a specific data source
-```sh
+# Validate ONE specific data source
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --val 
 --schema-version ${SCHEMA_VERSION} --input-file [PATH_TO_JSON_EVIDENCE_FILE.json.gz]
-```
-> \# Validate one or more data source(s)
-```sh
+# Validate one or more data source(s)
 ./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --val 
 --schema-version ${SCHEMA_VERSION} --input-file [PATH_TO_JSON_EVIDENCE_FILE.json.gz] 
 --input-file [PATH_TO_JSON_EVIDENCE_FILE_2.json.gz]
 ```
 #### 4. Evidence String Processing
 > Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```sh
+```bash
 ./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --evs   
 ```
 #### 5. Association Score Calculation
 > Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```sh
+```bash
 ./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --as
 ```
 #### 6. Association QC
-```sh
+```bash
 ./launch_mrtarget.sh [container_run_name] [container_branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --qc
 ```
 #### 7. Search Data Processing
 > Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```sh
+```bash
 ./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --sea
 ```
 #### 8. Relationship Data Computation
 > Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```sh
+```bash
 ./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --ddr   
 ```
 #### 9. Generate Data Metrics
-```sh
+```bash
 ./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --metric
 ```
 
@@ -399,7 +361,6 @@ when only a partial execution is desired (e.g. for testing) then the full path w
 
 *Recovery*: Make is designed around files, and regneerating them when out of date. To work with the OpenTargets pipeline, the files it is based on are the log files produced by the various stages. This means that if you need to rerun a stage (e.g. to regenerate an Elasticsearch index) you will need to delete the appropriate log file and re-run make.
 
-
 ## Using the Makefile within Docker
 
 It is possible to use both docker and the makefile together. You will need to override the default entrypoint of the docker image. For example:
@@ -407,9 +368,6 @@ It is possible to use both docker and the makefile together. You will need to ov
 ```sh
 docker-compose run --rm --entrypoint make mrtarget -j -l 8 -r -R -k all
 ```
-
-
-
 
 ---
 
@@ -437,7 +395,7 @@ Here the list to change, enable or disable functionality:
 
 ## Contributing
 
-Here the recipe to start coding on it:
+Here is the recipe to start coding on it:
 
 ```bash
 $ git clone ${this_repo}
@@ -457,38 +415,37 @@ $ pip install -r requirements.txt
 $ mrtarget -h
 ```
 
-Now you are ready to contribute to this project. As note, the **resource files** are located in
+Now you are ready to contribute to this project. Note that the **resource files** are located in
 the folder `mrtarget/resources/`.
 
-Tests are run using pytest. For eg:
+Tests are run using pytest. For example:
 ```sh
 pytest tests/test_score.py
 ```
 
-To skip running tests in the CI when pushing append `[skip ci]` to the commit message.
+To skip running tests in the CI when pushing, append `[skip ci]` to the commit message.
 
 The elasticsearch guide can be very useful: https://www.elastic.co/guide/en/elasticsearch/guide/2.x/getting-started.html
-The important bits to run/understand the data pipeline are the `getting started`, `search in depth`, `aggregations`, and `modeling your data`. You can probably ignore the others.
+The important bits to run/understand the data pipeline are the `getting started`, `search in depth`, `aggregations`, and `modeling your data`.
 
 ### Internal features for developers
 
 #### Evidence Validation (--val step) limit (WIP)
 
-It will give up if too many evidence strings failed the JSON schema validation. 1000 docs will be a
+It will give up if too many evidence strings failed the JSON schema validation. 1000 docs is a
 reasonable limit per launched process.
 
 #### Minimal dataset
 
 In case you want to run steps with a minimal dataset you should specify `export CTTV_MINIMAL=true`. If you want
-to regenerate the data source files used, then run:
+to regenerate the data source files that were used, then run:
 
 ```bash
 $ cd scripts/
 $ bash generate_minimal_dataset.sh
 ```
 
-It should upload to gcloud storage and enable public links to files but you need to be logged
-in to the gcloud account.
+It should upload to gcloud storage and enable public links to files but you need to be logged in to the gcloud account.
 
 #### Redislite and/or remote redis
 
