@@ -248,14 +248,14 @@ class Config():
 
     EVIDENCEVALIDATION_VALIDATOR_SCHEMAS = {
         'genetic_association': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/genetics.json',
-        'rna_expression': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/expression.json',
-        'genetic_literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
-        'affected_pathway': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
-        'somatic_mutation': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
-        'known_drug': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
-        'literature_mining': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
-        'literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
-        'animal_model': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
+        'rna_expression':      'https://raw.githubusercontent.com/opentargets/json_schema/master/src/expression.json',
+        'genetic_literature':  'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'affected_pathway':    'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'somatic_mutation':    'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'known_drug':          'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
+#        'literature_mining':   'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'literature':          'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'animal_model':        'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
     }
 
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
