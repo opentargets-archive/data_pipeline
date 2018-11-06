@@ -252,46 +252,6 @@ You can install Kibana in a variety of ways, including via [docker](https://www.
 
 Once Kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
 
-
-### Package users
-
-Just install via pip `pip install mrtarget` and then you will have a pretty
-ready to use application. Just call `mrtarget -h` and it will work as usual
-previous data_pipeline commands.
-
-```
-
-### db.ini
-The backend (Elasticsearch configuration) can be exported as the ENV var
-`ELASTICSEARCH_NODES` as a comma separated list of URLs:
-```sh
-export ELASTICSEARCH_NODES=http://host1:9200,https://securehost:9243
-```
-
-or using a configuration file named `db.ini` where a list
-of URL (one for each node if desired) is placed in JSON compatible format:
-
-```sh
-[dev]
-ELASTICSEARCH_NODES = [
-     "https://user:pwd@es.found.io:9200",
-     "http://127.0.0.1:9200/"
-    ]
-```
-
-Normally mrT-arget uses a local instance of redis, thanks to redislite.
-To make it connect to any given redis you can specify the parameter `--redis-remote`
-and point to the right host and port:
-```sh
-mrtarget --redis-remote --redis-host '127.0.0.1'--redis-port '8888'
-```
-
-This can also be done with environment variables:
-```sh
-CTTV_REDIS_REMOTE=true
-CTTV_REDIS_SERVER=127.0.0.1:8888
-```
-
 ## Running the Pipeline using Container/Docker
 
 If you have [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/) then you can start Elasticsearch and Kibana in the background with:
