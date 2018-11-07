@@ -2,7 +2,6 @@ from yapsy.IPlugin import IPlugin
 from mrtarget.common import url_to_tmpfile
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.Settings import Config
-import urllib2
 import ujson as json
 from tqdm import tqdm
 import logging
