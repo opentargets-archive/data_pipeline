@@ -7,11 +7,6 @@ import time
 
 from mrtarget.Settings import Config, build_ensembl_sql
 
-'''
-
-'''
-
-__log__ = logging.getLogger(__name__)
 
 class EnsemblMysqlGene(object):
     '''
@@ -31,6 +26,8 @@ class EnsemblMysqlGene(object):
         except mysql.connector.OperationalError as mysql_ex:
             raise mysql_ex
 
+        self.logger = logging.getLogger(__name__+".EnsemblMysqlGene")
+
     def get_ensembl_gene_ids(self):
         '''
         Execute an SQL statement, process its output and return a list of Ensembl stable IDs.
@@ -43,7 +40,7 @@ class EnsemblMysqlGene(object):
         cursor.execute(sql)
         ensembl_gene_ids = [element[0] for element in cursor.fetchall()]
         cursor.close()
-        __log__.info('Extracted list of ENSGIDs from ensembl MySQL server')
+        self.logger.info('Extracted list of ENSGIDs from ensembl MySQL server')
         return ensembl_gene_ids
     def conn_close(self):
         '''
@@ -116,6 +113,8 @@ class EnsemblGeneInfo(object):
         self.ensembl_release = ensembl_release
         mysql_gene.conn_close()
 
+        self.logger = logging.getLogger(__name__+".EnsemblGeneInfo")
+
     def __chunk_list(self, input_list, chunk_size=Config.ENSEMBL_CHUNK_SIZE):
         '''
         Breaks the input list into chunks. Used to limit the number of identifiers
@@ -144,7 +143,7 @@ class EnsemblGeneInfo(object):
         new_gene_info_json_map = {}
         for ensembl_gene_id, ensembl_rest_json in gene_info_json_map.items():
             if not ensembl_rest_json:
-                __log__.error('No JSON response for %s', ensembl_gene_id)
+                self.logger.warning('No JSON response for %s', ensembl_gene_id)
                 continue
             ensembl_rest_json['ensembl_release'] = self.ensembl_release
             if ensembl_rest_json['seq_region_name'] in chromosomes:
@@ -164,11 +163,11 @@ class EnsemblGeneInfo(object):
         gene_info_json_map = {}
         for i, sublist in enumerate(self.__chunk_list(self.mysql_genes)):
             if i % Config.ENSEMBL_CHUNK_SIZE ==0:
-                __log__.debug('Sending POST request for ENSGID sublist %s', i)
+                self.logger.debug('Sending POST request for ENSGID sublist %s', i)
             rest_gene_post = EnsemblRestGenePost(sublist)
             gene_post_output = rest_gene_post.get_gene_post_output()
             gene_info_json_map.update(gene_post_output)
-        __log__.info('Finished reading ENSGIDs information from REST API')
+        self.logger.info('Finished reading ENSGIDs information from REST API')
         return self.__add_additional_info(gene_info_json_map)
 
 
@@ -176,9 +175,10 @@ class EnsemblProcess(object):
 
     def __init__(self, loader):
         self.loader = loader
+        self.logger = logging.getLogger(__name__+".EnsemblProcess")
 
     def process(self, ensembl_release=Config.ENSEMBL_RELEASE_VERSION):
-        __log__.info('Start processing ENSGIDs from Ensembl')
+        self.logger.info('Start processing ENSGIDs from Ensembl')
         gene_info = EnsemblGeneInfo(ensembl_release)
         for ens_id, data in gene_info.get_gene_info_json_map().items():
             self.loader.put(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
