@@ -1,7 +1,6 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
 from tqdm import tqdm
-import traceback
 import logging
 logging.basicConfig(level=logging.DEBUG)
 

@@ -1,15 +1,12 @@
 import logging
 from collections import Counter
 import sys, os
-import multiprocessing
 import numpy as np
 
 import pickle
 
-import scipy
 import scipy.sparse as sp
 
-from redislite import Redis
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
 from tqdm import tqdm

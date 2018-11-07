@@ -1,4 +1,4 @@
-import sys
+
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.connection import PipelineConnectors

@@ -3,7 +3,6 @@ from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
 from mrtarget.common import URLZSource
 from mrtarget.common.safercast import SaferBool, SaferFloat, SaferInt
-from tqdm import tqdm
 from itertools import compress
 import csv
 

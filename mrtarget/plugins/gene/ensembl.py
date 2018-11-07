@@ -4,7 +4,6 @@ from mrtarget.Settings import Config
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from elasticsearch.exceptions import NotFoundError
 from tqdm import tqdm
-import sys
 import logging
 logging.basicConfig(level=logging.INFO)
 

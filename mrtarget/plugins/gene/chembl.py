@@ -1,5 +1,4 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from tqdm import tqdm
 import logging

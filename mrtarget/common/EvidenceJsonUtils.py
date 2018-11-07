@@ -5,8 +5,6 @@ from collections import OrderedDict
 from difflib import Differ
 import logging
 
-import sys
-
 
 logger = logging.getLogger(__name__)
 

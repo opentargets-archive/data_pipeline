@@ -1,5 +1,4 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from elasticsearch.exceptions import NotFoundError

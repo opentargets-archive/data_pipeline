@@ -25,13 +25,12 @@ limitations under the License.
 """
 
 import logging
-import os
 
 import requests
 
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
-import mrtarget.common as c
+from mrtarget.common import URLZSource
 import json
 
 __copyright__ = "Copyright 2014-2016, GlaxoSmithKline"
@@ -57,7 +56,7 @@ def get_chembl_url(uri):
 
     while next_get:
         chunk = None
-        with c.URLZSource(uri + _fmt(limit=limit, offset=offset)).open() as f:
+        with URLZSource(uri + _fmt(limit=limit, offset=offset)).open() as f:
             chunk = json.loads(f.read())
 
         page_meta = chunk['page_meta']

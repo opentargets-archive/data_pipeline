@@ -528,11 +528,7 @@ class ElasticSearchConfiguration():
                                                     },
                                                     "activity": {
                                                         "type": "keyword"
-                                                    },
-                                                    "activity": {
-                                                        "type": "keyword"
-                                                    },
-
+                                                    }
                                                 }
                                             },
                                             "disease": {
