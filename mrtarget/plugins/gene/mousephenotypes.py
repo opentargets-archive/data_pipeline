@@ -5,7 +5,6 @@ from mrtarget.Settings import Config
 import ujson as json
 from tqdm import tqdm
 import logging
-logging.basicConfig(level=logging.DEBUG)
 
 PHENOTYPE_CATEGORIES = {
     "MP:0005386" : "behavior/neurological phenotype",
