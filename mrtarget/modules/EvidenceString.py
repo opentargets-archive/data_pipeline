@@ -7,15 +7,14 @@ from collections import Counter
 import addict
 
 import pickle
-from tqdm import tqdm
 
 from mrtarget.Settings import Config, file_or_resource
-from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
+from mrtarget.common.connection import new_es_client
 from mrtarget.modules import GeneData
 from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO
@@ -23,7 +22,6 @@ from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
 
 logger = logging.getLogger(__name__)
-tqdm_out = TqdmToLogger(logger, level=logging.INFO)
 
 
 '''line profiler code'''
@@ -1192,13 +1190,6 @@ class EvidenceStringProcess():
                              r_server=self.r_server,
                              serialiser='pickle')
 
-        q_reporter = RedisQueueStatusReporter([evidence_q,
-                                               store_q,
-                                               ],
-                                              interval=30,
-                                              )
-        q_reporter.start()
-
         self.logger.info('evidence processer process with %d processes', number_of_workers)
         self.logger.info('trying with less workers because global stats')
         scorers = [EvidenceProcesser(evidence_q,
@@ -1220,12 +1211,7 @@ class EvidenceStringProcess():
             w.start()
 
         targets_with_data = set()
-        for row in tqdm(self.get_evidence(page_size=get_evidence_page_size, datasources=datasources),
-                        desc='Reading available evidence_strings',
-                        total=self.es_query.count_validated_evidence_strings(datasources=datasources),
-                        unit=' evidence',
-                        file=tqdm_out,
-                        unit_scale=True):
+        for row in self.get_evidence(page_size=get_evidence_page_size, datasources=datasources):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name'])
             idev = row['uniq_assoc_fields_hashdig']
             ev.evidence['id'] = idev
@@ -1242,8 +1228,6 @@ class EvidenceStringProcess():
         for w in scorers:
             w.join()
 
-        self.logger.info('collecting reporter')
-        q_reporter.join()
 
 
         self.logger.info('flushing data to index')
@@ -1269,12 +1253,7 @@ class EvidenceStringProcess():
 
     def get_global_stats(self, uni2ens, available_genes, non_reference_genes, page_size=5000,):
         global_stats = EvidenceGlobalCounter()
-        for row in tqdm(self.get_evidence(page_size),
-                        desc='getting global stats on  available evidence_strings',
-                        total=self.es_query.count_validated_evidence_strings(),
-                        unit=' evidence',
-                        file=tqdm_out,
-                        unit_scale=True):
+        for row in self.get_evidence(page_size):
             ev = Evidence(row['evidence_string'], datasource=row['data_source_name']).evidence
 
             EvidenceManager.fix_target_id(ev, uni2ens, available_genes, non_reference_genes)

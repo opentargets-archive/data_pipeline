@@ -8,7 +8,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 
 from mrtarget.Settings import Config
 
@@ -284,13 +284,11 @@ class SearchObjectProcess(object):
         '''
 
         self.loader.create_new_index(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
-        start_time = datetime.now()
+        
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID+'|search_obj_processing',
                            max_size=1000,
                            job_timeout=180)
 
-        q_reporter = RedisQueueStatusReporter([queue])
-        q_reporter.start()
         lookup_data = LookUpDataRetriever(self.loader.es,self.r_server,data_types=[LookUpDataType.CHEMBL_DRUGS]).lookup
 
         workers = [SearchObjectAnalyserWorker(queue,

@@ -1,7 +1,6 @@
 from yapsy.IPlugin import IPlugin
 from StringIO import StringIO
 from mrtarget.Settings import Config
-from tqdm import tqdm
 import requests
 import csv
 import gzip
@@ -16,19 +15,14 @@ class Orthologs(IPlugin):
     def print_name(self):
         self._logger.info("This is plugin ORTHOLOGS")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
+    def merge_data(self, genes, loader, r_server):
         self._logger.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
         req = requests.get(Config.HGNC_ORTHOLOGS)
         self._logger.info("Ortholog parsing - response code %s" % req.status_code)
         req.raise_for_status()
 
         # io.BytesIO is StringIO.StringIO in python 2
-        for row in tqdm(csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)), delimiter="\t"),
-                        desc='loading orthologues genes from HGNC',
-                        unit_scale=True,
-                        unit=' genes',
-                        file=tqdm_out,
-                        leave=False):
+        for row in csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)), delimiter="\t"):
             if row['human_ensembl_gene'] in genes:
                 self.add_ortholog_data_to_gene(gene=genes[row['human_ensembl_gene']], data=row)
 

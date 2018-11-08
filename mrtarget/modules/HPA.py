@@ -5,12 +5,13 @@ import csv
 import ujson as json
 import functools as ft
 import itertools as it
+import operator as oper
 
 import petl
 from mrtarget.common import URLZSource
 
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
-from mrtarget.common.Redis import RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
+from mrtarget.common.Redis import  RedisQueueWorkerProcess, RedisQueue
 
 from mrtarget.Settings import Config
 from addict import Dict
@@ -547,8 +548,6 @@ class HPAProcess():
                            max_size=10000,
                            job_timeout=600)
 
-        q_reporter = RedisQueueStatusReporter([queue])
-        q_reporter.start()
         loaders = min([16, Config.WORKERS_NUMBER])
 
         workers = [ExpressionObjectStorer(self.loader.es,
@@ -568,8 +567,6 @@ class HPAProcess():
 
         for w in workers:
             w.join()
-
-        q_reporter.join()
 
         self.logger.info('missing tissues %s', str(_missing_tissues))
         self.logger.info('all expressions objects pushed to elasticsearch')

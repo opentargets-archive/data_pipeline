@@ -39,16 +39,14 @@ class Tractability(IPlugin):
         self.ensembl_current = {}
         self.symbols = {}
         self.tractability = {}
-        self.tqdm_out = None
 
     def print_name(self):
         self._logger.info("Tractability plugin")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
+    def merge_data(self, genes, loader, r_server):
 
         self.loader = loader
         self.r_server = r_server
-        self.tqdm_out = tqdm_out
 
         try:
             # Parse tractability data into self.tractability

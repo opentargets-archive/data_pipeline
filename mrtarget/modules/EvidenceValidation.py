@@ -17,9 +17,7 @@ from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 import ujson as json
 import opentargets_validator.helpers
 
@@ -202,7 +200,6 @@ class FileReaderProcess(RedisQueueWorkerProcess):
         self.dry_run = dry_run
         self.start_time = time.time()  # reset timer start
         self.logger = logging.getLogger(__name__)
-        self.tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
     def process(self, data):
         file_path, file_version, provider_id, data_source_name, md5_hash,\
@@ -585,13 +582,6 @@ class EvidenceValidationFileChecker():
                              max_size=MAX_NB_EVIDENCE_CHUNKS*loaders_number*5,
                              job_timeout=1200)
 
-        q_reporter = RedisQueueStatusReporter([file_q,
-                                               evidence_q,
-                                               store_q
-                                               ],
-                                              interval=30)
-        q_reporter.start()
-
         # TODO XXX CHECK VALUE OF R_SERVER.DB
         self.logger.info('file reader process with %d processes', readers_number)
 
@@ -660,10 +650,6 @@ class EvidenceValidationFileChecker():
 
         if not dry_run:
             file_processer.loader.restore_after_bulk_indexing()
-
-        self.logger.info('collecting reporter')
-        q_reporter.join()
-        return
 
     def reset(self):
         audit_index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME)

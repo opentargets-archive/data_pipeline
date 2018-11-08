@@ -6,8 +6,11 @@ import pickle
 import logging
 import rdflib
 from rdflib import URIRef
-from rdflib.namespace import Namespace
-from rdflib.namespace import RDF, RDFS
+from rdflib.namespace import Namespace, NamespaceManager
+from rdflib.namespace import OWL, RDF, RDFS
+from SPARQLWrapper import SPARQLWrapper, JSON
+from datetime import date
+
 from mrtarget.Settings import Config
 
 
