@@ -2,10 +2,8 @@ from yapsy.IPlugin import IPlugin
 from mrtarget.common import url_to_tmpfile
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.Settings import Config
-import urllib2
 import ujson as json
 import logging
-logging.basicConfig(level=logging.DEBUG)
 
 PHENOTYPE_CATEGORIES = {
     "MP:0005386" : "behavior/neurological phenotype",

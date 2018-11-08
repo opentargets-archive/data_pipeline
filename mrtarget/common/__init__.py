@@ -7,7 +7,6 @@ import logging
 import io
 import tempfile as tmp
 import requests as r
-import json
 
 _l = logging.getLogger(__name__)
 

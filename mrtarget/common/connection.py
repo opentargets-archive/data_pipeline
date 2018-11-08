@@ -1,6 +1,5 @@
 import logging
 import time
-import certifi
 import os
 import tempfile as tmp
 from elasticsearch import Elasticsearch, ConnectionTimeout
@@ -9,7 +8,6 @@ from redislite import Redis
 import redis.exceptions as redis_ex
 
 from mrtarget.Settings import Config
-from redis.exceptions import ConnectionError
 
 
 # just one redis instance per app

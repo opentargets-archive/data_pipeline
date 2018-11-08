@@ -1,7 +1,6 @@
 import logging
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
-from mrtarget.common.connection import new_redis_client, PipelineConnectors
 from mrtarget.Settings import Config
 
 class HPALookUpTable(object):

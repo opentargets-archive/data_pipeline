@@ -7,11 +7,8 @@ import ConfigParser
 import pkg_resources as res
 from envparse import env, ConfigurationError
 import mrtarget
-import petl
 import multiprocessing as mp
 import logging
-
-from mrtarget.common import URLZSource
 
 logger = logging.getLogger(__name__)
 

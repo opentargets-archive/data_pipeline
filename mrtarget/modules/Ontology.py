@@ -1,20 +1,16 @@
-import copy
-import re
 import sys
 reload(sys)
 sys.setdefaultencoding("utf8")
 import os
-import gzip
 import pickle
 import logging
-import json
 import rdflib
-import requests
 from rdflib import URIRef
 from rdflib.namespace import Namespace, NamespaceManager
 from rdflib.namespace import OWL, RDF, RDFS
 from SPARQLWrapper import SPARQLWrapper, JSON
 from datetime import date
+
 from mrtarget.Settings import Config
 
 

@@ -1,8 +1,7 @@
 import logging
-import ujson as json
 from collections import OrderedDict
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.modules.Ontology import OntologyClassReader, DiseaseUtils
+from mrtarget.modules.Ontology import OntologyClassReader
 from rdflib import URIRef
 from mrtarget.Settings import Config
 

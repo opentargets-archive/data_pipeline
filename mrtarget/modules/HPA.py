@@ -2,7 +2,6 @@ from __future__ import absolute_import
 import logging
 import re
 import csv
-import hashlib
 import ujson as json
 import functools as ft
 import itertools as it
@@ -17,7 +16,6 @@ from mrtarget.common.Redis import  RedisQueueWorkerProcess, RedisQueue
 from mrtarget.Settings import Config
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
-import pprint
 
 
 _missing_tissues = {'names': {},

@@ -13,7 +13,7 @@ jsonpickle.set_preferred_backend('ujson')
 import logging
 import uuid
 import datetime
-from threading import Thread, current_thread
+from threading import Thread
 
 import numpy as np
 import psutil
