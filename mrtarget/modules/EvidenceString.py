@@ -16,7 +16,6 @@ from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-from mrtarget.common.connection import new_es_client
 from mrtarget.modules import GeneData
 from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO

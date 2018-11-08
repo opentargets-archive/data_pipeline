@@ -1,10 +1,9 @@
 import unittest
 import uuid
-import pytest
 
-from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess, WhiteCollarWorker, RedisQueueWorkerThread
-from mrtarget.common.connection import PipelineConnectors, new_redis_client
-from mrtarget import Settings
+from mrtarget.common.Redis import RedisQueue, WhiteCollarWorker, RedisQueueWorkerThread
+from mrtarget.common.connection import PipelineConnectors
+
 
 class ProxyWorker(RedisQueueWorkerThread):
     '''reads from the input queue and push it to the output queue'''

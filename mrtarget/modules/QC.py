@@ -4,12 +4,7 @@ import csv
 import os.path
 from numbers import Number
 
-from collections import Counter
-from pprint import pprint
 
-from elasticsearch import helpers
-
-from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 

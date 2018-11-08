@@ -1,11 +1,7 @@
-import os
 import sys
 reload(sys)
 sys.setdefaultencoding("utf8")
-import logging
-import json
 import ConfigParser
-from SPARQLWrapper import SPARQLWrapper, JSON
 from mrtarget.Settings import file_or_resource
 
 ONTOLOGY_CONFIG = ConfigParser.ConfigParser()

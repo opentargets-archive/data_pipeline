@@ -1,12 +1,8 @@
 import logging
 from collections import OrderedDict
-from tqdm import tqdm
 from mrtarget.common import TqdmToLogger
-from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisLookupTablePickle
-from mrtarget.modules.Ontology import OntologyClassReader, DiseaseUtils
+from mrtarget.modules.Ontology import OntologyClassReader
 from rdflib import URIRef
 from mrtarget.Settings import Config
 

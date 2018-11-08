@@ -2,13 +2,9 @@ from __future__ import absolute_import
 import logging
 import re
 import csv
-import hashlib
 import ujson as json
 import functools as ft
 import itertools as it
-import operator as oper
-from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
 
 import petl
 from mrtarget.common import URLZSource
@@ -19,7 +15,6 @@ from mrtarget.common.Redis import RedisQueueStatusReporter, RedisQueueWorkerProc
 from mrtarget.Settings import Config
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
-import pprint
 
 
 _missing_tissues = {'names': {},
