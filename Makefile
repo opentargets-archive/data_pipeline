@@ -11,7 +11,7 @@ mkfile_dir := $(dir $(mkfile_path))
 # Note that if any of these are already specified by environment variables, 
 # the existing variables will take precedence
 ES_PREFIX ?= makefile
-ELASTICSEARCH_NODES?=http://localhost:9200
+ELASTICSEARCH_NODES ?= http://localhost:9200
 LOG_LEVEL ?= DEBUG
 SCHEMA_VERSION ?= master
 NUMBER_TO_KEEP ?= 1000
