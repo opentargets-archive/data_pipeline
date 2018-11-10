@@ -24,63 +24,6 @@ from mrtarget.modules.GeneData import Gene
 logger = logging.getLogger(__name__)
 
 
-'''line profiler code'''
-try:
-    from line_profiler import LineProfiler
-
-
-    def do_profile(follow=[]):
-        def inner(func):
-            def profiled_func(*args, **kwargs):
-                try:
-                    profiler = LineProfiler()
-                    profiler.add_function(func)
-                    for f in follow:
-                        profiler.add_function(f)
-                    profiler.enable_by_count()
-                    return func(*args, **kwargs)
-                finally:
-                    profiler.print_stats()
-
-            return profiled_func
-
-        return inner
-
-except ImportError:
-    def do_profile(follow=[]):
-        "Helpful if you accidentally leave in production!"
-
-        def inner(func):
-            def nothing(*args, **kwargs):
-                return func(*args, **kwargs)
-
-            return nothing
-
-        return inner
-'''end of line profiler code'''
-
-# def evs_lookup(dic, key, *keys):
-#     '''
-#     use like evs_lookup(d, *key1.key2.key3.split('.'))
-#     :param dic:
-#     :param key:
-#     :param keys:
-#     :return:
-#     '''
-#     if keys:
-#         return evs_lookup(dic.get(key, {}), *keys)
-#     return dic.get(key)
-#
-# def evs_set(dic,value, key, *keys):
-#     '''use like evs_set(d, value, *key1.key2.key3.split('.'))
-#     '''
-#     if keys:
-#         return evs_set(dic.get(key, {}), *keys)
-#     dic[key]=value
-
-
-
-
 class DataNormaliser(object):
     def __init__(self, min_value, max_value, old_min_value=0., old_max_value=1., cap=True):
         '''just set all initial values and ranges'''
@@ -251,7 +194,7 @@ class EvidenceManager():
                 (evidence['type'] == 'somatic_mutation'):
             evidence['sourceID'] = 'eva_somatic'
             fixed = True
-        '''move genetic_literature to genetic_association'''
+        # move genetic_literature to genetic_association
         if evidence['type'] == 'genetic_literature':
             evidence['type'] = 'genetic_association'
 
@@ -260,7 +203,7 @@ class EvidenceManager():
                         'version' in evidence['provenance_type']['database']:
             evidence['provenance_type']['database']['version'] = str(evidence['provenance_type']['database']['version'])
 
-        '''enforce eco-based score for genetic_association evidencestrings'''
+        # enforce eco-based score for genetic_association evidencestrings
         if evidence['type'] == 'genetic_association':
             available_score = None
             eco_uri = None

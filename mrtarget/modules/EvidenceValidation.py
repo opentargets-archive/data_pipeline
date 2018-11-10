@@ -12,76 +12,19 @@ from addict import Dict
 
 import logging as l
 from mrtarget.Settings import Config
-from mrtarget.common import URLZSource, LogAccum
+from mrtarget.common import URLZSource, generate_validators_from_schemas, LogAccum
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 import ujson as json
-import opentargets_validator.helpers
 
 
-BLOCKSIZE = 65536
 NB_JSON_FILES = 3
 MAX_NB_EVIDENCE_CHUNKS = 1000
 EVIDENCESTRING_VALIDATION_CHUNK_SIZE = 1
-
-
-TOP_20_TARGETS_QUERY = {  "size": 0, "aggs" : {  "group_by_targets" : {   "terms" : { "field" : "target_id", "order" : { "_count" : "desc" }, "size": 20 } } } }
-TOP_20_DISEASES_QUERY = {  "size": 0, "aggs" : {  "group_by_diseases" : {   "terms" : { "field" : "disease_id", "order" : { "_count" : "desc" }, "size": 20 } } } }
-DISTINCT_TARGETS_QUERY = {  "size": 0, "aggs" : {  "distinct_targets" : {  "cardinality" : { "field" : "target_id" } } } }
-DISTINCT_DISEASES_QUERY = {  "size": 0, "aggs" : {  "distinct_diseases" : {  "cardinality" : { "field" : "disease_id" } } } }
-SUBMISSION_FILTER_FILENAME_QUERY = '''
-{
-  "query": {
-    "constant_score": {
-      "filter": {
-        "terms" : { "filename": ["%s"]}
-      }
-    }
-  }
-}
-'''
-
-
-
-SUBMISSION_FILTER_MD5_QUERY = '''
-{
-  "query": {
-    "constant_score": {
-      "filter": {
-        "terms" : { "md5": ["%s"]}
-      }
-    }
-  }
-}
-
-'''
-
-
-
-
-# yyyyMMdd'T'HHmmssZ
 VALIDATION_DATE = strftime("%Y%m%dT%H%M%SZ")
-
-# figlet -c "Validation Passed"
-messagePassed = '''-----------------
-VALIDATION PASSED
------------------
-'''
-
-messageFailed = '''-----------------
-VALIDATION FAILED
------------------
-'''
-
-
-class FileTypes():
-    LOCAL='local'
-    S3='s3'
-    HTTP='http'
-
 
 
 class FileProcesser():
@@ -287,22 +230,8 @@ class ValidatorProcess(RedisQueueWorkerProcess):
         # log accumulator
         self.log_acc = LogAccum(self.logger, 128)
         # generate all validators once
-        self.generate_validators_from_schemas()
-
-
-    def generate_validators_from_schemas(self):
-        schemas_map = Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS
-        '''return a dict of schema names and validators using the function
-        `generate_validator_from_schema`'''
-        self.validators = {}
-        for schema_name, schema_uri in schemas_map.iteritems():
-            # per kv we create the validator and instantiate it
-            self.logger.info('generate_validator_from_schema %s using the uri %s',
-                    schema_name, schema_uri)
-            self.validators[schema_name] = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
-        #TODO do this better
-        #we don't need all validators to be created up front - should use lazy initialization
-        #we can create only 1 validator per uri - no need to duplicate
+        self.validators = \
+            generate_validators_from_schemas(Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS)
 
 
     def close(self):

@@ -99,6 +99,9 @@ class URLZSource(object):
 
     @contextmanager
     def open(self, mode='r'):
+        self._open()
+
+    def _open(self, mode='r'):
         if not mode.startswith('r'):
             raise ValueError('source is read-only')
 
@@ -119,6 +122,9 @@ class URLZSource(object):
 
             yield zf
         zf.close()
+
+    def open_without_context(self):
+        self._open()
 
 
 class LogAccum(object):

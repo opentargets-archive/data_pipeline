@@ -39,6 +39,10 @@ colorama
 psutil
 pylru
 yapsy
+dask[bag]
+dask[dataframe]
+dask[delayed]
+lxml
 
 codecov
 
