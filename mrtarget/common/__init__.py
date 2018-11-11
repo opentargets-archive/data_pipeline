@@ -4,7 +4,7 @@ from contextlib import contextmanager
 import gzip
 import zipfile
 import logging
-import io
+import os
 import tempfile as tmp
 import requests as r
 
@@ -172,6 +172,7 @@ def require_all(*predicates):
     if not r_all:
         print 'ERROR require_all failed checking all predicates true'
         _l.error('require_all failed checking all predicates true')
+
 
 def require_any(*predicates):
     r_any = any(predicates)
