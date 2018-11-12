@@ -210,6 +210,10 @@ class ChEMBLLookup(object):
                 self.target2molecule[target_id].add(molecule_id)
 
     def _populate_synonyms_for_molecule(self, molecule_set):
+        #if an empty set was passed by accident, skip
+        if len(molecule_set) < 1:
+            return
+
         url = Config.CHEMBL_MOLECULE_SET.format(';'.join(molecule_set))
         response = requests.get(url)
         response.raise_for_status()
