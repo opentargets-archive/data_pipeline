@@ -1,6 +1,5 @@
 import hashlib
 import logging
-from logging.config import fileConfig
 import sys
 import os
 import json
@@ -9,40 +8,19 @@ import pypeln.process as pr
 import addict
 import uuid
 import codecs
-import itertools as iters
-import more_itertools as miters
-import functools as ftools
+import itertools
+import more_itertools
+
+from logging.config import fileConfig
 
 import opentargets_validator.helpers
 
 from mrtarget.Settings import file_or_resource, Config
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
-
-
-def to_source(filename):
-    f_handle = None
-    if filename.endswith('.gz'):
-        f_handle = gzip.open(filename, mode='wb')
-    else:
-        f_handle = open(filename, mode='w')
-
-    return f_handle
-
-
-def from_source(filename):
-    f_handle = None
-    if filename.endswith('.gz'):
-        f_handle = gzip.open(filename, mode='rb')
-    else:
-        f_handle = open(filename, mode='r')
-
-    return iters.izip(iters.cycle([filename]),enumerate(f_handle))
-
-class ProcessContext(object):
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = addict.Dict(kwargs)
-        self.logger = logging.getLogger(__name__ + '_' + str(os.getpid()))
+from mrtarget.common.EvidencesHelpers import (ProcessContext, to_source_for_writing,
+                                              from_source_for_reading, reduce_tuple_with_sum)
+from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.connection import new_redis_client, new_es_client, PipelineConnectors
 
 
 def validate_evidence_on_start():
@@ -53,9 +31,9 @@ def validate_evidence_on_start():
     schemas_map = Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS
     for schema_name, schema_uri in schemas_map.iteritems():
         # per kv we create the validator and instantiate it
-        pc.logger.info('generate_validator_from_schema %s using the uri %s',
-                         schema_name, schema_uri)
-        pc.kwargs.validators[schema_name] = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
+        pc.logger.info('generate_validator_from_schema %s using the uri %s', schema_name, schema_uri)
+        pc.kwargs.validators[schema_name] = \
+            opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
     return pc
 
 
@@ -64,79 +42,90 @@ def validate_evidence_on_done(_status, process_context):
 
 
 def validate_evidence(line, process_context):
-    (filename, (line_n, l)) = line
+    if not line or line is None or len(line) != 2:
+        process_context.logger.error('line != triple and this is weird as if any line you must have a triple')
+        return (None, None)
 
+    (filename, (line_n, l)) = line
     validated_evs = addict.Dict(is_valid=False, explanation_type='', explanation_str='', target_id=None,
-                                efo_id=None,data_type=None, id=None, line=l, line_n=line_n,
+                                efo_id=None, data_type=None, id=None, line=l, line_n=line_n,
                                 filename=filename, hash='')
 
-    data_type = None
-    parsed_line = None
-    parsed_line_bad = None
     try:
-        parsed_line = json.loads(codecs.decode(l, 'utf-8', 'replace'))
-        validated_evs.id = DatatStructureFlattener(parsed_line).get_hexdigest()
+        data_type = None
+        parsed_line = None
+        parsed_line_bad = None
+
+        try:
+            parsed_line = json.loads(codecs.decode(l, 'utf-8', 'replace'))
+            validated_evs.id = DatatStructureFlattener(parsed_line).get_hexdigest()
+        except Exception as e:
+            validated_evs.explanation_type = 'unparseable_json'
+            validated_evs.id = hashlib.md5(line).hexdigest()
+            return (validated_evs, None)
+
+        if ('label' in parsed_line or 'type' in parsed_line):
+            # setting type from label in case we have label??
+            if 'label' in parsed_line:
+                parsed_line['type'] = parsed_line.pop('label', None)
+
+            data_type = parsed_line['type']
+
+        else:
+            validated_evs.explanation_type = 'key_fields_missing'
+            return (validated_evs, None)
+
+        if data_type is None:
+            validated_evs.explanation_type = 'missing_datatype'
+            return (validated_evs, None)
+
+        if data_type not in Config.EVIDENCEVALIDATION_DATATYPES:
+            validated_evs.explanation_type = 'unsupported_datatype'
+            return (validated_evs, None)
+
+        # validate line
+        validation_errors = \
+            [str(e) for e in process_context.kwargs.validators[data_type].iter_errors(parsed_line)]
+
+        if validation_errors:
+            # here I have to log all fails to logger and elastic
+            error_messages = ' '.join(validation_errors).replace('\n', ' ; ').replace('\r', '')
+
+            error_messages_len = len(error_messages)
+
+            # capping error message to 2048
+            error_messages = error_messages if error_messages_len <= 2048 \
+                else error_messages[:2048] + ' ; ...'
+
+            validated_evs.explanation_type = 'validation_error'
+            validated_evs.explanation_str = error_messages
+
+            return (validated_evs, None)
+
+        target_id = None
+        efo_id = None
+        # generate fantabulous dict from addict
+        evidence_obj = addict.Dict(parsed_line)
+        evidence_obj.unique_association_fields['datasource'] = evidence_obj.sourceID
+
+        if evidence_obj.target.id:
+            target_id = evidence_obj.target.id
+        if evidence_obj.disease.id:
+            efo_id = evidence_obj.disease.id
+
+        # flatten but is it always valid unique_association_fields?
+        validated_evs.hash = \
+            DatatStructureFlattener(evidence_obj.unique_association_fields).get_hexdigest()
+        evidence_obj.id = validated_evs.hash
+        return (None, evidence_obj)
 
     except Exception as e:
-        validated_evs.explanation_type = 'unparseable_json'
-        validated_evs.id = hashlib.md5(line).hexdigest()
+        validated_evs.explanation_type = 'exception'
+        validated_evs.explanation_str = str(e)
         return (validated_evs, None)
 
-    if ('label' in parsed_line or 'type' in parsed_line):
-        # setting type from label in case we have label??
-        if 'label' in parsed_line:
-            parsed_line['type'] = parsed_line.pop('label', None)
 
-        data_type = parsed_line['type']
-
-    else:
-        validated_evs.explanation_type = 'key_fields_missing'
-        return (validated_evs, None)
-
-    if data_type is None:
-        validated_evs.explanation_type = 'missing_datatype'
-        return (validated_evs, None)
-
-    if data_type not in Config.EVIDENCEVALIDATION_DATATYPES:
-        validated_evs.explanation_type = 'unsupported_datatype'
-        return (validated_evs, None)
-
-    # validate line
-    validation_errors = \
-        [str(e) for e in process_context.kwargs.validators[data_type].iter_errors(parsed_line)]
-
-    if validation_errors:
-        # here I have to log all fails to logger and elastic
-        error_messages = ' '.join(validation_errors).replace('\n', ' ; ').replace('\r', '')
-
-        error_messages_len = len(error_messages)
-
-        # capping error message to 2048
-        error_messages = error_messages if error_messages_len <= 2048 \
-            else error_messages[:2048] + ' ; ...'
-
-        validated_evs.explanation_type = 'validation_error'
-        validated_evs.explanation_str = error_messages
-
-        return (validated_evs, None)
-
-    target_id = None
-    efo_id = None
-    # generate fantabulous dict from addict
-    evidence_obj = addict.Dict(parsed_line)
-    evidence_obj.unique_association_fields['datasource'] = evidence_obj.sourceID
-
-
-    if evidence_obj.target.id:
-        target_id = evidence_obj.target.id
-    if evidence_obj.disease.id:
-        efo_id = evidence_obj.disease.id
-
-    # flatten but is it always valid unique_association_fields?
-    validated_evs.hash = \
-        DatatStructureFlattener(evidence_obj.unique_association_fields).get_hexdigest()
-    evidence_obj.id = validated_evs.hash
-    return (None, evidence_obj)
+    return (None, None)
 
     if efo_id:
         # Check disease term or phenotype term
@@ -217,79 +206,91 @@ def validate_evidence(line, process_context):
                     'explanation %s', str(explanation))
 
 
-def output_stream_on_start():
+def write_evidences_on_start():
     pc = ProcessContext()
-    pc.logger.debug("called from %s", str(os.getpid()))
+    pc.logger.debug("called output_stream from %s", str(os.getpid()))
 
-    file_name = 'evidences_' + uuid.uuid4().hex + '.json'
-    file_handle = to_source(file_name)
-    pc.kwargs.file_name = file_name
-    pc.kwargs.file_handle = file_handle
+    valids_file_name = 'evidences_' + uuid.uuid4().hex + '.json.gz'
+    valids_file_handle = to_source_for_writing(valids_file_name)
+    pc.kwargs.valids_file_name = valids_file_name
+    pc.kwargs.valids_file_handle = valids_file_handle
+
+    invalids_file_name = 'validations_' + uuid.uuid4().hex + '.json.gz'
+    invalids_file_handle = to_source_for_writing(invalids_file_name)
+    pc.kwargs.invalids_file_name = invalids_file_name
+    pc.kwargs.invalids_file_handle = invalids_file_handle
     return pc
 
 
-def output_stream_on_done(_status, process_context):
-    process_context.logger.debug('closing file %s', process_context.kwargs.file_name)
-    process_context.kwargs.file_handle.close()
+def write_evidences_on_done(_status, process_context):
+    process_context.logger.debug('closing files %s %s',
+                                 process_context.kwargs.valids_file_name,
+                                 process_context.kwargs.invalids_file_name)
+    process_context.kwargs.valids_file_handle.close()
+    process_context.kwargs.invalids_file_handle.close()
 
 
-def write_lines(x, process_context):
-    (left, right) = x
-    if right is not None:
-        process_context.kwargs.file_handle.writelines(json.dumps(right) + os.linesep)
+def write_evidences(x, process_context):
+    is_right = 0
+    is_left = 0
+    try:
+        (left, right) = x
+        if right is not None:
+            process_context.kwargs.valids_file_handle.writelines(json.dumps(right) + os.linesep)
+            is_right = 1
+        elif left is not None:
+            process_context.kwargs.invalids_file_handle.writelines(json.dumps(left) + os.linesep)
+            is_left = 1
+    except Exception as e:
+        process_context.logger.exception(e)
+    finally:
+        return is_left, is_right
 
 
-def error_stream_on_start():
-    pc = ProcessContext()
-    pc.logger.debug("called error_stream on_start from %s", str(os.getpid()))
-
-    file_name = 'validations_' + uuid.uuid4().hex + '.json'
-    file_handle = to_source(file_name)
-    pc.kwargs.file_name = file_name
-    pc.kwargs.file_handle = file_handle
-    return pc
-
-
-def error_stream_on_done(_status, process_context):
-    process_context.logger.debug('closing file %s', process_context.kwargs.file_name)
-    process_context.kwargs.file_handle.close()
-
-
-def error_write_lines(x, process_context):
-    (left, right) = x
-    if left is not None:
-        process_context.kwargs.file_handle.writelines(json.dumps(left) + os.linesep)
-
-    return x
-
-def main(filenames):
+def process_evidences(filenames, first_n=0, es_client=None, redis_client=None):
     logger = logging.getLogger(__name__)
     from multiprocessing import cpu_count
 
     logger.debug('create an iterable of handles from filenames %s', str(filenames))
-    in_handles = iters.imap(from_source, filenames)
+    in_handles = itertools.imap(from_source_for_reading, filenames)
 
     logger.debug('create a iterable of lines from all file handles')
-    chained_handles = iters.chain.from_iterable(iters.ifilter(lambda e: e is not None, in_handles))
+    chained_handles = itertools.chain.from_iterable(itertools.ifilter(lambda e: e is not None, in_handles))
 
-    out_data = (miters.take(1000, chained_handles)
-            | pr.map(validate_evidence, workers=cpu_count(), maxsize=1000)
-            | pr.map(error_write_lines, workers=2, maxsize=1000, on_start=error_stream_on_start,
-                     on_done=error_stream_on_done)
-            | pr.filter(lambda el: el[1] is not None, workers=3, maxsize=1000)
-            | pr.map(write_lines, workers=2, maxsize=1000, on_start=output_stream_on_start,
-                     on_done=output_stream_on_done)
-            | pr.to_iterable
-    )
+    evs = more_itertools.take(first_n, chained_handles) \
+        if first_n else chained_handles
 
-    print(miters.ilen(out_data))
-    iters.imap(lambda el: el.close(), in_handles)
+    logger.debug('load LUTs')
+    lookup_data = LookUpDataRetriever(es_client,
+                                      redis_client,
+                                      data_types=(
+                                          LookUpDataType.TARGET,
+                                          LookUpDataType.EFO,
+                                          LookUpDataType.ECO,
+                                          LookUpDataType.HPO,
+                                          LookUpDataType.MP,
+                                          # LookUpDataType.HPA
+                                      ),
+                                      autoload=True,
+                                      ).lookup
+
+    pl_stage = pr.map(validate_evidence, evs, workers=cpu_count(), maxsize=100,
+                      on_start=validate_evidence_on_start, on_done=validate_evidence_on_done)
+    pl_stage = pr.map(write_evidences, pl_stage, workers=2, maxsize=1000, on_start=write_evidences_on_start,
+                      on_done=write_evidences_on_done)
+
+    results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
+    logger.info('done validation with %d failed and %d validated', results[0], results[1])
 
 
 if __name__ == '__main__':
     fileConfig(file_or_resource('logging.ini'),  disable_existing_loggers=False)
     logging.getLogger().setLevel(logging.DEBUG)
 
+    redis_c = new_redis_client()
+    es_c = new_es_client()
     args = sys.argv[1:]
     print(args)
-    main(args)
+    connectors = PipelineConnectors()
+    connectors.init_services_connections()
+    process_evidences(args, first_n=1000, es_client=es_c, redis_client=redis_c)
