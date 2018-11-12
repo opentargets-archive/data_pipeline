@@ -189,12 +189,10 @@ class ChEMBLLookup(object):
                                                                fields=['target.id',
                                                                        'disease.id',
                                                                        'evidence.target2drug.urls'])):
-            self._logger.info('retrieving ChEMBL evidence...')
             molecule_ids = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
                            '/compound/' in i['url']]
             if molecule_ids:
                 molecule_id=molecule_ids[0]
-                self._logger.info(molecule_id)
 
                 if c % 200 == 0:
                     self._logger.debug('retrieving ChEMBL evidence... %s', molecule_id)
