@@ -78,6 +78,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).uni.log :
 	mkdir -p $(LOG_PATH)
 	$(ELASTIC_CHECK_CMD)
 	$(MRTARGET_CMD) --unic $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).uni.log
+	sleep 60
 
 .PHONY: hpa
 hpa: $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
@@ -86,6 +87,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).hpa.log :
 	mkdir -p $(LOG_PATH)
 	$(ELASTIC_CHECK_CMD)
 	$(MRTARGET_CMD) --hpa $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
+	sleep 60
 
 .PHONY: mp
 mp: $(LOG_PATH)/out.$(ES_PREFIX).mp.log
@@ -94,6 +96,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).mp.log :
 	mkdir -p $(LOG_PATH)
 	$(ELASTIC_CHECK_CMD)
 	$(MRTARGET_CMD) --mp $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).mp.log
+	sleep 60
 
 
 .PHONY: efo
@@ -103,6 +106,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).efo.log :
 	mkdir -p $(LOG_PATH)
 	$(ELASTIC_CHECK_CMD)
 	$(MRTARGET_CMD) --efo $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).efo.log
+	sleep 60
 
 
 .PHONY: eco
@@ -111,6 +115,7 @@ eco: $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 $(LOG_PATH)/out.$(ES_PREFIX).eco.log : 
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --eco $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).eco.log
+	sleep 60
 
 
 .PHONY: base_gene
@@ -121,6 +126,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LO
 	$(ELASTIC_CHECK_CMD)
 	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data $(ES_PREFIX)_expression-data
 	$(MRTARGET_CMD) --gen $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).gen.log
+	sleep 60
 
 .PHONY: base
 base: base_gene mp efo eco
