@@ -153,15 +153,15 @@ def validate_evidence(line, process_context):
         if efo_id:
             # Check disease term or phenotype term
             # if (short_disease_id not in self.lookup_data.available_efos) and \
-            if (efo_id not in process_context.kwargs.luts.lookup_data.efo_ontology.current_classes) and \
-                    (efo_id not in process_context.kwargs.luts.lookup_data.hpo_ontology.current_classes) and \
-                    (efo_id not in process_context.kwargs.luts.lookup_data.mp_ontology.current_classes):
+            if (efo_id not in process_context.kwargs.luts.efo_ontology.current_classes) and \
+                    (efo_id not in process_context.kwargs.luts.hpo_ontology.current_classes) and \
+                    (efo_id not in process_context.kwargs.luts.mp_ontology.current_classes):
                 validated_evs.explanation_type = 'invalid_disease'
                 validated_evs.explanation_str = efo_id
                 disease_failed = True
-            if (efo_id in process_context.kwargs.luts.lookup_data.efo_ontology.obsolete_classes) or \
-                    (efo_id in process_context.kwargs.luts.lookup_data.hpo_ontology.obsolete_classes) or \
-                    (efo_id in process_context.kwargs.luts.lookup_data.mp_ontology.obsolete_classes):
+            if (efo_id in process_context.kwargs.luts.efo_ontology.obsolete_classes) or \
+                    (efo_id in process_context.kwargs.luts.hpo_ontology.obsolete_classes) or \
+                    (efo_id in process_context.kwargs.luts.mp_ontology.obsolete_classes):
                 validated_evs.explanation_type = 'obsolete_disease'
                 validated_evs.explanation_str = efo_id
                 disease_failed = True
@@ -175,45 +175,45 @@ def validate_evidence(line, process_context):
         if target_id:
             if 'ensembl' in target_id:
                 ensembl_id = target_id.split('/')[-1]
-                if not ensembl_id in process_context.kwargs.luts.lookup_data.available_genes:
+                if not ensembl_id in process_context.kwargs.luts.available_genes:
                     validated_evs.explanation_type = 'invalid_target'
                     validated_evs.explanation_str = ensembl_id
                     target_failed = True
 
-                elif ensembl_id in process_context.kwargs.luts.lookup_data.non_reference_genes:
+                elif ensembl_id in process_context.kwargs.luts.non_reference_genes:
                     process_context.logger.warning('nonref ensembl gene found %s line_n %d filename %s',
                                                    ensembl_id, line_n, filename)
 
             elif 'uniprot' in target_id:
                 uniprot_id = target_id.split('/')[-1]
-                if uniprot_id not in process_context.kwargs.luts.lookup_data.uni2ens:
+                if uniprot_id not in process_context.kwargs.luts.uni2ens:
                     validated_evs.explanation_type = 'unknown_uniprot_entry'
                     validated_evs.explanation_str = uniprot_id
                     target_failed = True
 
-                elif not process_context.kwargs.luts.lookup_data.uni2ens[uniprot_id]:
+                elif not process_context.kwargs.luts.uni2ens[uniprot_id]:
                     validated_evs.explanation_type = 'missing_ensembl_xref_for_uniprot_entry'
                     validated_evs.explanation_str = uniprot_id
                     target_failed = True
 
-                elif (uniprot_id in process_context.kwargs.luts.lookup_data.uni2ens) and \
-                        process_context.kwargs.luts.lookup_data.uni2ens[uniprot_id] in process_context.kwargs.luts.lookup_data.available_genes and \
-                        'is_reference' in process_context.kwargs.luts.lookup_data.available_genes[process_context.kwargs.luts.lookup_data.uni2ens[uniprot_id]] and \
-                        (not process_context.kwargs.luts.lookup_data.available_genes[process_context.kwargs.luts.lookup_data.uni2ens[uniprot_id]]['is_reference'] is True):
+                elif (uniprot_id in process_context.kwargs.luts.uni2ens) and \
+                        process_context.kwargs.luts.uni2ens[uniprot_id] in process_context.kwargs.luts.available_genes and \
+                        'is_reference' in process_context.kwargs.luts.available_genes[process_context.kwargs.luts.uni2ens[uniprot_id]] and \
+                        (not process_context.kwargs.luts.available_genes[process_context.kwargs.luts.uni2ens[uniprot_id]]['is_reference'] is True):
                     validated_evs.explanation_type = 'nonref_ensembl_xref_for_uniprot_entry'
                     validated_evs.explanation_str = uniprot_id
                     target_failed = True
                 else:
                     try:
                         reference_target_list = \
-                            process_context.kwargs.luts.lookup_data.available_genes[process_context.kwargs.luts.lookup_data.uni2ens[uniprot_id]]['is_reference'] is True
+                            process_context.kwargs.luts.available_genes[process_context.kwargs.luts.uni2ens[uniprot_id]]['is_reference'] is True
                     except KeyError:
                         reference_target_list = []
 
                     if reference_target_list:
                         target_id = 'http://identifiers.org/ensembl/%s' % reference_target_list[0]
                     else:
-                        target_id = process_context.kwargs.luts.lookup_data.uni2ens[uniprot_id]
+                        target_id = process_context.kwargs.luts.uni2ens[uniprot_id]
                     if target_id is None:
                         validated_evs.explanation_type = 'missing_target_id_for_protein'
                         validated_evs.explanation_str = uniprot_id
@@ -335,4 +335,4 @@ if __name__ == '__main__':
     print(args)
     connectors = PipelineConnectors()
     connectors.init_services_connections()
-    process_evidences(args, first_n=1000, es_client=es_c, redis_client=redis_c)
+    process_evidences(args, first_n=0, es_client=es_c, redis_client=redis_c)
