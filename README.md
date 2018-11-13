@@ -170,7 +170,7 @@ when only a partial execution is desired (e.g. for testing) then the full path w
 *Recovery*: Make is designed around files, and regneerating them when out of date. To work with the OpenTargets pipeline, the files it is based on are the log files produced by the various stages. This means that if you need to rerun a stage (e.g. to regenerate an Elasticsearch index) you will need to delete the appropriate log file and re-run make.
 
 
-## Using the Makefile within Docker
+### Using the Makefile within Docker
 
 It is possible to use both docker and the makefile together. You will need to override the default entrypoint of the docker image. For example:
 
@@ -178,8 +178,11 @@ It is possible to use both docker and the makefile together. You will need to ov
 docker-compose run --rm --entrypoint make mrtarget -j -l 8 -r -R -k all
 ```
 
+## Putting it all together on Google Cloud Platform
 
+There is a script `scripts/run_on_gcp.sh` that puts together the information above to create a virtual machine on Google Cloud Platform (GCP), install Docker and Docker Compose, and execute the pipeline via the Makefile within a Docker container. The only prerequisite is [Google Cloud SDK](https://cloud.google.com/sdk/docs/quickstarts) (gcloud) and then run `scripts/run_on_gcp.sh`.
 
+This will run a tagged version, so if you want use something else or to make your own changes, then you'll need to do more in-depth investigation. Note, it is not fast and will take on the order of 12 to 36 hours.
 
 ---
 
@@ -237,38 +240,6 @@ To skip running tests in the CI when pushing append `[skip ci]` to the commit me
 
 The elasticsearch guide can be very useful: https://www.elastic.co/guide/en/elasticsearch/guide/2.x/getting-started.html
 The important bits to run/understand the data pipeline are the `getting started`, `search in depth`, `aggregations`, and `modeling your data`. You can probably ignore the others.
-
-### Internal features for developers
-
-#### Evidence Validation (--val step) limit (WIP)
-
-It will give up if too many evidences were failed under schema validation. 1000 docs will be a
-rasonable upper bound limit per launched process.
-
-#### Minimal dataset
-
-In case you want to run steps with a minimal dataset you should `export CTTV_MINIMAL=true`. If you want
-to regenerate used data source files:
-
-```bash
-$ cd scripts/
-$ bash generate_minimal_dataset.sh
-```
-
-It should upload to gcloud storage and enable public link to files but you need to be logged
-in the gcloud account.
-
-#### Redislite and/or remote redis
-
---redis-remote 'enable remote'
---redis-host 'by example 127.0.0.1'
---redis-port 'by example 8888'
-
-CTTV_REDIS_REMOTE=true
-CTTV_REDIS_SERVER=127.0.0.1:8888
-
-if you dont specify remote then it will try to bind to that host and port and the
-overwrite rule is env var then arguments overwrite
 
 # Copyright
 
