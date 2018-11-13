@@ -1,4 +1,3 @@
 include mrtarget/resources/*.tsv
 include mrtarget/resources/*.ini
 include mrtarget/resources/*.txt
-imclude mrtarget/tests/resources/*.gz
