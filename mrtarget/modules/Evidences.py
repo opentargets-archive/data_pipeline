@@ -63,6 +63,7 @@ def validate_evidence(line, process_context):
         return (None, None)
 
     (filename, (line_n, l)) = line
+    l = codecs.decode(l, 'utf-8', 'replace')
     validated_evs = addict.Dict(is_valid=False, explanation_type='', explanation_str='', target_id=None,
                                 efo_id=None, data_type=None, id=None, line=l, line_n=line_n,
                                 filename=filename, hash='')
@@ -74,7 +75,7 @@ def validate_evidence(line, process_context):
         parsed_line_bad = None
 
         try:
-            parsed_line = json.loads(codecs.decode(l, 'utf-8', 'replace'))
+            parsed_line = json.loads(l)
             validated_evs.id = DatatStructureFlattener(parsed_line).get_hexdigest()
         except Exception as e:
             validated_evs.explanation_type = 'unparseable_json'
