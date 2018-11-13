@@ -306,8 +306,7 @@ def process_evidences(filenames, first_n=0, es_client=None, redis_client=None):
                                           LookUpDataType.EFO,
                                           LookUpDataType.ECO,
                                           LookUpDataType.HPO,
-                                          LookUpDataType.MP,
-                                          # LookUpDataType.HPA
+                                          LookUpDataType.MP
                                       ),
                                       autoload=True,
                                       ).lookup

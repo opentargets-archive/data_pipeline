@@ -6,6 +6,9 @@ import gzip
 import functools
 import itertools
 import addict
+import more_itertools
+
+from mrtarget.common import URLZSource
 
 _l = logging.getLogger(__name__)
 
@@ -26,13 +29,8 @@ def to_source_for_writing(filename):
 def from_source_for_reading(filename):
     '''return an iterator from izip (filename, (enumerate(file_handle))'''
     _l.debug('generate an iterator of (filename,enumerate) for filename %s', filename)
-    if filename.endswith('.gz'):
-        open_f = functools.partial(gzip.open, mode='rb')
-    else:
-        open_f = functools.partial(open, mode='r')
-
-    f_handle = open_f(filename)
-    return itertools.izip(itertools.cycle([filename]),enumerate(f_handle, start=1))
+    it = more_itertools.with_iter(URLZSource(filename).open())
+    return itertools.izip(itertools.cycle([filename]),enumerate(it, start=1))
 
 
 def reduce_tuple_with_sum(iterable):

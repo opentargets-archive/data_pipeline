@@ -1,10 +1,10 @@
 from __future__ import absolute_import
 
+import functools
 from contextlib import contextmanager
 import gzip
 import zipfile
 import logging
-import os
 import tempfile as tmp
 import requests as r
 
@@ -62,8 +62,8 @@ def url_to_tmpfile(url, delete=True, *args, **kwargs):
 
 
 class URLZSource(object):
-    def __init__(self, *args, **kwargs):
-        '''A source extension for petl python package
+    def __init__(self, filename, *args, **kwargs):
+        """A source extension for petl python package
         Just in case you need to use proxies for url use it as normal
         named arguments
 
@@ -92,36 +92,55 @@ class URLZSource(object):
         +------------------------+-------------------+
         ...
 
-        '''
+        """
+        self.filename = filename
         self.args = args
         self.kwargs = kwargs
         self.proxies = None
 
     @contextmanager
-    def open(self, mode='r'):
-        yield self._open()
+    def _open_local(self, filename):
+        file_to_open = filename[len('file://'):] if '://' in filename else filename
+        open_f = None
 
-    def _open(self, mode='r'):
-        if not mode.startswith('r'):
-            raise ValueError('source is read-only')
+        if file_to_open.endswith('.gz'):
+            open_f = functools.partial(gzip.open, mode='rb')
 
-        zf = None
+        elif file_to_open.endswith('.zip'):
+            zipped_data = zipfile.ZipFile(file_to_open)
+            info = zipped_data.getinfo(zipped_data.filelist[0].orig_filename)
 
-        with url_to_tmpfile(*self.args, **self.kwargs) as f:
-            buf = f
+            file_to_open = info
+            open_f = functools.partial(zipped_data.open)
+        else:
+            open_f = functools.partial(open, mode='r')
 
-            if self.args[0].endswith('.gz'):
-                zf = gzip.GzipFile(fileobj=buf)
-            elif self.args[0].endswith('.zip'):
-                zipped_data = zipfile.ZipFile(buf)
-                info = zipped_data.getinfo(
-                    zipped_data.filelist[0].orig_filename)
-                zf = zipped_data.open(info)
-            else:
-                zf = buf
+        with open_f(file_to_open) as fd:
+            yield fd
 
-            yield zf
-        zf.close()
+    @contextmanager
+    def open(self):
+        if self.filename.startswith('ftp://'):
+            raise NotImplementedError('finish ftp')
+
+        elif self.filename.startswith('file://') or ('://' not in self.filename):
+            file_to_open = self.filename[len('file://'):] if '://' in self.filename else self.filename
+            with self._open_local(file_to_open) as fd:
+                yield fd
+
+        else:
+            local_filename = self.filename.split('://')[-1].split('/')[-1]
+            f = r.get(self.filename, *self.args, stream=True, **self.kwargs)
+            f.raise_for_status()
+            file_to_open = None
+            with tmp.NamedTemporaryFile(mode='r+w+b', suffix=local_filename, delete=False) as fd:
+                # write data into file in streaming fashion
+                file_to_open = fd.name
+                for block in f.iter_content(1024):
+                    fd.write(block)
+
+            with self._open_local(file_to_open) as fd:
+                yield fd
 
 
 class LogAccum(object):
