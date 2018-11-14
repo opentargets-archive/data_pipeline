@@ -79,6 +79,10 @@ def main():
                         action="store_true")
     parser.add_argument("--valreset", help="reset audit table and previously parsed evidencestrings",
                         action="store_true")
+    parser.add_argument("--enable-fs", help="write to files instead elasticsearch use it with --output-folder",
+                        action="store_true", default=False)
+    parser.add_argument("--output-folder", help="write output to a folder. Default is './'",
+                        action='store', default='./')
     parser.add_argument("--input-file", help="pass the path to a gzipped file to use as input for the data validation step",
                         action='append', default=[])
     parser.add_argument("--schema-version", help="set the schema version aka 'branch' name. Default is 'master'",
@@ -275,6 +279,7 @@ def main():
                 process.process_all()
             qc_metrics.update(process.qc(esquery))
 
+        input_files = []
         if args.val:
             if args.input_file:
                 input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
@@ -284,8 +289,14 @@ def main():
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
 
-            results = process_evidences_pipeline(input_files, connectors.es, connectors.r_server,
-                                                 dry_run=args.dry_run)
+            print(input_files)
+            results = process_evidences_pipeline(filenames=input_files,
+                                                 first_n=0,
+                                                 es_client=connectors.es,
+                                                 redis_client=connectors.r_server,
+                                                 dry_run=args.dry_run,
+                                                 enable_output_to_es=(not args.enable_fs),
+                                                 output_folder=args.output_folder)
 
             # if not args.qc_only:
             #     process.check_all(input_files=input_files, increment=False)

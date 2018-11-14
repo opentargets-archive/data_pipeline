@@ -51,16 +51,16 @@ class ProcessContext(object):
 
 
 class ProcessContextFileWriter(ProcessContext):
-    def __init__(self, **kwargs):
+    def __init__(self, output_folder='./', **kwargs):
         super(ProcessContextFileWriter, self).__init__(**kwargs)
         self.logger.debug("called output_stream from %s", str(os.getpid()))
 
-        valids_file_name = 'evidences-valid_' + uuid.uuid4().hex + '.json.gz'
+        valids_file_name = output_folder + os.path.sep + 'evidences-valid_' + uuid.uuid4().hex + '.json.gz'
         valids_file_handle = to_source_for_writing(valids_file_name)
         self.kwargs.valids_file_name = valids_file_name
         self.kwargs.valids_file_handle = valids_file_handle
 
-        invalids_file_name = 'evidences-invalid_' + uuid.uuid4().hex + '.json.gz'
+        invalids_file_name = output_folder + os.path.sep + 'evidences-invalid_' + uuid.uuid4().hex + '.json.gz'
         invalids_file_handle = to_source_for_writing(invalids_file_name)
         self.kwargs.invalids_file_name = invalids_file_name
         self.kwargs.invalids_file_handle = invalids_file_handle

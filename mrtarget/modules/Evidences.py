@@ -288,7 +288,7 @@ def validate_evidence(line, process_context):
         return validated_evs, None
 
 
-def write_evidences_on_start(enable_output_to_es=False):
+def write_evidences_on_start(enable_output_to_es=False, output_folder='.'):
     """construct the processcontext to write lines to the files. we have to sets,
     the good validated ones and the failed ones.
     """
@@ -296,7 +296,7 @@ def write_evidences_on_start(enable_output_to_es=False):
     if enable_output_to_es:
         pc = ProcessContextESWriter()
     else:
-        pc = ProcessContextFileWriter()
+        pc = ProcessContextFileWriter(output_folder=output_folder)
 
     return pc
 
@@ -320,7 +320,7 @@ def write_evidences(x, process_context):
 
 
 def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_client=None,
-                               dry_run=False, enable_output_to_es=False):
+                               dry_run=False, enable_output_to_es=False, output_folder='.'):
     logger = logging.getLogger(__name__)
     from multiprocessing import cpu_count
 
@@ -341,7 +341,7 @@ def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_clien
     lookup_data = make_lookup_data(es_client, redis_client)
 
     logger.info('declare pipeline to run')
-    write_evidences_on_start_f = functools.partial(write_evidences_on_start, enable_output_to_es)
+    write_evidences_on_start_f = functools.partial(write_evidences_on_start, enable_output_to_es, output_folder)
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
 
     # here the pipeline definition
@@ -366,5 +366,5 @@ if __name__ == '__main__':
     connectors = PipelineConnectors()
     connectors.init_services_connections()
     r = process_evidences_pipeline(args, first_n=0, es_client=es_c, redis_client=redis_c,
-                                   enable_output_to_es = True)
+                                   enable_output_to_es=False, output_folder='.')
     print('results (failed, succeed) ', r)
