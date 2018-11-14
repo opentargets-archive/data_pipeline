@@ -291,7 +291,7 @@ def write_evidences_on_start():
     """construct the processcontext to write lines to the files. we have to sets,
     the good validated ones and the failed ones.
     """
-    pc = ProcessContext()
+    pc = ProcessContext
     pc.logger.debug("called output_stream from %s", str(os.getpid()))
 
     valids_file_name = 'evidences_' + uuid.uuid4().hex + '.json.gz'
@@ -331,7 +331,8 @@ def write_evidences(x, process_context):
         return is_left, is_right
 
 
-def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_client=None, dry_run=False):
+def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_client=None,
+                               dry_run=False, enable_output_to_es=False):
     logger = logging.getLogger(__name__)
     from multiprocessing import cpu_count
 
@@ -355,9 +356,9 @@ def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_clien
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
 
     # here the pipeline definition
-    pl_stage = pr.map(process_evidence, evs, workers=cpu_count(), maxsize=1000,
+    pl_stage = pr.map(process_evidence, evs, workers=cpu_count(), maxsize=10000,
                       on_start=validate_evidence_on_start_f, on_done=process_evidence_on_done)
-    pl_stage = pr.map(write_evidences, pl_stage, workers=2, maxsize=1000, on_start=write_evidences_on_start,
+    pl_stage = pr.map(write_evidences, pl_stage, workers=4, maxsize=10000, on_start=write_evidences_on_start,
                       on_done=write_evidences_on_done)
 
     logger.info('run evidence processing pipeline')

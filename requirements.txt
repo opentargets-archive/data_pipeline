@@ -33,6 +33,7 @@ mock
 nose
 toolz
 pylint
+pypeln
 
 rdflib
 colorama

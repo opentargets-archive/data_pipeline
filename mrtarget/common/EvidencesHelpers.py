@@ -6,12 +6,17 @@ import gzip
 
 import functools
 import itertools
+import uuid
+from abc import abstractmethod
+
 import addict
 import more_itertools
 
 from mrtarget.common import URLZSource
 from mrtarget.common.DataStructure import JSONSerializable
+from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.connection import new_es_client
 
 _l = logging.getLogger(__name__)
 
@@ -35,6 +40,68 @@ class ProcessContext(object):
     def __init__(self, **kwargs):
         self.kwargs = addict.Dict(kwargs)
         self.logger = logging.getLogger(__name__ + '_' + str(os.getpid()))
+
+    @abstractmethod
+    def put(self, line, **kwargs):
+        pass
+
+    def __del__(self):
+        pass
+
+
+class ProcessContextFileWriter(ProcessContext):
+    def __init__(self, **kwargs):
+        super(ProcessContextFileWriter, self).__init__(kwargs)
+        self.logger.debug("called output_stream from %s", str(os.getpid()))
+
+        valids_file_name = 'evidences_' + uuid.uuid4().hex + '.json.gz'
+        valids_file_handle = to_source_for_writing(valids_file_name)
+        self.kwargs.valids_file_name = valids_file_name
+        self.kwargs.valids_file_handle = valids_file_handle
+
+        invalids_file_name = 'validations_' + uuid.uuid4().hex + '.json.gz'
+        invalids_file_handle = to_source_for_writing(invalids_file_name)
+        self.kwargs.invalids_file_name = invalids_file_name
+        self.kwargs.invalids_file_handle = invalids_file_handle
+
+    def put(self, line, **kwargs):
+        pass
+
+    def __del__(self):
+        super(ProcessContextFileWriter, self).__del__()
+        self.logger.debug('closing files %s %s',
+                          self.kwargs.valids_file_name,
+                          self.kwargs.invalids_file_name)
+        self.kwargs.valids_file_handle.close()
+        self.kwargs.invalids_file_handle.close()
+
+
+class ProcessContextESWriter(ProcessContext):
+    def __init__(self, **kwargs):
+        super(ProcessContextESWriter, self).__init__(kwargs)
+        self.logger.debug("called output_stream from %s", str(os.getpid()))
+
+        self.kwargs.es_client = new_es_client()
+        self.kwargs.es_loader = Loader(es=self.kwargs.es_client, chunk_size=self.chunk_size)
+
+    # TODO finish this method and integerate with the rest of the code
+    def put(self, line, **kwargs):
+        #     def put(self,
+        #             index_name,
+        #             doc_type,
+        #             ID,
+        #             body,
+        #             create_index = True,
+        #             operation= None,
+        #             routing = None,
+        #             parent = None,
+        #             auto_optimise = False):
+        self.kwargs.es_loader.put(body=line, **kwargs)
+
+    def __del__(self):
+        super(ProcessContextESWriter, self).__del__()
+        self.kwargs.es_loader.flush()
+        self.kwargs.es_loader.close()
 
 
 def to_source_for_writing(filename):
