@@ -19,7 +19,8 @@ from mrtarget.Settings import file_or_resource, Config
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.EvidencesHelpers import (ProcessContext, to_source_for_writing,
                                               from_source_for_reading, reduce_tuple_with_sum, make_lookup_data,
-                                              make_validated_evs_obj, serialise_object_to_json)
+                                              make_validated_evs_obj, serialise_object_to_json,
+                                              ProcessContextFileWriter, ProcessContextESWriter)
 from mrtarget.common.connection import new_redis_client, new_es_client, PipelineConnectors
 from mrtarget.modules.EvidenceString import EvidenceManager, Evidence
 
@@ -68,7 +69,7 @@ def process_evidence(line, process_context):
         # too much code at the moment to move evidences to addict
         (left, right) = fix_and_score_evidence(right, process_context)
 
-    return left, right.line if right else right
+    return left, right
 
 
 def process_evidence_on_start(luts=None):
@@ -120,10 +121,10 @@ def validate_evidence(line, process_context):
 
         try:
             parsed_line = json.loads(decoded_line)
-            validated_evs.id = DatatStructureFlattener(parsed_line).get_hexdigest()
+            validated_evs['id'] = str(DatatStructureFlattener(parsed_line).get_hexdigest())
         except Exception as e:
             validated_evs.explanation_type = 'unparseable_json'
-            validated_evs.id = hashlib.md5(line).hexdigest()
+            validated_evs['id'] = str(hashlib.md5(decoded_line).hexdigest())
             return validated_evs, None
 
         if 'label' in parsed_line or 'type' in parsed_line:
@@ -190,7 +191,7 @@ def validate_evidence(line, process_context):
         # flatten but is it always valid unique_association_fields?
         validated_evs.hash = \
             DatatStructureFlattener(evidence_obj.unique_association_fields).get_hexdigest()
-        evidence_obj.id = validated_evs.hash
+        evidence_obj['id'] = str(validated_evs.hash)
 
         disease_failed = False
         target_failed = False
@@ -287,43 +288,30 @@ def validate_evidence(line, process_context):
         return validated_evs, None
 
 
-def write_evidences_on_start():
+def write_evidences_on_start(enable_output_to_es=False):
     """construct the processcontext to write lines to the files. we have to sets,
     the good validated ones and the failed ones.
     """
-    pc = ProcessContext
-    pc.logger.debug("called output_stream from %s", str(os.getpid()))
+    pc = None
+    if enable_output_to_es:
+        pc = ProcessContextESWriter()
+    else:
+        pc = ProcessContextFileWriter()
 
-    valids_file_name = 'evidences_' + uuid.uuid4().hex + '.json.gz'
-    valids_file_handle = to_source_for_writing(valids_file_name)
-    pc.kwargs.valids_file_name = valids_file_name
-    pc.kwargs.valids_file_handle = valids_file_handle
-
-    invalids_file_name = 'validations_' + uuid.uuid4().hex + '.json.gz'
-    invalids_file_handle = to_source_for_writing(invalids_file_name)
-    pc.kwargs.invalids_file_name = invalids_file_name
-    pc.kwargs.invalids_file_handle = invalids_file_handle
     return pc
-
-
-def write_evidences_on_done(_status, process_context):
-    process_context.logger.debug('closing files %s %s',
-                                 process_context.kwargs.valids_file_name,
-                                 process_context.kwargs.invalids_file_name)
-    process_context.kwargs.valids_file_handle.close()
-    process_context.kwargs.invalids_file_handle.close()
 
 
 def write_evidences(x, process_context):
     is_right = 0
     is_left = 0
+
     try:
         (left, right) = x
         if right is not None:
-            process_context.kwargs.valids_file_handle.writelines(serialise_object_to_json(right) + os.linesep)
+            process_context.put(x)
             is_right = 1
         elif left is not None:
-            process_context.kwargs.invalids_file_handle.writelines(serialise_object_to_json(left) + os.linesep)
+            process_context.put(x)
             is_left = 1
     except Exception as e:
         process_context.logger.exception(e)
@@ -353,13 +341,13 @@ def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_clien
     lookup_data = make_lookup_data(es_client, redis_client)
 
     logger.info('declare pipeline to run')
+    write_evidences_on_start_f = functools.partial(write_evidences_on_start, enable_output_to_es)
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
 
     # here the pipeline definition
     pl_stage = pr.map(process_evidence, evs, workers=cpu_count(), maxsize=10000,
                       on_start=validate_evidence_on_start_f, on_done=process_evidence_on_done)
-    pl_stage = pr.map(write_evidences, pl_stage, workers=4, maxsize=10000, on_start=write_evidences_on_start,
-                      on_done=write_evidences_on_done)
+    pl_stage = pr.map(write_evidences, pl_stage, workers=2, maxsize=10000, on_start=write_evidences_on_start_f)
 
     logger.info('run evidence processing pipeline')
     results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
@@ -377,5 +365,6 @@ if __name__ == '__main__':
     print(args)
     connectors = PipelineConnectors()
     connectors.init_services_connections()
-    r = process_evidences_pipeline(args, first_n=1000, es_client=es_c, redis_client=redis_c)
+    r = process_evidences_pipeline(args, first_n=0, es_client=es_c, redis_client=redis_c,
+                                   enable_output_to_es = True)
     print('results (failed, succeed) ', r)
