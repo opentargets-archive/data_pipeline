@@ -293,7 +293,6 @@ def main():
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
 
-            print(input_files)
             results = process_evidences_pipeline(filenames=input_files,
                                                  first_n=0,
                                                  es_client=connectors.es,
