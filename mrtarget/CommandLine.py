@@ -6,6 +6,7 @@ import os
 import itertools
 from logging.config import fileConfig
 
+from mrtarget.modules.Evidences import process_evidences_pipeline
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -19,7 +20,6 @@ from mrtarget.modules.HPO import HpoProcess
 from mrtarget.modules.MP import MpProcess
 from mrtarget.modules.Ensembl import EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringProcess
-from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneManager
 from mrtarget.modules.HPA import HPAProcess
 from mrtarget.modules.QC import QCRunner,QCMetrics
@@ -252,7 +252,7 @@ def main():
             process = GeneManager(loader,connectors.r_server)
             if not args.qc_only:
                 process.merge_all(dry_run=args.dry_run)
-            qc_metrics.update(process.qc(esquery))     
+            qc_metrics.update(process.qc(esquery))
 
         if args.mp:
             process = MpProcess(loader)
@@ -275,8 +275,6 @@ def main():
                 process.process_all()
             qc_metrics.update(process.qc(esquery))
 
-
-
         if args.val:
             if args.input_file:
                 input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
@@ -286,15 +284,15 @@ def main():
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
 
-            process = EvidenceValidationFileChecker(connectors.es, connectors.r_server, 
-                dry_run=args.dry_run)
-            if not args.qc_only:
-                process.check_all(input_files=input_files, increment=False)
-            qc_metrics.update(process.qc(esquery, input_files))
+            results = process_evidences_pipeline(input_files, connectors.es, connectors.r_server,
+                                                 dry_run=args.dry_run)
 
+            # if not args.qc_only:
+            #     process.check_all(input_files=input_files, increment=False)
+            # qc_metrics.update(process.qc(esquery, input_files))
 
-        if args.valreset:
-            EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
+        # if args.valreset:
+        #     EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
 
         if args.evs:
             process = EvidenceStringProcess(connectors.es, connectors.r_server)

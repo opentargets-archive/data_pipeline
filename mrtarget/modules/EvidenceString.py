@@ -19,6 +19,7 @@ from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
+import addict
 
 logger = logging.getLogger(__name__)
 
@@ -163,9 +164,9 @@ class EvidenceManager():
 
         evidence = evidence.evidence
         fixed = False
-        '''fix errors in data here so nobody needs to ask corrections to the data provider'''
 
-        '''fix missing version in gwas catalog data'''
+        # fix errors in data here so nobody needs to ask corrections to the data provider
+        # fix missing version in gwas catalog data
         if 'variant2disease' in evidence:
             try:
                 float(evidence['evidence']['variant2disease']['provenance_type']['database']['version'])
@@ -384,6 +385,30 @@ class EvidenceManager():
             logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
                 evidence['id'], disease_id))
 
+
+    def check_is_valid_evs(self, evidence, datasource):
+        """check consistency of the data in the evidence and returns a tuple with (is_valid, problem_str)"""
+
+        ev = evidence.evidence
+        evidence_id = ev['id']
+
+        if not ev['target']['id']:
+            problem_str = "%s Evidence %s has no valid gene in target.id" % (datasource, evidence_id)
+            return False, problem_str
+        gene_id = ev['target']['id']
+        if gene_id not in self.available_genes:
+            problem_str = "%s Evidence %s has an invalid gene id in target.id: %s" % (datasource, evidence_id, gene_id)
+            return False, problem_str
+        if not ev['disease']['id']:
+            problem_str = "%s Evidence %s has no valid efo id in disease.id" % (datasource, evidence_id)
+            return False, problem_str
+        efo_id = ev['disease']['id']
+        if efo_id not in self.available_efos:
+            problem_str = "%s Evidence %s has an invalid efo id in disease.id: %s" % (datasource, evidence_id, efo_id)
+            return False, problem_str
+
+        return True, ''
+
     def is_valid(self, evidence, datasource):
         '''check consistency of the data in the evidence'''
 
@@ -499,7 +524,7 @@ class EvidenceManager():
                 if eco is not None:
                     ecos_info.append(ExtendedInfoECO(eco))
                 else:
-                    self.logger.warning("Cannot get generic info for eco: %s" % eco_id)
+                    self.logger.debug("Cannot get generic info for eco: %s" % eco_id)
 
             if ecos_info:
                 data = []
@@ -548,8 +573,7 @@ class EvidenceManager():
             eco.load_json(self.available_ecos[ecoid])
             return eco
         except KeyError:
-            self.logger.debug('data for ECO code %s could not be injected'%ecoid)
-            return
+            return None
 
     def _get_non_reference_gene_mappings(self):
         self.non_reference_genes = {}
@@ -631,22 +655,6 @@ class Evidence(JSONSerializable):
                           sort_keys=True,
                           # indent=4,
                           cls=PipelineEncoder)
-
-        return
-
-    def score_to_json(self):
-        score = {}
-        score['id'] = self.evidence['id']
-        score['sourceID'] = self.evidence['sourceID']
-        score['type'] = self.evidence['type']
-        score['target'] = {"id": self.evidence['target']['id'],
-                           "gene_info": self.evidence['target']['gene_info']}
-
-        score['disease'] = {"id": self.evidence['disease']['id'],
-                            "efo_info": self.evidence['disease']['efo_info']}
-        score['scores'] = self.evidence['scores']
-        score['private'] = {"efo_codes": self.evidence['private']['efo_codes']}
-        return json.dumps(score)
 
     def load_json(self, data):
         self.evidence = json.loads(data)
@@ -863,34 +871,6 @@ class Evidence(JSONSerializable):
         normalised_no_of_cases = DataNormaliser.renormalize(no_of_cases, [0, max_cases], [0, 1])
         score = normalised_pvalue * normalised_no_of_cases
         return score
-
-
-class UploadError():
-    def __init__(self, evidence, trace, id, logdir='errorlogs'):
-        self.trace = trace
-        if isinstance(evidence, Evidence):
-            self.evidence = evidence.evidence
-        elif isinstance(evidence, str):
-            self.evidence = evidence
-        else:
-            self.evidence = repr(evidence)
-        self.id = id
-        try:
-            self.database = evidence['sourceID']
-        except:
-            self.database = 'unknown'
-        self.logdir = logdir
-
-    def save(self):
-        pass
-        # dir = os.path.join(self.logdir, self.database)
-        # if not os.path.exists(self.logdir):
-        #     os.mkdir(self.logdir)
-        # if not os.path.exists(dir):
-        #     os.mkdir(dir)
-        # filename = str(os.path.join(dir, self.id))
-        # pickle.dump(self, open(filename + '.pkl', 'w'))
-        # json.dump(self.evidence, open(filename + '.json', 'w'))
 
 
 class EvidenceProcesser(RedisQueueWorkerProcess):
