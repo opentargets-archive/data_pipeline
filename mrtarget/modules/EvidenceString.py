@@ -523,8 +523,8 @@ class EvidenceManager():
                 eco = self._get_eco_obj(eco_id)
                 if eco is not None:
                     ecos_info.append(ExtendedInfoECO(eco))
-                else:
-                    self.logger.debug("Cannot get generic info for eco: %s" % eco_id)
+                # else:
+                #     self.logger.debug("Cannot get generic info for eco: %s" % eco_id)
 
             if ecos_info:
                 data = []
@@ -534,7 +534,7 @@ class EvidenceManager():
         except Exception as e:
             extended_evidence['evidence'][ExtendedInfoECO.root] = None
             all_eco_codes = []
-            self.logger.exception("Cannot get generic info for eco: %s:"%str(e))
+            # self.logger.exception("Cannot get generic info for eco: %s:"%str(e))
 
         '''Add private objects used just for faceting'''
 

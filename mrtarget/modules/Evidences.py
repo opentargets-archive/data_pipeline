@@ -320,9 +320,9 @@ def write_evidences(x, process_context):
 
 
 def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_client=None,
-                               dry_run=False, enable_output_to_es=False, output_folder='.'):
+                               dry_run=False, enable_output_to_es=False, output_folder='.',
+                               num_workers=4, num_writers=2):
     logger = logging.getLogger(__name__)
-    from multiprocessing import cpu_count
 
     if dry_run:
         logger.debug('dry_run True so exiting doing nothing')
@@ -349,9 +349,9 @@ def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_clien
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
 
     # here the pipeline definition
-    pl_stage = pr.map(process_evidence, evs, workers=cpu_count(), maxsize=10000,
+    pl_stage = pr.map(process_evidence, evs, workers=num_workers, maxsize=10000,
                       on_start=validate_evidence_on_start_f, on_done=process_evidence_on_done)
-    pl_stage = pr.map(write_evidences, pl_stage, workers=2, maxsize=10000, on_start=write_evidences_on_start_f)
+    pl_stage = pr.map(write_evidences, pl_stage, workers=num_writers, maxsize=10000, on_start=write_evidences_on_start_f)
 
     logger.info('run evidence processing pipeline')
     results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))

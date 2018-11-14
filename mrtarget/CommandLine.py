@@ -129,6 +129,10 @@ def main():
                         action='store', default='')
     parser.add_argument("--redis-port", help="redis port",
                         action='store', default='')
+    parser.add_argument("--num-workers", help="num proc workers",
+                        action='store', default=4, type=int)
+    parser.add_argument("--num-writers", help="num proc writers",
+                        action='store', default=2, type=int)
 
     #tweak how lookup tables are managed
     parser.add_argument("--lt-reuse", help="reuse the current lookuptable",
@@ -296,7 +300,9 @@ def main():
                                                  redis_client=connectors.r_server,
                                                  dry_run=args.dry_run,
                                                  enable_output_to_es=(not args.enable_fs),
-                                                 output_folder=args.output_folder)
+                                                 output_folder=args.output_folder,
+                                                 num_workers=args.num_workers,
+                                                 num_writers=args.num_writers)
 
             logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
 
