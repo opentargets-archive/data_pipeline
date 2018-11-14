@@ -328,6 +328,10 @@ def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_clien
         logger.debug('dry_run True so exiting doing nothing')
         return 0, 0
 
+    if not filenames or first_n < 0:
+        logger.error('tried to run with no filenames at all or first_n < 0')
+        return 0, 0
+
     logger.debug('create an iterable of handles from filenames %s', str(filenames))
     in_handles = itertools.imap(from_source_for_reading, filenames)
 
