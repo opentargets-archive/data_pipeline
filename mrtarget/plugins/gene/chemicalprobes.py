@@ -1,7 +1,9 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
+from mrtarget.common import URLZSource
 import traceback
 import logging
+import csv
 logging.basicConfig(level=logging.DEBUG)
 
 class ChemicalProbes(IPlugin):
@@ -33,7 +35,6 @@ class ChemicalProbes(IPlugin):
             for gene_id, gene in genes.iterate():
                 # Extend gene with related chemical probe data
                 if gene.approved_symbol in self.chemicalprobes:
-                    self._logger.debug("Adding Chemical Probe data to gene %s", gene.approved_symbol)
                     gene.chemicalprobes=self.chemicalprobes[gene.approved_symbol]
 
         except Exception as ex:
@@ -42,42 +43,42 @@ class ChemicalProbes(IPlugin):
 
     def build_json(self, filename1=Config.CHEMICALPROBES_FILENAME1, filename2=Config.CHEMICALPROBES_FILENAME2):
         # *** Work through manually curated chemical probes from the different portals ***
-        with open(filename1, 'r') as input:
-            for row in input:
-                (Probe, Target, SGClink, CPPlink, OSPlink, Note) = tuple(row.rstrip().split(';'))
-
-                # Generate 'line' for current target
+        # chemicalprobes column names are Probe, Target, SGClink, CPPlink, OSPlink, Note
+        with URLZSource(filename1).open() as r_file:
+            for i, row in enumerate(csv.DictReader(r_file, dialect='excel-tab'), start=1):
+        # Generate 'line' for current target
                 probelinks = []
-                if SGClink != "":
-                    probelinks.append({'source': "Structural Genomics Consortium", 'link': SGClink})
-                if CPPlink != "":
-                    probelinks.append({'source': "Chemical Probes Portal", 'link': CPPlink})
-                if OSPlink != "":
-                    probelinks.append({'source': "Open Science Probes", 'link': OSPlink})
+                if row["SGClink"] != "":
+                    probelinks.append({'source': "Structural Genomics Consortium", 'link': row["SGClink"]})
+                if row["CPPlink"] != "":
+                    probelinks.append({'source': "Chemical Probes Portal", 'link': row["CPPlink"]})
+                if row["OSPlink"] != "":
+                    probelinks.append({'source': "Open Science Probes", 'link': row["OSPlink"]})
 
                 line = {
-                    "gene": Target,
-                    "chemicalprobe": Probe,
+                    "gene": row["Target"],
+                    "chemicalprobe": row["Probe"],
                     "sourcelinks": probelinks,
-                    "note": Note
+                    "note": row["Note"]
                 }
                 # Add data for current chemical probe to self.chemicalprobes[Target]['portalprobes']
                 # If gene has not appeared in chemical probe list yet,
                 # initialise self.chemicalprobes with an empty list
-                if Target not in self.chemicalprobes:
-                    self.chemicalprobes[Target] = {}
-                    self.chemicalprobes[Target]['portalprobes'] = []
-                self.chemicalprobes[Target]['portalprobes'].append(line)
+                if row["Target"] not in self.chemicalprobes:
+                    self.chemicalprobes[row["Target"]] = {}
+                    self.chemicalprobes[row["Target"]]['portalprobes'] = []
+                self.chemicalprobes[row["Target"]]['portalprobes'].append(line)
 
         # *** Work through Probe Miner targets ***
-        with open(filename2, 'r') as input:
-            for row in input:
-                (Target, UniPRotID, NrofProbes) = tuple(row.rstrip().split('\t'))
+        # probeminer column names are Target, UniPRotID, NrofProbes
+        # probeminer column names are hgnc_symbol, uniprot_symbol, nr_of_probes
+        with URLZSource(filename2).open() as r_file:
+            for i, row in enumerate(csv.DictReader(r_file, dialect='excel-tab'), start=1):
                 PMdata = {
-                    "probenumber": NrofProbes,
-                    "link": "https://probeminer.icr.ac.uk/#/"+UniPRotID
+                    "probenumber": row["nr_of_probes"],
+                    "link": "https://probeminer.icr.ac.uk/#/"+row["uniprot_symbol"]
                 }
-                if Target not in self.chemicalprobes:
-                    self.chemicalprobes[Target] = {}
-                self.chemicalprobes[Target]['probeminer'] = PMdata
+                if row["hgnc_symbol"] not in self.chemicalprobes:
+                    self.chemicalprobes[row["hgnc_symbol"]] = {}
+                self.chemicalprobes[row["hgnc_symbol"]]['probeminer'] = PMdata
 

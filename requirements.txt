@@ -16,7 +16,8 @@ simplejson
 
 #when installing from GitHub, a specific commit must be used for consistency
 #and to ensure dependency caching works as intended
-git+https://github.com/opentargets/validator.git@91fc3977d837eaf04aa586d2644dc77f0b631d1d#egg=opentargets_validator
+#git+https://github.com/opentargets/validator.git@711c098df9c82e66ff9b95412f4561c28a63b572#egg=opentargets_validator
+opentargets-validator>=0.3.0
 
 numpy
 scipy
