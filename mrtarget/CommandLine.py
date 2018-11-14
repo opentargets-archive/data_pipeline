@@ -298,6 +298,8 @@ def main():
                                                  enable_output_to_es=(not args.enable_fs),
                                                  output_folder=args.output_folder)
 
+            logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
+
             # if not args.qc_only:
             #     process.check_all(input_files=input_files, increment=False)
             # qc_metrics.update(process.qc(esquery, input_files))
