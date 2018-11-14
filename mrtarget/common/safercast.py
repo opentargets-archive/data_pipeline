@@ -5,10 +5,10 @@ _l = logging.getLogger(__name__)
 
 class SaferCast(object):
     """
-    SaferCast represents a customised cast function with and optional way to bypass any exception
-    by a fallback value.
+    SaferCast represents a customised cast function with an optional way to bypass an exception
+    by using a fallback value.
 
-    This base class wraps the generalisation and common functions
+    This base class wraps the generalisation and common functions.
     """
     @staticmethod
     def _catch_with_fallback(func, value, fallback):
@@ -26,7 +26,7 @@ class SaferCast(object):
             try:
                 v = func(value)
             except:
-                _l.warning("fallback '%s' was used as the str value to cast was '%s' but caused an exception",
+                _l.warning("fallback '%s' was used as the str value to cast '%s' but caused an exception",
                            v, value)
                 pass
             finally:
