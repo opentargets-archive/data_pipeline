@@ -28,13 +28,6 @@ scikit-learn
 biopython
 petl
 
-pytest-cov
-#transitively includes pytest
-mock
-nose
-toolz
-pylint
-
 rdflib
 colorama
 psutil
