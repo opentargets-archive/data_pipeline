@@ -49,6 +49,8 @@ def main():
                         action="store")
     parser.add_argument("--qc-only", help="only run the qc and not the stage itself",
                         action="store_true")
+    parser.add_argument("--skip-qc", help="do not run the qc for this stage",
+                        action="store_true")
 
     #load supplemental and genetic informtaion from various external resources
     parser.add_argument("--hpa", help="download human protein atlas, process, and store in elasticsearch",
@@ -239,49 +241,59 @@ def main():
             process = ReactomeProcess(loader)
             if not args.qc_only:
                 process.process_all()
-            qc_metrics.update(process.qc(esquery))
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
         if args.ens:
             process = EnsemblProcess(loader)
             if not args.qc_only:
                 process.process()
-            qc_metrics.update(process.qc(esquery))
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
         if args.unic:
             process = UniprotDownloader(loader, dry_run=args.dry_run)
             if not args.qc_only:
                 process.cache_human_entries()
-            qc_metrics.update(process.qc(esquery))            
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))            
         if args.hpa:
             process = HPAProcess(loader,connectors.r_server)
             if not args.qc_only:
                 process.process_all(dry_run=args.dry_run)
-            qc_metrics.update(process.qc(esquery))     
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))     
 
         if args.gen:
             process = GeneManager(loader,connectors.r_server)
             if not args.qc_only:
                 process.merge_all(dry_run=args.dry_run)
-            qc_metrics.update(process.qc(esquery))
+
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))     
 
         if args.mp:
             process = MpProcess(loader)
             if not args.qc_only:
                 process.process_all()
-            qc_metrics.update(process.qc(esquery))    
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))    
         if args.efo:
             process = EfoProcess(loader)
             if not args.qc_only:
                 process.process_all()
-            qc_metrics.update(process.qc(esquery))
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
         if args.eco:
             process = EcoProcess(loader)
             if not args.qc_only:
                 process.process_all()
-            qc_metrics.update(process.qc(esquery))
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
         if args.hpo:
             process = HpoProcess(loader)
             if not args.qc_only:
                 process.process_all()
-            qc_metrics.update(process.qc(esquery))
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
 
         input_files = []
         if args.val:
@@ -307,7 +319,8 @@ def main():
 
             # if not args.qc_only:
             #     process.check_all(input_files=input_files, increment=False)
-            # qc_metrics.update(process.qc(esquery, input_files))
+            # if not args.skip_qc:
+            #     qc_metrics.update(process.qc(esquery, input_files))
 
         # if args.valreset:
         #     EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
@@ -316,13 +329,17 @@ def main():
             process = EvidenceStringProcess(connectors.es, connectors.r_server)
             if not args.qc_only:
                 process.process_all(datasources = args.datasource, dry_run=args.dry_run)
-            #qc_metrics.update(process.qc(esquery))
+            if not args.skip_qc:
+                #qc_metrics.update(process.qc(esquery))
+                pass
 
         if args.ass:
             process = ScoringProcess(loader, connectors.r_server)
             if not args.qc_only:
                 process.process_all(targets = targets, dry_run=args.dry_run)
-            #qc_metrics.update(process.qc(esquery))
+            if not args.skip_qc:
+                #qc_metrics.update(process.qc(esquery))
+                pass
             
         if args.ddr:
             process = DataDrivenRelationProcess(connectors.es, connectors.r_server)
@@ -355,7 +372,6 @@ def main():
 
     logger.info('`'+" ".join(sys.argv)+'` - finished')
     return 0
-
 
 
 if __name__ == '__main__':
