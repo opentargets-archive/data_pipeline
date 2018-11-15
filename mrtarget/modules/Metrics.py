@@ -1,5 +1,4 @@
 import logging
-from mrtarget.common import TqdmToLogger
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 
@@ -8,7 +7,6 @@ class Metrics:
         self.logger = logging.getLogger(__name__)
         self.esquery = ESQuery(es)
         self.filename = Config.METRICS_FILENAME
-        tqdm_out = TqdmToLogger(self.logger, level=logging.INFO)
 
     def generate_metrics(self):
         self.logger.info("Producing data release metrics")

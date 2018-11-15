@@ -7,11 +7,8 @@ import ConfigParser
 import pkg_resources as res
 from envparse import env, ConfigurationError
 import mrtarget
-import petl
 import multiprocessing as mp
 import logging
-
-from mrtarget.common import URLZSource
 
 logger = logging.getLogger(__name__)
 
@@ -222,11 +219,11 @@ class Config():
         '4932':'yeast'
     }
 
-    BIOMARKER_FILENAME = file_or_resource(fname='cgi_biomarkers_per_variant.tsv')
-    CHEMICALPROBES_FILENAME1 = file_or_resource(fname='chemicalprobes_portalprobes.tsv')
-    CHEMICALPROBES_FILENAME2 = file_or_resource(fname='chemicalprobes_probeminer.tsv')
-    HALLMARK_FILENAME = file_or_resource(fname='v85_hallmark_export.tsv')
-    TRACTABILITY_FILENAME = file_or_resource(fname='tractability_buckets.tsv')
+    BIOMARKER_FILENAME = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/cgi_biomarkers_per_variant.tsv"
+    CHEMICALPROBES_FILENAME1 = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/chemicalprobes_portalprobes_20181015.tsv"
+    CHEMICALPROBES_FILENAME2 = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/chemicalprobes_probeminer_20181015.tsv"
+    HALLMARK_FILENAME = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/cosmic-v86_hallmark_export.tsv"
+    TRACTABILITY_FILENAME = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/tractability_buckets.tsv"
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
@@ -248,14 +245,14 @@ class Config():
 
     EVIDENCEVALIDATION_VALIDATOR_SCHEMAS = {
         'genetic_association': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/genetics.json',
-        'rna_expression': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/expression.json',
-        'genetic_literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
-        'affected_pathway': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
-        'somatic_mutation': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
-        'known_drug': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
-        'literature_mining': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
-        'literature': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
-        'animal_model': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
+        'rna_expression':      'https://raw.githubusercontent.com/opentargets/json_schema/master/src/expression.json',
+        'genetic_literature':  'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'affected_pathway':    'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'somatic_mutation':    'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
+        'known_drug':          'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
+#        'literature_mining':   'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'literature':          'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
+        'animal_model':        'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
     }
 
     EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000

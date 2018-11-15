@@ -1,23 +1,17 @@
-import json
+
 import unittest
 
 import mrtarget.common as common
 from toolz import curry, take
-from trace import find_lines_from_code
-from tempfile import gettempdir, NamedTemporaryFile
+from tempfile import NamedTemporaryFile
 import os
 from mrtarget.common import URLZSource, LogAccum
 from toolz.functoolz import compose
 from string import rstrip
-import functools
 
 
 class DataStructureTests(unittest.TestCase):
     def test_url_to_stream(self):
-        lines = ["User-agent: *",
-                 "Disallow: /search",
-                 "Allow: /search/about",
-                 "Allow: /search/howsearchworks"]
 
         lines4 = \
             list(take(4, common.url_to_stream("http://www.google.com/robots.txt")))
@@ -53,11 +47,6 @@ class DataStructureTests(unittest.TestCase):
                                             lambda l: rstrip(l, '\n')),
                                       curry(take, 4))
             lines4 = list(take_and_rstrip(f))
-
-        lines = ["User-agent: *",
-                 "Disallow: /search",
-                 "Allow: /search/about",
-                 "Allow: /search/howsearchworks"]
 
         print(str(lines4))
         self.assertGreaterEqual(len(lines4), 1,

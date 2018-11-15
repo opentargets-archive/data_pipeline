@@ -1,19 +1,14 @@
 import logging
 from collections import Counter
 import sys, os
-import multiprocessing
 import numpy as np
 
 import pickle
 
-import scipy
 import scipy.sparse as sp
 
-from redislite import Redis
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
-from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
 
 from mrtarget.common.DataStructure import JSONSerializable, RelationType
 from mrtarget.common.ElasticsearchLoader import Loader
@@ -23,14 +18,13 @@ import time
 from copy import copy
 import math
 
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.Settings import Config
 from mrtarget.common.connection import new_redis_client
 
 
 
 logger = logging.getLogger(__name__)
-tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 
 class Relation(JSONSerializable):
@@ -456,9 +450,7 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
         for i in range(buckets_number):
             buckets[i]=[]
         vector_hashes = {}
-        for i in tqdm(range(len(subject_ids[:limit])),
-                      desc='hashing vectors',
-                      file=tqdm_out):
+        for i in range(len(subject_ids[:limit])):
             vector = transformed_data[i].toarray()[0]
             digested = self.digest_in_buckets(vector, buckets_number)
             for bucket in digested:
@@ -481,9 +473,7 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
                           for i in range(Config.WORKERS_NUMBER)]
         for w in pair_producers:
             w.start()
-        for i in tqdm(range(len(subject_ids[:limit])),
-                      desc='getting neighbors',
-                      file=tqdm_out):
+        for i in range(len(subject_ids[:limit])):
             subject_analysis_queue.put(i, r_server=self.r_server)
         subject_analysis_queue.set_submission_finished(r_server=self.r_server)
 
@@ -537,26 +527,13 @@ class RelationHandlerProduceAll(RelationHandler):
 
     def _produce_pairs(self, subject_data, subject_ids, shared_ids, threshold=0.5, sample_size=512):
         vectorizer = DictVectorizer(sparse=True)
-        # tdidf_transformer = LocalTfidfTransformer(smooth_idf=False, norm=None)
         tdidf_transformer = TfidfTransformer(smooth_idf=False, norm=None)
         data_vector = vectorizer.fit_transform([subject_data[i] for i in subject_ids])
         limit = -1
-        for i in tqdm(range(len(subject_ids[:limit])),
-                      desc='producing all pairs',
-                      file=tqdm_out):
+        for i in range(len(subject_ids[:limit])):
             for j in range(len(subject_ids[:limit])):
                 if i>j:
                     yield (i, data_vector[i],  j, data_vector[j])
-        #             tot+= 1
-        #     if i%1000 == 0:
-        #         if optimised_nn:
-        #             ratio =  (1-(optimised_nn/float(tot))) * 100
-        #         else: ratio = 0.
-        #         logger.info('total pairs %i | optimised pairs %i | compression ratio: %1.2f%% | above threshold %i '%(tot, optimised_nn, ratio, really_above_threshold))
-        #
-        #
-        # logger.info("found %i NNs, optimised to %i by distance threshold over %i analysed vectors. pairs above threshold: %i" % (tot, optimised_nn, len(subject_ids), really_above_threshold))
-
     @staticmethod
     def digest_in_buckets(v, buckets_number):
         digested =set()
@@ -655,15 +632,7 @@ class DataDrivenRelationProcess(object):
                                    job_timeout=300,
                                    serialiser='pickle')
         '''start shared workers'''
-        q_reporter = RedisQueueStatusReporter([d2d_pair_producing,
-                                               t2t_pair_producing,
-                                               d2d_queue_processing,
-                                               t2t_queue_processing,
-                                               queue_storage],
-                                              interval=30,
-                                              history=True)
-        q_reporter.start()
-
+        
         storage_workers = [DistanceStorageWorker(queue_storage,
                                                  None,
                                                  dry_run=dry_run,
@@ -745,8 +714,6 @@ class DataDrivenRelationProcess(object):
         self.loader.flush()
         self.loader.close()
 
-        logger.info('collecting reporter')
-        q_reporter.join()
 
     def get_hot_node_blacklist(self, data):
         c = Counter()

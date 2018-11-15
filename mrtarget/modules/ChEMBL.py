@@ -25,13 +25,12 @@ limitations under the License.
 """
 
 import logging
-import os
 
 import requests
 
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
-import mrtarget.common as c
+from mrtarget.common import URLZSource
 import json
 
 __copyright__ = "Copyright 2014-2016, GlaxoSmithKline"
@@ -57,7 +56,7 @@ def get_chembl_url(uri):
 
     while next_get:
         chunk = None
-        with c.URLZSource(uri + _fmt(limit=limit, offset=offset)).open() as f:
+        with URLZSource(uri + _fmt(limit=limit, offset=offset)).open() as f:
             chunk = json.loads(f.read())
 
         page_meta = chunk['page_meta']
@@ -190,12 +189,10 @@ class ChEMBLLookup(object):
                                                                fields=['target.id',
                                                                        'disease.id',
                                                                        'evidence.target2drug.urls'])):
-            self._logger.info('retrieving ChEMBL evidence...')
             molecule_ids = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
                            '/compound/' in i['url']]
             if molecule_ids:
                 molecule_id=molecule_ids[0]
-                self._logger.info(molecule_id)
 
                 if c % 200 == 0:
                     self._logger.debug('retrieving ChEMBL evidence... %s', molecule_id)
@@ -210,6 +207,10 @@ class ChEMBLLookup(object):
                 self.target2molecule[target_id].add(molecule_id)
 
     def _populate_synonyms_for_molecule(self, molecule_set):
+        #if an empty set was passed by accident, skip
+        if len(molecule_set) < 1:
+            return
+
         url = Config.CHEMBL_MOLECULE_SET.format(';'.join(molecule_set))
         response = requests.get(url)
         response.raise_for_status()

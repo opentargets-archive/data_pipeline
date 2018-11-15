@@ -5,7 +5,8 @@ LABEL maintainer="ops@opentargets.org"
 #need git to pip install from git
 RUN apt-get update && apt-get install -y \
     build-essential \
-    git
+    git \
+    curl
 
 # install fresh these requirements.
 # do this before copying the code to minimize image layer rebuild for dev

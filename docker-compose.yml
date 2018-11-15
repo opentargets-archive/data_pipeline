@@ -36,13 +36,25 @@ services:
     depends_on:
       - elasticsearch
 
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+    
   mrtarget:
     build:
       context: ./
     depends_on:
       - elasticsearch
+      - redis
     environment:
       - ELASTICSEARCH_NODES=http://elasticsearch:9200
+      - CTTV_REDIS_REMOTE=true
+      - CTTV_REDIS_SERVER=redis:6379
+    volumes:
+      - ./log:/usr/src/app/log
+      - ./json:/usr/src/app/json
+      - ./qc:/usr/src/app/qc
 
 volumes:
   esdata:

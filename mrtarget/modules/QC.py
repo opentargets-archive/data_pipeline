@@ -4,12 +4,7 @@ import csv
 import os.path
 from numbers import Number
 
-from collections import Counter
-from pprint import pprint
 
-from elasticsearch import helpers
-
-from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 
@@ -62,6 +57,13 @@ class QCMetrics(object):
     def write_out(self, filename):
         #make a copy of the current metrics to avoid side effects
         metrics = dict(self.metrics)
+
+        #ensure the directory for the log file exists
+        qcdir = os.path.dirname(os.path.abspath(filename))
+        if not os.path.isdir(qcdir):
+            self._logger.debug("log directory %s does not exist, creating", qcdir)
+            os.makedirs(qcdir)
+
 
         #if the file exists, read it and add the contents to the metrics
         if os.path.isfile(filename):

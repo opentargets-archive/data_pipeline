@@ -1,15 +1,13 @@
 import logging
 import copy
 
-from tqdm import tqdm
 
 from mrtarget.Settings import Config
-from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable, denormDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess, RedisQueueStatusReporter
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer
 from mrtarget.modules.EFO import EFO
 from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
@@ -326,11 +324,6 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
         if available_evidence:
             self.init_data_cache()
             evidence_iterator = self.es_query.get_evidence_for_target_simple(target, available_evidence)
-            # for evidence in tqdm(evidence_iterator,
-            #                    desc='fetching evidence for target %s'%target,
-            #                    unit=' evidence',
-            #                    unit_scale=True,
-            #                    total=available_evidence):
             for evidence in evidence_iterator:
                 for efo in evidence['private']['efo_codes']:
                     key = (evidence['target']['id'], efo)
@@ -533,7 +526,6 @@ class ScoringProcess():
                  r_server):
 
         self.logger = logging.getLogger(__name__)
-        self.tqdm_out = TqdmToLogger(self.logger,level=logging.INFO)
 
         self.es_loader = loader
         self.es = loader.es
@@ -602,15 +594,6 @@ class ScoringProcess():
                                   r_server=self.r_server,
                                   serialiser='jsonpickle')
 
-        q_reporter = RedisQueueStatusReporter([target_q,
-                                               target_disease_pair_q,
-                                               # score_data_q
-                                               ],
-                                              interval=30,
-                                              )
-        q_reporter.start()
-
-
         # storage is located inside this code because the serialisation time
         scorers = [ScoreProducer(target_disease_pair_q,
                                  None,
@@ -631,11 +614,7 @@ class ScoringProcess():
         for w in readers:
             w.start()
 
-        for target in tqdm(targets,
-                           desc='fetching evidence for targets',
-                           unit=' targets',
-                           file=self.tqdm_out,
-                           unit_scale=True):
+        for target in targets:
             target_q.put(target)
         target_q.set_submission_finished()
 
@@ -648,9 +627,6 @@ class ScoringProcess():
         self.logger.info('flushing data to index')
         self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                         wait_if_ongoing =True)
-
-        self.logger.info('collecting reporter')
-        q_reporter.join()
 
         self.logger.info("DONE")
 

@@ -7,8 +7,6 @@ import logging
 import io
 import tempfile as tmp
 import requests as r
-import jsonschema as jss
-import json
 
 _l = logging.getLogger(__name__)
 
@@ -123,28 +121,6 @@ class URLZSource(object):
         zf.close()
 
 
-def generate_validator_from_schema(schema_uri):
-    '''load a uri, build and return a jsonschema validator'''
-    with URLZSource(schema_uri).open() as r_file:
-        js_schema = json.load(r_file)
-
-    validator = jss.validators.validator_for(js_schema)
-    return validator(schema=js_schema)
-
-
-def generate_validators_from_schemas(schemas_map):
-    '''return a dict of schema names and validators using the function
-    `generate_validator_from_schema`'''
-    validators = {}
-    for schema_name, schema_uri in schemas_map.iteritems():
-        # per kv we create the validator and instantiate it
-        _l.info('generate_validator_from_schema %s using the uri %s',
-                schema_name, schema_uri)
-        validators[schema_name] = generate_validator_from_schema(schema_uri)
-
-    return validators
-
-
 class LogAccum(object):
     def __init__(self, logger_o, elem_limit=1024):
         if not logger_o:
@@ -196,21 +172,3 @@ def require_any(*predicates):
     if not r_any:
         _l.error('requre_any failed checking at least one predicate true')
 
-
-# with thanks to: https://stackoverflow.com/questions/14897756/python-progress-bar-through-logging-module/41224909#41224909
-class TqdmToLogger(io.StringIO):
-    """
-        Output stream for TQDM which will output to logger module instead of
-        the StdOut.
-    """
-    logger = None
-    level = None
-    buf = ''
-    def __init__(self,logger,level=None):
-        super(TqdmToLogger, self).__init__()
-        self.logger = logger
-        self.level = level or logging.INFO
-    def write(self,buf):
-        self.buf = buf.strip('\r\n\t ')
-    def flush(self):
-        self.logger.log(self.level, self.buf)

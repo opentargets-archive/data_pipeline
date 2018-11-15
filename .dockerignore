@@ -4,6 +4,9 @@
 doc/
 docs/
 samples/
+json/
+log/
+qc/
 
 ### Python template
 # Byte-compiled / optimized / DLL files
