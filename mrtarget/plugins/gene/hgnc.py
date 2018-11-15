@@ -1,10 +1,8 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
-import urllib2
-import ujson as json
+import requests
 import logging
-logging.basicConfig(level=logging.INFO)
 
 class HGNC(IPlugin):
 
@@ -16,12 +14,14 @@ class HGNC(IPlugin):
 
     def merge_data(self, genes, loader, r_server):
         self._logger.info("HGNC parsing - requesting from URL %s" % Config.HGNC_COMPLETE_SET)
-        req = urllib2.Request(Config.HGNC_COMPLETE_SET)
-        response = urllib2.urlopen(req)
-        self._logger.info("HGNC parsing - response code %s" % response.code)
-        data = json.loads(response.read())
+
+        r = requests.get(Config.HGNC_COMPLETE_SET)
+        r.raise_for_status()
+        data = r.json()
+
         for row in data['response']['docs']:
             gene = Gene()
             gene.load_hgnc_data_from_json(row)
             genes.add_gene(gene)
+
         self._logger.info("STATS AFTER HGNC PARSING:\n" + genes.get_stats())
