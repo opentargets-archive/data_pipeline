@@ -46,24 +46,17 @@ class ProcessContext(object):
     def put(self, line, **kwargs):
         pass
 
-    def __del__(self):
-        pass
-
 
 class ProcessContextFileWriter(ProcessContext):
     def __init__(self, output_folder='./', **kwargs):
         super(ProcessContextFileWriter, self).__init__(**kwargs)
         self.logger.debug("called output_stream from %s", str(os.getpid()))
 
-        valids_file_name = output_folder + os.path.sep + 'evidences-valid_' + uuid.uuid4().hex + '.json.gz'
-        valids_file_handle = to_source_for_writing(valids_file_name)
-        self.kwargs.valids_file_name = valids_file_name
-        self.kwargs.valids_file_handle = valids_file_handle
+        self.kwargs.valids_file_name = output_folder + os.path.sep + 'evidences-valid_' + uuid.uuid4().hex + '.json.gz'
+        self.kwargs.valids_file_handle = to_source_for_writing(self.kwargs.valids_file_name)
 
-        invalids_file_name = output_folder + os.path.sep + 'evidences-invalid_' + uuid.uuid4().hex + '.json.gz'
-        invalids_file_handle = to_source_for_writing(invalids_file_name)
-        self.kwargs.invalids_file_name = invalids_file_name
-        self.kwargs.invalids_file_handle = invalids_file_handle
+        self.kwargs.invalids_file_name = output_folder + os.path.sep + 'evidences-invalid_' + uuid.uuid4().hex + '.json.gz'
+        self.kwargs.invalids_file_handle = to_source_for_writing(self.kwargs.invalids_file_name)
 
     def put(self, line, **kwargs):
         (left, right) = line
@@ -115,13 +108,14 @@ class ProcessContextESWriter(ProcessContext):
 
 
 def to_source_for_writing(filename):
-    '''open a filename checking if .gz or not at the end of the filename'''
-    return gzip.open(filename, mode='wb') \
-            if filename.endswith('.gz') else open(filename, mode='w')
+    """open a filename checking if .gz or not at the end of the filename"""
+    open_f = functools.partial(gzip.open, filename, 'wb') if filename.endswith('.gz') \
+        else functools.partial(open, filename, 'w')
 
+    return open_f()
 
 def from_source_for_reading(filename):
-    '''return an iterator from izip (filename, (enumerate(file_handle))'''
+    """return an iterator from izip (filename, (enumerate(file_handle))"""
     _l.debug('generate an iterator of (filename,enumerate) for filename %s', filename)
     it = more_itertools.with_iter(URLZSource(filename).open())
     return itertools.izip(itertools.cycle([filename]),enumerate(it, start=1))
@@ -140,6 +134,17 @@ def serialise_object_to_json(obj):
 
 def reduce_tuple_with_sum(iterable):
     return functools.reduce(lambda x, y: (x[0] + y[0], x[1] + y[1]), iterable, (0, 0))
+
+
+def emit_global_stats_from_evidence(ev):
+    """generate a list of tuples containing the required information to map-reduce"""
+    r = []
+
+    if 'literature' in ev and 'references' in ev['literature']:
+        r += [(pid['lit_id'].split('/')[-1], 1, 1, 1) for pid in ev['literature']['references']]
+
+    if 'unique_experiment_reference' in ev:
+        r += [(ev['unique_experiment_reference'], 1, 1, 1)]
 
 
 def make_validated_evs_obj(filename, hash, line, line_n, is_valid=False, explanation_type='', explanation_str='',

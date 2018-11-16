@@ -950,7 +950,7 @@ class EvidenceGlobalCounter():
         return d
 
     def digest(self, ev):
-        '''takes an evidence in dict format and populate the appropiate counters'''
+        """takes an evidence in dict format and populate the appropiate counters"""
         self._inject_counts(self.total, ev)
         for lit in self.get_literature(ev):
             if lit not in self.literature:
@@ -963,11 +963,10 @@ class EvidenceGlobalCounter():
             self._inject_counts(self.experiment[exp], ev)
 
     def get_target_and_disease_uniques_for_literature(self, lit_id):
-        '''
-
+        """
         :param lit_id: literature id
         :return: tuple of target and disease unique ids linked to the literature id
-        '''
+        """
         try:
             literature_data = self.literature[lit_id]
         except KeyError as e:
@@ -1032,6 +1031,7 @@ class EvidenceGlobalCounter():
             return ev['evidence']['unique_experiment_reference']
         except KeyError as e:
             pass
+
 
 class EvidenceStringProcess():
     def __init__(self,

@@ -98,7 +98,7 @@ def main():
 
     #this has to be stored as "ass" instead of "as" because "as" is a reserved name when accessing it later e.g. `args.as`
     parser.add_argument("--as", help="compute association scores, store in elasticsearch",
-                        action="store_true", dest="ass")                        
+                        action="store_true", dest="assoc")
     parser.add_argument("--targets", help="just process data for this target. Does not work with all the steps!!",
                         action='append', default=[])
                         
@@ -325,15 +325,15 @@ def main():
         # if args.valreset:
         #     EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
 
-        if args.evs:
-            process = EvidenceStringProcess(connectors.es, connectors.r_server)
-            if not args.qc_only:
-                process.process_all(datasources = args.datasource, dry_run=args.dry_run)
-            if not args.skip_qc:
-                #qc_metrics.update(process.qc(esquery))
-                pass
+        # if args.evs:
+        #     process = EvidenceStringProcess(connectors.es, connectors.r_server)
+        #     if not args.qc_only:
+        #         process.process_all(datasources = args.datasource, dry_run=args.dry_run)
+        #     if not args.skip_qc:
+        #         #qc_metrics.update(process.qc(esquery))
+        #         pass
 
-        if args.ass:
+        if args.assoc:
             process = ScoringProcess(loader, connectors.r_server)
             if not args.qc_only:
                 process.process_all(targets = targets, dry_run=args.dry_run)
