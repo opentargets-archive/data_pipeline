@@ -30,6 +30,7 @@ scikit-learn
 biopython
 petl
 
+more-itertools
 toolz
 pypeln
 
