@@ -15,12 +15,12 @@ from logging.config import fileConfig
 
 import opentargets_validator.helpers
 
+import mrtarget.common.IO as IO
 from mrtarget.Settings import file_or_resource, Config
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
-from mrtarget.common.EvidencesHelpers import (ProcessContext, to_source_for_writing,
-                                              from_source_for_reading, reduce_tuple_with_sum, make_lookup_data,
-                                              make_validated_evs_obj, serialise_object_to_json,
-                                              ProcessContextFileWriter, ProcessContextESWriter)
+from mrtarget.common.EvidencesHelpers import (ProcessContext, reduce_tuple_with_sum, make_lookup_data,
+                                              make_validated_evs_obj, open_writers_on_start,
+                                              close_writers_on_done)
 from mrtarget.common.connection import new_redis_client, new_es_client, PipelineConnectors
 from mrtarget.modules.EvidenceString import EvidenceManager, Evidence
 
@@ -95,6 +95,10 @@ def process_evidence_on_done(_status, process_context):
     """this is called once when the process is finished computing. It is
     potentially useful for closing sockets or fds"""
     process_context.logger.debug("called validate_evidence on_done from %s", str(os.getpid()))
+
+
+def write_evidences_on_done(_status, process_context):
+    process_context.close()
 
 
 def validate_evidence(line, process_context):
@@ -288,19 +292,6 @@ def validate_evidence(line, process_context):
         return validated_evs, None
 
 
-def write_evidences_on_start(enable_output_to_es=False, output_folder='.'):
-    """construct the processcontext to write lines to the files. we have to sets,
-    the good validated ones and the failed ones.
-    """
-    pc = None
-    if enable_output_to_es:
-        pc = ProcessContextESWriter()
-    else:
-        pc = ProcessContextFileWriter(output_folder=output_folder)
-
-    return pc
-
-
 def write_evidences(x, process_context):
     is_right = 0
     is_left = 0
@@ -319,6 +310,45 @@ def write_evidences(x, process_context):
         return is_left, is_right
 
 
+def stage_one(filenames, first_n=0, es_client=None, redis_client=None,
+                               enable_output_to_es=False, output_folder=Config.TEMP_DIR,
+                               num_workers=4, num_writers=2):
+    """this phase validate, fix and score each evidence from a list of files and write
+    the result to files in a temporal folder. Returns (failed, succeed) counts"""
+    logger = logging.getLogger(__name__)
+
+    logger.debug('load LUTs')
+    lookup_data = make_lookup_data(es_client, redis_client)
+
+    logger.debug('create a iterable of lines from all file handles')
+    evs = IO.make_iter_lines(filenames, first_n)
+
+    logger.info('declare pipeline to run')
+    write_evidences_on_start_f = functools.partial(open_writers_on_start, enable_output_to_es, output_folder)
+    validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
+
+    # here the pipeline definition
+    pl_stage = pr.map(process_evidence, evs, workers=num_workers, maxsize=10000,
+                      on_start=validate_evidence_on_start_f, on_done=process_evidence_on_done)
+    pl_stage = pr.map(write_evidences, pl_stage, workers=num_writers, maxsize=10000,
+                      on_start=write_evidences_on_start_f,
+                      on_done=close_writers_on_done)
+
+    logger.info('run evidence processing pipeline')
+    return reduce_tuple_with_sum(pr.to_iterable(pl_stage))
+
+
+
+def stage_two(filenames, first_n=0, es_client=None, redis_client=None,
+                               enable_output_to_es=False, output_folder=Config.TEMP_DIR,
+                               num_workers=4, num_writers=2):
+    """this phase validate, fix and score each evidence from a list of files and write
+    the result to files in a temporal folder. Returns (failed, succeed) counts"""
+    logger = logging.getLogger(__name__)
+
+    return 0, 0
+
+
 def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_client=None,
                                dry_run=False, enable_output_to_es=False, output_folder='.',
                                num_workers=4, num_writers=2):
@@ -328,35 +358,28 @@ def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_clien
         logger.debug('dry_run True so exiting doing nothing')
         return 0, 0
 
-    if not filenames or first_n < 0:
-        logger.error('tried to run with no filenames at all or first_n < 0')
+    if not filenames:
+        logger.error('tried to run with no filenames at all')
         return 0, 0
 
-    logger.debug('create an iterable of handles from filenames %s', str(filenames))
-    in_handles = itertools.imap(from_source_for_reading, filenames)
+    logger.info('start evidence processing pipeline stage one')
 
-    logger.debug('create a iterable of lines from all file handles')
-    chained_handles = itertools.chain.from_iterable(itertools.ifilter(lambda e: e is not None, in_handles))
+    stage_one_results = stage_one(filenames=filenames, first_n=first_n, es_client=es_client,
+                                  redis_client=redis_client, enable_output_to_es=False,
+                                  output_folder=Config.TEMP_DIR, num_workers=num_workers,
+                                  num_writers=num_writers)
 
-    evs = more_itertools.take(first_n, chained_handles) \
-        if first_n else chained_handles
+    logger.info('done evidence processing pipeline stage one with %s', str(stage_one_results))
+    logger.info('start evidence processing pipeline stage two')
 
-    logger.debug('load LUTs')
-    lookup_data = make_lookup_data(es_client, redis_client)
+    tmp_filenames = IO.get_filenames_by_glob(Config.TEMP_DIR + os.pathsep + 'evidences-*')
+    stage_two_results = stage_two(filenames=tmp_filenames, first_n=0, es_client=es_client,
+                                  redis_client=redis_client, enable_output_to_es=enable_output_to_es,
+                                  output_folder=output_folder, num_workers=num_workers,
+                                  num_writers=num_writers)
 
-    logger.info('declare pipeline to run')
-    write_evidences_on_start_f = functools.partial(write_evidences_on_start, enable_output_to_es, output_folder)
-    validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
-
-    # here the pipeline definition
-    pl_stage = pr.map(process_evidence, evs, workers=num_workers, maxsize=10000,
-                      on_start=validate_evidence_on_start_f, on_done=process_evidence_on_done)
-    pl_stage = pr.map(write_evidences, pl_stage, workers=num_writers, maxsize=10000, on_start=write_evidences_on_start_f)
-
-    logger.info('run evidence processing pipeline')
-    results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
-    logger.info('done evidence processing pipeline')
-    return results
+    logger.info('done evidence processing pipeline stage two with %s', str(stage_two_results))
+    return stage_two_results
 
 
 if __name__ == '__main__':

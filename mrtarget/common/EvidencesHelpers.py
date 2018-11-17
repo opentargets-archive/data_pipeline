@@ -1,23 +1,21 @@
 import json
 import os
-import random
 import logging
-import gzip
 
 import functools
-import itertools
 import uuid
 from abc import abstractmethod
 
 import addict
-import more_itertools
 
-from mrtarget.common import URLZSource
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.connection import new_es_client
 from mrtarget.Settings import Config
+
+import mrtarget.common.IO as IO
+
 
 _l = logging.getLogger(__name__)
 
@@ -53,10 +51,10 @@ class ProcessContextFileWriter(ProcessContext):
         self.logger.debug("called output_stream from %s", str(os.getpid()))
 
         self.kwargs.valids_file_name = output_folder + os.path.sep + 'evidences-valid_' + uuid.uuid4().hex + '.json.gz'
-        self.kwargs.valids_file_handle = to_source_for_writing(self.kwargs.valids_file_name)
+        self.kwargs.valids_file_handle = IO.open_to_write(self.kwargs.valids_file_name)
 
         self.kwargs.invalids_file_name = output_folder + os.path.sep + 'evidences-invalid_' + uuid.uuid4().hex + '.json.gz'
-        self.kwargs.invalids_file_handle = to_source_for_writing(self.kwargs.invalids_file_name)
+        self.kwargs.invalids_file_handle = IO.open_to_write(self.kwargs.invalids_file_name)
 
     def put(self, line, **kwargs):
         (left, right) = line
@@ -69,9 +67,14 @@ class ProcessContextFileWriter(ProcessContext):
         self.logger.debug('closing files %s %s',
                           self.kwargs.valids_file_name,
                           self.kwargs.invalids_file_name)
-        self.kwargs.valids_file_handle.close()
-        self.kwargs.invalids_file_handle.close()
-        super(ProcessContextFileWriter, self).__del__()
+        self.close()
+
+    def close(self):
+        try:
+            self.kwargs.valids_file_handle.close()
+            self.kwargs.invalids_file_handle.close()
+        except:
+            pass
 
 
 class ProcessContextESWriter(ProcessContext):
@@ -102,23 +105,32 @@ class ProcessContextESWriter(ProcessContext):
                                 create_index=True)
 
     def __del__(self):
-        self.kwargs.es_loader.flush()
-        self.kwargs.es_loader.close()
-        super(ProcessContextESWriter, self).__del__()
+        self.close()
+
+    def close(self):
+        try:
+            self.kwargs.es_loader.flush()
+            self.kwargs.es_loader.close()
+        except:
+            pass
 
 
-def to_source_for_writing(filename):
-    """open a filename checking if .gz or not at the end of the filename"""
-    open_f = functools.partial(gzip.open, filename, 'wb') if filename.endswith('.gz') \
-        else functools.partial(open, filename, 'w')
+def open_writers_on_start(enable_output_to_es=False, output_folder='.'):
+    """construct the processcontext to write lines to the files. we have to sets,
+    the good validated ones and the failed ones.
+    """
+    pc = None
+    if enable_output_to_es:
+        pc = ProcessContextESWriter()
+    else:
+        pc = ProcessContextFileWriter(output_folder=output_folder)
 
-    return open_f()
+    return pc
 
-def from_source_for_reading(filename):
-    """return an iterator from izip (filename, (enumerate(file_handle))"""
-    _l.debug('generate an iterator of (filename,enumerate) for filename %s', filename)
-    it = more_itertools.with_iter(URLZSource(filename).open())
-    return itertools.izip(itertools.cycle([filename]),enumerate(it, start=1))
+
+def close_writers_on_done(_status, process_context):
+    """close the processcontext after writing to the files."""
+    process_context.close()
 
 
 def serialise_object_to_json(obj):
