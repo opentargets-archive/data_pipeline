@@ -189,8 +189,10 @@ def validate_evidence(line, process_context):
 
         if evidence_obj.target.id:
             target_id = evidence_obj.target.id
+            validated_evs.target_id = evidence_obj.target.id
         if evidence_obj.disease.id:
             efo_id = evidence_obj.disease.id
+            validated_evs.efo_id = evidence_obj.disease.id
 
         # flatten but is it always valid unique_association_fields?
         validated_evs.hash = \
@@ -340,7 +342,6 @@ def stage_one(filenames, first_n=0, es_client=None, redis_client=None,
     logger.info('run evidence processing pipeline')
 
     return reduce_tuple_with_sum(pr.to_iterable(pl_stage))
-    return 0, 0
 
 
 def stage_two(filenames, first_n=0, es_client=None, redis_client=None,
