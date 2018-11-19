@@ -19,9 +19,3 @@ class RedisWorkerTestCase(unittest.TestCase):
                                  set=set(range(10)))
         encoded_set_test = json.loads(set_test.to_json())
         self.assertTrue(isinstance(encoded_set_test['set'],list))
-
-    def test_release_Version(self):
-        test = SerializeStub('data_release',)
-        encoded_test = json.loads(test.to_json())
-        self.assertEquals(encoded_test['data_release'], Config.RELEASE_VERSION.split('-')[-1])
-
