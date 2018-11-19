@@ -2,8 +2,7 @@ import logging
 from collections import OrderedDict
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.modules.Ontology import  DiseaseUtils
-from ontologyutils.rdf_utils import OntologyClassReader
+from ontologyutils.rdf_utils import OntologyClassReader,DiseaseUtils
 from rdflib import URIRef
 from mrtarget.Settings import Config
 
@@ -102,7 +101,10 @@ class EfoProcess():
         Get all phenotypes
         '''
         utils = DiseaseUtils()
-        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology)
+        uri_hpo = Config.ONTOLOGY_CONFIG.get('uris', 'hpo')
+        uri_mp = Config.ONTOLOGY_CONFIG.get('uris', 'mp')
+        uri_disease_phenotypes = Config.ONTOLOGY_CONFIG.items('disease_phenotypes_uris')
+        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology, uri_hpo, uri_mp, uri_disease_phenotypes)
 
         for uri,label in self.disease_ontology.current_classes.items():
             properties = self.disease_ontology.parse_properties(URIRef(uri))

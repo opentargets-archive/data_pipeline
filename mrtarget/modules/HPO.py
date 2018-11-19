@@ -4,7 +4,6 @@ from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
-from mrtarget.modules.Ontology import DiseaseUtils
 from ontologyutils.rdf_utils import OntologyClassReader
 from rdflib import URIRef
 from mrtarget.Settings import Config
