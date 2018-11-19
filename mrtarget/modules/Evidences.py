@@ -137,6 +137,7 @@ def validate_evidence(line, process_context):
                 parsed_line['type'] = parsed_line.pop('label', None)
 
             data_type = parsed_line['type']
+            validated_evs.data_type = data_type
 
         else:
             validated_evs.explanation_type = 'key_fields_missing'
@@ -156,6 +157,7 @@ def validate_evidence(line, process_context):
             return validated_evs, None
 
         data_source = parsed_line['sourceID']
+        validated_evs.data_source = data_source
 
         if data_source not in Config.DATASOURCE_TO_DATATYPE_MAPPING:
             validated_evs.explanation_type = 'unsupported_datasource'

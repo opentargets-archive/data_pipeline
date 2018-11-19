@@ -60,7 +60,7 @@ class ProcessContextFileWriter(ProcessContext):
     def put(self, line, **kwargs):
         (left, right) = line
         if right is not None:
-            self.kwargs.valids_file_handle.writelines(serialise_object_to_json(right) + os.linesep)
+            self.kwargs.valids_file_handle.writelines(right['line'] + os.linesep)
         elif left is not None:
             self.kwargs.invalids_file_handle.writelines(serialise_object_to_json(left) + os.linesep)
 
