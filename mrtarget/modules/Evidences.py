@@ -5,22 +5,21 @@ import os
 import json
 import pypeln.process as pr
 import addict
-import uuid
 import codecs
 import functools
-import itertools
-import more_itertools
+import functional as f
+import bounter
 
 from logging.config import fileConfig
 
 import opentargets_validator.helpers
-
 import mrtarget.common.IO as IO
+
 from mrtarget.Settings import file_or_resource, Config
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
-from mrtarget.common.EvidencesHelpers import (ProcessContext, reduce_tuple_with_sum, make_lookup_data,
+from mrtarget.common.EvidencesHelpers import (ProcessContext, make_lookup_data,
                                               make_validated_evs_obj, open_writers_on_start,
-                                              close_writers_on_done)
+                                              close_writers_on_done, reduce_tuple_with_sum)
 from mrtarget.common.connection import new_redis_client, new_es_client, PipelineConnectors
 from mrtarget.modules.EvidenceString import EvidenceManager, Evidence
 
@@ -84,10 +83,11 @@ def process_evidence_on_start(luts=None):
         pc.logger.info('generate_validator_from_schema %s using the uri %s', schema_name, schema_uri)
         pc.kwargs.validators[schema_name] = \
             opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
-        pc.kwargs.luts = luts
-        pc.kwargs.redis_c = new_redis_client()
-        pc.kwargs.luts.set_r_server(pc.kwargs.redis_c)
-        pc.kwargs.evidence_manager = EvidenceManager(pc.kwargs.luts)
+
+    pc.kwargs.luts = luts
+    pc.kwargs.redis_c = new_redis_client()
+    pc.kwargs.luts.set_r_server(pc.kwargs.redis_c)
+    pc.kwargs.evidence_manager = EvidenceManager(pc.kwargs.luts)
     return pc
 
 
@@ -293,6 +293,7 @@ def validate_evidence(line, process_context):
 
 
 def write_evidences(x, process_context):
+
     is_right = 0
     is_left = 0
 
@@ -311,11 +312,13 @@ def write_evidences(x, process_context):
 
 
 def stage_one(filenames, first_n=0, es_client=None, redis_client=None,
-                               enable_output_to_es=False, output_folder=Config.TEMP_DIR,
-                               num_workers=4, num_writers=2):
+              output_folder=Config.TEMP_DIR, num_workers=4, num_writers=2):
     """this phase validate, fix and score each evidence from a list of files and write
     the result to files in a temporal folder. Returns (failed, succeed) counts"""
     logger = logging.getLogger(__name__)
+
+    q_max = 10000
+    pub_counters = {}
 
     logger.debug('load LUTs')
     lookup_data = make_lookup_data(es_client, redis_client)
@@ -324,19 +327,20 @@ def stage_one(filenames, first_n=0, es_client=None, redis_client=None,
     evs = IO.make_iter_lines(filenames, first_n)
 
     logger.info('declare pipeline to run')
-    write_evidences_on_start_f = functools.partial(open_writers_on_start, enable_output_to_es, output_folder)
+    write_evidences_on_start_f = functools.partial(open_writers_on_start, False, output_folder)
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
 
     # here the pipeline definition
-    pl_stage = pr.map(process_evidence, evs, workers=num_workers, maxsize=10000,
+    pl_stage = pr.map(process_evidence, evs, workers=num_workers, maxsize=q_max,
                       on_start=validate_evidence_on_start_f, on_done=process_evidence_on_done)
-    pl_stage = pr.map(write_evidences, pl_stage, workers=num_writers, maxsize=10000,
+    pl_stage = pr.map(write_evidences, pl_stage, workers=num_writers, maxsize=q_max,
                       on_start=write_evidences_on_start_f,
                       on_done=close_writers_on_done)
 
     logger.info('run evidence processing pipeline')
-    return reduce_tuple_with_sum(pr.to_iterable(pl_stage))
 
+    return reduce_tuple_with_sum(pr.to_iterable(pl_stage))
+    return 0, 0
 
 
 def stage_two(filenames, first_n=0, es_client=None, redis_client=None,
@@ -364,10 +368,10 @@ def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_clien
 
     logger.info('start evidence processing pipeline stage one')
 
+    # same number of writers as workers for this first phase
     stage_one_results = stage_one(filenames=filenames, first_n=first_n, es_client=es_client,
-                                  redis_client=redis_client, enable_output_to_es=False,
-                                  output_folder=Config.TEMP_DIR, num_workers=num_workers,
-                                  num_writers=num_writers)
+                                  redis_client=redis_client, output_folder=Config.TEMP_DIR,
+                                  num_workers=num_workers, num_writers=num_workers)
 
     logger.info('done evidence processing pipeline stage one with %s', str(stage_one_results))
     logger.info('start evidence processing pipeline stage two')
@@ -392,6 +396,6 @@ if __name__ == '__main__':
     print(args)
     connectors = PipelineConnectors()
     connectors.init_services_connections()
-    r = process_evidences_pipeline(args, first_n=0, es_client=es_c, redis_client=redis_c,
+    r = process_evidences_pipeline(args, first_n=100, es_client=es_c, redis_client=redis_c,
                                    enable_output_to_es=False, output_folder='.')
-    print('results (failed, succeed) ', r)
+    print('results (failed, succeed) %s', str(r))

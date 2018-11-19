@@ -30,6 +30,7 @@ scikit-learn
 biopython
 petl
 
+pyfunctional
 toolz
 pypeln
 
