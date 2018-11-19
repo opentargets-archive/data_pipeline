@@ -97,7 +97,7 @@ class EfoProcess():
     def _process_ontology_data(self):
 
         self.disease_ontology = OntologyClassReader()
-        self.disease_ontology.load_open_targets_disease_ontology()
+        self.disease_ontology.load_open_targets_disease_ontology(Config.ONTOLOGY_CONFIG.get('uris','efo'))
         '''
         Get all phenotypes
         '''
