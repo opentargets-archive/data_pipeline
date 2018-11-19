@@ -136,6 +136,9 @@ def main():
     parser.add_argument("--num-writers", help="num proc writers",
                         action='store', default=2, type=int)
 
+    parser.add_argument("--first-n", help="num first lines to process default to 0 (all)",
+                        action='store', default=0, type=int)
+
     #tweak how lookup tables are managed
     parser.add_argument("--lt-reuse", help="reuse the current lookuptable",
                         action='store_true', default=False)
@@ -306,7 +309,7 @@ def main():
                     input_files = [x.rstrip() for x in f.readlines()]
 
             results = process_evidences_pipeline(filenames=input_files,
-                                                 first_n=0,
+                                                 first_n=args.first_n,
                                                  es_client=connectors.es,
                                                  redis_client=connectors.r_server,
                                                  dry_run=args.dry_run,
