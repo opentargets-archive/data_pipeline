@@ -95,7 +95,7 @@ class ProcessContextESWriter(ProcessContext):
     def put(self, line, **kwargs):
         (left, right) = line
         if right is not None:
-            self.kwargs.es_loader.put(body=right['line'], ID=right['id'],
+            self.kwargs.es_loader.put(body=right['line'], ID=right['hash'],
                                 index_name=self.kwargs.index_name_validated,
                                 doc_type=self.kwargs.doc_type_validated,
                                 create_index=True)

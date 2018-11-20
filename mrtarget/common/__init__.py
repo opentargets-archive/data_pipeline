@@ -50,7 +50,7 @@ def url_to_tmpfile(url, delete=True, *args, **kwargs):
         f = r.get(url, *args, stream=True, **kwargs)
         f.raise_for_status()
 
-        with tmp.NamedTemporaryFile(mode='r+w+b', delete=delete) as fd:
+        with tmp.NamedTemporaryFile(mode='rwb', delete=delete) as fd:
             # write data into file in streaming fashion
             for block in f.iter_content(1024):
                 fd.write(block)
