@@ -45,7 +45,7 @@ ELASTIC_CHECK_CMD = curl -sSf $(ELASTICSEARCH_NODES) -o /dev/null
 dry_run:
 	$(MRTARGET_CMD) --dry-run $(ES_PREFIX)
 
-.PHONEY: rea
+.PHONY: rea
 rea: $(LOG_PATH)/out.$(ES_PREFIX).rea.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).rea.log : 
