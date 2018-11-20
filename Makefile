@@ -25,6 +25,8 @@ QC_PATH ?= $(mkfile_dir)/qc
 QC_FILE ?= $(QC_PATH)/qc.$(ES_PREFIX).tsv
 QC_FILE_OLD ?= $(QC_PATH)/qc.18.08.tsv
 
+SCRIPT_PATH ?= $(mkfile_dir)/scripts
+
 # Allow specification of additional arguments for each stage on the command-line
 # Intended to be empty here and overriden from outside if needed
 MRTARGET_ARGS ?= 
@@ -45,7 +47,7 @@ ELASTIC_CHECK_CMD = curl -sSf $(ELASTICSEARCH_NODES) -o /dev/null
 dry_run:
 	$(MRTARGET_CMD) --dry-run $(ES_PREFIX)
 
-.PHONEY: rea
+.PHONY: rea
 rea: $(LOG_PATH)/out.$(ES_PREFIX).rea.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).rea.log : 
@@ -53,7 +55,11 @@ $(LOG_PATH)/out.$(ES_PREFIX).rea.log :
 	$(MRTARGET_CMD) --rea $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).rea.log
 
 .PHONY: ens
-ens: $(LOG_PATH)/out.$(ES_PREFIX).ens.log
+ens: $(mkfile_dir)/mrtarget/resources/ensembl-data.tsv.gz $(LOG_PATH)/out.$(ES_PREFIX).ens.log 
+
+# Download the Ensembl data file to mrtarget/resources if necessary
+$(mkfile_dir)/mrtarget/resources/ensembl-data.tsv.gz :
+	$(SCRIPT_PATH)/download_ensembl.sh $(mkfile_dir)/mrtarget/resources/ensembl-data.tsv.gz
 
 $(LOG_PATH)/out.$(ES_PREFIX).ens.log : 
 	$(ELASTIC_CHECK_CMD)
