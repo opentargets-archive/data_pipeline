@@ -235,11 +235,12 @@ class ChEMBLLookup(object):
                 r = response.json()
             except Exception as e:
                 logger.exception('problem downloading molecule info from url %s', str(e))
+                #re-raise exception to allow propegation
+                raise e
             finally:
                 return r
 
-        molecule_set_str = ';'.join(molecule_set)
-        urls = [Config.CHEMBL_MOLECULE_SET.format(';'.join(molecule_set))] if molecule_set_str else []
+        urls = [Config.CHEMBL_MOLECULE_SET.format(';'.join(molecule_set))] if len(molecule_set) else []
         data = more_itertools.first(itertools.imap(_get_molecules_syns_from_url,urls), default={})
 
         if 'molecules' in data:
