@@ -30,37 +30,6 @@ def url_to_stream(url, *args, **kwargs):
     f.close()
 
 
-@contextmanager
-def url_to_tmpfile(url, delete=True, *args, **kwargs):
-    '''request a url using requests pkg and pass *args and **kwargs to
-    requests.get function (useful for proxies) and returns the filled file
-    descriptor from a tempfile.NamedTemporaryFile
-    '''
-    f = None
-
-    if url.startswith('ftp://'):
-        raise NotImplementedError('finish ftp')
-
-    elif url.startswith('file://') or ('://' not in url):
-        filename = url[len('file://'):] if '://' in url else url
-        with open(filename, mode="r+b") as f:
-            yield f
-
-    else:
-        f = r.get(url, *args, stream=True, **kwargs)
-        f.raise_for_status()
-
-        with tmp.NamedTemporaryFile(mode='rwb', delete=delete) as fd:
-            # write data into file in streaming fashion
-            for block in f.iter_content(1024):
-                fd.write(block)
-
-            fd.seek(0)
-            yield fd
-
-        f.close()
-
-
 class URLZSource(object):
     def __init__(self, filename, *args, **kwargs):
         """A source extension for petl python package
@@ -133,7 +102,7 @@ class URLZSource(object):
             f = r.get(self.filename, *self.args, stream=True, **self.kwargs)
             f.raise_for_status()
             file_to_open = None
-            with tmp.NamedTemporaryFile(mode='r+w+b', suffix=local_filename, delete=False) as fd:
+            with tmp.NamedTemporaryFile(mode='wb', suffix=local_filename, delete=False) as fd:
                 # write data into file in streaming fashion
                 file_to_open = fd.name
                 for block in f.iter_content(1024):

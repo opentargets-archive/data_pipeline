@@ -1,5 +1,5 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.common import url_to_tmpfile
+from mrtarget.common import URLZSource
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.Settings import Config
 import ujson as json
@@ -138,7 +138,7 @@ class MousePhenotypes(IPlugin):
     def get_genotype_phenotype(self):
         self._logger.debug("get_genotype_phenotype")
         try:
-            with url_to_tmpfile(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY) as fi:
+            with URLZSource(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY).open() as fi:
                 self._logger.debug("get %s", Config.GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY)
 
                 for li, line in enumerate(fi):
@@ -178,7 +178,7 @@ class MousePhenotypes(IPlugin):
             count_symbols = set()
             count_accepted_symbols = set()
 
-            with url_to_tmpfile(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES) as fi:
+            with URLZSource(Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES).open() as fi:
                 # lines = response.readlines()
                 self._logger.debug("get lines from mgi report phenotyes file %s",
                                    Config.GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES)
