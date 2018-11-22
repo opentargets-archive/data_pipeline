@@ -23,10 +23,12 @@ limitations under the License.
     :synopsis: A data pipeline module to download data.
 .. moduleauthor:: Gautier Koscielny <gautierk@opentargets.org>
 """
-
+import functools
 import logging
 
 import requests
+import itertools
+import more_itertools
 
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
@@ -139,7 +141,9 @@ class ChEMBLLookup(object):
         batch_size = 100
         self._logger.debug('chembl populate synonyms')
         for i in range(0, len(required_molecules) + 1, batch_size):
-            self._populate_synonyms_for_molecule(required_molecules[i:i + batch_size])
+            self._populate_synonyms_for_molecule(required_molecules[i:i + batch_size],
+                                                 self.molecule2synonyms,
+                                                 self._logger)
 
     def download_protein_classification(self):
         '''fetches targets components from chembls and inject the target class data in self.protein_classification'''
@@ -189,12 +193,10 @@ class ChEMBLLookup(object):
                                                                fields=['target.id',
                                                                        'disease.id',
                                                                        'evidence.target2drug.urls'])):
-            self._logger.info('retrieving ChEMBL evidence...')
             molecule_ids = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
                            '/compound/' in i['url']]
             if molecule_ids:
                 molecule_id=molecule_ids[0]
-                self._logger.info(molecule_id)
 
                 if c % 200 == 0:
                     self._logger.debug('retrieving ChEMBL evidence... %s', molecule_id)
@@ -208,17 +210,47 @@ class ChEMBLLookup(object):
                     self.target2molecule[target_id]=set()
                 self.target2molecule[target_id].add(molecule_id)
 
-    def _populate_synonyms_for_molecule(self, molecule_set):
-        url = Config.CHEMBL_MOLECULE_SET.format(';'.join(molecule_set))
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        for i in data['molecules']:
-            if 'molecule_synonyms' in i and i['molecule_synonyms']:
+    @staticmethod
+    def _populate_synonyms_for_molecule(molecule_set, molecules_syn_dict, logger):
+        def _append_to_mol2syn(m2s_dict, molecule):
+            """if molecule has synonyms create a clean entry in m2s_dict with all synms for that chembl_id.
+            Returns either None if goes ok or the molecule chembl id if something wrong"""
+            if 'molecule_synonyms' in molecule and molecule['molecule_synonyms']:
                 synonyms = []
-                for syn in i['molecule_synonyms']:
+                for syn in molecule['molecule_synonyms']:
                     synonyms.append(syn['synonyms'])
                     synonyms.append(syn['molecule_synonym'])
                 synonyms = list(set(synonyms))
-                self.molecule2synonyms[i['molecule_chembl_id']] = synonyms
+                m2s_dict[molecule['molecule_chembl_id']] = synonyms
+                return None
+            else:
+                return molecule['molecule_chembl_id']
+
+        def _get_molecules_syns_from_url(url):
+            """get molecule list from an url. returns empty {} if something wrong"""
+            r = {}
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
+                r = response.json()
+            except Exception as e:
+                logger.exception('problem downloading molecule info from url %s', str(e))
+                #re-raise exception to allow propegation
+                raise e
+            finally:
+                return r
+
+        urls = [Config.CHEMBL_MOLECULE_SET.format(';'.join(molecule_set))] if len(molecule_set) else []
+        data = more_itertools.first(itertools.imap(_get_molecules_syns_from_url,urls), default={})
+
+        if 'molecules' in data:
+            map_f = functools.partial(_append_to_mol2syn, molecules_syn_dict)
+            mols_without_syn = \
+                list(itertools.ifilterfalse(lambda mol: mol is None, itertools.imap(map_f, data['molecules'])))
+            if logger.isEnabledFor(logging.DEBUG) and mols_without_syn:
+                logger.debug('molecule list with no synonyms %s', str(mols_without_syn))
+
+        else:
+            logger.error(" there is no 'molecules' key in the returned data - wrong api query/response?")
+
 
