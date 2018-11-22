@@ -68,7 +68,7 @@ class URLZSource(object):
         self.proxies = None
 
     @contextmanager
-    def _open_local(self, filename):
+    def _open_local(self, filename, mode):
         file_to_open = filename[len('file://'):] if '://' in filename else filename
         open_f = None
 
@@ -88,13 +88,13 @@ class URLZSource(object):
             yield fd
 
     @contextmanager
-    def open(self):
+    def open(self, mode='r'):
         if self.filename.startswith('ftp://'):
             raise NotImplementedError('finish ftp')
 
         elif self.filename.startswith('file://') or ('://' not in self.filename):
             file_to_open = self.filename[len('file://'):] if '://' in self.filename else self.filename
-            with self._open_local(file_to_open) as fd:
+            with self._open_local(file_to_open, mode) as fd:
                 yield fd
 
         else:
@@ -108,7 +108,7 @@ class URLZSource(object):
                 for block in f.iter_content(1024):
                     fd.write(block)
 
-            with self._open_local(file_to_open) as fd:
+            with self._open_local(file_to_open, mode) as fd:
                 yield fd
 
 
