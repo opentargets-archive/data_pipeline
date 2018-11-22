@@ -30,7 +30,8 @@ class UniprotDownloader(object):
 
                 self.logger.debug("iterate through the whole uniprot xml file")
 
-                def _operate(i, el):
+                def _operate(x):
+                    (i, el) = x
                     self._save_to_elasticsearch(self.loader, el.id, el,
                                                 Config.ELASTICSEARCH_UNIPROT_INDEX_NAME,
                                                 Config.ELASTICSEARCH_UNIPROT_DOC_NAME)
