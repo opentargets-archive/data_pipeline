@@ -995,7 +995,7 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
         else:
             raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
 
-        self.evidence_manager.inject_loci(ev)
+        # self.evidence_manager.inject_loci(ev)
         loader_args = (
             Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
             ev.get_doc_name(),
