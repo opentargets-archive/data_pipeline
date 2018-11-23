@@ -11,14 +11,21 @@ import requests_file
 
 _l = logging.getLogger(__name__)
 
+
+def urllify(string_name):
+    """return a file:// urlified simple path to a file:// is :// is not contained in it"""
+    return string_name if '://' in string_name else 'file://' + string_name
+
+
 def url_to_stream(url, *args, **kwargs):
-    '''request a url using requests pkg and pass *args and **kwargs to
+    """request a url using requests pkg and pass *args and **kwargs to
     requests.get function (useful for proxies) and returns the filled file
     descriptor from a tempfile.NamedTemporaryFile
 
     If you want to stream a raw uri (and not compressed) use the parameter
     `enable_stream=True`
-    '''
+    """
+    url_name = urllify(url)
     r_session = r.Session()
     r_session.mount('file://', requests_file.FileAdapter())
 
@@ -66,7 +73,7 @@ class URLZSource(object):
         ...
 
         """
-        self.filename = filename
+        self.filename = url_name = urllify(filename)
         self.args = args
         self.kwargs = kwargs
         self.proxies = None
