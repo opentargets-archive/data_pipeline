@@ -1,5 +1,6 @@
 from __future__ import print_function
 import logging
+import logging.config
 import argparse
 import sys
 import os
@@ -79,7 +80,7 @@ def main():
         requests_log.addHandler(logging.FileHandler(args.log_http))
 
 
-    connected = connectors.init_services_connections(redispersist=args.persist_redis)
+    connected = connectors.init_services_connections(args.redis_host, args.redis_port, args.redis_remote)
 
     logger.debug('Attempting to establish connection to the backend... %s',
                  str(connected))

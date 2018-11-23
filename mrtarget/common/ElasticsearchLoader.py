@@ -21,23 +21,12 @@ class Loader():
     """
 
     def __init__(self,
-                 es = None,
+                 es,
                  chunk_size=1000,
                  dry_run = False,
                  max_flush_interval = random.choice(range(60,120))):
 
         self.logger = logging.getLogger(__name__)
-
-        if es is None and not dry_run:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
-            if es is None:
-                e = EnvironmentError('no elasticsearch connection '
-                                     'was properly setup')
-                self.logger.exception(e)
-                raise e
-
         self.es = es
         self.cache = []
         self.results = defaultdict(list)

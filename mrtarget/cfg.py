@@ -121,8 +121,6 @@ class Configuration(object):
                             action="store_true")
                         
         #use an external redis rather than spawning one ourselves
-        p.add("--persist-redis", help="the temporary file wont be deleted if True default: False",
-                            action='store_true', default=False)
         p.add("--redis-remote", help="connect to a remote redis, instead of starting an embedded one",
                             action='store_true', default=False, 
                             env_var='CTTV_REDIS_REMOTE') #TODO use a different env variable
