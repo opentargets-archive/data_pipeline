@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 
 import functools
 from contextlib import contextmanager
@@ -41,7 +41,7 @@ class URLZSource(object):
         ...    # self.proxies = {"http": Config.PROXY,
         ...                      # "https": Config.PROXY}
         >>> # with URLZSource('http://var.foo/noname.csv',proxies=proxies).open() as f:
-        >>> from __futures__ import absolute_import
+        >>> from __future__ import absolute_import, print_function
         >>> import petl as p
         >>> t = p.fromcsv(mpetl.URLZSource('https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'), delimiter='|')
         >>> t.look()
@@ -155,7 +155,7 @@ class LogAccum(object):
 def require_all(*predicates):
     r_all = all(predicates)
     if not r_all:
-        print 'ERROR require_all failed checking all predicates true'
+        print('ERROR require_all failed checking all predicates true')
         _l.error('require_all failed checking all predicates true')
 
 
