@@ -29,7 +29,6 @@ from mrtarget.modules.Metrics import Metrics
 from mrtarget.Settings import Config, file_or_resource, update_schema_version
 
 import mrtarget.cfg
-import configargparse
 
 def main():
 
