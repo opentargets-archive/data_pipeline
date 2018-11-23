@@ -390,35 +390,8 @@ class Config():
     ENSEMBL_RELEASE_VERSION = 93
     ENSEMBL_CHUNK_SIZE = 100
 
-    LT_REUSE = False
-    LT_NAMESPACE = ""
-    REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
-                                   cast=bool, default=False)
-    REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
-        read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
-
-    # Literature Pipeline -- Pubmed/Medline FTP server
-    # PUBMED_TEMP_DIR = os.path.join(TEMP_DIR, 'medline')
-    # PUBMED_FTP_SERVER = 'ftp.ncbi.nlm.nih.gov'
-    # PUBMED_XML_LOCN = os.path.join(PUBMED_TEMP_DIR, 'baseline')
-    # PUBMED_XML_UPDATE_LOCN = os.path.join(PUBMED_TEMP_DIR, 'update')
-
-    # PUBMED_HTTP_MIRROR = 'https://storage.googleapis.com/pubmed-medline'
-    BIOLEXICON_GENE_XML_LOCN = 'geneProt (1).xml'
-    BIOLEXICON_DISEASE_XML_LOCN = 'umlsDisease.xml'
-    GENE_LEXICON_JSON_LOCN = 'gene_lexicon.json'
-    DISEASE_LEXICON_JSON_LOCN = 'disease_lexicon.json'
-
-    # for developers
-    DRY_RUN_OUTPUT = read_option('DRY_RUN_OUTPUT_ENABLE',
-                                 cast=bool, default=False)
-    DRY_RUN_OUTPUT_DELETE = read_option('DRY_RUN_OUTPUT_DELETE',
-                                        cast=bool, default=False)
-    DRY_RUN_OUTPUT_COUNT = read_option('DRY_RUN_OUTPUT_COUNT',
-                                       cast=int, default=10000)
-
 
     # This config file is like this and no prefixes or version will be
     # appended
@@ -431,7 +404,4 @@ class Config():
     # composed index name will be returned
     ES_CUSTOM_IDXS = read_option('CTTV_ES_CUSTOM_IDXS',
                                  default=False, cast=bool)
-
     ES_CUSTOM_IDXS_INI = ini if ES_CUSTOM_IDXS else None
-
-    METRICS_FILENAME = HOME + '/release_metrics.txt'

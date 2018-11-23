@@ -638,9 +638,8 @@ class RedisLookupTable(object):
                  namespace = None,
                  r_server = None,
                  ttl = 60*60*24+2):
-        self.lt_reuse = Config.LT_REUSE
         if namespace is None:
-            namespace = uuid.uuid4() if (not Config.LT_NAMESPACE) else Config.LT_NAMESPACE
+            namespace = uuid.uuid4() 
 
         self.namespace = self.LOOK_UPTABLE_NAMESPACE % {'namespace': namespace}
         self.r_server = new_redis_client() if not r_server else r_server
@@ -693,9 +692,8 @@ class RedisLookupTable(object):
                  r_server=self._get_r_server(r_server))
 
     def __setitem__(self, key, value,  r_server=None):
-        if not self.lt_reuse:
-            self.set(self._get_key_namespace(key), value,
-                     r_server=self._get_r_server(r_server))
+        self.set(self._get_key_namespace(key), value,
+                    r_server=self._get_r_server(r_server))
 
 
 class RedisLookupTableJson(RedisLookupTable):
