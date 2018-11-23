@@ -89,7 +89,7 @@ class Association(JSONSerializable):
                 self.target['tractability'] = copy.deepcopy(gene_obj.tractability)
 
                 # build facet for the types
-                self.private['tractability'] = \
+                self.private['facets']['tractability'] = \
                     {cat: _create_facet(gene_obj.tractability[cat]['categories']) for cat in trac_fields}
 
     def set_target_data(self, gene):
