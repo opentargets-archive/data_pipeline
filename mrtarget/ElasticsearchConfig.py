@@ -573,6 +573,16 @@ class ElasticSearchConfiguration():
                                                                     },
                                                                 }
                                                             },
+                                                            "tractability": {
+                                                                "properties": {
+                                                                    "antibody": {
+                                                                        "type": "keyword"
+                                                                    },
+                                                                    "smallmolecule": {
+                                                                        "type": "keyword"
+                                                                    },
+                                                                }
+                                                            },
                                                             "target_class": {
                                                                 "properties": {
                                                                     "level1": {
