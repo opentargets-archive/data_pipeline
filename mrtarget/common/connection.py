@@ -8,15 +8,17 @@ from redislite import Redis
 import redis.exceptions as redis_ex
 
 from mrtarget.Settings import Config
-
+import mrtarget.cfg
 
 # just one redis instance per app
 r_instance = {'instance': None}
 
 
 def new_redis_client():
-    return Redis(host=Config.REDISLITE_DB_HOST,
-                 port=Config.REDISLITE_DB_PORT)
+    host = mrtarget.cfg.Configuration().args.redis_host
+    port = mrtarget.cfg.Configuration().args.redis_port
+    return Redis(host=host,
+                 port=port)
 
 
 def redis_server_is_up(log_h=None):
@@ -69,9 +71,9 @@ class PipelineConnectors():
                                   redispersist=False):
         success = False
         self.persist = redispersist
-        r_host = Config.REDISLITE_DB_HOST
-        r_port = Config.REDISLITE_DB_PORT
-        r_remote = Config.REDISLITE_REMOTE
+        r_host = mrtarget.cfg.Configuration().args.redis_host
+        r_port = mrtarget.cfg.Configuration().args.redis_port
+        r_remote = mrtarget.cfg.Configuration().args.redis_remote
 
         '''init es client for data'''
         hosts = Config.ELASTICSEARCH_NODES
