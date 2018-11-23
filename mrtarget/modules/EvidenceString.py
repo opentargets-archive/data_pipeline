@@ -647,10 +647,9 @@ class EvidenceManager():
             except:
                 self.logger.error("cannot parse line in eco_scores.tsv: %s" % (line.strip()))
 
+    #TODO remove this
     def _get_score_modifiers(self):
         self.score_modifiers = {}
-        for datasource, values in Config.DATASOURCE_EVIDENCE_SCORE_AUTO_EXTEND_RANGE.items():
-            self.score_modifiers[datasource] = DataNormaliser(values['min'], values['max'])
 
 
 class Evidence(JSONSerializable):

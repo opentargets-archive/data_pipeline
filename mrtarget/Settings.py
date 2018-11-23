@@ -314,28 +314,6 @@ class Config():
     GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY = "http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt"
     # All Genotypes and Mammalian Phenotype Annotations (tab-delimited)
     GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES = "http://www.informatics.jax.org/downloads/reports/MGI_PhenoGenoMP.rpt"
-    # data dump location if you want to merge the data without running all the steps again
-    GENOTYPE_PHENOTYPE_OUTPUT = TEMP_DIR + os.path.sep + 'genotype_phenotype.json'
-
-    DATASOURCE_EVIDENCE_SCORE_WEIGHT=dict(
-        # gwas_catalog=2.5
-        )
-    DATASOURCE_EVIDENCE_SCORE_AUTO_EXTEND_RANGE=dict(
-                                                     # phenodigm=dict(min=0.4, max= 1),
-                                                    )
-
-    DATASOURCE_INTERNAL_NAME_TRANSLATION_REVERSED = dict(cttv006 = 'reactome',
-                                                         cttv008 = 'chembl',
-                                                         cttv009 = 'gwas_catalog',
-                                                         cttv011 = 'uniprot',
-                                                         cttv012 = 'eva',
-                                                         cttv018 = 'gwas_ibd',
-                                                         cttv007 = 'cancer_gene_census',
-                                                         cttv025 = 'europepmc',
-                                                         cttv005 = 'rare2common',
-                                                         cttv010 = 'expression_atlas',
-                                                         cttv026 = 'phewas_catalog'
-                                                )
 
     DATASOURCE_TO_DATATYPE_MAPPING = {}
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
