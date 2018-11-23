@@ -141,7 +141,7 @@ class Configuration(object):
 
         #logging
         p.add("--log-level", help="set the log level",
-                            action='store', default='WARNING')
+                            action='store', default='INFO')
         p.add("--log-config", help="logging configuration file",
                             action='store', default='logging.ini')
         p.add("--log-http", help="log HTTP(S) requests in this file",

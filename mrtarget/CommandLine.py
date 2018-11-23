@@ -4,6 +4,7 @@ import logging.config
 import argparse
 import sys
 import os
+import os.path
 import itertools
 
 from mrtarget.common.Redis import enable_profiling
@@ -37,10 +38,23 @@ def main():
     args = mrtarget.cfg.Configuration().args
 
     #set up logging
-    if args.log_config:
+    logging.basicConfig()
+    if args.log_config and os.path.isfile(args.log_config) and os.access(args.log_config, os.R_OK):
         logging.config.fileConfig(args.log_config,  disable_existing_loggers=False)
 
     logger = logging.getLogger(__name__+".main()")
+
+    if args.log_level:
+        try:
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.getLevelName(args.log_level))
+            logger.setLevel(logging.getLevelName(args.log_level))
+            logger.info('main log level set to: '+ str(args.log_level))
+            root_logger.info('root log level set to: '+ str(args.log_level))
+        except Exception, e:
+            root_logger.exception(e)
+            return 1
+
 
 
     if not args.release_tag:
@@ -55,17 +69,6 @@ def main():
     enable_profiling(args.profile)
 
     connectors = PipelineConnectors()
-
-    if args.log_level:
-        try:
-            root_logger = logging.getLogger()
-            root_logger.setLevel(logging.getLevelName(args.log_level))
-            logger.setLevel(logging.getLevelName(args.log_level))
-            logger.info('main log level set to: '+ str(args.log_level))
-            root_logger.info('root log level set to: '+ str(args.log_level))
-        except Exception, e:
-            root_logger.exception(e)
-            return 1
 
     if args.log_http:
         logger.info("Will log all HTTP requests to %s" % args.log_http)
