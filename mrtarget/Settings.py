@@ -134,8 +134,6 @@ class Config():
 
     HOME = os.getenv("HOME")
 
-    TEMP_DIR = os.path.sep + 'tmp'
-
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
@@ -301,8 +299,6 @@ class Config():
     PHENOTYPE_SLIM_INPUT_URLS = [
         'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/eva/hpo_mappings.txt'
     ]
-    #  put the path to the file where you want to write the SLIM file (turtle format)
-    PHENOTYPE_SLIM_OUTPUT_FILE = TEMP_DIR + os.path.sep + 'opentargets_disease_phenotype_slim.ttl'
 
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
