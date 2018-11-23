@@ -127,10 +127,10 @@ class Configuration(object):
                             action='store_true', default=False, 
                             env_var='CTTV_REDIS_REMOTE') #TODO use a different env variable
         p.add("--redis-host", help="redis host",
-                            action='store', default='',
+                            action='store', default='localhost',
                             env_var='REDIS_HOST')
         p.add("--redis-port", help="redis port",
-                            action='store', default='',
+                            action='store', default='35000',
                             env_var='REDIS_PORT')
 
         #for debugging
