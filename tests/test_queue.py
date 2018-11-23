@@ -26,7 +26,7 @@ class TestRedisWorker(unittest.TestCase):
 
     def test_WhiteCollar(self):
         connectors = PipelineConnectors()
-        connectors.init_services_connections("localhost",35000, False)
+        connectors.init_services_connections("localhost", 35000, False)
         
         queue1 = RedisQueue(queue_id='test1' + '_1',
                                 max_size=10,
