@@ -7,6 +7,7 @@ import zipfile
 import logging
 import tempfile as tmp
 import requests as r
+import requests_file
 
 _l = logging.getLogger(__name__)
 
@@ -18,7 +19,10 @@ def url_to_stream(url, *args, **kwargs):
     If you want to stream a raw uri (and not compressed) use the parameter
     `enable_stream=True`
     '''
-    f = r.get(url, *args, stream=True, **kwargs)
+    r_session = r.Session()
+    r_session.mount('file://', requests_file.FileAdapter())
+
+    f = r_session.get(url, *args, stream=True, **kwargs)
     f.raise_for_status()
 
     if f.encoding is None:
@@ -66,25 +70,26 @@ class URLZSource(object):
         self.args = args
         self.kwargs = kwargs
         self.proxies = None
+        self.r_session = r.Session()
+        self.r_session.mount('file://', requests_file.FileAdapter())
 
     @contextmanager
     def _open_local(self, filename, mode):
-        file_to_open = filename[len('file://'):] if '://' in filename else filename
         open_f = None
 
-        if file_to_open.endswith('.gz'):
+        if filename.endswith('.gz'):
             open_f = functools.partial(gzip.open, mode='rb')
 
-        elif file_to_open.endswith('.zip'):
-            zipped_data = zipfile.ZipFile(file_to_open)
+        elif filename.endswith('.zip'):
+            zipped_data = zipfile.ZipFile(filename)
             info = zipped_data.getinfo(zipped_data.filelist[0].orig_filename)
 
-            file_to_open = info
+            filename = info
             open_f = functools.partial(zipped_data.open)
         else:
             open_f = functools.partial(open, mode='r')
 
-        with open_f(file_to_open) as fd:
+        with open_f(filename) as fd:
             yield fd
 
     @contextmanager
@@ -92,14 +97,9 @@ class URLZSource(object):
         if self.filename.startswith('ftp://'):
             raise NotImplementedError('finish ftp')
 
-        elif self.filename.startswith('file://') or ('://' not in self.filename):
-            file_to_open = self.filename[len('file://'):] if '://' in self.filename else self.filename
-            with self._open_local(file_to_open, mode) as fd:
-                yield fd
-
         else:
             local_filename = self.filename.split('://')[-1].split('/')[-1]
-            f = r.get(self.filename, *self.args, stream=True, **self.kwargs)
+            f = self.r_session.get(url=self.filename, stream=True, **self.kwargs)
             f.raise_for_status()
             file_to_open = None
             with tmp.NamedTemporaryFile(mode='wb', suffix=local_filename, delete=False) as fd:
