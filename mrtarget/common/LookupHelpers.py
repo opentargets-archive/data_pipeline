@@ -237,7 +237,9 @@ class LookUpDataRetriever(object):
         all_molecules = list(all_molecules)
         query_batch_size = 100
         for i in range(0, len(all_molecules) + 1, query_batch_size):
-            chembl_handler._populate_synonyms_for_molecule(all_molecules[i:i + query_batch_size])
+            chembl_handler._populate_synonyms_for_molecule(all_molecules[i:i + query_batch_size],
+                                                           chembl_handler.molecule2synonyms,
+                                                           chembl_handler._logger)
         self.lookup.chembl = chembl_handler
 
     def _get_available_hpa(self):

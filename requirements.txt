@@ -27,6 +27,8 @@ scikit-learn
 biopython
 petl
 
+more-itertools
+
 rdflib
 colorama
 psutil
