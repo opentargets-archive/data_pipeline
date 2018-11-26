@@ -104,22 +104,23 @@ class ESQuery(object):
 
     def get_all_mammalian_phenotypes(self, fields = None):	
         source = self._get_source_from_fields(fields)	
-         res = helpers.scan(client=self.handler,	
-                            query={"query": {	
-                                      "match_all": {}	
-                                    },	
-                                   '_source': source,	
-                                   'size': 1000,	
-                                   },	
-                            scroll='12h',	
-                            doc_type=Config.ELASTICSEARCH_MP_LABEL_DOC_NAME,	
-                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME,True),	
-                            timeout="10m",	
-                            )	
+        res = helpers.scan(client=self.handler,	
+            query={"query": {	
+                        "match_all": {}	
+                    },	
+                    '_source': source,	
+                    'size': 1000,	
+                    },	
+            scroll='12h',	
+            doc_type=Config.ELASTICSEARCH_MP_LABEL_DOC_NAME,	
+            index=Loader.get_versioned_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME,True),	
+            timeout="10m",	
+            )	
         for hit in res:	
-            yield hit['_source']	
-     def count_all_mammalian_phenotypes(self):	
-         return self.count_elements_in_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME)
+            yield hit['_source']
+
+    def count_all_mammalian_phenotypes(self):	
+        return self.count_elements_in_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME)
 
     def get_all_eco(self, fields=None):
         source = self._get_source_from_fields(fields)

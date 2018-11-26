@@ -22,8 +22,6 @@ class LookUpData():
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
-        # self.available_hpos = None
-        # self.available_mps = None
         self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
@@ -41,12 +39,6 @@ class LookUpData():
         if self.available_efos:
             self.available_efos.r_server = r_server
             self.available_efos._table.set_r_server(r_server)
-        # if self.available_hpos:
-        #     self.available_hpos.r_server = r_server
-        #     self.available_hpos._table.set_r_server(r_server)
-        # if self.available_mps:
-        #     self.available_mps.r_server = r_server
-        #     self.available_mps._table.set_r_server(r_server)
         if self.available_hpa:
             self.available_hpa.r_server = r_server
             self.available_hpa._table.set_r_server(r_server)
