@@ -15,7 +15,6 @@ from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
 from mrtarget.modules.ECO import EcoProcess
 from mrtarget.modules.EFO import EfoProcess
-from mrtarget.modules.HPO import HpoProcess
 from mrtarget.modules.Ensembl import EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
@@ -70,8 +69,6 @@ def main():
                         action="store_true")
     parser.add_argument("--eco", help="process Evidence and Conclusion Ontology (ECO), store in elasticsearch",
                         action="store_true")
-    parser.add_argument("--hpo", help="process Human Phenotype Ontology (HPO), store in elasticsearch",
-                         action="store_true")
 
     #this generates a elasticsearch index from a source json file
     parser.add_argument("--val", help="check json file, validate, and store in elasticsearch",
@@ -266,12 +263,6 @@ def main():
                 qc_metrics.update(process.qc(esquery))
         if args.eco:
             process = EcoProcess(loader)
-            if not args.qc_only:
-                process.process_all()
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-        if args.hpo:
-            process = HpoProcess(loader)
             if not args.qc_only:
                 process.process_all()
             if not args.skip_qc:
