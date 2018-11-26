@@ -463,23 +463,6 @@ class ESQuery(object):
             yield  target['_id']
 
 
-    def get_lit_entities_for_type(self,type):
-        query_body = {"query": {
-            "constant_score": {
-                "filter": {
-                    "term": {
-                        "ent_type": type
-                    }
-                }
-            }
-        }
-        }
-        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME + '*'),
-                                  body=query_body
-                                  )
-        for hit in res['hits']['hits']:
-            yield hit['_source']
-
     def get_evidence_for_target_simple(self, target, expected = None):
         query_body = {
             "query": {
