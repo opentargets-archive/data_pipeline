@@ -607,7 +607,6 @@ class OntologyClassReader():
             Status: production
         """
         logger.debug("load_human_phenotype_ontology...")
-        #self.load_hpo_classes()
         self.load_ontology_graph(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
 
         all_ns = [n for n in self.rdf_graph.namespace_manager.namespaces()]
