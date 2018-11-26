@@ -2,6 +2,7 @@ import logging
 import copy
 
 import functional
+import itertools
 
 from mrtarget.Settings import Config
 from mrtarget.common.DataStructure import JSONSerializable, denormDict
