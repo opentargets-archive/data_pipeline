@@ -67,15 +67,10 @@ class Configuration(object):
                             action="store_true")
 
         #load various ontologies into various indexes
-        p.add("--mp", help="process Mammalian Phenotype (MP), store the resulting json objects in elasticsearch",
-                            action="store_true")
         p.add("--efo", help="process Experimental Factor Ontology (EFO), store in elasticsearch",
                             action="store_true")
         p.add("--eco", help="process Evidence and Conclusion Ontology (ECO), store in elasticsearch",
                             action="store_true")
-        p.add("--hpo", help="process Human Phenotype Ontology (HPO), store in elasticsearch",
-                            action="store_true")
-
         #this generates a elasticsearch index from a source json file
         p.add("--val", help="check json file, validate, and store in elasticsearch",
                             action="store_true")

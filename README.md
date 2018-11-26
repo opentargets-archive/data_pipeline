@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.com/opentargets/data_pipeline.svg?branch=master)](https://travis-ci.com/opentargets/data_pipeline)
-[quay.io](https://quay.io/repository/opentargets/mrtarget)
+
+[![Docker Repository on Quay.io](https://quay.io/repository/opentargets/mrtarget/status "Docker Repository on Quay.io")](https://quay.io/repository/opentargets/mrtarget)
 
 ## MrT-arget
 

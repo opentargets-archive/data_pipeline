@@ -16,8 +16,6 @@ from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
 from mrtarget.modules.ECO import EcoProcess
 from mrtarget.modules.EFO import EfoProcess
-from mrtarget.modules.HPO import HpoProcess
-from mrtarget.modules.MP import MpProcess
 from mrtarget.modules.Ensembl import EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringProcess
 from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
@@ -54,7 +52,6 @@ def main():
         except Exception, e:
             root_logger.exception(e)
             return 1
-
 
 
     if not args.release_tag:
@@ -138,12 +135,6 @@ def main():
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))     
 
-        if args.mp:
-            process = MpProcess(loader)
-            if not args.qc_only:
-                process.process_all()
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))    
         if args.efo:
             process = EfoProcess(loader)
             if not args.qc_only:
@@ -152,12 +143,6 @@ def main():
                 qc_metrics.update(process.qc(esquery))
         if args.eco:
             process = EcoProcess(loader)
-            if not args.qc_only:
-                process.process_all()
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-        if args.hpo:
-            process = HpoProcess(loader)
             if not args.qc_only:
                 process.process_all()
             if not args.skip_qc:
