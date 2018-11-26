@@ -10,7 +10,11 @@ from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
+<<<<<<< HEAD
 from ontologyutils.rdf_utils import OntologyClassReader
+=======
+from mrtarget.modules.Ontology import OntologyClassReader
+>>>>>>> master
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
 
@@ -22,8 +26,6 @@ class LookUpData():
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
-        # self.available_hpos = None
-        # self.available_mps = None
         self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
@@ -41,12 +43,6 @@ class LookUpData():
         if self.available_efos:
             self.available_efos.r_server = r_server
             self.available_efos._table.set_r_server(r_server)
-        # if self.available_hpos:
-        #     self.available_hpos.r_server = r_server
-        #     self.available_hpos._table.set_r_server(r_server)
-        # if self.available_mps:
-        #     self.available_mps.r_server = r_server
-        #     self.available_mps._table.set_r_server(r_server)
         if self.available_hpa:
             self.available_hpa.r_server = r_server
             self.available_hpa._table.set_r_server(r_server)
@@ -62,9 +58,7 @@ class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
     EFO = 'efo'
-    HPO = 'hpo'
     ECO = 'eco'
-    # PUBLICATION = 'publication'
     MP = 'mp'
     MP_LOOKUP = 'mp_lookup'
     CHEMBL_DRUGS = 'chembl_drugs'
@@ -110,14 +104,9 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.MP:
                 self._logger.debug("get MP info")
                 self._get_mp()
-            elif dt == LookUpDataType.HPO:
-                self._logger.debug("get HPO info")
-                self._get_hpo()
             elif dt == LookUpDataType.EFO:
                 self._logger.debug("get EFO info")
                 self._get_efo()
-            # elif dt == LookUpDataType.PUBLICATION:
-            #     self._get_available_publications()
             elif dt == LookUpDataType.CHEMBL_DRUGS:
                 self._get_available_chembl_mappings()
             elif dt == LookUpDataType.HPA:
@@ -133,11 +122,6 @@ class LookUpDataRetriever(object):
     def _get_available_efos(self):
         self._logger.info('getting efos')
         self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
-
-    # def _get_available_hpos(self):
-    #     self._logger.info('getting hpos')
-    #     self.lookup.available_efos = HPOLookUpTable(self.es, 'HPO_LOOKUP', self.r_server)
-    #
 
     def _get_available_mps(self, autoload=True):
          self._logger.info('getting mps info from ES')
@@ -172,20 +156,6 @@ class LookUpDataRetriever(object):
                 self.lookup.non_reference_genes[symbol]['reference']=ensg
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
-
-    def _get_hpo(self):
-        '''
-        Load HPO to accept phenotype terms that are not in EFO
-        :return:
-        '''
-        cache_file = 'processed_hpo_lookup'
-        obj = self._get_from_pickled_file_cache(cache_file)
-        if obj is None:
-            obj = OntologyClassReader()
-            obj.load_hpo_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
-            obj.rdf_graph = None
-            self._set_in_pickled_file_cache(obj, cache_file)
-        self.lookup.hpo_ontology = obj
 
     def _get_mp(self):
         '''
@@ -225,8 +195,7 @@ class LookUpDataRetriever(object):
         if not os.path.isdir(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'))):
             os.makedirs(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir')))
         file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
-        pickle.dump(obj,
-                    open(file_path, 'wb'),)
+        pickle.dump(obj, open(file_path, 'wb'),)
 
     def _get_available_chembl_mappings(self):
         chembl_handler = ChEMBLLookup()
