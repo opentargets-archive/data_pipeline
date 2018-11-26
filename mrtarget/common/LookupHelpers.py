@@ -180,7 +180,7 @@ class LookUpDataRetriever(object):
             obj.load_open_targets_disease_ontology()
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
-        self.lookup.e
+        self.lookup.efo_ontology = obj
 
     def _get_from_pickled_file_cache(self, file_id):
         file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
