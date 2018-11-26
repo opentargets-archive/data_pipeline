@@ -2,6 +2,7 @@ import logging
 import copy
 
 import functional
+import itertools
 
 from mrtarget.Settings import Config
 from mrtarget.common.DataStructure import JSONSerializable, denormDict
@@ -79,6 +80,14 @@ class Association(JSONSerializable):
             else:
                 return []
 
+        def _merge_facets(the_dict):
+            if isinstance(the_dict, dict):
+                return functional.seq(the_dict.viewitems())\
+                    .flat_map(lambda e: itertools.imap(lambda el: e[0] + '_' + el,e[1]))\
+                    .to_list()
+            else:
+                return []
+
         if gene_obj:
             # inject tractability data from the gene into the assoc
             trac_fields = ["smallmolecule", "antibody"]
@@ -91,6 +100,9 @@ class Association(JSONSerializable):
                 # build facet for the types
                 self.private['facets']['tractability'] = \
                     {cat: _create_facet(gene_obj.tractability[cat]['categories']) for cat in trac_fields}
+
+                self.private['facets']['tractability']['combined'] = \
+                    _merge_facets(self.private['facets']['tractability'])
 
     def set_target_data(self, gene):
         """get generic gene info"""
