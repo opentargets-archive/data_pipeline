@@ -581,6 +581,9 @@ class ElasticSearchConfiguration():
                                                                     "smallmolecule": {
                                                                         "type": "keyword"
                                                                     },
+                                                                    "combined": {
+                                                                        "type": "keyword"
+                                                                    }
                                                                 }
                                                             },
                                                             "target_class": {
