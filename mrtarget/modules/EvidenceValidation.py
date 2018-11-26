@@ -424,15 +424,11 @@ class ValidatorProcess(RedisQueueWorkerProcess):
 
                     if efo_id:
                         # Check disease term or phenotype term
-                        #if (short_disease_id not in self.lookup_data.available_efos) and \
                         if (efo_id not in self.lookup_data.efo_ontology.current_classes) and \
-                                (efo_id not in self.lookup_data.hpo_ontology.current_classes) and \
-                                (efo_id not in self.lookup_data.mp_ontology.current_classes):# or \
-                                # (disease_id in self.efo_uncat):
+                                (efo_id not in self.lookup_data.mp_ontology.current_classes):
                             explanation['invalid_disease'] = efo_id
                             disease_failed = True
                         if (efo_id in self.lookup_data.efo_ontology.obsolete_classes) or \
-                                (efo_id in self.lookup_data.hpo_ontology.obsolete_classes) or \
                                 (efo_id in self.lookup_data.mp_ontology.obsolete_classes):
 
                             explanation['obsolete_disease'] = efo_id
@@ -554,9 +550,7 @@ class EvidenceValidationFileChecker():
                                                       LookUpDataType.TARGET,
                                                       LookUpDataType.EFO,
                                                       LookUpDataType.ECO,
-                                                      LookUpDataType.HPO,
-                                                      LookUpDataType.MP,
-                                                      # LookUpDataType.HPA
+                                                      LookUpDataType.MP
                                                      ),
                                           autoload=True,
                                           ).lookup
