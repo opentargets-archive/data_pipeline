@@ -54,30 +54,6 @@ class LookupHelpersTestCase(unittest.TestCase):
         self.assertTrue(len(lookup_data.mp_ontology.top_level_classes) > 10 and len(lookup_data.mp_ontology.top_level_classes) < 30)
 
     @mock.patch('mrtarget.common.connection')
-    def test_hpo_lookup(self, mock_connectors):
-        self._logger.debug("test_hpo_lookup")
-
-        self.assertIsNotNone(mock_connectors.es)
-        self.assertIsNotNone(mock_connectors.r_server)
-
-        lookup_data = LookUpDataRetriever(mock_connectors.es, mock_connectors.r_server,
-                                          data_types=(
-                                              LookUpDataType.HPO,
-                                          ),
-                                          autoload=True,
-                                          ).lookup
-
-        self.assertIsNotNone(lookup_data)
-        self.assertIsNotNone(lookup_data.hpo_ontology)
-        self.assertIsNotNone(lookup_data.hpo_ontology.current_classes)
-        self.assertTrue(len(lookup_data.hpo_ontology.current_classes) > 8000)
-        self.assertIsNotNone(lookup_data.hpo_ontology.obsolete_classes)
-        self.assertTrue(len(lookup_data.hpo_ontology.obsolete_classes) > 0)
-        self.assertIsNotNone(lookup_data.hpo_ontology.top_level_classes)
-        self.assertTrue(
-            len(lookup_data.hpo_ontology.top_level_classes) > 10 and len(lookup_data.hpo_ontology.top_level_classes) < 30)
-
-    @mock.patch('mrtarget.common.connection')
     def test_efo_lookup(self, mock_connectors):
         self._logger.debug("test_hpo_lookup")
 

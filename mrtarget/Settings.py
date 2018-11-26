@@ -167,6 +167,8 @@ class Config():
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
     ELASTICSEARCH_EFO_LABEL_DOC_NAME = 'efo'
+    ELASTICSEARCH_MP_LABEL_INDEX_NAME = 'mp-data'	
+    ELASTICSEARCH_MP_LABEL_DOC_NAME = 'mp'    
     ELASTICSEARCH_ECO_INDEX_NAME = 'eco-data'
     ELASTICSEARCH_ECO_DOC_NAME = 'eco'
     ELASTICSEARCH_GENE_NAME_INDEX_NAME = 'gene-data'
@@ -286,6 +288,7 @@ class Config():
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
 
+<<<<<<< HEAD
     # mouse models
     MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
     # TODO remove refs to user directories
@@ -296,6 +299,8 @@ class Config():
         'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/eva/hpo_mappings.txt'
     ]
 
+=======
+>>>>>>> master
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
