@@ -288,19 +288,6 @@ class Config():
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
 
-<<<<<<< HEAD
-    # mouse models
-    MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
-    # TODO remove refs to user directories
-    MOUSEMODELS_CACHE_DIRECTORY = '/Users/otvisitor/.phenodigmcache'
-
-    # put the path to the file where you want to get the list of HP terms to be included in our ontology
-    PHENOTYPE_SLIM_INPUT_URLS = [
-        'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/eva/hpo_mappings.txt'
-    ]
-
-=======
->>>>>>> master
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
