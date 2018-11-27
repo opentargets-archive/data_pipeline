@@ -113,7 +113,6 @@ def update_schema_version(config, schema_version_string):
 
 
 class Config():
-    EV_LIMIT = read_option('CTTV_EV_LIMIT', cast=bool, default=False)
     MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
     MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
 
@@ -131,8 +130,6 @@ class Config():
         PROXY_PASSWORD = ini.get('proxy', 'password')
         PROXY_HOST = ini.get('proxy', 'host')
         PROXY_PORT = int(ini.get('proxy', 'port'))
-
-    HOME = os.getenv("HOME")
 
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     # TODO: an ontology section in the main db.ini file should suffice
@@ -187,8 +184,6 @@ class Config():
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
-    DEBUG = True
-    PROFILE = False
     # to generate this file you have to call
     # https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml
     UNIPROT_URI = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/uniprot-20181018.xml.gz"
@@ -289,7 +284,7 @@ class Config():
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
-    
+
     # list of datasources to be included from global stats computation
     GLOBAL_STATS_SOURCES_TO_INCLUDE = ['expression_atlas', 'phenodigm', 'chembl', 'europepmc',
                                        'reactome', 'slapenrich', 'intogen', 'eva_somatic', 'cancer_gene_census',
