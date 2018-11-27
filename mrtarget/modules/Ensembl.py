@@ -1,6 +1,5 @@
 import json
 import logging
-import csv
 
 from mrtarget.common import URLZSource
 from mrtarget.Settings import Config
@@ -17,18 +16,20 @@ class EnsemblProcess(object):
         filename = Config.ENSEMBL_FILENAME
         self.logger.info('Reading Ensembl gene info from %s' % filename)
 
-        with URLZSource(filename).open() as tsv_file:
-            for row in csv.DictReader(tsv_file, dialect='excel-tab'):
+        with URLZSource(filename).open() as json_file:
+            json_obj = json.load(json_file)
+            for count, line in enumerate(json_obj):
 
-                for key in ['start', 'end', 'strand', 'version', 'ensembl_release']:
-                    row[key] = int(row[key])
+                if int(line['ensembl_release']) != ensembl_release:
+                    self.logger.warn('Ensembl release %s at line %d of %s does not match release %d specified in config' % (line['ensembl_release'], count, filename, ensembl_release))
 
                 self.loader.put(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
                                 Config.ELASTICSEARCH_ENSEMBL_DOC_NAME,
-                                row['id'],
-                                json.dumps(row),
-                                #row,
+                                line['id'],
+                                json.dumps(line),
+                                #line,
                                 True)
+            self.logger.info("Read %d lines from %s", count, filename)
 
     """
     Run a series of QC tests on the Ensembl Elasticsearch index. Returns a dictionary
