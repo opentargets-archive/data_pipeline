@@ -189,8 +189,6 @@ class Config():
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     DEBUG = True
     PROFILE = False
-    ERROR_IDS_FILE = 'errors.txt'
-
     # to generate this file you have to call
     # https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml
     UNIPROT_URI = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/uniprot-20181018.xml.gz"
@@ -251,37 +249,6 @@ class Config():
         'animal_model':        'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
     }
 
-    EVIDENCEVALIDATION_MAX_NB_ERRORS_REPORTED = 1000
-    EVIDENCEVALIDATION_NB_TOP_DISEASES = 20
-    EVIDENCEVALIDATION_NB_TOP_TARGETS = 20
-    EVIDENCEVALIDATION_PERCENT_SCALE = 20
-    EVIDENCEVALIDATION_FORCE_VALIDATION = True
-    # Current genome Assembly
-    EVIDENCEVALIDATION_ENSEMBL_ASSEMBLY = 'GRCh38'
-    # Change this if you don't want to send e-mails
-    EVIDENCEVALIDATION_SEND_EMAIL = False
-    EVIDENCEVALIDATION_SENDER_ACCOUNT = 'no_reply@targetvalidation.org'
-    MAILGUN_DOMAIN = "https://api.mailgun.net/v3/mg.targetvalidation.org"
-    MAILGUN_MESSAGES = MAILGUN_DOMAIN+'/messages'
-    MAILGUN_API_KEY = "key-b7986f9a29fe234733b0af3b1206b146"
-    EVIDENCEVALIDATION_BCC_ACCOUNT = [ 'data@opentargets.org', ]
-    # Change this if you want to change the list of recipients
-    EVIDENCEVALIDATION_PROVIDER_EMAILS = defaultdict(lambda: "other")
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv001"] = [ 'data@opentargets.org' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv006"] = [ 'fabregat@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv007"] = [ 'zs1@sanger.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv008"] = [ 'mpaulam@ebi.ac.uk', 'patricia@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv009"] = [ 'olgavrou@ebi.ac.uk', 'tburdett@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv010"] = [ 'mkeays@ebi.ac.uk', 'irenep@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv011"] = [ 'eddturner@ebi.ac.uk', 'bpalka@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv012"] = [ 'tsmith@ebi.ac.uk', 'garys@ebi.ac.uk', 'cyenyxe@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_PROVIDER_EMAILS["cttv025"] = [ 'kafkas@ebi.ac.uk', 'ftalo@ebi.ac.uk' ]
-    EVIDENCEVALIDATION_FILENAME_REGEX = re.compile(r"""
-    (?P<datasource>[a-zA-Z0-9_]+)(\-
-    (?P<d1>\d{2})\-
-    (?P<d2>\d{2})\-
-    (?P<d3>\d{4}))?
-    (?P<suffix>\.json\.gz|\.json|\.json\.zip)$""", re.VERBOSE)
 
     # setup the number of workers to use for data processing. if None defaults
     # to the number of CPUs available
@@ -322,10 +289,7 @@ class Config():
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
-    # DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
-    # DATASOURCE_TO_INDEX_KEY_MAPPING['phenodigm'] = DATASOURCE_TO_DATATYPE_MAPPING['phenodigm']
-    # DATASOURCE_TO_INDEX_KEY_MAPPING['expression_atlas'] = DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas']
-
+    
     # list of datasources to be included from global stats computation
     GLOBAL_STATS_SOURCES_TO_INCLUDE = ['expression_atlas', 'phenodigm', 'chembl', 'europepmc',
                                        'reactome', 'slapenrich', 'intogen', 'eva_somatic', 'cancer_gene_census',
