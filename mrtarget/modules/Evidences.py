@@ -315,12 +315,16 @@ def write_evidences(x, process_context):
         return is_left, is_right
 
 
-def stage_one(filenames, first_n=0, es_client=None, redis_client=None,
-              enable_output_to_es=False, output_folder=Config.TEMP_DIR,
-              num_workers=4, num_writers=2):
-    """this phase validate, fix and score each evidence from a list of files and write
-    the result to files in a temporal folder. Returns (failed, succeed) counts"""
+def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_client=None,
+                               dry_run=False, enable_output_to_es=False, output_folder='.',
+                               num_workers=4, num_writers=2):
     logger = logging.getLogger(__name__)
+
+    if not filenames:
+        logger.error('tried to run with no filenames at all')
+        return 0, 0
+
+    logger.info('start evidence processing pipeline')
 
     q_max = 10000
 
@@ -331,7 +335,7 @@ def stage_one(filenames, first_n=0, es_client=None, redis_client=None,
     evs = IO.make_iter_lines(filenames, first_n)
 
     logger.info('declare pipeline to run')
-    write_evidences_on_start_f = functools.partial(open_writers_on_start, enable_output_to_es, output_folder)
+    write_evidences_on_start_f = functools.partial(open_writers_on_start, enable_output_to_es, output_folder, dry_run)
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
 
     # here the pipeline definition
@@ -342,64 +346,7 @@ def stage_one(filenames, first_n=0, es_client=None, redis_client=None,
                       on_done=close_writers_on_done)
 
     logger.info('run evidence processing pipeline')
+    results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
 
-    return reduce_tuple_with_sum(pr.to_iterable(pl_stage))
-
-
-def stage_two(filenames, first_n=0, es_client=None, redis_client=None,
-                               enable_output_to_es=False, output_folder=Config.TEMP_DIR,
-                               num_workers=4, num_writers=2):
-    """this phase validate, fix and score each evidence from a list of files and write
-    the result to files in a temporal folder. Returns (failed, succeed) counts"""
-    logger = logging.getLogger(__name__)
-
-    return 0, 0
-
-
-def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_client=None,
-                               dry_run=False, enable_output_to_es=False, output_folder='.',
-                               num_workers=4, num_writers=2):
-    logger = logging.getLogger(__name__)
-
-    if dry_run:
-        logger.debug('dry_run True so exiting doing nothing')
-        return 0, 0
-
-    if not filenames:
-        logger.error('tried to run with no filenames at all')
-        return 0, 0
-
-    logger.info('start evidence processing pipeline stage one')
-
-    # same number of writers as workers for this first phase
-    stage_one_results = stage_one(filenames=filenames, first_n=first_n, es_client=es_client,
-                                  enable_output_to_es=enable_output_to_es, redis_client=redis_client,
-                                  output_folder=output_folder, num_workers=num_workers,
-                                  num_writers=num_writers)
-
-    logger.info('done evidence processing pipeline stage one with %s', str(stage_one_results))
-    # logger.info('start evidence processing pipeline stage two')
-    #
-    # tmp_filenames = IO.get_filenames_by_glob(Config.TEMP_DIR + os.pathsep + 'evidences-*')
-    # stage_two_results = stage_two(filenames=tmp_filenames, first_n=0, es_client=es_client,
-    #                               redis_client=redis_client, enable_output_to_es=enable_output_to_es,
-    #                               output_folder=output_folder, num_workers=num_workers,
-    #                               num_writers=num_writers)
-    #
-    # logger.info('done evidence processing pipeline stage two with %s', str(stage_two_results))
-    return stage_one_results
-
-
-if __name__ == '__main__':
-    fileConfig(file_or_resource('logging.ini'),  disable_existing_loggers=False)
-    logging.getLogger().setLevel(logging.DEBUG)
-
-    redis_c = new_redis_client()
-    es_c = new_es_client()
-    args = sys.argv[1:]
-    print(args)
-    connectors = PipelineConnectors()
-    connectors.init_services_connections()
-    r = process_evidences_pipeline(args, first_n=0, es_client=es_c, redis_client=redis_c,
-                                   enable_output_to_es=False, output_folder='.')
-    print('results (failed, succeed) %s', str(r))
+    logger.info('done evidence processing pipeline stage one with %s', str(results))
+    return results

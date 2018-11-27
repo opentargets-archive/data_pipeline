@@ -78,6 +78,15 @@ class ProcessContextFileWriter(ProcessContext):
             pass
 
 
+class ProcessContextDryRun(ProcessContext):
+    def __init__(self, **kwargs):
+        super(ProcessContextDryRun, self).__init__(**kwargs)
+        self.logger.debug("new ProcessContextDryRun from %s", str(os.getpid()))
+
+    def put(self, line, **kwargs):
+        pass
+
+
 class ProcessContextESWriter(ProcessContext):
     def __init__(self, **kwargs):
         super(ProcessContextESWriter, self).__init__(**kwargs)
@@ -116,13 +125,15 @@ class ProcessContextESWriter(ProcessContext):
             pass
 
 
-def open_writers_on_start(enable_output_to_es=False, output_folder='.'):
+def open_writers_on_start(enable_output_to_es=False, output_folder='.', dry_run=False):
     """construct the processcontext to write lines to the files. we have to sets,
     the good validated ones and the failed ones.
     """
     pc = None
     if enable_output_to_es:
         pc = ProcessContextESWriter()
+    elif dry_run:
+        pc = ProcessContextDryRun()
     else:
         pc = ProcessContextFileWriter(output_folder=output_folder)
 

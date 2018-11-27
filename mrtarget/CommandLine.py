@@ -294,7 +294,6 @@ def main():
             if args.input_file:
                 input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
             else:
-                #default behaviour: use all the data sources listed in the evidences_sources.txt file
                 logger.info('reading the evidences sources URLs from evidence_sources.txt')
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
@@ -315,17 +314,6 @@ def main():
             #     process.check_all(input_files=input_files, increment=False)
             # if not args.skip_qc:
             #     qc_metrics.update(process.qc(esquery, input_files))
-
-        # if args.valreset:
-        #     EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
-
-        # if args.evs:
-        #     process = EvidenceStringProcess(connectors.es, connectors.r_server)
-        #     if not args.qc_only:
-        #         process.process_all(datasources = args.datasource, dry_run=args.dry_run)
-        #     if not args.skip_qc:
-        #         #qc_metrics.update(process.qc(esquery))
-        #         pass
 
         if args.assoc:
             process = ScoringProcess(loader, connectors.r_server)
