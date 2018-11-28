@@ -17,11 +17,6 @@ def build_uniprot_query(l):
     return '+or+'.join(l)
 
 
-def build_ensembl_sql(l):
-    return """SELECT stable_id FROM gene where stable_id IN ('{0}')"""\
-        .format("', '".join(l))
-
-
 def ini_from_file_or_resource(*filenames):
     '''load the ini files using file_or_resource an
     return the configuration object or None
@@ -224,6 +219,7 @@ class Config():
     CHEMICALPROBES_FILENAME2 = file_or_resource(fname='chemicalprobes_probeminer.tsv')
     HALLMARK_FILENAME = file_or_resource(fname='v85_hallmark_export.tsv')
     TRACTABILITY_FILENAME = file_or_resource(fname='tractability_buckets.tsv')
+    ENSEMBL_FILENAME = file_or_resource(fname='ensembl-data.json.gz')
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
@@ -388,7 +384,6 @@ class Config():
     IS_DIRECT_DO_NOT_PROPAGATE = ['europepmc']
 
     ENSEMBL_RELEASE_VERSION = 93
-    ENSEMBL_CHUNK_SIZE = 100
 
     LT_REUSE = False
     LT_NAMESPACE = ""
