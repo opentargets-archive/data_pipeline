@@ -10,7 +10,7 @@ mkfile_dir := $(dir $(mkfile_path))
 # These variables can be overridden on the command-line. 
 # Note that if any of these are already specified by environment variables, 
 # the existing variables will take precedence
-ES_PREFIX ?= makefile
+ES_PREFIX ?= gp-ens-test
 ELASTICSEARCH_NODES ?= http://localhost:9200
 LOG_LEVEL ?= DEBUG
 SCHEMA_VERSION ?= master
@@ -55,11 +55,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).rea.log :
 	$(MRTARGET_CMD) --rea $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).rea.log
 
 .PHONY: ens
-ens: $(mkfile_dir)/mrtarget/resources/ensembl-data.tsv.gz $(LOG_PATH)/out.$(ES_PREFIX).ens.log 
-
-# Download the Ensembl data file to mrtarget/resources if necessary
-$(mkfile_dir)/mrtarget/resources/ensembl-data.tsv.gz :
-	$(SCRIPT_PATH)/download_ensembl.sh $(mkfile_dir)/mrtarget/resources/ensembl-data.tsv.gz
+ens: $(LOG_PATH)/out.$(ES_PREFIX).ens.log 
 
 $(LOG_PATH)/out.$(ES_PREFIX).ens.log : 
 	$(ELASTIC_CHECK_CMD)
