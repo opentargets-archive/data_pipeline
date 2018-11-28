@@ -28,6 +28,7 @@ biopython
 petl
 
 more-itertools
+pyfunctional
 
 rdflib
 colorama
