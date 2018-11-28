@@ -1,8 +1,10 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
+from mrtarget.common import URLZSource
 import re
 import traceback
 import logging
+import csv
 logging.basicConfig(level=logging.DEBUG)
 
 class Hallmarks(IPlugin):
@@ -25,8 +27,7 @@ class Hallmarks(IPlugin):
                                   "tumour promoting inflammation",
                                   "suppression of growth",
                                   "escaping immune response to cancer",
-                                  "proliferative signalling",
-                                 ]
+                                  "proliferative signalling"]
 
     def print_name(self):
         self._logger.info("Hallmarks of cancer gene data plugin")
@@ -44,7 +45,6 @@ class Hallmarks(IPlugin):
                 ''' extend gene with related Hallmark data '''
                 if gene.approved_symbol in self.hallmarks:
                         gene.hallmarks = dict()
-                        self._logger.info("Adding Hallmark data to gene %s" % (gene.approved_symbol))
                         gene.hallmarks = self.hallmarks[gene.approved_symbol]
 
         except Exception as ex:
@@ -54,19 +54,17 @@ class Hallmarks(IPlugin):
             raise ex
 
     def build_json(self, filename=Config.HALLMARK_FILENAME):
+        # Just for reference: column names are: "ID_CENSUS_ANNOT", "ID_CENSUS", "ID_GENE", "GENE_NAME", "CELL_TYPE",
+        # "PUBMED_PMID", "ID_DATA_CATEGORY", "DESCRIPTION", "DISPLAY", "SHORT", "CELL_LINE", "DESCRIPTION_1")
+        with URLZSource(filename).open() as r_file:
+            for i, row in enumerate(csv.DictReader(r_file, dialect='excel-tab'), start=1):
 
-        with open(filename, 'r') as input:
-            n = 0
-            for row in input:
-                n += 1
-                (CensusAnnotation, CensusId, GeneId, GeneSymbol, CellType, PMID, Category, Description, Display, Short, CellLine, Description_1) = tuple(row.rstrip().split('\t'))
-
-                PMID = re.sub(r'^"|"$', '', PMID)
-                Short = re.sub(r'^"|"$', '', Short)
-                GeneSymbol = re.sub(r'^"|"$', '', GeneSymbol)
-                Description_1 = re.sub(r'^"|"$', '', Description_1)
+                PMID = re.sub(r'^"|"$', '', row["PUBMED_PMID"])
+                Short = re.sub(r'^"|"$', '', row["SHORT"])
+                GeneSymbol = re.sub(r'^"|"$', '', row["GENE_NAME"])
+                Description_1 = re.sub(r'^"|"$', '', row["DESCRIPTION_1"])
                 Description_1.rstrip()
-                Description = re.sub(r'^"|"$', '', Description)
+                Description = re.sub(r'^"|"$', '', row["DESCRIPTION"])
 
                 if GeneSymbol not in self.hallmarks:
                     self.hallmarks[GeneSymbol] = dict()

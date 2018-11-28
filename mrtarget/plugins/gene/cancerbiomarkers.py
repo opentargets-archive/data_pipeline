@@ -1,9 +1,18 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
-
+from mrtarget.common import URLZSource
 import traceback
 import logging
+import csv
+
 logging.basicConfig(level=logging.DEBUG)
+
+# Not used at the moment, but good to have here to check that the column names are correct
+cancerbiomarker_columns = ("Alteration", "AlterationType", "AssayType", "Association", "Biomarker", "Comments",
+                           "CurationDate", "Curator", "Drug", "DrugFamily", "DrugFullName", "DrugStatus",
+                           "EvidenceLevel", "Gene", "MetastaticTumorType", "PrimaryTumorAcronym",
+                           "PrimaryTumorTypeFullName", "Source", "TCGIincluded", "Targeting", "cDNA", "gDNA",
+                           "IndividualMutation", "Info", "Region", "Strand", "Transcript", "PrimaryTumorType")
 
 BIOMARKER_SOURCE_MAPPINGS = {
     "AACR 2012" : { 'url' : "http://cancerres.aacrjournals.org/content/72/8_Supplement", 'label' : "American Association for Cancer Research Annual Meeting 2012" },
@@ -165,7 +174,6 @@ class CancerBiomarkers(IPlugin):
             for gene_id, gene in genes.iterate():
                 # Extend gene with related Cancer Biomarker data
                 if gene.approved_symbol in self.cancerbiomarkers:
-                    self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.approved_symbol)
                     gene.cancerbiomarkers=self.cancerbiomarkers[gene.approved_symbol]
 
         except Exception as ex:
@@ -174,16 +182,14 @@ class CancerBiomarkers(IPlugin):
 
     def build_json(self, filename=Config.BIOMARKER_FILENAME):
 
-        with open(filename, 'r') as input:
-            next(input)
-            for row in input:
+        with URLZSource(filename).open() as r_file:
+            # fieldnames=cancerbiomarker_columns not used at the moment
+            for i, row in enumerate(csv.DictReader(r_file, dialect='excel-tab'), start=1):
 
-                (Alteration, AlterationType, AssayType, Association, Biomarker, Comments, CurationDate,
-                 Curator, Drug, DrugFamily, DrugFullName, DrugStatus, EvidenceLevel,
-                 Gene, MetastaticTumorType, PrimaryTumorAcronym, PrimaryTumorTypeFullName,
-                 Source, TCGIincluded, Targeting, cDNA, gDNA, IndividualMutation, Info,
-                 Region, Strand, Transcript, PrimaryTumorType) = \
-                    tuple(row.rstrip().split('\t'))
+                Source = row["Source"]
+                Gene = row["Gene"]
+                IndividualMutation = row["IndividualMutation"]
+                PrimaryTumorTypeFullName = row["PrimaryTumorTypeFullName"]
 
                 # Split Source and Gene to separate out multiple entries
                 mSource = map(str.strip, Source.split(";"))
@@ -245,14 +251,14 @@ class CancerBiomarkers(IPlugin):
 
                     line = {
                         "gene": singleGene,
-                        "biomarker": Biomarker,
-                        "individualbiomarker": IndividualMutation,
-                        "association": Association,
-                        "drug": Drug,
-                        "drugfamily": DrugFamily,
-                        "drugfullname": DrugFullName,
+                        "biomarker": row["Biomarker"],
+                        "individualbiomarker": row["IndividualMutation"],
+                        "association": row["Association"],
+                        "drug": row["Drug"],
+                        "drugfamily": row["DrugFamily"],
+                        "drugfullname": row["DrugFullName"],
                         "diseases": diseases,
-                        "evidencelevel": EvidenceLevel,
+                        "evidencelevel": row["EvidenceLevel"],
                         "references": myReferences
                     }
                     # Add data for current biomarker to self.cancerbiomarkers
