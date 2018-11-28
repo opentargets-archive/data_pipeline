@@ -10,11 +10,7 @@ from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
-<<<<<<< HEAD
-from ontologyutils.rdf_utils import OntologyClassReader
-=======
-from mrtarget.modules.Ontology import OntologyClassReader
->>>>>>> master
+from opentargets_ontologyutils.rdf_utils import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
 

@@ -2,7 +2,7 @@ import logging
 from collections import OrderedDict
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
-from ontologyutils.rdf_utils import OntologyClassReader,DiseaseUtils
+from opentargets_ontologyutils.rdf_utils import OntologyClassReader,DiseaseUtils
 from rdflib import URIRef
 from mrtarget.Settings import Config
 

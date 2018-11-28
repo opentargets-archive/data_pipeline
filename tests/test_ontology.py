@@ -1,4 +1,4 @@
-from ontologyutils.rdf_utils import OntologyClassReader
+from opentargets_ontologyutils.rdf_utils import OntologyClassReader
 from mrtarget.Settings import Config
 import logging
 import unittest

@@ -17,6 +17,11 @@ jsonpickle
 simplejson
 
 opentargets-validator>=0.3.0
+opentargets-ontologyutils
+
+#when installing from GitHub, a specific commit must be used for consistency
+#and to ensure dependency caching works as intended
+#git+https://github.com/opentargets/ontology-utils.git@8f2bad09f08d6580f58f4bb4507b537e9af7d337#egg=ontologyutils
 
 numpy
 scipy
@@ -39,7 +44,3 @@ yapsy
 codecov
 
 https://cdn.mysql.com/Downloads/Connector-Python/mysql-connector-python-1.2.3.tar.gz
-
-#when installing from GitHub, a specific commit must be used for consistency
-#and to ensure dependency caching works as intended
-git+https://github.com/opentargets/ontology-utils.git@8f2bad09f08d6580f58f4bb4507b537e9af7d337#egg=ontologyutils
