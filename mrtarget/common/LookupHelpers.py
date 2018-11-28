@@ -54,6 +54,7 @@ class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
     EFO = 'efo'
+    HPO = 'hpo'
     ECO = 'eco'
     MP = 'mp'
     MP_LOOKUP = 'mp_lookup'
@@ -95,11 +96,12 @@ class LookUpDataRetriever(object):
                 self._get_available_efos()
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
-            elif dt == LookUpDataType.MP_LOOKUP:
-                self._get_available_mps()
             elif dt == LookUpDataType.MP:
                 self._logger.debug("get MP info")
                 self._get_mp()
+            elif dt == LookUpDataType.HPO:
+                self._logger.debug("get HPO info")
+                self._get_hpo()
             elif dt == LookUpDataType.EFO:
                 self._logger.debug("get EFO info")
                 self._get_efo()
@@ -118,10 +120,6 @@ class LookUpDataRetriever(object):
     def _get_available_efos(self):
         self._logger.info('getting efos')
         self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
-
-    def _get_available_mps(self, autoload=True):
-         self._logger.info('getting mps info from ES')
-         self.lookup.available_mps = MPLookUpTable(self.es, 'MP_LOOKUP',self.r_server)
 
     def _get_available_ecos(self):
         self._logger.info('getting ecos')
@@ -152,6 +150,20 @@ class LookUpDataRetriever(object):
                 self.lookup.non_reference_genes[symbol]['reference']=ensg
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
+
+    def _get_hpo(self):
+        '''
+        Load HPO to accept phenotype terms that are not in EFO
+        :return:
+        '''
+        cache_file = 'processed_hpo_lookup'
+        obj = self._get_from_pickled_file_cache(cache_file)
+        if obj is None:
+            obj = OntologyClassReader()
+            obj.load_hpo_classes()
+            obj.rdf_graph = None
+            self._set_in_pickled_file_cache(obj, cache_file)
+        self.lookup.hpo_ontology = obj
 
     def _get_mp(self):
         '''
