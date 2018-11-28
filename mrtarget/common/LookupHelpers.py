@@ -7,7 +7,6 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
-from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 from mrtarget.modules.Ontology import OntologyClassReader
@@ -25,11 +24,11 @@ class LookUpData():
         self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
-        self.available_gene_objects = None
-        self.available_efo_objects = None
-        self.available_eco_objects = None
         self.chembl = None
-        self.available_publications = None
+
+        self.hpo_ontology = None
+        self.mp_ontology = None
+        self.efo_ontology = None
 
     def set_r_server(self, r_server):
         self.logger.debug('setting r_server to all lookup tables from external r_server')
@@ -45,9 +44,6 @@ class LookUpData():
         if self.available_genes:
             self.available_genes.r_server = r_server
             self.available_genes._table.set_r_server(r_server)
-        if self.available_publications:
-            self.available_publications.r_server = r_server
-            self.available_publications._table.set_r_server(r_server)
 
 
 class LookUpDataType(object):
@@ -57,7 +53,6 @@ class LookUpDataType(object):
     HPO = 'hpo'
     ECO = 'eco'
     MP = 'mp'
-    MP_LOOKUP = 'mp_lookup'
     CHEMBL_DRUGS = 'chembl_drugs'
     HPA = 'hpa'
 

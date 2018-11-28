@@ -209,9 +209,6 @@ class EvidenceManager():
         # self.efo_retriever = EFOLookUpTable(self.es)
         # self.eco_retriever = ECOLookUpTable(self.es)
         self._get_score_modifiers()
-        self.available_publications = {}
-        if 'available_publications' in lookup_data.__dict__:
-            self.available_publications = lookup_data.available_publications
 
 
             # self.logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
