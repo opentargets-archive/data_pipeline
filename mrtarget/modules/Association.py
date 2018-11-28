@@ -1,6 +1,8 @@
 import logging
 import copy
 
+import functional
+import itertools
 
 from mrtarget.Settings import Config
 from mrtarget.common.DataStructure import JSONSerializable, denormDict
@@ -69,31 +71,38 @@ class Association(JSONSerializable):
     def set_id(self):
         self.id = '%s-%s' % (self.target['id'], self.disease['id'])
 
-
     def _inject_tractability_in_target(self, gene_obj):
+        def _create_facet(categories_dict):
+            if isinstance(categories_dict, dict):
+                return functional.seq(categories_dict.viewitems())\
+                    .filter(lambda e: e[1] > 0)\
+                    .map(lambda e: e[0]).to_list()
+            else:
+                return []
+
+        def _merge_facets(the_dict):
+            if isinstance(the_dict, dict):
+                return functional.seq(the_dict.viewitems())\
+                    .flat_map(lambda e: itertools.imap(lambda el: e[0] + '_' + el,e[1]))\
+                    .to_list()
+            else:
+                return []
+
         if gene_obj:
             # inject tractability data from the gene into the assoc
             trac_fields = ["smallmolecule", "antibody"]
-            trac_subfields = ["buckets", "categories"]
+            # trac_subfields = ["buckets", "categories"]
 
-            if 'tractability' not in self.target:
-                self.target['tractability'] = {}
+            if gene_obj.tractability:
+                # we do have tractability data
+                self.target['tractability'] = copy.deepcopy(gene_obj.tractability)
 
-            for el in trac_fields:
-                if el in gene_obj.tractability:
-                    for subel in trac_subfields:
-                        if subel in gene_obj.tractability[el]:
-                            if el not in self.private['facets']:
-                                self.private['facets'][el] = {}
+                # build facet for the types
+                self.private['facets']['tractability'] = \
+                    {cat: _create_facet(gene_obj.tractability[cat]['categories']) for cat in trac_fields}
 
-                            if el not in self.target['tractability']:
-                                self.target['tractability'][el] = {}
-
-                            self.private['facets'][el][subel] = copy.deepcopy(gene_obj.tractability[el][subel])
-
-                            if subel == "buckets":
-                                self.target['tractability'][el][subel] = copy.deepcopy(gene_obj.tractability[el][subel])
-
+                self.private['facets']['tractability']['combined'] = \
+                    _merge_facets(self.private['facets']['tractability'])
 
     def set_target_data(self, gene):
         """get generic gene info"""
