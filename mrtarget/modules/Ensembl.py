@@ -26,9 +26,7 @@ class EnsemblProcess(object):
                 self.loader.put(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
                                 Config.ELASTICSEARCH_ENSEMBL_DOC_NAME,
                                 line['id'],
-                                json.dumps(line),
-                                #line,
-                                True)
+                                json.dumps(line))
             self.logger.info("Read %d lines from %s", count, filename)
 
     """
