@@ -3,6 +3,7 @@ import logging
 import argparse
 import sys
 import os
+import math
 import itertools
 from logging.config import fileConfig
 
@@ -298,6 +299,8 @@ def main():
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
 
+            num_workers = Config.WORKERS_NUMBER
+            num_writers = min(1,int(math.sqrt(Config.WORKERS_NUMBER)))
             results = process_evidences_pipeline(filenames=input_files,
                                                  first_n=args.first_n,
                                                  es_client=connectors.es,
@@ -305,15 +308,12 @@ def main():
                                                  dry_run=args.dry_run,
                                                  enable_output_to_es=(not args.enable_fs),
                                                  output_folder=args.output_folder,
-                                                 num_workers=args.num_workers,
-                                                 num_writers=args.num_writers)
+                                                 num_workers=num_workers,
+                                                 num_writers=num_writers)
 
             logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
 
-            # if not args.qc_only:
-            #     process.check_all(input_files=input_files, increment=False)
-            # if not args.skip_qc:
-            #     qc_metrics.update(process.qc(esquery, input_files))
+            #TODO qc
 
         if args.assoc:
             process = ScoringProcess(loader, connectors.r_server)
