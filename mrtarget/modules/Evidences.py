@@ -71,7 +71,7 @@ def process_evidence(line, process_context):
     return left, right
 
 
-def process_evidence_on_start(luts=None):
+def process_evidence_on_start(luts):
     """this function is called once per started process and return a ProcessContext per process."""
     pc = ProcessContext()
     pc.logger.debug("called validate_evidence on_start from %s", str(os.getpid()))
@@ -315,9 +315,9 @@ def write_evidences(x, process_context):
         return is_left, is_right
 
 
-def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_client=None,
-                               dry_run=False, enable_output_to_es=False, output_folder='.',
-                               num_workers=4, num_writers=2):
+def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
+                               dry_run, enable_output_to_es, output_folder,
+                               num_workers, num_writers):
     logger = logging.getLogger(__name__)
 
     if not filenames:
@@ -326,7 +326,7 @@ def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_clien
 
     logger.info('start evidence processing pipeline')
 
-    q_max = 10000
+    q_max = 10000 #TODO make this a configuration option
 
     logger.debug('load LUTs')
     lookup_data = make_lookup_data(es_client, redis_client)
@@ -348,5 +348,5 @@ def process_evidences_pipeline(filenames, first_n=0, es_client=None, redis_clien
     logger.info('run evidence processing pipeline')
     results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
 
-    logger.info('done evidence processing pipeline stage one with %s', str(results))
+    logger.info('done evidence processing pipeline with %s', str(results))
     return results

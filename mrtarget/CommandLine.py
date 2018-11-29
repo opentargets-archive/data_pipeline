@@ -17,7 +17,6 @@ from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
 from mrtarget.modules.ECO import EcoProcess
 from mrtarget.modules.EFO import EfoProcess
-from mrtarget.modules.MP import MpProcess
 from mrtarget.modules.Ensembl import EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringProcess
 from mrtarget.modules.GeneData import GeneManager
@@ -67,8 +66,6 @@ def main():
                         action="store_true")
 
     #load various ontologies into various indexes
-    parser.add_argument("--mp", help="process Mammalian Phenotype (MP), store the resulting json objects in elasticsearch",	
-                         action="store_true")    
     parser.add_argument("--efo", help="process Experimental Factor Ontology (EFO), store in elasticsearch",
                         action="store_true")
     parser.add_argument("--eco", help="process Evidence and Conclusion Ontology (ECO), store in elasticsearch",
@@ -270,13 +267,7 @@ def main():
 
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))     
-
-        if args.mp:	
-            process = MpProcess(loader)	
-            if not args.qc_only:	
-                process.process_all()	
-            if not args.skip_qc:	
-                qc_metrics.update(process.qc(esquery))    
+ 
         if args.efo:
             process = EfoProcess(loader)
             if not args.qc_only:
