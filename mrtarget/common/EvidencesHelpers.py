@@ -29,6 +29,7 @@ def make_lookup_data(es_client, redis_client):
                             LookUpDataType.DISEASE,
                             LookUpDataType.EFO,
                             LookUpDataType.HPO,
+                            LookUpDataType.MP,
                             LookUpDataType.ECO
                         ),
                         autoload=True,

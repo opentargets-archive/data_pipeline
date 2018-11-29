@@ -322,11 +322,11 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
 
     if not filenames:
         logger.error('tried to run with no filenames at all')
-        return 0, 0
+        raise RuntimeError("Must specify at least one filename of evidence")
 
     logger.info('start evidence processing pipeline')
 
-    q_max = 10000 #TODO make this a configuration option
+    q_max = 100 #TODO make this a configuration option
 
     logger.debug('load LUTs')
     lookup_data = make_lookup_data(es_client, redis_client)
@@ -348,5 +348,8 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     logger.info('run evidence processing pipeline')
     results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
 
-    logger.info('done evidence processing pipeline with %s', str(results))
-    return results
+    logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
+
+    if not results[0]:
+        raise RuntimeError("No evidence was sucessful!")
+

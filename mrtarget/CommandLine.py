@@ -291,18 +291,17 @@ def main():
                     input_files = [x.rstrip() for x in f.readlines()]
 
             num_workers = Config.WORKERS_NUMBER
-            num_writers = min(1,int(math.sqrt(Config.WORKERS_NUMBER)))
-            results = process_evidences_pipeline(filenames=input_files,
-                                                 first_n=args.first_n,
-                                                 es_client=connectors.es,
-                                                 redis_client=connectors.r_server,
-                                                 dry_run=args.dry_run,
-                                                 enable_output_to_es=(not args.enable_fs),
-                                                 output_folder=args.output_folder,
-                                                 num_workers=num_workers,
-                                                 num_writers=num_writers)
+            num_writers = min(1,max(16, Config.WORKERS_NUMBER))
+            process_evidences_pipeline(filenames=input_files,
+                first_n=args.first_n,
+                es_client=connectors.es,
+                redis_client=connectors.r_server,
+                dry_run=args.dry_run,
+                enable_output_to_es=(not args.enable_fs),
+                output_folder=args.output_folder,
+                num_workers=num_workers,
+                num_writers=num_writers)
 
-            logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
 
             #TODO qc
 
