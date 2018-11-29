@@ -89,15 +89,6 @@ $(LOG_PATH)/out.$(ES_PREFIX).hpa.log :
 	$(MRTARGET_CMD) --hpa $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
 	sleep 60
 
-.PHONY: mp
-mp: $(LOG_PATH)/out.$(ES_PREFIX).mp.log
-
-$(LOG_PATH)/out.$(ES_PREFIX).mp.log : 
-	mkdir -p $(LOG_PATH)
-	$(ELASTIC_CHECK_CMD)
-	$(MRTARGET_CMD) --mp $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).mp.log
-	sleep 60
-
 
 .PHONY: efo
 efo: $(LOG_PATH)/out.$(ES_PREFIX).efo.log
@@ -121,10 +112,10 @@ $(LOG_PATH)/out.$(ES_PREFIX).eco.log :
 .PHONY: base_gene
 base_gene: $(LOG_PATH)/out.$(ES_PREFIX).gen.log	
 
-$(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log
+$(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
 	mkdir -p $(LOG_PATH)
 	$(ELASTIC_CHECK_CMD)
-	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data $(ES_PREFIX)_expression-data $(ES_PREFIX)_mp-data
+	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data $(ES_PREFIX)_expression-data
 	$(MRTARGET_CMD) --gen $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).gen.log
 	sleep 60
 
