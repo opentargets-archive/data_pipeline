@@ -170,7 +170,7 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_mp_classes()
+            obj.load_mammalian_phenotype_ontology()
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.mp_ontology = obj
