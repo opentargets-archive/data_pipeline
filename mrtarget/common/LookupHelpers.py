@@ -171,6 +171,7 @@ class LookUpDataRetriever(object):
         if obj is None:
             obj = OntologyClassReader()
             obj.load_mammalian_phenotype_ontology()
+            obj.get_deprecated_classes()
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.mp_ontology = obj

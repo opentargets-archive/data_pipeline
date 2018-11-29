@@ -31,7 +31,7 @@ class LookupHelpersTestCase(unittest.TestCase):
         self.loader = Loader(self.connectors.es, dry_run=DRY_RUN)
 
     @mock.patch('mrtarget.common.connection')
-    def test_eco_lookup(self, mock_connectors):
+    def test_mp_lookup(self, mock_connectors):
 
         self._logger.debug("test_mp_lookup")
 
@@ -51,8 +51,6 @@ class LookupHelpersTestCase(unittest.TestCase):
         self.assertTrue(len(lookup_data.mp_ontology.current_classes) > 8000)
         self.assertIsNotNone(lookup_data.mp_ontology.obsolete_classes)
         self.assertTrue(len(lookup_data.mp_ontology.obsolete_classes) > 0)
-        self.assertIsNotNone(lookup_data.mp_ontology.top_level_classes)
-        self.assertTrue(len(lookup_data.mp_ontology.top_level_classes) > 10 and len(lookup_data.mp_ontology.top_level_classes) < 30)
 
     @mock.patch('mrtarget.common.connection')
     def test_efo_lookup(self, mock_connectors):
@@ -74,9 +72,6 @@ class LookupHelpersTestCase(unittest.TestCase):
         self.assertTrue(len(lookup_data.efo_ontology.current_classes) > 8000)
         self.assertIsNotNone(lookup_data.efo_ontology.obsolete_classes)
         self.assertTrue(len(lookup_data.efo_ontology.obsolete_classes) > 0)
-        self.assertIsNotNone(lookup_data.efo_ontology.top_level_classes)
-        self.assertTrue(
-            len(lookup_data.efo_ontology.top_level_classes) > 10)
 
 if __name__ == '__main__':
     unittest.main()
