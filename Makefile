@@ -327,18 +327,10 @@ $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log : $(JSON_PATH)/uniprot.json.gz $(LO
 .PHONY: validate_all
 validate_all : validate_uniprot validate_slapenrich validate_reactome validate_progeny validate_phewas_catalog validate_phenodigm validate_intogen validate_gwas validate_genomics_england validate_gene2phenotype validate_eva validate_europepmc validate_cosmic validate_chembl validate_atlas
 
-.PHONY: evidence_strings
-evidence_strings: $(LOG_PATH)/out.$(ES_PREFIX).evs.log
-
-$(LOG_PATH)/out.$(ES_PREFIX).evs.log : $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_validated-data-atlas $(ES_PREFIX)_validated-data-chembl $(ES_PREFIX)_validated-data-cosmic $(ES_PREFIX)_validated-data-europepmc $(ES_PREFIX)_validated-data-eva $(ES_PREFIX)_validated-data-gene2phenotype $(ES_PREFIX)_validated-data-genomics_england $(ES_PREFIX)_validated-data-gwas $(ES_PREFIX)_validated-data-intogen $(ES_PREFIX)_validated-data-phenodigm $(ES_PREFIX)_validated-data-phewas_catalog $(ES_PREFIX)_validated-data-progeny $(ES_PREFIX)_validated-data-reactome $(ES_PREFIX)_validated-data-slapenrich $(ES_PREFIX)_validated-data-uniprot
-	$(MRTARGET_CMD) --evs $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).evs.log
-
 .PHONY: association_scores
 association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).evs.log
+$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
 	mkdir -p $(LOG_PATH)
 	$(INDEX_CMD) $(ES_PREFIX)_evidence-data-generic
 	$(MRTARGET_CMD) --as $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).as.log
