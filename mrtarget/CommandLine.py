@@ -3,9 +3,11 @@ import logging
 import argparse
 import sys
 import os
+import math
 import itertools
 from logging.config import fileConfig
 
+from mrtarget.modules.Evidences import process_evidences_pipeline
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -15,10 +17,8 @@ from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
 from mrtarget.modules.ECO import EcoProcess
 from mrtarget.modules.EFO import EfoProcess
-from mrtarget.modules.MP import MpProcess
 from mrtarget.modules.Ensembl import EnsemblProcess
 from mrtarget.modules.EvidenceString import EvidenceStringProcess
-from mrtarget.modules.EvidenceValidation import EvidenceValidationFileChecker
 from mrtarget.modules.GeneData import GeneManager
 from mrtarget.modules.HPA import HPAProcess
 from mrtarget.modules.QC import QCRunner,QCMetrics
@@ -66,8 +66,6 @@ def main():
                         action="store_true")
 
     #load various ontologies into various indexes
-    parser.add_argument("--mp", help="process Mammalian Phenotype (MP), store the resulting json objects in elasticsearch",	
-                         action="store_true")    
     parser.add_argument("--efo", help="process Experimental Factor Ontology (EFO), store in elasticsearch",
                         action="store_true")
     parser.add_argument("--eco", help="process Evidence and Conclusion Ontology (ECO), store in elasticsearch",
@@ -78,6 +76,10 @@ def main():
                         action="store_true")
     parser.add_argument("--valreset", help="reset audit table and previously parsed evidencestrings",
                         action="store_true")
+    parser.add_argument("--enable-fs", help="write to files instead elasticsearch use it with --output-folder",
+                        action="store_true", default=False)
+    parser.add_argument("--output-folder", help="write output to a folder. Default is './'",
+                        action='store', default='./')
     parser.add_argument("--input-file", help="pass the path to a gzipped file to use as input for the data validation step",
                         action='append', default=[])
     parser.add_argument("--schema-version", help="set the schema version aka 'branch' name. Default is 'master'",
@@ -91,7 +93,7 @@ def main():
 
     #this has to be stored as "ass" instead of "as" because "as" is a reserved name when accessing it later e.g. `args.as`
     parser.add_argument("--as", help="compute association scores, store in elasticsearch",
-                        action="store_true", dest="ass")                        
+                        action="store_true", dest="assoc")
     parser.add_argument("--targets", help="just process data for this target. Does not work with all the steps!!",
                         action='append', default=[])
                         
@@ -124,6 +126,16 @@ def main():
                         action='store', default='')
     parser.add_argument("--redis-port", help="redis port",
                         action='store', default='')
+    parser.add_argument("--num-workers", help="num proc workers",
+                        action='store', default=4, type=int)
+    parser.add_argument("--num-writers", help="num proc writers",
+                        action='store', default=2, type=int)
+
+    parser.add_argument("--first-n", help="num first lines to process default to 0 (all)",
+                        action='store', default=0, type=int)
+
+    parser.add_argument("--max-queued-events", help="max number of events to put per queue. Default to 1000",
+                        action='store', default=1000, type=int)
 
     #tweak how lookup tables are managed
     parser.add_argument("--lt-reuse", help="reuse the current lookuptable",
@@ -255,15 +267,10 @@ def main():
             process = GeneManager(loader,connectors.r_server)
             if not args.qc_only:
                 process.merge_all(dry_run=args.dry_run)
+
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))     
-
-        if args.mp:	
-            process = MpProcess(loader)	
-            if not args.qc_only:	
-                process.process_all()	
-            if not args.skip_qc:	
-                qc_metrics.update(process.qc(esquery))    
+ 
         if args.efo:
             process = EfoProcess(loader)
             if not args.qc_only:
@@ -277,37 +284,32 @@ def main():
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))
 
-
-
+        input_files = []
         if args.val:
             if args.input_file:
                 input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
             else:
-                #default behaviour: use all the data sources listed in the evidences_sources.txt file
                 logger.info('reading the evidences sources URLs from evidence_sources.txt')
                 with open(file_or_resource('evidences_sources.txt')) as f:
                     input_files = [x.rstrip() for x in f.readlines()]
 
-            process = EvidenceValidationFileChecker(connectors.es, connectors.r_server, 
-                dry_run=args.dry_run)
-            if not args.qc_only:
-                process.check_all(input_files=input_files, increment=False)
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery, input_files))
+            num_workers = Config.WORKERS_NUMBER
+            num_writers = min(1, max(16, Config.WORKERS_NUMBER))
+            process_evidences_pipeline(filenames=input_files,
+                                       first_n=args.first_n,
+                                       es_client=connectors.es,
+                                       redis_client=connectors.r_server,
+                                       dry_run=args.dry_run,
+                                       enable_output_to_es=(not args.enable_fs),
+                                       output_folder=args.output_folder,
+                                       num_workers=num_workers,
+                                       num_writers=num_writers,
+                                       max_queued_events=args.max_queued_events)
 
 
-        if args.valreset:
-            EvidenceValidationFileChecker(connectors.es, connectors.r_server).reset()
+            #TODO qc
 
-        if args.evs:
-            process = EvidenceStringProcess(connectors.es, connectors.r_server)
-            if not args.qc_only:
-                process.process_all(datasources = args.datasource, dry_run=args.dry_run)
-            if not args.skip_qc:
-                #qc_metrics.update(process.qc(esquery))
-                pass
-
-        if args.ass:
+        if args.assoc:
             process = ScoringProcess(loader, connectors.r_server)
             if not args.qc_only:
                 process.process_all(targets = targets, dry_run=args.dry_run)
@@ -346,7 +348,6 @@ def main():
 
     logger.info('`'+" ".join(sys.argv)+'` - finished')
     return 0
-
 
 
 if __name__ == '__main__':
