@@ -504,7 +504,7 @@ class ESQuery(object):
                 yield hit['_source']
 
     def count_evidence_for_target(self, target):
-        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
+        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME, True),
                                   body={
                                         "query": {
                                             "constant_score": {
@@ -648,7 +648,10 @@ class ESQuery(object):
                            query={"query": {
                                     "match_all": {}
                                     },
-                                 '_source': self._get_source_from_fields(['target.id', 'disease.id', 'private.efo_codes','scores.association_score']),
+                                 '_source': self._get_source_from_fields(['target.id',
+                                                                          'disease.id',
+                                                                          'private.efo_codes',
+                                                                          'scores.association_score']),
                                  'size': 1000,
                                  },
                            scroll='6h',
@@ -671,32 +674,6 @@ class ESQuery(object):
                         if pair not in yielded_pairs:
                             yield pair
                             yielded_pairs.add(pair)
-
-    def count_evidence_sourceIDs(self, target, disease):
-        count = Counter()
-        for ev_hit in helpers.scan(client=self.handler,
-                                    query={"query": {
-                                              "constant_score": {
-                                                  "filter": {
-                                                      "bool": {
-                                                          "must": [
-                                                              {"terms": {"target.id": [target]}},
-                                                              {"terms": {"private.efo_codes": [disease]}},
-                                                                    ]
-                                                      }
-                                                  }
-                                              }
-                                            },
-                                           '_source': dict(include=['sourceID']),
-                                           'size': 1000,
-                                    },
-                                    scroll = '1h',
-                                    index = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',True),
-                                    timeout = '1h',
-                                    ):
-            count [ev_hit['_source']['sourceID']]+=1
-
-        return count
 
     def delete_data(self, index, query, doc_type = '', chunk_size=1000, altered_keys=()):
         '''

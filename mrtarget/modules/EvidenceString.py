@@ -494,13 +494,10 @@ class EvidenceManager():
 
         """get generic efo info"""
         all_efo_codes = []
-        efo_info = []
         diseaseid = extended_evidence['disease']['id']
-        # try:
         efo = self._get_efo_obj(diseaseid)
         efo_info = ExtendedInfoEFO(efo)
-        # except Exception:
-        #     self.logger.warning("Cannot get generic info for efo: %s" % aboutid)
+
         if efo_info:
             for path in efo_info.data['path']:
                 all_efo_codes.extend(path)

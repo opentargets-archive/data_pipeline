@@ -327,11 +327,11 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                                                             queue_out=target_disease_pair_q)
 
     def process(self, data):
+        self.data_cache = {}
         target = data
 
         available_evidence = self.es_query.count_evidence_for_target(target)
         if available_evidence:
-            self.init_data_cache()
             evidence_iterator = self.es_query.get_evidence_for_target_simple(target, available_evidence)
             for evidence in evidence_iterator:
                 for efo in evidence['private']['efo_codes']:
@@ -346,12 +346,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                     self.data_cache[key].append(row)
 
             self.produce_pairs()
-
-    def init_data_cache(self,):
-        try:
-            del self.data_cache
-        except: pass
-        self.data_cache = dict()
+        self.data_cache.clear()
 
     def produce_pairs(self):
         for key,evidence in self.data_cache.items():
@@ -368,7 +363,6 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                 '''set is_direct to true if '''
                 is_direct = True
             self.put_into_queue_out((key[0],key[1], evidence, is_direct))
-        self.init_data_cache()
 
     def init(self):
         super(TargetDiseaseEvidenceProducer, self).init()
