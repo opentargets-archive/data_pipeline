@@ -34,14 +34,18 @@ scikit-learn
 biopython
 petl
 
-more-itertools
 pyfunctional
+requests-file
+toolz
+pypeln
 
 rdflib
 colorama
 psutil
 pylru
 yapsy
+lxml
+more-itertools
 
 codecov
 

@@ -34,7 +34,7 @@ def json_serialize(obj):
 
 class JSONSerializable(object):
     def to_json(self):
-        self.stamp_data_release()
+        # self.stamp_data_release()
         return json.dumps(self,
                           default=json_serialize,
                           sort_keys=True,

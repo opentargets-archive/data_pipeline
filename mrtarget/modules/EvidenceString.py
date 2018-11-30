@@ -4,7 +4,6 @@ import logging
 import math
 import os
 from collections import Counter
-import addict
 
 import pickle
 
@@ -20,65 +19,9 @@ from mrtarget.common.Scoring import HarmonicSumScorer
 from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
+import addict
 
 logger = logging.getLogger(__name__)
-
-
-'''line profiler code'''
-try:
-    from line_profiler import LineProfiler
-
-
-    def do_profile(follow=[]):
-        def inner(func):
-            def profiled_func(*args, **kwargs):
-                try:
-                    profiler = LineProfiler()
-                    profiler.add_function(func)
-                    for f in follow:
-                        profiler.add_function(f)
-                    profiler.enable_by_count()
-                    return func(*args, **kwargs)
-                finally:
-                    profiler.print_stats()
-
-            return profiled_func
-
-        return inner
-
-except ImportError:
-    def do_profile(follow=[]):
-        "Helpful if you accidentally leave in production!"
-
-        def inner(func):
-            def nothing(*args, **kwargs):
-                return func(*args, **kwargs)
-
-            return nothing
-
-        return inner
-'''end of line profiler code'''
-
-# def evs_lookup(dic, key, *keys):
-#     '''
-#     use like evs_lookup(d, *key1.key2.key3.split('.'))
-#     :param dic:
-#     :param key:
-#     :param keys:
-#     :return:
-#     '''
-#     if keys:
-#         return evs_lookup(dic.get(key, {}), *keys)
-#     return dic.get(key)
-#
-# def evs_set(dic,value, key, *keys):
-#     '''use like evs_set(d, value, *key1.key2.key3.split('.'))
-#     '''
-#     if keys:
-#         return evs_set(dic.get(key, {}), *keys)
-#     dic[key]=value
-
-
 
 
 class DataNormaliser(object):
@@ -218,9 +161,9 @@ class EvidenceManager():
 
         evidence = evidence.evidence
         fixed = False
-        '''fix errors in data here so nobody needs to ask corrections to the data provider'''
 
-        '''fix missing version in gwas catalog data'''
+        # fix errors in data here so nobody needs to ask corrections to the data provider
+        # fix missing version in gwas catalog data
         if 'variant2disease' in evidence:
             try:
                 float(evidence['evidence']['variant2disease']['provenance_type']['database']['version'])
@@ -248,7 +191,7 @@ class EvidenceManager():
                 (evidence['type'] == 'somatic_mutation'):
             evidence['sourceID'] = 'eva_somatic'
             fixed = True
-        '''move genetic_literature to genetic_association'''
+        # move genetic_literature to genetic_association
         if evidence['type'] == 'genetic_literature':
             evidence['type'] = 'genetic_association'
 
@@ -257,7 +200,7 @@ class EvidenceManager():
                         'version' in evidence['provenance_type']['database']:
             evidence['provenance_type']['database']['version'] = str(evidence['provenance_type']['database']['version'])
 
-        '''enforce eco-based score for genetic_association evidencestrings'''
+        # enforce eco-based score for genetic_association evidencestrings
         if evidence['type'] == 'genetic_association':
             available_score = None
             eco_uri = None
@@ -439,6 +382,30 @@ class EvidenceManager():
             logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
                 evidence['id'], disease_id))
 
+
+    def check_is_valid_evs(self, evidence, datasource):
+        """check consistency of the data in the evidence and returns a tuple with (is_valid, problem_str)"""
+
+        ev = evidence.evidence
+        evidence_id = ev['id']
+
+        if not ev['target']['id']:
+            problem_str = "%s Evidence %s has no valid gene in target.id" % (datasource, evidence_id)
+            return False, problem_str
+        gene_id = ev['target']['id']
+        if gene_id not in self.available_genes:
+            problem_str = "%s Evidence %s has an invalid gene id in target.id: %s" % (datasource, evidence_id, gene_id)
+            return False, problem_str
+        if not ev['disease']['id']:
+            problem_str = "%s Evidence %s has no valid efo id in disease.id" % (datasource, evidence_id)
+            return False, problem_str
+        efo_id = ev['disease']['id']
+        if efo_id not in self.available_efos:
+            problem_str = "%s Evidence %s has an invalid efo id in disease.id: %s" % (datasource, evidence_id, efo_id)
+            return False, problem_str
+
+        return True, ''
+
     def is_valid(self, evidence, datasource):
         '''check consistency of the data in the evidence'''
 
@@ -553,8 +520,8 @@ class EvidenceManager():
                 eco = self._get_eco_obj(eco_id)
                 if eco is not None:
                     ecos_info.append(ExtendedInfoECO(eco))
-                else:
-                    self.logger.warning("Cannot get generic info for eco: %s" % eco_id)
+                # else:
+                #     self.logger.debug("Cannot get generic info for eco: %s" % eco_id)
 
             if ecos_info:
                 data = []
@@ -564,7 +531,7 @@ class EvidenceManager():
         except Exception as e:
             extended_evidence['evidence'][ExtendedInfoECO.root] = None
             all_eco_codes = []
-            self.logger.exception("Cannot get generic info for eco: %s:"%str(e))
+            # self.logger.exception("Cannot get generic info for eco: %s:"%str(e))
 
         '''Add private objects used just for faceting'''
 
@@ -603,8 +570,7 @@ class EvidenceManager():
             eco.load_json(self.available_ecos[ecoid])
             return eco
         except KeyError:
-            self.logger.debug('data for ECO code %s could not be injected'%ecoid)
-            return
+            return None
 
     def _get_non_reference_gene_mappings(self):
         self.non_reference_genes = {}
@@ -681,27 +647,11 @@ class Evidence(JSONSerializable):
         return self.evidence['id']
 
     def to_json(self):
-        self.stamp_data_release()
+        # self.stamp_data_release()
         return json.dumps(self.evidence,
                           sort_keys=True,
                           # indent=4,
                           cls=PipelineEncoder)
-
-        return
-
-    def score_to_json(self):
-        score = {}
-        score['id'] = self.evidence['id']
-        score['sourceID'] = self.evidence['sourceID']
-        score['type'] = self.evidence['type']
-        score['target'] = {"id": self.evidence['target']['id'],
-                           "gene_info": self.evidence['target']['gene_info']}
-
-        score['disease'] = {"id": self.evidence['disease']['id'],
-                            "efo_info": self.evidence['disease']['efo_info']}
-        score['scores'] = self.evidence['scores']
-        score['private'] = {"efo_codes": self.evidence['private']['efo_codes']}
-        return json.dumps(score)
 
     def load_json(self, data):
         self.evidence = json.loads(data)
@@ -920,34 +870,6 @@ class Evidence(JSONSerializable):
         return score
 
 
-class UploadError():
-    def __init__(self, evidence, trace, id, logdir='errorlogs'):
-        self.trace = trace
-        if isinstance(evidence, Evidence):
-            self.evidence = evidence.evidence
-        elif isinstance(evidence, str):
-            self.evidence = evidence
-        else:
-            self.evidence = repr(evidence)
-        self.id = id
-        try:
-            self.database = evidence['sourceID']
-        except:
-            self.database = 'unknown'
-        self.logdir = logdir
-
-    def save(self):
-        pass
-        # dir = os.path.join(self.logdir, self.database)
-        # if not os.path.exists(self.logdir):
-        #     os.mkdir(self.logdir)
-        # if not os.path.exists(dir):
-        #     os.mkdir(dir)
-        # filename = str(os.path.join(dir, self.id))
-        # pickle.dump(self, open(filename + '.pkl', 'w'))
-        # json.dump(self.evidence, open(filename + '.json', 'w'))
-
-
 class EvidenceProcesser(RedisQueueWorkerProcess):
     def __init__(self,
                  score_q,
@@ -1025,7 +947,7 @@ class EvidenceGlobalCounter():
         return d
 
     def digest(self, ev):
-        '''takes an evidence in dict format and populate the appropiate counters'''
+        """takes an evidence in dict format and populate the appropiate counters"""
         self._inject_counts(self.total, ev)
         for lit in self.get_literature(ev):
             if lit not in self.literature:
@@ -1038,11 +960,10 @@ class EvidenceGlobalCounter():
             self._inject_counts(self.experiment[exp], ev)
 
     def get_target_and_disease_uniques_for_literature(self, lit_id):
-        '''
-
+        """
         :param lit_id: literature id
         :return: tuple of target and disease unique ids linked to the literature id
-        '''
+        """
         try:
             literature_data = self.literature[lit_id]
         except KeyError as e:
@@ -1107,6 +1028,7 @@ class EvidenceGlobalCounter():
             return ev['evidence']['unique_experiment_reference']
         except KeyError as e:
             pass
+
 
 class EvidenceStringProcess():
     def __init__(self,
