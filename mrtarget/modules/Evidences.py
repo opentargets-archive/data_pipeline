@@ -317,7 +317,7 @@ def write_evidences(x, process_context):
 
 def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
                                dry_run, enable_output_to_es, output_folder,
-                               num_workers, num_writers):
+                               num_workers, num_writers, max_queued_events):
     logger = logging.getLogger(__name__)
 
     if not filenames:
@@ -325,8 +325,6 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
         raise RuntimeError("Must specify at least one filename of evidence")
 
     logger.info('start evidence processing pipeline')
-
-    q_max = 100 #TODO make this a configuration option
 
     logger.debug('load LUTs')
     lookup_data = make_lookup_data(es_client, redis_client)
@@ -339,9 +337,9 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
 
     # here the pipeline definition
-    pl_stage = pr.map(process_evidence, evs, workers=num_workers, maxsize=q_max,
+    pl_stage = pr.map(process_evidence, evs, workers=num_workers, maxsize=max_queued_events,
                       on_start=validate_evidence_on_start_f, on_done=process_evidence_on_done)
-    pl_stage = pr.map(write_evidences, pl_stage, workers=num_writers, maxsize=q_max,
+    pl_stage = pr.map(write_evidences, pl_stage, workers=num_writers, maxsize=max_queued_events,
                       on_start=write_evidences_on_start_f,
                       on_done=close_writers_on_done)
 
@@ -350,6 +348,6 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
 
     logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
 
-    if not results[0]:
+    if not results[1]:
         raise RuntimeError("No evidence was sucessful!")
 

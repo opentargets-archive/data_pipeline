@@ -134,6 +134,9 @@ def main():
     parser.add_argument("--first-n", help="num first lines to process default to 0 (all)",
                         action='store', default=0, type=int)
 
+    parser.add_argument("--max-queued-events", help="max number of events to put per queue. Default to 1000",
+                        action='store', default=1000, type=int)
+
     #tweak how lookup tables are managed
     parser.add_argument("--lt-reuse", help="reuse the current lookuptable",
                         action='store_true', default=False)
@@ -291,16 +294,17 @@ def main():
                     input_files = [x.rstrip() for x in f.readlines()]
 
             num_workers = Config.WORKERS_NUMBER
-            num_writers = min(1,max(16, Config.WORKERS_NUMBER))
+            num_writers = min(1, max(16, Config.WORKERS_NUMBER))
             process_evidences_pipeline(filenames=input_files,
-                first_n=args.first_n,
-                es_client=connectors.es,
-                redis_client=connectors.r_server,
-                dry_run=args.dry_run,
-                enable_output_to_es=(not args.enable_fs),
-                output_folder=args.output_folder,
-                num_workers=num_workers,
-                num_writers=num_writers)
+                                       first_n=args.first_n,
+                                       es_client=connectors.es,
+                                       redis_client=connectors.r_server,
+                                       dry_run=args.dry_run,
+                                       enable_output_to_es=(not args.enable_fs),
+                                       output_folder=args.output_folder,
+                                       num_workers=num_workers,
+                                       num_writers=num_writers,
+                                       max_queued_events=args.max_queued_events)
 
 
             #TODO qc
