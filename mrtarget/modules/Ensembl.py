@@ -9,7 +9,10 @@ Load a set of Ensembl genes from a JSON file into Elasticsearch.
 The file is specifided in Settings.py as Config.ENSEMBL_FILENAME
 It should be generated using the create_genes_dictionary.py script in opentargets/genetics_backend/makeLUTs
 e.g.
-python create_genes_dictionary.py --pipeline ../../data_pipeline/mrtarget/resources/ensembl-data.json.gz --ensembl-database homo_sapiens_core_93_38
+python create_genes_dictionary.py \
+    --enable-platform-mode \
+    -o path/ensembl_genes.json.gz \
+    --ensembl-database homo_sapiens_core_93_38
 
 """
 
