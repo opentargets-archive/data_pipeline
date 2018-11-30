@@ -126,216 +126,95 @@ $(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LO
 .PHONY: base
 base: base_gene efo eco
 
-.PHONY: validate_atlas
-validate_atlas : $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log
-
 $(JSON_PATH)/atlas.json.gz:
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/atlas-27-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/atlas.json.gz
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log: $(JSON_PATH)/atlas.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/atlas.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log
-
-
-.PHONY: validate_chembl
-validate_chembl : $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log
-
 $(JSON_PATH)/chembl.json.gz :
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/chembl-27-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/chembl.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log : $(JSON_PATH)/chembl.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/chembl.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log
-
-
-.PHONY: validate_cosmic
-validate_cosmic : $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log
 
 $(JSON_PATH)/cosmic.json.gz :
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/cosmic-25-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/cosmic.json.gz
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log : $(JSON_PATH)/cosmic.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/cosmic.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log
-
-
-.PHONY: validate_europepmc
-validate_europepmc : $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log
-
 $(JSON_PATH)/europepmc.json.gz :
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/europepmc-03-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/europepmc.json.gz
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log : $(JSON_PATH)/europepmc.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/europepmc.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log
-
-
-.PHONY: validate_eva
-validate_eva : $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log
-
 $(JSON_PATH)/eva.json.gz :
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/eva-01-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/eva.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.eva.log : $(JSON_PATH)/eva.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/eva.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log
-
-
-
-.PHONY: validate_gene2phenotype
-validate_gene2phenotype : $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log
 
 $(JSON_PATH)/gene2phenotype.json.gz :
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/gene2phenotype-19-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gene2phenotype.json.gz
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log :  $(JSON_PATH)/gene2phenotype.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/gene2phenotype.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log
-
-
-.PHONY: validate_genomics_england
-validate_genomics_england : $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log
-
 $(JSON_PATH)/genomics_england.json.gz :
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/genomics_england-02-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/genomics_england.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log : $(JSON_PATH)/genomics_england.json.gz
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/genomics_england.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log
-
-
-.PHONY: validate_gwas
-validate_gwas : $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log
 
 $(JSON_PATH)/gwas.json.gz :
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/gwas-09-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gwas.json.gz
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log : $(JSON_PATH)/gwas.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/gwas.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log
-
-
-.PHONY: validate_intogen
-validate_intogen : $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log 
-
 $(JSON_PATH)/intogen.json.gz :
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/intogen-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/intogen.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log : $(JSON_PATH)/intogen.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/intogen.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log
-
-
-.PHONY: validate_phenodigm
-validate_phenodigm: $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log
 
 $(JSON_PATH)/phenodigm.json.gz:
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/phenodigm-12-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phenodigm.json.gz
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log : $(JSON_PATH)/phenodigm.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/phenodigm.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log
-
-
-.PHONY: validate_phewas_catalog
-validate_phewas_catalog : $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log
-
 $(JSON_PATH)/phewas_catalog.json.gz:
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/phewas_catalog-11-09-2017.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log : $(JSON_PATH)/phewas_catalog.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/phewas_catalog.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log
-
-
-.PHONY: validate_progeny
-validate_progeny : $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log
 
 $(JSON_PATH)/progeny.json.gz:
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/progeny-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/progeny.json.gz
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log : $(JSON_PATH)/progeny.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/progeny.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log
-
-
-.PHONY: validate_reactome
-validate_reactome : $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log 
-
 $(JSON_PATH)/reactome.json.gz:
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/reactome-03-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/reactome.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log : $(JSON_PATH)/reactome.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/reactome.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log
-
-
-.PHONY: validate_slapenrich
-validate_slapenrich : $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log
 
 $(JSON_PATH)/slapenrich.json.gz:
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/slapenrich-27-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/slapenrich.json.gz
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log : $(JSON_PATH)/slapenrich.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/slapenrich.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log
-
-
-.PHONY: validate_uniprot
-validate_uniprot : $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
-
 $(JSON_PATH)/uniprot.json.gz:
 	mkdir -p $(JSON_PATH)
 	curl --silent https://storage.googleapis.com/ot-releases/18.10/uniprot-26-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/uniprot.json.gz
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log : $(JSON_PATH)/uniprot.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
+.PHONY: validate_all
+validate_all : $(LOG_PATH)/out.$(ES_PREFIX).val.log
+
+$(LOG_PATH)/out.$(ES_PREFIX).val.log : $(JSON_PATH)/atlas.json.gz $(JSON_PATH)/chembl.json.gz $(JSON_PATH)/cosmic.json.gz $(JSON_PATH)/europepmc.json.gz $(JSON_PATH)/eva.json.gz $(JSON_PATH)/gene2phenotype.json.gz $(JSON_PATH)/genomics_england.json.gz $(JSON_PATH)/gwas.json.gz $(JSON_PATH)/intogen.json.gz $(JSON_PATH)/phenodigm.json.gz $(JSON_PATH)/phewas_catalog.json.gz $(JSON_PATH)/progeny.json.gz $(JSON_PATH)/reactome.json.gz $(JSON_PATH)/slapenrich.json.gz $(JSON_PATH)/uniprot.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	mkdir -p $(LOG_PATH)
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/uniprot.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
-
-.PHONY: validate_all
-validate_all : validate_uniprot validate_slapenrich validate_reactome validate_progeny validate_phewas_catalog validate_phenodigm validate_intogen validate_gwas validate_genomics_england validate_gene2phenotype validate_eva validate_europepmc validate_cosmic validate_chembl validate_atlas
-
-.PHONY: evidence_strings
-evidence_strings: $(LOG_PATH)/out.$(ES_PREFIX).evs.log
-
-$(LOG_PATH)/out.$(ES_PREFIX).evs.log : $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
-	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_validated-data-atlas $(ES_PREFIX)_validated-data-chembl $(ES_PREFIX)_validated-data-cosmic $(ES_PREFIX)_validated-data-europepmc $(ES_PREFIX)_validated-data-eva $(ES_PREFIX)_validated-data-gene2phenotype $(ES_PREFIX)_validated-data-genomics_england $(ES_PREFIX)_validated-data-gwas $(ES_PREFIX)_validated-data-intogen $(ES_PREFIX)_validated-data-phenodigm $(ES_PREFIX)_validated-data-phewas_catalog $(ES_PREFIX)_validated-data-progeny $(ES_PREFIX)_validated-data-reactome $(ES_PREFIX)_validated-data-slapenrich $(ES_PREFIX)_validated-data-uniprot
-	$(MRTARGET_CMD) --evs $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).evs.log
+	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val \
+		--input-file $(JSON_PATH)/atlas.json.gz \
+		--input-file $(JSON_PATH)/chembl.json.gz \
+		--input-file $(JSON_PATH)/cosmic.json.gz \
+		--input-file $(JSON_PATH)/europepmc.json.gz \
+		--input-file $(JSON_PATH)/eva.json.gz \
+		--input-file $(JSON_PATH)/gene2phenotype.json.gz \
+		--input-file $(JSON_PATH)/genomics_england.json.gz \
+		--input-file $(JSON_PATH)/gwas.json.gz \
+		--input-file $(JSON_PATH)/intogen.json.gz \
+		--input-file $(JSON_PATH)/phenodigm.json.gz \
+		--input-file $(JSON_PATH)/phewas_catalog.json.gz \
+		--input-file $(JSON_PATH)/progeny.json.gz \
+		--input-file $(JSON_PATH)/reactome.json.gz \
+		--input-file $(JSON_PATH)/slapenrich.json.gz \
+		--input-file $(JSON_PATH)/uniprot.json.gz \
+		$(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.log
+	sleep 60
 
 .PHONY: association_scores
 association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).evs.log
+$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_evidence-data-generic
+	$(INDEX_CMD) $(ES_PREFIX)_validated-data-generic
 	$(MRTARGET_CMD) --as $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
 .PHONY: association_qc
