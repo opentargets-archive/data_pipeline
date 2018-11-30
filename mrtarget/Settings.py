@@ -164,10 +164,6 @@ class Config():
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
     ELASTICSEARCH_EFO_LABEL_DOC_NAME = 'efo'
-    ELASTICSEARCH_HPO_LABEL_INDEX_NAME = 'hpo-data'
-    ELASTICSEARCH_HPO_LABEL_DOC_NAME = 'hpo'
-    ELASTICSEARCH_MP_LABEL_INDEX_NAME = 'mp-data'
-    ELASTICSEARCH_MP_LABEL_DOC_NAME = 'mp'
     ELASTICSEARCH_ECO_INDEX_NAME = 'eco-data'
     ELASTICSEARCH_ECO_DOC_NAME = 'eco'
     ELASTICSEARCH_GENE_NAME_INDEX_NAME = 'gene-data'
@@ -288,18 +284,6 @@ class Config():
     # to the number of CPUs available
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
-
-    # mouse models
-    MOUSEMODELS_PHENODIGM_SOLR = 'solrclouddev.sanger.ac.uk'
-    # TODO remove refs to user directories
-    MOUSEMODELS_CACHE_DIRECTORY = '/Users/otvisitor/.phenodigmcache'
-
-    # put the path to the file where you want to get the list of HP terms to be included in our ontology
-    PHENOTYPE_SLIM_INPUT_URLS = [
-        'https://raw.githubusercontent.com/opentargets/platform_semantic/master/resources/eva/hpo_mappings.txt'
-    ]
-    #  put the path to the file where you want to write the SLIM file (turtle format)
-    PHENOTYPE_SLIM_OUTPUT_FILE = TEMP_DIR + os.path.sep + 'opentargets_disease_phenotype_slim.ttl'
 
     CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
     CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')

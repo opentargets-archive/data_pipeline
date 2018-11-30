@@ -16,10 +16,14 @@ SPARQLWrapper>=1.7.6
 jsonpickle
 simplejson
 
+opentargets-validator>=0.3.0
+opentargets-ontologyutils
+
 #when installing from GitHub, a specific commit must be used for consistency
 #and to ensure dependency caching works as intended
 #git+https://github.com/opentargets/validator.git@711c098df9c82e66ff9b95412f4561c28a63b572#egg=opentargets_validator
 opentargets-validator>=0.3.0
+opentargets-ontologyutils
 
 numpy
 scipy
@@ -30,13 +34,18 @@ scikit-learn
 biopython
 petl
 
-more-itertools
+pyfunctional
+requests-file
+toolz
+pypeln
 
 rdflib
 colorama
 psutil
 pylru
 yapsy
+lxml
+more-itertools
 
 codecov
 

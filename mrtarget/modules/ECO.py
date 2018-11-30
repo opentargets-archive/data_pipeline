@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.modules.Ontology import OntologyClassReader
+from opentargets_ontologyutils.rdf_utils import OntologyClassReader
 from mrtarget.Settings import Config
 import logging
 logger = logging.getLogger(__name__)
@@ -46,7 +46,10 @@ class EcoProcess():
 
     def _process_ontology_data(self):
 
-        self.evidence_ontology.load_evidence_classes()
+        uri_so = Config.ONTOLOGY_CONFIG.get('uris', 'eco')
+        uri_eco = Config.ONTOLOGY_CONFIG.get('uris', 'eco')
+
+        self.evidence_ontology.load_evidence_classes(uri_so, uri_eco)
         for uri,label in self.evidence_ontology.current_classes.items():
             #logger.debug("URI: %s, label:%s"%(uri, label))
             eco = ECO(uri,

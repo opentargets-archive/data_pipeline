@@ -14,8 +14,7 @@ class UniprotTestCase(unittest.TestCase):
         entries = []
         with URLZSource(uniprot_uri).open() as r_file:
             for i, xml in enumerate(UniprotDownloader._iterate_xml(r_file, UniprotDownloader.NS)):
-                result = Parser(xml, return_raw_comments=True).parse()
-                entries.append(result.id)
+                entries.append(xml.id)
 
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0], "Q9UHF1")

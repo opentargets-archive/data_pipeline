@@ -100,53 +100,27 @@ class ESQuery(object):
             yield hit['_source']
 
     def count_all_diseases(self):
-
         return self.count_elements_in_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
 
-    def get_all_human_phenotypes(self, fields = None):
-        source = self._get_source_from_fields(fields)
-
-        res = helpers.scan(client=self.handler,
-                            query={"query": {
-                                      "match_all": {}
-                                    },
-                                   '_source': source,
-                                   'size': 1000,
-                                   },
-                            scroll='12h',
-                            doc_type=Config.ELASTICSEARCH_HPO_LABEL_DOC_NAME,
-                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_HPO_LABEL_INDEX_NAME,True),
-                            timeout="10m",
-                            )
-        for hit in res:
+    def get_all_mammalian_phenotypes(self, fields = None):	
+        source = self._get_source_from_fields(fields)	
+        res = helpers.scan(client=self.handler,	
+            query={"query": {	
+                        "match_all": {}	
+                    },	
+                    '_source': source,	
+                    'size': 1000,	
+                    },	
+            scroll='12h',	
+            doc_type=Config.ELASTICSEARCH_MP_LABEL_DOC_NAME,	
+            index=Loader.get_versioned_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME,True),	
+            timeout="10m",	
+            )	
+        for hit in res:	
             yield hit['_source']
 
-    def count_all_human_phenotypes(self):
-
-        return self.count_elements_in_index(Config.ELASTICSEARCH_HPO_LABEL_INDEX_NAME)
-
-    def get_all_mammalian_phenotypes(self, fields = None):
-        source = self._get_source_from_fields(fields)
-
-        res = helpers.scan(client=self.handler,
-                            query={"query": {
-                                      "match_all": {}
-                                    },
-                                   '_source': source,
-                                   'size': 1000,
-                                   },
-                            scroll='12h',
-                            doc_type=Config.ELASTICSEARCH_MP_LABEL_DOC_NAME,
-                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME,True),
-                            timeout="10m",
-                            )
-        for hit in res:
-            yield hit['_source']
-
-    def count_all_mammalian_phenotypes(self):
-
+    def count_all_mammalian_phenotypes(self):	
         return self.count_elements_in_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME)
-
 
     def get_all_eco(self, fields=None):
         source = self._get_source_from_fields(fields)
@@ -488,23 +462,6 @@ class ESQuery(object):
         for target in res:
             yield  target['_id']
 
-
-    def get_lit_entities_for_type(self,type):
-        query_body = {"query": {
-            "constant_score": {
-                "filter": {
-                    "term": {
-                        "ent_type": type
-                    }
-                }
-            }
-        }
-        }
-        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME + '*'),
-                                  body=query_body
-                                  )
-        for hit in res['hits']['hits']:
-            yield hit['_source']
 
     def get_evidence_for_target_simple(self, target, expected = None):
         query_body = {

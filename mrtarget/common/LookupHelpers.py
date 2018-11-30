@@ -7,12 +7,9 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
-# from mrtarget.common.LookupTables import HPOLookUpTable
-from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
-# from mrtarget.common.LookupTables import LiteratureLookUpTable
-from mrtarget.modules.Ontology import OntologyClassReader
+from opentargets_ontologyutils.rdf_utils import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
 
@@ -24,16 +21,14 @@ class LookUpData():
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
-        # self.available_hpos = None
-        # self.available_mps = None
         self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
-        self.available_gene_objects = None
-        self.available_efo_objects = None
-        self.available_eco_objects = None
         self.chembl = None
-        self.available_publications = None
+
+        self.hpo_ontology = None
+        self.mp_ontology = None
+        self.efo_ontology = None
 
     def set_r_server(self, r_server):
         self.logger.debug('setting r_server to all lookup tables from external r_server')
@@ -43,21 +38,12 @@ class LookUpData():
         if self.available_efos:
             self.available_efos.r_server = r_server
             self.available_efos._table.set_r_server(r_server)
-        # if self.available_hpos:
-        #     self.available_hpos.r_server = r_server
-        #     self.available_hpos._table.set_r_server(r_server)
-        # if self.available_mps:
-        #     self.available_mps.r_server = r_server
-        #     self.available_mps._table.set_r_server(r_server)
         if self.available_hpa:
             self.available_hpa.r_server = r_server
             self.available_hpa._table.set_r_server(r_server)
         if self.available_genes:
             self.available_genes.r_server = r_server
             self.available_genes._table.set_r_server(r_server)
-        if self.available_publications:
-            self.available_publications.r_server = r_server
-            self.available_publications._table.set_r_server(r_server)
 
 
 class LookUpDataType(object):
@@ -66,9 +52,7 @@ class LookUpDataType(object):
     EFO = 'efo'
     HPO = 'hpo'
     ECO = 'eco'
-    # PUBLICATION = 'publication'
     MP = 'mp'
-    MP_LOOKUP = 'mp_lookup'
     CHEMBL_DRUGS = 'chembl_drugs'
     HPA = 'hpa'
 
@@ -107,8 +91,6 @@ class LookUpDataRetriever(object):
                 self._get_available_efos()
             elif dt == LookUpDataType.ECO:
                 self._get_available_ecos()
-            elif dt == LookUpDataType.MP_LOOKUP:
-                self._get_available_mps()
             elif dt == LookUpDataType.MP:
                 self._logger.debug("get MP info")
                 self._get_mp()
@@ -118,8 +100,6 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.EFO:
                 self._logger.debug("get EFO info")
                 self._get_efo()
-            # elif dt == LookUpDataType.PUBLICATION:
-            #     self._get_available_publications()
             elif dt == LookUpDataType.CHEMBL_DRUGS:
                 self._get_available_chembl_mappings()
             elif dt == LookUpDataType.HPA:
@@ -135,15 +115,6 @@ class LookUpDataRetriever(object):
     def _get_available_efos(self):
         self._logger.info('getting efos')
         self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
-
-    # def _get_available_hpos(self):
-    #     self._logger.info('getting hpos')
-    #     self.lookup.available_efos = HPOLookUpTable(self.es, 'HPO_LOOKUP', self.r_server)
-    #
-
-    def _get_available_mps(self, autoload=True):
-         self._logger.info('getting mps info from ES')
-         self.lookup.available_mps = MPLookUpTable(self.es, 'MP_LOOKUP',self.r_server)
 
     def _get_available_ecos(self):
         self._logger.info('getting ecos')
@@ -184,7 +155,7 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_hpo_classes()
+            obj.load_hpo_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.hpo_ontology = obj
@@ -199,12 +170,11 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_mp_classes()
+            obj.load_mammalian_phenotype_ontology(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+            obj.get_deprecated_classes()
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.mp_ontology = obj
-
-
 
     def _get_efo(self):
         '''
@@ -215,16 +185,10 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_open_targets_disease_ontology()
+            obj.load_open_targets_disease_ontology(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.efo_ontology = obj
-
-
-    # def _get_available_publications(self):
-    #     self._logger.info('getting literature/publications')
-    #     self.lookup.available_publications = LiteratureLookUpTable(self.es_pub, 'LITERATURE_LOOKUP', self.r_server)
-
 
     def _get_from_pickled_file_cache(self, file_id):
         file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
@@ -235,8 +199,7 @@ class LookUpDataRetriever(object):
         if not os.path.isdir(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'))):
             os.makedirs(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir')))
         file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
-        pickle.dump(obj,
-                    open(file_path, 'wb'),)
+        pickle.dump(obj, open(file_path, 'wb'),)
 
     def _get_available_chembl_mappings(self):
         chembl_handler = ChEMBLLookup()

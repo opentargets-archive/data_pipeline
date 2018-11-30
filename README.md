@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.com/opentargets/data_pipeline.svg?branch=master)](https://travis-ci.com/opentargets/data_pipeline)
-[quay.io](https://quay.io/repository/opentargets/mrtarget)
+
+[![Docker Repository on Quay.io](https://quay.io/repository/opentargets/mrtarget/status "Docker Repository on Quay.io")](https://quay.io/repository/opentargets/mrtarget)
 
 ## MrT-arget
 
@@ -209,7 +210,7 @@ Here the list to change, enable or disable functionality:
 * `CTTV_DATA_VERSION` indexes prefix a name to enable otherwise `17.04`
 * `CTTV_EL_LOADER` the name of the section of the ES config file db.ini default `dev`
 * `ELASTICSEARCH_NODES` default is `['http://127.0.0.1:9200']`
-* `CTTV_WORKERS_NUMBER` is an number and by default is `multiprocessing.cpu_count()`
+* `WORKERS_NUMBER` is an number and by default is `multiprocessing.cpu_count()`
 * `CTTV_DUMP_FOLDER` is a string of a writable path and by default is `tempfile.gettempdir()`
 * `DUMP_REMOTE_API_URL` a string and by default is `http://beta.opentargets.io`
 * `DUMP_REMOTE_API_PORT` a number and by default is `80`
