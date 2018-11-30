@@ -223,7 +223,7 @@ class Config():
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
 
-    ENSEMBL_FILENAME = file_or_resource(fname='ensembl-data.json.gz')
+    ENSEMBL_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/homo_sapiens_core_93_38_genes.json.gz"
 
     HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
     HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')

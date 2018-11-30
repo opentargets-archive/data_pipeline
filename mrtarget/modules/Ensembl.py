@@ -1,57 +1,51 @@
 import json
 import logging
+import more_itertools
+import functional
 
 from mrtarget.common import URLZSource
 from mrtarget.Settings import Config
 
-"""
-Load a set of Ensembl genes from a JSON file into Elasticsearch.
-The file is specifided in Settings.py as Config.ENSEMBL_FILENAME
-It should be generated using the create_genes_dictionary.py script in opentargets/genetics_backend/makeLUTs
-e.g.
-python create_genes_dictionary.py \
-    --enable-platform-mode \
-    -o path/ensembl_genes.json.gz \
-    --ensembl-database homo_sapiens_core_93_38
-
-"""
 
 class EnsemblProcess(object):
-
+    """
+    Load a set of Ensembl genes from a JSON file into Elasticsearch.
+    The file is specifided in Settings.py as Config.ENSEMBL_FILENAME
+    It should be generated using the create_genes_dictionary.py script in opentargets/genetics_backend/makeLUTs
+    e.g.
+    python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38
+    """
     def __init__(self, loader):
         self.loader = loader
-        self.logger = logging.getLogger(__name__+".EnsemblProcess")
+        self.logger = logging.getLogger(__name__)
 
-    def process(self, ensembl_release=Config.ENSEMBL_RELEASE_VERSION):
+    def process(self, ensembl_filename):
+        def _put_line(line):
+            self.loader.put(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
+                            Config.ELASTICSEARCH_ENSEMBL_DOC_NAME,
+                            line['id'],
+                            json.dumps(line))
+            return 1
 
-        filename = Config.ENSEMBL_FILENAME
-        self.logger.info('Reading Ensembl gene info from %s' % filename)
+        self.logger.info('Reading Ensembl gene info from %s' % ensembl_filename)
 
-        with URLZSource(filename).open() as json_file:
-            json_obj = json.load(json_file)
-            for count, line in enumerate(json_obj):
+        inserted_lines = functional.seq(more_itertools.with_iter(URLZSource(ensembl_filename).open()))\
+            .map(json.loads)\
+            .map(_put_line)\
+            .len()
 
-                if int(line['ensembl_release']) != ensembl_release:
-                    self.logger.warn('Ensembl release %s at line %d of %s does not match release %d specified in config' % (line['ensembl_release'], count, filename, ensembl_release))
-
-                self.loader.put(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
-                                Config.ELASTICSEARCH_ENSEMBL_DOC_NAME,
-                                line['id'],
-                                json.dumps(line))
-            self.logger.info("Read %d lines from %s", count, filename)
-
-    """
-    Run a series of QC tests on the Ensembl Elasticsearch index. Returns a dictionary
-    of string test names and result objects
-    """
+        self.logger.info("Read %d lines from %s", inserted_lines, ensembl_filename)
 
     def qc(self, esquery):
-
+        """
+        Run a series of QC tests on the Ensembl Elasticsearch index. Returns a dictionary
+        of string test names and result objects
+        """
         self.logger.info("Starting QC")
         # number of genes
         ensembl_count = 0
         # Note: try to avoid doing this more than once!
-        for ensembl in esquery.get_all_ensembl_genes():
+        for _ in esquery.get_all_ensembl_genes():
             ensembl_count += 1
 
         # put the metrics into a single dict
