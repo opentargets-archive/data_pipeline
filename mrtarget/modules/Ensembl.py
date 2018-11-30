@@ -36,6 +36,9 @@ class EnsemblProcess(object):
 
         self.logger.info("Read %d lines from %s", inserted_lines, ensembl_filename)
 
+        self.logger.info("flush index")
+        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
+
     def qc(self, esquery):
         """
         Run a series of QC tests on the Ensembl Elasticsearch index. Returns a dictionary
