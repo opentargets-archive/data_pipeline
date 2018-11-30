@@ -13,7 +13,7 @@ mkfile_dir := $(dir $(mkfile_path))
 # These variables can be overridden on the command-line. 
 # Note that if any of these are already specified by environment variables, 
 # the existing variables will take precedence
-ES_PREFIX ?= makefile
+ES_PREFIX ?= test
 ELASTICSEARCH_NODES ?= http://localhost:9200
 LOG_LEVEL ?= DEBUG
 SCHEMA_VERSION ?= master
@@ -27,6 +27,8 @@ JSON_PATH ?= $(mkfile_dir)/json
 QC_PATH ?= $(mkfile_dir)/qc
 QC_FILE ?= $(QC_PATH)/qc.$(ES_PREFIX).tsv
 QC_FILE_OLD ?= $(QC_PATH)/qc.18.08.tsv
+
+SCRIPT_PATH ?= $(mkfile_dir)/scripts
 
 # Allow specification of additional arguments for each stage on the command-line
 # Intended to be empty here and overriden from outside if needed
@@ -57,7 +59,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).rea.log :
 	$(MRTARGET_CMD) --rea $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).rea.log
 
 .PHONY: ens
-ens: $(LOG_PATH)/out.$(ES_PREFIX).ens.log
+ens: $(LOG_PATH)/out.$(ES_PREFIX).ens.log 
 
 $(LOG_PATH)/out.$(ES_PREFIX).ens.log : 
 	mkdir -p $(LOG_PATH)

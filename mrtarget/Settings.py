@@ -17,11 +17,6 @@ def build_uniprot_query(l):
     return '+or+'.join(l)
 
 
-def build_ensembl_sql(l):
-    return """SELECT stable_id FROM gene where stable_id IN ('{0}')"""\
-        .format("', '".join(l))
-
-
 def ini_from_file_or_resource(*filenames):
     '''load the ini files using file_or_resource an
     return the configuration object or None
@@ -224,6 +219,8 @@ class Config():
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
 
+    ENSEMBL_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/homo_sapiens_core_94_38_genes.json.gz"
+
     HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
     HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')
     HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
@@ -372,7 +369,6 @@ class Config():
     IS_DIRECT_DO_NOT_PROPAGATE = ['expression_atlas']
 
     ENSEMBL_RELEASE_VERSION = 93
-    ENSEMBL_CHUNK_SIZE = 100
 
     LT_REUSE = False
     LT_NAMESPACE = ""
