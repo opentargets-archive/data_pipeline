@@ -1,6 +1,9 @@
 # Makefile for Open Targets data pipeline
 # Based on steps in https://github.com/opentargets/data_release/wiki/OT011-Data-Processing-(Backend)
 
+#ensure pipes behave correctly
+SHELL = /bin/bash
+.SHELLFLAGS = -o pipefail -c
 
 #get the directory the makefile is in
 # from https://stackoverflow.com/questions/18136918
