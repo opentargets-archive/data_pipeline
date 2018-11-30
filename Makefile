@@ -13,7 +13,7 @@ mkfile_dir := $(dir $(mkfile_path))
 # These variables can be overridden on the command-line. 
 # Note that if any of these are already specified by environment variables, 
 # the existing variables will take precedence
-ES_PREFIX ?= gp-ens-test
+ES_PREFIX ?=
 ELASTICSEARCH_NODES ?= http://localhost:9200
 LOG_LEVEL ?= DEBUG
 SCHEMA_VERSION ?= master
