@@ -550,6 +550,7 @@ class EvidenceValidationFileChecker():
                                                       LookUpDataType.TARGET,
                                                       LookUpDataType.EFO,
                                                       LookUpDataType.ECO,
+                                                      LookUpDataType.HPO,
                                                       LookUpDataType.MP
                                                      ),
                                           autoload=True,

@@ -78,19 +78,26 @@ class MousePhenotypes(IPlugin):
 
     def _get_mp_classes(self):
         self._logger.debug("_get_mp_classes")
-        lookup_data_types = (LookUpDataType.MP_LOOKUP,)
-        self._logger.debug(LookUpDataType.MP)
         self.lookup_data = LookUpDataRetriever(self.loader.es,
                                                self.r_server,
-                                               data_types=lookup_data_types,
+                                               data_types=(LookUpDataType.MP,),
                                                autoload=True
                                                ).lookup
 
-        for mp_id in self.lookup_data.available_mps.get_available_mp_ids():
-            self._logger.debug(mp_id)
-            mp_class = self.lookup_data.available_mps.get_mp(mp_id,
-                                                             self.r_server)
-            self.mps[mp_id] = mp_class
+        #TOD this is a moderately hideous bit of pointless munging, but I don't have time fix it now!
+
+        for mp_id,label in self.lookup_data.mp_ontology.current_classes.items():
+
+            mp_class = {}
+            mp_class["label"] = label
+            if mp_id not in self.lookup_data.mp_ontology.classes_paths:
+                self._logger.warning("cannot find paths for "+mp_id)
+                continue
+            mp_class["path"] = self.lookup_data.mp_ontology.classes_paths[mp_id]['all']
+            mp_class["path_codes"] = self.lookup_data.mp_ontology.classes_paths[mp_id]['ids']
+
+            mp_id_key = mp_id.split("/")[-1].replace(":", "_")
+            self.mps[mp_id_key] = mp_class
             self.mp_labels[mp_class["label"]] = mp_id
             self.mp_to_label[mp_id] = mp_class["label"]
             paths = []
@@ -100,8 +107,7 @@ class MousePhenotypes(IPlugin):
 
             self.top_levels[mp_id] = paths
 
-            self._logger.debug("top_levels paths %d for mp_id %s and class label %s",
-                               len(paths), mp_id, mp_class['label'])
+            #self._logger.debug("top_levels paths %d for mp_id %s and class label %s", len(paths), mp_id, mp_class['label'])
 
 
     def assign_to_human_genes(self):
@@ -124,8 +130,6 @@ class MousePhenotypes(IPlugin):
                 self.human_genes[human_gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : gene["gene_id"],
                                                                           "mouse_gene_symbol" : gene["gene_symbol"],
                                                                           "phenotypes" : gene["phenotypes"].values()})
-
-                #print json.dumps(self.human_genes[gene_symbol]["mouse_orthologs"], indent=2)
 
 
     def write_all_to_file(self, filename=None):
@@ -150,10 +154,6 @@ class MousePhenotypes(IPlugin):
                         # at least 1 phenotype in phenotypes_raw
                         if len(phenotypes_raw) > 0:
                             try:
-                                self._logger.debug("get phenotypes for %s in line %d", human_gene_symbol, li)
-                                #ensembl_gene_id = self._get_human_gene_ensembl_id(human_gene_symbol)
-                                #if ensembl_gene_id is not None:
-                                #    print ensembl_gene_id
                                 mouse_gene_id = mouse_gene_id.strip()
                                 mouse_gene_symbol = mouse_gene_symbol.strip()
                                 if mouse_gene_id not in self.mouse_genes:
@@ -166,10 +166,6 @@ class MousePhenotypes(IPlugin):
                                     self.human_genes[human_gene_symbol] = {"gene_symbol": human_gene_symbol, "ensembl_gene_id": None,
                                                                      "gene_id": None,
                                                                      "mouse_orthologs": []}
-                                # self._logger.debug("phenotype mouse structure for gene %s %s", human_gene_symbol,
-                                #                    str(self.mouse_genes[mouse_gene_id]))
-                                # self._logger.debug("phenotype human structure for gene %s %s", human_gene_symbol,
-                                #                    str(self.human_genes[human_gene_symbol]) )
                             except Exception as e:
                                 self._logger.debug("exception processing a line %d: %s", li, str(e))
 
@@ -197,7 +193,11 @@ class MousePhenotypes(IPlugin):
                             for mouse_gene_id in set(mouse_gene_ids.split(",")):
                                 # exclude heritable phenotypic marker like http://www.debugrmatics.jax.org/marker/MGI:97446
                                 count_symbols.add(mouse_gene_id)
-                                mp_id_key = mp_id.replace(":", "_")
+
+                                mp_id_key = mp_id.split("/")[-1].replace(":", "_")
+                                self._logger.debug("Looking for mouse_gene_id "+mouse_gene_id)
+                                self._logger.debug("Looking for mp_id_key "+mp_id_key)
+
                                 if mouse_gene_id in self.mouse_genes and mp_id_key in self.mps:
                                     self._logger.debug('process mouse KO gene %s', mouse_gene_id)
                                     count_accepted_symbols.add(mouse_gene_id)
@@ -226,8 +226,6 @@ class MousePhenotypes(IPlugin):
                                                 "mp_identifier": mp_id,
                                                 "mp_label": mp_label
                                             })
-                                    # self._logger.debug('process mouse KO gene %s with phenotypes list %s line %d',
-                                    #    mouse_gene_id, self.mouse_genes[mouse_gene_id]["phenotypes"], li)
                                 else:
                                     self._logger.debug('process mouse KO gene %s failed because not in self.mouse_genes set in line %d',
                                                        mouse_gene_id, li)
