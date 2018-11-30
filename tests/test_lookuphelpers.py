@@ -31,7 +31,7 @@ class LookupHelpersTestCase(unittest.TestCase):
         self.loader = Loader(self.connectors.es, dry_run=DRY_RUN)
 
     @mock.patch('mrtarget.common.connection')
-    def test_eco_lookup(self, mock_connectors):
+    def test_mp_lookup(self, mock_connectors):
 
         self._logger.debug("test_mp_lookup")
 

@@ -10,7 +10,7 @@ from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import MPLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
-from mrtarget.modules.Ontology import OntologyClassReader
+from opentargets_ontologyutils.rdf_utils import OntologyClassReader
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
 
@@ -163,7 +163,7 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_mp_classes()
+            obj.load_mp_classes(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.mp_ontology = obj
@@ -177,7 +177,7 @@ class LookUpDataRetriever(object):
         obj = self._get_from_pickled_file_cache(cache_file)
         if obj is None:
             obj = OntologyClassReader()
-            obj.load_open_targets_disease_ontology()
+            obj.load_open_targets_disease_ontology(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
             obj.rdf_graph = None
             self._set_in_pickled_file_cache(obj, cache_file)
         self.lookup.efo_ontology = obj
