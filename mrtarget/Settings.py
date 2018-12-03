@@ -368,8 +368,6 @@ class Config():
 
     IS_DIRECT_DO_NOT_PROPAGATE = ['expression_atlas']
 
-    ENSEMBL_RELEASE_VERSION = 93
-
     LT_REUSE = False
     LT_NAMESPACE = ""
     REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
