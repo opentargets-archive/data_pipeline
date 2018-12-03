@@ -128,61 +128,65 @@ base: base_gene efo eco
 
 $(JSON_PATH)/atlas.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/atlas-27-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/atlas.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/atlas-2018-11-20.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/atlas.json.gz
 
 $(JSON_PATH)/chembl.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/chembl-27-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/chembl.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/chembl-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/chembl.json.gz
 
 $(JSON_PATH)/cosmic.json.gz :
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/cosmic-25-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/cosmic.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/cosmic-27-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/cosmic.json.gz
 
 $(JSON_PATH)/europepmc.json.gz :
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/europepmc-03-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/europepmc.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/europepmc-29-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/europepmc.json.gz
 
 $(JSON_PATH)/eva.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/eva-01-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/eva.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/eva-01-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/eva.json.gz
 
 $(JSON_PATH)/gene2phenotype.json.gz :
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/gene2phenotype-19-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gene2phenotype.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/gene2phenotype-29-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gene2phenotype.json.gz
 
 $(JSON_PATH)/genomics_england.json.gz :
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/genomics_england-02-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/genomics_england.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/genomics_england-02-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/genomics_england.json.gz
 
 $(JSON_PATH)/gwas.json.gz :
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/gwas-09-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gwas.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/gwas-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gwas.json.gz
 
 $(JSON_PATH)/intogen.json.gz :
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/intogen-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/intogen.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/intogen-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/intogen.json.gz
 
 $(JSON_PATH)/phenodigm.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/phenodigm-12-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phenodigm.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phenodigm-12-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phenodigm.json.gz
 
 $(JSON_PATH)/phewas_catalog.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/phewas_catalog-11-09-2017.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
 
 $(JSON_PATH)/progeny.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/progeny-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/progeny.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/progeny-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/progeny.json.gz
 
 $(JSON_PATH)/reactome.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/reactome-03-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/reactome.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/reactome-03-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/reactome.json.gz
 
 $(JSON_PATH)/slapenrich.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/slapenrich-27-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/slapenrich.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/slapenrich-29-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/slapenrich.json.gz
+
+$(JSON_PATH)/sysbio.json.gz:
+	mkdir -p $(JSON_PATH)
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/sysbio-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/sysbio.json.gz
 
 $(JSON_PATH)/uniprot.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.10/uniprot-26-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/uniprot.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/uniprot-15-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/uniprot.json.gz
 
 .PHONY: validate_all
 validate_all : $(LOG_PATH)/out.$(ES_PREFIX).val.log
