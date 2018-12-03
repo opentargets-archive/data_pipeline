@@ -739,7 +739,10 @@ class Evidence(JSONSerializable):
                         score = 1.
                 self.evidence['scores']['association_score'] = score
             elif self.evidence['type'] == 'affected_pathway':
-                if self.evidence['evidence']['resource_score']['type']== 'pvalue':
+                # TODO: Implement two types of scoring for sysbio - based on p-value range & based on rank-based score range
+                if self.evidence['sourceID'] == 'sysbio':
+                    score = float(self.evidence['evidence']['resource_score']['value'])
+                elif self.evidence['evidence']['resource_score']['type']== 'pvalue':
                     score = self._get_score_from_pvalue_linear(float(self.evidence['evidence']['resource_score']['value']),
                                                                range_min=1e-4,
                                                                range_max=1e-14)
