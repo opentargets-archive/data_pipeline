@@ -361,6 +361,7 @@ class Config():
     SCORING_WEIGHTS['expression_atlas'] = 0.2
     SCORING_WEIGHTS['europepmc'] = 0.2
     SCORING_WEIGHTS['slapenrich'] = 0.5
+    SCORING_WEIGHTS['progeny'] = 0.5
     SCORING_WEIGHTS['sysbio'] = 0.5
     # SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
