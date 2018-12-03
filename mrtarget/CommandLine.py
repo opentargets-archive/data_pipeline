@@ -1,9 +1,8 @@
-from __future__ import print_function
+from __future__ import print_function, absolute_import
 import logging
 import argparse
 import sys
 import os
-import math
 import itertools
 from logging.config import fileConfig
 
@@ -18,7 +17,6 @@ from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
 from mrtarget.modules.ECO import EcoProcess
 from mrtarget.modules.EFO import EfoProcess
 from mrtarget.modules.Ensembl import EnsemblProcess
-from mrtarget.modules.EvidenceString import EvidenceStringProcess
 from mrtarget.modules.GeneData import GeneManager
 from mrtarget.modules.HPA import HPAProcess
 from mrtarget.modules.QC import QCRunner,QCMetrics
