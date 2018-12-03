@@ -95,11 +95,11 @@ class ProcessContextESWriter(ProcessContext):
         self.kwargs.es_client = new_es_client()
         self.kwargs.es_loader = Loader(es=self.kwargs.es_client)
 
-        self.kwargs.index_name_validated = Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + 'generic'
-        self.kwargs.doc_type_validated = Config.ELASTICSEARCH_DATA_DOC_NAME + '-' + 'generic'
+        self.kwargs.index_name_validated = Config.ELASTICSEARCH_DATA_INDEX_NAME
+        self.kwargs.doc_type_validated = Config.ELASTICSEARCH_DATA_DOC_NAME
 
-        self.kwargs.index_name_invalidated = Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME + '-' + 'generic'
-        self.kwargs.doc_type_invalidated = Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME + '-' + 'generic'
+        self.kwargs.index_name_invalidated = Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME
+        self.kwargs.doc_type_invalidated = Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME
 
     def put(self, line, **kwargs):
         (left, right) = line
