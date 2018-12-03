@@ -210,11 +210,11 @@ class Config():
         '4932':'yeast'
     }
 
-    BIOMARKER_FILENAME = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/cgi_biomarkers_per_variant.tsv"
-    CHEMICALPROBES_FILENAME1 = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/chemicalprobes_portalprobes_20181015.tsv"
-    CHEMICALPROBES_FILENAME2 = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/chemicalprobes_probeminer_20181015.tsv"
-    HALLMARK_FILENAME = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/cosmic-v86_hallmark_export.tsv"
-    TRACTABILITY_FILENAME = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/tractability_buckets.tsv"
+    BIOMARKER_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/cgi_biomarkers_per_variant.tsv"
+    CHEMICALPROBES_FILENAME1 = "https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_portalprobes_20181130.tsv"
+    CHEMICALPROBES_FILENAME2 = "https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_probeminer_20181015.tsv"
+    HALLMARK_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/cosmic-v87_hallmark_export.tsv"
+    TRACTABILITY_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/tractability_buckets-30-11-2018.tsv"
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
