@@ -338,6 +338,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['progeny'] = 'affected_pathway'
+    DATASOURCE_TO_DATATYPE_MAPPING['sysbio'] = 'affected_pathway'
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
@@ -360,6 +361,7 @@ class Config():
     SCORING_WEIGHTS['expression_atlas'] = 0.2
     SCORING_WEIGHTS['europepmc'] = 0.2
     SCORING_WEIGHTS['slapenrich'] = 0.5
+    SCORING_WEIGHTS['sysbio'] = 0.5
     # SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
     # setup a minimum score value for an evidence string to be accepted.
