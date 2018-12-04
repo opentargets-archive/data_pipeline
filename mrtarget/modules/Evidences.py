@@ -1,6 +1,6 @@
 import hashlib
 import logging
-import sys
+import datetime
 import os
 import json
 import pypeln.process as pr
@@ -31,7 +31,6 @@ def fix_and_score_evidence(validated_evs, process_context):
 
     (fixed_ev, _) = process_context.kwargs.evidence_manager.fix_evidence(ev)
 
-    # TODO global stats is disabled at the moment
     (is_valid, problem_str) = \
         process_context.kwargs.evidence_manager.check_is_valid_evs(fixed_ev, datasource=fixed_ev.datasource)
     if is_valid:
@@ -57,13 +56,23 @@ def fix_and_score_evidence(validated_evs, process_context):
 
 def process_evidence(line, process_context):
     # validate evidence
+    t1 = datetime.datetime.now()
     (left, right) = validate_evidence(line, process_context)
-
+    t2 = datetime.datetime.now()
     # fix evidence
     if right is not None:
         # ev comes as addict.Dict
         # too much code at the moment to move evidences to addict
         (left, right) = fix_and_score_evidence(right, process_context)
+
+    t3 = datetime.datetime.now()
+
+    (_, (ln, _)) = line
+    p1 = (t2-t1).total_seconds()
+    p2 = (t3-t2).total_seconds()
+    p3 = (t3-t1).total_seconds()
+
+    process_context.logger.debug("<dt>%d,%f,%f,%f", ln, p1, p2, p3)
 
     return left, right
 
