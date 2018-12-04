@@ -126,7 +126,7 @@ class ProcessContextESWriter(ProcessContext):
             pass
 
 
-def open_writers_on_start(enable_output_to_es=False, output_folder='.', dry_run=False):
+def open_writers_on_start(enable_output_to_es, output_folder, dry_run):
     """construct the processcontext to write lines to the files. we have to sets,
     the good validated ones and the failed ones.
     """
@@ -138,6 +138,7 @@ def open_writers_on_start(enable_output_to_es=False, output_folder='.', dry_run=
     else:
         pc = ProcessContextFileWriter(output_folder=output_folder)
 
+    pc.logger.debug("called open_writers on_start from %s", str(os.getpid()))
     return pc
 
 
