@@ -64,8 +64,6 @@ def process_evidence(line, process_context):
         # too much code at the moment to move evidences to addict
         (left, right) = fix_and_score_evidence(right, process_context)
 
-    (_, (ln, _)) = line
-
     return left, right
 
 
