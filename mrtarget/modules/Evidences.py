@@ -329,10 +329,7 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     evs = IO.make_iter_lines(filenames, first_n)
 
     logger.info('declare pipeline to run')
-    write_evidences_on_start_f = functools.partial(open_writers_on_start,
-                                                   enable_output_to_es=enable_output_to_es,
-                                                   output_folder=output_folder,
-                                                   dry_run=dry_run)
+    write_evidences_on_start_f = functools.partial(open_writers_on_start, enable_output_to_es, output_folder, dry_run)
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
 
     # here the pipeline definition
