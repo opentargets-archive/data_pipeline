@@ -17,8 +17,7 @@ from mrtarget.Settings import file_or_resource, Config
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.EvidencesHelpers import (ProcessContext, make_lookup_data,
                                               make_validated_evs_obj, open_writers_on_start,
-                                              close_writers_on_done, reduce_tuple_with_sum,
-                                              emit_global_stats_from_evidence)
+                                              close_writers_on_done, reduce_tuple_with_sum)
 from mrtarget.common.connection import new_redis_client, new_es_client, PipelineConnectors
 from mrtarget.modules.EvidenceString import EvidenceManager, Evidence
 
@@ -43,8 +42,6 @@ def fix_and_score_evidence(validated_evs, process_context):
         fixed_ev_ext = process_context.kwargs.evidence_manager.get_extended_evidence(fixed_ev)
         process_context.kwargs.evidence_manager.inject_loci(fixed_ev_ext)
         validated_evs.is_valid = True
-        # TODO emit data for global stats
-        # validated_evs.global_stats = emit_global_stats_from_evidence(fixed_ev_ext)
         validated_evs.line = fixed_ev_ext.to_json()
         right = validated_evs
 

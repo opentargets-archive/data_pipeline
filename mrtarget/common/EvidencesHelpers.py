@@ -160,36 +160,6 @@ def reduce_tuple_with_sum(iterable):
     return functools.reduce(lambda x, y: (x[0] + y[0], x[1] + y[1]), iterable, (0, 0))
 
 
-def emit_global_stats_from_evidence(ev):
-    """generate a list of tuples containing the required information to map-reduce"""
-    def _strip_lit_id(lit_url):
-        return lit_url['lit_id'].split('/')[-1]
-
-    internal_ev = ev.evidence
-    ev_id = internal_ev['id']
-    ev_t = internal_ev['target']['id']
-    ev_d = internal_ev['disease']['id']
-    ids = []
-    r = []
-
-    if 'literature' in internal_ev and 'references' in internal_ev['literature']:
-        ids += list(itertools.imap(_strip_lit_id, iter(internal_ev['literature']['references'])))
-
-    if 'unique_experiment_reference' in internal_ev:
-        ids += [internal_ev['unique_experiment_reference']]
-
-    r += list(itertools.izip(itertools.cycle([ev_id]),
-                             iter(ids),
-                             itertools.cycle([ev_t]),
-                             itertools.cycle([1])))
-
-    r += list(itertools.izip(itertools.cycle([ev_id]),
-                             iter(ids),
-                             itertools.cycle([ev_d]),
-                             itertools.cycle([1])))
-    return r
-
-
 def make_validated_evs_obj(filename, hash, line, line_n, is_valid=False, explanation_type='', explanation_str='',
                            target_id=None, efo_id=None, data_type=None, id=None):
     return addict.Dict(is_valid=is_valid, explanation_type=explanation_type, explanation_str=explanation_str,
