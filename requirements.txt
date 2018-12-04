@@ -1,5 +1,6 @@
 requests
 future
+redis<=2.10.6
 redislite
 addict
 envparse
