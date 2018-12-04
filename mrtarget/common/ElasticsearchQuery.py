@@ -486,7 +486,7 @@ class ESQuery(object):
 
         if expected is not None and expected <10000:
             query_body['size']=10000
-            res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
+            res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME,True),
                                       body=query_body
                                       )
             for hit in res['hits']['hits']:
@@ -495,7 +495,7 @@ class ESQuery(object):
             res = helpers.scan(client=self.handler,
                                query=query_body,
                                scroll='1h',
-                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
+                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME,True),
                                timeout="1h",
                                request_timeout=2 * 60 * 60,
                                size=1000
@@ -655,7 +655,7 @@ class ESQuery(object):
                                  'size': 1000,
                                  },
                            scroll='6h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME + '*',True),
+                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME,True),
                            timeout="1h",
                            request_timeout=2 * 60 * 60,
                            )
@@ -752,7 +752,7 @@ class ESQuery(object):
                         }
                     }
                  }
-        self.delete_data(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*',
+        self.delete_data(Config.ELASTICSEARCH_DATA_INDEX_NAME,
                          query=query)
 
     def _flush_bulk(self, batch):
@@ -762,7 +762,7 @@ class ESQuery(object):
                                 stats_only=True)
 
     def get_all_evidence(self, fields = None):
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*', True)
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME, True)
         doc_type = None
         res = helpers.scan(client=self.handler,
                            query={"query":  {"match_all": {}},
@@ -782,7 +782,7 @@ class ESQuery(object):
 
     def get_all_evidence_for_datasource(self, datasources=None, fields = None, ):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*', True)
+        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME, True)
         doc_type = None
 
         if datasources:
@@ -809,7 +809,7 @@ class ESQuery(object):
 
     # Queries used to generate the page https://github.com/opentargets/data_release/wiki/Data-Metrics-&-Plots
     def count_drug_w_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -873,7 +873,7 @@ class ESQuery(object):
         return res
 
     def count_BRAF_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -883,7 +883,7 @@ class ESQuery(object):
         return res
 
     def count_withdrawn_drug_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index ,
@@ -893,7 +893,7 @@ class ESQuery(object):
         return res
 
     def count_trinucleotide_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -906,7 +906,7 @@ class ESQuery(object):
         return res
 
     def count_datasource_evidence(self, doc_type):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
 
         doc_type = Config.ELASTICSEARCH_DATA_DOC_NAME + "-" + doc_type
 
@@ -918,7 +918,7 @@ class ESQuery(object):
         return res
 
     def count_datatype_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME + "-generic"
+        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
