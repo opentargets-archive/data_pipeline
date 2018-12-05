@@ -145,6 +145,13 @@ class Configuration(object):
         p.add("--log-http", help="log HTTP(S) requests in this file",
               action='store')
 
+        # process handling
+        p.add("--num-workers", help="num proc workers",
+              action='store', default=4, type=int)
+
+        p.add("--max-queued-events", help="max number of events to put per queue",
+              action='store', default=10000, type=int)
+
         return p
 
     def _get_args(self):
