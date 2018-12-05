@@ -292,7 +292,7 @@ def main():
                     input_files = [x.rstrip() for x in f.readlines()]
 
             num_workers = Config.WORKERS_NUMBER
-            num_writers = min(1, max(16, Config.WORKERS_NUMBER))
+            num_writers = max(1, min(16, Config.WORKERS_NUMBER))
             process_evidences_pipeline(filenames=input_files,
                                        first_n=args.first_n,
                                        es_client=connectors.es,
