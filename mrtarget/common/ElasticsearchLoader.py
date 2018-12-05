@@ -141,6 +141,10 @@ class Loader():
         self.flush()
         self.restore_after_bulk_indexing()
 
+    def flush_all_and_wait(self, index_name):
+        self.flush()
+        self.es.indices.flush(self.get_versioned_index(index_name), wait_if_ongoing=True)
+
     def __enter__(self):
         return self
 

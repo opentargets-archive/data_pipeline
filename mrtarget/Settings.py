@@ -17,11 +17,6 @@ def build_uniprot_query(l):
     return '+or+'.join(l)
 
 
-def build_ensembl_sql(l):
-    return """SELECT stable_id FROM gene where stable_id IN ('{0}')"""\
-        .format("', '".join(l))
-
-
 def ini_from_file_or_resource(*filenames):
     '''load the ini files using file_or_resource an
     return the configuration object or None
@@ -164,8 +159,6 @@ class Config():
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
     ELASTICSEARCH_EFO_LABEL_DOC_NAME = 'efo'
-    ELASTICSEARCH_MP_LABEL_INDEX_NAME = 'mp-data'	
-    ELASTICSEARCH_MP_LABEL_DOC_NAME = 'mp'    
     ELASTICSEARCH_ECO_INDEX_NAME = 'eco-data'
     ELASTICSEARCH_ECO_DOC_NAME = 'eco'
     ELASTICSEARCH_GENE_NAME_INDEX_NAME = 'gene-data'
@@ -186,7 +179,7 @@ class Config():
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
     # to generate this file you have to call
     # https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml
-    UNIPROT_URI = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/uniprot-20181018.xml.gz"
+    UNIPROT_URI = "https://storage.googleapis.com/ot-releases/18.12/annotations/uniprot-20181130.xml.gz"
     GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
     GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks',
                               'CancerBiomarkers', 'ChemicalProbes', 'Tractability']
@@ -208,14 +201,16 @@ class Config():
         '4932':'yeast'
     }
 
-    BIOMARKER_FILENAME = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/cgi_biomarkers_per_variant.tsv"
-    CHEMICALPROBES_FILENAME1 = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/chemicalprobes_portalprobes_20181015.tsv"
-    CHEMICALPROBES_FILENAME2 = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/chemicalprobes_probeminer_20181015.tsv"
-    HALLMARK_FILENAME = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/cosmic-v86_hallmark_export.tsv"
-    TRACTABILITY_FILENAME = "https://storage.googleapis.com/ot-releases/18.10/ot-annotation-files/tractability_buckets.tsv"
+    BIOMARKER_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/cgi_biomarkers_per_variant.tsv"
+    CHEMICALPROBES_FILENAME1 = "https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_portalprobes_20181130.tsv"
+    CHEMICALPROBES_FILENAME2 = "https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_probeminer_20181015.tsv"
+    HALLMARK_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/cosmic-v87_hallmark_export.tsv"
+    TRACTABILITY_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/tractability_buckets-30-11-2018.tsv"
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
     TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
+
+    ENSEMBL_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/homo_sapiens_core_94_38_genes.json.gz"
 
     HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
     HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')
@@ -281,6 +276,7 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
     DATASOURCE_TO_DATATYPE_MAPPING['progeny'] = 'affected_pathway'
+    DATASOURCE_TO_DATATYPE_MAPPING['sysbio'] = 'affected_pathway'
 
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
@@ -297,19 +293,18 @@ class Config():
     # setup the weights for evidence strings score
     SCORING_WEIGHTS = defaultdict(lambda: 1)
     SCORING_WEIGHTS['phenodigm'] = 0.2
-    SCORING_WEIGHTS['expression_atlas'] = 0.5
+    SCORING_WEIGHTS['expression_atlas'] = 0.2
     SCORING_WEIGHTS['europepmc'] = 0.2
     SCORING_WEIGHTS['slapenrich'] = 0.5
+    SCORING_WEIGHTS['progeny'] = 0.5
+    SCORING_WEIGHTS['sysbio'] = 0.5
     # SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
     # setup a minimum score value for an evidence string to be accepted.
     SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
 
-    IS_DIRECT_DO_NOT_PROPAGATE = ['europepmc']
-
-    ENSEMBL_RELEASE_VERSION = 93
-    ENSEMBL_CHUNK_SIZE = 100
+    IS_DIRECT_DO_NOT_PROPAGATE = ['expression_atlas']
 
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
