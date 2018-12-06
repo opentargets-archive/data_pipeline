@@ -111,9 +111,21 @@ class EfoProcess():
             definition = ''
             if 'http://www.ebi.ac.uk/efo/definition' in properties:
                 definition = ". ".join(properties['http://www.ebi.ac.uk/efo/definition'])
-            synonyms = []
-            if 'http://www.ebi.ac.uk/efo/alternative_term' in properties:
-                synonyms = properties['http://www.ebi.ac.uk/efo/alternative_term']
+
+            #build a set of all the relevant synonyms
+            synonyms = set()            
+            #exact synonyms
+            if 'http://www.geneontology.org/formats/oboInOwl#hasExactSynonym' in properties:
+                synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasExactSynonym'])
+
+            #narrow synonyms
+            if 'http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym' in properties:
+                synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym'])
+
+            #could also have broad synonyms, but that is better captured by parent term
+
+
+
             phenotypes = []
             if uri in disease_phenotypes:
                 phenotypes = disease_phenotypes[uri]['phenotypes']
