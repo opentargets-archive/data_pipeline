@@ -97,7 +97,7 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.HPA:
                 self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP', self.r_server)
 
-            self._logger.info("loaded %s in %ss" % (dt, str(int(time.time() - start_time)))
+            self._logger.info("loaded %s in %ss" % (dt, str(int(time.time() - start_time))))
 
     def set_r_server(self, r_server):
         self.r_server = r_server
