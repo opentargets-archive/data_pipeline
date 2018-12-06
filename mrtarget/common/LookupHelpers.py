@@ -92,15 +92,12 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.HPO:
                 self._logger.debug("get HPO info")
                 self._get_hpo()
-            elif dt == LookUpDataType.EFO:
-                self._logger.debug("get EFO info")
-                self._get_efo()
             elif dt == LookUpDataType.CHEMBL_DRUGS:
                 self._get_available_chembl_mappings()
             elif dt == LookUpDataType.HPA:
                 self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP', self.r_server)
 
-            self._logger.info("finished loading %s data into redis, took %ss" % (dt, str(time.time() - start_time)))
+            self._logger.info("loaded %s in %ss" % (dt, str(int(time.time() - start_time)))
 
     def set_r_server(self, r_server):
         self.r_server = r_server
@@ -138,12 +135,9 @@ class LookUpDataRetriever(object):
         :return:
         '''
         cache_file = 'processed_hpo_lookup'
-        obj = self._get_from_pickled_file_cache(cache_file)
-        if obj is None:
-            obj = OntologyClassReader()
-            obj.load_hpo_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
-            obj.rdf_graph = None
-            self._set_in_pickled_file_cache(obj, cache_file)
+        obj = OntologyClassReader()
+        obj.load_hpo_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+        obj.rdf_graph = None
         self.lookup.hpo_ontology = obj
 
     def _get_mp(self):
@@ -151,41 +145,11 @@ class LookUpDataRetriever(object):
         Load MP to accept phenotype terms that are not in EFO
         :return:
         '''
-        cache_file = 'processed_mp_lookup'
-        obj = None
-        obj = self._get_from_pickled_file_cache(cache_file)
-        if obj is None:
-            obj = OntologyClassReader()
-            obj.load_mammalian_phenotype_ontology(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
-            obj.get_deprecated_classes()
-            obj.rdf_graph = None
-            self._set_in_pickled_file_cache(obj, cache_file)
+        obj = OntologyClassReader()
+        obj.load_mammalian_phenotype_ontology(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
+        obj.get_deprecated_classes()
+        obj.rdf_graph = None
         self.lookup.mp_ontology = obj
-
-    def _get_efo(self):
-        '''
-        Load EFO current and obsolete classes to report them to data providers
-        :return:
-        '''
-        cache_file = 'processed_efo_lookup'
-        obj = self._get_from_pickled_file_cache(cache_file)
-        if obj is None:
-            obj = OntologyClassReader()
-            obj.load_open_targets_disease_ontology(Config.ONTOLOGY_CONFIG.get('uris', 'efo'))
-            obj.rdf_graph = None
-            self._set_in_pickled_file_cache(obj, cache_file)
-        self.lookup.efo_ontology = obj
-
-    def _get_from_pickled_file_cache(self, file_id):
-        file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
-        if os.path.isfile(file_path):
-            return pickle.load(open(file_path, 'rb'))
-
-    def _set_in_pickled_file_cache(self, obj, file_id):
-        if not os.path.isdir(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'))):
-            os.makedirs(os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir')))
-        file_path = os.path.join(Config.ONTOLOGY_CONFIG.get('pickle', 'cache_dir'), file_id+'.pck')
-        pickle.dump(obj, open(file_path, 'wb'),)
 
     def _get_available_chembl_mappings(self):
         chembl_handler = ChEMBLLookup()

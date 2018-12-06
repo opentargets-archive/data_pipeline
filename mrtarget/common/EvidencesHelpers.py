@@ -26,9 +26,6 @@ def make_lookup_data(es_client, redis_client):
         redis_client, [], (
             LookUpDataType.TARGET,
             LookUpDataType.DISEASE,
-            LookUpDataType.EFO,
-            LookUpDataType.HPO,
-            LookUpDataType.MP,
             LookUpDataType.ECO
         )
         ).lookup
