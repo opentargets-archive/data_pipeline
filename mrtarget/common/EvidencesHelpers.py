@@ -23,17 +23,15 @@ _l = logging.getLogger(__name__)
 
 def make_lookup_data(es_client, redis_client):
     return LookUpDataRetriever(es_client,
-                        redis_client,
-                        data_types=(
-                            LookUpDataType.TARGET,
-                            LookUpDataType.DISEASE,
-                            LookUpDataType.EFO,
-                            LookUpDataType.HPO,
-                            LookUpDataType.MP,
-                            LookUpDataType.ECO
-                        ),
-                        autoload=True,
-                        ).lookup
+        redis_client, [], (
+            LookUpDataType.TARGET,
+            LookUpDataType.DISEASE,
+            LookUpDataType.EFO,
+            LookUpDataType.HPO,
+            LookUpDataType.MP,
+            LookUpDataType.ECO
+        )
+        ).lookup
 
 
 class ProcessContext(object):

@@ -80,8 +80,8 @@ class MousePhenotypes(IPlugin):
         self._logger.debug("_get_mp_classes")
         self.lookup_data = LookUpDataRetriever(self.loader.es,
                                                self.r_server,
-                                               data_types=(LookUpDataType.MP,),
-                                               autoload=True
+                                               [],
+                                               (LookUpDataType.MP,)
                                                ).lookup
 
         #TOD this is a moderately hideous bit of pointless munging, but I don't have time fix it now!

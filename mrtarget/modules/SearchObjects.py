@@ -289,7 +289,8 @@ class SearchObjectProcess(object):
                            max_size=1000,
                            job_timeout=180)
 
-        lookup_data = LookUpDataRetriever(self.loader.es,self.r_server,data_types=[LookUpDataType.CHEMBL_DRUGS]).lookup
+        lookup_data = LookUpDataRetriever(self.loader.es, self.r_server,
+            [],[LookUpDataType.CHEMBL_DRUGS]).lookup
 
         workers = [SearchObjectAnalyserWorker(queue,
                                               None,

@@ -59,18 +59,13 @@ class LookUpDataType(object):
 
 class LookUpDataRetriever(object):
     def __init__(self,
-                 es=None,
-                 r_server=None,
-                 targets=[],
-                 data_types=(LookUpDataType.TARGET,
-                             LookUpDataType.DISEASE,
-                             LookUpDataType.ECO),
-                 autoload=True,
-                #  es_pub=None,
+                 es,
+                 r_server,
+                 targets,
+                 data_types
                  ):
 
         self.es = es
-        # self.es_pub = es_pub
         self.r_server = r_server
 
         self.esquery = ESQuery(self.es)
@@ -86,11 +81,11 @@ class LookUpDataRetriever(object):
         for dt in data_types:
             start_time = time.time()
             if dt == LookUpDataType.TARGET:
-                self._get_gene_info(targets, autoload=autoload)
+                self._get_gene_info(targets, True)
             elif dt == LookUpDataType.DISEASE:
-                self._get_available_efos()
+                self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.ECO:
-                self._get_available_ecos()
+                self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.MP:
                 self._logger.debug("get MP info")
                 self._get_mp()
@@ -103,7 +98,7 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.CHEMBL_DRUGS:
                 self._get_available_chembl_mappings()
             elif dt == LookUpDataType.HPA:
-                self._get_available_hpa()
+                self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP', self.r_server)
 
             self._logger.info("finished loading %s data into redis, took %ss" % (dt, str(time.time() - start_time)))
 
@@ -111,15 +106,6 @@ class LookUpDataRetriever(object):
         self.r_server = r_server
         self.lookup.set_r_server(r_server)
         self.esquery = ESQuery()
-
-    def _get_available_efos(self):
-        self._logger.info('getting efos')
-        self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
-
-    def _get_available_ecos(self):
-        self._logger.info('getting ecos')
-        self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
-
 
     def _get_gene_info(self, targets=[], autoload = True):
         self._logger.info('getting gene info')
@@ -214,11 +200,7 @@ class LookUpDataRetriever(object):
                                                            chembl_handler.molecule2synonyms,
                                                            chembl_handler._logger)
         self.lookup.chembl = chembl_handler
-
-    def _get_available_hpa(self):
-        self._logger.info('getting expressions')
-        self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP',
-                                                   self.r_server)
+        
 
 
 

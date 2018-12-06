@@ -39,11 +39,8 @@ class LookupHelpersTestCase(unittest.TestCase):
         self.assertIsNotNone(mock_connectors.r_server)
 
         lookup_data = LookUpDataRetriever(mock_connectors.es, mock_connectors.r_server,
-                                          data_types=(
-                                              LookUpDataType.MP,
-                                          ),
-                                          autoload=True,
-                                          ).lookup
+            [], ( LookUpDataType.MP, ),
+            ).lookup
 
         self.assertIsNotNone(lookup_data)
         self.assertIsNotNone(lookup_data.mp_ontology)
@@ -60,11 +57,8 @@ class LookupHelpersTestCase(unittest.TestCase):
         self.assertIsNotNone(mock_connectors.r_server)
 
         lookup_data = LookUpDataRetriever(mock_connectors.es, mock_connectors.r_server,
-                                      data_types=(
-                                          LookUpDataType.EFO,
-                                      ),
-                                      autoload=True,
-                                      ).lookup
+            [], ( LookUpDataType.EFO, ),
+            ).lookup
 
         self.assertIsNotNone(lookup_data)
         self.assertIsNotNone(lookup_data.efo_ontology)
