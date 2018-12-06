@@ -84,7 +84,7 @@ class MousePhenotypes(IPlugin):
                                                (LookUpDataType.MP,)
                                                ).lookup
 
-        #TOD this is a moderately hideous bit of pointless munging, but I don't have time fix it now!
+        #TODO this is a moderately hideous bit of pointless munging, but I don't have time fix it now!
 
         for mp_id,label in self.lookup_data.mp_ontology.current_classes.items():
 
