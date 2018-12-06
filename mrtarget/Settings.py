@@ -156,7 +156,7 @@ class Config():
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=[])
 
-    ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
+    ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'invalid-evidence-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME = 'submission'
