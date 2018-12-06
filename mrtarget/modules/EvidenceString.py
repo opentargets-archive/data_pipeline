@@ -493,6 +493,7 @@ class EvidenceManager():
             target_class['level2'].append([i['l2'] for i in gene.protein_classification['chembl'] if 'l2' in i])
 
         # Get generic efo info
+        # can it happen you get no efo codes but just one disease?
         all_efo_codes = []
         diseaseid = extended_evidence['disease']['id']
         efo = self._get_efo_obj(diseaseid)
@@ -502,6 +503,7 @@ class EvidenceManager():
             for path in efo_info.data['path']:
                 all_efo_codes.extend(path)
             extended_evidence["disease"][ExtendedInfoEFO.root] = efo_info.data
+
         all_efo_codes = list(set(all_efo_codes))
 
         # Get generic eco info
