@@ -108,9 +108,12 @@ class EfoProcess():
 
         for uri,label in self.disease_ontology.current_classes.items():
             properties = self.disease_ontology.parse_properties(URIRef(uri))
+
+            #create a text block definition/description by joining others together
             definition = ''
-            if 'http://www.ebi.ac.uk/efo/definition' in properties:
-                definition = ". ".join(properties['http://www.ebi.ac.uk/efo/definition'])
+            if 'http://purl.obolibrary.org/obo/IAO_0000115' in properties:
+                definition = ". ".join(properties['http://purl.obolibrary.org/obo/IAO_0000115'])
+
             synonyms = []
             if 'http://www.ebi.ac.uk/efo/alternative_term' in properties:
                 synonyms = properties['http://www.ebi.ac.uk/efo/alternative_term']
