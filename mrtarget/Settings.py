@@ -108,24 +108,6 @@ def update_schema_version(config, schema_version_string):
 
 
 class Config():
-    MINIMAL = read_option('CTTV_MINIMAL', default=False, cast=bool)
-    MINIMAL_ENSEMBL = file_to_list(file_or_resource('minimal_ensembl.txt'))
-
-    INI_SECTION = 'minimal_dataset' if MINIMAL else 'full_dataset'
-
-    HAS_PROXY = ini is not None and ini.has_section('proxy')
-    if HAS_PROXY:
-        PROXY = ini.get('proxy', 'protocol') + "://" + ini.get('proxy', 'username') + \
-                ":" + ini.get('proxy', 'password') + "@" + \
-                ini.get('proxy', 'host') + ":" + \
-                ini.get('proxy', 'port')
-
-        PROXY_PROTOCOL = ini.get('proxy', 'protocol')
-        PROXY_USERNAME = ini.get('proxy', 'username')
-        PROXY_PASSWORD = ini.get('proxy', 'password')
-        PROXY_HOST = ini.get('proxy', 'host')
-        PROXY_PORT = int(ini.get('proxy', 'port'))
-
     ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
     # TODO: an ontology section in the main db.ini file should suffice
     ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
@@ -212,17 +194,17 @@ class Config():
 
     ENSEMBL_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/homo_sapiens_core_94_38_genes.json.gz"
 
-    HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
-    HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')
-    HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
-    HPA_RNA_LEVEL_URL = ini.get(INI_SECTION, 'hpa_rna_level')
-    HPA_RNA_VALUE_URL = ini.get(INI_SECTION, 'hpa_rna_value')
-    HPA_RNA_ZSCORE_URL = ini.get(INI_SECTION, 'hpa_rna_zscore')
+    HPA_NORMAL_TISSUE_URL = ini.get('full_dataset', 'hpa_normal')
+    HPA_CANCER_URL = ini.get('full_dataset', 'hpa_cancer')
+    HPA_SUBCELLULAR_LOCATION_URL = ini.get('full_dataset', 'hpa_subcellular')
+    HPA_RNA_LEVEL_URL = ini.get('full_dataset', 'hpa_rna_level')
+    HPA_RNA_VALUE_URL = ini.get('full_dataset', 'hpa_rna_value')
+    HPA_RNA_ZSCORE_URL = ini.get('full_dataset', 'hpa_rna_zscore')
     #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
-    REACTOME_ENSEMBL_MAPPINGS = ini.get(INI_SECTION, 'ensembl_reactome')
+    REACTOME_ENSEMBL_MAPPINGS = ini.get('full_dataset', 'ensembl_reactome')
     # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
-    REACTOME_PATHWAY_DATA = ini.get(INI_SECTION, 'reactome_pathways')
-    REACTOME_PATHWAY_RELATION = ini.get(INI_SECTION, 'reactome_pathways_rel')
+    REACTOME_PATHWAY_DATA = ini.get('full_dataset', 'reactome_pathways')
+    REACTOME_PATHWAY_RELATION = ini.get('full_dataset', 'reactome_pathways_rel')
     REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
     EVIDENCEVALIDATION_SCHEMA = 'master'
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
@@ -245,11 +227,11 @@ class Config():
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
 
-    CHEMBL_TARGET_BY_UNIPROT_ID = ini.get(INI_SECTION, 'chembl_target')
-    CHEMBL_MECHANISM = ini.get(INI_SECTION, 'chembl_mechanism')
+    CHEMBL_TARGET_BY_UNIPROT_ID = ini.get('full_dataset', 'chembl_target')
+    CHEMBL_MECHANISM = ini.get('full_dataset', 'chembl_mechanism')
     CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
-    CHEMBL_PROTEIN_CLASS = ini.get(INI_SECTION, 'chembl_protein')
-    CHEMBL_TARGET_COMPONENT = ini.get(INI_SECTION, 'chembl_component')
+    CHEMBL_PROTEIN_CLASS = ini.get('full_dataset', 'chembl_protein')
+    CHEMBL_TARGET_COMPONENT = ini.get('full_dataset', 'chembl_component')
 
     # Mouse/Human Orthology with Phenotype Annotations (tab-delimited)
     GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY = "http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt"
