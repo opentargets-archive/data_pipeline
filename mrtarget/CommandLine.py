@@ -41,7 +41,6 @@ def main():
 
     logger = logging.getLogger(__name__+".main()")
 
-<<<<<<< HEAD
     if args.log_level:
         try:
             root_logger = logging.getLogger()
@@ -53,131 +52,6 @@ def main():
             root_logger.exception(e)
             return 1
 
-=======
-    parser = argparse.ArgumentParser(description='Open Targets processing pipeline')
-
-    #take the release tag from the command line, but fall back to environment or ini files
-    parser.add_argument('release_tag', nargs='?', default=Config.RELEASE_VERSION,
-                        help='The prefix to prepend default: %s' % \
-                        Config.RELEASE_VERSION)
-    
-    #handle stage-specific QC
-    parser.add_argument("--qc-out", help="TSV file to write/update qc information",
-                        action="store")
-    parser.add_argument("--qc-in", help="TSV file to read qc information for comparison",
-                        action="store")
-    parser.add_argument("--qc-only", help="only run the qc and not the stage itself",
-                        action="store_true")
-    parser.add_argument("--skip-qc", help="do not run the qc for this stage",
-                        action="store_true")
-
-    #load supplemental and genetic informtaion from various external resources
-    parser.add_argument("--hpa", help="download human protein atlas, process, and store in elasticsearch",
-                        action="store_true")
-    parser.add_argument("--ens", help="retrieve the latest ensembl gene records, store in elasticsearch",
-                        action="store_true")
-    parser.add_argument("--unic", help="cache the uniprot human entries in elasticsearch",
-                        action="store_true")
-    parser.add_argument("--rea", help="download reactome data, process it, and store elasticsearch",
-                        action="store_true")
-
-    #use the sources to combine the gene information into a single new index
-    parser.add_argument("--gen", help="merge the available gene information, store in elasticsearch",
-                        action="store_true")
-
-    #load various ontologies into various indexes
-    parser.add_argument("--efo", help="process Experimental Factor Ontology (EFO), store in elasticsearch",
-                        action="store_true")
-    parser.add_argument("--eco", help="process Evidence and Conclusion Ontology (ECO), store in elasticsearch",
-                        action="store_true")
-
-    #this generates a elasticsearch index from a source json file
-    parser.add_argument("--val", help="check json file, validate, and store in elasticsearch",
-                        action="store_true")
-    parser.add_argument("--valreset", help="reset audit table and previously parsed evidencestrings",
-                        action="store_true")
-    parser.add_argument("--enable-fs", help="write to files instead elasticsearch use it with --output-folder",
-                        action="store_true", default=False)
-    parser.add_argument("--output-folder", help="write output to a folder. Default is './'",
-                        action='store', default='./')
-    parser.add_argument("--input-file", help="pass the path to a gzipped file to use as input for the data validation step",
-                        action='append', default=[])
-    parser.add_argument("--schema-version", help="set the schema version aka 'branch' name. Default is 'master'",
-                        action='store', default='master')
-
-    #this is related to generating a combine evidence index from all the inidividual datasource indicies
-    parser.add_argument("--evs", help="process and validate the available evidence strings, store in elasticsearch",
-                        action="store_true")
-    parser.add_argument("--datasource", help="just process data for this datasource. Does not work with all the steps!!",
-                        action='append', default=[])
-
-    #this has to be stored as "ass" instead of "as" because "as" is a reserved name when accessing it later e.g. `args.as`
-    parser.add_argument("--as", help="compute association scores, store in elasticsearch",
-                        action="store_true", dest="assoc")
-    parser.add_argument("--targets", help="just process data for this target. Does not work with all the steps!!",
-                        action='append', default=[])
-                        
-    #these are related to generated in a search index
-    parser.add_argument("--sea", help="compute search results, store in elasticsearch",
-                        action="store_true")
-    parser.add_argument("--skip-diseases", help="Skip adding diseases to the search index",
-                        action='store_true', default=False)
-    parser.add_argument("--skip-targets", help="Skip adding targets to the search index",
-                        action='store_true', default=False)
-
-    #additional information to add
-    parser.add_argument("--ddr", help="compute data driven t2t and d2d relations, store in elasticsearch",
-                        action="store_true")
-
-    #generate some high-level summary metrics over the release
-    parser.add_argument("--metric", help="generate metrics", 
-                        action="store_true")
-
-    #quality control steps
-    parser.add_argument("--qc", help="Run quality control scripts",
-                        action="store_true")
-                       
-    #use an external redis rather than spawning one ourselves
-    parser.add_argument("--persist-redis", help="the temporary file wont be deleted if True default: False",
-                        action='store_true', default=False)
-    parser.add_argument("--redis-remote", help="connect to a remote redis",
-                        action='store_true', default=False)
-    parser.add_argument("--redis-host", help="redis host",
-                        action='store', default='')
-    parser.add_argument("--redis-port", help="redis port",
-                        action='store', default='')
-    parser.add_argument("--num-workers", help="num proc workers",
-                        action='store', default=4, type=int)
-    parser.add_argument("--num-writers", help="num proc writers",
-                        action='store', default=2, type=int)
-
-    parser.add_argument("--first-n", help="num first lines to process default to 0 (all)",
-                        action='store', default=0, type=int)
-
-    parser.add_argument("--max-queued-events", help="max number of events to put per queue. Default to 1000",
-                        action='store', default=1000, type=int)
-
-    #tweak how lookup tables are managed
-    parser.add_argument("--lt-reuse", help="reuse the current lookuptable",
-                        action='store_true', default=False)
-    parser.add_argument("--lt-namespace", help="lookuptable namespace to reuse",
-                        action='store', default='')
-
-    #for debugging
-    parser.add_argument("--dump", help="dump core data to local gzipped files",
-                        action="store_true")
-    parser.add_argument("--dry-run", help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
-                        action='store_true', default=False)
-    parser.add_argument("--profile", help="magically profiling process() per process",
-                        action='store_true', default=False)
-    parser.add_argument("--log-level", help="set the log level",
-                        action='store', default='WARNING')
-
-    parser.add_argument("--log-http", help="log all HTTP protocol requests to the specified file",
-                        action='store')
-
-    args = parser.parse_args()
->>>>>>> master
 
     if not args.release_tag:
         logger.error('A [release-tag] has to be specified.')
@@ -205,7 +79,7 @@ def main():
         requests_log.addHandler(logging.FileHandler(args.log_http))
 
 
-    connected = connectors.init_services_connections(args.redis_host, args.redis_port, args.redis_remote)
+    connected = connectors.init_services_connections(redispersist=args.redis_remote)
 
     logger.debug('Attempting to establish connection to the backend... %s',
                  str(connected))

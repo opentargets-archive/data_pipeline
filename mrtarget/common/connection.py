@@ -9,19 +9,20 @@ import redis.exceptions as redis_ex
 
 from mrtarget.Settings import Config
 
+
 # just one redis instance per app
 r_instance = {'instance': None}
 
 
-def new_redis_client(host, port):
-    return Redis(host=host,
-                 port=port)
+def new_redis_client():
+    return Redis(host=Config.REDISLITE_DB_HOST,
+                 port=Config.REDISLITE_DB_PORT)
 
 
-def redis_server_is_up(host, port, log_h=None):
+def redis_server_is_up(log_h=None):
     is_up = False
     try:
-        c = new_redis_client(host, port)
+        c = new_redis_client()
         c.ping()
         is_up = True
 
@@ -65,8 +66,12 @@ class PipelineConnectors():
         self.r_instance = r_instance['instance']
 
     def init_services_connections(self,
-            r_host, r_port, r_remote):
+                                  redispersist=False):
         success = False
+        self.persist = redispersist
+        r_host = Config.REDISLITE_DB_HOST
+        r_port = Config.REDISLITE_DB_PORT
+        r_remote = Config.REDISLITE_REMOTE
 
         '''init es client for data'''
         hosts = Config.ELASTICSEARCH_NODES
@@ -95,11 +100,13 @@ class PipelineConnectors():
         # check if redis server is already running it will be checked if we dont want
         # remote enabled but the local redis server instance is still running and we want
         # things implicit and stop bothering other developers forced to kill local redis
-        if redis_server_is_up(r_host, r_port, self.logger):
+        if redis_server_is_up(self.logger):
             r_remote = True
 
         if not r_remote and not r_instance['instance']:
             self.redis_db_file = tmp.mktemp(suffix='.rdb', dir='/tmp')
+            self.logger.debug('new named temp file for redis %s with persist %s',
+                              self.redis_db_file, str(redispersist))
 
             r_instance['instance'] = Redis(dbfilename=self.redis_db_file,
                                  serverconfig={'save': [],
@@ -108,7 +115,7 @@ class PipelineConnectors():
                                                'port': str(r_port)})
             self.r_instance = r_instance['instance']
 
-        self.r_server = new_redis_client(r_host, r_port)
+        self.r_server = new_redis_client()
         self.logger.debug('Established redislite at %s port %s',
                           r_host,
                           str(r_port))

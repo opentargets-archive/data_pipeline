@@ -24,9 +24,38 @@ class TestRedisWorker(unittest.TestCase):
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
     queue_name_test = UNIQUE_RUN_ID+'|test_queue'
 
+    @classmethod
+    def setUpClass(cls):
+        pass
+#         cls.connectors = PipelineConnectors()
+#         cls.connectors.init_services_connections()
+#         cls.queue1 = RedisQueue(queue_id=cls.queue_name_test + '_1',
+#                                 max_size=10,
+#                                 job_timeout=120,
+#                                 batch_size=1,
+#                                 r_server=cls.connectors.r_server,
+#                                 serialiser='pickle')
+#         cls.queue2 = RedisQueue(queue_id=cls.queue_name_test + '_2',
+#                                 max_size=10,
+#                                 job_timeout=120,
+#                                 batch_size=1,
+#                                 r_server=cls.connectors.r_server,
+#                                 serialiser='pickle')
+
+    @classmethod
+    def tearDown(cls):
+        pass
+#         if not cls.queue1.is_done(): cls.queue1.done()
+#         if not cls.queue2.is_done(): cls.queue2.done()
+# 
+#         cls.queue1.close()
+#         cls.queue2.close()
+# 
+#         cls.connectors.close()
+
     def test_WhiteCollar(self):
         connectors = PipelineConnectors()
-        connectors.init_services_connections("localhost", 35000, False)
+        connectors.init_services_connections()
         
         queue1 = RedisQueue(queue_id='test1' + '_1',
                                 max_size=10,
@@ -75,7 +104,10 @@ class TestRedisWorker(unittest.TestCase):
         self.assertTrue(queue2.is_done())
         self.assertFalse(test_workers.is_alive())
         self.assertFalse(test_consumer.is_alive())
-        
+
+        if not queue1.is_done(): queue1.done()
+        if not queue2.is_done(): queue2.done()
+ 
         queue1.close()
         queue2.close()
  

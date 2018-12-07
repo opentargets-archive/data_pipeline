@@ -1,14 +1,11 @@
 import unittest
 from mrtarget.common.ElasticsearchLoader import Loader
-from mrtarget.common.connection import new_es_client
-from mrtarget.Settings import Config
 
 
 class ElasticsearchLoaderTestCase(unittest.TestCase):
 
     def test_put(self):
-        es = new_es_client(Config.ELASTICSEARCH_NODES)
-        loader = Loader(es, dry_run=True)
+        loader = Loader(dry_run=True)
         loader.put('dummy-index',
                    'dummy-doctype',
                    'id',
@@ -19,8 +16,7 @@ class ElasticsearchLoaderTestCase(unittest.TestCase):
         loader.close()
 
     def test_many_put(self):
-        es = new_es_client(Config.ELASTICSEARCH_NODES)
-        loader = Loader(es, dry_run=True,
+        loader = Loader(dry_run=True,
                         chunk_size=100)
         for i in range(150):
             loader.put('dummy-index',

@@ -17,8 +17,9 @@ def init_services_connections():
     '''
     _logger.info("init_services_connections")
     connectors = PipelineConnectors()
-    m = connectors.init_services_connections("localhost",35000, False)
-    _logger.debug('Attempting to establish connection to the backend... %s',str(m))
+    m = connectors.init_services_connections()
+    _logger.debug('Attempting to establish connection to the backend... %s',
+                       str(m))
     return connectors
 
 class LookupHelpersTestCase(unittest.TestCase):
