@@ -152,6 +152,7 @@ class EfoProcess():
                             doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                             ID=efo_id,
                             body = efo_obj)
+        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
