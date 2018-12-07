@@ -1,6 +1,7 @@
 import os
 
 import configargparse
+from Settings import Config
 
 
 """
@@ -29,8 +30,8 @@ class Configuration(object):
     This will create a singleton argument parser that is appropriately configured
     with the various command line, environment, and ini/yaml file options.
 
-    Note that backwards compatibility of arguments is not guaranteed. To ensure 
-    legacy arguments are interpreted, use get_args() 
+    Note that backwards compatibility of arguments is not guaranteed. To ensure
+    legacy arguments are interpreted, use get_args()
     """
 
     def _setup_parser(self):
@@ -90,9 +91,9 @@ class Configuration(object):
         p.add("--datasource", help="just process data for this datasource. Does not work with all the steps!!",
               action='append', default=[])
 
-        # this has to be stored as "ass" instead of "as" because "as" is a reserved name when accessing it later e.g. `args.as`
+        # this has to be stored as "assoc" instead of "as" because "as" is a reserved name when accessing it later e.g. `args.as`
         p.add("--as", help="compute association scores, store in elasticsearch",
-              action="store_true", dest="ass")
+              action="store_true", dest="assoc")
         p.add("--targets", help="just process data for this target. Does not work with all the steps!!",
               action='append', default=[])
 
@@ -167,5 +168,14 @@ class Configuration(object):
         if not args.redis_host and not args.redis_port and 'CTTV_REDIS_SERVER' in os.environ:
             args.redis_host, args.redis_port = os.environ['CTTV_REDIS_REMOTE'].split(
                 ":")
+
+        if args.redis_remote:
+            Config.REDISLITE_REMOTE = args.redis_remote
+
+        if args.redis_host:
+            Config.REDISLITE_DB_HOST = args.redis_host
+
+        if args.redis_port:
+            Config.REDISLITE_DB_PORT = args.redis_port
 
         return args
