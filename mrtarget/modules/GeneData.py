@@ -474,6 +474,7 @@ class GeneManager():
         for w in workers:
             w.join()
 
+        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         self._logger.info('all gene objects pushed to elasticsearch')
 
 
