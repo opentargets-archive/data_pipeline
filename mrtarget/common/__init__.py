@@ -43,37 +43,20 @@ def url_to_stream(url, *args, **kwargs):
 
 class URLZSource(object):
     def __init__(self, filename, *args, **kwargs):
-        """A source extension for petl python package
+        """Easy way to open multiple types of URL protocol (e.g. http:// and file://)
+        as well as handling compressed content (e.g. .gz or .zip) if appropriate.
+
         Just in case you need to use proxies for url use it as normal
-        named arguments
+        named arguments to requests.
 
         >>> # proxies = {}
         >>> # if Config.HAS_PROXY:
         ...    # self.proxies = {"http": Config.PROXY,
         ...                      # "https": Config.PROXY}
         >>> # with URLZSource('http://var.foo/noname.csv',proxies=proxies).open() as f:
-        >>> from __future__ import absolute_import, print_function
-        >>> import petl as p
-        >>> t = p.fromcsv(mpetl.URLZSource('https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'), delimiter='|')
-        >>> t.look()
-
-        +------------------------+-------------------+
-        | label                  | uberon_code       |
-        +========================+===================+
-        | u'stomach 2'           | u'UBERON_0000945' |
-        +------------------------+-------------------+
-        | u'stomach 1'           | u'UBERON_0000945' |
-        +------------------------+-------------------+
-        | u'mucosa of esophagus' | u'UBERON_0002469' |
-        +------------------------+-------------------+
-        | u'transverse colon'    | u'UBERON_0001157' |
-        +------------------------+-------------------+
-        | u'brain'               | u'UBERON_0000955' |
-        +------------------------+-------------------+
-        ...
 
         """
-        self.filename = url_name = urllify(filename)
+        self.filename = urllify(filename)
         self.args = args
         self.kwargs = kwargs
         self.proxies = None
@@ -82,6 +65,11 @@ class URLZSource(object):
 
     @contextmanager
     def _open_local(self, filename, mode):
+        """
+        This is an internal function to handle opening the temporary file 
+        that the URL has been downloaded to, including handling compression
+        if appropriate
+        """
         open_f = None
 
         if filename.endswith('.gz'):
@@ -101,6 +89,11 @@ class URLZSource(object):
 
     @contextmanager
     def open(self, mode='r'):
+        """
+        This downloads the URL to a temporary file, naming the file
+        based on the URL. 
+        """
+
         if self.filename.startswith('ftp://'):
             raise NotImplementedError('finish ftp')
 
@@ -109,6 +102,8 @@ class URLZSource(object):
             f = self.r_session.get(url=self.filename, stream=True, **self.kwargs)
             f.raise_for_status()
             file_to_open = None
+            #this has to be "delete=false" so that it can be re-opened with the same filename
+            #to be read out again
             with tmp.NamedTemporaryFile(mode='wb', suffix=local_filename, delete=False) as fd:
                 # write data into file in streaming fashion
                 file_to_open = fd.name
