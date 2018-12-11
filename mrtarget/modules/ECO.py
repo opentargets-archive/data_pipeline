@@ -41,17 +41,15 @@ class EcoProcess():
 
     def process_all(self):
         self._process_ontology_data()
-        #self._process_eco_data()
         self._store_eco()
 
     def _process_ontology_data(self):
 
-        uri_so = Config.ONTOLOGY_CONFIG.get('uris', 'eco')
+        uri_so = Config.ONTOLOGY_CONFIG.get('uris', 'so')
         uri_eco = Config.ONTOLOGY_CONFIG.get('uris', 'eco')
 
         self.evidence_ontology.load_evidence_classes(uri_so, uri_eco)
         for uri,label in self.evidence_ontology.current_classes.items():
-            #logger.debug("URI: %s, label:%s"%(uri, label))
             eco = ECO(uri,
                       label,
                       self.evidence_ontology.classes_paths[uri]['all'],
