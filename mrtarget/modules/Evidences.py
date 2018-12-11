@@ -39,7 +39,7 @@ def fix_and_score_evidence(validated_evs, process_context):
 
         # extend data in evidencestring
         fixed_ev_ext = process_context.kwargs.evidence_manager.get_extended_evidence(fixed_ev)
-        process_context.kwargs.evidence_manager.inject_loci(fixed_ev_ext)
+
         validated_evs.is_valid = True
         validated_evs.line = fixed_ev_ext.to_json()
         right = validated_evs

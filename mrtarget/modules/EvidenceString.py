@@ -317,39 +317,14 @@ class EvidenceManager():
 
         return new_target_id, id_not_in_ensembl
 
-    def inject_loci(self, ev):
-        gene_id = ev.evidence['target']['id']
-        loc = addict.Dict()
-
-        if gene_id in self.available_genes:
-            # setting gene loci info
+    def is_excluded_by_biotype(self, datasource, gene_id):
+        is_excluded = False
+        if datasource in Config.EXCLUDED_BIOTYPES_BY_DATASOURCE:
             gene_obj = self.available_genes[gene_id]
-            chr = gene_obj['chromosome']
-            pos_begin = gene_obj['gene_start']
-            pos_end = gene_obj['gene_end']
+            if gene_obj['biotype'] in Config.EXCLUDED_BIOTYPES_BY_DATASOURCE[datasource]:
+                is_excluded = True
 
-            loc[chr].gene_begin = pos_begin
-            loc[chr].gene_end = pos_end
-
-            # setting variant loci info if any
-            # only snps are supported at the moment
-            if 'variant' in ev.evidence and \
-                    'chrom' in ev.evidence['variant'] and \
-                    'pos' in ev.evidence['variant']:
-                vchr = ev.evidence['variant']['chrom']
-
-                vpos_begin = ev.evidence['variant']['pos']
-                vpos_end = ev.evidence['variant']['pos']
-
-                loc[vchr].variant_begin = vpos_begin
-                loc[vchr].variant_end = vpos_end
-
-            # setting all loci into the evidence
-            ev.evidence['loci'] = loc.to_dict()
-
-        else:
-            self.logger.error('inject_loci cannot find gene id %s', gene_id)
-
+        return is_excluded
 
     @staticmethod
     def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
@@ -385,7 +360,6 @@ class EvidenceManager():
 
     def check_is_valid_evs(self, evidence, datasource):
         """check consistency of the data in the evidence and returns a tuple with (is_valid, problem_str)"""
-
         ev = evidence.evidence
         evidence_id = ev['id']
 
@@ -403,7 +377,11 @@ class EvidenceManager():
         if efo_id not in self.available_efos:
             problem_str = "%s Evidence %s has an invalid efo id in disease.id: %s" % (datasource, evidence_id, efo_id)
             return False, problem_str
-
+        if self.is_excluded_by_biotype(datasource, gene_id):
+            problem_str = "%s Evidence %s gene_id %s is an excluded biotype" % \
+                                        (datasource, evidence_id, gene_id)
+            return False, problem_str
+        # well, it seems this evidence is probably valid
         return True, ''
 
     def is_valid(self, evidence, datasource):
@@ -493,6 +471,7 @@ class EvidenceManager():
             target_class['level2'].append([i['l2'] for i in gene.protein_classification['chembl'] if 'l2' in i])
 
         # Get generic efo info
+        # can it happen you get no efo codes but just one disease?
         all_efo_codes = []
         diseaseid = extended_evidence['disease']['id']
         efo = self._get_efo_obj(diseaseid)
@@ -502,6 +481,7 @@ class EvidenceManager():
             for path in efo_info.data['path']:
                 all_efo_codes.extend(path)
             extended_evidence["disease"][ExtendedInfoEFO.root] = efo_info.data
+
         all_efo_codes = list(set(all_efo_codes))
 
         # Get generic eco info
@@ -908,13 +888,11 @@ class EvidenceProcesser(RedisQueueWorkerProcess):
             # Add scoring to evidence string
             fixed_ev.score_evidence(self.evidence_manager.score_modifiers,
                                     self.global_stats)
-            # Extend data in evidencestring
 
             ev = self.evidence_manager.get_extended_evidence(fixed_ev)
         else:
             raise AttributeError("Invalid %s Evidence String" % (fixed_ev.datasource))
 
-        # self.evidence_manager.inject_loci(ev)
         loader_args = (
             Config.ELASTICSEARCH_DATA_INDEX_NAME + '-' + Config.DATASOURCE_TO_INDEX_KEY_MAPPING[ev.database],
             ev.get_doc_name(),
