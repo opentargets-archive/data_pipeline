@@ -166,7 +166,7 @@ $(JSON_PATH)/phenodigm.json.gz:
 
 $(JSON_PATH)/phewas_catalog.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-07-12-18.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
 
 $(JSON_PATH)/progeny.json.gz:
 	mkdir -p $(JSON_PATH)

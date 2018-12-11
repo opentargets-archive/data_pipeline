@@ -202,17 +202,8 @@ def validate_evidence(line, process_context):
 
         if efo_id:
             # Check disease term or phenotype term
-            # if (short_disease_id not in self.lookup_data.available_efos) and \
-            if (efo_id not in process_context.kwargs.luts.efo_ontology.current_classes) and \
-                    (efo_id not in process_context.kwargs.luts.hpo_ontology.current_classes) and \
-                    (efo_id not in process_context.kwargs.luts.mp_ontology.current_classes):
+            if efo_id not in process_context.kwargs.luts.available_efos:
                 validated_evs.explanation_type = 'invalid_disease'
-                validated_evs.explanation_str = efo_id
-                disease_failed = True
-            if (efo_id in process_context.kwargs.luts.efo_ontology.obsolete_classes) or \
-                    (efo_id in process_context.kwargs.luts.hpo_ontology.obsolete_classes) or \
-                    (efo_id in process_context.kwargs.luts.mp_ontology.obsolete_classes):
-                validated_evs.explanation_type = 'obsolete_disease'
                 validated_evs.explanation_str = efo_id
                 disease_failed = True
         else:
