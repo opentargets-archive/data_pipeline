@@ -21,41 +21,12 @@ class ReactomeDataDownloader():
 
     def _download_data(self, url):
         r = requests.get(url)
-        print "getting from " + url
+        self.logger.debug("getting from " + url)
         try:
             r.raise_for_status()
         except:
-            print "failed to load file"
             raise Exception("failed to download data from url: %s. Status code: %i" % (url, r.status_code))
         return r.content
-
-    #
-    # def retrieve_pathway_gene_mappings(self):
-    #     data =  self._download_data(Config.REACTOME_ENSEMBL_MAPPINGS)
-    #     self._load_pathway_gene_mappings_to_pg(data)
-
-    #
-    # def _load_pathway_gene_mappings_to_pg(self, data):
-    #     self.relations = {}
-    #     added_relations=[]
-    #     for row in data.split('\n'):
-    #         if row:
-    #             ensembl_id, reactome_id,url, name, eco, species  = row.split('\t')
-    #             relation =(ensembl_id, reactome_id)
-    #             if relation not in added_relations:
-    #                 if (reactome_id in self.valid_pathway_ids) and (species in self.allowed_species):
-    #                     self.relations[relation]=dict(ensembl_id=ensembl_id,
-    #                                                              reactome_id=reactome_id,
-    #                                                              evidence_code=eco,
-    #                                                              species=species
-    #                                                          )
-    #                     added_relations.append(relation)
-    #                     if len(added_relations)% 1000 == 0:
-    #                         self.logger.info("%i rows parsed for reactome_ensembl_mapping"%len(added_relations))
-    #             else:
-    #                 self.logger.warn("Pathway mapping %s is already loaded, skipping duplicate data"%str(relation))
-    #     self.logger.info('parsed %i rows for reactome_ensembl_mapping'%len(added_relations))
-
 
     def get_pathway_data(self):
         self.valid_pathway_ids = []
