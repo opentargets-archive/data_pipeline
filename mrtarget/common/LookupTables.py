@@ -170,7 +170,7 @@ class ECOLookUpTable(object):
 
     def _load_eco_data(self, r_server=None):
         self._logger = logging.getLogger(__name__)
-        for eco in self._es_query.get_all_eco(True):
+        for eco in self._es_query.get_all_eco():
             self._table.set(self.get_ontology_code_from_url(eco['code']), eco,
                             r_server=self._get_r_server(r_server))  # TODO can be improved by sending elements in batches
 

@@ -67,6 +67,7 @@ class EcoProcess():
                             doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
                             ID=eco_id,
                             body=eco_obj)
+        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_ECO_INDEX_NAME)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
@@ -77,8 +78,7 @@ class EcoProcess():
         #number of eco entries
         eco_count = 0
         #Note: try to avoid doing this more than once!
-        #for some reason, only the ECO get all need to explicitly be told to get all sources
-        for eco_entry in esquery.get_all_eco(True):
+        for eco_entry in esquery.get_all_eco():
             eco_count += 1
 
         #put the metrics into a single dict
