@@ -16,10 +16,13 @@ class ReactomeNode(TreeNode, JSONSerializable):
 class ReactomeDataDownloader():
     allowed_species = ['Homo sapiens']
 
-    def __init__(self):
+    def __init__(self, pathway_data_url, pathway_relation_url):
         self.logger = logging.getLogger(__name__)
+        self.pathway_data_url = pathway_data_url
+        self.pathway_relation_url = pathway_relation_url
 
     def _download_data(self, url):
+        #TODO use URLZSource properly
         r = requests.get(url)
         self.logger.debug("getting from " + url)
         try:
@@ -30,7 +33,7 @@ class ReactomeDataDownloader():
 
     def get_pathway_data(self):
         self.valid_pathway_ids = []
-        for row in self._download_data(Config.REACTOME_PATHWAY_DATA).split('\n'):
+        for row in self._download_data(self.pathway_data_url).split('\n'):
             if row:
                 pathway_id, pathway_name, species = row.split('\t')
                 pathway_id = pathway_id[1:-1] if pathway_id[0] == '"' else pathway_id
@@ -52,7 +55,7 @@ class ReactomeDataDownloader():
 
     def get_pathway_relations(self):
         added_relations = []
-        for row in self._download_data(Config.REACTOME_PATHWAY_RELATION).split('\n'):
+        for row in self._download_data(self.pathway_relation_url).split('\n'):
             if row:
                 parent_id, child_id = row.split('\t')
                 parent_id = parent_id[1:-1] if parent_id[0] == '"' else parent_id
@@ -73,12 +76,12 @@ class ReactomeDataDownloader():
 
 
 class ReactomeProcess():
-    def __init__(self, loader):
+    def __init__(self, loader, pathway_data_url, pathway_relation_url):
         self.loader = loader
         self.g = nx.DiGraph(name="reactome")
         self.data = {}
         '''download data'''
-        self.downloader = ReactomeDataDownloader()
+        self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
         self.logger = logging.getLogger(__name__)
 
     def process_all(self):

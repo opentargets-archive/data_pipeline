@@ -113,7 +113,8 @@ def main():
 
 
         if args.rea:
-            process = ReactomeProcess(loader)
+            process = ReactomeProcess(loader, 
+                args.reactome_pathway_data, args.reactome_pathway_relation)
             if not args.qc_only:
                 process.process_all()
             if not args.skip_qc:

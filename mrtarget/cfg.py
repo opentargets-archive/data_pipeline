@@ -20,7 +20,7 @@ class Configuration(object):
         return it
 
     """
-    One-time intiialization of singleton
+    One-time intialization of singleton
     """
 
     def init(self, *args, **kwds):
@@ -35,12 +35,21 @@ class Configuration(object):
     """
 
     def _setup_parser(self):
-        p = configargparse.get_argument_parser()
+        p = configargparse.get_argument_parser(config_file_parser_class=configargparse.YAMLConfigFileParser)
         p.description = 'Open Targets processing pipeline'
 
         # argument to read config file
         p.add('-c', '--config', is_config_file=True,
-            help='path to config file')
+            env_var="CONFIG", help='path to config file (YAML)')
+
+        # logging
+        p.add("--log-level", help="set the log level",
+            env_var="LOG_LEVEL", action='store', default='INFO')
+        p.add("--log-config", help="logging configuration file",
+            env_var="LOG_CONFIG", action='store', default='mrtarget/resources/logging.ini')
+        #TODO remove this as it can be captured inside a custom log config instead
+        p.add("--log-http", help="log HTTP(S) requests in this file",
+            env_var="LOG_HTTP", action='store')
 
         # take the release tag from the command line, but fall back to environment or ini files
         p.add('release_tag', nargs='?')
@@ -78,8 +87,6 @@ class Configuration(object):
 
         # this generates a elasticsearch index from a source json file
         p.add("--val", help="check json file, validate, and store in elasticsearch",
-            action="store_true")
-        p.add("--valreset", help="reset audit table and previously parsed evidencestrings",
             action="store_true")
         p.add("--input-file", help="pass the path to a gzipped file to use as input for the data validation step",
             action='append')
@@ -145,30 +152,18 @@ class Configuration(object):
         p.add("--profile", help="magically profiling process() per process",
             action='store_true', default=False)
 
-        # logging
-        p.add("--log-level", help="set the log level",
-            env_var="LOG_LEVEL", action='store', default='INFO')
-        p.add("--log-config", help="logging configuration file",
-            env_var="LOG_CONFIG", action='store', default='mrtarget/resources/logging.ini')
-        p.add("--log-http", help="log HTTP(S) requests in this file",
-            env_var="LOG_HTTP", action='store')
-
         # process handling
         p.add("--num-workers", help="num proc workers",
             env_var="NUM_WORKERS", action='store', default=4, type=int)
-
         p.add("--max-queued-events", help="max number of events to put per queue",
             env_var="MAX_QUEUED_EVENTS", action='store', default=10000, type=int)
 
 
         #reactome
-        
-        p.add("--reactome-ensembl-mappings", help="location of ensemble/reactome mapping file",
-            action='store')
         p.add("--reactome-pathway-data", help="location of reactome pathway file",
-            action='store')
+            env_var="REACTOME_PATHWAY_DATA", action='store')
         p.add("--reactome-pathway-relation", help="location of reactome pathway relationships file",
-            action='store')
+            env_var="REACTOME_PATHWAY_RELACTION", action='store')
         
 
         return p

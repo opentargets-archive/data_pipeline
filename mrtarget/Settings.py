@@ -201,10 +201,6 @@ class Config():
     HPA_RNA_VALUE_URL = ini.get('full_dataset', 'hpa_rna_value')
     HPA_RNA_ZSCORE_URL = ini.get('full_dataset', 'hpa_rna_zscore')
 
-    REACTOME_ENSEMBL_MAPPINGS = ini.get('full_dataset', 'ensembl_reactome')
-    REACTOME_PATHWAY_DATA = ini.get('full_dataset', 'reactome_pathways')
-    REACTOME_PATHWAY_RELATION = ini.get('full_dataset', 'reactome_pathways_rel')
-
     EVIDENCEVALIDATION_SCHEMA = 'master'
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
 

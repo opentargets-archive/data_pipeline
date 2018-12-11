@@ -1,0 +1,8 @@
+#default configuration 
+
+#logging
+
+
+#reactome
+reactome-pathway-data: http://www.reactome.org/download/current/ReactomePathways.txt
+reactome-pathway-relation: http://www.reactome.org/download/current/ReactomePathwaysRelation.txt
