@@ -218,7 +218,7 @@ association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_validated-data-generic
+	$(INDEX_CMD) $(ES_PREFIX)_validated-data
 	$(MRTARGET_CMD) --as $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
 .PHONY: association_qc

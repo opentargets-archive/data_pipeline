@@ -67,6 +67,7 @@ class EcoProcess():
                             doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
                             ID=eco_id,
                             body=eco_obj)
+        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_ECO_INDEX_NAME)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
