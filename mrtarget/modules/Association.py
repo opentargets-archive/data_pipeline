@@ -558,10 +558,7 @@ class ScoringProcess():
                                               LookUpDataType.TARGET,
                                               LookUpDataType.ECO,
                                               LookUpDataType.HPA
-                                          ),
-                                          autoload=True if not targets
-                                          or len(targets) > 100
-                                          else False).lookup
+                                          )).lookup
 
         if not targets:
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
