@@ -341,8 +341,24 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['sysbio'] = 'affected_pathway'
 
     EXCLUDED_BIOTYPES_BY_DATASOURCE = {
-        'expression_atlas': [],
-        'europepmc': []
+        'expression_atlas': ["IG_C_pseudogene",
+                             "IG_J_pseudogene",
+                             "IG_pseudogene",
+                             "IG_V_pseudogene",
+                             "polymorphic_pseudogene",
+                             "processed_pseudogene",
+                             "pseudogene",
+                             "rRNA",
+                             "rRNA_pseudogene",
+                             "snoRNA",
+                             "snRNA",
+                             "transcribed_processed_pseudogene",
+                             "transcribed_unitary_pseudogene",
+                             "transcribed_unprocessed_pseudogene",
+                             "TR_J_pseudogene",
+                             "TR_V_pseudogene",
+                             "unitary_pseudogene",
+                             "unprocessed_pseudogene"]
     }
 
     # use specific index for a datasource
