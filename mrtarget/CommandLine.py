@@ -34,12 +34,22 @@ def main():
     #parse config file, environment, and command line arguments
     args = mrtarget.cfg.Configuration().args
 
-    #set up logging
-    logging.basicConfig()
-    if args.log_config and os.path.isfile(args.log_config) and os.access(args.log_config, os.R_OK):
-        logging.config.fileConfig(args.log_config,  disable_existing_loggers=False)
 
-    logger = logging.getLogger(__name__+".main()")
+    #set up logging
+    logger = None
+    if args.log_config:
+        if os.path.isfile(args.log_config) and os.access(args.log_config, os.R_OK):
+            logging.config.fileConfig(args.log_config,  disable_existing_loggers=False)
+            logger = logging.getLogger(__name__+".main()")
+        else:
+            logging.basicConfig()
+            logger = logging.getLogger(__name__+".main()")
+            logger.warning("unable to read file {}".format(args.log_config))
+
+    else:
+        logging.basicConfig()
+        logger = logging.getLogger(__name__+".main()")
+
 
     if args.log_level:
         try:

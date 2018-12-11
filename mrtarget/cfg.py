@@ -46,10 +46,8 @@ class Configuration(object):
         p.add('release_tag', nargs='?')
 
         # handle stage-specific QC
-        p.add("--qc-out", help="TSV file to write/update qc information",
-            action="store")
-        p.add("--qc-in", help="TSV file to read qc information for comparison",
-            action="store")
+        p.add("--qc-out", help="TSV file to write/update qc information")
+        p.add("--qc-in", help="TSV file to read qc information for comparison")
         p.add("--qc-only", help="only run the qc and not the stage itself",
             action="store_true")
         p.add("--skip-qc", help="do not run the qc for this stage",
@@ -62,6 +60,7 @@ class Configuration(object):
             action="store_true")
         p.add("--unic", help="cache the uniprot human entries in elasticsearch",
             action="store_true")
+
         p.add("--rea", help="download reactome data, process it, and store elasticsearch",
             action="store_true")
 
@@ -76,27 +75,28 @@ class Configuration(object):
             action="store_true")
         p.add("--eco", help="process Evidence and Conclusion Ontology (ECO), store in elasticsearch",
             action="store_true")
+
         # this generates a elasticsearch index from a source json file
         p.add("--val", help="check json file, validate, and store in elasticsearch",
             action="store_true")
         p.add("--valreset", help="reset audit table and previously parsed evidencestrings",
             action="store_true")
         p.add("--input-file", help="pass the path to a gzipped file to use as input for the data validation step",
-            action='append', default=[])
+            action='append')
         p.add("--schema-version", help="set the schema version aka 'branch' name. Default is 'master'",
-            action='store', default='master')
+            env_var="SCHEMA_VERSION", default='master')
 
         # this is related to generating a combine evidence index from all the inidividual datasource indicies
         p.add("--evs", help="process and validate the available evidence strings, store in elasticsearch",
             action="store_true")
         p.add("--datasource", help="just process data for this datasource. Does not work with all the steps!!",
-            action='append', default=[])
+            action='append')
 
         # this has to be stored as "assoc" instead of "as" because "as" is a reserved name when accessing it later e.g. `args.as`
         p.add("--as", help="compute association scores, store in elasticsearch",
             action="store_true", dest="assoc")
         p.add("--targets", help="just process data for this target. Does not work with all the steps!!",
-            action='append', default=[])
+            action='append')
 
         # these are related to generated in a search index
         p.add("--sea", help="compute search results, store in elasticsearch",
@@ -111,12 +111,13 @@ class Configuration(object):
             action="store_true")
 
         # generate some high-level summary metrics over the release
-        p.add("--metric", help="generate metrics",
-            action="store_true")
-        p.add("--metric-file", help="generate metrics",
-            action="store", default='release_metrics.txt')
+        #TODO cleanup and possibly delete eventually
+        p.add("--metric", help="generate metrics", action="store_true")
+        p.add("--metric-file", help="generate metrics", 
+            env_var="METRIC_FILE", default='release_metrics.txt')
 
         # quality control steps
+        #TODO cleanup and possibly delete eventually
         p.add("--qc", help="Run quality control scripts",
             action="store_true")
 
@@ -133,7 +134,7 @@ class Configuration(object):
 
         # elasticsearch
         p.add("--elasticseach-nodes", help="elasticsearch host(s)",
-            action='append', default='localhost',
+            action='append', default=['localhost:9200'],
             env_var='ELASTICSEARCH_NODES')
 
         # for debugging
@@ -146,33 +147,45 @@ class Configuration(object):
 
         # logging
         p.add("--log-level", help="set the log level",
-            action='store', default='INFO')
+            env_var="LOG_LEVEL", action='store', default='INFO')
         p.add("--log-config", help="logging configuration file",
-            action='store', default='logging.ini')
+            env_var="LOG_CONFIG", action='store', default='mrtarget/resources/logging.ini')
         p.add("--log-http", help="log HTTP(S) requests in this file",
-            action='store')
+            env_var="LOG_HTTP", action='store')
 
         # process handling
         p.add("--num-workers", help="num proc workers",
-            action='store', default=4, type=int)
+            env_var="NUM_WORKERS", action='store', default=4, type=int)
 
         p.add("--max-queued-events", help="max number of events to put per queue",
-            action='store', default=10000, type=int)
+            env_var="MAX_QUEUED_EVENTS", action='store', default=10000, type=int)
+
+
+        #reactome
+        
+        p.add("--reactome-ensembl-mappings", help="location of ensemble/reactome mapping file",
+            action='store')
+        p.add("--reactome-pathway-data", help="location of reactome pathway file",
+            action='store')
+        p.add("--reactome-pathway-relation", help="location of reactome pathway relationships file",
+            action='store')
+        
 
         return p
 
     def _get_args(self):
+
         p = self._setup_parser()
         args = p.parse_args()
+
+        #output all configuration values, useful for debugging
+        p.print_values()
 
         # check legacy environment variables for backwards compatibility
         # note these will not be documented via --help !
 
-        if not args.redis_remote and 'CTTV_REDIS_REMOTE' in os.environ:
-            args.redis_remote = os.environ['CTTV_REDIS_REMOTE']
-
-        if not args.redis_host and not args.redis_port and 'CTTV_REDIS_SERVER' in os.environ:
-            args.redis_host, args.redis_port = os.environ['CTTV_REDIS_REMOTE'].split(":")
+#        if not args.redis_host and not args.redis_port and 'CTTV_REDIS_SERVER' in os.environ:
+#            args.redis_host, args.redis_port = os.environ['CTTV_REDIS_REMOTE'].split(":")
 
         if args.redis_remote:
             Config.REDISLITE_REMOTE = args.redis_remote
@@ -182,5 +195,6 @@ class Configuration(object):
 
         if args.redis_port:
             Config.REDISLITE_DB_PORT = args.redis_port
+
 
         return args
