@@ -200,12 +200,11 @@ class Config():
     HPA_RNA_LEVEL_URL = ini.get('full_dataset', 'hpa_rna_level')
     HPA_RNA_VALUE_URL = ini.get('full_dataset', 'hpa_rna_value')
     HPA_RNA_ZSCORE_URL = ini.get('full_dataset', 'hpa_rna_zscore')
-    #HPA_RNA_URL = 'http://v16.proteinatlas.org/download/rna_tissue.csv.zip'
+
     REACTOME_ENSEMBL_MAPPINGS = ini.get('full_dataset', 'ensembl_reactome')
-    # REACTOME_ENSEMBL_MAPPINGS = 'http://www.reactome.org/download/current/Ensembl2Reactome_All_Levels.txt'
     REACTOME_PATHWAY_DATA = ini.get('full_dataset', 'reactome_pathways')
     REACTOME_PATHWAY_RELATION = ini.get('full_dataset', 'reactome_pathways_rel')
-    REACTOME_SBML_REST_URI = 'http://www.reactome.org/ReactomeRESTfulAPI/RESTfulWS/sbmlExporter/{0}'
+
     EVIDENCEVALIDATION_SCHEMA = 'master'
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
 
@@ -216,7 +215,6 @@ class Config():
         'affected_pathway':    'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
         'somatic_mutation':    'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
         'known_drug':          'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
-#        'literature_mining':   'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
         'literature':          'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
         'animal_model':        'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
     }
