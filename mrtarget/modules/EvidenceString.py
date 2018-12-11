@@ -1055,9 +1055,8 @@ class EvidenceStringProcess():
 
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
-                                          data_types=lookup_data_types,
-                                          autoload=True,
-                                        #   es_pub=self.es_pub,
+                                          [],
+                                          lookup_data_types,
                                           ).lookup
 
         global_stat_cache= 'global_stats.pkl'
