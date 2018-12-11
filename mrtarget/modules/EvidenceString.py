@@ -378,7 +378,7 @@ class EvidenceManager():
             problem_str = "%s Evidence %s has an invalid efo id in disease.id: %s" % (datasource, evidence_id, efo_id)
             return False, problem_str
         if self.is_excluded_by_biotype(datasource, gene_id):
-            problem_str = problem_str = "%s Evidence %s gene_id %s is an excluded biotype" % \
+            problem_str = "%s Evidence %s gene_id %s is an excluded biotype" % \
                                         (datasource, evidence_id, gene_id)
             return False, problem_str
         # well, it seems this evidence is probably valid
