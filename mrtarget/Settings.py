@@ -340,6 +340,11 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['progeny'] = 'affected_pathway'
     DATASOURCE_TO_DATATYPE_MAPPING['sysbio'] = 'affected_pathway'
 
+    EXCLUDED_BIOTYPES_BY_DATASOURCE = {
+        'expression_atlas': [],
+        'europepmc': []
+    }
+
     # use specific index for a datasource
     DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
     # DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
