@@ -22,28 +22,6 @@ install:
 script:
   - make dry_run
   - pytest --cov=mrtarget --cov-report term tests/ --fulltrace
-branches:
-  only:
-  - master
-  - "/\\d+\\.\\d+\\.\\d+/"
-  - "/mk.*/"
-  - "/af.*/"
-  - "/ck.*/"
-  - "/ms.*/"
-  - "/MS.*/"
-  - "/gp.*/"
-  - "/pl.*/"
-  - "/gk.*/"
-#deploy:
-#  provider: releases
-#  api_key: ${GITHUB_KEY}
-#  file_glob: true
-#  file:
-#    - "target/universal/ot-genetics-api-latest.zip"
-#  on:
-#    repo: opentargets/genetics-api
-#    tags: true
-#  skip_cleanup: true
 notifications:
   email:
     recipients:
@@ -55,7 +33,7 @@ after_success:
   - docker pull "${QUAY_REPO}:${TRAVIS_BRANCH}" || true
   - docker build --pull --cache-from "${QUAY_REPO}:${TRAVIS_BRANCH}" --tag "${QUAY_REPO}" .
   - docker login -u="${QUAY_USER}" -p="${QUAY_PASSWORD}" quay.io
-#   - git_sha="$(git rev-parse --short HEAD)"
+#   - git_sha="$(git rev-parse --short HEAD)" # removed since travis provides a better one to use
   - git_sha="${TRAVIS_COMMIT}"
   - docker tag "${QUAY_REPO}" "${QUAY_REPO}:${TRAVIS_BRANCH}"
   - docker tag "${QUAY_REPO}" "${QUAY_REPO}:${git_sha}-${TRAVIS_BRANCH}"
