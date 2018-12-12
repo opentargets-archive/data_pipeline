@@ -18,45 +18,39 @@ class UniprotDownloader(object):
 
         self.loader = loader
 
-    def cache_human_entries(self, uri=Config.UNIPROT_URI):
+    def cache_human_entries(self, uri):
+        self.logger.debug("download uniprot uri %s", uri)
+        self.logger.debug("to generate this file you have to call this url "
+                            "https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml")
+
+        with URLZSource(uri).open() as r_file:
+            self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
+            self.loader.create_new_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
+
+            self.logger.debug("iterate through the whole uniprot xml file")
+            total_entries = 0
+            for event, elem in etree.iterparse(r_file, events=("end",), tag=self.NS + 'entry'):
+                #parse the XML into an object
+                entry = Parser(elem, return_raw_comments=False).parse()
+                elem.clear()
+
+                #horrible hack, just save it as a blob
+                #have already (re-)created the index so don't do it again
+                json_seqrec = base64.b64encode(jsonpickle.encode(entry))
+                #we canskip this bit (and only this bit!) if dry running
+                if not self.dry_run:
+                    self.loader.put(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, 
+                        Config.ELASTICSEARCH_UNIPROT_DOC_NAME, entry.id, 
+                        {'entry': json_seqrec}, create_index=False)
+
+                total_entries += 1
+
+            self.logger.debug("finished loading %d uniprot entries", total_entries)
+
+        #flush and wait for the index to be complete and ready before ending this step
+
         if not self.dry_run:
-            self.logger.debug("download uniprot uri %s", Config.UNIPROT_URI)
-            self.logger.debug("to generate this file you have to call this url "
-                              "https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml")
-
-            with URLZSource(uri).open() as r_file:
-                self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
-                self.loader.create_new_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
-
-                self.logger.debug("iterate through the whole uniprot xml file")
-
-                def _operate(x):
-                    (i, el) = x
-                    self._save_to_elasticsearch(self.loader, el.id, el,
-                                                Config.ELASTICSEARCH_UNIPROT_INDEX_NAME,
-                                                Config.ELASTICSEARCH_UNIPROT_DOC_NAME)
-                    return i
-
-                total_entries = \
-                    miters.last(iters.imap(_operate,
-                                           enumerate(self._iterate_xml(r_file, UniprotDownloader.NS),
-                                                     start=1)))
-
-                self.logger.debug("finished loading %d uniprot entries", total_entries)
-                self.loader.close()
-        else:
-            self.logger.debug("skipping uniprot as --dry-run was activated")
-
-    @staticmethod
-    def _iterate_xml(handle, ns):
-        for event, elem in etree.iterparse(handle, events=("end",), tag=ns + 'entry'):
-            yield Parser(elem, return_raw_comments=False).parse()
-            elem.clear()
-
-    @staticmethod
-    def _save_to_elasticsearch(loader_obj, uniprotid, seqrec, index_name, doc_name):
-        json_seqrec = base64.b64encode(jsonpickle.encode(seqrec))
-        loader_obj.put(index_name, doc_name, uniprotid, {'entry': json_seqrec}, create_index=False)
+            self.loader.flush_all_and_wait(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)
 
     def qc(self, esquery):
         """Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
