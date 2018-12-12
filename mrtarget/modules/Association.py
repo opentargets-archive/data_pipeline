@@ -334,7 +334,11 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
         if available_evidence:
             evidence_iterator = self.es_query.get_evidence_for_target_simple(target, available_evidence)
             for evidence in evidence_iterator:
-                for efo in evidence['private']['efo_codes']:
+                efo_list = [evidence['disease']['id']] \
+                    if evidence['sourceID'] in Config.IS_DIRECT_DO_NOT_PROPAGATE \
+                    else evidence['private']['efo_codes']
+
+                for efo in efo_list:
                     key = (evidence['target']['id'], efo)
                     if key not in self.data_cache:
                         self.data_cache[key] = []
@@ -351,17 +355,11 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
     def produce_pairs(self):
         for key,evidence in self.data_cache.items():
             is_direct = False
-            direct_datasources = []
             for e in evidence:
                 if e.is_direct:
-                    if e.datasource not in Config.IS_DIRECT_DO_NOT_PROPAGATE:
-                        is_direct = True
-                        break
-                    else:
-                        direct_datasources.append(e.datasource)
-            if is_direct is False and direct_datasources:
-                '''set is_direct to true if '''
-                is_direct = True
+                    is_direct = True
+                    break
+
             self.put_into_queue_out((key[0],key[1], evidence, is_direct))
 
     def init(self):
@@ -558,10 +556,7 @@ class ScoringProcess():
                                               LookUpDataType.TARGET,
                                               LookUpDataType.ECO,
                                               LookUpDataType.HPA
-                                          ),
-                                          autoload=True if not targets
-                                          or len(targets) > 100
-                                          else False).lookup
+                                          )).lookup
 
         if not targets:
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
