@@ -431,21 +431,10 @@ class GeneManager():
 
     def merge_all(self, dry_run = False):
 
-        plugin_count = len(self.simplePluginManager.getAllPlugins())
-
         for plugin_name in Config.GENE_DATA_PLUGIN_ORDER:
-            try:
-                plugin = self.simplePluginManager.getPluginByName(plugin_name)
-                plugin.plugin_object.print_name()
-                plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server)
-
-            except AttributeError:
-                self._logger.exception("the current plugin %s wasn't loaded", plugin_name)
-
-            except Exception as error:
-                self._logger.error('plugin %s failed with an exception', plugin_name)
-                self._logger.exception(str(error))
-
+            plugin = self.simplePluginManager.getPluginByName(plugin_name)
+            plugin.plugin_object.print_name()
+            plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server)
 
         self._store_data(dry_run=dry_run)
 
