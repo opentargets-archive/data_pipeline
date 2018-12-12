@@ -18,9 +18,11 @@ class Orthologs(IPlugin):
     def merge_data(self, genes, loader, r_server):
         self._logger.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
 
-        for row in csv.DictReader(URLZSource(Config.HGNC_ORTHOLOGS).open()):
-            if row['human_ensembl_gene'] in genes:
-                self.add_ortholog_data_to_gene(gene=genes[row['human_ensembl_gene']], data=row)
+        with URLZSource(Config.HGNC_ORTHOLOGS).open() as source:
+            reader = csv.DictReader(source)
+            for row in reader:
+                if row['human_ensembl_gene'] in genes:
+                    self.add_ortholog_data_to_gene(gene=genes[row['human_ensembl_gene']], data=row)
 
         self._logger.info("STATS AFTER HGNC ortholog PARSING:\n" + genes.get_stats())
 
