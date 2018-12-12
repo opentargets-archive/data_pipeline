@@ -100,16 +100,16 @@ class ReactomeProcess():
                 parents = tuple(self.g.predecessors(node))
 
                 self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
-                                doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                                ID=node,
-                                body=dict(id=node,
-                                          label=node_data['name'],
-                                          path=paths,
-                                          children=children,
-                                          parents=parents,
-                                          is_root=node == root,
-                                          ancestors=list(ancestors)
-                                          ))
+                    doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                    ID=node,
+                    body=dict(id=node,
+                        label=node_data['name'],
+                        path=paths,
+                        children=children,
+                        parents=parents,
+                        is_root=node == root,
+                        ancestors=list(ancestors)
+                    ))
         #make sure the index is all ready for future operations before completing this step
         self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
 
