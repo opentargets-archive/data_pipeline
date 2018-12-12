@@ -153,7 +153,9 @@ class ReactomeProcess():
                                           is_root=node == root,
                                           ancestors=list(ancestors)
                                           ))
-                                          
+        #make sure the index is all ready for future operations before completing this step
+        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
+
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
