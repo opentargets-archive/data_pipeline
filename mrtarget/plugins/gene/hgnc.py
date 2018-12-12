@@ -15,6 +15,11 @@ class HGNC(IPlugin):
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
 
+
+    def print_name(self):
+        self._logger.info("HGNC gene data plugin")
+
+    def merge_data(self, genes, loader, r_server):
         #handle plugin specific configuration here
         #helps separate the plugin from the rest of the pipeline
         #and makes it easier to manage custom plugins
@@ -27,11 +32,6 @@ class HGNC(IPlugin):
         #if there are extra arguments e.g. for plugins
         self.args = p.parse_known_args()[0]
 
-
-    def print_name(self):
-        self._logger.info("HGNC gene data plugin")
-
-    def merge_data(self, genes, loader, r_server):
         self._logger.info("HGNC parsing - requesting from URL %s" % self.args.hgnc_complete_set)
 
         with URLZSource(self.args.hgnc_complete_set).open() as source:

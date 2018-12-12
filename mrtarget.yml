@@ -8,3 +8,8 @@ reactome-pathway-relation: http://www.reactome.org/download/current/ReactomePath
 hgnc-complete-set: http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json
 
 #ortholog gene plugin
+hgnc-orthologs: http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz
+hgnc-orthologs-species: [9606-human,9598-chimpanzee,9544-macaque,10090-mouse,10116-rat,9615-dog,9823-pig,8364-frog,7955-zebrafish,7227-fly,6239-worm,4932-yeast]
+
+
+
