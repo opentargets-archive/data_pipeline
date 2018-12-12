@@ -1,11 +1,11 @@
-from yapsy.IPlugin import IPlugin
-from StringIO import StringIO
-from mrtarget.Settings import Config
-import requests
+
 import csv
 import gzip
 import logging
-logging.basicConfig(level=logging.INFO)
+
+from yapsy.IPlugin import IPlugin
+from mrtarget.Settings import Config
+from mrtarget.common import URLZSource
 
 class Orthologs(IPlugin):
 
@@ -17,12 +17,8 @@ class Orthologs(IPlugin):
 
     def merge_data(self, genes, loader, r_server):
         self._logger.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
-        req = requests.get(Config.HGNC_ORTHOLOGS)
-        self._logger.info("Ortholog parsing - response code %s" % req.status_code)
-        req.raise_for_status()
 
-        # io.BytesIO is StringIO.StringIO in python 2
-        for row in csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)), delimiter="\t"):
+        for row in csv.DictReader(URLZSource(Config.HGNC_ORTHOLOGS).open()):
             if row['human_ensembl_gene'] in genes:
                 self.add_ortholog_data_to_gene(gene=genes[row['human_ensembl_gene']], data=row)
 
