@@ -177,4 +177,4 @@ def get_args():
         Config.REDISLITE_DB_PORT = args.redis_port
 
 
-    return args
+    return args[0]

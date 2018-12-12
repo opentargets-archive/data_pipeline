@@ -25,7 +25,7 @@ class HGNC(IPlugin):
 
         #dont use parse_args because that will error
         #if there are extra arguments e.g. for plugins
-        self.args = p.parse_known_args()
+        self.args = p.parse_known_args()[0]
 
 
     def print_name(self):
