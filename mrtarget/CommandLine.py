@@ -32,7 +32,8 @@ import mrtarget.cfg
 def main():
 
     #parse config file, environment, and command line arguments
-    args = mrtarget.cfg.Configuration().args
+    mrtarget.cfg.setup_parser()
+    args = mrtarget.cfg.get_args()
 
 
     #set up logging
