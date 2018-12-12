@@ -208,7 +208,6 @@ Here the list to change, enable or disable functionality:
 * `CTTV_MINIMAL` string `true` to enable otherwise `false` or delete
 * `CTTV_DATA_VERSION` indexes prefix a name to enable otherwise `17.04`
 * `ELASTICSEARCH_NODES` default is `['http://127.0.0.1:9200']`
-* `WORKERS_NUMBER` is an number and by default is `multiprocessing.cpu_count()`
 * `CTTV_ES_CUSTOM_IDXS` `true` to enable it and by default is `false`
 
 ## Contributing
