@@ -6,7 +6,6 @@ from networkx.algorithms import all_simple_paths
 
 from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.Settings import Config
 from mrtarget.common import URLZSource
 
 class ReactomeNode(TreeNode, JSONSerializable):
@@ -71,12 +70,8 @@ class ReactomeProcess():
         self.loader = loader
         self.g = nx.DiGraph(name="reactome")
         self.data = {}
-<<<<<<< .merge_file_ZtKBri
         '''download data'''
         self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
-=======
-        self.downloader = ReactomeDataDownloader()
->>>>>>> .merge_file_K5Iqqi
         self.logger = logging.getLogger(__name__)
 
     def process_all(self):
