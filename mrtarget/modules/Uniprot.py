@@ -15,7 +15,7 @@ class UniprotDownloader(object):
     def __init__(self, loader, dry_run=False):
         self.logger = logging.getLogger(__name__)
         self.dry_run = dry_run
-
+        self.total_entries = None
         self.loader = loader
 
     def cache_human_entries(self, uri):
@@ -23,12 +23,13 @@ class UniprotDownloader(object):
         self.logger.debug("to generate this file you have to call this url "
                             "https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml")
 
-        with URLZSource(uri).open() as r_file:
+        if not self.dry_run:
             self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
             self.loader.create_new_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
 
+        with URLZSource(uri).open() as r_file:
             self.logger.debug("iterate through the whole uniprot xml file")
-            total_entries = 0
+            self.total_entries = 0
             for event, elem in etree.iterparse(r_file, events=("end",), tag=self.NS + 'entry'):
                 #parse the XML into an object
                 entry = Parser(elem, return_raw_comments=False).parse()
@@ -43,9 +44,9 @@ class UniprotDownloader(object):
                         Config.ELASTICSEARCH_UNIPROT_DOC_NAME, entry.id, 
                         {'entry': json_seqrec}, create_index=False)
 
-                total_entries += 1
+                self.total_entries += 1
 
-            self.logger.debug("finished loading %d uniprot entries", total_entries)
+            self.logger.debug("finished loading %d uniprot entries", self.total_entries)
 
         #flush and wait for the index to be complete and ready before ending this step
 
