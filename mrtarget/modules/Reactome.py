@@ -6,6 +6,7 @@ from networkx.algorithms import all_simple_paths
 
 from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.Settings import Config
 from mrtarget.common import URLZSource
 
 class ReactomeNode(TreeNode, JSONSerializable):
