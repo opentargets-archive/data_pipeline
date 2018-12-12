@@ -156,7 +156,7 @@ def get_args():
     p = configargparse.get_argument_parser()
     #dont use parse_args because that will error
     #if there are extra arguments e.g. for plugins
-    args = p.parse_known_args()
+    args = p.parse_known_args()[0]
 
     #output all configuration values, useful for debugging
     p.print_values()
@@ -177,4 +177,4 @@ def get_args():
         Config.REDISLITE_DB_PORT = args.redis_port
 
 
-    return args[0]
+    return args
