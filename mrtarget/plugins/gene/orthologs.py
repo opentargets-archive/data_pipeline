@@ -19,7 +19,7 @@ class Orthologs(IPlugin):
         self._logger.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
 
         with URLZSource(Config.HGNC_ORTHOLOGS).open() as source:
-            reader = csv.DictReader(source)
+            reader = csv.DictReader(source, delimiter="\t")
             for row in reader:
                 if row['human_ensembl_gene'] in genes:
                     self.add_ortholog_data_to_gene(gene=genes[row['human_ensembl_gene']], data=row)
