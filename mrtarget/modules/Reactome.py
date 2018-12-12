@@ -1,12 +1,13 @@
 import logging
+import csv
 
 import networkx as nx
-import requests
 from networkx.algorithms import all_simple_paths
 
 from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
+from mrtarget.common import URLZSource
 
 class ReactomeNode(TreeNode, JSONSerializable):
     def __init__(self, **kwargs):
@@ -21,21 +22,11 @@ class ReactomeDataDownloader():
         self.pathway_data_url = pathway_data_url
         self.pathway_relation_url = pathway_relation_url
 
-    def _download_data(self, url):
-        #TODO use URLZSource properly
-        r = requests.get(url)
-        self.logger.debug("getting from " + url)
-        try:
-            r.raise_for_status()
-        except:
-            raise Exception("failed to download data from url: %s. Status code: %i" % (url, r.status_code))
-        return r.content
-
     def get_pathway_data(self):
         self.valid_pathway_ids = []
-        for row in self._download_data(self.pathway_data_url).split('\n'):
-            if row:
-                pathway_id, pathway_name, species = row.split('\t')
+        with URLZSource(self.pathway_data_url).open() as source:
+            for row in source:
+                pathway_id, pathway_name, species = row.strip().split('\t')
                 pathway_id = pathway_id[1:-1] if pathway_id[0] == '"' else pathway_id
                 pathway_name = pathway_name[1:-1] if pathway_name[0] == '"' else pathway_name
                 species = species[1:-1] if species[0] == '"' else species
@@ -44,9 +35,9 @@ class ReactomeDataDownloader():
                     if species in self.allowed_species:
                         self.valid_pathway_ids.append(pathway_id)
                         yield dict(id=pathway_id,
-                                   name=pathway_name,
-                                   species=species,
-                                   )
+                                name=pathway_name,
+                                species=species,
+                                )
                         if len(self.valid_pathway_ids) % 1000 == 0:
                             self.logger.debug("%i rows parsed for reactome_pathway_data" % len(self.valid_pathway_ids))
                 else:
@@ -55,9 +46,9 @@ class ReactomeDataDownloader():
 
     def get_pathway_relations(self):
         added_relations = []
-        for row in self._download_data(self.pathway_relation_url).split('\n'):
-            if row:
-                parent_id, child_id = row.split('\t')
+        with URLZSource(self.pathway_relation_url).open() as source:
+            for row in source:
+                parent_id, child_id = row.strip().split('\t')
                 parent_id = parent_id[1:-1] if parent_id[0] == '"' else parent_id
                 child_id = child_id[1:-1] if child_id[0] == '"' else child_id
 
@@ -65,8 +56,8 @@ class ReactomeDataDownloader():
                 if relation not in added_relations:
                     if parent_id in self.valid_pathway_ids:
                         yield dict(id=parent_id,
-                                   child=child_id,
-                                   )
+                                child=child_id,
+                                )
                         added_relations.append(relation)
                         if len(added_relations) % 1000 == 0:
                             self.logger.debug("%i rows parsed from reactome_pathway_relation" % len(added_relations))
@@ -80,16 +71,15 @@ class ReactomeProcess():
         self.loader = loader
         self.g = nx.DiGraph(name="reactome")
         self.data = {}
+<<<<<<< .merge_file_ZtKBri
         '''download data'''
         self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
+=======
+        self.downloader = ReactomeDataDownloader()
+>>>>>>> .merge_file_K5Iqqi
         self.logger = logging.getLogger(__name__)
 
     def process_all(self):
-        self._process_pathway_hierarchy()
-        self.loader.flush()
-        self.loader.close()
-
-    def _process_pathway_hierarchy(self):
         root = 'root'
         self.relations = dict()
         self.g.add_node(root, name="", species="")
@@ -117,17 +107,19 @@ class ReactomeProcess():
                 parents = tuple(self.g.predecessors(node))
 
                 self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
-                                doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                                ID=node,
-                                body=dict(id=node,
-                                          label=node_data['name'],
-                                          path=paths,
-                                          children=children,
-                                          parents=parents,
-                                          is_root=node == root,
-                                          ancestors=list(ancestors)
-                                          ))
-                                          
+                    doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                    ID=node,
+                    body=dict(id=node,
+                        label=node_data['name'],
+                        path=paths,
+                        children=children,
+                        parents=parents,
+                        is_root=node == root,
+                        ancestors=list(ancestors)
+                    ))
+        #make sure the index is all ready for future operations before completing this step
+        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
+
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
