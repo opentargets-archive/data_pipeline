@@ -35,7 +35,7 @@ def fix_and_score_evidence(validated_evs, process_context):
         process_context.kwargs.evidence_manager.check_is_valid_evs(fixed_ev, datasource=fixed_ev.datasource)
     if is_valid:
         # add scoring to evidence string
-        fixed_ev.score_evidence(process_context.kwargs.evidence_manager.score_modifiers, None)
+        fixed_ev.score_evidence(process_context.kwargs.evidence_manager.score_modifiers)
 
         # extend data in evidencestring
         fixed_ev_ext = process_context.kwargs.evidence_manager.get_extended_evidence(fixed_ev)
