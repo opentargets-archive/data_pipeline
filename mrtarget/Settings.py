@@ -275,17 +275,6 @@ class Config():
                              "unprocessed_pseudogene"]
     }
 
-    # use specific index for a datasource
-    DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
-
-    # list of datasources to be included from global stats computation
-    GLOBAL_STATS_SOURCES_TO_INCLUDE = ['expression_atlas', 'phenodigm', 'chembl', 'europepmc',
-                                       'reactome', 'slapenrich', 'intogen', 'eva_somatic', 'cancer_gene_census',
-                                       'uniprot_somatic', 'eva', 'gwas_catalog', 'uniprot', 'uniprot_literature',
-                                       'gene2phenotype', 'phewas_catalog', 'genomics_england']
-
-    # datasources to be used to apply computed global stats
-    GLOBAL_STATS_SOURCES_TO_APPLY = ['europepmc', 'expression_atlas']
 
     # setup the weights for evidence strings score
     SCORING_WEIGHTS = defaultdict(lambda: 1)

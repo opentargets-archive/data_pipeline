@@ -15,10 +15,9 @@ class ReactomeNode(TreeNode, JSONSerializable):
 
 
 class ReactomeDataDownloader():
-    allowed_species = ['Homo sapiens']
-
     def __init__(self, pathway_data_url, pathway_relation_url):
         self.logger = logging.getLogger(__name__)
+        self.allowed_species = ['Homo sapiens']
         self.pathway_data_url = pathway_data_url
         self.pathway_relation_url = pathway_relation_url
 
