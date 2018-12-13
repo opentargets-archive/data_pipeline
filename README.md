@@ -38,7 +38,7 @@ Typing `curl localhost:9200` should show something like:
   "cluster_name": "elasticsearch",
   "cluster_uuid": "6BlykLd8Sj2mxswcump2wA",
   "version": {
-    "number": "5.6.11",
+    "number": "5.6.13",
     "build_hash": "bc3eef4",
     "build_date": "2018-08-16T15:25:17.293Z",
     "build_snapshot": false,
