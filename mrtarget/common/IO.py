@@ -24,7 +24,7 @@ def open_to_read(filename):
     """return an iterator from izip (filename, (enumerate(file_handle, start=1))"""
     _l.debug('generate an iterator of (filename,enumerate) for filename %s', filename)
     it = more_itertools.with_iter(URLZSource(filename).open())
-    return itertools.izip(itertools.cycle([filename]),enumerate(it, start=1))
+    return itertools.izip(itertools.cycle([filename]), enumerate(it, start=1))
 
 
 def get_filenames_by_glob(path_str):
