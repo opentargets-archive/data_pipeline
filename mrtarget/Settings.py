@@ -166,21 +166,6 @@ class Config():
     GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks',
                               'CancerBiomarkers', 'ChemicalProbes', 'Tractability']
 
-    HGNC_ORTHOLOGS = 'http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz'
-    HGNC_ORTHOLOGS_SPECIES = {
-        '9606':'human',
-        '9598':'chimpanzee',
-        '9544':'macaque',
-        '10090':'mouse',
-        '10116':'rat',
-        '9615':'dog',
-        '9823':'pig',
-        '8364':'frog',
-        '7955':'zebrafish',
-        '7227':'fly',
-        '6239':'worm',
-        '4932':'yeast'
-    }
 
     BIOMARKER_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/cgi_biomarkers_per_variant.tsv"
     CHEMICALPROBES_FILENAME1 = "https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_portalprobes_20181130.tsv"

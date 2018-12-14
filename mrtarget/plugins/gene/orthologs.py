@@ -55,7 +55,7 @@ class Orthologs(IPlugin):
 
     def add_ortholog_data_to_gene(self, gene, data):
         if 'ortholog_species' in data:
-            if data['ortholog_species'] in Config.HGNC_ORTHOLOGS_SPECIES:
+            if data['ortholog_species'] in self.orthologs_species:
                 # get rid of some redundant (ie.human) field that we are going to
                 # get from other sources anyways
                 ortholog_data = dict((k, v) for (k, v) in data.iteritems() if k.startswith('ortholog'))
@@ -67,7 +67,7 @@ class Orthologs(IPlugin):
                     ortholog_data['support'] = data['support'].split(',')
 
                 # use a readable key for the species in the ortholog dictionary
-                species = Config.HGNC_ORTHOLOGS_SPECIES[ortholog_data['ortholog_species']]
+                species = self.orthologs_species[ortholog_data['ortholog_species']]
 
                 try:
                     # I am appending because there are more than one records
