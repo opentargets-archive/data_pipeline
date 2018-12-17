@@ -8,15 +8,20 @@ shopt -s failglob # empty globs are errors
 NOW=`date +'%y%m%d-%k%M%S'`
 #underscores are not allowed
 NAME=data-pipeline-$NOW
-#cores should be at least 16 to get >100GB RAM
-CORES=32
 
 #create an instance
+#  n1-standard-8 is 8 vCPUs and 30GB memory
+#  n1-standard-16 is 16 vCPUs and 60GB memory
+#  n1-highcpu-16 is 16 vCPUs and 14.4GB memory
+#  n1-highcpu-32 is 32 vCPUs and 28.8GB memory
+#  n1-highcpu-64 is 64 vCPUs and 57.6GB memory
+#Note: for 18.12 release more than 30GB memory is required
+
 #TODO check if it exists already and abort
 gcloud compute instances create $NAME \
   --image-project debian-cloud \
   --image-family debian-9 \
-  --machine-type n1-highmem-$CORES \
+  --machine-type n1-standard-16 \
   --boot-disk-size 250 \
   --boot-disk-type pd-ssd --boot-disk-device-name $NAME
   
@@ -50,6 +55,7 @@ sudo systemctl enable docker
 sudo curl -L "https://github.com/docker/compose/releases/download/1.23.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 
+#elasticsearch needs a large number of concurrent files
 sudo sysctl -w vm.max_map_count=262144
 sudo echo '* hard nofile 10000' >> /etc/security/limits.conf
 sudo echo '* hard memlock infinity' >> /etc/security/limits.conf
@@ -64,14 +70,14 @@ version: "3.6"
 services:
       
   elasticsearch:
-    #image: elasticsearch:5.6.11
+    #image: elasticsearch:5.6.13
     #note that the docker hub version doesn't allow restores for some reason...
-    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.11
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.13
     ports:
       - 9200:9200
     environment:
       # assign more memory to JVM 
-      - "ES_JAVA_OPTS=-Xms12g -Xmx12g"
+      - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
       - "xpack.security.enabled=false"
       - "bootstrap.memory_lock=true"
       #allow downloading from google buckets
@@ -90,7 +96,7 @@ services:
       retries:  30
         
   kibana:
-    image: kibana:5.6.11
+    image: kibana:5.6.13
     ports:
       - 5601:5601
     environment:
@@ -104,7 +110,7 @@ services:
       - 6379:6379
     
   mrtarget:
-    image: quay.io/opentargets/mrtarget:18.10.2
+    image: quay.io/opentargets/mrtarget:18.12.3
     depends_on:
       - elasticsearch
       - redis
@@ -135,7 +141,8 @@ sleep 30
 gcloud compute ssh $NAME --command 'sudo docker-compose run --rm --entrypoint make mrtarget dry_run'
     
 #full build!
-gcloud compute ssh $NAME --command 'sudo docker-compose run -d --rm --entrypoint make mrtarget -r -R all'
+#metrics is broken, so dont do it
+gcloud compute ssh $NAME --command 'sudo docker-compose run -d --rm --entrypoint make mrtarget -r -R relationship_data search_data association_qc'
 
 
 #delete the instance at the end
