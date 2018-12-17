@@ -112,7 +112,6 @@ docker-compose up -d elasticsearch kibana
 By default, these will be accessible on http://localhost:9200 and http://localhost:5601 for Elasticsearch and Kibana respectively.
 
 
-
 You can run the pipeline with a command like:
 
 ```sh
