@@ -193,6 +193,9 @@ class Loader():
     def prepare_for_bulk_indexing(self, index_name):
         if not self.dry_run:
             old_cluster_settings = self.es.cluster.get_settings()
+
+            #try to turn of throttling of indexes
+            #removed in ES >= 6.0
             try:
                 if old_cluster_settings['persistent']['indices']['store']['throttle']['type']=='none':
                     pass
@@ -200,27 +203,30 @@ class Loader():
                     raise ValueError
             except (KeyError, ValueError):
                 transient_cluster_settings = {
-                                            "persistent" : {
-                                                "indices.store.throttle.type" : "none"
-                                            }
-                                        }
+                    "persistent" : {
+                        "indices.store.throttle.type" : "none"
+                    }
+                }
                 self.es.cluster.put_settings(transient_cluster_settings)
+
+            #temporary settins while indexing only
             old_index_settings = self.es.indices.get_settings(index=index_name)
             temp_index_settings = {
-                        "index" : {
-                            "refresh_interval" : "-1",
-                            "number_of_replicas" : 0,
-                            "translog.durability" : 'async',
-                        }
+                "index" : {
+                    "refresh_interval" : "-1",
+                    "number_of_replicas" : 0,
+                    "translog.durability" : 'async',
+                }
             }
             self.es.indices.put_settings(index=index_name,
                                          body =temp_index_settings)
+            #store the old settings so can be restored later
             self.indexes_optimised[index_name]= dict(settings_to_restore={
-                        "index" : {
-                            "refresh_interval" : "1s",
-                            "number_of_replicas" : old_index_settings[index_name]['settings']['index']['number_of_replicas'],
-                            "translog.durability": 'request',
-                        }
+                    "index" : {
+                        "refresh_interval" : "1s",
+                        "number_of_replicas" : old_index_settings[index_name]['settings']['index']['number_of_replicas'],
+                        "translog.durability": 'request',
+                    }
                 })
 
     def restore_after_bulk_indexing(self):
@@ -236,10 +242,7 @@ class Loader():
 
     def _safe_create_index(self, index_name, body={}, ignore=400):
         if not self.dry_run:
-            res = self.es.indices.create(index=index_name,
-                                         ignore=ignore,
-                                         body=body
-                                         )
+            res = self.es.indices.create(index=index_name, ignore=ignore, body=body )
             if not self._check_is_aknowledge(res):
                 if res['error']['root_cause'][0]['reason']== 'already exists':
                     self.logger.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists

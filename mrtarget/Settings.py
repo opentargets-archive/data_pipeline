@@ -156,7 +156,7 @@ class Config():
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=[])
 
-    ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'validated-data'
+    ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'invalid-evidence-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
     ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME = 'submission'
@@ -340,20 +340,27 @@ class Config():
     DATASOURCE_TO_DATATYPE_MAPPING['progeny'] = 'affected_pathway'
     DATASOURCE_TO_DATATYPE_MAPPING['sysbio'] = 'affected_pathway'
 
-    # use specific index for a datasource
-    DATASOURCE_TO_INDEX_KEY_MAPPING = defaultdict(lambda: "generic")
-    # DATASOURCE_TO_INDEX_KEY_MAPPING['europepmc'] = 'europepmc'
-    # DATASOURCE_TO_INDEX_KEY_MAPPING['phenodigm'] = DATASOURCE_TO_DATATYPE_MAPPING['phenodigm']
-    # DATASOURCE_TO_INDEX_KEY_MAPPING['expression_atlas'] = DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas']
+    EXCLUDED_BIOTYPES_BY_DATASOURCE = {
+        'expression_atlas': ["IG_C_pseudogene",
+                             "IG_J_pseudogene",
+                             "IG_pseudogene",
+                             "IG_V_pseudogene",
+                             "polymorphic_pseudogene",
+                             "processed_pseudogene",
+                             "pseudogene",
+                             "rRNA",
+                             "rRNA_pseudogene",
+                             "snoRNA",
+                             "snRNA",
+                             "transcribed_processed_pseudogene",
+                             "transcribed_unitary_pseudogene",
+                             "transcribed_unprocessed_pseudogene",
+                             "TR_J_pseudogene",
+                             "TR_V_pseudogene",
+                             "unitary_pseudogene",
+                             "unprocessed_pseudogene"]
+    }
 
-    # list of datasources to be included from global stats computation
-    GLOBAL_STATS_SOURCES_TO_INCLUDE = ['expression_atlas', 'phenodigm', 'chembl', 'europepmc',
-                                       'reactome', 'slapenrich', 'intogen', 'eva_somatic', 'cancer_gene_census',
-                                       'uniprot_somatic', 'eva', 'gwas_catalog', 'uniprot', 'uniprot_literature',
-                                       'gene2phenotype', 'phewas_catalog', 'genomics_england']
-
-    # datasources to be used to apply computed global stats
-    GLOBAL_STATS_SOURCES_TO_APPLY = ['europepmc', 'expression_atlas']
 
     # setup the weights for evidence strings score
     SCORING_WEIGHTS = defaultdict(lambda: 1)

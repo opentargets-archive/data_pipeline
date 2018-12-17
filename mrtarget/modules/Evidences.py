@@ -35,11 +35,11 @@ def fix_and_score_evidence(validated_evs, process_context):
         process_context.kwargs.evidence_manager.check_is_valid_evs(fixed_ev, datasource=fixed_ev.datasource)
     if is_valid:
         # add scoring to evidence string
-        fixed_ev.score_evidence(process_context.kwargs.evidence_manager.score_modifiers, None)
+        fixed_ev.score_evidence(process_context.kwargs.evidence_manager.score_modifiers)
 
         # extend data in evidencestring
         fixed_ev_ext = process_context.kwargs.evidence_manager.get_extended_evidence(fixed_ev)
-        process_context.kwargs.evidence_manager.inject_loci(fixed_ev_ext)
+
         validated_evs.is_valid = True
         validated_evs.line = fixed_ev_ext.to_json()
         right = validated_evs
@@ -202,17 +202,8 @@ def validate_evidence(line, process_context):
 
         if efo_id:
             # Check disease term or phenotype term
-            # if (short_disease_id not in self.lookup_data.available_efos) and \
-            if (efo_id not in process_context.kwargs.luts.efo_ontology.current_classes) and \
-                    (efo_id not in process_context.kwargs.luts.hpo_ontology.current_classes) and \
-                    (efo_id not in process_context.kwargs.luts.mp_ontology.current_classes):
+            if efo_id not in process_context.kwargs.luts.available_efos:
                 validated_evs.explanation_type = 'invalid_disease'
-                validated_evs.explanation_str = efo_id
-                disease_failed = True
-            if (efo_id in process_context.kwargs.luts.efo_ontology.obsolete_classes) or \
-                    (efo_id in process_context.kwargs.luts.hpo_ontology.obsolete_classes) or \
-                    (efo_id in process_context.kwargs.luts.mp_ontology.obsolete_classes):
-                validated_evs.explanation_type = 'obsolete_disease'
                 validated_evs.explanation_str = efo_id
                 disease_failed = True
         else:

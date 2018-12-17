@@ -135,6 +135,9 @@ Temporary Items
 # IntelliJ
 out/
 
+#eclipse and other IDEs
+.settings/
+
 # mpeltonen/sbt-idea plugin
 .idea_modules/
 
