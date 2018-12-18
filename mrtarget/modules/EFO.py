@@ -120,11 +120,19 @@ class EfoProcess():
             if 'http://www.geneontology.org/formats/oboInOwl#hasExactSynonym' in properties:
                 synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasExactSynonym'])
 
+            #related synonyms (partially overlapping)
+            if 'http://www.geneontology.org/formats/oboInOwl#hasRelatedSynonym' in properties:
+                synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasRelatedSynonym'])
+
+            #generic synoynms
+            if 'http://www.geneontology.org/formats/oboInOwl#hasSynonym' in properties:
+                synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasSynonym'])
+
             #narrow synonyms
             if 'http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym' in properties:
                 synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym'])
 
-            #could also have broad synonyms, but that is better captured by parent term
+            #could have http://www.geneontology.org/formats/oboInOwl#hasBroadSynonym, but that is better captured by parent term
 
             phenotypes = []
             if uri in disease_phenotypes:
