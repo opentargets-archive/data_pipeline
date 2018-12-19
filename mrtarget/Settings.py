@@ -211,11 +211,6 @@ class Config():
     CHEMBL_PROTEIN_CLASS = ini.get('full_dataset', 'chembl_protein')
     CHEMBL_TARGET_COMPONENT = ini.get('full_dataset', 'chembl_component')
 
-    # Mouse/Human Orthology with Phenotype Annotations (tab-delimited)
-    GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY = "http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt"
-    # All Genotypes and Mammalian Phenotype Annotations (tab-delimited)
-    GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES = "http://www.informatics.jax.org/downloads/reports/MGI_PhenoGenoMP.rpt"
-
     DATASOURCE_TO_DATATYPE_MAPPING = {}
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
     DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
