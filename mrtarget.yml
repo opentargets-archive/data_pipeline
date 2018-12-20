@@ -27,3 +27,7 @@ chemical-probes-2: https://storage.googleapis.com/ot-releases/18.12/annotations/
 
 #hallmark plugin
 hallmark: https://storage.googleapis.com/ot-releases/18.12/annotations/cosmic-v87_hallmark_export.tsv
+
+#tractability plugin
+tractability : 
+    TRACTABILITY_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/tractability_buckets-30-11-2018.tsv"
