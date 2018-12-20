@@ -4,6 +4,7 @@ from mrtarget.common import URLZSource
 import traceback
 import logging
 import csv
+import configargparse
 logging.basicConfig(level=logging.DEBUG)
 
 class ChemicalProbes(IPlugin):
@@ -18,17 +19,33 @@ class ChemicalProbes(IPlugin):
         self.symbols = {}
         self.chemicalprobes = {}
 
+        #handle plugin specific configuration here
+        #helps separate the plugin from the rest of the pipeline
+        #and makes it easier to manage custom plugins
+        p = configargparse.get_argument_parser()
+
+        p.add("--chemical-probes-1", help="location of chemical probes 1 file",
+            env_var="CHEMICALPROBES_1", action='store')
+
+        p.add("--chemical-probes-2", help="location of chemical probes 2 file",
+            env_var="CHEMICALPROBES_2", action='store')
+
     def print_name(self):
         self._logger.info("Chemical Probes plugin")
 
     def merge_data(self, genes, loader, r_server):
+
+        #dont use parse_args because that will error
+        #if there are extra arguments e.g. for plugins
+        p = configargparse.get_argument_parser()
+        self.args = p.parse_known_args()[0]
 
         self.loader = loader
         self.r_server = r_server
 
         try:
             # Parse chemical probes data into self.chemicalprobes
-            self.build_json(filename1=Config.CHEMICALPROBES_FILENAME1, filename2=Config.CHEMICALPROBES_FILENAME2)
+            self.build_json(filename1=self.args.chemical_probes_1, filename2=self.args.chemical_probes_2)
 
             # Iterate through all genes and add chemical probes data if gene symbol is present
             self._logger.info("Generating Chemical Probes data injection")
@@ -41,7 +58,7 @@ class ChemicalProbes(IPlugin):
             self._logger.exception(str(ex), exc_info=1)
             raise ex
 
-    def build_json(self, filename1=Config.CHEMICALPROBES_FILENAME1, filename2=Config.CHEMICALPROBES_FILENAME2):
+    def build_json(self, filename1, filename2):
         # *** Work through manually curated chemical probes from the different portals ***
         # chemicalprobes column names are Probe, Target, SGClink, CPPlink, OSPlink, Note
         with URLZSource(filename1).open() as r_file:

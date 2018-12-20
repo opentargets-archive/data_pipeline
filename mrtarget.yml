@@ -20,3 +20,7 @@ mouse-phenotypes-report: http://www.informatics.jax.org/downloads/reports/MGI_Ph
 
 #cancer biomarkers plugin
 biomarker: https://storage.googleapis.com/ot-releases/18.12/annotations/cgi_biomarkers_per_variant.tsv
+
+#chemical probes plugin
+chemical-probes-1: https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_portalprobes_20181130.tsv
+chemical-probes-2: https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_probeminer_20181015.tsv
