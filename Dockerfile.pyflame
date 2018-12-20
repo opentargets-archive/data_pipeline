@@ -1,0 +1,25 @@
+FROM mrtarget:latest
+
+# Install dependencies required to ‘build’ PyFlame
+RUN apt-get update && apt-get install -y \
+    git \
+    autoconf \
+    automake \
+    autotools-dev \
+    g++ \
+    pkg-config \
+    python-dev \
+    libtool \
+    make
+# Build PyFlame
+RUN git clone https://github.com/uber/pyflame.git && \
+    cd pyflame && ./autogen.sh && ./configure && make
+# Install flamegraph to turn pyflame output into pretty picture
+RUN git clone https://github.com/brendangregg/FlameGraph
+
+#needed for pgrep
+RUN apt-get update && apt-get install -y \
+    procps
+
+# point to the entrypoint script fo pyflame
+ENTRYPOINT [ "scripts/entrypoint.pyflame.sh" ]
