@@ -162,7 +162,6 @@ class Config():
     GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks',
                               'CancerBiomarkers', 'ChemicalProbes', 'Tractability']
 
-    HALLMARK_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/cosmic-v87_hallmark_export.tsv"
     TRACTABILITY_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/tractability_buckets-30-11-2018.tsv"
 
     TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'

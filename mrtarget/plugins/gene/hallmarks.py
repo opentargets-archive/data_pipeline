@@ -5,6 +5,7 @@ import re
 import traceback
 import logging
 import csv
+import configargparse
 logging.basicConfig(level=logging.DEBUG)
 
 class Hallmarks(IPlugin):
@@ -29,17 +30,30 @@ class Hallmarks(IPlugin):
                                   "escaping immune response to cancer",
                                   "proliferative signalling"]
 
+        #handle plugin specific configuration here
+        #helps separate the plugin from the rest of the pipeline
+        #and makes it easier to manage custom plugins
+        p = configargparse.get_argument_parser()
+
+        p.add("--hallmark", help="location of hallmark file",
+            env_var="HALLMARK", action='store')
+
     def print_name(self):
         self._logger.info("Hallmarks of cancer gene data plugin")
 
     def merge_data(self, genes, loader, r_server):
+
+        #dont use parse_args because that will error
+        #if there are extra arguments e.g. for plugins
+        p = configargparse.get_argument_parser()
+        self.args = p.parse_known_args()[0]
 
         self.loader = loader
         self.r_server = r_server
 
         try:
 
-            self.build_json(filename=Config.HALLMARK_FILENAME)
+            self.build_json(filename=self.args.hallmark)
 
             for gene_id, gene in genes.iterate():
                 ''' extend gene with related Hallmark data '''
@@ -53,7 +67,7 @@ class Hallmarks(IPlugin):
             self._logger.error('Error %s' % ex)
             raise ex
 
-    def build_json(self, filename=Config.HALLMARK_FILENAME):
+    def build_json(self, filename):
         # Just for reference: column names are: "ID_CENSUS_ANNOT", "ID_CENSUS", "ID_GENE", "GENE_NAME", "CELL_TYPE",
         # "PUBMED_PMID", "ID_DATA_CATEGORY", "DESCRIPTION", "DISPLAY", "SHORT", "CELL_LINE", "DESCRIPTION_1")
         with URLZSource(filename).open() as r_file:
