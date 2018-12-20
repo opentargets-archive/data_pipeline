@@ -150,6 +150,13 @@ def setup_parser():
     #helps separate the plugins from the rest of the pipeline
     #and makes it easier to manage custom plugins
 
+    #uniprot
+    # to generate this file you have to call
+    # https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml
+    p.add("--uniprot_uri", help="location of uniprot file",
+        env_var="UNIPROT_URI", action='store')
+
+
     return p
 
 def get_args():
