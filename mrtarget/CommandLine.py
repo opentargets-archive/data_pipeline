@@ -123,7 +123,7 @@ def main():
         if args.ens:
             process = EnsemblProcess(loader)
             if not args.qc_only:
-                process.process(Config.ENSEMBL_FILENAME)
+                process.process(args.ensembl_filename)
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))
         if args.unic:

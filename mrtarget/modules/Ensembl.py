@@ -2,6 +2,7 @@ import json
 import logging
 import more_itertools
 import functional
+import configargparse
 
 from mrtarget.common import URLZSource
 from mrtarget.Settings import Config
@@ -10,7 +11,6 @@ from mrtarget.Settings import Config
 class EnsemblProcess(object):
     """
     Load a set of Ensembl genes from a JSON file into Elasticsearch.
-    The file is specifided in Settings.py as Config.ENSEMBL_FILENAME
     It should be generated using the create_genes_dictionary.py script in opentargets/genetics_backend/makeLUTs
     e.g.
     python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38

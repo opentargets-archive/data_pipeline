@@ -156,6 +156,12 @@ def setup_parser():
     p.add("--uniprot_uri", help="location of uniprot file",
         env_var="UNIPROT_URI", action='store')
 
+    #ensembl
+    # It should be generated using the create_genes_dictionary.py script in opentargets/genetics_backend/makeLUTs
+    #   python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38
+    p.add("--ensembl-filename", help="location of ensembl file",
+        env_var="ENSEMBL_FILENAME", action='store')
+    
 
     return p
 
