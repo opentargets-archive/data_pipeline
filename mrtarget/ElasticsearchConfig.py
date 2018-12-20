@@ -163,8 +163,6 @@ class ElasticSearchConfiguration():
     publication_replicas_number = '0'
     validation_shard_number = '1'
     validation_replicas_number = '0'
-    submission_audit_shard_number = '1'
-    submission_audit_replicas_number = '0'
     index_storage_type = "niofs"
     bulk_load_chunk = 1000
 
@@ -366,52 +364,6 @@ class ElasticSearchConfiguration():
 
     expression_data_mapping = expm.to_dict()
 
-    submission_audit_mapping = {
-        "properties": {
-            "md5": {
-                "type": "keyword"
-            },
-            "provider_id": {
-                "type": "keyword"
-            },
-            "data_source_name": {
-                "type": "keyword"
-            },
-            "filename": {
-                "type": "keyword"
-            },
-            "nb_submission": {
-                "type": "integer",
-            },
-            "nb_records": {
-                "type": "integer",
-            },
-            "nb_passed_validation": {
-                "type": "integer",
-            },
-            "nb_errors": {
-                "type": "integer",
-            },
-            "nb_duplicates": {
-                "type": "integer",
-            },
-            "successfully_validated": {
-                "type": "boolean",
-            },
-            "date_created": {
-                "type": "date",
-                "format": "basic_date_time_no_millis",
-            },
-            "date_validated": {
-                "type": "date",
-                "format": "basic_date_time_no_millis",
-            },
-            "date_modified": {
-                "type": "date",
-                "format": "basic_date_time_no_millis",
-            }
-        }
-    }
 
     validated_data_mapping = {
         "dynamic_templates": [
@@ -488,17 +440,6 @@ class ElasticSearchConfiguration():
                                             "mappings": {"_default_": validated_data_mapping},
 
                                             }
-
-    submission_audit_settings_and_mappings = {"settings": {"number_of_shards": submission_audit_shard_number,
-                                                           "number_of_replicas": submission_audit_replicas_number,
-                                                           # "index.store.type": "memory",
-                                                           "refresh_interval": "60s",
-                                                           },
-                                              "mappings": {
-                                                  Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME:
-                                                      submission_audit_mapping
-                                              }
-                                              }
 
     association_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
                                              "number_of_replicas": evidence_replicas_number,
@@ -796,7 +737,6 @@ class ElasticSearchConfiguration():
                        Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME: expression_data_mapping,
                        Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME: search_obj_data_mapping,
                        Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME: validated_data_settings_and_mappings,
-                       Config.ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME: submission_audit_settings_and_mappings,
                        Config.ELASTICSEARCH_UNIPROT_INDEX_NAME: uniprot_data_mapping,
                        Config.ELASTICSEARCH_RELATION_INDEX_NAME: relation_data_mapping,
                     #    Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME: publication_data_mapping,

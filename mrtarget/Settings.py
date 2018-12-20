@@ -135,8 +135,6 @@ class Config():
 
     ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME = 'invalid-evidence-data'
     ELASTICSEARCH_VALIDATED_DATA_DOC_NAME = 'evidencestring'
-    ELASTICSEARCH_DATA_SUBMISSION_AUDIT_INDEX_NAME = 'submission-audit'
-    ELASTICSEARCH_DATA_SUBMISSION_AUDIT_DOC_NAME = 'submission'
     ELASTICSEARCH_DATA_INDEX_NAME = 'evidence-data'
     ELASTICSEARCH_DATA_DOC_NAME = 'evidencestring'
     ELASTICSEARCH_EFO_LABEL_INDEX_NAME = 'efo-data'
@@ -159,9 +157,11 @@ class Config():
     ELASTICSEARCH_UNIPROT_DOC_NAME = 'uniprot-gene'
     ELASTICSEARCH_RELATION_INDEX_NAME = 'relation-data'
     ELASTICSEARCH_RELATION_DOC_NAME = 'relation'
+
     # to generate this file you have to call
     # https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml
     UNIPROT_URI = "https://storage.googleapis.com/ot-releases/18.12/annotations/uniprot-20181130.xml.gz"
+
     GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
     GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks',
                               'CancerBiomarkers', 'ChemicalProbes', 'Tractability']
