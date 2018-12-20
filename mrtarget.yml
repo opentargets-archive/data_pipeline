@@ -18,3 +18,5 @@ hgnc-orthologs-species: [9606-human,9598-chimpanzee,9544-macaque,10090-mouse,101
 mouse-phenotypes-orthology: http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt
 mouse-phenotypes-report: http://www.informatics.jax.org/downloads/reports/MGI_PhenoGenoMP.rpt
 
+#cancer biomarkers plugin
+biomarker: https://storage.googleapis.com/ot-releases/18.12/annotations/cgi_biomarkers_per_variant.tsv

@@ -163,7 +163,7 @@ class Config():
                               'CancerBiomarkers', 'ChemicalProbes', 'Tractability']
 
 
-    BIOMARKER_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/cgi_biomarkers_per_variant.tsv"
+    
     CHEMICALPROBES_FILENAME1 = "https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_portalprobes_20181130.tsv"
     CHEMICALPROBES_FILENAME2 = "https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_probeminer_20181015.tsv"
     HALLMARK_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/cosmic-v87_hallmark_export.tsv"

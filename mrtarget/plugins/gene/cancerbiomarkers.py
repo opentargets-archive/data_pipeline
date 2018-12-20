@@ -4,8 +4,7 @@ from mrtarget.common import URLZSource
 import traceback
 import logging
 import csv
-
-logging.basicConfig(level=logging.DEBUG)
+import configargparse
 
 # Not used at the moment, but good to have here to check that the column names are correct
 cancerbiomarker_columns = ("Alteration", "AlterationType", "AssayType", "Association", "Biomarker", "Comments",
@@ -157,17 +156,30 @@ class CancerBiomarkers(IPlugin):
         self.symbols = {}
         self.cancerbiomarkers = {}
 
+        #handle plugin specific configuration here
+        #helps separate the plugin from the rest of the pipeline
+        #and makes it easier to manage custom plugins
+        p = configargparse.get_argument_parser()
+
+        p.add("--biomarker", help="location of cancer biomarker file",
+            env_var="BIOMARKER", action='store')
+
     def print_name(self):
         self._logger.info("Cancer Biomarkers plugin")
 
     def merge_data(self, genes, loader, r_server):
+
+        #dont use parse_args because that will error
+        #if there are extra arguments e.g. for plugins
+        p = configargparse.get_argument_parser()
+        self.args = p.parse_known_args()[0]
 
         self.loader = loader
         self.r_server = r_server
 
         try:
             # Parse cancer biomarker data into self.cancerbiomarkers
-            self.build_json(filename=Config.BIOMARKER_FILENAME)
+            self.build_json(filename=self.args.biomarker)
 
             # Iterate through all genes and add cancer biomarkers data if gene symbol is present
             self._logger.info("Generating Cancer Biomarker data injection")
@@ -180,7 +192,7 @@ class CancerBiomarkers(IPlugin):
             self._logger.exception(str(ex), exc_info=1)
             raise ex
 
-    def build_json(self, filename=Config.BIOMARKER_FILENAME):
+    def build_json(self, filename):
 
         with URLZSource(filename).open() as r_file:
             # fieldnames=cancerbiomarker_columns not used at the moment
