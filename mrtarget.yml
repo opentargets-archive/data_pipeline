@@ -4,6 +4,9 @@
 reactome-pathway-data: http://www.reactome.org/download/current/ReactomePathways.txt
 reactome-pathway-relation: http://www.reactome.org/download/current/ReactomePathwaysRelation.txt
 
+#uniprot
+uniprot_uri: https://storage.googleapis.com/ot-releases/18.12/annotations/uniprot-20181130.xml.gz
+
 #hgnc gene plugin
 hgnc-complete-set: http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json
 
