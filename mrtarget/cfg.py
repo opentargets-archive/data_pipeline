@@ -167,14 +167,14 @@ def get_args():
 #        if not args.redis_host and not args.redis_port and 'CTTV_REDIS_SERVER' in os.environ:
 #            args.redis_host, args.redis_port = os.environ['CTTV_REDIS_REMOTE'].split(":")
 
-    if args.redis_remote:
-        Config.REDISLITE_REMOTE = args.redis_remote
+#    if args.redis_remote:
+#        Config.REDISLITE_REMOTE = args.redis_remote
 
-    if args.redis_host:
-        Config.REDISLITE_DB_HOST = args.redis_host
+#    if args.redis_host:
+#        Config.REDISLITE_DB_HOST = args.redis_host
 
-    if args.redis_port:
-        Config.REDISLITE_DB_PORT = args.redis_port
+#    if args.redis_port:
+#        Config.REDISLITE_DB_PORT = args.redis_port
 
 
     return args
