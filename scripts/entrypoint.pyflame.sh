@@ -42,10 +42,10 @@ sleep 2
 #  --abi                    Force a particular Python ABI (26, 34, 36)
 #  --flamechart             Include timestamps for generating Chrome "flamecharts"
 
-#monitor for 1 hour
+#monitor for 24 hour
 #check twice a second
 #check child processess too
-/pyflame/src/pyflame -p `pgrep -f -o "python -m mrtarget.CommandLine"` -o /usr/src/app/log/pyflame.$MRT_PID.out --threads --abi 27 -s 360 -r 0.5
+/pyflame/src/pyflame -p `pgrep -f -o "python -m mrtarget.CommandLine"` -o /usr/src/app/log/pyflame.$MRT_PID.out --threads --abi 27 -s 86400 -r 0.5
 
 #run flamegraph to make the svg
 /FlameGraph/flamegraph.pl </usr/src/app/log/pyflame.$MRT_PID.out >/usr/src/app/log/pyflame.$MRT_PID.svg
