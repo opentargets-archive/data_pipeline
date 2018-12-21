@@ -137,9 +137,7 @@ class Config():
     GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks',
                               'CancerBiomarkers', 'ChemicalProbes', 'Tractability']
 
-    TISSUE_TRANSLATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json'
-    TISSUE_CURATION_MAP_URL = 'https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv'
-
+    
     HPA_NORMAL_TISSUE_URL = ini.get('full_dataset', 'hpa_normal')
     HPA_CANCER_URL = ini.get('full_dataset', 'hpa_cancer')
     HPA_SUBCELLULAR_LOCATION_URL = ini.get('full_dataset', 'hpa_subcellular')

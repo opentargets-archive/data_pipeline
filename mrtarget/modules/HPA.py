@@ -335,19 +335,21 @@ def hpa2tissues(hpa=None):
             'zscore': zscores}
 
 class HPADataDownloader():
-    def __init__(self):
+    def __init__(self, tissue_translation_map_url, tissue_curation_map_url):
         self.logger = logging.getLogger(__name__)
         self.t2m = self.load_t2m()
+        self.tissue_translation_map_url = tissue_translation_map_url
+        self.tissue_curation_map_url = tissue_curation_map_url
 
     def load_t2m(self):
         t2m = {'tissues': {} ,
                'curations': {}}
 
-        with URLZSource(Config.TISSUE_TRANSLATION_MAP_URL).open() as r_file:
+        with URLZSource(self.tissue_translation_map_url).open() as r_file:
             t2m['tissues'] = json.load(r_file)['tissues']
 
 
-        with URLZSource(Config.TISSUE_CURATION_MAP_URL).open() as r_file:
+        with URLZSource(self.tissue_curation_map_url).open() as r_file:
             t2m['curations'] = {el['name']: el['canonical']
                                     for el in csv.DictReader(r_file,
                                               fieldnames=['name', 'canonical'],
@@ -498,11 +500,11 @@ class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
 
 class HPAProcess():
-    def __init__(self, loader, r_server):
+    def __init__(self, loader, r_server, tissue_translation_map_url, tissue_curation_map_url):
         self.loader = loader
         self.esquery = ESQuery(loader.es)
         self.r_server = r_server
-        self.downloader = HPADataDownloader()
+        self.downloader = HPADataDownloader(tissue_translation_map_url, tissue_curation_map_url)
         self.logger = logging.getLogger(__name__)
         self.hpa_normal_table = None
         self.hpa_rna_table = None

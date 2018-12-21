@@ -33,3 +33,7 @@ tractability : https://storage.googleapis.com/ot-releases/18.12/annotations/trac
 
 #ensembl
 ensembl-filename: https://storage.googleapis.com/ot-releases/18.12/annotations/homo_sapiens_core_94_38_genes.json.gz
+
+#hpa tissue specificity
+tissue-translation-map: https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json
+tissue-curation-map: https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv

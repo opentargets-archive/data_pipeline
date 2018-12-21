@@ -161,7 +161,12 @@ def setup_parser():
     #   python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38
     p.add("--ensembl-filename", help="location of ensembl file",
         env_var="ENSEMBL_FILENAME", action='store')
-    
+
+    #hpa tissue specificity
+    p.add("--tissue-translation-map", help="location of tissue translation map file",
+        env_var="TISSUE_TRANSLATION_MAP", action='store')
+    p.add("--tissue-curation-map", help="location of tissue curation map file",
+        env_var="TISSUE_CURATION_MAP", action='store')
 
     return p
 
