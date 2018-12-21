@@ -3,7 +3,7 @@ from collections import OrderedDict
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 import logging
 logger = logging.getLogger(__name__)
 
@@ -61,11 +61,11 @@ class EcoProcess():
 
     def _store_eco(self):
         for eco_id, eco_obj in self.ecos.items():
-            self.loader.put(index_name=Config.ELASTICSEARCH_ECO_INDEX_NAME,
-                            doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
+            self.loader.put(index_name=Const.ELASTICSEARCH_ECO_INDEX_NAME,
+                            doc_type=Const.ELASTICSEARCH_ECO_DOC_NAME,
                             ID=eco_id,
                             body=eco_obj)
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_ECO_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_ECO_INDEX_NAME)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

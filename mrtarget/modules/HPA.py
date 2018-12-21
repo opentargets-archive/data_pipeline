@@ -13,7 +13,9 @@ from mrtarget.common import URLZSource
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
 from mrtarget.common.Redis import  RedisQueueWorkerProcess, RedisQueue
 
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
+from mrtarget.Settings import Config #TODO remove this eventually
+
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
 
@@ -479,8 +481,8 @@ class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
     def process(self, data):
         geneid, gene = data
-        self.loader.put(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                       Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+        self.loader.put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                       Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
                        ID=geneid,
                        body=gene,
                        create_index=False)
@@ -536,11 +538,11 @@ class HPAProcess():
 
         self.logger.debug('calling to create new expression index')
         overwrite_indices = not dry_run
-        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+        self.loader.create_new_index(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
                                      recreate=overwrite_indices)
         self.loader.prepare_for_bulk_indexing(
             self.loader.get_versioned_index(
-                Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
+                Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
 
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
                            r_server=self.r_server,

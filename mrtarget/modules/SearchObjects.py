@@ -10,7 +10,7 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 
 
@@ -247,8 +247,8 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
 
         '''store search objects'''
         #print so.to_json()
-        self.loader.put(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
-                   Config.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
+        self.loader.put(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
+                   Const.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
                    so.id,
                    so.to_json(),
                    create_index=False)
@@ -283,7 +283,7 @@ class SearchObjectProcess(object):
         :return:
         '''
 
-        self.loader.create_new_index(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
+        self.loader.create_new_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
         
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID+'|search_obj_processing',
                            max_size=1000,
@@ -319,7 +319,7 @@ class SearchObjectProcess(object):
             w.join()
 
         self.logger.info('flushing data to index and wait until is finished and stop fuffing around')
-        self.loader.es.indices.flush('%s*' % (Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME),),
+        self.loader.es.indices.flush('%s*' % (Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME),),
                                         wait_if_ongoing =True)
 
 

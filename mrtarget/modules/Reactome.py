@@ -6,7 +6,7 @@ from networkx.algorithms import all_simple_paths
 
 from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from mrtarget.common import URLZSource
 
 class ReactomeNode(TreeNode, JSONSerializable):
@@ -101,8 +101,8 @@ class ReactomeProcess():
                 children = tuple(self.g.successors(node))
                 parents = tuple(self.g.predecessors(node))
 
-                self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
-                    doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                self.loader.put(index_name=Const.ELASTICSEARCH_REACTOME_INDEX_NAME,
+                    doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
                     ID=node,
                     body=dict(id=node,
                         label=node_data['name'],
@@ -113,7 +113,7 @@ class ReactomeProcess():
                         ancestors=list(ancestors)
                     ))
         #make sure the index is all ready for future operations before completing this step
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_REACTOME_INDEX_NAME)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

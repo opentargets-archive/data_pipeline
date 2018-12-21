@@ -1,6 +1,6 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.modules.GeneData import Gene
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from elasticsearch.exceptions import NotFoundError
 import sys
@@ -20,7 +20,7 @@ class Ensembl(IPlugin):
         esquery = ESQuery(loader.es)
 
         try:
-            count = esquery.count_elements_in_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
+            count = esquery.count_elements_in_index(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
         except NotFoundError as ex:
             self._logger.error('no Ensembl index in ES. Skipping. Has the --ensembl step been run? Are you pointing to the correct index? %s' % ex)
             raise ex

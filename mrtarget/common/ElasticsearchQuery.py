@@ -10,6 +10,7 @@ import jsonpickle
 from elasticsearch import helpers, TransportError
 
 from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import new_es_client
@@ -62,8 +63,8 @@ class ESQuery(object):
                                    'size': 100,
                                    },
                             scroll='12h',
-                            doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,True),
+                            doc_type=Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                            index=Loader.get_versioned_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,True),
                             timeout="30m",
                             )
         for hit in res:
@@ -74,13 +75,13 @@ class ESQuery(object):
             ids = [ids]
 
         self.get_objects_by_id(ids,
-                               Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                               Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                               Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                               Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                                fields)
 
     def count_all_targets(self):
 
-        return self.count_elements_in_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        return self.count_elements_in_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
 
     def get_all_diseases(self, fields = None):
         source = self._get_source_from_fields(fields)
@@ -92,35 +93,15 @@ class ESQuery(object):
                                    'size': 1000,
                                    },
                             scroll='12h',
-                            doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                            index=Loader.get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,True),
+                            doc_type=Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+                            index=Loader.get_versioned_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,True),
                             timeout="10m",
                             )
         for hit in res:
             yield hit['_source']
 
     def count_all_diseases(self):
-        return self.count_elements_in_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
-
-    def get_all_mammalian_phenotypes(self, fields = None):	
-        source = self._get_source_from_fields(fields)	
-        res = helpers.scan(client=self.handler,	
-            query={"query": {	
-                        "match_all": {}	
-                    },	
-                    '_source': source,	
-                    'size': 1000,	
-                    },	
-            scroll='12h',	
-            doc_type=Config.ELASTICSEARCH_MP_LABEL_DOC_NAME,	
-            index=Loader.get_versioned_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME,True),	
-            timeout="10m",	
-            )	
-        for hit in res:	
-            yield hit['_source']
-
-    def count_all_mammalian_phenotypes(self):	
-        return self.count_elements_in_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME)
+        return self.count_elements_in_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
 
     def get_all_eco(self, fields=None):
         source = self._get_source_from_fields(fields)
@@ -133,8 +114,8 @@ class ESQuery(object):
                                'size': 1000,
                            },
                            scroll='2h',
-                           doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_ECO_INDEX_NAME,True),
+                           doc_type=Const.ELASTICSEARCH_ECO_DOC_NAME,
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME,True),
                            timeout="10m",
                            )
         for hit in res:
@@ -142,7 +123,7 @@ class ESQuery(object):
 
     def count_all_eco(self):
         return self.count_elements_in_index(
-            Config.ELASTICSEARCH_ECO_INDEX_NAME)
+            Const.ELASTICSEARCH_ECO_INDEX_NAME)
 
     def get_all_hpa(self, fields=None):
         source = self._get_source_from_fields(fields)
@@ -155,16 +136,16 @@ class ESQuery(object):
                             'size': 100,
                            },
                            scroll='12h',
-                           doc_type=Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+                           doc_type=Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
                            index=Loader.get_versioned_index(
-                               Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME, True),
+                               Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME, True),
                            timeout="10m")
         for hit in res:
             yield hit['_source']
 
     def count_all_hpa(self):
         return self.count_elements_in_index(
-            Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+            Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
 
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
@@ -183,8 +164,8 @@ class ESQuery(object):
         q.aggs = aggs
         q.size = size
 
-        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
-                                  doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
+        res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
+                                  doc_type=Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body=q.to_dict()
                                   )
         return AssociationSummary(res)
@@ -206,15 +187,15 @@ class ESQuery(object):
         q.aggs = aggs
         q.size = size
 
-        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
-                                  doc_type=Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
+        res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
+                                  doc_type=Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                   body=q.to_dict()
                                   )
         return AssociationSummary(res)
 
     def get_all_validated_evidence_strings(self,  size=1000, datasources = []):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
+        index_name = Loader.get_versioned_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
 
         doc_type = None
         if datasources:
@@ -239,7 +220,7 @@ class ESQuery(object):
 
     def get_validated_evidence_strings(self,  size=1000, datasources = [], is_valid=True):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
+        index_name = Loader.get_versioned_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
 
         doc_type = None
         if datasources:
@@ -272,7 +253,7 @@ class ESQuery(object):
         if datasources:
             doc_type = datasources
 
-        return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
+        return self.count_elements_in_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
                                             doc_type=doc_type,
                                             query={
                                                 "match_phrase": {
@@ -290,8 +271,7 @@ class ESQuery(object):
                                'size': 1000,
                            },
                            scroll='1h',
-                           # doc_type=Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,True),
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME,True),
                            timeout="10m",
                            )
         for hit in res:
@@ -306,7 +286,7 @@ class ESQuery(object):
                                'size': 100,
                            },
                            scroll='12h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME,True),
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME,True),
                            timeout="10m",
                            )
         for hit in res:
@@ -321,16 +301,16 @@ class ESQuery(object):
                                'size': 1000,
                            },
                            scroll='1h',
-                            doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_REACTOME_INDEX_NAME,True),
+                            doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME,True),
                            timeout="10m",
                            )
         for hit in res:
             yield hit['_source']
 
     def get_reaction(self, reaction_id):
-        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_REACTOME_INDEX_NAME,True),
-                                  doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+        res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME,True),
+                                  doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
                                   body={"query": {
                                             "ids" : {
                                                 "values" : [reaction_id]
@@ -366,7 +346,7 @@ class ESQuery(object):
                                'size': 1000,
                            },
                            scroll='12h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
                            timeout="10m",
                            )
 
@@ -408,7 +388,7 @@ class ESQuery(object):
                                'size': 1,
                            },
                           scroll='12h',
-                          index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,True),
+                          index=Loader.get_versioned_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,True),
                           timeout="10m",
                           )
 
@@ -427,7 +407,7 @@ class ESQuery(object):
                                'size': 1,
                            },
                            scroll='12h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,True),
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,True),
                            timeout="10m",
                            )
 
@@ -455,8 +435,8 @@ class ESQuery(object):
                                'size': 100,
                            },
                            scroll='12h',
-                           doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,True),
+                           doc_type=Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,True),
                            timeout="30m",
                            )
         for target in res:
@@ -486,7 +466,7 @@ class ESQuery(object):
 
         if expected is not None and expected <10000:
             query_body['size']=10000
-            res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME,True),
+            res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME,True),
                                       body=query_body
                                       )
             for hit in res['hits']['hits']:
@@ -495,7 +475,7 @@ class ESQuery(object):
             res = helpers.scan(client=self.handler,
                                query=query_body,
                                scroll='1h',
-                               index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME,True),
+                               index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME,True),
                                timeout="1h",
                                request_timeout=2 * 60 * 60,
                                size=1000
@@ -504,7 +484,7 @@ class ESQuery(object):
                 yield hit['_source']
 
     def count_evidence_for_target(self, target):
-        res = self.handler.search(index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME, True),
+        res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME, True),
                                   body={
                                         "query": {
                                             "constant_score": {
@@ -621,7 +601,7 @@ class ESQuery(object):
                                'size': 1000,
                            },
                            scroll='1h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
                            timeout="10m",
                            )
         for hit in res:
@@ -636,7 +616,7 @@ class ESQuery(object):
                                'size': 1000,
                            },
                            scroll='1h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
                            timeout="10m",
                            )
         for hit in res:
@@ -655,7 +635,7 @@ class ESQuery(object):
                                  'size': 1000,
                                  },
                            scroll='6h',
-                           index=Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME,True),
+                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME,True),
                            timeout="1h",
                            request_timeout=2 * 60 * 60,
                            )
@@ -752,7 +732,7 @@ class ESQuery(object):
                         }
                     }
                  }
-        self.delete_data(Config.ELASTICSEARCH_DATA_INDEX_NAME,
+        self.delete_data(Const.ELASTICSEARCH_DATA_INDEX_NAME,
                          query=query)
 
     def _flush_bulk(self, batch):
@@ -762,7 +742,7 @@ class ESQuery(object):
                                 stats_only=True)
 
     def get_all_evidence(self, fields = None):
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME, True)
+        index_name = Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME, True)
         doc_type = None
         res = helpers.scan(client=self.handler,
                            query={"query":  {"match_all": {}},
@@ -782,7 +762,7 @@ class ESQuery(object):
 
     def get_all_evidence_for_datasource(self, datasources=None, fields = None, ):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME, True)
+        index_name = Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME, True)
         doc_type = None
 
         if datasources:
@@ -809,7 +789,7 @@ class ESQuery(object):
 
     # Queries used to generate the page https://github.com/opentargets/data_release/wiki/Data-Metrics-&-Plots
     def count_drug_w_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -821,7 +801,7 @@ class ESQuery(object):
         return res
 
     def count_entity_w_association(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -833,7 +813,7 @@ class ESQuery(object):
         return res
 
     def count_target_w_symbol(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -843,7 +823,7 @@ class ESQuery(object):
         return res
 
     def count_target_w_mp(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -853,7 +833,7 @@ class ESQuery(object):
         return res
 
     def count_target_w_hallmark(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -863,7 +843,7 @@ class ESQuery(object):
         return res
 
     def count_target_w_biomarker(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME
 
         res = self.handler.search(
                 index = index ,
@@ -873,7 +853,7 @@ class ESQuery(object):
         return res
 
     def count_BRAF_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -883,7 +863,7 @@ class ESQuery(object):
         return res
 
     def count_withdrawn_drug_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index ,
@@ -893,7 +873,7 @@ class ESQuery(object):
         return res
 
     def count_trinucleotide_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -906,9 +886,9 @@ class ESQuery(object):
         return res
 
     def count_datasource_evidence(self, doc_type):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_DATA_INDEX_NAME
 
-        doc_type = Config.ELASTICSEARCH_DATA_DOC_NAME + "-" + doc_type
+        doc_type = Const.ELASTICSEARCH_DATA_DOC_NAME + "-" + doc_type
 
         res = self.handler.search(
                 index= index,
@@ -918,7 +898,7 @@ class ESQuery(object):
         return res
 
     def count_datatype_evidence(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_DATA_INDEX_NAME
 
         res = self.handler.search(
                 index = index,
@@ -930,7 +910,7 @@ class ESQuery(object):
         return res
 
     def count_datatype_association(self):
-        index = Config.RELEASE_VERSION + "_" + Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME
+        index = Config.RELEASE_VERSION + "_" + Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME
 
         res = self.handler.search(
                 index = index,

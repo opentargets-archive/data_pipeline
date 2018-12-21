@@ -1,4 +1,5 @@
 from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from addict import Dict
 
 
@@ -167,9 +168,9 @@ class ElasticSearchConfiguration():
     bulk_load_chunk = 1000
 
     unip = Dict()
-    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.type = 'binary'
-    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.index = False
-    unip.mappings[Config.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.store = True
+    unip.mappings[Const.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.type = 'binary'
+    unip.mappings[Const.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.index = False
+    unip.mappings[Const.ELASTICSEARCH_UNIPROT_DOC_NAME].properties.entry.store = True
     unip.settings.number_of_shards = generic_shard_number
     unip.settings.number_of_replicas = generic_replicas_number
     unip.settings.refresh_interval = '60s'
@@ -178,9 +179,9 @@ class ElasticSearchConfiguration():
 
     ecom = Dict()
 
-    ecom.mappings[Config.ELASTICSEARCH_ECO_DOC_NAME].properties.code.type = 'keyword'
-    ecom.mappings[Config.ELASTICSEARCH_ECO_DOC_NAME].properties.path_codes.type = 'keyword'
-    ecom.mappings[Config.ELASTICSEARCH_ECO_DOC_NAME].properties.path.properties.uri.type = 'keyword'
+    ecom.mappings[Const.ELASTICSEARCH_ECO_DOC_NAME].properties.code.type = 'keyword'
+    ecom.mappings[Const.ELASTICSEARCH_ECO_DOC_NAME].properties.path_codes.type = 'keyword'
+    ecom.mappings[Const.ELASTICSEARCH_ECO_DOC_NAME].properties.path.properties.uri.type = 'keyword'
     ecom.settings.number_of_shards = generic_shard_number
     ecom.settings.number_of_replicas = generic_replicas_number
     ecom.settings.refresh_interval = '60s'
@@ -193,7 +194,7 @@ class ElasticSearchConfiguration():
     efomp.phenotypes.properties.uri.type = 'keyword'
     efomp.path_codes.type = 'keyword'
     efomp.path.properties.uri.type = 'keyword'
-    efom.mappings[Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME].properties = efomp
+    efom.mappings[Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME].properties = efomp
 
     efom.settings.number_of_shards = generic_shard_number
     efom.settings.number_of_replicas = generic_replicas_number
@@ -251,22 +252,8 @@ class ElasticSearchConfiguration():
             }
         },
         "mappings": {
-            Config.ELASTICSEARCH_GENE_NAME_DOC_NAME: {
+            Const.ELASTICSEARCH_GENE_NAME_DOC_NAME: {
                 "properties": {
-                    #             "symbol_synonyms" : {
-                    #                 "type" : "string",
-                    #                 "index" : "not_analyzed"
-                    #                 },
-                    #             "approved_symbol" : {
-                    #                 "type" : "string",
-                    #                 "index" : "not_analyzed"
-                    #                 },
-                    #             "ensembl_external_name" : {
-                    #                 "properties" : {
-                    #                     "type" : "string",
-                    #                     "index" : "not_analyzed"
-                    #                     },
-                    #                 },
                     "protein_class": {
                         "properties": {
                             "label": {
@@ -275,19 +262,10 @@ class ElasticSearchConfiguration():
                         }
                     },
                     "_private": {
-                        # "type" : "object",
                         "properties": {
-                            # "suggestions": {
-                            #     "type": "completion",
-                            #     "analyzer": "whitespace_analyzer",
-                            #     "search_analyzer": "whitespace_analyzer",
-                            #     "payloads": True
-                            # },
                             "facets": {
-                                # "type" : "object",
                                 "properties": {
                                     "reactome": {
-                                        # "type" : "object",
                                         "properties": {
                                             "pathway_type_code": {
                                                 "type": "keyword"
@@ -306,50 +284,6 @@ class ElasticSearchConfiguration():
                         },
                     },
                 },
-                # "dynamic_templates" : [
-
-                # {
-                #     "do_not_index_drugbank" : {
-                #         "path_match" : "drugbank.*",
-                #         "mapping" : {
-                #             "index" : "no"
-                #         }
-                #     }
-                # },
-                #
-                # {
-                #     "do_not_index_go" : {
-                #         "path_match" : "go.*",
-                #         "mapping" : {
-                #             "index" : "no"
-                #         }
-                #     }
-                # },
-                # {
-                #     "do_not_index_interpro" : {
-                #         "path_match" : "interpro.*",
-                #         "mapping" : {
-                #             "index" : "no"
-                #         }
-                #     }
-                # },
-                # {
-                #     "do_not_index_pdb" : {
-                #         "path_match" : "pdb.*",
-                #         "mapping" : {
-                #             "index" : "no"
-                #         }
-                #     }
-                # },
-                # {
-                #     "do_not_index_reactome" : {
-                #         "path_match" : "reactome.*",
-                #         "mapping" : {
-                #             "index" : "no"
-                #         }
-                #     }
-                # },
-                #     ]
             },
         }
     }
@@ -358,9 +292,9 @@ class ElasticSearchConfiguration():
     expm.settings.number_of_shards = generic_shard_number
     expm.settings.number_of_replicas = generic_replicas_number
     expm.settings.refresh_interval = '60s'
-    expm.mappings[Config.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.gene.type = 'keyword'
-    expm.mappings[Config.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.tissues.properties.efo_code.type = 'keyword'
-    expm.mappings[Config.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.tissues.properties.rna.properties.value.type = 'float'
+    expm.mappings[Const.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.gene.type = 'keyword'
+    expm.mappings[Const.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.tissues.properties.efo_code.type = 'keyword'
+    expm.mappings[Const.ELASTICSEARCH_EXPRESSION_DOC_NAME].properties.tissues.properties.rna.properties.value.type = 'float'
 
     expression_data_mapping = expm.to_dict()
 
@@ -421,12 +355,10 @@ class ElasticSearchConfiguration():
     for rt in [RelationType.SHARED_DISEASE,
                RelationType.SHARED_TARGET,
                ]:
-        relation_mappings[Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + rt] = _get_relation_generic_mapping()
+        relation_mappings[Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + rt] = _get_relation_generic_mapping()
 
     relation_data_mapping = {"settings": {"number_of_shards": relation_shard_number,
                                           "number_of_replicas": relation_replicas_number,
-                                          # "index.store.type": "memory",
-                                          # "index.store.type": index_storage_type,
                                           "refresh_interval": "60s",
                                           },
                              "mappings": relation_mappings,
@@ -434,7 +366,6 @@ class ElasticSearchConfiguration():
 
     validated_data_settings_and_mappings = {"settings": {"number_of_shards": validation_shard_number,
                                                          "number_of_replicas": validation_replicas_number,
-                                                         # "index.store.type": "memory",
                                                          "refresh_interval": "60s",
                                                          },
                                             "mappings": {"_default_": validated_data_mapping},
@@ -443,14 +374,11 @@ class ElasticSearchConfiguration():
 
     association_data_mapping = {"settings": {"number_of_shards": evidence_shard_number,
                                              "number_of_replicas": evidence_replicas_number,
-                                             # "index.store.type": "memory",
-                                             # "index.store.type": index_storage_type,
                                              "refresh_interval": "60s",
                                              "max_result_window": str(int(5e6)),
                                              },
                                 "mappings": {
-                                    Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {
-                                        # "_routing": {"required": True,},
+                                    Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME: {
                                         "properties": {
                                             "target": {
                                                 "properties": {
@@ -614,131 +542,14 @@ class ElasticSearchConfiguration():
             }
         }
     }
-
-    # publication_data_mapping = {
-    #     "settings": {
-    #         "number_of_shards": publication_shard_number,
-    #         "number_of_replicas": publication_replicas_number,
-    #         "refresh_interval": "1s",
-    #     },
-    #     "mappings": {
-    #         Config.ELASTICSEARCH_PUBLICATION_DOC_NAME: {
-    #             "properties": {
-    #                 "date_of_revision": {
-    #                     "type": "date",
-    #                     "format": "strict_date_optional_time||epoch_millis",
-    #                 },
-    #                 "date": {
-    #                     "type": "date",
-    #                     "format": "strict_date_optional_time||epoch_millis",
-    #                 },
-    #                 "pub_date": {
-    #                     "type": "date",
-    #                     "format": "strict_date_optional_time||epoch_millis",
-    #                 },
-    #                 "title": {
-    #                     "type": "text"
-
-    #                 },
-    #                 "abstract": {
-    #                     "type": "text"
-    #                 },
-    #             },
-    #             "dynamic_templates": [
-    #                 {
-    #                     "string_fields": {
-    #                         "match": "*",
-    #                         "match_mapping_type": "text",
-    #                         "mapping": {
-    #                             "omit_norms": True,
-    #                             "type": "keyword",
-    #                             "index": "not_analyzed"
-    #                         }
-    #                     }
-    #                 }
-    #             ],
-    #         },
-    #         Config.ELASTICSEARCH_PUBLICATION_DOC_ANALYSIS_SPACY_NAME: {
-    #             "_parent": {
-    #                 "type": Config.ELASTICSEARCH_PUBLICATION_DOC_NAME,
-    #                 "fielddata": {
-    #                     "loading": "eager_global_ordinals"
-    #                 },
-    #             },
-    #             "_routing": {
-    #                 "required": True
-    #             }
-    #         },
-    #         "_default_": {
-    #             "_all": {
-    #                 "enabled": True
-    #             },
-    #             "dynamic_templates": [
-    #                 {
-    #                     "string_fields": {
-    #                         "match": "*",
-    #                         "match_mapping_type": "text",
-    #                         "mapping": {
-    #                             "index": "not_analyzed",
-    #                             "omit_norms": True,
-    #                             "type": "keyword"
-    #                         }
-    #                     }
-    #                 }
-    #             ],
-    #         }
-    #     }
-    # }
-
-    # literature_ent_mapping = {
-    #     "settings": {
-    #         "number_of_shards": publication_shard_number,
-    #         "number_of_replicas": publication_replicas_number,
-    #         "refresh_interval": "1s",
-    #     },
-    #     "mappings": {
-    #         Config.ELASTICSEARCH_LITERATURE_ENTITY_DOC_NAME: {
-    #             "properties": {
-    #                             "id": {
-    #                                 "type": "integer"
-    #                             },
-    #                             "label": {
-    #                                 "type": "keyword"
-    #                             },
-    #                             "ent_type": {
-    #                                 "type": "keyword"
-    #                             },
-    #                             "label": {
-    #                                 "type": "keyword"
-    #                             },
-    #                             "matched_word": {
-    #                                 "type": "keyword"
-    #                             },
-    #                             "start_pos": {
-    #                                 "type": "integer"
-    #                             },
-    #                             "end_pos": {
-    #                                 "type": "integer"
-    #                             },
-    #                             "doc_id": {
-    #                                 "type": "integer"
-    #                             }
-
-    #                         }
-    #             }
-    #         }
-    # }
-
-    INDEX_MAPPPINGS = {Config.ELASTICSEARCH_DATA_INDEX_NAME: evidence_data_mapping,
-                       Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME: association_data_mapping,
-                       Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME: efo_data_mapping,
-                       Config.ELASTICSEARCH_ECO_INDEX_NAME: eco_data_mapping,
-                       Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME: gene_data_mapping,
-                       Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME: expression_data_mapping,
-                       Config.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME: search_obj_data_mapping,
-                       Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME: validated_data_settings_and_mappings,
-                       Config.ELASTICSEARCH_UNIPROT_INDEX_NAME: uniprot_data_mapping,
-                       Config.ELASTICSEARCH_RELATION_INDEX_NAME: relation_data_mapping,
-                    #    Config.ELASTICSEARCH_PUBLICATION_INDEX_NAME: publication_data_mapping,
-                    #    Config.ELASTICSEARCH_LITERATURE_ENTITY_INDEX_NAME: literature_ent_mapping,
+    INDEX_MAPPPINGS = {Const.ELASTICSEARCH_DATA_INDEX_NAME: evidence_data_mapping,
+                       Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME: association_data_mapping,
+                       Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME: efo_data_mapping,
+                       Const.ELASTICSEARCH_ECO_INDEX_NAME: eco_data_mapping,
+                       Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME: gene_data_mapping,
+                       Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME: expression_data_mapping,
+                       Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME: search_obj_data_mapping,
+                       Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME: validated_data_settings_and_mappings,
+                       Const.ELASTICSEARCH_UNIPROT_INDEX_NAME: uniprot_data_mapping,
+                       Const.ELASTICSEARCH_RELATION_INDEX_NAME: relation_data_mapping,
                        }

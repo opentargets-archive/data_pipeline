@@ -8,6 +8,7 @@ from collections import Counter
 import pickle
 
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.constants import Const
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -617,7 +618,7 @@ class Evidence(JSONSerializable):
         self.datatype = translate_database[self.database]
 
     def get_doc_name(self):
-        return Config.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.database
+        return Const.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.database
 
     def get_id(self):
         return self.evidence['id']

@@ -4,7 +4,7 @@ from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader, DiseaseUtils
 from rdflib import URIRef
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 logger = logging.getLogger(__name__)
 
@@ -151,11 +151,11 @@ class EfoProcess():
     def _store_efo(self):
 
         for efo_id, efo_obj in self.efos.items():
-            self.loader.put(index_name=Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                            doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+            self.loader.put(index_name=Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                            doc_type=Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                             ID=efo_id,
                             body = efo_obj)
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects

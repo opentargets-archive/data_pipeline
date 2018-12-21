@@ -5,6 +5,7 @@ import functional
 import itertools
 
 from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from mrtarget.common.DataStructure import JSONSerializable, denormDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -471,8 +472,8 @@ class ScoreProducer(RedisQueueWorkerProcess):
 
 
                 element_id = '%s-%s' % (target, disease)
-                self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-                                       Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
+                self.loader.put(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+                                       Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                        element_id,
                                        score,
                                        create_index=False)
@@ -502,8 +503,8 @@ class ScoreStorerWorker(RedisQueueWorkerProcess):
 
         target, disease, score = data
         element_id = '%s-%s' % (target, disease)
-        self.loader.put(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-                               Config.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
+        self.loader.put(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+                               Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
                                element_id,
                                score,
                                create_index=False
@@ -562,9 +563,9 @@ class ScoringProcess():
             targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
 
-        self.es_loader.create_new_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
+        self.es_loader.create_new_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
         self.es_loader.prepare_for_bulk_indexing(
-            self.es_loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
+            self.es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
 
         '''create queues'''
         number_of_workers = Config.WORKERS_NUMBER
@@ -623,7 +624,7 @@ class ScoringProcess():
             w.join()
 
         self.logger.info('flushing data to index')
-        self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
+        self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
                                         wait_if_ongoing =True)
 
         self.logger.info("DONE")

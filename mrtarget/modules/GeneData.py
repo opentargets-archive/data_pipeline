@@ -6,6 +6,7 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from yapsy.PluginManager import PluginManager
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
@@ -388,8 +389,8 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
         geneid, gene = data
         '''process objects to simple search object'''
         gene.preprocess()
-        self.loader.put(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                       Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+        self.loader.put(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                       Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                        geneid,
                        gene.to_json(),
                        create_index=False)
@@ -440,7 +441,7 @@ class GeneManager():
 
     def _store_data(self, dry_run = False):
 
-        self.loader.create_new_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        self.loader.create_new_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|gene_data_storage',
                            r_server=self.r_server,
                            serialiser='jsonpickle',
@@ -463,7 +464,7 @@ class GeneManager():
         for w in workers:
             w.join()
 
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         self._logger.info('all gene objects pushed to elasticsearch')
 
 

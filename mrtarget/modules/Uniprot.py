@@ -7,7 +7,7 @@ import more_itertools as miters
 
 from mrtarget.common.UniprotIO import Parser
 from mrtarget.common import URLZSource
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 
 class UniprotDownloader(object):
@@ -25,7 +25,7 @@ class UniprotDownloader(object):
 
         if not self.dry_run:
             self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
-            self.loader.create_new_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
+            self.loader.create_new_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
 
         with URLZSource(uri).open() as r_file:
             self.logger.debug("iterate through the whole uniprot xml file")
@@ -40,8 +40,8 @@ class UniprotDownloader(object):
                 json_seqrec = base64.b64encode(jsonpickle.encode(entry))
                 #we canskip this bit (and only this bit!) if dry running
                 if not self.dry_run:
-                    self.loader.put(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME, 
-                        Config.ELASTICSEARCH_UNIPROT_DOC_NAME, entry.id, 
+                    self.loader.put(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME, 
+                        Const.ELASTICSEARCH_UNIPROT_DOC_NAME, entry.id, 
                         {'entry': json_seqrec}, create_index=False)
 
                 self.total_entries += 1
@@ -51,7 +51,7 @@ class UniprotDownloader(object):
         #flush and wait for the index to be complete and ready before ending this step
 
         if not self.dry_run:
-            self.loader.flush_all_and_wait(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)
+            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
 
     def qc(self, esquery):
         """Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

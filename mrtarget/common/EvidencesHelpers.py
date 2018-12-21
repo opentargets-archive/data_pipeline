@@ -13,7 +13,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.connection import new_es_client
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 import mrtarget.common.IO as IO
 
@@ -90,11 +90,11 @@ class ProcessContextESWriter(ProcessContext):
         self.kwargs.es_client = new_es_client()
         self.kwargs.es_loader = Loader(es=self.kwargs.es_client)
 
-        self.kwargs.index_name_validated = Config.ELASTICSEARCH_DATA_INDEX_NAME
-        self.kwargs.doc_type_validated = Config.ELASTICSEARCH_DATA_DOC_NAME
+        self.kwargs.index_name_validated = Const.ELASTICSEARCH_DATA_INDEX_NAME
+        self.kwargs.doc_type_validated = Const.ELASTICSEARCH_DATA_DOC_NAME
 
-        self.kwargs.index_name_invalidated = Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME
-        self.kwargs.doc_type_invalidated = Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME
+        self.kwargs.index_name_invalidated = Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME
+        self.kwargs.doc_type_invalidated = Const.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME
 
     def put(self, line, **kwargs):
         (left, right) = line
