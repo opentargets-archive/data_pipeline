@@ -5,11 +5,33 @@ import gzip
 import logging
 import os.path
 import glob
+import requests as r
+import requests_file
 
-from mrtarget.common import URLZSource
+from mrtarget.common import URLZSource, urllify
 
 
 _l = logging.getLogger(__name__)
+
+
+def check_to_open(filename):
+    """check if `filename` is a fetchable uri and returns True in the case is true False otherwise"""
+    url_name = urllify(filename)
+    r_session = r.Session()
+    r_session.mount('file://', requests_file.FileAdapter())
+
+    f = r_session.get(url_name, stream=True)
+    is_ok = True
+
+    _l.debug("check to open uri %s", url_name)
+    try:
+        f.raise_for_status()
+    except Exception as e:
+        _l.exception(e)
+        is_ok = False
+    finally:
+        f.close()
+        return is_ok
 
 
 def open_to_write(filename):
