@@ -1,24 +1,22 @@
 import hashlib
 import logging
-import datetime
 import os
 import json
 import pypeln.process as pr
 import addict
 import codecs
 import functools
-
-from logging.config import fileConfig
+import itertools
 
 import opentargets_validator.helpers
 import mrtarget.common.IO as IO
 
-from mrtarget.Settings import file_or_resource, Config
+from mrtarget.Settings import Config
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.EvidencesHelpers import (ProcessContext, make_lookup_data,
                                               make_validated_evs_obj, open_writers_on_start,
                                               close_writers_on_done, reduce_tuple_with_sum)
-from mrtarget.common.connection import new_redis_client, new_es_client, PipelineConnectors
+from mrtarget.common.connection import new_redis_client
 from mrtarget.modules.EvidenceString import EvidenceManager, Evidence
 
 
@@ -311,13 +309,22 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
         logger.error('tried to run with no filenames at all')
         raise RuntimeError("Must specify at least one filename of evidence")
 
+    # files that are not fetchable
+    failed_filenames = list(itertools.ifilterfalse(IO.check_to_open, filenames))
+
+    for uri in failed_filenames:
+        logger.warning('failed to fetch uri %s', uri)
+
+    # get the filenames that are properly fetchable
+    checked_filenames = list(set(filenames) - set(failed_filenames))
+
     logger.info('start evidence processing pipeline')
 
     logger.debug('load LUTs')
     lookup_data = make_lookup_data(es_client, redis_client)
 
     logger.debug('create a iterable of lines from all file handles')
-    evs = IO.make_iter_lines(filenames, first_n)
+    evs = IO.make_iter_lines(checked_filenames, first_n)
 
     logger.info('declare pipeline to run')
     write_evidences_on_start_f = functools.partial(open_writers_on_start, enable_output_to_es, output_folder, dry_run)
@@ -334,6 +341,8 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
 
     logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
+    if failed_filenames:
+        logger.warning('some filenames were missing or were not properly fetched %s', str(failed_filenames))
 
     if not results[1]:
         raise RuntimeError("No evidence was sucessful!")
