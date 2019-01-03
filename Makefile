@@ -213,6 +213,14 @@ $(LOG_PATH)/out.$(ES_PREFIX).val.log : $(JSON_PATH)/atlas.json.gz $(JSON_PATH)/c
 		$(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.log
 	sleep 60
 
+.PHONY: validate_custom
+validate_custom : $(LOG_PATH)/out.$(ES_PREFIX).val-custom.log
+
+$(LOG_PATH)/out.$(ES_PREFIX).val-custom.log : $(CUSTOM_JSON_FILE)
+	mkdir -p $(LOG_PATH)
+	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data
+	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(CUSTOM_JSON_FILE) $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val-custom.log
+
 .PHONY: association_scores
 association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log
 

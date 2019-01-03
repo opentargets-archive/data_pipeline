@@ -159,6 +159,10 @@ There are several targets, one for each stage of the pipeline, as well as compos
 
 Each target checks that the required Elasticsearch indices exist (via `scripts/check_index.py`) before execution.
 
+Note that there is a `validate_custom` target which an be used to run the validation/evidence step on a JSON evidence file that is not part of the core Open Targets build, e.g. assuming the file is placed in `json/custom.json.gz`;
+
+`make "CUSTOM_JSON_FILE=$(pwd)/json/custom.json.gz" validate_custom`
+
 There are several targets which speed up common tasks, such as 
  * `list_indices`
  * `clean` (see also `clean_json`, `clean_logs`, `clean_indice`)
