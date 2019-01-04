@@ -1,5 +1,6 @@
 import logging
 import csv
+import sys
 
 import networkx as nx
 from networkx.algorithms import all_simple_paths
@@ -23,11 +24,14 @@ class ReactomeDataDownloader():
     def get_pathway_data(self):
         self.valid_pathway_ids = []
         with URLZSource(Config.REACTOME_PATHWAY_DATA).open() as source:
-            for row in source:
-                pathway_id, pathway_name, species = row.strip().split('\t')
-                pathway_id = pathway_id[1:-1] if pathway_id[0] == '"' else pathway_id
-                pathway_name = pathway_name[1:-1] if pathway_name[0] == '"' else pathway_name
-                species = species[1:-1] if species[0] == '"' else species
+            for row in csv.reader(source, dialect='excel-tab'):
+                if len(row) != 3:
+                   raise ValueError('Reactome.py: Pathway file format unexpected.')
+
+                # It works with a line with \t\t\t. The list will contain ['','','']
+                pathway_id = row[0]
+                pathway_name = row[1]
+                species = row[2]
 
                 if pathway_id not in self.valid_pathway_ids:
                     if species in self.allowed_species:
@@ -45,10 +49,12 @@ class ReactomeDataDownloader():
     def get_pathway_relations(self):
         added_relations = []
         with URLZSource(Config.REACTOME_PATHWAY_RELATION).open() as source:
-            for row in source:
-                parent_id, child_id = row.strip().split('\t')
-                parent_id = parent_id[1:-1] if parent_id[0] == '"' else parent_id
-                child_id = child_id[1:-1] if child_id[0] == '"' else child_id
+            for row in csv.reader(source, dialect='excel-tab'):
+                if len(row) != 2:
+                    raise ValueError('Reactome.py: Pathway Relation file format unexpected.')
+
+                parent_id = row[0]
+                child_id = row[1]
 
                 relation = (parent_id, child_id)
                 if relation not in added_relations:
@@ -76,42 +82,51 @@ class ReactomeProcess():
         root = 'root'
         self.relations = dict()
         self.g.add_node(root, name="", species="")
-        for row in self.downloader.get_pathway_data():
-            self.g.add_node(row['id'], name=row['name'], species=row['species'])
-        children = set()
-        for row in self.downloader.get_pathway_relations():
-            self.g.add_edge(row['id'], row['child'])
-            children.add(row['child'])
-        nodes_without_parent = set(self.g.nodes()) - children
-        for node in nodes_without_parent:
-            if node != root:
-                self.g.add_edge(root, node)
-        for node, node_data in self.g.nodes(data=True):
-            if node != root:
-                ancestors = set()
-                paths = list(all_simple_paths(self.g, root, node))
-                for path in paths:
-                    for p in path:
-                        ancestors.add(p)
 
-                #ensure these are real tuples, not generators
-                #otherwise they can't be serialized to json
-                children = tuple(self.g.successors(node))
-                parents = tuple(self.g.predecessors(node))
+        try:
+            for row in self.downloader.get_pathway_data():
+                self.g.add_node(row['id'], name=row['name'], species=row['species'])
+            children = set()
 
-                self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
-                    doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                    ID=node,
-                    body=dict(id=node,
-                        label=node_data['name'],
-                        path=paths,
-                        children=children,
-                        parents=parents,
-                        is_root=node == root,
-                        ancestors=list(ancestors)
-                    ))
-        #make sure the index is all ready for future operations before completing this step
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
+            for row in self.downloader.get_pathway_relations():
+                self.g.add_edge(row['id'], row['child'])
+                children.add(row['child'])
+            nodes_without_parent = set(self.g.nodes()) - children
+
+            for node in nodes_without_parent:
+                if node != root:
+                    self.g.add_edge(root, node)
+
+            for node, node_data in self.g.nodes(data=True):
+                if node != root:
+                    ancestors = set()
+                    paths = list(all_simple_paths(self.g, root, node))
+                    for path in paths:
+                        for p in path:
+                            ancestors.add(p)
+
+                    #ensure these are real tuples, not generators
+                    #otherwise they can't be serialized to json
+                    children = tuple(self.g.successors(node))
+                    parents = tuple(self.g.predecessors(node))
+
+                    self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
+                        doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                        ID=node,
+                        body=dict(id=node,
+                            label=node_data['name'],
+                            path=paths,
+                            children=children,
+                            parents=parents,
+                            is_root=node == root,
+                            ancestors=list(ancestors)
+                        ))
+            #make sure the index is all ready for future operations before completing this step
+            self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
+        except ValueError as error:
+            self.logger.error(error)
+            error_type, error_instance, traceback = sys.exc_info()
+            raise error_type, error_instance, traceback if logging.getLogger().level == logging.DEBUG else exit(1)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
