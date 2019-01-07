@@ -17,6 +17,7 @@ from mrtarget.common.EvidencesHelpers import (ProcessContext, make_lookup_data,
                                               make_validated_evs_obj, open_writers_on_start,
                                               close_writers_on_done, reduce_tuple_with_sum)
 from mrtarget.common.connection import new_redis_client
+from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.modules.EvidenceString import EvidenceManager, Evidence
 
 
@@ -316,12 +317,19 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
         logger.warning('failed to fetch uri %s', uri)
 
     # get the filenames that are properly fetchable
-    checked_filenames = list(set(filenames) - set(failed_filenames))
+    #sort the list for consistent behaviour
+    checked_filenames = sorted((set(filenames) - set(failed_filenames)))
 
     logger.info('start evidence processing pipeline')
 
     logger.debug('load LUTs')
     lookup_data = make_lookup_data(es_client, redis_client)
+
+    if enable_output_to_es:
+        logger.debug('creating elasticsearch indexs')
+        es_loader = Loader(es=es_client)
+        es_loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME)
+        es_loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
 
     logger.debug('create a iterable of lines from all file handles')
     evs = IO.make_iter_lines(checked_filenames, first_n)
@@ -343,6 +351,12 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
     if failed_filenames:
         logger.warning('some filenames were missing or were not properly fetched %s', str(failed_filenames))
+
+    if enable_output_to_es:
+        logger.debug('flushing elasticsearch indexs')
+        es_loader = Loader(es=es_client)
+        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_DATA_INDEX_NAME)
+        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
 
     if not results[1]:
         raise RuntimeError("No evidence was sucessful!")
