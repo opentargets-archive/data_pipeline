@@ -56,6 +56,7 @@ class URLZSource(object):
         >>> # with URLZSource('http://var.foo/noname.csv',proxies=proxies).open() as f:
 
         """
+        self._log = logging.getLogger(__name__)
         self.filename = urllify(filename)
         self.args = args
         self.kwargs = kwargs
@@ -95,7 +96,8 @@ class URLZSource(object):
         """
 
         if self.filename.startswith('ftp://'):
-            raise NotImplementedError('finish ftp')
+            self._log.error('Not implemented ftp protocol')
+            NotImplementedError('finish ftp')
 
         else:
             local_filename = self.filename.split('://')[-1].split('/')[-1]
