@@ -16,25 +16,25 @@ class ReactomeNode(TreeNode, JSONSerializable):
 
 
 class ReactomeDataDownloader():
-    allowed_species = ['Homo sapiens']
+    ALLOWED_SPECIES = ['Homo sapiens']
+    HEADERS = ["id", "description", "taxonomy"]
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def get_pathway_data(self):
+    def get_pathway_data(self, uri=Config.REACTOME_PATHWAY_DATA):
         self.valid_pathway_ids = []
-        with URLZSource(Config.REACTOME_PATHWAY_DATA).open() as source:
-            for row in csv.reader(source, dialect='excel-tab'):
+        with URLZSource(uri).open() as source:
+            for i, row in enumerate(csv.DictReader(source, fieldnames=ReactomeDataDownloader.HEADERS, dialect='excel-tab'), start=1):
                 if len(row) != 3:
-                   raise ValueError('Reactome.py: Pathway file format unexpected.')
+                   raise ValueError('Reactome.py: Pathway file format unexpected at line %d.' % (i))
 
-                # It works with a line with \t\t\t. The list will contain ['','','']
-                pathway_id = row[0]
-                pathway_name = row[1]
-                species = row[2]
+                pathway_id = row["id"]
+                pathway_name = row["description"]
+                species = row["taxonomy"]
 
                 if pathway_id not in self.valid_pathway_ids:
-                    if species in self.allowed_species:
+                    if species in self.ALLOWED_SPECIES:
                         self.valid_pathway_ids.append(pathway_id)
                         yield dict(id=pathway_id,
                                 name=pathway_name,
@@ -44,6 +44,7 @@ class ReactomeDataDownloader():
                             self.logger.debug("%i rows parsed for reactome_pathway_data" % len(self.valid_pathway_ids))
                 else:
                     self.logger.warn("Pathway id %s is already loaded, skipping duplicate data" % pathway_id)
+
         self.logger.info('parsed %i rows for reactome_pathway_data' % len(self.valid_pathway_ids))
 
     def get_pathway_relations(self):
