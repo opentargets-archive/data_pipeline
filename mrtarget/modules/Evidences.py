@@ -14,7 +14,7 @@ import mrtarget.common.IO as IO
 from mrtarget.Settings import Config
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.EvidencesHelpers import (ProcessContext, make_lookup_data,
-                                              make_validated_evs_obj, open_writers_on_start,
+                                              make_validated_evs_obj, create_process_context,
                                               close_writers_on_done, reduce_tuple_with_sum)
 from mrtarget.common.connection import new_redis_client
 from mrtarget.common.ElasticsearchLoader import Loader
@@ -116,7 +116,6 @@ def validate_evidence(line, process_context):
         data_type = None
         data_source = None
         parsed_line = None
-        parsed_line_bad = None
 
         try:
             parsed_line = json.loads(decoded_line)
@@ -322,23 +321,22 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
 
     logger.info('start evidence processing pipeline')
 
-    logger.debug('load LUTs')
+    #load lookup tables
     lookup_data = make_lookup_data(es_client, redis_client)
 
-    if enable_output_to_es:
-        logger.debug('creating elasticsearch indexs')
-        es_loader = Loader(es=es_client)
-        es_loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        es_loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
-
-    logger.debug('create a iterable of lines from all file handles')
+    #create a iterable of lines from all file handles
     evs = IO.make_iter_lines(checked_filenames, first_n)
 
-    logger.info('declare pipeline to run')
-    write_evidences_on_start_f = functools.partial(open_writers_on_start, enable_output_to_es, output_folder, dry_run)
+    #create functions with pre-baked arguments
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data)
+    write_evidences_on_start_f = functools.partial(create_process_context, enable_output_to_es, output_folder, dry_run)
 
-    # here the pipeline definition
+    #perform any single-thread setup
+    logger.debug('context setup')
+    main_process_context = write_evidences_on_start_f()
+    main_process_context.single_before(es_client=es_client)
+
+    #here is the pipeline definition
     pl_stage = pr.map(process_evidence, evs, workers=num_workers, maxsize=max_queued_events,
                       on_start=validate_evidence_on_start_f, on_done=process_evidence_on_done)
     pl_stage = pr.map(write_evidences, pl_stage, workers=num_writers, maxsize=max_queued_events,
@@ -348,15 +346,13 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     logger.info('run evidence processing pipeline')
     results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
 
+    #perform any single-thread cleanup
+    logger.debug('context teardown')
+    main_process_context.single_after(es_client=es_client)
+
     logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
     if failed_filenames:
-        logger.warning('some filenames were missing or were not properly fetched %s', str(failed_filenames))
-
-    if enable_output_to_es:
-        logger.debug('flushing elasticsearch indexs')
-        es_loader = Loader(es=es_client)
-        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        raise RuntimeError('unable to handle %s', str(failed_filenames))
 
     if not results[1]:
         raise RuntimeError("No evidence was sucessful!")
