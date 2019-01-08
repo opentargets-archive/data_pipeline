@@ -202,7 +202,7 @@ def validate_evidence(line, process_context):
             # Check disease term or phenotype term
             #redis/elasticsearch is based on short ontology id, not full iri
             if '/' in efo_id:
-                short_efo_id = efo_id.split('/')[-1]
+                short_efo_id = process_context.kwargs.luts.available_efos.get_ontology_code_from_url(efo_id)
             else:
                 #handle being given a short id to start with
                 short_efo_id = efo_id
