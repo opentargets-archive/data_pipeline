@@ -96,10 +96,13 @@ def load_eco_scores_table(filename, eco_lut_obj):
     if check_to_open(filename):
         with URLZSource(filename).open() as r_file:
             for i, d in enumerate(csv.DictReader(r_file, fieldnames=ECO_SCORES_HEADERS, dialect='excel-tab'), start=1):
-                if d["uri"] in eco_lut_obj:
-                    table[d["uri"]] = float(d["score"])
+                #lookup tables use short ids not full iri
+                eco_uri = d["uri"]
+                short_eco_code = eco_uri.split('/')[-1]
+                if short_eco_code in eco_lut_obj:
+                    table[eco_uri] = float(d["score"])
                 else:
                     logger.error("eco uri '%s' from eco scores file at line %d is not part of the ECO LUT so not using it",
-                                 d["uri"], i)
+                                 eco_uri, i)
     else:
         logger.error("eco_scores file %s does not exist", filename)
