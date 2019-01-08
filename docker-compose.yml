@@ -47,8 +47,14 @@ services:
     image: redis
     ports:
       - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 1s
+      timeout: 60s
+      retries: 60
     
   mrtarget:
+    image: mrtarget:latest
     build:
       context: ./
     depends_on:
