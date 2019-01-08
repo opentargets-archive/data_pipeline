@@ -36,7 +36,7 @@ def check_to_open(filename):
 
 def open_to_write(filename):
     """open a filename checking if .gz or not at the end of the filename"""
-    if filename.endswith('.gz')
+    if filename.endswith('.gz'):
         return gzip.open(filename, 'wb')
     else:
         return open(filename,'w')
