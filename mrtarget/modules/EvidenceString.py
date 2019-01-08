@@ -478,8 +478,8 @@ class EvidenceManager():
                 eco = self._get_eco_obj(eco_id)
                 if eco is not None:
                     ecos_info.append(ExtendedInfoECO(eco))
-                # else:
-                #     self.logger.debug("Cannot get generic info for eco: %s" % eco_id)
+                else:
+                    self.logger.warning("eco uri %s is not in the ECO LUT so it will not be considered as included", eco_id)
 
             if ecos_info:
                 data = []
