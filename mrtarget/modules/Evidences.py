@@ -200,11 +200,21 @@ def validate_evidence(line, process_context):
 
         if efo_id:
             # Check disease term or phenotype term
-            if efo_id not in process_context.kwargs.luts.available_efos:
+            #redis/elasticsearch is based on short ontology id, not full iri
+            if '/' in efo_id:
+                short_efo_id = efo_id.split('/')[-1]
+            else:
+                #handle being given a short id to start with
+                short_efo_id = efo_id
+
+            #if its not in the efo lookup table, fail
+            if short_efo_id not in process_context.kwargs.luts.available_efos:
                 validated_evs.explanation_type = 'invalid_disease'
                 validated_evs.explanation_str = efo_id
                 disease_failed = True
         else:
+            #disease is missing entirely
+            #should never happen because it will fail validation, but...
             validated_evs.explanation_type = 'missing_disease'
             disease_failed = True
 
