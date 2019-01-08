@@ -1,6 +1,5 @@
 import logging
 import csv
-import sys
 
 import networkx as nx
 from networkx.algorithms import all_simple_paths
@@ -17,21 +16,25 @@ class ReactomeNode(TreeNode, JSONSerializable):
 
 class ReactomeDataDownloader():
     ALLOWED_SPECIES = ['Homo sapiens']
-    HEADERS = ["id", "description", "taxonomy"]
+    HEADERS = ["id", "description", "species"]
+    HEADERS_PATHWAY_REL = ["id","related_id"]
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+
+    def __len__(self):
+        return len(self.valid_pathway_ids)
 
     def get_pathway_data(self, uri=Config.REACTOME_PATHWAY_DATA):
         self.valid_pathway_ids = []
         with URLZSource(uri).open() as source:
             for i, row in enumerate(csv.DictReader(source, fieldnames=ReactomeDataDownloader.HEADERS, dialect='excel-tab'), start=1):
                 if len(row) != 3:
-                   raise ValueError('Reactome.py: Pathway file format unexpected at line %d.' % (i))
+                   raise ValueError('Reactome.py: Pathway file format unexpected at line %d.' % i)
 
                 pathway_id = row["id"]
                 pathway_name = row["description"]
-                species = row["taxonomy"]
+                species = row["species"]
 
                 if pathway_id not in self.valid_pathway_ids:
                     if species in self.ALLOWED_SPECIES:
@@ -47,15 +50,16 @@ class ReactomeDataDownloader():
 
         self.logger.info('parsed %i rows for reactome_pathway_data' % len(self.valid_pathway_ids))
 
-    def get_pathway_relations(self):
+    def get_pathway_relations(self,uri=Config.REACTOME_PATHWAY_RELATION):
         added_relations = []
-        with URLZSource(Config.REACTOME_PATHWAY_RELATION).open() as source:
-            for row in csv.reader(source, dialect='excel-tab'):
+        with URLZSource(uri).open() as source:
+            for i, row in enumerate(
+                    csv.DictReader(source, fieldnames=ReactomeDataDownloader.HEADERS_PATHWAY_REL, dialect='excel-tab'), start=1):
                 if len(row) != 2:
-                    raise ValueError('Reactome.py: Pathway Relation file format unexpected.')
+                    raise ValueError('Reactome.py: Pathway Relation file format unexpected at line %d.' % i)
 
-                parent_id = row[0]
-                child_id = row[1]
+                parent_id = row["id"]
+                child_id = row["related_id"]
 
                 relation = (parent_id, child_id)
                 if relation not in added_relations:
@@ -126,8 +130,7 @@ class ReactomeProcess():
             self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
         except ValueError as error:
             self.logger.error(error)
-            error_type, error_instance, traceback = sys.exc_info()
-            raise error_type, error_instance, traceback if logging.getLogger().level == logging.DEBUG else exit(1)
+            raise
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
