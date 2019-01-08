@@ -49,10 +49,6 @@ def open_to_read(filename):
     return itertools.izip(itertools.cycle([filename]), enumerate(it, start=1))
 
 
-def get_filenames_by_glob(path_str):
-    return glob.glob(path_str)
-
-
 def make_iter_lines(iterable_of_filenames, first_n=0):
     """return an iterator of lines for all filenames in `iterable_of_filenames`. It returns
     each element from the iterator is  in the shape of (filenae, (line_n, line)) starting
