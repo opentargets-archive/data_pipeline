@@ -54,6 +54,7 @@ services:
       retries: 60
     
   mrtarget:
+    image: mrtarget:latest
     build:
       context: ./
     depends_on:
