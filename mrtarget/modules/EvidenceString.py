@@ -136,17 +136,11 @@ class EvidenceManager():
         self.available_ecos = lookup_data.available_ecos
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
-        self._get_eco_scoring_values()
-        # self.logger.debug("finished self._get_eco_scoring_values(), took %ss"%str(time.time()-start_time))
+        self._get_eco_scoring_values(eco_lut_obj=self.available_ecos)
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
-        # self.gene_retriever = GeneLookUpTable(self.es)
-        # self.efo_retriever = EFOLookUpTable(self.es)
-        # self.eco_retriever = ECOLookUpTable(self.es)
+
         self._get_score_modifiers()
-
-
-            # self.logger.debug("finished self._get_score_modifiers(), took %ss"%str(time.time()-start_time))
 
     # @do_profile()#follow=[])
     def fix_evidence(self, evidence):
@@ -387,13 +381,6 @@ class EvidenceManager():
             self.logger.error(
                 "%s Evidence %s has an invalid efo id in disease.id: %s" % (datasource, evidence_id, efo_id))
             return False
-        # for eco_id in ev['evidence']['evidence_codes']:
-        #     if eco_id not in self.available_ecos:
-        #         self.logger.error(
-        #             "%s Evidence %s has an invalid eco id in evidence.evidence_codes: %s" % (
-        #             datasource, evidence_id, eco_id))
-        #         return False
-
         return True
 
     def get_extended_evidence(self, evidence):
