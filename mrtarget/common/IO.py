@@ -17,29 +17,29 @@ _l = logging.getLogger(__name__)
 def check_to_open(filename):
     """check if `filename` is a fetchable uri and returns True in the case is true False otherwise"""
     url_name = urllify(filename)
-    r_session = r.Session()
-    r_session.mount('file://', requests_file.FileAdapter())
+    with r.Session() as r_session:
+        r_session.mount('file://', requests_file.FileAdapter())
 
-    f = r_session.get(url_name, stream=True)
-    is_ok = True
+        f = r_session.get(url_name, stream=True)
+        is_ok = True
 
-    _l.debug("check to open uri %s", url_name)
-    try:
-        f.raise_for_status()
-    except Exception as e:
-        _l.exception(e)
-        is_ok = False
-    finally:
-        f.close()
-        return is_ok
+        _l.debug("check to open uri %s", url_name)
+        try:
+            f.raise_for_status()
+        except Exception as e:
+            _l.exception(e)
+            is_ok = False
+        finally:
+            f.close()
+            return is_ok
 
 
 def open_to_write(filename):
     """open a filename checking if .gz or not at the end of the filename"""
-    open_f = functools.partial(gzip.open, filename, 'wb') if filename.endswith('.gz') \
-        else functools.partial(open, filename, 'w')
-
-    return open_f()
+    if filename.endswith('.gz'):
+        return gzip.open(filename, 'wb')
+    else:
+        return open(filename,'w')
 
 
 def open_to_read(filename):
@@ -47,16 +47,6 @@ def open_to_read(filename):
     _l.debug('generate an iterator of (filename,enumerate) for filename %s', filename)
     it = more_itertools.with_iter(URLZSource(filename).open())
     return itertools.izip(itertools.cycle([filename]), enumerate(it, start=1))
-
-
-def get_filenames_by_glob(path_str):
-    filenames = []
-    try:
-        filenames = glob.glob(path_str)
-    except Exception as e:
-        _l.exception(e)
-    finally:
-        return filenames
 
 
 def make_iter_lines(iterable_of_filenames, first_n=0):

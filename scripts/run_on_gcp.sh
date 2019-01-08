@@ -15,7 +15,7 @@ shopt -s failglob # empty globs are errors
 
 NOW=`date +'%y%m%d-%k%M%S'`
 #underscores are not allowed
-NAME=data-pipeline-18-12-3-$NOW
+NAME=data-pipeline-latest-$NOW
 
 #create an instance
 #  n1-standard-8 is 8 vCPUs and 30GB memory
@@ -50,30 +50,30 @@ set -u # unset variables are errors
 set -o pipefail # a pipe fails if any command in it fails
 shopt -s failglob # empty globs are errors
 
-sudo apt-get -q -y update
-sudo apt-get -q -y install \
+apt-get -q -y update
+apt-get -q -y install \
      apt-transport-https \
      ca-certificates \
      curl \
      gnupg2 \
      software-properties-common
 curl -fsSL https://download.docker.com/linux/debian/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian jessie stable"
-sudo apt-get -q -y update
-sudo apt-get -q -y install docker-ce
-sudo systemctl enable docker
+add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian jessie stable"
+apt-get -q -y update
+apt-get -q -y install docker-ce
+systemctl enable docker
 
 #update docker-compose version number below as appropriate
-sudo curl -L "https://github.com/docker/compose/releases/download/1.23.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+curl -L "https://github.com/docker/compose/releases/download/1.23.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
 
 #elasticsearch needs a large number of concurrent files
-sudo echo 'vm.max_map_count=262144' >> /etc/sysctl.conf
-sudo sysctl -p
+echo 'vm.max_map_count=262144' >> /etc/sysctl.conf
+sysctl -p
 echo "vm.max_map_count is `sudo sysctl vm.max_map_count`"
-sudo echo '* hard nofile 10000' >> /etc/security/limits.conf
-sudo echo '* hard memlock infinity' >> /etc/security/limits.conf
-sudo echo /etc/security/limits.conf
+echo '* hard nofile 10000' >> /etc/security/limits.conf
+echo '* hard memlock infinity' >> /etc/security/limits.conf
+echo /etc/security/limits.conf
 
 EOF
 
@@ -129,6 +129,11 @@ services:
     image: redis
     ports:
       - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 1s
+      timeout: 60s
+      retries: 60
     
   mrtarget:
     image: quay.io/opentargets/mrtarget:latest
