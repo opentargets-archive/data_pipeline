@@ -36,7 +36,8 @@ MRTARGET_ARGS ?=
 
 # Internal variables
 #command to run mrtarget with various logging
-MRTARGET_CMD = python -m mrtarget.CommandLine --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
+MRTARGET_ENTRYPOINT ?= $(mkfile_dir)/scripts/entrypoint.sh
+MRTARGET_CMD = $(MRTARGET_ENTRYPOINT) --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
 
 
 INDEX_CMD = python scripts/check_index.py --elasticsearch $(ELASTICSEARCH_NODES) --zero-fail --index
