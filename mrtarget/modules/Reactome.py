@@ -22,9 +22,6 @@ class ReactomeDataDownloader():
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def __len__(self):
-        return len(self.valid_pathway_ids)
-
     def get_pathway_data(self, uri=Config.REACTOME_PATHWAY_DATA):
         self.valid_pathway_ids = []
         with URLZSource(uri).open() as source:
