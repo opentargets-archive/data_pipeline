@@ -98,7 +98,7 @@ def load_eco_scores_table(filename, eco_lut_obj):
             for i, d in enumerate(csv.DictReader(r_file, fieldnames=ECO_SCORES_HEADERS, dialect='excel-tab'), start=1):
                 #lookup tables use short ids not full iri
                 eco_uri = d["uri"]
-                short_eco_code = eco_uri.split('/')[-1]
+                short_eco_code = ECOLookUpTable.get_ontology_code_from_url(eco_uri)
                 if short_eco_code in eco_lut_obj:
                     table[eco_uri] = float(d["score"])
                 else:
