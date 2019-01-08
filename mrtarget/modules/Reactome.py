@@ -15,22 +15,26 @@ class ReactomeNode(TreeNode, JSONSerializable):
 
 
 class ReactomeDataDownloader():
-    allowed_species = ['Homo sapiens']
+    ALLOWED_SPECIES = ['Homo sapiens']
+    HEADERS = ["id", "description", "species"]
+    HEADERS_PATHWAY_REL = ["id","related_id"]
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def get_pathway_data(self):
+    def get_pathway_data(self, uri=Config.REACTOME_PATHWAY_DATA):
         self.valid_pathway_ids = []
-        with URLZSource(Config.REACTOME_PATHWAY_DATA).open() as source:
-            for row in source:
-                pathway_id, pathway_name, species = row.strip().split('\t')
-                pathway_id = pathway_id[1:-1] if pathway_id[0] == '"' else pathway_id
-                pathway_name = pathway_name[1:-1] if pathway_name[0] == '"' else pathway_name
-                species = species[1:-1] if species[0] == '"' else species
+        with URLZSource(uri).open() as source:
+            for i, row in enumerate(csv.DictReader(source, fieldnames=ReactomeDataDownloader.HEADERS, dialect='excel-tab'), start=1):
+                if len(row) != 3:
+                   raise ValueError('Reactome.py: Pathway file format unexpected at line %d.' % i)
+
+                pathway_id = row["id"]
+                pathway_name = row["description"]
+                species = row["species"]
 
                 if pathway_id not in self.valid_pathway_ids:
-                    if species in self.allowed_species:
+                    if species in self.ALLOWED_SPECIES:
                         self.valid_pathway_ids.append(pathway_id)
                         yield dict(id=pathway_id,
                                 name=pathway_name,
@@ -40,15 +44,19 @@ class ReactomeDataDownloader():
                             self.logger.debug("%i rows parsed for reactome_pathway_data" % len(self.valid_pathway_ids))
                 else:
                     self.logger.warn("Pathway id %s is already loaded, skipping duplicate data" % pathway_id)
+
         self.logger.info('parsed %i rows for reactome_pathway_data' % len(self.valid_pathway_ids))
 
-    def get_pathway_relations(self):
+    def get_pathway_relations(self,uri=Config.REACTOME_PATHWAY_RELATION):
         added_relations = []
-        with URLZSource(Config.REACTOME_PATHWAY_RELATION).open() as source:
-            for row in source:
-                parent_id, child_id = row.strip().split('\t')
-                parent_id = parent_id[1:-1] if parent_id[0] == '"' else parent_id
-                child_id = child_id[1:-1] if child_id[0] == '"' else child_id
+        with URLZSource(uri).open() as source:
+            for i, row in enumerate(
+                    csv.DictReader(source, fieldnames=ReactomeDataDownloader.HEADERS_PATHWAY_REL, dialect='excel-tab'), start=1):
+                if len(row) != 2:
+                    raise ValueError('Reactome.py: Pathway Relation file format unexpected at line %d.' % i)
+
+                parent_id = row["id"]
+                child_id = row["related_id"]
 
                 relation = (parent_id, child_id)
                 if relation not in added_relations:
@@ -76,42 +84,50 @@ class ReactomeProcess():
         root = 'root'
         self.relations = dict()
         self.g.add_node(root, name="", species="")
-        for row in self.downloader.get_pathway_data():
-            self.g.add_node(row['id'], name=row['name'], species=row['species'])
-        children = set()
-        for row in self.downloader.get_pathway_relations():
-            self.g.add_edge(row['id'], row['child'])
-            children.add(row['child'])
-        nodes_without_parent = set(self.g.nodes()) - children
-        for node in nodes_without_parent:
-            if node != root:
-                self.g.add_edge(root, node)
-        for node, node_data in self.g.nodes(data=True):
-            if node != root:
-                ancestors = set()
-                paths = list(all_simple_paths(self.g, root, node))
-                for path in paths:
-                    for p in path:
-                        ancestors.add(p)
 
-                #ensure these are real tuples, not generators
-                #otherwise they can't be serialized to json
-                children = tuple(self.g.successors(node))
-                parents = tuple(self.g.predecessors(node))
+        try:
+            for row in self.downloader.get_pathway_data():
+                self.g.add_node(row['id'], name=row['name'], species=row['species'])
+            children = set()
 
-                self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
-                    doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                    ID=node,
-                    body=dict(id=node,
-                        label=node_data['name'],
-                        path=paths,
-                        children=children,
-                        parents=parents,
-                        is_root=node == root,
-                        ancestors=list(ancestors)
-                    ))
-        #make sure the index is all ready for future operations before completing this step
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
+            for row in self.downloader.get_pathway_relations():
+                self.g.add_edge(row['id'], row['child'])
+                children.add(row['child'])
+            nodes_without_parent = set(self.g.nodes()) - children
+
+            for node in nodes_without_parent:
+                if node != root:
+                    self.g.add_edge(root, node)
+
+            for node, node_data in self.g.nodes(data=True):
+                if node != root:
+                    ancestors = set()
+                    paths = list(all_simple_paths(self.g, root, node))
+                    for path in paths:
+                        for p in path:
+                            ancestors.add(p)
+
+                    #ensure these are real tuples, not generators
+                    #otherwise they can't be serialized to json
+                    children = tuple(self.g.successors(node))
+                    parents = tuple(self.g.predecessors(node))
+
+                    self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
+                        doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                        ID=node,
+                        body=dict(id=node,
+                            label=node_data['name'],
+                            path=paths,
+                            children=children,
+                            parents=parents,
+                            is_root=node == root,
+                            ancestors=list(ancestors)
+                        ))
+            #make sure the index is all ready for future operations before completing this step
+            self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
+        except ValueError as error:
+            self.logger.error(error)
+            raise
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
