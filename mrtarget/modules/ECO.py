@@ -1,11 +1,14 @@
 from collections import OrderedDict
 
+import csv
+from mrtarget.common.IO import check_to_open, URLZSource
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
 import opentargets_ontologyutils.eco_so
 from mrtarget.Settings import Config
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,3 +89,22 @@ class EcoProcess():
         metrics["eco.count"] = eco_count
 
         return metrics
+
+
+ECO_SCORES_HEADERS = ["uri", "code", "score"]
+
+def load_eco_scores_table(filename, eco_lut_obj):
+    table = {}
+    if check_to_open(filename):
+        with URLZSource(filename).open() as r_file:
+            for i, d in enumerate(csv.DictReader(r_file, fieldnames=ECO_SCORES_HEADERS, dialect='excel-tab'), start=1):
+                #lookup tables use short ids not full iri
+                eco_uri = d["uri"]
+                short_eco_code = ECOLookUpTable.get_ontology_code_from_url(eco_uri)
+                if short_eco_code in eco_lut_obj:
+                    table[eco_uri] = float(d["score"])
+                else:
+                    logger.error("eco uri '%s' from eco scores file at line %d is not part of the ECO LUT so not using it",
+                                 eco_uri, i)
+    else:
+        logger.error("eco_scores file %s does not exist", filename)

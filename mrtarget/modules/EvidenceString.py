@@ -2,24 +2,16 @@ import copy
 import json
 import logging
 import math
-import os
-from collections import Counter
 
-import pickle
+import csv
 
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
-from mrtarget.common.ElasticsearchLoader import Loader, LoaderWorker
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
-from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
-from mrtarget.common.connection import new_es_client
+from mrtarget.common.IO import check_to_open, URLZSource
 from mrtarget.modules import GeneData
-from mrtarget.common.Scoring import HarmonicSumScorer
-from mrtarget.modules.ECO import ECO
+from mrtarget.modules.ECO import ECO, load_eco_scores_table
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
-import addict
 
 logger = logging.getLogger(__name__)
 
@@ -228,17 +220,7 @@ class EvidenceManager():
                     if available_score != self.eco_scores[eco_uri]:
                         fixed = True
             else:
-                if evidence['sourceID'] not in ['uniprot_literature', 'gene2phenotype']:
-                    self.logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
-
-        # '''use just one mutation per somatic data'''
-        # if 'known_mutations' in evidence['evidence'] and evidence['evidence']['known_mutations']:
-        #     if len(evidence['evidence']['known_mutations']) == 1:
-        #         evidence['evidence']['known_mutations'] = evidence['evidence']['known_mutations'][0]
-        #     else:
-        #         raise AttributeError('only one mutation is allowed. %i submitted for evidence id %s' % (
-        #         len(evidence['evidence']['known_mutations']),
-        #         evidence['id']))
+                self.logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
         # Remove identifiers.org from genes and map to ensembl ids
         EvidenceManager.fix_target_id(evidence,
@@ -246,7 +228,6 @@ class EvidenceManager():
                                       self.available_genes,
                                       self.non_reference_genes
                                       )
-
 
         # Remove identifiers.org from cttv activity  and target type ids
         if 'target_type' in evidence['target']:
@@ -497,8 +478,8 @@ class EvidenceManager():
                 eco = self._get_eco_obj(eco_id)
                 if eco is not None:
                     ecos_info.append(ExtendedInfoECO(eco))
-                # else:
-                #     self.logger.debug("Cannot get generic info for eco: %s" % eco_id)
+                else:
+                    self.logger.warning("eco uri %s is not in the ECO LUT so it will not be considered as included", eco_id)
 
             if ecos_info:
                 data = []
@@ -576,15 +557,8 @@ class EvidenceManager():
             ensemblid = EvidenceManager._map_to_reference_ensembl_gene(ensemblid, non_reference_genes) or ensemblid
         return ensemblid
 
-    def _get_eco_scoring_values(self):
-        self.eco_scores = dict()
-        for line in file(file_or_resource('eco_scores.tsv')):
-            try:
-                uri, label, score = line.strip().split('\t')
-                uri.rstrip()
-                self.eco_scores[uri] = float(score)
-            except:
-                self.logger.error("cannot parse line in eco_scores.tsv: %s" % (line.strip()))
+    def _get_eco_scoring_values(self, eco_lut_obj):
+        self.eco_scores = load_eco_scores_table(filename=Config.ECO_SCORES_URL, eco_lut_obj=eco_lut_obj)
 
     def _get_score_modifiers(self):
         self.score_modifiers = {}

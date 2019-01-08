@@ -221,6 +221,7 @@ class Config():
 
     ENSEMBL_FILENAME = "https://storage.googleapis.com/ot-releases/18.12/annotations/homo_sapiens_core_94_38_genes.json.gz"
 
+    ECO_SCORES_URL = "https://raw.githubusercontent.com/opentargets/data_pipeline/master/mrtarget/resources/eco_scores.tsv"
     HPA_NORMAL_TISSUE_URL = ini.get(INI_SECTION, 'hpa_normal')
     HPA_CANCER_URL = ini.get(INI_SECTION, 'hpa_cancer')
     HPA_SUBCELLULAR_LOCATION_URL = ini.get(INI_SECTION, 'hpa_subcellular')
