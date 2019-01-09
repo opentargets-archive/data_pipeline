@@ -7,7 +7,7 @@ shopt -s failglob # empty globs are errors
 
 NOW=`date +'%y%m%d-%k%M%S'`
 #underscores are not allowed
-NAME=data-pipeline-18-12-3-$NOW
+NAME=data-pipeline-18-12-5-$NOW
 
 #create an instance
 #  n1-standard-8 is 8 vCPUs and 30GB memory
@@ -120,7 +120,7 @@ services:
       - 6379:6379
     
   mrtarget:
-    image: quay.io/opentargets/mrtarget:18.12.4
+    image: quay.io/opentargets/mrtarget:18.12.5-dev
     depends_on:
       - elasticsearch
       - redis
@@ -188,7 +188,7 @@ gcloud compute ssh $NAME --command 'sudo docker-compose run --rm --entrypoint ma
 #full build!
 #metrics is broken, so dont do it
 gcloud compute ssh $NAME --command "cat > run.sh" <<EOF
-docker-compose run -d --rm --entrypoint make mrtarget -r -R -j -l 16 relationship_data search_data association_qc
+docker-compose run -d --rm --entrypoint make mrtarget -r -R relationship_data search_data
 EOF
 gcloud compute ssh $NAME --command "chmod +x run.sh"
 gcloud compute ssh $NAME --command 'sudo ./run.sh'
