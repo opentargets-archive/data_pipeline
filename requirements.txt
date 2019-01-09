@@ -34,7 +34,7 @@ petl
 pyfunctional
 requests-file
 toolz
-pypeln
+pypeln<=0.1.6
 
 rdflib
 colorama
