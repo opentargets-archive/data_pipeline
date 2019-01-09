@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import time
 
 import functools
 import itertools
@@ -130,11 +131,10 @@ class ProcessContextESWriter(ProcessContext):
         self.close()
 
     def close(self):
-        try:
-            self.kwargs.es_loader.flush()
-            self.kwargs.es_loader.close()
-        except:
-            pass
+        #flush but dont close because it changes index settings
+        #and that needs to be done in a single place outside of multiprocessing
+        self.kwargs.es_loader.flush_all_and_wait(Config.ELASTICSEARCH_DATA_INDEX_NAME)
+        self.kwargs.es_loader.flush_all_and_wait(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
 
     @staticmethod
     def single_before(**kwargs):
@@ -142,8 +142,13 @@ class ProcessContextESWriter(ProcessContext):
         logger.debug('creating elasticsearch indexs')        
         es_client = kwargs["es_client"]
         es_loader = Loader(es=es_client)
+
         es_loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME)
         es_loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+
+        #need to directly get the versioned index name for this function
+        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME))
+        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME))
 
     @staticmethod
     def single_after(**kwargs):
@@ -151,8 +156,12 @@ class ProcessContextESWriter(ProcessContext):
         logger.debug('flushing elasticsearch indexs')  
         es_client = kwargs["es_client"]
         es_loader = Loader(es=es_client)
+        #ensure everything pending has been flushed to index
         es_loader.flush_all_and_wait(Config.ELASTICSEARCH_DATA_INDEX_NAME)
         es_loader.flush_all_and_wait(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        #restore old pre-load settings
+        #note this automatically does all prepared indexes
+        es_loader.restore_after_bulk_indexing()
 
 
 def create_process_context(enable_output_to_es, output_folder, dry_run):
