@@ -5,6 +5,7 @@ from mrtarget.common.IO import check_to_open, URLZSource
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
+import opentargets_ontologyutils.eco_so
 from mrtarget.Settings import Config
 import logging
 
@@ -51,7 +52,8 @@ class EcoProcess():
         uri_so = Config.ONTOLOGY_CONFIG.get('uris', 'so')
         uri_eco = Config.ONTOLOGY_CONFIG.get('uris', 'eco')
 
-        self.evidence_ontology.load_evidence_classes(uri_so, uri_eco)
+        opentargets_ontologyutils.eco_so.load_evidence_classes(self.evidence_ontology, uri_so, uri_eco)
+
         for uri,label in self.evidence_ontology.current_classes.items():
             eco = ECO(uri,
                       label,
