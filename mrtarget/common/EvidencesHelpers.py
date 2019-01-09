@@ -40,6 +40,22 @@ class ProcessContext(object):
     def put(self, line, **kwargs):
         pass
 
+    '''
+    Method call one in the main thread before any processing.
+    Override in subclass to do any singleton setup
+    '''
+    @staticmethod
+    def single_before(**kwargs):
+        pass
+
+    '''
+    Method call one in the main thread after all processing.
+    Override in subclass to cleanup any singleton setup
+    '''
+    @staticmethod
+    def single_after(**kwargs):
+        pass
+
 
 class ProcessContextFileWriter(ProcessContext):
     def __init__(self, output_folder='./', **kwargs):
@@ -102,12 +118,12 @@ class ProcessContextESWriter(ProcessContext):
             self.kwargs.es_loader.put(body=right['line'], ID=right['hash'],
                                       index_name=self.kwargs.index_name_validated,
                                       doc_type=self.kwargs.doc_type_validated,
-                                      create_index=True, auto_optimise=True)
+                                      create_index=False, auto_optimise=True)
         elif left is not None:
             self.kwargs.es_loader.put(body=serialise_object_to_json(left), ID=left['id'],
                                       index_name=self.kwargs.index_name_invalidated,
                                       doc_type=self.kwargs.doc_type_invalidated,
-                                      create_index=True,
+                                      create_index=False,
                                       auto_optimise=True)
 
     def __del__(self):
@@ -120,22 +136,32 @@ class ProcessContextESWriter(ProcessContext):
         except:
             pass
 
+    @staticmethod
+    def single_before(**kwargs):
+        logger = logging.getLogger(__name__)
+        logger.debug('creating elasticsearch indexs')        
+        es_client = kwargs["es_client"]
+        es_loader = Loader(es=es_client)
+        es_loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME)
+        es_loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
 
-def open_writers_on_start(enable_output_to_es, output_folder, dry_run):
-    """construct the processcontext to write lines to the files. we have to sets,
-    the good validated ones and the failed ones.
-    """
-    pc = None
-    if enable_output_to_es:
-        pc = ProcessContextESWriter()
-    elif dry_run:
-        pc = ProcessContextDryRun()
+    @staticmethod
+    def single_after(**kwargs):
+        logger = logging.getLogger(__name__)
+        logger.debug('flushing elasticsearch indexs')  
+        es_client = kwargs["es_client"]
+        es_loader = Loader(es=es_client)
+        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_DATA_INDEX_NAME)
+        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+
+
+def create_process_context(enable_output_to_es, output_folder, dry_run):
+    if dry_run:
+        return ProcessContextDryRun()
+    elif enable_output_to_es:
+        return ProcessContextESWriter()
     else:
-        pc = ProcessContextFileWriter(output_folder=output_folder)
-
-    pc.logger.debug("called open_writers on_start from %s", str(os.getpid()))
-    return pc
-
+        return ProcessContextFileWriter(output_folder=output_folder)
 
 def close_writers_on_done(_status, process_context):
     """close the processcontext after writing to the files."""
