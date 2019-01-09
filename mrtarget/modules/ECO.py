@@ -108,3 +108,5 @@ def load_eco_scores_table(filename, eco_lut_obj):
                                  eco_uri, i)
     else:
         logger.error("eco_scores file %s does not exist", filename)
+
+    return table
