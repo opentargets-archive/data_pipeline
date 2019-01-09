@@ -780,28 +780,22 @@ class ESQuery(object):
 
 
 
-    def get_all_evidence_for_datasource(self, datasources=None, fields = None, ):
+    def get_all_evidence_for_datasource(self, datasources, fields = None, ):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME, True)
-        doc_type = None
-
-        if datasources:
-            if isinstance(datasources, str):
-                doc_type='evidencestring-'+datasources
-            elif isinstance(datasources, list) or isinstance(datasources, tuple):
-                doc_type=['evidencestring-'+ds for ds in datasources]
-            else:
-                raise AttributeError()
         res = helpers.scan(client=self.handler,
-                           query={"query":  {"match_all": {}},
-                               '_source': self._get_source_from_fields(fields),
-                               'size': 1000,
-                           },
-                           scroll='12h',
-                           doc_type=doc_type,
-                           index=index_name,
-                           timeout="10m",
-                           )
+            query={"query": {
+                "match_phrase": {
+                    "sourceID": datasources
+                }
+            },
+                '_source': self._get_source_from_fields(fields),
+                'size': 1000,
+            },
+            scroll='12h',
+            index=index_name,
+            timeout="10m",
+            )
 
         # res = list(res)
         for hit in res:
@@ -813,7 +807,7 @@ class ESQuery(object):
 
         res = self.handler.search(
                 index = index,
-                doc_type="evidencestring-chembl",
+                doc_type="evidencestring",
                 body={"query": {"match_all":{}},
                       "aggs":
                             {"general_drug":{"cardinality": {"field":"drug.id"}}}

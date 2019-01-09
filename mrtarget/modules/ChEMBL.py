@@ -189,7 +189,7 @@ class ChEMBLLookup(object):
     def get_molecules_from_evidence(self):
         self._logger.debug('get_molecules_from_evidence')
 
-        for c, e in enumerate(self.es_query.get_all_evidence_for_datasource(['chembl'],
+        for c, e in enumerate(self.es_query.get_all_evidence_for_datasource('chembl',
                                                                fields=['target.id',
                                                                        'disease.id',
                                                                        'evidence.target2drug.urls'])):
