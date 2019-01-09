@@ -166,7 +166,14 @@ class ECOLookUpTable(object):
 
     @staticmethod
     def get_ontology_code_from_url(url):
-        return url.split('/')[-1]
+        #note, this is not a guaranteed solution
+        #to do it properly, it has to be from the actual
+        #ontology file or from OLS API
+        if '/' in url:
+            return url.split('/')[-1]
+        else:
+            #assume already a short code
+            return url
 
     def _load_eco_data(self, r_server=None):
         self._logger = logging.getLogger(__name__)
@@ -227,10 +234,24 @@ class EFOLookUpTable(object):
         if self.r_server is not None:
             self._load_efo_data(r_server)
 
+    @staticmethod
+    def get_ontology_code_from_url(url):
+        #note, this is not a guaranteed solution
+        #to do it properly, it has to be from the actual
+        #ontology file or from OLS API
+        if '/' in url:
+            return url.split('/')[-1]
+        else:
+            #assume already a short code
+            return url
+
     def _load_efo_data(self, r_server = None):
         self._logger = logging.getLogger(__name__)
-        for efo in self._es_query.get_all_diseases():
-            self.set_efo(efo, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
+        for i,efo in enumerate(self._es_query.get_all_diseases()):
+            #TODO can be improved by sending elements in batches
+            self.set_efo(efo, r_server=self._get_r_server(r_server))
+            if i % 1000 == 0:
+                self._logger.debug("Loaded %s efo", i)                
 
     def get_efo(self, efo_id, r_server=None):
         return self._table.get(efo_id, r_server=self._get_r_server(r_server))
