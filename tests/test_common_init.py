@@ -11,12 +11,6 @@ from string import rstrip
 
 
 class DataStructureTests(unittest.TestCase):
-    def test_url_to_stream(self):
-
-        lines4 = \
-            list(take(4, common.url_to_stream("http://www.google.com/robots.txt")))
-
-        self.assertGreaterEqual(len(lines4), 1, "Failed to get more than 0 lines")
 
     def test_urlzsource(self):
         lines4 = []

@@ -17,30 +17,6 @@ def urllify(string_name):
     return string_name if '://' in string_name else 'file://' + string_name
 
 
-def url_to_stream(url, *args, **kwargs):
-    """request a url using requests pkg and pass *args and **kwargs to
-    requests.get function (useful for proxies) and returns the filled file
-    descriptor from a tempfile.NamedTemporaryFile
-
-    If you want to stream a raw uri (and not compressed) use the parameter
-    `enable_stream=True`
-    """
-    url_name = urllify(url)
-    r_session = r.Session()
-    r_session.mount('file://', requests_file.FileAdapter())
-
-    f = r_session.get(url, *args, stream=True, **kwargs)
-    f.raise_for_status()
-
-    if f.encoding is None:
-        f.encoding = 'utf-8'
-
-    for line in f.iter_lines(decode_unicode=True):
-            yield line
-
-    f.close()
-
-
 class URLZSource(object):
     def __init__(self, filename, *args, **kwargs):
         """Easy way to open multiple types of URL protocol (e.g. http:// and file://)
