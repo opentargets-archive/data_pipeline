@@ -13,10 +13,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def build_uniprot_query(l):
-    return '+or+'.join(l)
-
-
 def ini_from_file_or_resource(*filenames):
     '''load the ini files using file_or_resource an
     return the configuration object or None
@@ -46,12 +42,6 @@ def file_or_resource(fname=None):
 
         return abs_filename if os.path.isfile(abs_filename) \
             else res.resource_filename(resource_package, resource_path)
-
-
-def file_to_list(filename):
-    '''read the whole file and returns a list of lines'''
-    with open(filename) as f:
-        return f.read().splitlines()
 
 
 # loading all ini files into the same configuration
