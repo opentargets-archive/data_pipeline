@@ -309,10 +309,6 @@ class Loader():
                 return True
         return False
 
-    def clear_index(self, index_name):
-        if not self.dry_run:
-            self.es.indices.delete(index=index_name)
-
     def optimize_all(self):
         if not self.dry_run:
             try:
