@@ -208,23 +208,6 @@ class ESQuery(object):
         for hit in res:
             yield hit['_source']
 
-
-
-    def count_validated_evidence_strings(self, datasources = [], is_valid=True):
-
-        doc_type = None
-        if datasources:
-            doc_type = datasources
-
-        return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
-                                            doc_type=doc_type,
-                                            query={
-                                                "match_phrase": {
-                                                    "is_valid": is_valid
-                                                }
-                                            })
-
-
     def get_all_ensembl_genes(self):
         res = helpers.scan(client=self.handler,
                            query={"query": {
