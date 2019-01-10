@@ -89,9 +89,6 @@ class Loader():
 
         return idx_name + suffix
 
-    def is_dry_run(self):
-        return self.dry_run
-
     def put(self,
             index_name,
             doc_type,
@@ -313,17 +310,6 @@ class Loader():
                 return True
         return False
 
-    def clear_index(self, index_name):
-        if not self.dry_run:
-            self.es.indices.delete(index=index_name)
-
-    def optimize_all(self):
-        if not self.dry_run:
-            try:
-                self.es.indices.optimize(index='', max_num_segments=5, wait_for_merge = False)
-            except:
-                self.logger.warn('optimisation of all indexes failed')
-
     def optimize_index(self, index_name):
         if not self.dry_run:
             try:
@@ -333,43 +319,3 @@ class Loader():
 
     def _check_is_aknowledge(self, res):
         return (u'acknowledged' in res) and (res[u'acknowledged'] == True)
-
-
-
-class LoaderWorker(RedisQueueWorkerProcess):
-    def __init__(self,
-                 queue_in,
-                 redis_path,
-                 queue_out = None,
-                 chunk_size = 1000,
-                 dry_run = False
-                 ):
-        super(LoaderWorker, self).__init__(queue_in, redis_path, queue_out)
-        self.chunk_size = chunk_size
-        self.es = None
-        self.loader = None
-        self.dry_run = dry_run
-        self.logger = logging.getLogger(__name__)
-
-
-    def process(self, data):
-        '''
-        expects an array of args and kwargs to pass to a loader.put method
-        :param data:
-        :return:
-        '''
-        if data:
-            args, kwargs = data
-            self.loader.put(*args,
-                            **kwargs
-                            )
-
-    def init(self):
-        super(LoaderWorker, self).init()
-        self.loader = Loader(chunk_size=self.chunk_size,
-                             dry_run=self.dry_run)
-
-    def close(self):
-        super(LoaderWorker, self).close()
-        self.loader.flush()
-        self.loader.close()
