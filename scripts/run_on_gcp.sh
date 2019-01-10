@@ -180,7 +180,7 @@ services:
       - REST_API_PORT=80
       - APIHOST=localhost
     healthcheck:
-      test: ["CMD", "curl", "https://localhost:80/api/v3/platform/public/utils/stats"]
+      test: ["CMD", "curl", "http://localhost:80/api/v3/platform/public/utils/stats"]
       interval: 30s
       timeout: 500s
       retries:  30
