@@ -24,7 +24,7 @@ class ReactomeDataDownloader():
         self.pathway_data_url = pathway_data_url
         self.pathway_relation_url = pathway_relation_url
 
-    def get_pathway_data(self, uri=Config.REACTOME_PATHWAY_DATA):
+    def get_pathway_data(self):
         self.valid_pathway_ids = []
         with URLZSource(self.pathway_data_url).open() as source:
             for i, row in enumerate(csv.DictReader(source, fieldnames=self.headers, dialect='excel-tab'), start=1):
@@ -36,7 +36,7 @@ class ReactomeDataDownloader():
                 species = row["species"]
 
                 if pathway_id not in self.valid_pathway_ids:
-                    if species in self.ALLOWED_SPECIES:
+                    if species in self.allowed_species:
                         self.valid_pathway_ids.append(pathway_id)
                         yield dict(id=pathway_id,
                                 name=pathway_name,
@@ -49,7 +49,7 @@ class ReactomeDataDownloader():
 
         self.logger.info('parsed %i rows for reactome_pathway_data' % len(self.valid_pathway_ids))
 
-    def get_pathway_relations(self,uri=Config.REACTOME_PATHWAY_RELATION):
+    def get_pathway_relations(self):
         added_relations = []
         with URLZSource(self.pathway_relation_url).open() as source:
             for i, row in enumerate(
