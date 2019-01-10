@@ -89,9 +89,6 @@ class Loader():
 
         return idx_name + suffix
 
-    def is_dry_run(self):
-        return self.dry_run
-
     def put(self,
             index_name,
             doc_type,
