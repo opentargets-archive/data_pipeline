@@ -448,25 +448,6 @@ class ESQuery(object):
                                   )
         return res['hits']['total']
 
-
-    def get_objects_by_doc(self, docs,
-                           fields=[],
-                           realtime = False):
-        '''
-
-        :param docs: list of dictionaries {'id':doc_id,"index":index,"doc_type":doc_type}
-        :return: generator of documents
-        '''
-        res = self.handler.mget(body=dict(docs=docs),
-                                _source=self._get_source_from_fields(fields),
-                                realtime=realtime,
-                                )
-        for doc in res['docs']:
-            if doc['found']:
-                yield doc['_source']
-            else:
-                raise KeyError('publication with id %s not found' % (doc['_id']))
-
     def get_objects_by_id(self,
                           ids,
                           index,
