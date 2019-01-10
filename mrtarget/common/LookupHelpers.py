@@ -2,7 +2,6 @@ import logging
 import os
 import time
 
-import pickle
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable

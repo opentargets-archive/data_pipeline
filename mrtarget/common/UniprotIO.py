@@ -43,42 +43,6 @@ NS = "{http://uniprot.org/uniprot}"
 REFERENCE_JOURNAL = "%(name)s %(volume)s:%(first)s-%(last)s(%(pub_date)s)"
 
 
-def UniprotIterator(handle, alphabet=Alphabet.ProteinAlphabet(), return_raw_comments=False):
-    """Generator function to parse UniProt XML as SeqRecord objects.
-
-    parses an XML entry at a time from any UniProt XML file
-    returns a SeqRecord for each iteration
-
-    This generator can be used in Bio.SeqIO
-
-    return_raw_comments = True --> comment fields are returned as complete XML to allow further processing
-    skip_parsing_errors = True --> if parsing errors are found, skip to next entry
-    """
-    if isinstance(alphabet, Alphabet.NucleotideAlphabet):
-        raise ValueError("Wrong alphabet %r" % alphabet)
-    if isinstance(alphabet, Alphabet.Gapped):
-        if isinstance(alphabet.alphabet, Alphabet.NucleotideAlphabet):
-            raise ValueError("Wrong alphabet %r" % alphabet)
-
-    if not hasattr(handle, "read"):
-        if isinstance(handle, str):
-            handle = StringIO(handle)
-        else:
-            raise Exception('An XML-containing handler or an XML string must be passed')
-
-    if ElementTree is None:
-        from Bio import MissingExternalDependencyError
-        raise MissingExternalDependencyError(
-                "No ElementTree module was found. "
-                "Use Python 2.5+, lxml or elementtree if you "
-                "want to use Bio.SeqIO.UniprotIO.")
-
-    for event, elem in ElementTree.iterparse(handle, events=("start", "end")):
-        if event == "end" and elem.tag == NS + "entry":
-            yield Parser(elem, alphabet=alphabet, return_raw_comments=return_raw_comments).parse()
-            elem.clear()
-
-
 class Parser(object):
     """Parse a UniProt XML entry to a SeqRecord.
 
