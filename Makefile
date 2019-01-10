@@ -120,7 +120,7 @@ base_gene: $(LOG_PATH)/out.$(ES_PREFIX).gen.log
 $(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log
 	mkdir -p $(LOG_PATH)
 	$(ELASTIC_CHECK_CMD)
-	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data $(ES_PREFIX)_expression-data
+	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data
 	$(MRTARGET_CMD) --gen $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).gen.log
 	sleep 60
 
@@ -219,7 +219,7 @@ association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_evidence-data
+	$(INDEX_CMD) $(ES_PREFIX)_evidence-data $(ES_PREFIX)_expression-data
 	$(MRTARGET_CMD) --as $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
 .PHONY: association_qc
