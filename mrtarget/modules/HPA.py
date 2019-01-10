@@ -331,26 +331,25 @@ def hpa2tissues(hpa=None):
             'zscore': zscores}
 
 class HPADataDownloader():
-    def __init__(self, tissue_translation_map_url, tissue_curation_map_url):
+    def __init__(self, tissue_translation_map, tissue_curation_map):
         self.logger = logging.getLogger(__name__)
-        self.t2m = self.load_t2m()
-        self.tissue_translation_map_url = tissue_translation_map_url
-        self.tissue_curation_map_url = tissue_curation_map_url
+        self.tissue_translation_map = tissue_translation_map
+        self.tissue_curation_map = tissue_curation_map
 
-    def load_t2m(self):
+        #load t2m
         t2m = {'tissues': {} ,
                'curations': {}}
 
-        with URLZSource(self.tissue_translation_map_url).open() as r_file:
+        with URLZSource(self.tissue_translation_map).open() as r_file:
             t2m['tissues'] = json.load(r_file)['tissues']
 
 
-        with URLZSource(self.tissue_curation_map_url).open() as r_file:
+        with URLZSource(self.tissue_curation_map).open() as r_file:
             t2m['curations'] = {el['name']: el['canonical']
                                     for el in csv.DictReader(r_file,
                                               fieldnames=['name', 'canonical'],
                                               delimiter='\t')}
-        return t2m
+        self.t2m = t2m
 
     def retrieve_normal_tissue_data(self):
         """Parse 'normal_tissue' csv file,
