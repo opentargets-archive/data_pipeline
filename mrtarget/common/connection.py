@@ -97,34 +97,6 @@ class PipelineConnectors():
             self.logger.warn('No valid configuration available for elasticsearch data nodes')
             self.es = None
 
-        # '''init es client for publication'''
-        # pub_hosts = Config.ELASTICSEARCH_NODES_PUB
-        # if pub_hosts != hosts:
-        #     if pub_hosts:
-        #         self.es_pub = new_es_client(pub_hosts)
-        #         try:
-        #             connection_attempt = 1
-        #             while not self.es.ping():
-        #                 wait_time = 3 * connection_attempt
-        #                 self.logger.warn('Cannot connect to elasticsearch publication nodes retrying in %i', wait_time)
-        #                 time.sleep(wait_time)
-        #                 if connection_attempt >= 3:
-        #                     raise ConnectionTimeout(
-        #                         "Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES_PUB))
-        #                 connection_attempt += 1
-        #             self.logger.debug('Connected to elasticsearch publication nodes: %s',
-        #                              str(Config.ELASTICSEARCH_NODES_PUB))
-        #             success = True
-        #         except ConnectionTimeout:
-        #             self.logger.exception("Elasticsearch publication nodes connection timeout")
-
-        #     else:
-        #         self.logger.warn('No valid configuration available for elasticsearch publication nodes')
-        #         self.es_pub = None
-        # else:
-        #     self.es_pub = self.es
-
-
         # check if redis server is already running it will be checked if we dont want
         # remote enabled but the local redis server instance is still running and we want
         # things implicit and stop bothering other developers forced to kill local redis
