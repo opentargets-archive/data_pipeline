@@ -96,6 +96,7 @@ class Loader():
             body,
             create_index = True,
             operation= None,
+            routing = None,
             parent = None,
             auto_optimise = False):
 
