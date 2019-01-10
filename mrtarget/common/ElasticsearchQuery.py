@@ -628,26 +628,6 @@ class ESQuery(object):
 
         return altered
 
-    def delete_evidence_for_datasources(self, datasources):
-        '''
-        delete all the evidence objects with a given source id
-        :param sourceID: a list of datasources ids to delete
-        :return:
-        '''
-
-        if not isinstance(datasources, (list, tuple)):
-            datasources = [datasources]
-        query = {"query": {
-                    "constant_score": {
-                        "filter": {
-                            "terms": {"sourceID": datasources},
-                            }
-                        }
-                    }
-                 }
-        self.delete_data(Config.ELASTICSEARCH_DATA_INDEX_NAME,
-                         query=query)
-
     def _flush_bulk(self, batch):
         if not self.dry_run:
             return helpers.bulk(self.handler,
