@@ -10,7 +10,6 @@ from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
-import opentargets_ontologyutils.hpo
 import opentargets_ontologyutils.mp
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
@@ -28,9 +27,7 @@ class LookUpData():
         self.non_reference_genes = None
         self.chembl = None
 
-        self.hpo_ontology = None
         self.mp_ontology = None
-        self.efo_ontology = None
 
     def set_r_server(self, r_server):
         self.logger.debug('setting r_server to all lookup tables from external r_server')
@@ -52,7 +49,6 @@ class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
     EFO = 'efo'
-    HPO = 'hpo'
     ECO = 'eco'
     MP = 'mp'
     CHEMBL_DRUGS = 'chembl_drugs'
@@ -88,9 +84,6 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.MP:
                 self._logger.debug("get MP info")
                 self._get_mp(mp_uri)
-            elif dt == LookUpDataType.HPO:
-                self._logger.debug("get HPO info")
-                self._get_hpo(hpo_uri)
             elif dt == LookUpDataType.CHEMBL_DRUGS:
                 self._get_available_chembl_mappings()
             elif dt == LookUpDataType.HPA:
@@ -127,16 +120,6 @@ class LookUpDataRetriever(object):
                 self.lookup.non_reference_genes[symbol]['reference']=ensg
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
-
-    def _get_hpo(self, hpo_uri):
-        '''
-        Load HPO to accept phenotype terms that are not in EFO
-        :return:
-        '''
-        obj = OntologyClassReader()
-        opentargets_ontologyutils.hpo.get_hpo(obj, hpo_uri)
-        obj.rdf_graph = None
-        self.lookup.hpo_ontology = obj
 
     def _get_mp(self, mp_uri):
         '''

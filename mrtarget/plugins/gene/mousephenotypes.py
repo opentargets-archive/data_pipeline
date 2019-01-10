@@ -82,7 +82,7 @@ class MousePhenotypes(IPlugin):
         self.loader = loader
         self.r_server = r_server
 
-        self._get_mp_classes()
+        self._get_mp_classes(self.args.ontology_mp)
 
         self.get_genotype_phenotype()
 
@@ -94,12 +94,15 @@ class MousePhenotypes(IPlugin):
                     self._logger.debug("Adding %i phenotype data from MGI to gene %s" % (len(self.human_genes[gene.approved_symbol]["mouse_orthologs"][0]["phenotypes"]), gene.approved_symbol))
                     gene.mouse_phenotypes = self.human_genes[gene.approved_symbol]["mouse_orthologs"]
 
-    def _get_mp_classes(self):
+    def _get_mp_classes(self, mp_uri):
         self._logger.debug("_get_mp_classes")
+        #TODO replace this lookup table with simply loading the ontology itself
         self.lookup_data = LookUpDataRetriever(self.loader.es,
                                                self.r_server,
                                                [],
                                                (LookUpDataType.MP,)
+                                               None,
+                                               mp_uri
                                                ).lookup
 
         #TODO this is a moderately hideous bit of pointless munging, but I don't have time fix it now!
