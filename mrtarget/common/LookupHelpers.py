@@ -137,6 +137,7 @@ class LookUpDataRetriever(object):
         obj = OntologyClassReader()
         hpo_uri = Config.ONTOLOGY_CONFIG.get('uris', 'hpo')
         opentargets_ontologyutils.hpo.get_hpo(obj, hpo_uri)
+        obj.rdf_graph = None
         self.lookup.hpo_ontology = obj
 
     def _get_mp(self):
@@ -147,6 +148,7 @@ class LookUpDataRetriever(object):
         obj = OntologyClassReader()
         mp_uri = Config.ONTOLOGY_CONFIG.get('uris', 'mp')
         opentargets_ontologyutils.mp.load_mammalian_phenotype_ontology(obj, mp_uri)
+        obj.rdf_graph = None
         self.lookup.mp_ontology = obj
 
     def _get_available_chembl_mappings(self):
