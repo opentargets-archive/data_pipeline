@@ -36,7 +36,8 @@ MRTARGET_ARGS ?=
 
 # Internal variables
 #command to run mrtarget with various logging
-MRTARGET_CMD = python -m mrtarget.CommandLine --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
+MRTARGET_ENTRYPOINT ?= $(mkfile_dir)/scripts/entrypoint.sh
+MRTARGET_CMD = $(MRTARGET_ENTRYPOINT) --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
 
 
 INDEX_CMD = python scripts/check_index.py --elasticsearch $(ELASTICSEARCH_NODES) --zero-fail --index
@@ -166,7 +167,7 @@ $(JSON_PATH)/phenodigm.json.gz:
 
 $(JSON_PATH)/phewas_catalog.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-07-12-18.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
 
 $(JSON_PATH)/progeny.json.gz:
 	mkdir -p $(JSON_PATH)

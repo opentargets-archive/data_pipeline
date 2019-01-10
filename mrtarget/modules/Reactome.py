@@ -15,6 +15,7 @@ class ReactomeNode(TreeNode, JSONSerializable):
 
 
 class ReactomeDataDownloader():
+
     def __init__(self, pathway_data_url, pathway_relation_url):
         self.logger = logging.getLogger(__name__)
         self.allowed_species = ['Homo sapiens']
@@ -23,7 +24,7 @@ class ReactomeDataDownloader():
         self.pathway_data_url = pathway_data_url
         self.pathway_relation_url = pathway_relation_url
 
-    def get_pathway_data(self):
+    def get_pathway_data(self, uri=Config.REACTOME_PATHWAY_DATA):
         self.valid_pathway_ids = []
         with URLZSource(self.pathway_data_url).open() as source:
             for i, row in enumerate(csv.DictReader(source, fieldnames=self.headers, dialect='excel-tab'), start=1):
@@ -35,7 +36,7 @@ class ReactomeDataDownloader():
                 species = row["species"]
 
                 if pathway_id not in self.valid_pathway_ids:
-                    if species in self.allowed_species:
+                    if species in self.ALLOWED_SPECIES:
                         self.valid_pathway_ids.append(pathway_id)
                         yield dict(id=pathway_id,
                                 name=pathway_name,
@@ -45,9 +46,10 @@ class ReactomeDataDownloader():
                             self.logger.debug("%i rows parsed for reactome_pathway_data" % len(self.valid_pathway_ids))
                 else:
                     self.logger.warn("Pathway id %s is already loaded, skipping duplicate data" % pathway_id)
+
         self.logger.info('parsed %i rows for reactome_pathway_data' % len(self.valid_pathway_ids))
 
-    def get_pathway_relations(self):
+    def get_pathway_relations(self,uri=Config.REACTOME_PATHWAY_RELATION):
         added_relations = []
         with URLZSource(self.pathway_relation_url).open() as source:
             for i, row in enumerate(
@@ -93,10 +95,12 @@ class ReactomeProcess():
             for row in self.downloader.get_pathway_relations():
                 self.g.add_edge(row['id'], row['child'])
                 children.add(row['child'])
+
             nodes_without_parent = set(self.g.nodes()) - children
             for node in nodes_without_parent:
                 if node != root:
                     self.g.add_edge(root, node)
+                    
             for node, node_data in self.g.nodes(data=True):
                 if node != root:
                     ancestors = set()

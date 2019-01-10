@@ -3,6 +3,7 @@ from collections import OrderedDict
 from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader, DiseaseUtils
+import opentargets_ontologyutils.efo
 from rdflib import URIRef
 from mrtarget.constants import Const
 
@@ -96,7 +97,9 @@ class EfoProcess():
     def _process_ontology_data(self):
 
         self.disease_ontology = OntologyClassReader()
-        self.disease_ontology.load_open_targets_disease_ontology(Config.ONTOLOGY_CONFIG.get('uris','efo'))
+        efo_uri = Config.ONTOLOGY_CONFIG.get('uris','efo')
+        opentargets_ontologyutils.efo.load_open_targets_disease_ontology(self.disease_ontology, efo_uri)
+
         '''
         Get all phenotypes
         '''
