@@ -309,13 +309,6 @@ class Loader():
                 return True
         return False
 
-    def optimize_all(self):
-        if not self.dry_run:
-            try:
-                self.es.indices.optimize(index='', max_num_segments=5, wait_for_merge = False)
-            except:
-                self.logger.warn('optimisation of all indexes failed')
-
     def optimize_index(self, index_name):
         if not self.dry_run:
             try:
