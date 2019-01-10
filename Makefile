@@ -117,7 +117,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).eco.log :
 .PHONY: base_gene
 base_gene: $(LOG_PATH)/out.$(ES_PREFIX).gen.log	
 
-$(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
+$(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log
 	mkdir -p $(LOG_PATH)
 	$(ELASTIC_CHECK_CMD)
 	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data $(ES_PREFIX)_expression-data
@@ -215,9 +215,9 @@ $(LOG_PATH)/out.$(ES_PREFIX).val.log : $(JSON_PATH)/atlas.json.gz $(JSON_PATH)/c
 	sleep 60
 
 .PHONY: association_scores
-association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log
+association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log 
 
-$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.log
+$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
 	mkdir -p $(LOG_PATH)
 	$(INDEX_CMD) $(ES_PREFIX)_evidence-data
 	$(MRTARGET_CMD) --as $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).as.log
