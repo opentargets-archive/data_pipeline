@@ -505,21 +505,6 @@ class ESQuery(object):
                 if te.status_code == 404:
                     raise KeyError('object with id %s not found' % ids)
 
-    def get_all_pub_ids_from_validated_evidence(self, datasources= None):
-        for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
-                                                                    size=1000,
-                                                   datasources=datasources)):
-            if hit:
-                try:
-                    ev = json.loads(hit['evidence_string'])
-                    for lit in ev['literature']['references']:
-                        yield lit['lit_id'].split('/')[-1]
-                except KeyError:
-                    pass
-
-
-
-
     def get_all_associations_ids(self,):
         res = helpers.scan(client=self.handler,
                            query={"query": {
