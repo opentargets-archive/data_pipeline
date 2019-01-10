@@ -168,6 +168,22 @@ def setup_parser():
     p.add("--tissue-curation-map", help="location of tissue curation map file",
         env_var="TISSUE_CURATION_MAP", action='store')
 
+    #ontology URIs
+    p.add("--ontology-efo", help="location of EFO file",
+        env_var="ONTOLOGY_EFO", action='store')
+    p.add("--ontology-hpo", help="location of HPO file",
+        env_var="ONTOLOGY_HPO", action='store')
+    p.add("--ontology-mp", help="location of MP file",
+        env_var="ONTOLOGY_MP", action='store')
+    p.add("--ontology-so", help="location of SO file",
+        env_var="ONTOLOGY_SO", action='store')
+    p.add("--ontology-eco", help="location of ECO file",
+        env_var="ONTOLOGY_ECO", action='store')
+
+    #disease-phenotype links
+    p.add("--disease-phenotype", help="location of disese phenotype file(s)",
+        env_var="DISEASE_PHENOTYPE", action='append')
+
     return p
 
 def get_args():

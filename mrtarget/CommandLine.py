@@ -149,13 +149,14 @@ def main():
                 qc_metrics.update(process.qc(esquery))     
  
         if args.efo:
-            process = EfoProcess(loader)
+            process = EfoProcess(loader, args.ontology_efo, args.ontology_hpo, 
+                args.ontology_mp, args.disease_phenotype)
             if not args.qc_only:
                 process.process_all()
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))
         if args.eco:
-            process = EcoProcess(loader)
+            process = EcoProcess(loader, args.ontology_eco, args.ontology_so)
             if not args.qc_only:
                 process.process_all()
             if not args.skip_qc:

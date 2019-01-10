@@ -85,10 +85,19 @@ class EFO(JSONSerializable):
 class EfoProcess():
 
     def __init__(self,
-                 loader):
+                 loader,
+                 efo_uri,
+                 hpo_uri,
+                 mp_uri,
+                 disease_phenotype_uris
+                 ):
         self.loader = loader
         self.efos = OrderedDict()
         self.logger = logging.getLogger(__name__+".EfoProcess")
+        self.efo_uri = efo_uri
+        self.hpo_uri = hpo_uri
+        self.mp_uri = mp_uri
+        self.disease_phenotype_uris = disease_phenotype_uris
 
     def process_all(self):
         self._process_ontology_data()
@@ -97,17 +106,13 @@ class EfoProcess():
     def _process_ontology_data(self):
 
         self.disease_ontology = OntologyClassReader()
-        efo_uri = Config.ONTOLOGY_CONFIG.get('uris','efo')
-        opentargets_ontologyutils.efo.load_open_targets_disease_ontology(self.disease_ontology, efo_uri)
+        opentargets_ontologyutils.efo.load_open_targets_disease_ontology(self.disease_ontology,  self.efo_uri)
 
         '''
         Get all phenotypes
         '''
         utils = DiseaseUtils()
-        uri_hpo = Config.ONTOLOGY_CONFIG.get('uris', 'hpo')
-        uri_mp = Config.ONTOLOGY_CONFIG.get('uris', 'mp')
-        uri_disease_phenotypes = Config.ONTOLOGY_CONFIG.items('disease_phenotypes_uris')
-        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology, uri_hpo, uri_mp, uri_disease_phenotypes)
+        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology, self.hpo_uri, self.mp_uri, self.disease_phenotype)
 
         for uri,label in self.disease_ontology.current_classes.items():
             properties = self.disease_ontology.parse_properties(URIRef(uri))

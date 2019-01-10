@@ -98,9 +98,6 @@ def update_schema_version(config, schema_version_string):
 
 
 class Config():
-    ONTOLOGY_CONFIG = ConfigParser.ConfigParser()
-    # TODO: an ontology section in the main db.ini file should suffice
-    ONTOLOGY_CONFIG.read(file_or_resource('ontology_config.ini'))
 
     RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='')
 

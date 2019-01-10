@@ -64,23 +64,20 @@ class LookUpDataRetriever(object):
                  es,
                  r_server,
                  targets,
-                 data_types
+                 data_types,
+                 hpo_uri,
+                 mp_uri
                  ):
-
         self.es = es
         self.r_server = r_server
-
         self.esquery = ESQuery(self.es)
-
-        require_all(self.es is not None, self.r_server is not None)
-
         self.lookup = LookUpData()
+
         self._logger = logging.getLogger(__name__)
 
         # TODO: run the steps in parallel to speedup loading times
         for dt in data_types:
             self._logger.info("get %s info"%dt)
-        for dt in data_types:
             start_time = time.time()
             if dt == LookUpDataType.TARGET:
                 self._get_gene_info(targets, True)
@@ -90,10 +87,10 @@ class LookUpDataRetriever(object):
                 self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.MP:
                 self._logger.debug("get MP info")
-                self._get_mp()
+                self._get_mp(mp_uri)
             elif dt == LookUpDataType.HPO:
                 self._logger.debug("get HPO info")
-                self._get_hpo()
+                self._get_hpo(hpo_uri)
             elif dt == LookUpDataType.CHEMBL_DRUGS:
                 self._get_available_chembl_mappings()
             elif dt == LookUpDataType.HPA:
@@ -131,24 +128,22 @@ class LookUpDataRetriever(object):
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
 
-    def _get_hpo(self):
+    def _get_hpo(self, hpo_uri):
         '''
         Load HPO to accept phenotype terms that are not in EFO
         :return:
         '''
         obj = OntologyClassReader()
-        hpo_uri = Config.ONTOLOGY_CONFIG.get('uris', 'hpo')
         opentargets_ontologyutils.hpo.get_hpo(obj, hpo_uri)
         obj.rdf_graph = None
         self.lookup.hpo_ontology = obj
 
-    def _get_mp(self):
+    def _get_mp(self, mp_uri):
         '''
         Load MP to accept phenotype terms that are not in EFO
         :return:
         '''
         obj = OntologyClassReader()
-        mp_uri = Config.ONTOLOGY_CONFIG.get('uris', 'mp')
         opentargets_ontologyutils.mp.load_mammalian_phenotype_ontology(obj, mp_uri)
         obj.rdf_graph = None
         self.lookup.mp_ontology = obj

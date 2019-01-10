@@ -39,21 +39,20 @@ class ECO(JSONSerializable):
 
 class EcoProcess():
 
-    def __init__(self, loader):
+    def __init__(self, loader, eco_uri, so_uri):
         self.loader = loader
         self.ecos = OrderedDict()
         self.evidence_ontology = OntologyClassReader()
+        self.eco_uri = eco_uri
+        self.so_uri = so_uri
 
     def process_all(self):
         self._process_ontology_data()
         self._store_eco()
 
     def _process_ontology_data(self):
-
-        uri_so = Config.ONTOLOGY_CONFIG.get('uris', 'so')
-        uri_eco = Config.ONTOLOGY_CONFIG.get('uris', 'eco')
-
-        opentargets_ontologyutils.eco_so.load_evidence_classes(self.evidence_ontology, uri_so, uri_eco)
+        opentargets_ontologyutils.eco_so.load_evidence_classes(self.evidence_ontology, 
+            self.so_uri, self.eco_uri)
 
         for uri,label in self.evidence_ontology.current_classes.items():
             eco = ECO(uri,
