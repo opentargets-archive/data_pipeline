@@ -99,9 +99,6 @@ class ESQuery(object):
         for hit in res:
             yield hit['_source']
 
-    def count_all_diseases(self):
-        return self.count_elements_in_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
-
     def get_all_mammalian_phenotypes(self, fields = None):	
         source = self._get_source_from_fields(fields)	
         res = helpers.scan(client=self.handler,	
