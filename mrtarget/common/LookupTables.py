@@ -166,7 +166,14 @@ class ECOLookUpTable(object):
 
     @staticmethod
     def get_ontology_code_from_url(url):
-        return url.split('/')[-1]
+        #note, this is not a guaranteed solution
+        #to do it properly, it has to be from the actual
+        #ontology file or from OLS API
+        if '/' in url:
+            return url.split('/')[-1]
+        else:
+            #assume already a short code
+            return url
 
     def _load_eco_data(self, r_server=None):
         self._logger = logging.getLogger(__name__)
@@ -226,6 +233,17 @@ class EFOLookUpTable(object):
         self._logger = logging.getLogger(__name__)
         if self.r_server is not None:
             self._load_efo_data(r_server)
+
+    @staticmethod
+    def get_ontology_code_from_url(url):
+        #note, this is not a guaranteed solution
+        #to do it properly, it has to be from the actual
+        #ontology file or from OLS API
+        if '/' in url:
+            return url.split('/')[-1]
+        else:
+            #assume already a short code
+            return url
 
     def _load_efo_data(self, r_server = None):
         self._logger = logging.getLogger(__name__)
