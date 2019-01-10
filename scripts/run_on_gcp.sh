@@ -138,7 +138,7 @@ services:
       - ./qc:/usr/src/app/qc
 
   ot_api:
-    image: quay.io/opentargets/rest_api
+    image: quay.io/opentargets/rest_api:18.12.0
     ports:
       - 8080:80
     depends_on:
@@ -153,7 +153,7 @@ services:
       retries:  30
 
   ot_webapp:
-    image: quay.io/opentargets/webapp
+    image: quay.io/opentargets/webapp:v3.10
     ports:
       - 8081:80
       - 7443:443
