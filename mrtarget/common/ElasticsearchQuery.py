@@ -135,10 +135,6 @@ class ESQuery(object):
         for hit in res:
             yield hit['_source']
 
-    def count_all_hpa(self):
-        return self.count_elements_in_index(
-            Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
 
