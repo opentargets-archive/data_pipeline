@@ -181,31 +181,6 @@ class ESQuery(object):
                                   )
         return AssociationSummary(res)
 
-    def get_all_validated_evidence_strings(self,  size=1000, datasources = []):
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
-
-        doc_type = None
-        if datasources:
-            doc_type = datasources
-
-        res = helpers.scan(client=self.handler,
-                           query={
-                               "query": {
-                                    "match_all": {},
-                               },
-                               '_source': True,
-                               'size': size,
-                           },
-                           scroll='12h',
-                           doc_type=doc_type,
-                           index=index_name,
-                           timeout="20m",
-                           )
-
-        for hit in res:
-            yield hit['_source']
-
     def get_validated_evidence_strings(self,  size=1000, datasources = [], is_valid=True):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
