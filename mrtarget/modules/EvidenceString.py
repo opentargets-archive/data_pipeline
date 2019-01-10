@@ -585,7 +585,6 @@ class Evidence(JSONSerializable):
         return self.evidence['id']
 
     def to_json(self):
-        # self.stamp_data_release()
         return json.dumps(self.evidence,
                           sort_keys=True,
                           # indent=4,

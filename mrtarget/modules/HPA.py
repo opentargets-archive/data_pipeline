@@ -120,11 +120,7 @@ class HPAExpression(Dict, JSONSerializable):
 
         return tissue
 
-    def stamp_data_release(self):
-        self.data_release = Config.RELEASE_VERSION
-
     def to_json(self):
-        # self.stamp_data_release()
         return json.dumps(self.to_dict(),
                           default=json_serialize,
                           sort_keys=True,
