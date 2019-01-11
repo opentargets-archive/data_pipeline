@@ -151,59 +151,6 @@ def format_expression(rec):
     return d.to_dict()
 
 
-def format_expression_with_rna(rec):
-    # get gene,result,data = rec
-    exp = HPAExpression(gene=rec['gene'],
-                        data_release=Config.RELEASE_VERSION)
-
-    if rec['result']:
-        exp.update(rec['result'])
-
-    if rec['data']:
-        new_tissues = []
-        has_tissues = len(exp.tissues) > 0
-
-        t_set = ft.reduce(lambda x, y: x.union(set([y['efo_code']])),
-                          exp.tissues, set()) \
-                    if has_tissues else set()
-        nt_set = ft.reduce(lambda x, y: x.union(set([y[0]])),
-                          rec['data'], set())
-
-        intersection = t_set.intersection(nt_set)
-        intersection_idxs = {e['efo_code']: i for i, e in enumerate(exp.tissues) if e['efo_code'] in intersection}
-        intersection_idxs_data = {e[0]: i for i, e in enumerate(rec['data']) if e[0] in intersection}
-        difference = nt_set.difference(t_set)
-        difference_idxs = [i for i, e in enumerate(rec['data']) if e[0] in difference]
-
-        for ec in intersection:
-            tidx = intersection_idxs[ec]
-            didx = intersection_idxs_data[ec]
-
-            exp.tissues[tidx].rna.level = int(rec['data'][didx][2])
-            exp.tissues[tidx].rna.value = float(rec['data'][didx][3])
-            exp.tissues[tidx].rna.unit = rec['data'][didx][4]
-            exp.tissues[tidx].rna.zscore = int(rec['data'][didx][7])
-
-
-        for idx in difference_idxs:
-            rna = rec['data'][idx]
-            t = exp.new_tissue(efo_code=rna[0],
-                               label=rna[1],
-                               anatomical_systems=rna[5],
-                               organs=rna[6])
-            t.rna.level = int(rna[2])
-            t.rna.value = float(rna[3])
-            t.rna.unit = rna[4]
-            t.rna.zscore = int(rna[7])
-
-            new_tissues.append(t)
-
-        # iterate all tissues
-        exp.tissues.extend(new_tissues)
-
-    return exp.to_dict()
-
-
 def name_from_tissue(tissue_name, t2m):
     curated = None
     tname = None
