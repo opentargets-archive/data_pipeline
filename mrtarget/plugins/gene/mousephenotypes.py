@@ -100,7 +100,7 @@ class MousePhenotypes(IPlugin):
         self.lookup_data = LookUpDataRetriever(self.loader.es,
                                                self.r_server,
                                                [],
-                                               (LookUpDataType.MP,)
+                                               (LookUpDataType.MP,),
                                                None,
                                                mp_uri
                                                ).lookup
