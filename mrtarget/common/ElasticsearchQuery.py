@@ -99,29 +99,6 @@ class ESQuery(object):
         for hit in res:
             yield hit['_source']
 
-    def count_all_diseases(self):
-        return self.count_elements_in_index(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
-
-    def get_all_mammalian_phenotypes(self, fields = None):	
-        source = self._get_source_from_fields(fields)	
-        res = helpers.scan(client=self.handler,	
-            query={"query": {	
-                        "match_all": {}	
-                    },	
-                    '_source': source,	
-                    'size': 1000,	
-                    },	
-            scroll='12h',	
-            doc_type=Config.ELASTICSEARCH_MP_LABEL_DOC_NAME,	
-            index=Loader.get_versioned_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME,True),	
-            timeout="10m",	
-            )	
-        for hit in res:	
-            yield hit['_source']
-
-    def count_all_mammalian_phenotypes(self):	
-        return self.count_elements_in_index(Config.ELASTICSEARCH_MP_LABEL_INDEX_NAME)
-
     def get_all_eco(self, fields=None):
         source = self._get_source_from_fields(fields)
 
@@ -140,10 +117,6 @@ class ESQuery(object):
         for hit in res:
             yield hit['_source']
 
-    def count_all_eco(self):
-        return self.count_elements_in_index(
-            Config.ELASTICSEARCH_ECO_INDEX_NAME)
-
     def get_all_hpa(self, fields=None):
         source = self._get_source_from_fields(fields)
 
@@ -161,10 +134,6 @@ class ESQuery(object):
                            timeout="10m")
         for hit in res:
             yield hit['_source']
-
-    def count_all_hpa(self):
-        return self.count_elements_in_index(
-            Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
 
     def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
         source = self._get_source_from_fields(fields)
@@ -212,31 +181,6 @@ class ESQuery(object):
                                   )
         return AssociationSummary(res)
 
-    def get_all_validated_evidence_strings(self,  size=1000, datasources = []):
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
-        index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
-
-        doc_type = None
-        if datasources:
-            doc_type = datasources
-
-        res = helpers.scan(client=self.handler,
-                           query={
-                               "query": {
-                                    "match_all": {},
-                               },
-                               '_source': True,
-                               'size': size,
-                           },
-                           scroll='12h',
-                           doc_type=doc_type,
-                           index=index_name,
-                           timeout="20m",
-                           )
-
-        for hit in res:
-            yield hit['_source']
-
     def get_validated_evidence_strings(self,  size=1000, datasources = [], is_valid=True):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*', True)
@@ -263,23 +207,6 @@ class ESQuery(object):
 
         for hit in res:
             yield hit['_source']
-
-
-
-    def count_validated_evidence_strings(self, datasources = [], is_valid=True):
-
-        doc_type = None
-        if datasources:
-            doc_type = datasources
-
-        return self.count_elements_in_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME+'*',
-                                            doc_type=doc_type,
-                                            query={
-                                                "match_phrase": {
-                                                    "is_valid": is_valid
-                                                }
-                                            })
-
 
     def get_all_ensembl_genes(self):
         res = helpers.scan(client=self.handler,
@@ -521,25 +448,6 @@ class ESQuery(object):
                                   )
         return res['hits']['total']
 
-
-    def get_objects_by_doc(self, docs,
-                           fields=[],
-                           realtime = False):
-        '''
-
-        :param docs: list of dictionaries {'id':doc_id,"index":index,"doc_type":doc_type}
-        :return: generator of documents
-        '''
-        res = self.handler.mget(body=dict(docs=docs),
-                                _source=self._get_source_from_fields(fields),
-                                realtime=realtime,
-                                )
-        for doc in res['docs']:
-            if doc['found']:
-                yield doc['_source']
-            else:
-                raise KeyError('publication with id %s not found' % (doc['_id']))
-
     def get_objects_by_id(self,
                           ids,
                           index,
@@ -596,21 +504,6 @@ class ESQuery(object):
             except TransportError as te:
                 if te.status_code == 404:
                     raise KeyError('object with id %s not found' % ids)
-
-    def get_all_pub_ids_from_validated_evidence(self, datasources= None):
-        for i,hit in enumerate(self.get_validated_evidence_strings(#fields='evidence_string.literature.references.lit_id',
-                                                                    size=1000,
-                                                   datasources=datasources)):
-            if hit:
-                try:
-                    ev = json.loads(hit['evidence_string'])
-                    for lit in ev['literature']['references']:
-                        yield lit['lit_id'].split('/')[-1]
-                except KeyError:
-                    pass
-
-
-
 
     def get_all_associations_ids(self,):
         res = helpers.scan(client=self.handler,
@@ -735,26 +628,6 @@ class ESQuery(object):
 
         return altered
 
-    def delete_evidence_for_datasources(self, datasources):
-        '''
-        delete all the evidence objects with a given source id
-        :param sourceID: a list of datasources ids to delete
-        :return:
-        '''
-
-        if not isinstance(datasources, (list, tuple)):
-            datasources = [datasources]
-        query = {"query": {
-                    "constant_score": {
-                        "filter": {
-                            "terms": {"sourceID": datasources},
-                            }
-                        }
-                    }
-                 }
-        self.delete_data(Config.ELASTICSEARCH_DATA_INDEX_NAME,
-                         query=query)
-
     def _flush_bulk(self, batch):
         if not self.dry_run:
             return helpers.bulk(self.handler,
@@ -780,28 +653,23 @@ class ESQuery(object):
 
 
 
-    def get_all_evidence_for_datasource(self, datasources=None, fields = None, ):
+    def get_all_evidence_for_datatype(self, datatype, fields = None, ):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME, True)
-        doc_type = None
-
-        if datasources:
-            if isinstance(datasources, str):
-                doc_type='evidencestring-'+datasources
-            elif isinstance(datasources, list) or isinstance(datasources, tuple):
-                doc_type=['evidencestring-'+ds for ds in datasources]
-            else:
-                raise AttributeError()
         res = helpers.scan(client=self.handler,
-                           query={"query":  {"match_all": {}},
-                               '_source': self._get_source_from_fields(fields),
-                               'size': 1000,
-                           },
-                           scroll='12h',
-                           doc_type=doc_type,
-                           index=index_name,
-                           timeout="10m",
-                           )
+            query={
+                "query": {
+                    "match": {
+                        "type": datatype
+                    }
+                },
+                    '_source': self._get_source_from_fields(fields),
+                    'size': 1000,
+                },
+            scroll='12h',
+            index=index_name,
+            timeout="10m",
+            )
 
         # res = list(res)
         for hit in res:
@@ -813,7 +681,7 @@ class ESQuery(object):
 
         res = self.handler.search(
                 index = index,
-                doc_type="evidencestring-chembl",
+                doc_type="evidencestring",
                 body={"query": {"match_all":{}},
                       "aggs":
                             {"general_drug":{"cardinality": {"field":"drug.id"}}}

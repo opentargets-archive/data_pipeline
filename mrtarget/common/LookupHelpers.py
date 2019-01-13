@@ -2,7 +2,6 @@ import logging
 import os
 import time
 
-import pickle
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
@@ -30,7 +29,6 @@ class LookUpData():
 
         self.hpo_ontology = None
         self.mp_ontology = None
-        self.efo_ontology = None
 
     def set_r_server(self, r_server):
         self.logger.debug('setting r_server to all lookup tables from external r_server')
