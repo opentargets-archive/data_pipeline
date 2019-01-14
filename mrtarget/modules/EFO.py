@@ -206,39 +206,3 @@ class EfoProcess():
         #return the metrics to the caller so they can write to file or further compare
         self.logger.info("Finished QC")
         return metrics
- 
-
-
-
-class DiseaseGraph:
-    """
-    A DAG of disease nodes whose elements are instances of class DiseaseNode
-    Input: g - an RDFLib-generated ConjugativeGraph, i.e. list of RDF triples
-    """
-
-    def __init__(self, g):
-        self.g = g
-        self.root = None
-        self.node_map = {}
-        self.node_cnt = 0
-        self.print_rdf_tree_from_root(g)
-        self.make_node_graph(g)
-
-    def print_rdf_tree_from_root(self, g):
-        print("STUB for method: print_rdf_tree_from_root()")
-
-    def make_node_graph(self, g):
-        print("STUB for method: make_node_graph()")
-
-
-class DiseaseNode:
-    """
-    A class representing all triples associated with a particular disease subject
-    e.g. asthma: http://www.ebi.ac.uk/efo/EFO_0000270
-    and its parents and children
-    """
-
-    def __init__(self, name="name", parents = [], children = []):
-        self.name = name,
-        self.parents = parents
-        self.children = children
