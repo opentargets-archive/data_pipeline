@@ -162,25 +162,17 @@ def main():
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))
 
-        input_files = []
         if args.val:
-            if args.input_file:
-                input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
-            else:
-                logger.info('reading the evidences sources URLs from evidence_sources.txt')
-                with open(file_or_resource('evidences_sources.txt')) as f:
-                    input_files = [x.rstrip() for x in f.readlines()]
-
             num_workers = Config.WORKERS_NUMBER
             num_writers = max(1, min(16, Config.WORKERS_NUMBER))
-
+            
             es_output = True
             es_output_folder = None
             if "elasticsearch_folder" in vars(args) and args.elasticsearch_folder is not None:
                 es_output = False
                 es_output_folder = args.elasticsearch_folder
 
-            process_evidences_pipeline(filenames=input_files,
+            process_evidences_pipeline(filenames=args.input_file,
                                        first_n=args.val_first_n,
                                        es_client=connectors.es,
                                        redis_client=connectors.r_server,
