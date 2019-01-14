@@ -204,7 +204,12 @@ def main():
         if args.sea:
             process = SearchObjectProcess(loader, connectors.r_server)
             if not args.qc_only:
-                process.process_all(args.chembl_target, 
+                process.process_all(
+                    args.chembl_target, 
+                    args.chembl_mechanism, 
+                    args.chembl_component, 
+                    args.chembl_protein, 
+                    args.chembl_molecule_set_uri_pattern,
                     dry_run = args.dry_run,
                     skip_targets=args.skip_targets, 
                     skip_diseases=args.skip_diseases)

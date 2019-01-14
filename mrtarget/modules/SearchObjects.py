@@ -279,9 +279,15 @@ class SearchObjectProcess(object):
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self, chembl_target_uri, chembl_mechanism_uri, chembl_component_uri, 
-        chembl_protein_uri, chembl_molecule_set_uri_pattern,
-        dry_run=False, skip_targets=False, skip_diseases=False):
+    def process_all(self, 
+            chembl_target_uri, 
+            chembl_mechanism_uri, 
+            chembl_component_uri, 
+            chembl_protein_uri, 
+            chembl_molecule_set_uri_pattern,
+            dry_run=False, 
+            skip_targets=False, 
+            skip_diseases=False):
         ''' process all the objects that needs to be returned by the search method
         :return:
         '''
