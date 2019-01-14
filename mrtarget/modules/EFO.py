@@ -111,8 +111,11 @@ class EfoProcess():
         '''
         Get all phenotypes
         '''
+        #becuse of opentargets_ontologyutils for legacy iterates over key,uri pairs
+        disease_phenotype_uris_counter = enumerate(self.disease_phenotype_uris)
+
         utils = DiseaseUtils()
-        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology, self.hpo_uri, self.mp_uri, self.disease_phenotype)
+        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology, self.hpo_uri, self.mp_uri, disease_phenotype_uris_counter)
 
         for uri,label in self.disease_ontology.current_classes.items():
             properties = self.disease_ontology.parse_properties(URIRef(uri))
