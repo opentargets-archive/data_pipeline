@@ -204,7 +204,10 @@ def main():
         if args.sea:
             process = SearchObjectProcess(loader, connectors.r_server)
             if not args.qc_only:
-                process.process_all(skip_targets=args.skip_targets, skip_diseases=args.skip_diseases)
+                process.process_all(args.chembl_target, 
+                    dry_run = args.dry_run,
+                    skip_targets=args.skip_targets, 
+                    skip_diseases=args.skip_diseases)
             #TODO qc
 
         if args.metric:

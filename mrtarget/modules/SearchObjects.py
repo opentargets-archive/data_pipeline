@@ -11,6 +11,7 @@ from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 
 from mrtarget.constants import Const
+from mrtarget.Settings import Config
 
 
 
@@ -278,7 +279,9 @@ class SearchObjectProcess(object):
         self.r_server = r_server
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self, dry_run=False, skip_targets=False, skip_diseases=False):
+    def process_all(self, chembl_target_uri, chembl_mechanism_uri, chembl_component_uri, 
+        chembl_protein_uri, chembl_molecule_set_uri_pattern,
+        dry_run=False, skip_targets=False, skip_diseases=False):
         ''' process all the objects that needs to be returned by the search method
         :return:
         '''
@@ -289,8 +292,14 @@ class SearchObjectProcess(object):
                            max_size=1000,
                            job_timeout=180)
 
+        #TODO remove from lookupdata and use ChEMBLLookup directly
         lookup_data = LookUpDataRetriever(self.loader.es, self.r_server,
-            [],[LookUpDataType.CHEMBL_DRUGS]).lookup
+            [],[LookUpDataType.CHEMBL_DRUGS], 
+            chembl_target_uri = chembl_target_uri,
+            chembl_mechanism_uri = chembl_mechanism_uri,
+            chembl_component_uri = chembl_component_uri,
+            chembl_protein_uri = chembl_protein_uri,
+            chembl_molecule_set_uri_pattern = chembl_molecule_set_uri_pattern).lookup
 
         workers = [SearchObjectAnalyserWorker(queue,
                                               None,

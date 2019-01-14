@@ -24,7 +24,8 @@ _l = logging.getLogger(__name__)
 
 def make_lookup_data(es_client, redis_client):
     return LookUpDataRetriever(es_client,
-        redis_client, [], (
+        redis_client, [], 
+        (
             LookUpDataType.TARGET,
             LookUpDataType.DISEASE,
             LookUpDataType.ECO

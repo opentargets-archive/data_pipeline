@@ -152,12 +152,6 @@ class Config():
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
 
-    CHEMBL_TARGET_BY_UNIPROT_ID = ini.get('full_dataset', 'chembl_target')
-    CHEMBL_MECHANISM = ini.get('full_dataset', 'chembl_mechanism')
-    CHEMBL_MOLECULE_SET = '''https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json'''
-    CHEMBL_PROTEIN_CLASS = ini.get('full_dataset', 'chembl_protein')
-    CHEMBL_TARGET_COMPONENT = ini.get('full_dataset', 'chembl_component')
-
     DATASOURCE_TO_DATATYPE_MAPPING = {}
     DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
     DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'

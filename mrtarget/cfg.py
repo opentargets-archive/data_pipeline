@@ -184,6 +184,20 @@ def setup_parser():
     p.add("--disease-phenotype", help="location of disese phenotype file(s)",
         env_var="DISEASE_PHENOTYPE", action='append')
 
+    #chembl API
+    p.add("--chembl-target", help="Chembl target by Uniprot ID file location",
+        env_var="CHEMBL_TARGET", action='store')
+    p.add("--chembl-mechanism", help="Chembl mechanism file location",
+        env_var="CHEMBL_MECHANISM", action='store')
+    p.add("--chembl-protein", help="Chembl protein file location",
+        env_var="CHEMBL_PROTEIN", action='store')
+    p.add("--chembl-component", help="Chembl component file location",
+        env_var="CHEMBL_COMPONENT", action='store')
+    p.add("--chembl-molecule-set-uri-pattern", help="Chembl molecule set uri pattern",
+        env_var="CHEMBL_MOLECULE_SET_URI_PATTERN", action='store')
+
+
+
     return p
 
 def get_args():
