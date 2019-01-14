@@ -70,6 +70,8 @@ def setup_parser():
         action='append')
     p.add("--schema-version", help="set the schema version aka 'branch' name. Default is 'master'",
         env_var="SCHEMA_VERSION", default='master')
+    p.add("--val-first-n", help="read only the first n lines from each input file",
+        env_var="VAL_FIRST_N")
 
     # this is related to generating a combine evidence index from all the inidividual datasource indicies
     p.add("--evs", help="process and validate the available evidence strings, store in elasticsearch",
@@ -121,6 +123,8 @@ def setup_parser():
     p.add("--elasticseach-nodes", help="elasticsearch host(s)",
         action='append', default=['localhost:9200'],
         env_var='ELASTICSEARCH_NODES')
+    p.add("--elasticsearch-folder", help="write to files instead of a live elasticsearch server",
+        action='store') #this only applies to --val at the moment
 
     # for debugging
     p.add("--dump", help="dump core data to local gzipped files",
@@ -183,6 +187,10 @@ def setup_parser():
     #disease-phenotype links
     p.add("--disease-phenotype", help="location of disese phenotype file(s)",
         env_var="DISEASE_PHENOTYPE", action='append')
+
+    #eco score modifiers
+    p.add("--eco-scores", help="location of ECO score modifiers file",
+        env_var="ECO_SCORES", action='store')
 
     #chembl API
     p.add("--chembl-target", help="Chembl target by Uniprot ID file location",

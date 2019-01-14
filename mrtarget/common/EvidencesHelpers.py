@@ -60,9 +60,12 @@ class ProcessContext(object):
 
 
 class ProcessContextFileWriter(ProcessContext):
-    def __init__(self, output_folder='./', **kwargs):
+    def __init__(self, output_folder, **kwargs):
         super(ProcessContextFileWriter, self).__init__(**kwargs)
         self.logger.debug("called output_stream from %s", str(os.getpid()))
+
+        if not output_folder:
+            output_folder = "./"
 
         self.kwargs.valids_file_name = output_folder + os.path.sep + 'evidences-valid_' + uuid.uuid4().hex + '.json.gz'
         self.kwargs.valids_file_handle = IO.open_to_write(self.kwargs.valids_file_name)
@@ -134,8 +137,8 @@ class ProcessContextESWriter(ProcessContext):
     def close(self):
         #flush but dont close because it changes index settings
         #and that needs to be done in a single place outside of multiprocessing
-        self.kwargs.es_loader.flush_all_and_wait(Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        self.kwargs.es_loader.flush_all_and_wait(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        self.kwargs.es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_INDEX_NAME)
+        self.kwargs.es_loader.flush_all_and_wait(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
 
     @staticmethod
     def single_before(**kwargs):
@@ -144,12 +147,12 @@ class ProcessContextESWriter(ProcessContext):
         es_client = kwargs["es_client"]
         es_loader = Loader(es=es_client)
 
-        es_loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        es_loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        es_loader.create_new_index(Const.ELASTICSEARCH_DATA_INDEX_NAME)
+        es_loader.create_new_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
 
         #need to directly get the versioned index name for this function
-        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME))
-        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME))
+        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME))
+        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME))
 
     @staticmethod
     def single_after(**kwargs):
@@ -158,8 +161,8 @@ class ProcessContextESWriter(ProcessContext):
         es_client = kwargs["es_client"]
         es_loader = Loader(es=es_client)
         #ensure everything pending has been flushed to index
-        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_INDEX_NAME)
+        es_loader.flush_all_and_wait(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
         #restore old pre-load settings
         #note this automatically does all prepared indexes
         es_loader.restore_after_bulk_indexing()

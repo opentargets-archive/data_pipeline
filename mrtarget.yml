@@ -49,7 +49,7 @@ ontology-so: https://raw.githubusercontent.com/The-Sequence-Ontology/SO-Ontologi
 ontology-eco: https://raw.githubusercontent.com/evidenceontology/evidenceontology/v2018-11-10/eco.owl
 
 #disease/phenotype mappings
-disase-phenotype:  ["https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/immune_disease_2_pheno.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareAlbuminuria_associations_03Jun15.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareIBDpheno.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ordo_hpo_mappings.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/charite_HP_ORDO_07Oct15.owl?format=raw"]
+disease-phenotype:  ["https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/immune_disease_2_pheno.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareAlbuminuria_associations_03Jun15.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareIBDpheno.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ordo_hpo_mappings.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/charite_HP_ORDO_07Oct15.owl?format=raw"]
 
 #chembl
 chembl-target: https://www.ebi.ac.uk/chembl/api/data/target.json
@@ -57,3 +57,8 @@ chembl-mechanism: https://www.ebi.ac.uk/chembl/api/data/mechanism.json
 chembl-protein: https://www.ebi.ac.uk/chembl/api/data/protein_class.json
 chembl-component: https://www.ebi.ac.uk/chembl/api/data/target_component.json
 chembl-molecule-set-uri-pattern: https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json
+
+#eco_scores
+#TODO move this to GCP https://github.com/opentargets/platform/issues/391
+eco-scores: https://raw.githubusercontent.com/opentargets/data_pipeline/master/mrtarget/resources/eco_scores.tsv
+

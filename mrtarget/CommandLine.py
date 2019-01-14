@@ -173,16 +173,24 @@ def main():
 
             num_workers = Config.WORKERS_NUMBER
             num_writers = max(1, min(16, Config.WORKERS_NUMBER))
+
+            es_output = True
+            es_output_folder = None
+            if "elasticsearch_folder" in vars(args) and args.elasticsearch_folder is not None:
+                es_output = False
+                es_output_folder = args.elasticsearch_folder
+
             process_evidences_pipeline(filenames=input_files,
-                                       first_n=args.first_n,
+                                       first_n=args.val_first_n,
                                        es_client=connectors.es,
                                        redis_client=connectors.r_server,
                                        dry_run=args.dry_run,
-                                       enable_output_to_es=(not args.enable_fs),
-                                       output_folder=args.output_folder,
+                                       enable_output_to_es=es_output,
+                                       output_folder=es_output_folder,
                                        num_workers=num_workers,
                                        num_writers=num_writers,
-                                       max_queued_events=args.max_queued_events)
+                                       max_queued_events=args.max_queued_events,
+                                       eco_scores_uri=args.eco_scores)
 
 
             #TODO qc

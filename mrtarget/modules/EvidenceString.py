@@ -130,14 +130,14 @@ class ExtendedInfoECO(ExtendedInfo):
 
 
 class EvidenceManager():
-    def __init__(self, lookup_data):
+    def __init__(self, lookup_data, eco_scores_uri):
         self.logger = logging.getLogger(__name__)
         self.available_genes = lookup_data.available_genes
         self.available_efos = lookup_data.available_efos
         self.available_ecos = lookup_data.available_ecos
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
-        self._get_eco_scoring_values(eco_lut_obj=self.available_ecos)
+        self._get_eco_scoring_values(self.available_ecos, eco_scores_uri)
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
 
@@ -545,8 +545,10 @@ class EvidenceManager():
             ensemblid = EvidenceManager._map_to_reference_ensembl_gene(ensemblid, non_reference_genes) or ensemblid
         return ensemblid
 
-    def _get_eco_scoring_values(self, eco_lut_obj):
-        self.eco_scores = load_eco_scores_table(filename=Config.ECO_SCORES_URL, eco_lut_obj=eco_lut_obj)
+    def _get_eco_scoring_values(self, eco_lut_obj, eco_scores_uri):
+        self.eco_scores = load_eco_scores_table(
+            filename=eco_scores_uri, 
+            eco_lut_obj=eco_lut_obj)
 
     #TODO remove this
     def _get_score_modifiers(self):
@@ -702,14 +704,6 @@ class Evidence(JSONSerializable):
                     self.evidence['sourceID'], self.get_id(), self.evidence['scores']['association_score'],
                     Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]))
 
-
-        # Modify scores according to weights
-        datasource_weight = Config.DATASOURCE_EVIDENCE_SCORE_WEIGHT.get(self.evidence['sourceID'], 1.)
-        if datasource_weight != 1:
-            weighted_score = self.evidence['scores']['association_score'] * datasource_weight
-            if weighted_score > 1:
-                weighted_score = 1.
-            self.evidence['scores']['association_score'] = weighted_score
 
         # Apply rescaling to scores
         if self.evidence['sourceID'] in modifiers:
