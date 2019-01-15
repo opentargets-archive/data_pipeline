@@ -112,7 +112,6 @@ docker-compose up -d elasticsearch kibana
 By default, these will be accessible on http://localhost:9200 and http://localhost:5601 for Elasticsearch and Kibana respectively.
 
 
-
 You can run the pipeline with a command like:
 
 ```sh
@@ -255,6 +254,15 @@ To skip running tests in the CI when pushing append `[skip ci]` to the commit me
 
 The elasticsearch guide can be very useful: https://www.elastic.co/guide/en/elasticsearch/guide/2.x/getting-started.html
 The important bits to run/understand the data pipeline are the `getting started`, `search in depth`, `aggregations`, and `modeling your data`. You can probably ignore the others.
+
+### Profiling with PyFlame
+
+There is some additional configuration to build a docker container that can run the pipeline while profiling it with [PyFlame ](https://github.com/uber/pyflame) to produce
+output that [FlameGraph](https://github.com/brendangregg/FlameGraph) can turn into pretty interactive svg images.
+
+To do this, use the `Dockerfile.pyfile` to build the container, and run it ensuring that the kernel of the host has `kernel.yama.ptrace_scope=0` and `--cap-add=SYS_PTRACE` on the docker container. See the updated entrypoint `scripts/entrypoint.pyflame.sh` for more details.
+
+It will output to `logs/profile.*.svg` which can be opened with a browser e.g. Chrome. Note, while profiling performance will be **much much slower**.
 
 # Copyright
 

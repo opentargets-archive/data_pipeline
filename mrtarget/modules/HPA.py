@@ -21,26 +21,6 @@ from mrtarget.common.DataStructure import JSONSerializable, json_serialize, Pipe
 _missing_tissues = {'names': {},
                     'codes': {}}
 
-def level_from_text(key):
-    level_translation = {'Not detected': 0,
-                              'Low': 1,
-                              'Medium': 2,
-                              'High': 3,
-                              }
-    return level_translation[key]
-
-
-def reliability_from_text(key):
-    reliability_translation = {'Supportive': True,
-                                'Uncertain': False,
-                                # # new types for hpa v16
-                                'Approved' : True,
-                                'Supported': True,
-                                'Enhanced': True
-                                }
-    return reliability_translation[key]
-
-
 class HPAExpression(Dict, JSONSerializable):
     def __init__(self, *args, **kwargs):
         super(HPAExpression, self).__init__(*args, **kwargs)

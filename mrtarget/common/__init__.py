@@ -17,30 +17,6 @@ def urllify(string_name):
     return string_name if '://' in string_name else 'file://' + string_name
 
 
-def url_to_stream(url, *args, **kwargs):
-    """request a url using requests pkg and pass *args and **kwargs to
-    requests.get function (useful for proxies) and returns the filled file
-    descriptor from a tempfile.NamedTemporaryFile
-
-    If you want to stream a raw uri (and not compressed) use the parameter
-    `enable_stream=True`
-    """
-    url_name = urllify(url)
-    r_session = r.Session()
-    r_session.mount('file://', requests_file.FileAdapter())
-
-    f = r_session.get(url, *args, stream=True, **kwargs)
-    f.raise_for_status()
-
-    if f.encoding is None:
-        f.encoding = 'utf-8'
-
-    for line in f.iter_lines(decode_unicode=True):
-            yield line
-
-    f.close()
-
-
 class URLZSource(object):
     def __init__(self, filename, *args, **kwargs):
         """Easy way to open multiple types of URL protocol (e.g. http:// and file://)
@@ -56,6 +32,7 @@ class URLZSource(object):
         >>> # with URLZSource('http://var.foo/noname.csv',proxies=proxies).open() as f:
 
         """
+        self._log = logging.getLogger(__name__)
         self.filename = urllify(filename)
         self.args = args
         self.kwargs = kwargs
@@ -95,7 +72,8 @@ class URLZSource(object):
         """
 
         if self.filename.startswith('ftp://'):
-            raise NotImplementedError('finish ftp')
+            self._log.error('Not implemented ftp protocol')
+            NotImplementedError('finish ftp')
 
         else:
             local_filename = self.filename.split('://')[-1].split('/')[-1]
@@ -114,55 +92,8 @@ class URLZSource(object):
                 yield fd
 
 
-class LogAccum(object):
-    def __init__(self, logger_o, elem_limit=1024):
-        if not logger_o:
-            raise TypeError('logger_o cannot have None value')
-
-        self._logger = logger_o
-        self._accum = {'counter': 0}
-        self._limit = elem_limit
-
-    def _flush(self, force=False):
-        if force or self._accum['counter'] >= self._limit:
-            keys = set(self._accum.iterkeys()) - set(['counter'])
-
-            for k in keys:
-                for msg in self._accum[k]:
-                    self._logger.log(k, msg[0], *msg[1])
-
-                # python indentation playing truth or dare
-                del self._accum[k][:]
-
-            # reset the accum
-            del(self._accum)
-            self._accum = {'counter': 0}
-
-    def flush(self, force=True):
-        self._flush(force)
-
-    def log(self, level, message, *args):
-        if level in self._accum:
-            self._accum[level].append((message, args))
-        else:
-            self._accum[level] = [(message, args)]
-
-        self._accum['counter'] += 1
-        self._flush()
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.flush(True)
-
-
 def require_all(*predicates):
     r_all = all(predicates)
     if not r_all:
         print('ERROR require_all failed checking all predicates true')
         _l.error('require_all failed checking all predicates true')
-
-
-def require_any(*predicates):
-    r_any = any(predicates)
-    if not r_any:
-        _l.error('requre_any failed checking at least one predicate true')
-

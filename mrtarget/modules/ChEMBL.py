@@ -1,28 +1,3 @@
-"""
-Copyright 2014-2016 EMBL - European Bioinformatics Institute, Wellcome
-Trust Sanger Institute, GlaxoSmithKline and Biogen
-
-This software was developed as part of Open Targets. For more information please see:
-
-	http://targetvalidation.org
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-.. module:: Downloader
-    :platform: Unix, Linux
-    :synopsis: A data pipeline module to download data.
-.. moduleauthor:: Gautier Koscielny <gautierk@opentargets.org>
-"""
 import functools
 import logging
 
@@ -34,16 +9,6 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
 from mrtarget.common import URLZSource
 import json
-
-__copyright__ = "Copyright 2014-2016, GlaxoSmithKline"
-
-__credits__ = ["Gautier Koscielny"]
-__license__ = "Apache 2.0"
-__version__ = "1.2.2"
-__maintainer__ = "Gautier Koscielny"
-__email__ = "gautier.x.koscielny@gsk.com"
-__status__ = "Production"
-
 
 def get_chembl_url(uri):
     '''return to json from uri'''
@@ -84,8 +49,6 @@ class ChEMBLLookup(object):
         self.mechanisms = {}
         self.target2molecule = {}
         self.disease2molecule = {}
-        # TODO XXX here I need to enable this class
-        # self.download = Downloader()
         self.targets = {}
         self.uni2chembl = {}
         self.molecule2synonyms = {}
@@ -140,7 +103,7 @@ class ChEMBLLookup(object):
         required_molecules = list(required_molecules)
         batch_size = 100
         self._logger.debug('chembl populate synonyms')
-        for i in range(0, len(required_molecules) + 1, batch_size):
+        for i in range(0, len(required_molecules), batch_size):
             self._populate_synonyms_for_molecule(required_molecules[i:i + batch_size],
                                                  self.molecule2synonyms,
                                                  self._logger)
@@ -188,11 +151,11 @@ class ChEMBLLookup(object):
 
     def get_molecules_from_evidence(self):
         self._logger.debug('get_molecules_from_evidence')
-
-        for c, e in enumerate(self.es_query.get_all_evidence_for_datasource(['chembl'],
-                                                               fields=['target.id',
-                                                                       'disease.id',
-                                                                       'evidence.target2drug.urls'])):
+        datatype = Config.DATASOURCE_TO_DATATYPE_MAPPING['chembl']
+        for c, e in enumerate(self.es_query.get_all_evidence_for_datatype(datatype,
+                fields=['target.id','disease.id', 'evidence.target2drug.urls'])):
+            #get information from URLs that we need to extract short ids
+            #e.g. https://www.ebi.ac.uk/chembl/compound/inspect/CHEMBL502835
             molecule_ids = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
                            '/compound/' in i['url']]
             if molecule_ids:
@@ -226,23 +189,25 @@ class ChEMBLLookup(object):
             else:
                 return molecule['molecule_chembl_id']
 
-        def _get_molecules_syns_from_url(url):
-            """get molecule list from an url. returns empty {} if something wrong"""
-            r = {}
-            try:
-                response = requests.get(url)
-                response.raise_for_status()
-                r = response.json()
-            except Exception as e:
-                logger.exception('problem downloading molecule info from url %s', str(e))
-                #re-raise exception to allow propegation
-                raise e
-            finally:
-                return r
+        if not molecule_set or not len(molecule_set):
+            logger.warn("No molecules in set")
+            return
 
-        urls = [Config.CHEMBL_MOLECULE_SET.format(';'.join(molecule_set))] if len(molecule_set) else []
-        data = more_itertools.first(itertools.imap(_get_molecules_syns_from_url,urls), default={})
+        #build a URL to query chembl for
+        url = Config.CHEMBL_MOLECULE_SET.format(';'.join(molecule_set))
 
+        #actually query that URL and get json back
+        data = None
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+        except Exception as e:
+            logger.error('problem downloading molecule info from url %s', url)
+            #re-raise exception to allow propegation
+            raise e
+
+        #if the data is what we expected, process it
         if 'molecules' in data:
             map_f = functools.partial(_append_to_mol2syn, molecules_syn_dict)
             mols_without_syn = \
@@ -251,6 +216,7 @@ class ChEMBLLookup(object):
                 logger.debug('molecule list with no synonyms %s', str(mols_without_syn))
 
         else:
-            logger.error(" there is no 'molecules' key in the returned data - wrong api query/response?")
+            logger.error("there is no 'molecules' key in %s", url)
+            raise RuntimeError("unexpected chembl API response")
 
 

@@ -2,7 +2,6 @@ import logging
 import os
 import time
 
-import pickle
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
@@ -10,6 +9,8 @@ from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
+import opentargets_ontologyutils.hpo
+import opentargets_ontologyutils.mp
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
 
@@ -28,7 +29,6 @@ class LookUpData():
 
         self.hpo_ontology = None
         self.mp_ontology = None
-        self.efo_ontology = None
 
     def set_r_server(self, r_server):
         self.logger.debug('setting r_server to all lookup tables from external r_server')
@@ -134,9 +134,9 @@ class LookUpDataRetriever(object):
         Load HPO to accept phenotype terms that are not in EFO
         :return:
         '''
-        cache_file = 'processed_hpo_lookup'
         obj = OntologyClassReader()
-        obj.load_hpo_classes(Config.ONTOLOGY_CONFIG.get('uris', 'hpo'))
+        hpo_uri = Config.ONTOLOGY_CONFIG.get('uris', 'hpo')
+        opentargets_ontologyutils.hpo.get_hpo(obj, hpo_uri)
         obj.rdf_graph = None
         self.lookup.hpo_ontology = obj
 
@@ -146,8 +146,8 @@ class LookUpDataRetriever(object):
         :return:
         '''
         obj = OntologyClassReader()
-        obj.load_mammalian_phenotype_ontology(Config.ONTOLOGY_CONFIG.get('uris', 'mp'))
-        obj.get_deprecated_classes()
+        mp_uri = Config.ONTOLOGY_CONFIG.get('uris', 'mp')
+        opentargets_ontologyutils.mp.load_mammalian_phenotype_ontology(obj, mp_uri)
         obj.rdf_graph = None
         self.lookup.mp_ontology = obj
 

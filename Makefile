@@ -36,7 +36,8 @@ MRTARGET_ARGS ?=
 
 # Internal variables
 #command to run mrtarget with various logging
-MRTARGET_CMD = python -m mrtarget.CommandLine --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
+MRTARGET_ENTRYPOINT ?= $(mkfile_dir)/scripts/entrypoint.sh
+MRTARGET_CMD = $(MRTARGET_ENTRYPOINT) --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
 
 
 INDEX_CMD = python scripts/check_index.py --elasticsearch $(ELASTICSEARCH_NODES) --zero-fail --index
@@ -116,10 +117,10 @@ $(LOG_PATH)/out.$(ES_PREFIX).eco.log :
 .PHONY: base_gene
 base_gene: $(LOG_PATH)/out.$(ES_PREFIX).gen.log	
 
-$(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
+$(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log
 	mkdir -p $(LOG_PATH)
 	$(ELASTIC_CHECK_CMD)
-	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data $(ES_PREFIX)_expression-data
+	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data
 	$(MRTARGET_CMD) --gen $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).gen.log
 	sleep 60
 
@@ -166,7 +167,7 @@ $(JSON_PATH)/phenodigm.json.gz:
 
 $(JSON_PATH)/phewas_catalog.json.gz:
 	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-07-12-18.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
+	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
 
 $(JSON_PATH)/progeny.json.gz:
 	mkdir -p $(JSON_PATH)
@@ -214,11 +215,11 @@ $(LOG_PATH)/out.$(ES_PREFIX).val.log : $(JSON_PATH)/atlas.json.gz $(JSON_PATH)/c
 	sleep 60
 
 .PHONY: association_scores
-association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log
+association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log 
 
-$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.log
+$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_evidence-data
+	$(INDEX_CMD) $(ES_PREFIX)_evidence-data $(ES_PREFIX)_expression-data
 	$(MRTARGET_CMD) --as $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
 .PHONY: association_qc
