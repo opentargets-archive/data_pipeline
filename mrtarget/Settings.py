@@ -120,13 +120,6 @@ class Config():
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=[])
     
-    HPA_NORMAL_TISSUE_URL = ini.get('full_dataset', 'hpa_normal')
-    HPA_CANCER_URL = ini.get('full_dataset', 'hpa_cancer')
-    HPA_SUBCELLULAR_LOCATION_URL = ini.get('full_dataset', 'hpa_subcellular')
-    HPA_RNA_LEVEL_URL = ini.get('full_dataset', 'hpa_rna_level')
-    HPA_RNA_VALUE_URL = ini.get('full_dataset', 'hpa_rna_value')
-    HPA_RNA_ZSCORE_URL = ini.get('full_dataset', 'hpa_rna_zscore')
-
     EVIDENCEVALIDATION_SCHEMA = 'master'
     EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
 

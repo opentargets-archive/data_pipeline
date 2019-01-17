@@ -41,6 +41,10 @@ ensembl-filename: https://storage.googleapis.com/ot-releases/18.12/annotations/h
 #hpa tissue specificity
 tissue-translation-map: https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json
 tissue-curation-map: https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv
+hpa-normal-tissue: https://www.proteinatlas.org/download/normal_tissue.tsv.zip
+hpa-rna-level: https://storage.googleapis.com/atlas_baseline_expression/expatlas.blueprint2.baseline.binned_v2.tsv
+hpa-rna-value: https://storage.googleapis.com/atlas_baseline_expression/exp_summary_NormCounts_genes_all_Blueprint2_v2.txt
+hpa-rna-zscore: https://storage.googleapis.com/atlas_baseline_expression/expatlas.blueprint2.baseline.z-score.binned_v2.tsv
 
 #ontology
 ontology-hpo: https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/v2018-10-09/hp.owl

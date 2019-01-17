@@ -131,10 +131,12 @@ def main():
             if not args.qc_only:
                 process.cache_human_entries(args.uniprot_uri)
             if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))            
+                qc_metrics.update(process.qc(esquery))
         if args.hpa:
             process = HPAProcess(loader,connectors.r_server, 
-                args.tissue_translation_map, args.tissue_curation_map)
+                args.tissue_translation_map, args.tissue_curation_map
+                args.hpa_normal_tissue, args.hpa-rna-level, 
+                args.hpa-rna-value, args.hpa-rna-zscore)
             if not args.qc_only:
                 process.process_all(dry_run=args.dry_run)
             if not args.skip_qc:

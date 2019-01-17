@@ -176,6 +176,14 @@ def setup_parser():
         env_var="TISSUE_TRANSLATION_MAP", action='store')
     p.add("--tissue-curation-map", help="location of tissue curation map file",
         env_var="TISSUE_CURATION_MAP", action='store')
+    p.add("--hpa-normal-tissue", help="location of tissue normal file",
+        env_var="HPA_NORMAL_TISSUE_URL", action='store')
+    p.add("--hpa-rna-level", help="location of rna level file",
+        env_var="HPA_RNA_LEVEL_URL", action='store')
+    p.add("--hpa-rna-value", help="location of rna value file",
+        env_var="HPA_RNA_VALUE_URL", action='store')
+    p.add("--hpa-rna-zscore", help="location of rna zscore file",
+        env_var="HPA_RNA_ZSCORE_URL", action='store')
 
     #ontology URIs
     p.add("--ontology-efo", help="location of EFO file",
