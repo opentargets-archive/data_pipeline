@@ -25,7 +25,7 @@ from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
 from mrtarget.modules.Uniprot import UniprotDownloader
 from mrtarget.modules.Metrics import Metrics
-from mrtarget.Settings import Config, file_or_resource, update_schema_version
+from mrtarget.Settings import Config, file_or_resource
 
 import mrtarget.cfg
 
@@ -107,12 +107,6 @@ def main():
                 chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
                 dry_run = args.dry_run) as loader:
 
-        # get the schema version and change all needed resources
-        update_schema_version(Config,args.schema_version)
-        logger.info('setting schema version string to %s', args.schema_version)
-
-
-
         if args.rea:
             process = ReactomeProcess(loader, 
                 args.reactome_pathway_data, args.reactome_pathway_relation)
@@ -134,7 +128,7 @@ def main():
                 qc_metrics.update(process.qc(esquery))
         if args.hpa:
             process = HPAProcess(loader,connectors.r_server, 
-                args.tissue_translation_map, args.tissue_curation_map
+                args.tissue_translation_map, args.tissue_curation_map,
                 args.hpa_normal_tissue, args.hpa-rna-level, 
                 args.hpa-rna-value, args.hpa-rna-zscore)
             if not args.qc_only:
@@ -186,7 +180,8 @@ def main():
                                        num_workers=num_workers,
                                        num_writers=num_writers,
                                        max_queued_events=args.max_queued_events,
-                                       eco_scores_uri=args.eco_scores)
+                                       eco_scores_uri=args.eco_scores,
+                                       schema_uri = args.schema)
 
 
             #TODO qc

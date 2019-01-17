@@ -73,8 +73,8 @@ def setup_parser():
         action="store_true")
     p.add("--input-file", help="pass the path to a gzipped file to use as input for the data validation step",
         action='append')
-    p.add("--schema-version", help="set the schema version aka 'branch' name. Default is 'master'",
-        env_var="SCHEMA_VERSION", default='master')
+    p.add("--schema", help="set the schema uri",
+        env_var="SCHEMA")
     p.add("--val-first-n", help="read only the first n lines from each input file",
         env_var="VAL_FIRST_N")
 

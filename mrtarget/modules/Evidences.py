@@ -66,18 +66,13 @@ def process_evidence(line, process_context):
     return left, right
 
 
-def process_evidence_on_start(luts, eco_scores_uri):
+def process_evidence_on_start(luts, eco_scores_uri, schema_uri):
     """this function is called once per started process and return a ProcessContext per process."""
     pc = ProcessContext()
     pc.logger.debug("called validate_evidence on_start from %s", str(os.getpid()))
-    pc.logger.debug("creating schema validators")
 
-    schemas_map = Config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS
-    for schema_name, schema_uri in schemas_map.iteritems():
-        # per kv we create the validator and instantiate it
-        pc.logger.info('generate_validator_from_schema %s using the uri %s', schema_name, schema_uri)
-        pc.kwargs.validators[schema_name] = \
-            opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
+    pc.logger.info('generate_validator_from_schema for %s', schema_uri)
+    pc.kwargs.validator(schema_uri)
 
     pc.kwargs.luts = luts
     pc.kwargs.redis_c = new_redis_client()
@@ -141,11 +136,6 @@ def validate_evidence(line, process_context):
             validated_evs.explanation_type = 'missing_datatype'
             return validated_evs, None
 
-        if data_type not in Config.EVIDENCEVALIDATION_DATATYPES:
-            validated_evs.explanation_type = 'unsupported_datatype'
-            validated_evs.explanation_str = data_type
-            return validated_evs, None
-
         if 'sourceID' not in parsed_line:
             validated_evs.explanation_type = 'missing_datasource'
             return validated_evs, None
@@ -160,17 +150,11 @@ def validate_evidence(line, process_context):
 
         # validate line
         validation_errors = \
-            [str(e) for e in process_context.kwargs.validators[data_type].iter_errors(parsed_line)]
+            [str(e) for e in process_context.kwargs.validator.iter_errors(parsed_line)]
 
         if validation_errors:
             # here I have to log all fails to logger and elastic
             error_messages = ' '.join(validation_errors).replace('\n', ' ; ').replace('\r', '')
-
-            error_messages_len = len(error_messages)
-
-            # capping error message to 2048
-            error_messages = error_messages if error_messages_len <= 2048 \
-                else error_messages[:2048] + ' ; ...'
 
             validated_evs.explanation_type = 'validation_error'
             validated_evs.explanation_str = error_messages
@@ -312,7 +296,8 @@ def write_evidences(x, process_context):
 
 def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
                                dry_run, enable_output_to_es, output_folder,
-                               num_workers, num_writers, max_queued_events, eco_scores_uri):
+                               num_workers, num_writers, max_queued_events, 
+                               eco_scores_uri, schema_uri):
     logger = logging.getLogger(__name__)
 
     if not filenames:
@@ -338,7 +323,7 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     evs = IO.make_iter_lines(checked_filenames, first_n)
 
     #create functions with pre-baked arguments
-    validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data, eco_scores_uri)
+    validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data, eco_scores_uri, schema_uri)
     write_evidences_on_start_f = functools.partial(create_process_context, enable_output_to_es, output_folder, dry_run)
 
     #perform any single-thread setup

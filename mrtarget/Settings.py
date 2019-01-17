@@ -89,14 +89,6 @@ def read_option(option, cast=None, ini=ini, section='dev',
         except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
             return default_value
 
-def update_schema_version(config, schema_version_string):
-    config.EVIDENCEVALIDATION_SCHEMA = schema_version_string
-    for el in config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS:
-        config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el] = \
-            config.EVIDENCEVALIDATION_VALIDATOR_SCHEMAS[el].replace('master',
-                                                                    schema_version_string)
-
-
 class Config():
 
     RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='')
@@ -120,20 +112,6 @@ class Config():
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=[])
     
-    EVIDENCEVALIDATION_SCHEMA = 'master'
-    EVIDENCEVALIDATION_DATATYPES = ['genetic_association', 'rna_expression', 'genetic_literature', 'affected_pathway', 'somatic_mutation', 'known_drug', 'literature', 'animal_model']
-
-    EVIDENCEVALIDATION_VALIDATOR_SCHEMAS = {
-        'genetic_association': 'https://raw.githubusercontent.com/opentargets/json_schema/master/src/genetics.json',
-        'rna_expression':      'https://raw.githubusercontent.com/opentargets/json_schema/master/src/expression.json',
-        'genetic_literature':  'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
-        'affected_pathway':    'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
-        'somatic_mutation':    'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_curated.json',
-        'known_drug':          'https://raw.githubusercontent.com/opentargets/json_schema/master/src/drug.json',
-        'literature':          'https://raw.githubusercontent.com/opentargets/json_schema/master/src/literature_mining.json',
-        'animal_model':        'https://raw.githubusercontent.com/opentargets/json_schema/master/src/animal_models.json'
-    }
-
 
     # setup the number of workers to use for data processing. if None defaults
     # to the number of CPUs available
@@ -192,7 +170,6 @@ class Config():
     SCORING_WEIGHTS['slapenrich'] = 0.5
     SCORING_WEIGHTS['progeny'] = 0.5
     SCORING_WEIGHTS['sysbio'] = 0.5
-    # SCORING_WEIGHTS['gwas_catalog'] = 1.5
 
     # setup a minimum score value for an evidence string to be accepted.
     SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
