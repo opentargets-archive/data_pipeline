@@ -141,7 +141,9 @@ def main():
                 qc_metrics.update(process.qc(esquery))     
 
         if args.gen:
-            process = GeneManager(loader,connectors.r_server)
+            process = GeneManager(loader, connectors.r_server,
+                args.gene_data_plugin_places, args.gene_data_plugin_names
+)
             if not args.qc_only:
                 process.merge_all(dry_run=args.dry_run)
 

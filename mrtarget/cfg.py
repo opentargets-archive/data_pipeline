@@ -54,6 +54,11 @@ def setup_parser():
     # use the sources to combine the gene information into a single new index
     p.add("--gen", help="merge the available gene information, store in elasticsearch",
         action="store_true")
+    p.add("--gene-data-plugin-places", help="file paths to search for plugins",
+        env_var="GENE_DATA_PLUGIN_PLACES", action="append")
+    p.add("--gene-data-plugin-names", help="plugin names in order of invocation",
+        env_var="GENE_DATA_PLUGIN_ORDER", action="append")
+    
 
     # load various ontologies into various indexes
     p.add("--mp", help="process Mammalian Phenotype (MP), store the resulting json objects in elasticsearch",

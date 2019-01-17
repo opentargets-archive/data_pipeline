@@ -7,6 +7,10 @@ reactome-pathway-relation: https://storage.googleapis.com/open-targets-data-rele
 #uniprot
 uniprot_uri: https://storage.googleapis.com/ot-releases/18.12/annotations/uniprot-20181130.xml.gz
 
+#gene plugins
+gene-data-plugin-places: [mrtarget/plugins/gene]
+gene-data-plugin-names: [HGNC,Orthologs,Ensembl,Uniprot,ChEMBL,MousePhenotypes,Hallmarks,CancerBiomarkers,ChemicalProbes,Tractability]
+
 #hgnc gene plugin
 hgnc-complete-set: http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json
 

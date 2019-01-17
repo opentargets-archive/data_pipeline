@@ -408,11 +408,20 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
 class GeneManager():
     """
     Merge data available in ?elasticsearch into proper json objects
+
+
+    plugin_paths is a collection of filesystem paths to search for potential plugins
+
+    plugin_names is an ordered collection of class names of plugins which determines
+    the order they are handled in
+
     """
 
     def __init__(self,
                  loader,
-                 r_server):
+                 r_server,
+                 plugin_paths,
+                 plugin_order):
 
         self.loader = loader
         self.r_server = r_server
@@ -423,19 +432,22 @@ class GeneManager():
         # Build the manager
         self.simplePluginManager = PluginManager()
         # Tell it the default place(s) where to find plugins
-        self.simplePluginManager.setPluginPlaces(Config.GENE_DATA_PLUGIN_PLACES)
-        for dir in Config.GENE_DATA_PLUGIN_PLACES:
-            self._logger.info(dir)
+        self.simplePluginManager.setPluginPlaces(plugin_paths)
+        for dir in plugin_paths:
+            self._logger.debug("Looking for plugins in %s", dir)
         # Load all plugins
         self.simplePluginManager.collectPlugins()
+
+        self.plugin_order = plugin_order
 
 
     def merge_all(self, dry_run = False):
 
-        for plugin_name in Config.GENE_DATA_PLUGIN_ORDER:
+        for plugin_name in self.plugin_order:
             plugin = self.simplePluginManager.getPluginByName(plugin_name)
             plugin.plugin_object.print_name()
-            plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server)
+            plugin.plugin_object.merge_data(genes=self.genes, 
+                loader=self.loader, r_server=self.r_server)
 
         self._store_data(dry_run=dry_run)
 

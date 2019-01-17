@@ -119,11 +119,6 @@ class Config():
 
     ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
                                       default=[])
-
-    GENE_DATA_PLUGIN_PLACES = [ 'mrtarget' + os.path.sep + 'plugins' + os.path.sep + 'gene' ]
-    GENE_DATA_PLUGIN_ORDER = ['HGNC', 'Orthologs', 'Ensembl', 'Uniprot', 'ChEMBL', 'MousePhenotypes', 'Hallmarks',
-                              'CancerBiomarkers', 'ChemicalProbes', 'Tractability']
-
     
     HPA_NORMAL_TISSUE_URL = ini.get('full_dataset', 'hpa_normal')
     HPA_CANCER_URL = ini.get('full_dataset', 'hpa_cancer')
