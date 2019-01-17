@@ -120,7 +120,7 @@ services:
       - 6379:6379
     
   mrtarget:
-    image: quay.io/opentargets/mrtarget:18.12.5-dev
+    image: quay.io/opentargets/mrtarget:18.12.6
     depends_on:
       - elasticsearch
       - redis
@@ -131,7 +131,7 @@ services:
       - SCHEMA_VERSION=1.3.0
       - NUMBER_TO_KEEP=100000000
       - ES_PREFIX=18.12
-      - "MRTARGET_ARGS=--max-queued-events=16000"
+      - "MRTARGET_ARGS=--max-queued-events=4000"
     volumes:
       - ./log:/usr/src/app/log
       - ./json:/usr/src/app/json

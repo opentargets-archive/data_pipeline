@@ -191,7 +191,7 @@ $(JSON_PATH)/uniprot.json.gz:
 .PHONY: validate_all
 validate_all : $(LOG_PATH)/out.$(ES_PREFIX).val.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.log : $(JSON_PATH)/atlas.json.gz $(JSON_PATH)/chembl.json.gz $(JSON_PATH)/cosmic.json.gz $(JSON_PATH)/europepmc.json.gz $(JSON_PATH)/eva.json.gz $(JSON_PATH)/gene2phenotype.json.gz $(JSON_PATH)/genomics_england.json.gz $(JSON_PATH)/gwas.json.gz $(JSON_PATH)/intogen.json.gz $(JSON_PATH)/phenodigm.json.gz $(JSON_PATH)/phewas_catalog.json.gz $(JSON_PATH)/progeny.json.gz $(JSON_PATH)/reactome.json.gz $(JSON_PATH)/slapenrich.json.gz $(JSON_PATH)/uniprot.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
+$(LOG_PATH)/out.$(ES_PREFIX).val.log : $(JSON_PATH)/atlas.json.gz $(JSON_PATH)/chembl.json.gz $(JSON_PATH)/cosmic.json.gz $(JSON_PATH)/europepmc.json.gz $(JSON_PATH)/eva.json.gz $(JSON_PATH)/gene2phenotype.json.gz $(JSON_PATH)/genomics_england.json.gz $(JSON_PATH)/gwas.json.gz $(JSON_PATH)/intogen.json.gz $(JSON_PATH)/phenodigm.json.gz $(JSON_PATH)/phewas_catalog.json.gz $(JSON_PATH)/progeny.json.gz $(JSON_PATH)/reactome.json.gz $(JSON_PATH)/slapenrich.json.gz $(JSON_PATH)/sysbio.json.gz $(JSON_PATH)/uniprot.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	mkdir -p $(LOG_PATH)
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
 	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val \
@@ -209,6 +209,7 @@ $(LOG_PATH)/out.$(ES_PREFIX).val.log : $(JSON_PATH)/atlas.json.gz $(JSON_PATH)/c
 		--input-file $(JSON_PATH)/progeny.json.gz \
 		--input-file $(JSON_PATH)/reactome.json.gz \
 		--input-file $(JSON_PATH)/slapenrich.json.gz \
+		--input-file $(JSON_PATH)/sysbio.json.gz \
 		--input-file $(JSON_PATH)/uniprot.json.gz \
 		$(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.log
 	sleep 60
