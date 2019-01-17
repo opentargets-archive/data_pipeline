@@ -45,7 +45,7 @@ def file_or_resource(fname=None):
 
 
 # loading all ini files into the same configuration
-ini = ini_from_file_or_resource('db.ini', 'uris.ini',
+ini = ini_from_file_or_resource('db.ini',
                                 'es_custom_idxs.ini')
 
 
@@ -91,27 +91,7 @@ def read_option(option, cast=None, ini=ini, section='dev',
 
 class Config():
 
-    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='')
-
-    # [elasticsearch]
-
-    # each node in the cluster has to be specified to the client, unless we use
-    # Sniffing, but we'd prefer not to do that. The problem arises when you
-    # allow nodes with SSL or not. A simple solution is to force full URLs to be
-    # specified, protocol and port included and passed as a list.
-
-    # The client accepts host lists such as these:
-    # es = Elasticsearch(
-    # [
-    #     'http://user:secret@localhost:9200/',
-    #     'https://user:secret@other_host:443/production'
-    # ],
-    # verify_certs=True
-    # )
-
-    ELASTICSEARCH_NODES = read_option('ELASTICSEARCH_NODES', cast=list,
-                                      default=[])
-    
+    RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='')    
 
     # setup the number of workers to use for data processing. if None defaults
     # to the number of CPUs available

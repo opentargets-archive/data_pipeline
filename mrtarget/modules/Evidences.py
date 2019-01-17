@@ -297,7 +297,7 @@ def write_evidences(x, process_context):
 def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
                                dry_run, enable_output_to_es, output_folder,
                                num_workers, num_writers, max_queued_events, 
-                               eco_scores_uri, schema_uri):
+                               eco_scores_uri, schema_uri, es_hosts):
     logger = logging.getLogger(__name__)
 
     if not filenames:
@@ -324,7 +324,7 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
 
     #create functions with pre-baked arguments
     validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data, eco_scores_uri, schema_uri)
-    write_evidences_on_start_f = functools.partial(create_process_context, enable_output_to_es, output_folder, dry_run)
+    write_evidences_on_start_f = functools.partial(create_process_context, enable_output_to_es, output_folder, es_hosts, dry_run)
 
     #perform any single-thread setup
     logger.debug('context setup')

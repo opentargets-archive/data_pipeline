@@ -90,7 +90,8 @@ def main():
         requests_log.addHandler(logging.FileHandler(args.log_http))
 
 
-    connected = connectors.init_services_connections(redispersist=args.redis_remote)
+    connected = connectors.init_services_connections(es_hosts=args.elasticseach_nodes,
+        redispersist=args.redis_remote)
 
     logger.debug('Attempting to establish connection to the backend... %s',
                  str(connected))
@@ -129,8 +130,8 @@ def main():
         if args.hpa:
             process = HPAProcess(loader,connectors.r_server, 
                 args.tissue_translation_map, args.tissue_curation_map,
-                args.hpa_normal_tissue, args.hpa-rna-level, 
-                args.hpa-rna-value, args.hpa-rna-zscore)
+                args.hpa_normal_tissue, args.hpa_rna_level, 
+                args.hpa_rna_value, args.hpa_rna_zscore)
             if not args.qc_only:
                 process.process_all(dry_run=args.dry_run)
             if not args.skip_qc:
@@ -181,7 +182,8 @@ def main():
                                        num_writers=num_writers,
                                        max_queued_events=args.max_queued_events,
                                        eco_scores_uri=args.eco_scores,
-                                       schema_uri = args.schema)
+                                       schema_uri = args.schema,
+                                       es_hosts=args.elasticseach_nodes)
 
 
             #TODO qc

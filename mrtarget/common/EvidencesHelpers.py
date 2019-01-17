@@ -108,7 +108,8 @@ class ProcessContextESWriter(ProcessContext):
         super(ProcessContextESWriter, self).__init__(**kwargs)
         self.logger.debug("called output_stream from %s", str(os.getpid()))
 
-        self.kwargs.es_client = new_es_client()
+
+        self.kwargs.es_client = new_es_client(kwargs['hosts'])
         self.kwargs.es_loader = Loader(es=self.kwargs.es_client)
 
         self.kwargs.index_name_validated = Const.ELASTICSEARCH_DATA_INDEX_NAME
@@ -168,11 +169,11 @@ class ProcessContextESWriter(ProcessContext):
         es_loader.restore_after_bulk_indexing()
 
 
-def create_process_context(enable_output_to_es, output_folder, dry_run):
+def create_process_context(enable_output_to_es, output_folder, es_hosts, dry_run):
     if dry_run:
         return ProcessContextDryRun()
     elif enable_output_to_es:
-        return ProcessContextESWriter()
+        return ProcessContextESWriter(hosts=es_hosts)
     else:
         return ProcessContextFileWriter(output_folder=output_folder)
 

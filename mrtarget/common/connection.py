@@ -34,7 +34,7 @@ def redis_server_is_up(log_h=None):
         return is_up
 
 
-def new_es_client(hosts=Config.ELASTICSEARCH_NODES):
+def new_es_client(hosts):
     return Elasticsearch(hosts=hosts,
                          maxsize=50,
                          timeout=1800,
@@ -57,16 +57,13 @@ class PipelineConnectors():
         ''' elasticsearch data connection'''
         self.es = None
 
-        ''' elasticsearch publication connection'''
-        # self.es_pub = None
-
         ''' Redis '''
         self.r_server = None
         self.logger = logging.getLogger(__name__)
         self.r_instance = r_instance['instance']
 
     def init_services_connections(self,
-                                  redispersist=False):
+            es_hosts, redispersist=False):
         success = False
         self.persist = redispersist
         r_host = Config.REDISLITE_DB_HOST
@@ -74,10 +71,8 @@ class PipelineConnectors():
         r_remote = Config.REDISLITE_REMOTE
 
         '''init es client for data'''
-        hosts = Config.ELASTICSEARCH_NODES
-
-        if hosts:
-            self.es = new_es_client(hosts)
+        if es_hosts:
+            self.es = new_es_client(es_hosts)
 
             try:
                 connection_attempt = 1
@@ -86,15 +81,15 @@ class PipelineConnectors():
                     self.logger.warn('Cannot connect to elasticsearch data nodes retrying in %i', wait_time)
                     time.sleep(wait_time)
                     if connection_attempt >= 3:
-                        raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % str(Config.ELASTICSEARCH_NODES))
+                        raise ConnectionTimeout("Couldn't connect to %s after 3 tries" % str(es_hosts))
                     connection_attempt += 1
-                self.logger.debug('Connected to elasticsearch data nodes: %s', str(Config.ELASTICSEARCH_NODES))
+                self.logger.debug('Connected to elasticsearch data nodes: %s', str(es_hosts))
                 success = True
             except ConnectionTimeout:
                 self.logger.exception("Elasticsearch data nodes connection timeout")
 
         else:
-            self.logger.warn('No valid configuration available for elasticsearch data nodes')
+            self.logger.info('No valid configuration available for elasticsearch data nodes')
             self.es = None
 
         # check if redis server is already running it will be checked if we dont want

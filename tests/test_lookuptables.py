@@ -17,7 +17,7 @@ def init_services_connections():
     '''
     _logger.info("init_services_connections")
     connectors = PipelineConnectors()
-    m = connectors.init_services_connections()
+    m = connectors.init_services_connections(es_hosts=None)
     _logger.debug('Attempting to establish connection to the backend... %s',
                        str(m))
     return connectors

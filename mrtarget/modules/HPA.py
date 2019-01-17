@@ -486,11 +486,22 @@ class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
 
 class HPAProcess():
-    def __init__(self, loader, r_server, tissue_translation_map_url, tissue_curation_map_url):
+    def __init__(self, loader, r_server, 
+            tissue_translation_map_url, 
+            tissue_curation_map_url,
+            normal_tissue_url,
+            rna_level_url,
+            rna_value_url,
+            rna_zscore_url):
         self.loader = loader
         self.esquery = ESQuery(loader.es)
         self.r_server = r_server
-        self.downloader = HPADataDownloader(tissue_translation_map_url, tissue_curation_map_url)
+        self.downloader = HPADataDownloader(tissue_translation_map_url, 
+            tissue_curation_map_url,
+            normal_tissue_url,
+            rna_level_url,
+            rna_value_url,
+            rna_zscore_url)
         self.logger = logging.getLogger(__name__)
         self.hpa_normal_table = None
         self.hpa_rna_table = None
