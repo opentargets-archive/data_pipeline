@@ -1,0 +1,8 @@
+#default ops configuration 
+
+#this is read by ConfigArgParse
+#it uses a sub-set of YAML
+#for details see https://pypi.org/project/ConfigArgParse/
+
+log-config: mrtarget/resources/logging.ini
+release-tag: master

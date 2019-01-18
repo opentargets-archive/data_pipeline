@@ -30,30 +30,16 @@ class Hallmarks(IPlugin):
                                   "escaping immune response to cancer",
                                   "proliferative signalling"]
 
-        #handle plugin specific configuration here
-        #helps separate the plugin from the rest of the pipeline
-        #and makes it easier to manage custom plugins
-        p = configargparse.get_argument_parser()
-
-        p.add("--hallmark", help="location of hallmark file",
-            env_var="HALLMARK", action='store')
-
     def print_name(self):
         self._logger.info("Hallmarks of cancer gene data plugin")
 
-    def merge_data(self, genes, loader, r_server):
-
-        #dont use parse_args because that will error
-        #if there are extra arguments e.g. for plugins
-        p = configargparse.get_argument_parser()
-        self.args = p.parse_known_args()[0]
-
+    def merge_data(self, genes, loader, r_server, data_config):
         self.loader = loader
         self.r_server = r_server
 
         try:
 
-            self.build_json(filename=self.args.hallmark)
+            self.build_json(filename=data_config.hallmark)
 
             for gene_id, gene in genes.iterate():
                 ''' extend gene with related Hallmark data '''

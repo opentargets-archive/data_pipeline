@@ -58,31 +58,18 @@ class MousePhenotypes(IPlugin):
         self.human_genes = {}
         self.not_found_genes = {}
         self.human_ensembl_gene_ids = {}
-        #handle plugin specific configuration here
-        #helps separate the plugin from the rest of the pipeline
-        #and makes it easier to manage custom plugins
-        p = configargparse.get_argument_parser()
-
-        p.add("--mouse-phenotypes-orthology", help="location of MGI orthology report",
-            env_var="GENOTYPE_PHENOTYPE_MGI_REPORT_ORTHOLOGY", action='store')
-
-        p.add("--mouse-phenotypes-report", help="location of MGI phenotypes report",
-            env_var="GENOTYPE_PHENOTYPE_MGI_REPORT_PHENOTYPES", action='store')
+        self.data_config = None
 
     def print_name(self):
         self._logger.debug("MousePhenotypes gene data plugin")
 
-    def merge_data(self, genes, loader, r_server):
-
-        #dont use parse_args because that will error
-        #if there are extra arguments e.g. for plugins
-        p = configargparse.get_argument_parser()
-        self.args = p.parse_known_args()[0]
+    def merge_data(self, genes, loader, r_server, data_config):
 
         self.loader = loader
         self.r_server = r_server
+        self.data_config = data_config
 
-        self._get_mp_classes(self.args.ontology_mp)
+        self._get_mp_classes(self.data_config.ontology_mp)
 
         self.get_genotype_phenotype()
 
@@ -154,8 +141,8 @@ class MousePhenotypes(IPlugin):
 
     def get_genotype_phenotype(self):
         self._logger.debug("get_genotype_phenotype")
-        with URLZSource(self.args.mouse_phenotypes_orthology).open() as fi:
-            self._logger.debug("get %s", self.args.mouse_phenotypes_orthology)
+        with URLZSource(self.data_config.mouse_phenotypes_orthology).open() as fi:
+            self._logger.debug("get %s", self.data_config.mouse_phenotypes_orthology)
 
             for li, line in enumerate(fi):
                 # a way too many false spaces just to bother people
@@ -186,10 +173,10 @@ class MousePhenotypes(IPlugin):
         count_symbols = set()
         count_accepted_symbols = set()
 
-        with URLZSource(self.args.mouse_phenotypes_report).open() as fi:
+        with URLZSource(self.data_config.mouse_phenotypes_report).open() as fi:
             # lines = response.readlines()
             self._logger.debug("get lines from mgi report phenotyes file %s",
-                                self.args.mouse_phenotypes_report)
+                                self.data_config.mouse_phenotypes_report)
 
             # Allelic Composition	Allele Symbol(s)	Genetic Background	Mammalian Phenotype ID	PubMed ID	MGI Marker Accession ID
             for li, line in enumerate(fi):

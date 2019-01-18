@@ -20,7 +20,7 @@ from mrtarget.modules.EFO import EfoProcess
 from mrtarget.modules.Ensembl import EnsemblProcess
 from mrtarget.modules.GeneData import GeneManager
 from mrtarget.modules.HPA import HPAProcess
-from mrtarget.modules.QC import QCRunner,QCMetrics
+from mrtarget.modules.QC import QCMetrics
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
 from mrtarget.modules.Uniprot import UniprotDownloader
@@ -31,8 +31,8 @@ import mrtarget.cfg
 
 def main():
     #parse config file, environment, and command line arguments
-    mrtarget.cfg.setup_parser()
-    args = mrtarget.cfg.get_args()
+    mrtarget.cfg.setup_ops_parser()
+    args = mrtarget.cfg.get_ops_args()
 
     #set up logging
     logger = None
@@ -75,6 +75,9 @@ def main():
     #create a single query object for future use
     esquery = ESQuery(connectors.es)
 
+    #read the data configuration
+    data_config = mrtarget.cfg.get_data_config(args.data_config)
+
     #create something to accumulate qc metrics into over various steps
     qc_metrics = QCMetrics()
 
@@ -84,7 +87,7 @@ def main():
 
         if args.rea:
             process = ReactomeProcess(loader, 
-                args.reactome_pathway_data, args.reactome_pathway_relation)
+                data_config.reactome_pathway_data, data_config.reactome_pathway_relation)
             if not args.qc_only:
                 process.process_all()
             if not args.skip_qc:
@@ -92,20 +95,20 @@ def main():
         if args.ens:
             process = EnsemblProcess(loader)
             if not args.qc_only:
-                process.process(args.ensembl_filename)
+                process.process(data_config.ensembl_filename)
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))
         if args.unic:
             process = UniprotDownloader(loader, dry_run=args.dry_run)
             if not args.qc_only:
-                process.cache_human_entries(args.uniprot_uri)
+                process.cache_human_entries(data_config.uniprot_uri)
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))
         if args.hpa:
             process = HPAProcess(loader,connectors.r_server, 
-                args.tissue_translation_map, args.tissue_curation_map,
-                args.hpa_normal_tissue, args.hpa_rna_level, 
-                args.hpa_rna_value, args.hpa_rna_zscore)
+                data_config.tissue_translation_map, data_config.tissue_curation_map,
+                data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
+                data_config.hpa_rna_value, data_config.hpa_rna_zscore)
             if not args.qc_only:
                 process.process_all(dry_run=args.dry_run)
             if not args.skip_qc:
@@ -113,23 +116,23 @@ def main():
 
         if args.gen:
             process = GeneManager(loader, connectors.r_server,
-                args.gene_data_plugin_places, args.gene_data_plugin_names
-)
+                args.gene_data_plugin_places, args.gene_data_plugin_names,
+                )
             if not args.qc_only:
-                process.merge_all(dry_run=args.dry_run)
+                process.merge_all(data_config, dry_run=args.dry_run)
 
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))     
  
         if args.efo:
-            process = EfoProcess(loader, args.ontology_efo, args.ontology_hpo, 
-                args.ontology_mp, args.disease_phenotype)
+            process = EfoProcess(loader, data_config.ontology_efo, data_config.ontology_hpo, 
+                data_config.ontology_mp, data_config.disease_phenotype)
             if not args.qc_only:
                 process.process_all()
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))
         if args.eco:
-            process = EcoProcess(loader, args.ontology_eco, args.ontology_so)
+            process = EcoProcess(loader, data_config.ontology_eco, data_config.ontology_so)
             if not args.qc_only:
                 process.process_all()
             if not args.skip_qc:
@@ -155,8 +158,8 @@ def main():
                 num_workers=num_workers,
                 num_writers=num_writers,
                 max_queued_events=args.max_queued_events,
-                eco_scores_uri=args.eco_scores,
-                schema_uri = args.schema,
+                eco_scores_uri=data_config.eco_scores,
+                schema_uri = data_config.schema,
                 es_hosts=args.elasticseach_nodes)
 
 
@@ -168,7 +171,7 @@ def main():
                 process.process_all(targets = args.targets, 
                     dry_run=args.dry_run)
             if not args.skip_qc:
-                #qc_metrics.update(process.qc(esquery))
+                qc_metrics.update(process.qc(esquery))
                 pass
             
         if args.ddr:
@@ -181,11 +184,11 @@ def main():
             process = SearchObjectProcess(loader, connectors.r_server)
             if not args.qc_only:
                 process.process_all(
-                    args.chembl_target, 
-                    args.chembl_mechanism, 
-                    args.chembl_component, 
-                    args.chembl_protein, 
-                    args.chembl_molecule_set_uri_pattern,
+                    data_config.chembl_target, 
+                    data_config.chembl_mechanism, 
+                    data_config.chembl_component, 
+                    data_config.chembl_protein, 
+                    data_config.chembl_molecule_set_uri_pattern,
                     dry_run = args.dry_run,
                     skip_targets=args.skip_targets, 
                     skip_diseases=args.skip_diseases)
@@ -193,9 +196,6 @@ def main():
 
         if args.metric:
             process = Metrics(connectors.es).generate_metrics()
-
-        if args.qc:
-            QCRunner(connectors.es).run_associationQC()
 
     if args.qc_in:
         #handle reading in previous qc from filename provided, and adding comparitive metrics

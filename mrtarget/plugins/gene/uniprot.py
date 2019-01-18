@@ -14,7 +14,7 @@ class Uniprot(IPlugin):
     def print_name(self):
         self._logger.info("Uniprot (and Reactome) gene data plugin")
 
-    def merge_data(self, genes, loader, r_server):
+    def merge_data(self, genes, loader, r_server, data_config):
 
         esquery = ESQuery(loader.es)
         reactome_retriever = ReactomeRetriever(loader.es)

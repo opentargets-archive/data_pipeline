@@ -1,12 +1,4 @@
-#default configuration 
-
-#note: ConfigArgParse doesn't support splitting lists over multiple lines
-#therefore viewing this file with word wrap is recommended!
-
-#general configuration
-log-config: mrtarget/resources/logging.ini
-log-level: INFO
-release-tag: master
+#default data configuration 
 
 #evidence validation
 schema: https://raw.githubusercontent.com/opentargets/json_schema/1.5.0/opentargets.json

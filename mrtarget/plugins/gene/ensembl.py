@@ -15,7 +15,7 @@ class Ensembl(IPlugin):
     def print_name(self):
         self._logger.info("ENSEMBL gene data plugin")
 
-    def merge_data(self, genes, loader, r_server):
+    def merge_data(self, genes, loader, r_server, data_config):
 
         esquery = ESQuery(loader.es)
 

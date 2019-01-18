@@ -16,6 +16,9 @@ ELASTICSEARCH_NODES ?= http://localhost:9200
 
 LOG_PATH ?= $(mkfile_dir)/log
 
+ES_PREFIX ?= master
+
+
 # Allow specification of additional arguments for each stage on the command-line
 # Intended to be empty here and overriden from outside if needed
 MRTARGET_ARGS ?= 

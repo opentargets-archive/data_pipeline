@@ -13,19 +13,14 @@ class ChEMBL(IPlugin):
     def print_name(self):
         self._logger.info("ChEMBL gene data plugin")
 
-    def merge_data(self, genes, loader, r_server):
-
-        #dont use parse_args because that will error
-        #if there are extra arguments e.g. for plugins
-        p = configargparse.get_argument_parser()
-        self.args = p.parse_known_args()[0]
+    def merge_data(self, genes, loader, r_server, data_config):
 
         chembl_handler = ChEMBLLookup(
-            target_uri=self.args.chembl_target, 
-            mechanism_uri=self.args.chembl_mechanism,
-            component_uri=self.args.chembl_component,
-            protein_uri=self.args.chembl_protein,
-            molecule_set_uri_pattern=self.args.chembl_molecule_set_uri_pattern)
+            target_uri=data_config.chembl_target, 
+            mechanism_uri=data_config.chembl_mechanism,
+            component_uri=data_config.chembl_component,
+            protein_uri=data_config.chembl_protein,
+            molecule_set_uri_pattern=data_config.chembl_molecule_set_uri_pattern)
 
         self._logger.info("Retrieving ChEMBL Drug")
         chembl_handler.download_molecules_linked_to_target()

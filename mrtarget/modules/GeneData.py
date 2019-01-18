@@ -441,13 +441,13 @@ class GeneManager():
         self.plugin_order = plugin_order
 
 
-    def merge_all(self, dry_run = False):
+    def merge_all(self, data_config, dry_run = False):
 
         for plugin_name in self.plugin_order:
             plugin = self.simplePluginManager.getPluginByName(plugin_name)
             plugin.plugin_object.print_name()
             plugin.plugin_object.merge_data(genes=self.genes, 
-                loader=self.loader, r_server=self.r_server)
+                loader=self.loader, r_server=self.r_server, data_config=data_config)
 
         self._store_data(dry_run=dry_run)
 

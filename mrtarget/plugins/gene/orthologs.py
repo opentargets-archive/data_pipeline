@@ -13,40 +13,25 @@ class Orthologs(IPlugin):
 
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
-        #handle plugin specific configuration here
-        #helps separate the plugin from the rest of the pipeline
-        #and makes it easier to manage custom plugins
-        p = configargparse.get_argument_parser()
-
-        p.add("--hgnc-orthologs", help="location of hgnc orthologs",
-            env_var="HGNC_ORTHOLOGS", action='store')
-
-        p.add("--hgnc-orthologs-species", help="colon separated code to label",
-            env_var="HGNC_ORTHOLOGS_SPECIES", action='append')
 
 
     def print_name(self):
         self._logger.info("This is plugin ORTHOLOGS")
 
-    def merge_data(self, genes, loader, r_server):
-
-        #dont use parse_args because that will error
-        #if there are extra arguments e.g. for plugins
-        p = configargparse.get_argument_parser()
-        self.args = p.parse_known_args()[0]
+    def merge_data(self, genes, loader, r_server, data_config):
 
         #turn the species id/label mappings into a dict from the argument list
         self.orthologs_species = dict()
-        if self.args.hgnc_orthologs_species:
-            for value in self.args.hgnc_orthologs_species:
+        if data_config.hgnc_orthologs_species:
+            for value in data_config.hgnc_orthologs_species:
                 code,label = value.split("-")
                 label = label.strip()
                 code = code.strip()
                 self.orthologs_species[code] = label
 
-        self._logger.info("Ortholog parsing - requesting from URL %s",self.args.hgnc_orthologs)
+        self._logger.info("Ortholog parsing - requesting from URL %s",data_config.hgnc_orthologs)
 
-        with URLZSource(self.args.hgnc_orthologs).open() as source:
+        with URLZSource(data_config.hgnc_orthologs).open() as source:
             reader = csv.DictReader(source, delimiter="\t")
             for row in reader:
                 if row['human_ensembl_gene'] in genes:
