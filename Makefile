@@ -16,12 +16,6 @@ ELASTICSEARCH_NODES ?= http://localhost:9200
 
 LOG_PATH ?= $(mkfile_dir)/log
 
-QC_PATH ?= $(mkfile_dir)/qc
-QC_FILE ?= $(QC_PATH)/qc.$(ES_PREFIX).tsv
-QC_FILE_OLD ?= $(QC_PATH)/qc.18.08.tsv
-
-SCRIPT_PATH ?= $(mkfile_dir)/scripts
-
 # Allow specification of additional arguments for each stage on the command-line
 # Intended to be empty here and overriden from outside if needed
 MRTARGET_ARGS ?= 
@@ -29,13 +23,7 @@ MRTARGET_ARGS ?=
 # Internal variables
 #command to run mrtarget with various logging
 MRTARGET_ENTRYPOINT ?= $(mkfile_dir)/scripts/entrypoint.sh
-MRTARGET_CMD = $(MRTARGET_ENTRYPOINT) --qc-out=$(QC_FILE) $(MRTARGET_ARGS)
-
-
-INDEX_CMD = python scripts/check_index.py --elasticsearch $(ELASTICSEARCH_NODES) --zero-fail --index
-
-#simple command to ping elasticsearch
-ELASTIC_CHECK_CMD = curl -sSf $(ELASTICSEARCH_NODES) -o /dev/null
+MRTARGET_CMD = $(MRTARGET_ENTRYPOINT)
 
 # First target is run by default if make is run with no arguments, so do something safe
 .PHONY: dry_run
@@ -47,7 +35,6 @@ rea: $(LOG_PATH)/out.$(ES_PREFIX).rea.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).rea.log : 
 	mkdir -p $(LOG_PATH)
-	$(ELASTIC_CHECK_CMD)
 	$(MRTARGET_CMD) --rea $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).rea.log
 
 .PHONY: ens
@@ -55,7 +42,6 @@ ens: $(LOG_PATH)/out.$(ES_PREFIX).ens.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).ens.log : 
 	mkdir -p $(LOG_PATH)
-	$(ELASTIC_CHECK_CMD)
 	$(MRTARGET_CMD) --ens $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).ens.log
 
 .PHONY: unic
@@ -66,7 +52,6 @@ uni: $(LOG_PATH)/out.$(ES_PREFIX).uni.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).uni.log :
 	mkdir -p $(LOG_PATH)
-	$(ELASTIC_CHECK_CMD)
 	$(MRTARGET_CMD) --unic $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).uni.log
 	sleep 60
 
@@ -75,7 +60,6 @@ hpa: $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).hpa.log : 
 	mkdir -p $(LOG_PATH)
-	$(ELASTIC_CHECK_CMD)
 	$(MRTARGET_CMD) --hpa $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
 	sleep 60
 
@@ -84,7 +68,6 @@ efo: $(LOG_PATH)/out.$(ES_PREFIX).efo.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).efo.log : 
 	mkdir -p $(LOG_PATH)
-	$(ELASTIC_CHECK_CMD)
 	$(MRTARGET_CMD) --efo $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).efo.log
 	sleep 60
 
@@ -103,8 +86,6 @@ base_gene: $(LOG_PATH)/out.$(ES_PREFIX).gen.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log
 	mkdir -p $(LOG_PATH)
-	$(ELASTIC_CHECK_CMD)
-	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data
 	$(MRTARGET_CMD) --gen $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).gen.log
 	sleep 60
 
@@ -116,7 +97,6 @@ validate_all : $(LOG_PATH)/out.$(ES_PREFIX).val.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).val.log : $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
 	$(MRTARGET_CMD) $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.log
 	sleep 60
 
@@ -125,7 +105,6 @@ association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_evidence-data $(ES_PREFIX)_expression-data
 	$(MRTARGET_CMD) --as $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).as.log
 
 .PHONY: association_qc
@@ -133,7 +112,6 @@ association_qc: $(LOG_PATH)/out.$(ES_PREFIX).qc.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).qc.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_association-data
 	$(MRTARGET_CMD) --qc $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).qc.log
 
 .PHONY: search_data
@@ -141,7 +119,6 @@ search_data: $(LOG_PATH)/out.$(ES_PREFIX).sea.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).sea.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_association-data
 	$(MRTARGET_CMD) --sea $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).sea.log
 
 .PHONY: relationship_data
@@ -149,7 +126,6 @@ relationship_data: $(LOG_PATH)/out.$(ES_PREFIX).ddr.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).ddr.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_association-data
 	$(MRTARGET_CMD) --ddr $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).ddr.log
 
 .PHONY: metrics
@@ -157,7 +133,6 @@ metrics: $(LOG_PATH)/out.$(ES_PREFIX).metric.log
 
 $(LOG_PATH)/out.$(ES_PREFIX).metric.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
 	mkdir -p $(LOG_PATH)
-	$(INDEX_CMD) $(ES_PREFIX)_association-data
 	$(MRTARGET_CMD) --metric $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).metric.log
 
 .PHONY: all
@@ -174,13 +149,9 @@ list:
 .PHONY: no_targets__ shell
 no_targets__:
 shell:
-	@ES_PREFIX="$(ES_PREFIX)" \
-	    ELASTICSEARCH_NODES="$(ELASTICSEARCH_NODES)" \
-	    LOG_LEVEL="$(LOG_LEVEL)" \
-	    SCHEMA_VERSION="$(SCHEMA_VERSION)" \
-	    NUMBER_TO_KEEP="$(NUMBER_TO_KEEP)" \
-	    MRTARGET_CMD="$(MRTARGET_CMD)" \
-	    bash
+	@ELASTICSEARCH_NODES="$(ELASTICSEARCH_NODES)" \
+	MRTARGET_CMD="$(MRTARGET_CMD)" \
+	bash
 
 .PHONY: list_indices
 list_indices:
@@ -194,9 +165,5 @@ clean_indices:
 clean_logs:
 	@rm -f $(LOG_PATH)/*.log
 
-.PHONY: clean_qc
-clean_qc:
-	@rm -f $(QC_PATH)/*.tsv
-
 .PHONY: clean
-clean: clean_logs clean_qc clean_indices
+clean: clean_logs clean_indices
