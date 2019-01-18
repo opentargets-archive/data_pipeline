@@ -356,269 +356,157 @@ class RedisQueue(object):
 
 
 
-def get_redis_worker(base = Process):
+class RedisQueueWorkerProcess(Process):
     '''
-    Factory for returning workers
-    :param base: either a multiprocessing.Process or threading.Thread base class. might work with other base classes with duck typing
-    :return: worker class subclassing the base class
+    Base class for workers attached to the RedisQueue class that runs in a separate process
+    it requires a queue in object to get data from, and a redis connection path.
+    if a queue out is specified it will push the output to that queue.
+    the implemented classes needs to add an implementation of the 'process' method, that either store the output or
+    returns it to be stored in a queue out
     '''
-
-    class RedisQueueWorkerBase(base):
-        '''
-        Base class for workers attached to the RedisQueue class that runs in a separate process
-        it requires a queue in object to get data from, and a redis connection path.
-        if a queue out is specified it will push the output to that queue.
-        the implemented classes needs to add an implementation of the 'process' method, that either store the output or
-        returns it to be stored in a queue out
-        '''
-        def __init__(self,
-                     queue_in,
-                     redis_path,
-                     queue_out=None,
-                     auto_signal_submission_finished=True,
-                     ignore_errors =[],
-                     **kwargs
-                     ):
-
-
-            super(RedisQueueWorkerBase, self).__init__(**kwargs)
-            self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
-            self.queue_out = queue_out
-            self.redis_path = redis_path
-            self.auto_signal = auto_signal_submission_finished
-            self.queue_in_as_batch = queue_in.batch_size >1
-            if self.queue_out:
-                self.queue_out_batch_size = queue_out.batch_size
-            self.logger = logging.getLogger(__name__)
-            self.logger.info('%s started' % self.name)
-            self.job_result_cache = []
-            self.kill_switch = False
-            self.ignore_errors = ignore_errors
-
-        def _inner_run(self):
-            # here we are inside the new process
-            self._init()
-
-            while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
-                job = self.queue_in.get(r_server=self.r_server, timeout=1)
-
-                if job is not None:
-                    key, data = job
-                    error = False
-                    signal.alarm(self.queue_in.job_timeout)
-                    try:
-                        if self.queue_in_as_batch:
-                            job_results = [self.process(d) for d in data]
-                        else:
-                            job_results = self.process(data)
-                        if self.queue_out is not None and job_results is not None:
-                            self.put_into_queue_out(job_results, aggregated_input = self.queue_in_as_batch)
-                    except TimeoutException as e:
-                        error = True
-                        self.logger.exception('Timed out processing job %s: %s' % (key, e.message))
-                    except Exception as e:
-                        error = True
-                        for ignored_error in self.ignore_errors:
-                            if isinstance(e, ignored_error):
-                                error = False
-                        if error:
-                            self.logger.exception('Error processing job %s: %s' % (key, e.message))
-                        else:
-                            self.logger.debug('Error processing job %s: %s' % (key, e.message))
-                    else:
-                        signal.alarm(0)
-
-                    self.queue_in.done(key, error=error, r_server=self.r_server)
-                else:
-                    # self.logger.info('nothing to do in '+self.name)
-                    time.sleep(.01)
-
-            if self.job_result_cache:
-                self._clear_job_results_cache()
-
-            self.logger.info('%s done processing' % self.name)
-            if (self.queue_out is not None) and self.auto_signal:
-                self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
-
-            # closing everything properly before exiting the spawned process/thread
-            self._close()
-
-        def _outer_run(self):
-            cur_file_token = current_process().name
-
-            if _redis_queue_worker_base['profiling']:
-                print str(_redis_queue_worker_base)
-                cProfile.runctx('self._inner_run()',
-                                globals(), locals(),
-                                '/tmp/prof_%s.prof' % cur_file_token)
-            else:
-                self._inner_run()
-
-        def run(self):
-            self._outer_run()
-
-        def _split_iterable(self, item_list, size):
-                for i in range(0, len(item_list), size):
-                    yield item_list[i:i + size]
-
-        def put_into_queue_out(self, result, aggregated_input = False ):
-            if result is not None:
-                if self.queue_out_batch_size > 1:
-                    if aggregated_input:
-                        not_none_results = [r for r in result if r is not None]
-                        for batch in self._split_iterable(not_none_results, self.queue_out_batch_size):
-                            self.queue_out.put(batch, self.r_server)
-                    else:
-                        self.job_result_cache.append(result)
-                        if len(self.job_result_cache) >= self.queue_out_batch_size:
-                            self._clear_job_results_cache()
-                else:
-                    if aggregated_input:
-                        for r in result:
-                            self.queue_out.put(r, self.r_server)
-                    else:
-                        self.queue_out.put(result, self.r_server)
-
-        def _clear_job_results_cache(self):
-            self.queue_out.put(self.job_result_cache, self.r_server)
-            self.job_result_cache = []
-
-        def init(self):
-            pass
-
-        def close(self):
-            '''
-            implement in subclass to clean up loaders and other trailing elements when the processer is done if needed
-            :return:
-            '''
-            pass
-
-        def process(self, data):
-            raise NotImplementedError('please add an implementation to process the data')
-
-        def _init(self):
-            self.r_server = new_redis_client()
-            # TODO move 1000 to a conf
-            self.lru_cache = lru.lrucache(10000)
-            self.init()
-
-        def _close(self):
-            self.close()
-            self.lru_cache.clear()
-
-        def __enter__(self):
-            pass
-
-        def __exit__(self, *args):
-            pass
-
-        def get_r_server(self):
-            return self.r_server
-
-    return RedisQueueWorkerBase
-
-
-RedisQueueWorkerProcess = get_redis_worker()
-RedisQueueWorkerThread = get_redis_worker(base=Thread)
-
-
-class WhiteCollarWorker(Thread):
-    '''
-    spawns and monitors a set of workers
-    '''
-
     def __init__(self,
-                 target,
-                 pool_size,
-                 queue_in,
-                 redis_path,
-                 queue_out=None,
-                 args=[],
-                 kwargs={},
-                 max_restart=3,
-                 max_memory_level = 80):
-        super(WhiteCollarWorker, self).__init__()
-        self.daemon = True
-        self.target = target
-        self.workers_instances = {}
-        self.pool_size = pool_size
-        self.queue_in = queue_in
+                    queue_in,
+                    redis_path,
+                    queue_out=None,
+                    auto_signal_submission_finished=True,
+                    ignore_errors =[],
+                    **kwargs
+                    ):
+
+
+        super(RedisQueueWorkerProcess, self).__init__(**kwargs)
+        self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
         self.queue_out = queue_out
         self.redis_path = redis_path
-        self.args = args
-        self.kwargs = kwargs
-        self.max_restarts=max_restart
-        self.restart_log = Counter()
+        self.auto_signal = auto_signal_submission_finished
+        self.queue_in_as_batch = queue_in.batch_size >1
+        if self.queue_out:
+            self.queue_out_batch_size = queue_out.batch_size
         self.logger = logging.getLogger(__name__)
-        self.MAX_MEMORY_LEVEL = max_memory_level
+        self.logger.info('%s started' % self.name)
+        self.job_result_cache = []
+        self.kill_switch = False
+        self.ignore_errors = ignore_errors
 
+    def _inner_run(self):
+        # here we are inside the new process
+        self._init()
 
+        while not self.queue_in.is_done(r_server=self.r_server) and not self.kill_switch:
+            job = self.queue_in.get(r_server=self.r_server, timeout=1)
+
+            if job is not None:
+                key, data = job
+                error = False
+                signal.alarm(self.queue_in.job_timeout)
+                try:
+                    if self.queue_in_as_batch:
+                        job_results = [self.process(d) for d in data]
+                    else:
+                        job_results = self.process(data)
+                    if self.queue_out is not None and job_results is not None:
+                        self.put_into_queue_out(job_results, aggregated_input = self.queue_in_as_batch)
+                except TimeoutException as e:
+                    error = True
+                    self.logger.exception('Timed out processing job %s: %s' % (key, e.message))
+                except Exception as e:
+                    error = True
+                    for ignored_error in self.ignore_errors:
+                        if isinstance(e, ignored_error):
+                            error = False
+                    if error:
+                        self.logger.exception('Error processing job %s: %s' % (key, e.message))
+                    else:
+                        self.logger.debug('Error processing job %s: %s' % (key, e.message))
+                else:
+                    signal.alarm(0)
+
+                self.queue_in.done(key, error=error, r_server=self.r_server)
+            else:
+                # self.logger.info('nothing to do in '+self.name)
+                time.sleep(.01)
+
+        if self.job_result_cache:
+            self._clear_job_results_cache()
+
+        self.logger.info('%s done processing' % self.name)
+        if (self.queue_out is not None) and self.auto_signal:
+            self.queue_out.set_submission_finished(self.r_server)# todo: check for problems with concurrency. it might be signalled as finished even if other workers are still processing
+
+        # closing everything properly before exiting the spawned process/thread
+        self._close()
+
+    def _outer_run(self):
+        cur_file_token = current_process().name
+
+        if _redis_queue_worker_base['profiling']:
+            print str(_redis_queue_worker_base)
+            cProfile.runctx('self._inner_run()',
+                            globals(), locals(),
+                            '/tmp/prof_%s.prof' % cur_file_token)
+        else:
+            self._inner_run()
 
     def run(self):
+        self._outer_run()
+
+    def _split_iterable(self, item_list, size):
+            for i in range(0, len(item_list), size):
+                yield item_list[i:i + size]
+
+    def put_into_queue_out(self, result, aggregated_input = False ):
+        if result is not None:
+            if self.queue_out_batch_size > 1:
+                if aggregated_input:
+                    not_none_results = [r for r in result if r is not None]
+                    for batch in self._split_iterable(not_none_results, self.queue_out_batch_size):
+                        self.queue_out.put(batch, self.r_server)
+                else:
+                    self.job_result_cache.append(result)
+                    if len(self.job_result_cache) >= self.queue_out_batch_size:
+                        self._clear_job_results_cache()
+            else:
+                if aggregated_input:
+                    for r in result:
+                        self.queue_out.put(r, self.r_server)
+                else:
+                    self.queue_out.put(result, self.r_server)
+
+    def _clear_job_results_cache(self):
+        self.queue_out.put(self.job_result_cache, self.r_server)
+        self.job_result_cache = []
+
+    def init(self):
+        pass
+
+    def close(self):
         '''
-        starts the pool of workers, monitor the registered instances, tries to restart them if needed,
-        and wait for all the workers to be finished before returning
+        implement in subclass to clean up loaders and other trailing elements when the processer is done if needed
         :return:
         '''
+        pass
 
-        #TODO: create just one
-        for i in range(self.pool_size):
-            worker = self.target(self.queue_in,
-                                 self.redis_path,
-                                 self.queue_out,
-                                 *self.args,
-                                 **self.kwargs)
-            self.start_worker(worker,i)
+    def process(self, data):
+        raise NotImplementedError('please add an implementation to process the data')
 
+    def _init(self):
+        self.r_server = new_redis_client()
+        # TODO move 1000 to a conf
+        self.lru_cache = lru.lrucache(10000)
+        self.init()
 
-        #TODO: check queue and scale up workers if needed
-        while self.workers_instances:
-            for n, p in self.workers_instances.items():
-                if p is not None:
-                    if  p.is_alive():
-                        continue #worker still running
-                    else:
-                        if p.exitcode is None:
-                            self.logger.error('%s is not finished and not running as if it was never started' % p.name)
-                        elif p.exitcode != 0: #worker exted with error
-                            self.logger.error('Worker %s ended with an error or terminated. exitcode: %s' % (p.name, str(p.exitcode)))
-                            if self.restart_log[n] < self.max_restarts:
-                                self.logger.info('Restarting failed worker instance number %i' % n)
-                                worker= self.target(self.queue_in,
-                                                    self.redis_path,
-                                                    self.queue_out,
-                                                    *self.args,
-                                                    **self.kwargs)
-                                self.start_worker(worker, n)
-                                self.restart_log[n] += 1
-                            else:
-                                self.logger.error('Gave up on restarting worker instance number %i' % n)
-                                del self.workers_instances[n]
-                        elif p.exitcode == 0:  #worker completed fine
-                            del self.workers_instances[n]
-            time.sleep(0.2)
+    def _close(self):
+        self.close()
+        self.lru_cache.clear()
 
-    def kill_all(self):
-        '''
-        send a kill signal to all the workers nicely
+    def __enter__(self):
+        pass
 
-        :return:
-        '''
-        for _, p in self.workers_instances.items():
-            self.logger.debug('setting kill switch on for worker %s', p.name)
-            p.kill_switch = True
+    def __exit__(self, *args):
+        pass
 
-    def start_worker(self, worker, i):
-        memory_load = psutil.virtual_memory().percent
-        if memory_load < self.MAX_MEMORY_LEVEL:
-            self.logger.debug('Spawning a new worker of type: %s, index %i. Memory level: %s' % (self.target, i, str(memory_load)))
-            worker.start()
-            time.sleep(0.2)#or worker.join(1)
-            self.workers_instances[i] = worker
-        else:
-            worker.terminate()
-            self.logger.warning('Not enough memory to spawn a new worker of type: %s, index %i' % (self.target, i))
-            self.workers_instances[i] = None
+    def get_r_server(self):
+        return self.r_server
 
 class RedisLookupTable(object):
     '''
