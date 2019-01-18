@@ -21,16 +21,12 @@ def setup_parser():
         env_var="CONFIG", help='path to config file (YAML)')
 
     # logging
-    p.add("--log-level", help="set the log level",
-        env_var="LOG_LEVEL", action='store', default='INFO')
     p.add("--log-config", help="logging configuration file",
         env_var="LOG_CONFIG", action='store', default='mrtarget/resources/logging.ini')
-    #TODO remove this as it can be captured inside a custom log config instead
-    p.add("--log-http", help="log HTTP(S) requests in this file",
-        env_var="LOG_HTTP", action='store')
 
     # take the release tag from the command line, but fall back to environment or ini files
-    p.add('release_tag', nargs='?')
+    p.add('--release-tag', help="identifier for data storage for this release",
+        env_var="ES_PREFIX", action='store')
 
     # handle stage-specific QC
     p.add("--qc-out", help="TSV file to write/update qc information")
@@ -162,7 +158,7 @@ def setup_parser():
     #uniprot
     # to generate this file you have to call
     # https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml
-    p.add("--uniprot_uri", help="location of uniprot file",
+    p.add("--uniprot-uri", help="location of uniprot file",
         env_var="UNIPROT_URI", action='store')
 
     #ensembl

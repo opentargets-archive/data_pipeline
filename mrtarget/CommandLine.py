@@ -30,38 +30,27 @@ from mrtarget.Settings import Config, file_or_resource
 import mrtarget.cfg
 
 def main():
-
     #parse config file, environment, and command line arguments
     mrtarget.cfg.setup_parser()
     args = mrtarget.cfg.get_args()
-
 
     #set up logging
     logger = None
     if args.log_config:
         if os.path.isfile(args.log_config) and os.access(args.log_config, os.R_OK):
+            #read a log configuration file
             logging.config.fileConfig(args.log_config,  disable_existing_loggers=False)
             logger = logging.getLogger(__name__+".main()")
         else:
+            #unable to read the logging config file, abort
             logging.basicConfig()
             logger = logging.getLogger(__name__+".main()")
-            logger.warning("unable to read file {}".format(args.log_config))
-
+            logger.error("unable to read file {}".format(args.log_config))
+            return 1
     else:
+        #no logging config specified, fall back to default
         logging.basicConfig()
         logger = logging.getLogger(__name__+".main()")
-
-
-    if args.log_level:
-        try:
-            root_logger = logging.getLogger()
-            root_logger.setLevel(logging.getLevelName(args.log_level))
-            logger.setLevel(logging.getLevelName(args.log_level))
-            logger.info('main log level set to: '+ str(args.log_level))
-            root_logger.info('root log level set to: '+ str(args.log_level))
-        except Exception, e:
-            root_logger.exception(e)
-            return 1
 
 
     if not args.release_tag:
@@ -70,33 +59,18 @@ def main():
         return 1
     else:
         Config.RELEASE_VERSION = args.release_tag
-
-    targets = args.targets
+        logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
     enable_profiling(args.profile)
 
     connectors = PipelineConnectors()
-
-    if args.log_http:
-        logger.info("Will log all HTTP requests to %s" % args.log_http)
-        requests_log = logging.getLogger("urllib3")
-        requests_log.setLevel(logging.DEBUG)
-        requests_log.propagate = False  # Change to True to log to main log as well
-        #ensure the directory for the log file exists
-        logdir = os.path.dirname(os.path.abspath(args.log_http))
-        if not os.path.isdir(logdir):
-            logger.debug("log directory %s does not exist, creating", logdir)
-            os.makedirs(logdir)
-        requests_log.addHandler(logging.FileHandler(args.log_http))
-
-
     connected = connectors.init_services_connections(es_hosts=args.elasticseach_nodes,
         redispersist=args.redis_remote)
 
-    logger.debug('Attempting to establish connection to the backend... %s',
-                 str(connected))
+    if not connected:
+        logger.error("Unable to connect to services")
+        return 1
 
-    logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
     #create a single query object for future use
     esquery = ESQuery(connectors.es)
@@ -172,18 +146,18 @@ def main():
                 es_output_folder = args.elasticsearch_folder
 
             process_evidences_pipeline(filenames=args.input_file,
-                                       first_n=args.val_first_n,
-                                       es_client=connectors.es,
-                                       redis_client=connectors.r_server,
-                                       dry_run=args.dry_run,
-                                       enable_output_to_es=es_output,
-                                       output_folder=es_output_folder,
-                                       num_workers=num_workers,
-                                       num_writers=num_writers,
-                                       max_queued_events=args.max_queued_events,
-                                       eco_scores_uri=args.eco_scores,
-                                       schema_uri = args.schema,
-                                       es_hosts=args.elasticseach_nodes)
+                first_n=args.val_first_n,
+                es_client=connectors.es,
+                redis_client=connectors.r_server,
+                dry_run=args.dry_run,
+                enable_output_to_es=es_output,
+                output_folder=es_output_folder,
+                num_workers=num_workers,
+                num_writers=num_writers,
+                max_queued_events=args.max_queued_events,
+                eco_scores_uri=args.eco_scores,
+                schema_uri = args.schema,
+                es_hosts=args.elasticseach_nodes)
 
 
             #TODO qc
@@ -191,7 +165,8 @@ def main():
         if args.assoc:
             process = ScoringProcess(loader, connectors.r_server)
             if not args.qc_only:
-                process.process_all(targets = targets, dry_run=args.dry_run)
+                process.process_all(targets = args.targets, 
+                    dry_run=args.dry_run)
             if not args.skip_qc:
                 #qc_metrics.update(process.qc(esquery))
                 pass

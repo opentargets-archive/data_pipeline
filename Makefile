@@ -1,7 +1,6 @@
 # Makefile for Open Targets data pipeline
-# Based on steps in https://github.com/opentargets/data_release/wiki/OT011-Data-Processing-(Backend)
 
-#ensure pipes behave correctly
+#ensure pipes behave correctly in called processes
 SHELL = /bin/bash
 .SHELLFLAGS = -o pipefail -c
 
@@ -13,16 +12,9 @@ mkfile_dir := $(dir $(mkfile_path))
 # These variables can be overridden on the command-line. 
 # Note that if any of these are already specified by environment variables, 
 # the existing variables will take precedence
-ES_PREFIX ?= test
 ELASTICSEARCH_NODES ?= http://localhost:9200
-LOG_LEVEL ?= DEBUG
-SCHEMA_VERSION ?= master
-NUMBER_TO_KEEP ?= 1000
 
 LOG_PATH ?= $(mkfile_dir)/log
-LOG_HTTP ?= $(LOG_PATH)/http.log
-
-JSON_PATH ?= $(mkfile_dir)/json
 
 QC_PATH ?= $(mkfile_dir)/qc
 QC_FILE ?= $(QC_PATH)/qc.$(ES_PREFIX).tsv
@@ -37,7 +29,7 @@ MRTARGET_ARGS ?=
 # Internal variables
 #command to run mrtarget with various logging
 MRTARGET_ENTRYPOINT ?= $(mkfile_dir)/scripts/entrypoint.sh
-MRTARGET_CMD = $(MRTARGET_ENTRYPOINT) --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
+MRTARGET_CMD = $(MRTARGET_ENTRYPOINT) --qc-out=$(QC_FILE) $(MRTARGET_ARGS)
 
 
 INDEX_CMD = python scripts/check_index.py --elasticsearch $(ELASTICSEARCH_NODES) --zero-fail --index
@@ -46,7 +38,6 @@ INDEX_CMD = python scripts/check_index.py --elasticsearch $(ELASTICSEARCH_NODES)
 ELASTIC_CHECK_CMD = curl -sSf $(ELASTICSEARCH_NODES) -o /dev/null
 
 # First target is run by default if make is run with no arguments, so do something safe
-
 .PHONY: dry_run
 dry_run:
 	$(MRTARGET_CMD) --dry-run $(ES_PREFIX)
@@ -73,13 +64,6 @@ unic: uni
 .PHONY: uni
 uni: $(LOG_PATH)/out.$(ES_PREFIX).uni.log
 
-#handle uniprot download and local file cache
-#not quite implemented yet, so were mostly ahead of the game wit this
-$(JSON_PATH)/uniprot.xml.gz:
-	mkdir -p $(JSON_PATH)
-	curl --silent --output $(JSON_PATH)/uniprot.xml.gz "https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml"
-
-#$(LOG_PATH)/out.$(ES_PREFIX).uni.log :  $(JSON_PATH)/uniprot.xml.gz
 $(LOG_PATH)/out.$(ES_PREFIX).uni.log :
 	mkdir -p $(LOG_PATH)
 	$(ELASTIC_CHECK_CMD)
@@ -125,93 +109,15 @@ $(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LO
 	sleep 60
 
 .PHONY: base
-base: base_gene efo eco
-
-$(JSON_PATH)/atlas.json.gz:
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/atlas-2018-11-20.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/atlas.json.gz
-
-$(JSON_PATH)/chembl.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/chembl-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/chembl.json.gz
-
-$(JSON_PATH)/cosmic.json.gz :
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/cosmic-27-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/cosmic.json.gz
-
-$(JSON_PATH)/europepmc.json.gz :
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/europepmc-29-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/europepmc.json.gz
-
-$(JSON_PATH)/eva.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/eva-01-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/eva.json.gz
-
-$(JSON_PATH)/gene2phenotype.json.gz :
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/gene2phenotype-29-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gene2phenotype.json.gz
-
-$(JSON_PATH)/genomics_england.json.gz :
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/genomics_england-02-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/genomics_england.json.gz
-
-$(JSON_PATH)/gwas.json.gz :
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/gwas-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gwas.json.gz
-
-$(JSON_PATH)/intogen.json.gz :
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/intogen-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/intogen.json.gz
-
-$(JSON_PATH)/phenodigm.json.gz:
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phenodigm-12-10-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phenodigm.json.gz
-
-$(JSON_PATH)/phewas_catalog.json.gz:
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
-
-$(JSON_PATH)/progeny.json.gz:
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/progeny-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/progeny.json.gz
-
-$(JSON_PATH)/reactome.json.gz:
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/reactome-03-09-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/reactome.json.gz
-
-$(JSON_PATH)/slapenrich.json.gz:
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/slapenrich-29-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/slapenrich.json.gz
-
-$(JSON_PATH)/sysbio.json.gz:
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/sysbio-28-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/sysbio.json.gz
-
-$(JSON_PATH)/uniprot.json.gz:
-	mkdir -p $(JSON_PATH)
-	curl --silent https://storage.googleapis.com/ot-releases/18.12/evidences/uniprot-15-11-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/uniprot.json.gz
+base: base_gene efo eco hpa
 
 .PHONY: validate_all
 validate_all : $(LOG_PATH)/out.$(ES_PREFIX).val.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.log : $(JSON_PATH)/atlas.json.gz $(JSON_PATH)/chembl.json.gz $(JSON_PATH)/cosmic.json.gz $(JSON_PATH)/europepmc.json.gz $(JSON_PATH)/eva.json.gz $(JSON_PATH)/gene2phenotype.json.gz $(JSON_PATH)/genomics_england.json.gz $(JSON_PATH)/gwas.json.gz $(JSON_PATH)/intogen.json.gz $(JSON_PATH)/phenodigm.json.gz $(JSON_PATH)/phewas_catalog.json.gz $(JSON_PATH)/progeny.json.gz $(JSON_PATH)/reactome.json.gz $(JSON_PATH)/slapenrich.json.gz $(JSON_PATH)/uniprot.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
+$(LOG_PATH)/out.$(ES_PREFIX).val.log : $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
 	mkdir -p $(LOG_PATH)
 	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data 
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val \
-		--input-file $(JSON_PATH)/atlas.json.gz \
-		--input-file $(JSON_PATH)/chembl.json.gz \
-		--input-file $(JSON_PATH)/cosmic.json.gz \
-		--input-file $(JSON_PATH)/europepmc.json.gz \
-		--input-file $(JSON_PATH)/eva.json.gz \
-		--input-file $(JSON_PATH)/gene2phenotype.json.gz \
-		--input-file $(JSON_PATH)/genomics_england.json.gz \
-		--input-file $(JSON_PATH)/gwas.json.gz \
-		--input-file $(JSON_PATH)/intogen.json.gz \
-		--input-file $(JSON_PATH)/phenodigm.json.gz \
-		--input-file $(JSON_PATH)/phewas_catalog.json.gz \
-		--input-file $(JSON_PATH)/progeny.json.gz \
-		--input-file $(JSON_PATH)/reactome.json.gz \
-		--input-file $(JSON_PATH)/slapenrich.json.gz \
-		--input-file $(JSON_PATH)/uniprot.json.gz \
-		$(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.log
+	$(MRTARGET_CMD) $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.log
 	sleep 60
 
 .PHONY: association_scores
@@ -288,13 +194,9 @@ clean_indices:
 clean_logs:
 	@rm -f $(LOG_PATH)/*.log
 
-.PHONY: clean_json
-clean_json:
-	@rm -f $(JSON_PATH)/*.json.gz
-
 .PHONY: clean_qc
 clean_qc:
 	@rm -f $(QC_PATH)/*.tsv
 
 .PHONY: clean
-clean: clean_logs clean_json clean_qc clean_indices
+clean: clean_logs clean_qc clean_indices
