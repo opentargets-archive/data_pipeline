@@ -479,7 +479,7 @@ def write_on_start():
     return kwargs
 
 def write_on_done(status, resources):
-    resources['es_loader'].flush_all_and_wait()
+    resources['es_loader'].flush_all_and_wait(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
     resources['es_loader'].close()
 
 def write_to_elastic(data, resources):
