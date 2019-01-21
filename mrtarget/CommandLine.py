@@ -116,7 +116,7 @@ def main():
 
         if args.gen:
             process = GeneManager(loader, connectors.r_server,
-                args.gene_data_plugin_places, args.gene_data_plugin_names,
+                args.gen_plugin_places, data_config.gene_data_plugin_names,
                 )
             if not args.qc_only:
                 process.merge_all(data_config, dry_run=args.dry_run)
@@ -138,10 +138,7 @@ def main():
             if not args.skip_qc:
                 qc_metrics.update(process.qc(esquery))
 
-        if args.val:
-            num_workers = Config.WORKERS_NUMBER
-            num_writers = max(1, min(16, Config.WORKERS_NUMBER))
-            
+        if args.val:            
             es_output = True
             es_output_folder = None
             if "elasticsearch_folder" in vars(args) and args.elasticsearch_folder is not None:
@@ -155,13 +152,13 @@ def main():
                 dry_run=args.dry_run,
                 enable_output_to_es=es_output,
                 output_folder=es_output_folder,
-                num_workers=num_workers,
-                num_writers=num_writers,
+                num_workers=args.val_workers_validator,
+                num_writers=args.val_workers_writer,
                 max_queued_events=args.max_queued_events,
                 eco_scores_uri=data_config.eco_scores,
                 schema_uri = data_config.schema,
-                es_hosts=args.elasticseach_nodes)
-
+                es_hosts=args.elasticseach_nodes,
+                excluded_biotypes = data_config.excluded_biotypes)
 
             #TODO qc
 

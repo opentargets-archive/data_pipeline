@@ -12,7 +12,6 @@ reactome-pathway-relation: https://storage.googleapis.com/open-targets-data-rele
 uniprot-uri: https://storage.googleapis.com/ot-releases/18.12/annotations/uniprot-20181130.xml.gz
 
 #gene plugins
-gene-data-plugin-places: [mrtarget/plugins/gene]
 gene-data-plugin-names: [HGNC,Orthologs,Ensembl,Uniprot,ChEMBL,MousePhenotypes,Hallmarks,CancerBiomarkers,ChemicalProbes,Tractability]
 
 #hgnc gene plugin
@@ -80,3 +79,24 @@ chembl-molecule-set-uri-pattern: https://www.ebi.ac.uk/chembl/api/data/molecule/
 #TODO move this to GCP https://github.com/opentargets/platform/issues/391
 eco-scores: https://raw.githubusercontent.com/opentargets/data_pipeline/master/mrtarget/resources/eco_scores.tsv
 
+#target biotypes to exclude per data source
+excluded-biotypes:
+  expression_atlas:
+    - IG_C_pseudogene
+    - IG_J_pseudogene
+    - IG_pseudogene
+    - IG_V_pseudogene
+    - polymorphic_pseudogene
+    - processed_pseudogene
+    - pseudogene
+    - rRNA
+    - rRNA_pseudogene
+    - snoRNA
+    - snRNA
+    - transcribed_processed_pseudogene
+    - transcribed_unitary_pseudogene
+    - transcribed_unprocessed_pseudogene
+    - TR_J_pseudogene
+    - TR_V_pseudogene
+    - unitary_pseudogene
+    - unprocessed_pseudogene

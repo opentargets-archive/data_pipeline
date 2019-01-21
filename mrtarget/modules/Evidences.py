@@ -66,7 +66,7 @@ def process_evidence(line, process_context):
     return left, right
 
 
-def process_evidence_on_start(luts, eco_scores_uri, schema_uri):
+def process_evidence_on_start(luts, eco_scores_uri, schema_uri, excluded_biotypes):
     """this function is called once per started process and return a ProcessContext per process."""
     pc = ProcessContext()
     pc.logger.debug("called validate_evidence on_start from %s", str(os.getpid()))
@@ -77,7 +77,7 @@ def process_evidence_on_start(luts, eco_scores_uri, schema_uri):
     pc.kwargs.luts = luts
     pc.kwargs.redis_c = new_redis_client()
     pc.kwargs.luts.set_r_server(pc.kwargs.redis_c)
-    pc.kwargs.evidence_manager = EvidenceManager(pc.kwargs.luts, eco_scores_uri)
+    pc.kwargs.evidence_manager = EvidenceManager(pc.kwargs.luts, eco_scores_uri, excluded_biotypes)
     return pc
 
 
@@ -297,7 +297,7 @@ def write_evidences(x, process_context):
 def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
                                dry_run, enable_output_to_es, output_folder,
                                num_workers, num_writers, max_queued_events, 
-                               eco_scores_uri, schema_uri, es_hosts):
+                               eco_scores_uri, schema_uri, es_hosts, excluded_biotypes):
     logger = logging.getLogger(__name__)
 
     if not filenames:
@@ -323,7 +323,7 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     evs = IO.make_iter_lines(checked_filenames, first_n)
 
     #create functions with pre-baked arguments
-    validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data, eco_scores_uri, schema_uri)
+    validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data, eco_scores_uri, schema_uri, excluded_biotypes)
     write_evidences_on_start_f = functools.partial(create_process_context, enable_output_to_es, output_folder, es_hosts, dry_run)
 
     #perform any single-thread setup

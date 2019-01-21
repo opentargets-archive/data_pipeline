@@ -54,8 +54,12 @@ def setup_ops_parser():
     #note this is the number of workers for each parallel operation
     #if there are multiple parallel operations happening at once, then 
     #this could be many more than that
-    p.add("--num-workers", help="num worker processess for a parallel operation",
-        env_var="NUM_WORKERS", action='store', default=4, type=int)
+
+    p.add("--val-workers-validator", help="# or procs for validation workers",
+        env_var="VAL_WORKDERS_VALIDATOR", action='store', default=4, type=int)
+    p.add("--val-workers-writers", help="# or procs for validation writers",
+        env_var="VAL_WORKDERS_WRITER", action='store', default=4, type=int)
+
     p.add("--max-queued-events", help="max number of events to put per queue",
         env_var="MAX_QUEUED_EVENTS", action='store', default=10000, type=int)
 
@@ -80,6 +84,10 @@ def setup_ops_parser():
     # use the sources to combine the gene information into a single new index
     p.add("--gen", help="merge the available gene information, store in elasticsearch",
         action="store_true")
+    #paths to plugins to ensure discoverability
+    p.add("--gen-plugin-places", help="paths to check for gene plugins",
+        action='append')
+
 
     # load various ontologies into various indexes
     p.add("--efo", help="process Experimental Factor Ontology (EFO), store in elasticsearch",

@@ -130,7 +130,7 @@ class ExtendedInfoECO(ExtendedInfo):
 
 
 class EvidenceManager():
-    def __init__(self, lookup_data, eco_scores_uri):
+    def __init__(self, lookup_data, eco_scores_uri, excluded_biotypes):
         self.logger = logging.getLogger(__name__)
         self.available_genes = lookup_data.available_genes
         self.available_efos = lookup_data.available_efos
@@ -140,6 +140,8 @@ class EvidenceManager():
         self._get_eco_scoring_values(self.available_ecos, eco_scores_uri)
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
+
+        self.excluded_biotypes = excluded_biotypes
 
         self._get_score_modifiers()
 
@@ -295,9 +297,9 @@ class EvidenceManager():
 
     def is_excluded_by_biotype(self, datasource, gene_id):
         is_excluded = False
-        if datasource in Config.EXCLUDED_BIOTYPES_BY_DATASOURCE:
+        if datasource in self.excluded_biotypes:
             gene_obj = self.available_genes[gene_id]
-            if gene_obj['biotype'] in Config.EXCLUDED_BIOTYPES_BY_DATASOURCE[datasource]:
+            if gene_obj['biotype'] in self.excluded_biotypes[datasource]:
                 is_excluded = True
 
         return is_excluded

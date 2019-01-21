@@ -6,3 +6,8 @@
 
 log-config: mrtarget/resources/logging.ini
 release-tag: master
+
+gen-plugin-places: [mrtarget/plugins/gene]
+
+val-workers-validator: 16
+val-workers-writer: 8

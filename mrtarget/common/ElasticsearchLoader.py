@@ -28,8 +28,8 @@ class Loader():
 
         self.logger = logging.getLogger(__name__)
 
-        if es is None and not dry_run:
-            raise ValueError("Must specify elasticsearch on a non-dry-run")
+        #if es is None and not dry_run:
+            #raise ValueError("Must specify elasticsearch on a non-dry-run")
 
         self.es = es
         self.cache = []
