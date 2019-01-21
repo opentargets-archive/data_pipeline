@@ -3,8 +3,8 @@ import logging
 import re
 import csv
 import ujson as json
-import functools as ft
-import itertools as it
+import itertools
+import functools
 import operator as oper
 
 import pypeln.process as pr
@@ -185,10 +185,10 @@ def format_expression_with_rna(rec):
         new_tissues = []
         has_tissues = len(exp.tissues) > 0
 
-        t_set = ft.reduce(lambda x, y: x.union(set([y['efo_code']])),
+        t_set = functools.reduce(lambda x, y: x.union(set([y['efo_code']])),
                           exp.tissues, set()) \
                     if has_tissues else set()
-        nt_set = ft.reduce(lambda x, y: x.union(set([y[0]])),
+        nt_set = functools.reduce(lambda x, y: x.union(set([y[0]])),
                           rec['data'], set())
 
         intersection = t_set.intersection(nt_set)
@@ -294,19 +294,19 @@ def hpa2tissues(hpa=None):
     def _split_tissue(k, v):
         rna_level = v['rna']['level'] if v['rna'] else -1
         '''from tissue dict to rna and protein dicts pair'''
-        rna = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+        rna = list(itertools.imap(lambda e: {'id': '_'.join([str(e), k]),
                                       'level': e} if v['rna'] else {},
                            xrange(0, rna_level + 1) if rna_level >= 0 else xrange(-1, 0)))
 
         zscore_level = v['rna']['zscore'] if v['rna'] else -1
         '''from tissue dict to rna and protein dicts pair'''
-        zscore = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+        zscore = list(itertools.imap(lambda e: {'id': '_'.join([str(e), k]),
                                       'level': e} if v['rna'] else {},
                            xrange(0, zscore_level + 1) if zscore_level >= 0 else xrange(-1, 0)))
 
 
         pro_level = v['protein']['level'] if v['protein'] else -1
-        protein = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+        protein = list(itertools.imap(lambda e: {'id': '_'.join([str(e), k]),
                                           'level': e} if v['protein'] else {},
                                xrange(0, pro_level + 1) if pro_level >= 0 else xrange(-1, 0)))
 
@@ -478,7 +478,7 @@ def write_on_start():
 
     return kwargs
 
-def write_on_done(resources):
+def write_on_done(status, resources):
     resources['es_loader'].flush_all_and_wait()
     resources['es_loader'].close()
 
@@ -542,14 +542,23 @@ class HPAProcess():
 
         data = self.hpa_merged_table.data()
 
-        #setup the mulitprocesses but dont do much
-        pl_stage = pr.map(write_to_elastic, data,
-            workers=Config.WORKERS_NUMBER*2, maxsize=1000,
-            on_start=write_on_start,
-            on_done=write_on_done)
+        #handle everything on this main thread
+        resources = write_on_start()
+        more_itertools.consume(
+            itertools.imap(write_to_elastic, 
+                data, itertools.repeat(resources)))
+        write_on_done(None, resources)
 
+        #this is a way to do it using pypyeln mulitprocessing
+        #but this is 33% slower than the main thread version
+        #
+        #setup the mulitprocesses but dont do much
+        #pl_stage = pr.map(write_to_elastic, data,
+        #    workers=Config.WORKERS_NUMBER, maxsize=1000,
+        #    on_start=write_on_start,
+        #    on_done=write_on_done)
         #now wait for all the multiprocessing to actually finish
-        more_itertools.consume(pr.to_iterable(pl_stage))
+        #more_itertools.consume(pr.to_iterable(pl_stage))
 
         self.loader.flush_all_and_wait(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
         #restore old pre-load settings
