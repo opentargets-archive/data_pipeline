@@ -40,8 +40,8 @@ class AssociationSummary(object):
 
 class ESQuery(object):
 
-    def __init__(self, es = None, dry_run = False):
-        self.handler = es if es else new_es_client()
+    def __init__(self, es, dry_run = False):
+        self.handler = es
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 

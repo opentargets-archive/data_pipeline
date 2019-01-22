@@ -1,6 +1,5 @@
 import logging
 from collections import OrderedDict
-from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader, DiseaseUtils
 import opentargets_ontologyutils.efo

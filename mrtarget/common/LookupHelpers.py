@@ -2,7 +2,6 @@ import logging
 import os
 import time
 
-from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
@@ -68,8 +67,6 @@ class LookUpDataRetriever(object):
         self.es = es
         self.r_server = r_server
 
-        self.esquery = ESQuery(self.es)
-
         require_all(self.es is not None, self.r_server is not None)
 
         self.lookup = LookUpData()
@@ -102,7 +99,6 @@ class LookUpDataRetriever(object):
     def set_r_server(self, r_server):
         self.r_server = r_server
         self.lookup.set_r_server(r_server)
-        self.esquery = ESQuery()
 
     def _get_gene_info(self, targets=[], autoload = True):
         self._logger.info('getting gene info')

@@ -10,7 +10,7 @@ from mrtarget.modules.Evidences import process_evidences_pipeline
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.connection import PipelineConnectors
+from mrtarget.common.connection import RedisManager, new_es_client, new_redis_client
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
@@ -187,8 +187,6 @@ def main():
                  Config.REDISLITE_DB_HOST,
                  Config.REDISLITE_DB_PORT)
 
-    connectors = PipelineConnectors()
-
     if args.log_level:
         try:
             root_logger = logging.getLogger()
@@ -213,125 +211,122 @@ def main():
         requests_log.addHandler(logging.FileHandler(args.log_http))
 
 
-    connected = connectors.init_services_connections(redispersist=args.persist_redis)
+    with RedisManager():
 
-    logger.debug('Attempting to establish connection to the backend... %s',
-                 str(connected))
+        es = new_es_client()
+        redis = new_redis_client()
 
-    logger.info('setting release version %s' % Config.RELEASE_VERSION)
+        logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
-    #create a single query object for future use
-    esquery = ESQuery(connectors.es)
+        #create a single query object for future use
+        esquery = ESQuery(es)
 
-    #create something to accumulate qc metrics into over various steps
-    qc_metrics = QCMetrics()
+        #create something to accumulate qc metrics into over various steps
+        qc_metrics = QCMetrics()
 
-    with Loader(connectors.es,
-                chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
-                dry_run = args.dry_run) as loader:
+        with Loader(es,
+                    chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
+                    dry_run = args.dry_run) as loader:
 
-        # get the schema version and change all needed resources
-        update_schema_version(Config,args.schema_version)
-        logger.info('setting schema version string to %s', args.schema_version)
+            # get the schema version and change all needed resources
+            update_schema_version(Config,args.schema_version)
+            logger.info('setting schema version string to %s', args.schema_version)
 
+            if args.rea:
+                process = ReactomeProcess(loader)
+                if not args.qc_only:
+                    process.process_all()
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
+            if args.ens:
+                process = EnsemblProcess(loader)
+                if not args.qc_only:
+                    process.process(Config.ENSEMBL_FILENAME)
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
+            if args.unic:
+                process = UniprotDownloader(loader, dry_run=args.dry_run)
+                if not args.qc_only:
+                    process.cache_human_entries(Config.UNIPROT_URI)
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))            
+            if args.hpa:
+                process = HPAProcess(loader,redis)
+                if not args.qc_only:
+                    process.process_all(dry_run=args.dry_run)
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))     
 
+            if args.gen:
+                process = GeneManager(loader,redis)
+                if not args.qc_only:
+                    process.merge_all(dry_run=args.dry_run)
 
-        if args.rea:
-            process = ReactomeProcess(loader)
-            if not args.qc_only:
-                process.process_all()
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-        if args.ens:
-            process = EnsemblProcess(loader)
-            if not args.qc_only:
-                process.process(Config.ENSEMBL_FILENAME)
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-        if args.unic:
-            process = UniprotDownloader(loader, dry_run=args.dry_run)
-            if not args.qc_only:
-                process.cache_human_entries(Config.UNIPROT_URI)
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))            
-        if args.hpa:
-            process = HPAProcess(loader,connectors.r_server)
-            if not args.qc_only:
-                process.process_all(dry_run=args.dry_run)
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))     
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))     
+    
+            if args.efo:
+                process = EfoProcess(loader)
+                if not args.qc_only:
+                    process.process_all()
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
+            if args.eco:
+                process = EcoProcess(loader)
+                if not args.qc_only:
+                    process.process_all()
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
 
-        if args.gen:
-            process = GeneManager(loader,connectors.r_server)
-            if not args.qc_only:
-                process.merge_all(dry_run=args.dry_run)
+            input_files = []
+            if args.val:
+                if args.input_file:
+                    input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
+                else:
+                    logger.info('reading the evidences sources URLs from evidence_sources.txt')
+                    with open(file_or_resource('evidences_sources.txt')) as f:
+                        input_files = [x.rstrip() for x in f.readlines()]
 
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))     
- 
-        if args.efo:
-            process = EfoProcess(loader)
-            if not args.qc_only:
-                process.process_all()
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-        if args.eco:
-            process = EcoProcess(loader)
-            if not args.qc_only:
-                process.process_all()
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
+                num_workers = Config.WORKERS_NUMBER
+                num_writers = max(1, min(16, Config.WORKERS_NUMBER))
+                process_evidences_pipeline(filenames=input_files,
+                    first_n=args.first_n,
+                    es_client=es,
+                    redis_client=redis,
+                    dry_run=args.dry_run,
+                    enable_output_to_es=(not args.enable_fs),
+                    output_folder=args.output_folder,
+                    num_workers=num_workers,
+                    num_writers=num_writers,
+                    max_queued_events=args.max_queued_events)
 
-        input_files = []
-        if args.val:
-            if args.input_file:
-                input_files = list(itertools.chain.from_iterable([el.split(",") for el in args.input_file]))
-            else:
-                logger.info('reading the evidences sources URLs from evidence_sources.txt')
-                with open(file_or_resource('evidences_sources.txt')) as f:
-                    input_files = [x.rstrip() for x in f.readlines()]
+                #TODO qc
 
-            num_workers = Config.WORKERS_NUMBER
-            num_writers = max(1, min(16, Config.WORKERS_NUMBER))
-            process_evidences_pipeline(filenames=input_files,
-                                       first_n=args.first_n,
-                                       es_client=connectors.es,
-                                       redis_client=connectors.r_server,
-                                       dry_run=args.dry_run,
-                                       enable_output_to_es=(not args.enable_fs),
-                                       output_folder=args.output_folder,
-                                       num_workers=num_workers,
-                                       num_writers=num_writers,
-                                       max_queued_events=args.max_queued_events)
+            if args.assoc:
+                process = ScoringProcess(loader, redis)
+                if not args.qc_only:
+                    process.process_all(targets = targets, dry_run=args.dry_run)
+                if not args.skip_qc:
+                    #qc_metrics.update(process.qc(esquery))
+                    pass
+                
+            if args.ddr:
+                process = DataDrivenRelationProcess(es, redis)
+                if not args.qc_only:
+                    process.process_all(dry_run = args.dry_run)
+                #TODO qc
 
+            if args.sea:
+                process = SearchObjectProcess(loader, redis)
+                if not args.qc_only:
+                    process.process_all(skip_targets=args.skip_targets, skip_diseases=args.skip_diseases)
+                #TODO qc
 
-            #TODO qc
+            if args.metric:
+                process = Metrics(es).generate_metrics()
 
-        if args.assoc:
-            process = ScoringProcess(loader, connectors.r_server)
-            if not args.qc_only:
-                process.process_all(targets = targets, dry_run=args.dry_run)
-            if not args.skip_qc:
-                #qc_metrics.update(process.qc(esquery))
-                pass
-            
-        if args.ddr:
-            process = DataDrivenRelationProcess(connectors.es, connectors.r_server)
-            if not args.qc_only:
-                process.process_all(dry_run = args.dry_run)
-            #TODO qc
-
-        if args.sea:
-            process = SearchObjectProcess(loader, connectors.r_server)
-            if not args.qc_only:
-                process.process_all(skip_targets=args.skip_targets, skip_diseases=args.skip_diseases)
-            #TODO qc
-
-        if args.metric:
-            process = Metrics(connectors.es).generate_metrics()
-
-        if args.qc:
-            QCRunner(connectors.es).run_associationQC()
+            if args.qc:
+                QCRunner(es).run_associationQC()
 
     if args.qc_in:
         #handle reading in previous qc from filename provided, and adding comparitive metrics
@@ -340,9 +335,6 @@ def main():
     if args.qc_out:
         #handle writing out to a tsv file
         qc_metrics.write_out(args.qc_out)
-
-    logger.debug('close connectors')
-    connectors.close()
 
     logger.info('`'+" ".join(sys.argv)+'` - finished')
     return 0

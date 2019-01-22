@@ -487,7 +487,7 @@ class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
     def init(self):
         super(ExpressionObjectStorer, self).init()
-        self.loader = Loader(dry_run=self.dry_run)
+        self.loader = Loader(self.es, dry_run=self.dry_run)
 
     def close(self):
         super(ExpressionObjectStorer, self).close()
