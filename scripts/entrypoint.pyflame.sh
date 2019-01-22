@@ -59,12 +59,13 @@ do
       then
         #run pyflame to monitor
         #run flamegraph to make the svg
-        echo pyflame monitoring $PID
+        DATETIME=$(date +%Y%m%d%H%M%S)
+        echo pyflame monitoring $PID at $DATETIME
         #monitor for 24 hour
-        #check twice a second
+        #check 10x a second
         #dont check threads, instead follow GIL
         #NOTE: will not check child *processes*
-        bash -c "/pyflame/src/pyflame -p $PID -o /usr/src/app/log/pyflame.$MRT_PID.out --abi 27 -s 86400 -r 0.5; /FlameGraph/flamegraph.pl </usr/src/app/log/pyflame.$MRT_PID.out >/usr/src/app/log/pyflame.$MRT_PID.svg" &
+        bash -c "/pyflame/src/pyflame -p $PID -o /usr/src/app/log/pyflame.$DATETIME-$MRT_PID.out --abi 27 -s 86400 -r 0.1; /FlameGraph/flamegraph.pl </usr/src/app/log/pyflame.$DATETIME-$MRT_PID.out >/usr/src/app/log/pyflame.$DATETIME-$MRT_PID.svg" &
 
         PIDS_DONE="$PIDS_DONE $PID"
       fi
