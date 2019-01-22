@@ -16,7 +16,7 @@ def new_redis_client():
     return Redis(host=Config.REDISLITE_DB_HOST,
                  port=Config.REDISLITE_DB_PORT)
 
-def new_es_client(hosts=Config.ELASTICSEARCH_NODES):
+def new_es_client(hosts):
     return Elasticsearch(hosts=hosts,
                          maxsize=50,
                          timeout=1800,

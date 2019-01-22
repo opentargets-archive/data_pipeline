@@ -323,10 +323,12 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                  target_q,
                  r_path,
                  target_disease_pair_q,
+                 es
                  ):
         super(TargetDiseaseEvidenceProducer, self).__init__(queue_in=target_q,
                                                             redis_path=r_path,
                                                             queue_out=target_disease_pair_q)
+        self.es = es
 
     def process(self, data):
         self.data_cache = {}
@@ -366,7 +368,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
 
     def init(self):
         super(TargetDiseaseEvidenceProducer, self).init()
-        self.es_query = ESQuery(new_es_client())
+        self.es_query = ESQuery(self.es)
 
     def close(self):
         super(TargetDiseaseEvidenceProducer, self).close()
@@ -381,9 +383,9 @@ class ScoreProducer(RedisQueueWorkerProcess):
                  r_path,
                  score_q,
                  lookup_data,
+                 es,
                  chunk_size = 1e4,
-                 dry_run = False,
-                 es = None
+                 dry_run = False
                  ):
         super(ScoreProducer, self).__init__(queue_in=evidence_data_q,
                                             redis_path=r_path,
@@ -402,7 +404,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
         super(ScoreProducer, self).init()
         self.scorer = Scorer()
         self.lookup_data.set_r_server(self.r_server)
-        self.loader = Loader(chunk_size=self.chunk_size,
+        self.loader = Loader(self.es, chunk_size=self.chunk_size,
                              dry_run=self.dry_run)
 
     def close(self):
@@ -483,45 +485,6 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 self.logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
 
 
-
-class ScoreStorerWorker(RedisQueueWorkerProcess):
-    def __init__(self,
-                 score_q,
-                 r_path,
-                 chunk_size = 1e4,
-                 dry_run = False,
-                 es = None
-                 ):
-        super(ScoreStorerWorker, self).__init__(score_q, r_path)
-        self.q = score_q
-        self.chunk_size = chunk_size
-        self.dry_run = dry_run
-        self.es = None
-        self.loader = None
-
-
-    def process(self, data):
-
-        target, disease, score = data
-        element_id = '%s-%s' % (target, disease)
-        self.loader.put(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-                               Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                               element_id,
-                               score,
-                               create_index=False
-                            )
-
-    def init(self):
-        super(ScoreStorerWorker, self).init()
-        self.loader = Loader(chunk_size=self.chunk_size,
-                             dry_run=self.dry_run)
-
-    def close(self):
-        super(ScoreStorerWorker, self).close()
-        self.loader.flush()
-        self.loader.close()
-
-
 class ScoringProcess():
 
     def __init__(self,
@@ -582,35 +545,39 @@ class ScoringProcess():
                               serialiser='jsonpickle',
                               total=len(targets))
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
-                                           max_size=queue_per_worker * number_of_storers,
-                                           job_timeout=1200,
-                                           batch_size=10,
-                                           r_server=self.r_server,
-                                           serialiser='jsonpickle')
+            max_size=queue_per_worker * number_of_storers,
+            job_timeout=1200,
+            batch_size=10,
+            r_server=self.r_server,
+            serialiser='jsonpickle')
         score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
-                                  max_size=queue_per_worker * number_of_storers,
-                                  job_timeout=1200,
-                                  batch_size=10,
-                                  r_server=self.r_server,
-                                  serialiser='jsonpickle')
+            max_size=queue_per_worker * number_of_storers,
+            job_timeout=1200,
+            batch_size=10,
+            r_server=self.r_server,
+            serialiser='jsonpickle')
 
         # storage is located inside this code because the serialisation time
         scorers = [ScoreProducer(target_disease_pair_q,
-                                 None,
-                                 None,
-                                 lookup_data,
-                                 chunk_size=1000,
-                                 dry_run=dry_run
-                                 ) for _ in range(number_of_storers)]
+            None,
+            None,
+            lookup_data,,
+            self.es
+            chunk_size=1000,
+            dry_run=dry_run
+            ) for _ in range(number_of_storers)]
+
         for w in scorers:
             w.start()
 
 
         '''start target-disease evidence producer'''
         readers = [TargetDiseaseEvidenceProducer(target_q,
-                                                 None,
-                                                 target_disease_pair_q,
-                                                ) for _ in range(number_of_workers)]
+            None,
+            target_disease_pair_q,
+            self.es
+            ) for _ in range(number_of_workers)]
+
         for w in readers:
             w.start()
 

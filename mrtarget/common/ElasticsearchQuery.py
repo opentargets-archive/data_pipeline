@@ -13,7 +13,6 @@ from mrtarget.Settings import Config
 from mrtarget.constants import Const
 from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
-from mrtarget.common.connection import new_es_client
 
 
 class AssociationSummary(object):

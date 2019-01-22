@@ -65,7 +65,7 @@ def main():
     
     with RedisManager():
 
-        es = new_es_client()
+        es = new_es_client(args.elasticseach_nodes)
         redis = new_redis_client()
 
         #create a single query object for future use
