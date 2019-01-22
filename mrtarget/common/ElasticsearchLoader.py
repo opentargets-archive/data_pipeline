@@ -187,8 +187,8 @@ class Loader():
         if not self.dry_run:
             res = self.es.indices.create(index=index_name, ignore=ignore, body=body )
             if not self._check_is_aknowledge(res):
-                if res['error']['root_cause'][0]['reason']== 'already exists':
-                    self.logger.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
+                if 'already exists' in res['error']['root_cause'][0]['reason']:
+                    self.logger.warning('cannot create index %s because it already exists'%index_name) #TODO: move the creation of index to the main thread to avoid all threads trying this
                     return
                 else:
                     raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
