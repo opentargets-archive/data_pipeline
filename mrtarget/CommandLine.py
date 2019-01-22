@@ -11,7 +11,7 @@ from mrtarget.modules.Evidences import process_evidences_pipeline
 from mrtarget.common.Redis import enable_profiling
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.connection import PipelineConnectors
+from mrtarget.common.connection import RedisManager, new_es_client, new_redis_client
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
@@ -62,137 +62,133 @@ def main():
         logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
     enable_profiling(args.profile)
+    
+    with RedisManager():
 
-    connectors = PipelineConnectors()
-    connected = connectors.init_services_connections(es_hosts=args.elasticseach_nodes,
-        redispersist=args.redis_remote)
+        es = new_es_client()
+        redis = new_redis_client()
 
-    if not connected:
-        logger.error("Unable to connect to services")
-        return 1
+        #create a single query object for future use
+        esquery = ESQuery(es)
 
+        #read the data configuration
+        data_config = mrtarget.cfg.get_data_config(args.data_config)
 
-    #create a single query object for future use
-    esquery = ESQuery(connectors.es)
+        #create something to accumulate qc metrics into over various steps
+        qc_metrics = QCMetrics()
 
-    #read the data configuration
-    data_config = mrtarget.cfg.get_data_config(args.data_config)
+        with Loader(es,
+                    chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
+                    dry_run = args.dry_run) as loader:
 
-    #create something to accumulate qc metrics into over various steps
-    qc_metrics = QCMetrics()
+            if args.rea:
+                process = ReactomeProcess(loader, 
+                    data_config.reactome_pathway_data, data_config.reactome_pathway_relation)
+                if not args.qc_only:
+                    process.process_all()
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
+            if args.ens:
+                process = EnsemblProcess(loader)
+                if not args.qc_only:
+                    process.process(data_config.ensembl_filename)
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
+            if args.unic:
+                process = UniprotDownloader(loader, dry_run=args.dry_run)
+                if not args.qc_only:
+                    process.cache_human_entries(data_config.uniprot_uri)
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
+            if args.hpa:
+                process = HPAProcess(loader,redis, 
+                    data_config.tissue_translation_map, data_config.tissue_curation_map,
+                    data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
+                    data_config.hpa_rna_value, data_config.hpa_rna_zscore)
+                if not args.qc_only:
+                    process.process_all(dry_run=args.dry_run)
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))     
 
-    with Loader(connectors.es,
-                chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
-                dry_run = args.dry_run) as loader:
+            if args.gen:
+                process = GeneManager(loader, redis,
+                    args.gen_plugin_places, data_config.gene_data_plugin_names,
+                    )
+                if not args.qc_only:
+                    process.merge_all(data_config, dry_run=args.dry_run)
 
-        if args.rea:
-            process = ReactomeProcess(loader, 
-                data_config.reactome_pathway_data, data_config.reactome_pathway_relation)
-            if not args.qc_only:
-                process.process_all()
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-        if args.ens:
-            process = EnsemblProcess(loader)
-            if not args.qc_only:
-                process.process(data_config.ensembl_filename)
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-        if args.unic:
-            process = UniprotDownloader(loader, dry_run=args.dry_run)
-            if not args.qc_only:
-                process.cache_human_entries(data_config.uniprot_uri)
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-        if args.hpa:
-            process = HPAProcess(loader,connectors.r_server, 
-                data_config.tissue_translation_map, data_config.tissue_curation_map,
-                data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
-                data_config.hpa_rna_value, data_config.hpa_rna_zscore)
-            if not args.qc_only:
-                process.process_all(dry_run=args.dry_run)
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))     
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))     
+    
+            if args.efo:
+                process = EfoProcess(loader, data_config.ontology_efo, data_config.ontology_hpo, 
+                    data_config.ontology_mp, data_config.disease_phenotype)
+                if not args.qc_only:
+                    process.process_all()
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
+            if args.eco:
+                process = EcoProcess(loader, data_config.ontology_eco, data_config.ontology_so)
+                if not args.qc_only:
+                    process.process_all()
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
 
-        if args.gen:
-            process = GeneManager(loader, connectors.r_server,
-                args.gen_plugin_places, data_config.gene_data_plugin_names,
-                )
-            if not args.qc_only:
-                process.merge_all(data_config, dry_run=args.dry_run)
+            if args.val:            
+                es_output = True
+                es_output_folder = None
+                if "elasticsearch_folder" in vars(args) and args.elasticsearch_folder is not None:
+                    es_output = False
+                    es_output_folder = args.elasticsearch_folder
 
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))     
- 
-        if args.efo:
-            process = EfoProcess(loader, data_config.ontology_efo, data_config.ontology_hpo, 
-                data_config.ontology_mp, data_config.disease_phenotype)
-            if not args.qc_only:
-                process.process_all()
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-        if args.eco:
-            process = EcoProcess(loader, data_config.ontology_eco, data_config.ontology_so)
-            if not args.qc_only:
-                process.process_all()
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
+                process_evidences_pipeline(filenames=args.input_file,
+                    first_n=args.val_first_n,
+                    es_client=es,
+                    redis_client=redis,
+                    dry_run=args.dry_run,
+                    enable_output_to_es=es_output,
+                    output_folder=es_output_folder,
+                    num_workers=args.val_workers_validator,
+                    num_writers=args.val_workers_writer,
+                    max_queued_events=args.max_queued_events,
+                    eco_scores_uri=data_config.eco_scores,
+                    schema_uri = data_config.schema,
+                    es_hosts=args.elasticseach_nodes,
+                    excluded_biotypes = data_config.excluded_biotypes)
 
-        if args.val:            
-            es_output = True
-            es_output_folder = None
-            if "elasticsearch_folder" in vars(args) and args.elasticsearch_folder is not None:
-                es_output = False
-                es_output_folder = args.elasticsearch_folder
+                #TODO qc
 
-            process_evidences_pipeline(filenames=args.input_file,
-                first_n=args.val_first_n,
-                es_client=connectors.es,
-                redis_client=connectors.r_server,
-                dry_run=args.dry_run,
-                enable_output_to_es=es_output,
-                output_folder=es_output_folder,
-                num_workers=args.val_workers_validator,
-                num_writers=args.val_workers_writer,
-                max_queued_events=args.max_queued_events,
-                eco_scores_uri=data_config.eco_scores,
-                schema_uri = data_config.schema,
-                es_hosts=args.elasticseach_nodes,
-                excluded_biotypes = data_config.excluded_biotypes)
+            if args.assoc:
+                process = ScoringProcess(loader, redis)
+                if not args.qc_only:
+                    process.process_all(targets = args.targets, 
+                        dry_run=args.dry_run)
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))
+                    pass
+                
+            if args.ddr:
+                process = DataDrivenRelationProcess(es, redis)
+                if not args.qc_only:
+                    process.process_all(dry_run = args.dry_run)
+                #TODO qc
 
-            #TODO qc
+            if args.sea:
+                process = SearchObjectProcess(loader, redis)
+                if not args.qc_only:
+                    process.process_all(
+                        data_config.chembl_target, 
+                        data_config.chembl_mechanism, 
+                        data_config.chembl_component, 
+                        data_config.chembl_protein, 
+                        data_config.chembl_molecule_set_uri_pattern,
+                        dry_run = args.dry_run,
+                        skip_targets=args.skip_targets, 
+                        skip_diseases=args.skip_diseases)
+                #TODO qc
 
-        if args.assoc:
-            process = ScoringProcess(loader, connectors.r_server)
-            if not args.qc_only:
-                process.process_all(targets = args.targets, 
-                    dry_run=args.dry_run)
-            if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
-                pass
-            
-        if args.ddr:
-            process = DataDrivenRelationProcess(connectors.es, connectors.r_server)
-            if not args.qc_only:
-                process.process_all(dry_run = args.dry_run)
-            #TODO qc
-
-        if args.sea:
-            process = SearchObjectProcess(loader, connectors.r_server)
-            if not args.qc_only:
-                process.process_all(
-                    data_config.chembl_target, 
-                    data_config.chembl_mechanism, 
-                    data_config.chembl_component, 
-                    data_config.chembl_protein, 
-                    data_config.chembl_molecule_set_uri_pattern,
-                    dry_run = args.dry_run,
-                    skip_targets=args.skip_targets, 
-                    skip_diseases=args.skip_diseases)
-            #TODO qc
-
-        if args.metric:
-            process = Metrics(connectors.es).generate_metrics()
+            if args.metric:
+                process = Metrics(es).generate_metrics()
 
     if args.qc_in:
         #handle reading in previous qc from filename provided, and adding comparitive metrics
@@ -201,9 +197,6 @@ def main():
     if args.qc_out:
         #handle writing out to a tsv file
         qc_metrics.write_out(args.qc_out)
-
-    logger.debug('close connectors')
-    connectors.close()
 
     logger.info('`'+" ".join(sys.argv)+'` - finished')
     return 0

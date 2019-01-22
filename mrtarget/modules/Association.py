@@ -9,6 +9,7 @@ from mrtarget.constants import Const
 from mrtarget.common.DataStructure import JSONSerializable, denormDict
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.connection import new_es_client
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer
@@ -365,7 +366,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
 
     def init(self):
         super(TargetDiseaseEvidenceProducer, self).init()
-        self.es_query = ESQuery()
+        self.es_query = ESQuery(new_es_client())
 
     def close(self):
         super(TargetDiseaseEvidenceProducer, self).close()

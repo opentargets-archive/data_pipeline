@@ -380,9 +380,9 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
 
     def __init__(self, es, r_server, queue, dry_run=False):
         super(GeneObjectStorer, self).__init__(queue, None)
-        self.es = None
+        self.es = es
         self.r_server = None
-        self.loader = None
+        self.loader = None # will be set in init()
         self.dry_run = dry_run
 
     def process(self, data):
@@ -397,7 +397,7 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
 
     def init(self):
         super(GeneObjectStorer, self).init()
-        self.loader = Loader(dry_run=self.dry_run)
+        self.loader = Loader(self.es, dry_run=self.dry_run)
 
     def close(self):
         super(GeneObjectStorer, self).close()

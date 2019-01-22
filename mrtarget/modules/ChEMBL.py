@@ -6,6 +6,7 @@ import itertools
 import more_itertools
 
 from mrtarget.common.ElasticsearchQuery import ESQuery
+from mrtarget.common.connection import new_es_client
 from mrtarget.Settings import Config
 from mrtarget.common import URLZSource
 import json
@@ -44,7 +45,7 @@ class ChEMBLLookup(object):
             molecule_set_uri_pattern):
         super(ChEMBLLookup, self).__init__()
         self._logger = logging.getLogger(__name__)
-
+        
         #save configuration locally for future use
         self.target_uri = target_uri
         self.mechanism_uri = mechanism_uri
@@ -52,7 +53,8 @@ class ChEMBLLookup(object):
         self.protein_uri = protein_uri
         self.molecule_set_uri_pattern = molecule_set_uri_pattern
 
-        self.es_query = ESQuery()
+        self.es_query = ESQuery(new_es_client())
+
         self.protein_class = dict()
         self.target_component = dict()
         self.mechanisms = {}
