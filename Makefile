@@ -16,9 +16,6 @@ ELASTICSEARCH_NODES ?= http://localhost:9200
 
 LOG_PATH ?= $(mkfile_dir)/log
 
-ES_PREFIX ?= master
-
-
 # Allow specification of additional arguments for each stage on the command-line
 # Intended to be empty here and overriden from outside if needed
 MRTARGET_ARGS ?= 
@@ -31,112 +28,112 @@ MRTARGET_CMD = $(MRTARGET_ENTRYPOINT)
 # First target is run by default if make is run with no arguments, so do something safe
 .PHONY: dry_run
 dry_run:
-	$(MRTARGET_CMD) --dry-run $(ES_PREFIX)
+	$(MRTARGET_CMD) --dry-run --release-tag dry_run
 
 .PHONY: rea
-rea: $(LOG_PATH)/out.$(ES_PREFIX).rea.log
+rea: $(LOG_PATH)/out.rea.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).rea.log : 
+$(LOG_PATH)/out.rea.log : 
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --rea $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).rea.log
+	$(MRTARGET_CMD) --rea 2>&1 | tee $(LOG_PATH)/out.rea.log
 
 .PHONY: ens
-ens: $(LOG_PATH)/out.$(ES_PREFIX).ens.log 
+ens: $(LOG_PATH)/out.ens.log 
 
-$(LOG_PATH)/out.$(ES_PREFIX).ens.log : 
+$(LOG_PATH)/out.ens.log : 
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --ens $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).ens.log
+	$(MRTARGET_CMD) --ens 2>&1 | tee $(LOG_PATH)/out.ens.log
 
 .PHONY: unic
 unic: uni
 
 .PHONY: uni
-uni: $(LOG_PATH)/out.$(ES_PREFIX).uni.log
+uni: $(LOG_PATH)/out.uni.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).uni.log :
+$(LOG_PATH)/out.uni.log :
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --unic $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).uni.log
+	$(MRTARGET_CMD) --unic 2>&1 | tee $(LOG_PATH)/out.uni.log
 	sleep 60
 
 .PHONY: hpa
-hpa: $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
+hpa: $(LOG_PATH)/out.hpa.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).hpa.log : 
+$(LOG_PATH)/out.hpa.log : 
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --hpa $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
+	$(MRTARGET_CMD) --hpa 2>&1 | tee $(LOG_PATH)/out.hpa.log
 	sleep 60
 
 .PHONY: efo
-efo: $(LOG_PATH)/out.$(ES_PREFIX).efo.log
+efo: $(LOG_PATH)/out.efo.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).efo.log : 
+$(LOG_PATH)/out.efo.log : 
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --efo $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).efo.log
+	$(MRTARGET_CMD) --efo 2>&1 | tee $(LOG_PATH)/out.efo.log
 	sleep 60
 
 
 .PHONY: eco
-eco: $(LOG_PATH)/out.$(ES_PREFIX).eco.log
+eco: $(LOG_PATH)/out.eco.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).eco.log : 
+$(LOG_PATH)/out.eco.log : 
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --eco $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).eco.log
+	$(MRTARGET_CMD) --eco 2>&1 | tee $(LOG_PATH)/out.eco.log
 	sleep 60
 
 
 .PHONY: base_gene
-base_gene: $(LOG_PATH)/out.$(ES_PREFIX).gen.log	
+base_gene: $(LOG_PATH)/out.gen.log	
 
-$(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log
+$(LOG_PATH)/out.gen.log : $(LOG_PATH)/out.rea.log $(LOG_PATH)/out.ens.log $(LOG_PATH)/out.uni.log
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --gen $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).gen.log
+	$(MRTARGET_CMD) --gen 2>&1 | tee $(LOG_PATH)/out.gen.log
 	sleep 60
 
 .PHONY: base
 base: base_gene efo eco hpa
 
 .PHONY: validate_all
-validate_all : $(LOG_PATH)/out.$(ES_PREFIX).val.log
+validate_all : $(LOG_PATH)/out.val.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).val.log : $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
+$(LOG_PATH)/out.val.log : $(LOG_PATH)/out.gen.log $(LOG_PATH)/out.efo.log $(LOG_PATH)/out.eco.log
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.log
+	$(MRTARGET_CMD) --val 2>&1 | tee $(LOG_PATH)/out.val.log
 	sleep 60
 
 .PHONY: association_scores
-association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log 
+association_scores: $(LOG_PATH)/out.as.log 
 
-$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).val.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
+$(LOG_PATH)/out.as.log : $(LOG_PATH)/out.val.log $(LOG_PATH)/out.hpa.log
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --as $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).as.log
+	$(MRTARGET_CMD) --as 2>&1 | tee $(LOG_PATH)/out.as.log
 
 .PHONY: association_qc
-association_qc: $(LOG_PATH)/out.$(ES_PREFIX).qc.log
+association_qc: $(LOG_PATH)/out.qc.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).qc.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
+$(LOG_PATH)/out.qc.log : $(LOG_PATH)/out.as.log
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --qc $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).qc.log
+	$(MRTARGET_CMD) --qc 2>&1 | tee $(LOG_PATH)/out.qc.log
 
 .PHONY: search_data
-search_data: $(LOG_PATH)/out.$(ES_PREFIX).sea.log
+search_data: $(LOG_PATH)/out.sea.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).sea.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
+$(LOG_PATH)/out.sea.log : $(LOG_PATH)/out.as.log
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --sea $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).sea.log
+	$(MRTARGET_CMD) --sea 2>&1 | tee $(LOG_PATH)/out.sea.log
 
 .PHONY: relationship_data
-relationship_data: $(LOG_PATH)/out.$(ES_PREFIX).ddr.log
+relationship_data: $(LOG_PATH)/out.ddr.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).ddr.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
+$(LOG_PATH)/out.ddr.log : $(LOG_PATH)/out.as.log
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --ddr $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).ddr.log
+	$(MRTARGET_CMD) --ddr 2>&1 | tee $(LOG_PATH)/out.ddr.log
 
 .PHONY: metrics
-metrics: $(LOG_PATH)/out.$(ES_PREFIX).metric.log
+metrics: $(LOG_PATH)/out.metric.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).metric.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
+$(LOG_PATH)/out.metric.log : $(LOG_PATH)/out.as.log
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --metric $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).metric.log
+	$(MRTARGET_CMD) --metric 2>&1 | tee $(LOG_PATH)/out.metric.log
 
 .PHONY: all
 all: metrics relationship_data search_data association_qc
