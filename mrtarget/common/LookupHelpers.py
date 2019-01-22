@@ -2,7 +2,6 @@ import logging
 import os
 import time
 
-from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
@@ -23,7 +22,6 @@ class LookUpData():
         self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
-        self.chembl = None
 
         self.mp_ontology = None
 
@@ -48,7 +46,6 @@ class LookUpDataType(object):
     DISEASE = 'disease'
     ECO = 'eco'
     MP = 'mp'
-    CHEMBL_DRUGS = 'chembl_drugs'
     HPA = 'hpa'
 
 
@@ -59,12 +56,7 @@ class LookUpDataRetriever(object):
                  targets,
                  data_types,
                  hpo_uri = None,
-                 mp_uri = None,
-                 chembl_target_uri = None,
-                 chembl_mechanism_uri = None,
-                 chembl_component_uri = None,
-                 chembl_protein_uri = None,
-                 chembl_molecule_set_uri_pattern = None
+                 mp_uri = None
                  ):
         self.es = es
         self.r_server = r_server
@@ -86,9 +78,6 @@ class LookUpDataRetriever(object):
             elif dt == LookUpDataType.MP:
                 self._logger.debug("get MP info")
                 self._get_mp(mp_uri)
-            elif dt == LookUpDataType.CHEMBL_DRUGS:
-                self._get_available_chembl_mappings(chembl_target_uri, chembl_mechanism_uri, 
-                    chembl_component_uri, chembl_protein_uri, chembl_molecule_set_uri_pattern)
             elif dt == LookUpDataType.HPA:
                 self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP', self.r_server)
 
@@ -133,25 +122,6 @@ class LookUpDataRetriever(object):
         obj.rdf_graph = None
         self.lookup.mp_ontology = obj
 
-    def _get_available_chembl_mappings(self, target_uri, mechanism_uri, component_uri, 
-            protein_uri, molecule_set_uri_pattern):
-
-        chembl_handler = ChEMBLLookup(target_uri, mechanism_uri, component_uri, 
-            protein_uri, molecule_set_uri_pattern)
-
-        chembl_handler.get_molecules_from_evidence()
-
-        all_molecules = set()
-        for target, molecules in  chembl_handler.target2molecule.items():
-            all_molecules = all_molecules|molecules
-
-        all_molecules = sorted(all_molecules)
-
-        query_batch_size = 100
-        for i in range(0, len(all_molecules) + 1, query_batch_size):
-            chembl_handler.populate_synonyms_for_molecule(all_molecules[i:i + query_batch_size],
-                chembl_handler.molecule2synonyms)
-        self.lookup.chembl = chembl_handler
         
 
 

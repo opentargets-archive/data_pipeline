@@ -53,8 +53,6 @@ class ChEMBLLookup(object):
         self.protein_uri = protein_uri
         self.molecule_set_uri_pattern = molecule_set_uri_pattern
 
-        self.es_query = ESQuery(new_es_client())
-
         self.protein_class = dict()
         self.target_component = dict()
         self.mechanisms = {}
@@ -160,10 +158,10 @@ class ChEMBLLookup(object):
                 label = v['label']
         self.protein_class_label_to_id[label] = protein_class_id
 
-    def get_molecules_from_evidence(self):
+    def get_molecules_from_evidence(self, es_query):
         self._logger.debug('get_molecules_from_evidence')
         datatype = Config.DATASOURCE_TO_DATATYPE_MAPPING['chembl']
-        for c, e in enumerate(self.es_query.get_all_evidence_for_datatype(datatype,
+        for c, e in enumerate(es_query.get_all_evidence_for_datatype(datatype,
                 fields=['target.id','disease.id', 'evidence.target2drug.urls'])):
             #get information from URLs that we need to extract short ids
             #e.g. https://www.ebi.ac.uk/chembl/compound/inspect/CHEMBL502835

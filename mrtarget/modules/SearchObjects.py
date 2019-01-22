@@ -7,7 +7,7 @@ from datetime import datetime
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 
 from mrtarget.constants import Const
@@ -185,26 +185,57 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
     data_handlers[SearchObjectTypes.DISEASE] = SearchObjectDisease
 
     def __init__(self,
-                 queue,
-                 redis_path,
-                 dry_run = False,
-                 chunk_size = 0,
-                 lookup = None):
+            queue,
+            redis_path,
+            chembl_target_uri, 
+            chembl_mechanism_uri, 
+            chembl_component_uri, 
+            chembl_protein_uri, 
+            chembl_molecule_set_uri_pattern,
+            dry_run = False,
+            chunk_size = 0):
         super(SearchObjectAnalyserWorker, self).__init__(queue,redis_path)
         self.queue = queue
-        self.lookup = lookup
         self.loader = None
         self.es_query = None
         self.chunk_size = chunk_size
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
 
+        self.chembl_target_uri = chembl_target_uri
+        self.chembl_mechanism_uri = chembl_mechanism_uri
+        self.chembl_component_uri = chembl_component_uri
+        self.chembl_protein_uri = chembl_protein_uri
+        self.chembl_molecule_set_uri_pattern = chembl_molecule_set_uri_pattern
+
     def init(self):
         super(SearchObjectAnalyserWorker, self).init()
-        self.lookup.set_r_server(self.r_server)
         self.loader = Loader(self.es_query.handler, chunk_size=self.chunk_size,
-                             dry_run=self.dry_run)
+            dry_run=self.dry_run)
         self.es_query = ESQuery(self.loader.es)
+
+
+        #setup chembl handler
+        chembl_handler = ChEMBLLookup(self.chembl_target_uri, 
+            self.chembl_mechanism_uri, 
+            self.chembl_component_uri, 
+            self.chembl_protein_uri, 
+            self.chembl_molecule_set_uri_pattern)
+
+        chembl_handler.get_molecules_from_evidence(self.es_query)
+
+        all_molecules = set()
+        for target, molecules in  chembl_handler.target2molecule.items():
+            all_molecules = all_molecules|molecules
+
+        all_molecules = sorted(all_molecules)
+
+        query_batch_size = 100
+        for i in range(0, len(all_molecules) + 1, query_batch_size):
+            chembl_handler.populate_synonyms_for_molecule(all_molecules[i:i + query_batch_size],
+                chembl_handler.molecule2synonyms)
+                
+        self.chembl = chembl_handler
 
     def close(self):
         self.loader.flush()
@@ -224,22 +255,22 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
             ass_data = self.es_query.get_associations_for_target(data['id'], fields=['id','harmonic-sum.overall'], size = 20)
             so.set_associations(self._summarise_association(ass_data.top_associations),
                                 ass_data.associations_count)
-            if so.id in self.lookup.chembl.target2molecule:
+            if so.id in self.chembl.target2molecule:
                 drugs_synonyms = set()
-                for molecule in self.lookup.chembl.target2molecule[so.id]:
-                    if molecule in self.lookup.chembl.molecule2synonyms:
-                        drugs_synonyms = drugs_synonyms | set(self.lookup.chembl.molecule2synonyms[molecule])
+                for molecule in self.chembl.target2molecule[so.id]:
+                    if molecule in self.chembl.molecule2synonyms:
+                        drugs_synonyms = drugs_synonyms | set(self.chembl.molecule2synonyms[molecule])
                 so.drugs['evidence_data'] = list(drugs_synonyms)
 
         elif data[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
             ass_data = self.es_query.get_associations_for_disease(data['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
             so.set_associations(self._summarise_association(ass_data.top_associations),
                                 ass_data.associations_count)
-            if so.id in self.lookup.chembl.disease2molecule:
+            if so.id in self.chembl.disease2molecule:
                 drugs_synonyms = set()
-                for molecule in self.lookup.chembl.disease2molecule[so.id]:
-                    if molecule in self.lookup.chembl.molecule2synonyms:
-                        drugs_synonyms = drugs_synonyms | set(self.lookup.chembl.molecule2synonyms[molecule])
+                for molecule in self.chembl.disease2molecule[so.id]:
+                    if molecule in self.chembl.molecule2synonyms:
+                        drugs_synonyms = drugs_synonyms | set(self.chembl.molecule2synonyms[molecule])
                 so.drugs['evidence_data'] = list(drugs_synonyms)
         else:
             so.set_associations()
@@ -298,19 +329,15 @@ class SearchObjectProcess(object):
                            max_size=1000,
                            job_timeout=180)
 
-        #TODO remove from lookupdata and use ChEMBLLookup directly
-        lookup_data = LookUpDataRetriever(self.loader.es, self.r_server,
-            [],[LookUpDataType.CHEMBL_DRUGS], 
+
+        workers = [SearchObjectAnalyserWorker(queue,
+            None,
             chembl_target_uri = chembl_target_uri,
             chembl_mechanism_uri = chembl_mechanism_uri,
             chembl_component_uri = chembl_component_uri,
             chembl_protein_uri = chembl_protein_uri,
-            chembl_molecule_set_uri_pattern = chembl_molecule_set_uri_pattern).lookup
-
-        workers = [SearchObjectAnalyserWorker(queue,
-                                              None,
-                                              lookup=lookup_data,
-                                              dry_run=dry_run) for i in range(Config.WORKERS_NUMBER)]
+            chembl_molecule_set_uri_pattern = chembl_molecule_set_uri_pattern,
+            dry_run=dry_run) for i in range(Config.WORKERS_NUMBER)]
 
         for w in workers:
             w.start()
