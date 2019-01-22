@@ -201,7 +201,7 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
     def init(self):
         super(SearchObjectAnalyserWorker, self).init()
         self.lookup.set_r_server(self.r_server)
-        self.loader = Loader(chunk_size=self.chunk_size,
+        self.loader = Loader(self.es_query.handler, chunk_size=self.chunk_size,
                              dry_run=self.dry_run)
         self.es_query = ESQuery(self.loader.es)
 
