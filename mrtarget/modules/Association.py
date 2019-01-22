@@ -561,8 +561,8 @@ class ScoringProcess():
         scorers = [ScoreProducer(target_disease_pair_q,
             None,
             None,
-            lookup_data,,
-            self.es
+            lookup_data,
+            self.es,
             chunk_size=1000,
             dry_run=dry_run
             ) for _ in range(number_of_storers)]
