@@ -28,7 +28,7 @@ MRTARGET_CMD = $(MRTARGET_ENTRYPOINT)
 # First target is run by default if make is run with no arguments, so do something safe
 .PHONY: dry_run
 dry_run:
-	$(MRTARGET_CMD) --dry-run --release-tag dry_run
+	$(MRTARGET_CMD) --dry-run
 
 .PHONY: rea
 rea: $(LOG_PATH)/out.rea.log

@@ -21,7 +21,7 @@ install:
   - pipdeptree
 script:
   - mkdir log
-  - make dry_run
+  - export DATA_CONFIG=mrtarget.data.yml && export ES_PREFIX=master && make dry_run 
   - pytest --cov=mrtarget --cov-report term tests/ --fulltrace
 notifications:
   email:

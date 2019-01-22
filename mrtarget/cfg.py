@@ -13,9 +13,8 @@ def setup_ops_parser():
         env_var="OPS_CONFIG", help='path to ops config file')
 
     # configuration file with data related settings
-    p.add('--data-config',
-        env_var="DATA_CONFIG", help='path to data config file (YAML)',
-        default="mtarget.data.yml")
+    p.add('--data-config', help='path to data config file (YAML)',
+        env_var="DATA_CONFIG", action='store', default="mtarget.data.yml")
 
     # logging
     p.add("--log-config", help="logging configuration file",
