@@ -55,13 +55,12 @@ def setup_ops_parser():
     #if there are multiple parallel operations happening at once, then 
     #this could be many more than that
 
-    p.add("--val-workers-validator", help="# or procs for validation workers",
-        env_var="VAL_WORKDERS_VALIDATOR", action='store', default=4, type=int)
-    p.add("--val-workers-writers", help="# or procs for validation writers",
-        env_var="VAL_WORKDERS_WRITER", action='store', default=4, type=int)
-
-    p.add("--max-queued-events", help="max number of events to put per queue",
-        env_var="MAX_QUEUED_EVENTS", action='store', default=10000, type=int)
+    p.add("--val-workers-validator", help="# of procs for validation workers",
+        env_var="VAL_WORKERS_VALIDATOR", action='store', default=4, type=int)
+    p.add("--val-workers-writer", help="# of procs for validation writers",
+        env_var="VAL_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--val-queue-validator-writer", help="size of validation writer to worker queue",
+        env_var="VAL_QUEUE_VALIDATOR_WRITER", action='store', default=1000, type=int)
 
     # for debugging
     p.add("--dump", help="dump core data to local gzipped files",

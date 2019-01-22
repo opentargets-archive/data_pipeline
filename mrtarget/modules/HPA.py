@@ -480,9 +480,9 @@ class HPADataDownloader():
         return t_join
 
 
-def write_on_start():
+def write_on_start(es_hosts):
     kwargs = {}
-    es_client = new_es_client()
+    es_client = new_es_client(es_hosts)
     kwargs['es_loader'] = Loader(es=es_client)
 
     return kwargs
@@ -503,6 +503,7 @@ def write_to_elastic(data, resources):
 
 class HPAProcess():
     def __init__(self, loader, r_server, 
+            es_hosts,
             tissue_translation_map_url, 
             tissue_curation_map_url,
             normal_tissue_url,
@@ -511,6 +512,7 @@ class HPAProcess():
             rna_zscore_url):
         self.loader = loader
         self.r_server = r_server
+        self.es_hosts = es_hosts
         self.downloader = HPADataDownloader(tissue_translation_map_url, 
             tissue_curation_map_url,
             normal_tissue_url,
@@ -561,8 +563,10 @@ class HPAProcess():
 
         data = self.hpa_merged_table.data()
 
+        write_on_start_partial = functools.partial(write_on_start, self.es_hosts)
+
         #handle everything on this main thread
-        resources = write_on_start()
+        resources = write_on_start_partial()
         more_itertools.consume(
             itertools.imap(write_to_elastic, 
                 data, itertools.repeat(resources)))
@@ -574,12 +578,12 @@ class HPAProcess():
         #setup the mulitprocesses but dont do much
         #pl_stage = pr.map(write_to_elastic, data,
         #    workers=Config.WORKERS_NUMBER, maxsize=1000,
-        #    on_start=write_on_start,
+        #    on_start=write_on_start_partial,
         #    on_done=write_on_done)
         #now wait for all the multiprocessing to actually finish
         #more_itertools.consume(pr.to_iterable(pl_stage))
 
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
         #restore old pre-load settings
         #note this automatically does all prepared indexes
         self.loader.restore_after_bulk_indexing()

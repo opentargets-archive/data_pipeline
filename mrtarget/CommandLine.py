@@ -101,7 +101,7 @@ def main():
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.hpa:
-                process = HPAProcess(loader,redis, 
+                process = HPAProcess(loader,redis, args.es_hosts,
                     data_config.tissue_translation_map, data_config.tissue_curation_map,
                     data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
                     data_config.hpa_rna_value, data_config.hpa_rna_zscore)
@@ -150,7 +150,7 @@ def main():
                     output_folder=es_output_folder,
                     num_workers=args.val_workers_validator,
                     num_writers=args.val_workers_writer,
-                    max_queued_events=args.max_queued_events,
+                    max_queued_events=args.val_queue_validator_writer,
                     eco_scores_uri=data_config.eco_scores,
                     schema_uri = data_config.schema,
                     es_hosts=args.elasticseach_nodes,

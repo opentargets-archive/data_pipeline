@@ -9,5 +9,5 @@ release-tag: master
 
 gen-plugin-places: [mrtarget/plugins/gene]
 
-val-workers-validator: 16
+val-workers-validator: 8
 val-workers-writer: 8
