@@ -101,7 +101,7 @@ def main():
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.hpa:
-                process = HPAProcess(loader,redis, args.es_hosts,
+                process = HPAProcess(loader,redis, args.elasticseach_nodes,
                     data_config.tissue_translation_map, data_config.tissue_curation_map,
                     data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
                     data_config.hpa_rna_value, data_config.hpa_rna_zscore)
@@ -141,7 +141,7 @@ def main():
                     es_output = False
                     es_output_folder = args.elasticsearch_folder
 
-                process_evidences_pipeline(filenames=args.input_file,
+                process_evidences_pipeline(filenames=data_config.input_file,
                     first_n=args.val_first_n,
                     es_client=es,
                     redis_client=redis,

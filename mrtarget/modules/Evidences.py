@@ -72,7 +72,7 @@ def process_evidence_on_start(luts, eco_scores_uri, schema_uri, excluded_biotype
     pc.logger.debug("called validate_evidence on_start from %s", str(os.getpid()))
 
     pc.logger.info('generate_validator_from_schema for %s', schema_uri)
-    pc.kwargs.validator(schema_uri)
+    pc.kwargs.validator = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
 
     pc.kwargs.luts = luts
     pc.kwargs.redis_c = new_redis_client()

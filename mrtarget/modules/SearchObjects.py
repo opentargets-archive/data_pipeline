@@ -187,6 +187,7 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
     def __init__(self,
             queue,
             redis_path,
+            es,
             chembl_target_uri, 
             chembl_mechanism_uri, 
             chembl_component_uri, 
@@ -196,6 +197,7 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
             chunk_size = 0):
         super(SearchObjectAnalyserWorker, self).__init__(queue,redis_path)
         self.queue = queue
+        self.es = es
         self.loader = None
         self.es_query = None
         self.chunk_size = chunk_size
@@ -210,9 +212,9 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
 
     def init(self):
         super(SearchObjectAnalyserWorker, self).init()
-        self.loader = Loader(self.es_query.handler, chunk_size=self.chunk_size,
+        self.loader = Loader(self.es, chunk_size=self.chunk_size,
             dry_run=self.dry_run)
-        self.es_query = ESQuery(self.loader.es)
+        self.es_query = ESQuery(self.es)
 
 
         #setup chembl handler
@@ -332,6 +334,7 @@ class SearchObjectProcess(object):
 
         workers = [SearchObjectAnalyserWorker(queue,
             None,
+            self.loader.es,
             chembl_target_uri = chembl_target_uri,
             chembl_mechanism_uri = chembl_mechanism_uri,
             chembl_component_uri = chembl_component_uri,
