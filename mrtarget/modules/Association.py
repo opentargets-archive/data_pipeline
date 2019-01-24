@@ -397,7 +397,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
         self.lookup_data = lookup_data
         self.chunk_size = chunk_size
         self.dry_run = dry_run
-        self.es = None
+        self.es = es
         self.loader = None
 
     def init(self):
@@ -545,12 +545,6 @@ class ScoringProcess():
                               serialiser='jsonpickle',
                               total=len(targets))
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
-            max_size=queue_per_worker * number_of_storers,
-            job_timeout=1200,
-            batch_size=10,
-            r_server=self.r_server,
-            serialiser='jsonpickle')
-        score_data_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|score_data_q',
             max_size=queue_per_worker * number_of_storers,
             job_timeout=1200,
             batch_size=10,
