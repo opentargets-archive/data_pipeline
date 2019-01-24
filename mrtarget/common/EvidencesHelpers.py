@@ -14,7 +14,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.connection import new_es_client
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 import mrtarget.common.IO as IO
 
@@ -24,7 +24,8 @@ _l = logging.getLogger(__name__)
 
 def make_lookup_data(es_client, redis_client):
     return LookUpDataRetriever(es_client,
-        redis_client, [], (
+        redis_client, [], 
+        (
             LookUpDataType.TARGET,
             LookUpDataType.DISEASE,
             LookUpDataType.ECO
@@ -59,9 +60,12 @@ class ProcessContext(object):
 
 
 class ProcessContextFileWriter(ProcessContext):
-    def __init__(self, output_folder='./', **kwargs):
+    def __init__(self, output_folder, **kwargs):
         super(ProcessContextFileWriter, self).__init__(**kwargs)
         self.logger.debug("called output_stream from %s", str(os.getpid()))
+
+        if not output_folder:
+            output_folder = "./"
 
         self.kwargs.valids_file_name = output_folder + os.path.sep + 'evidences-valid_' + uuid.uuid4().hex + '.json.gz'
         self.kwargs.valids_file_handle = IO.open_to_write(self.kwargs.valids_file_name)
@@ -104,14 +108,15 @@ class ProcessContextESWriter(ProcessContext):
         super(ProcessContextESWriter, self).__init__(**kwargs)
         self.logger.debug("called output_stream from %s", str(os.getpid()))
 
-        self.kwargs.es_client = new_es_client()
+
+        self.kwargs.es_client = new_es_client(kwargs['hosts'])
         self.kwargs.es_loader = Loader(es=self.kwargs.es_client)
 
-        self.kwargs.index_name_validated = Config.ELASTICSEARCH_DATA_INDEX_NAME
-        self.kwargs.doc_type_validated = Config.ELASTICSEARCH_DATA_DOC_NAME
+        self.kwargs.index_name_validated = Const.ELASTICSEARCH_DATA_INDEX_NAME
+        self.kwargs.doc_type_validated = Const.ELASTICSEARCH_DATA_DOC_NAME
 
-        self.kwargs.index_name_invalidated = Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME
-        self.kwargs.doc_type_invalidated = Config.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME
+        self.kwargs.index_name_invalidated = Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME
+        self.kwargs.doc_type_invalidated = Const.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME
 
     def put(self, line, **kwargs):
         (left, right) = line
@@ -133,8 +138,8 @@ class ProcessContextESWriter(ProcessContext):
     def close(self):
         #flush but dont close because it changes index settings
         #and that needs to be done in a single place outside of multiprocessing
-        self.kwargs.es_loader.flush_all_and_wait(Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        self.kwargs.es_loader.flush_all_and_wait(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        self.kwargs.es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_INDEX_NAME)
+        self.kwargs.es_loader.flush_all_and_wait(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
 
     @staticmethod
     def single_before(**kwargs):
@@ -143,12 +148,12 @@ class ProcessContextESWriter(ProcessContext):
         es_client = kwargs["es_client"]
         es_loader = Loader(es=es_client)
 
-        es_loader.create_new_index(Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        es_loader.create_new_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        es_loader.create_new_index(Const.ELASTICSEARCH_DATA_INDEX_NAME)
+        es_loader.create_new_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
 
         #need to directly get the versioned index name for this function
-        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Config.ELASTICSEARCH_DATA_INDEX_NAME))
-        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME))
+        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME))
+        es_loader.prepare_for_bulk_indexing(es_loader.get_versioned_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME))
 
     @staticmethod
     def single_after(**kwargs):
@@ -157,18 +162,18 @@ class ProcessContextESWriter(ProcessContext):
         es_client = kwargs["es_client"]
         es_loader = Loader(es=es_client)
         #ensure everything pending has been flushed to index
-        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_DATA_INDEX_NAME)
-        es_loader.flush_all_and_wait(Config.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_INDEX_NAME)
+        es_loader.flush_all_and_wait(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
         #restore old pre-load settings
         #note this automatically does all prepared indexes
         es_loader.restore_after_bulk_indexing()
 
 
-def create_process_context(enable_output_to_es, output_folder, dry_run):
+def create_process_context(enable_output_to_es, output_folder, es_hosts, dry_run):
     if dry_run:
         return ProcessContextDryRun()
     elif enable_output_to_es:
-        return ProcessContextESWriter()
+        return ProcessContextESWriter(hosts=es_hosts)
     else:
         return ProcessContextFileWriter(output_folder=output_folder)
 

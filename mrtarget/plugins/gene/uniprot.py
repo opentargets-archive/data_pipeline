@@ -1,5 +1,5 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from elasticsearch.exceptions import NotFoundError
 from mrtarget.modules.Reactome import ReactomeRetriever
@@ -14,13 +14,13 @@ class Uniprot(IPlugin):
     def print_name(self):
         self._logger.info("Uniprot (and Reactome) gene data plugin")
 
-    def merge_data(self, genes, loader, r_server):
+    def merge_data(self, genes, loader, r_server, data_config):
 
         esquery = ESQuery(loader.es)
         reactome_retriever = ReactomeRetriever(loader.es)
 
         try:
-            esquery.count_elements_in_index(Config.ELASTICSEARCH_UNIPROT_INDEX_NAME)
+            esquery.count_elements_in_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
         except NotFoundError as ex:
             self._logger.error('no Uniprot index found in ES. Skipping. Has the --uniprot step been run? Are you pointing to the correct index? %s' % ex)
             raise ex

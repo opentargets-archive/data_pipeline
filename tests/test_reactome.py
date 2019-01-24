@@ -25,30 +25,30 @@ class ReactomeTestCase(unittest.TestCase):
             f.write("R-HSA-209563\tAxonal growth stimulation\tHomo sapiens\textra_field\n")
 
     def test_get_pathway_data_succeed(self):
-        downloader = ReactomeDataDownloader()
+        downloader = ReactomeDataDownloader(self.file_pathway.name, self.file_pathway_relations.name)
         num_lines_file = sum(1 for line in open(self.file_pathway.name))
-        num_entries = sum(1 for _ in downloader.get_pathway_data(self.file_pathway.name))
+        num_entries = sum(1 for _ in downloader.get_pathway_data())
 
         self.assertEqual(num_entries, num_lines_file)
 
     def test_get_pathway_data_failure(self):
-        downloader = ReactomeDataDownloader()
+        downloader = ReactomeDataDownloader(self.file_wrong_tab.name, self.file_pathway_relations.name)
         with self.assertRaises(ValueError):
-            list(downloader.get_pathway_data(self.file_wrong_tab.name))
+            list(downloader.get_pathway_data())
 
     def test_get_pathway_relations_data_succeed(self):
-        downloader = ReactomeDataDownloader()
+        downloader = ReactomeDataDownloader(self.file_pathway.name, self.file_pathway_relations.name)
         # load the valid_pathway_ids
-        load_pathways_ids = sum(1 for _ in downloader.get_pathway_data(self.file_pathway.name))
+        load_pathways_ids = sum(1 for _ in downloader.get_pathway_data())
         num_lines_file = sum(1 for line in open(self.file_pathway_relations.name))
-        num_entries = sum(1 for _ in downloader.get_pathway_relations(self.file_pathway_relations.name))
+        num_entries = sum(1 for _ in downloader.get_pathway_relations())
 
         self.assertEqual(num_entries, num_lines_file)
 
     def test_get_pathway_relations_data_failure(self):
-        downloader = ReactomeDataDownloader()
+        downloader = ReactomeDataDownloader(self.file_pathway.name, self.file_wrong_tab.name)
         with self.assertRaises(ValueError):
-            list(downloader.get_pathway_relations(self.file_wrong_tab.name))
+            list(downloader.get_pathway_relations())
 
     def tearDown(self):
         os.remove(self.file_pathway.name)

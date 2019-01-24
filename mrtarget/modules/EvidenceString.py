@@ -6,6 +6,7 @@ import math
 import csv
 
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.constants import Const
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.IO import check_to_open, URLZSource
 from mrtarget.modules import GeneData
@@ -129,16 +130,18 @@ class ExtendedInfoECO(ExtendedInfo):
 
 
 class EvidenceManager():
-    def __init__(self, lookup_data):
+    def __init__(self, lookup_data, eco_scores_uri, excluded_biotypes):
         self.logger = logging.getLogger(__name__)
         self.available_genes = lookup_data.available_genes
         self.available_efos = lookup_data.available_efos
         self.available_ecos = lookup_data.available_ecos
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
-        self._get_eco_scoring_values(eco_lut_obj=self.available_ecos)
+        self._get_eco_scoring_values(self.available_ecos, eco_scores_uri)
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
+
+        self.excluded_biotypes = excluded_biotypes
 
         self._get_score_modifiers()
 
@@ -294,9 +297,9 @@ class EvidenceManager():
 
     def is_excluded_by_biotype(self, datasource, gene_id):
         is_excluded = False
-        if datasource in Config.EXCLUDED_BIOTYPES_BY_DATASOURCE:
+        if datasource in self.excluded_biotypes:
             gene_obj = self.available_genes[gene_id]
-            if gene_obj['biotype'] in Config.EXCLUDED_BIOTYPES_BY_DATASOURCE[datasource]:
+            if gene_obj['biotype'] in self.excluded_biotypes[datasource]:
                 is_excluded = True
 
         return is_excluded
@@ -544,13 +547,14 @@ class EvidenceManager():
             ensemblid = EvidenceManager._map_to_reference_ensembl_gene(ensemblid, non_reference_genes) or ensemblid
         return ensemblid
 
-    def _get_eco_scoring_values(self, eco_lut_obj):
-        self.eco_scores = load_eco_scores_table(filename=Config.ECO_SCORES_URL, eco_lut_obj=eco_lut_obj)
+    def _get_eco_scoring_values(self, eco_lut_obj, eco_scores_uri):
+        self.eco_scores = load_eco_scores_table(
+            filename=eco_scores_uri, 
+            eco_lut_obj=eco_lut_obj)
 
+    #TODO remove this
     def _get_score_modifiers(self):
         self.score_modifiers = {}
-        for datasource, values in Config.DATASOURCE_EVIDENCE_SCORE_AUTO_EXTEND_RANGE.items():
-            self.score_modifiers[datasource] = DataNormaliser(values['min'], values['max'])
 
 
 class Evidence(JSONSerializable):
@@ -579,13 +583,12 @@ class Evidence(JSONSerializable):
         self.datatype = translate_database[self.database]
 
     def get_doc_name(self):
-        return Config.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.database
+        return Const.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.database
 
     def get_id(self):
         return self.evidence['id']
 
     def to_json(self):
-        # self.stamp_data_release()
         return json.dumps(self.evidence,
                           sort_keys=True,
                           # indent=4,
@@ -703,14 +706,6 @@ class Evidence(JSONSerializable):
                     self.evidence['sourceID'], self.get_id(), self.evidence['scores']['association_score'],
                     Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]))
 
-
-        # Modify scores according to weights
-        datasource_weight = Config.DATASOURCE_EVIDENCE_SCORE_WEIGHT.get(self.evidence['sourceID'], 1.)
-        if datasource_weight != 1:
-            weighted_score = self.evidence['scores']['association_score'] * datasource_weight
-            if weighted_score > 1:
-                weighted_score = 1.
-            self.evidence['scores']['association_score'] = weighted_score
 
         # Apply rescaling to scores
         if self.evidence['sourceID'] in modifiers:

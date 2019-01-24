@@ -19,7 +19,7 @@ from copy import copy
 import math
 
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from mrtarget.common.connection import new_redis_client
 
 
@@ -157,8 +157,8 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
 
         def process(self, data):
             r = data
-            self.loader.put(Config.ELASTICSEARCH_RELATION_INDEX_NAME,
-                       Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
+            self.loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
+                       Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
                        r.id,
                        r.to_json(),
                        create_index=False)
@@ -168,8 +168,8 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
                 r.subject = obj
                 r.object = subj
                 r.set_id()
-                self.loader.put(Config.ELASTICSEARCH_RELATION_INDEX_NAME,
-                           Config.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
+                self.loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
+                           Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
                            r.id,
                            r.to_json(),
                            create_index=False)
@@ -595,8 +595,8 @@ class DataDrivenRelationProcess(object):
 
         '''create the index'''
         self.loader = Loader(self.es, dry_run=dry_run)
-        self.loader.create_new_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME, recreate=True)
-        self.loader.prepare_for_bulk_indexing(self.loader.get_versioned_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME))
+        self.loader.create_new_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME, recreate=True)
+        self.loader.prepare_for_bulk_indexing(self.loader.get_versioned_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME))
 
 
         '''create the queues'''
@@ -707,7 +707,7 @@ class DataDrivenRelationProcess(object):
 
         logger.info('flushing data to index')
         self.es.indices.flush(
-            '%s*' % Loader.get_versioned_index(Config.ELASTICSEARCH_RELATION_INDEX_NAME),
+            '%s*' % Loader.get_versioned_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME),
             wait_if_ongoing=True)
 
         logger.info("flush loader")

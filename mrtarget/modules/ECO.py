@@ -5,8 +5,9 @@ from mrtarget.common.IO import check_to_open, URLZSource
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
+from mrtarget.constants import Const
 import opentargets_ontologyutils.eco_so
-from mrtarget.Settings import Config
+from mrtarget.Settings import Config #TODO remove
 import logging
 
 logger = logging.getLogger(__name__)
@@ -38,21 +39,20 @@ class ECO(JSONSerializable):
 
 class EcoProcess():
 
-    def __init__(self, loader):
+    def __init__(self, loader, eco_uri, so_uri):
         self.loader = loader
         self.ecos = OrderedDict()
         self.evidence_ontology = OntologyClassReader()
+        self.eco_uri = eco_uri
+        self.so_uri = so_uri
 
     def process_all(self):
         self._process_ontology_data()
         self._store_eco()
 
     def _process_ontology_data(self):
-
-        uri_so = Config.ONTOLOGY_CONFIG.get('uris', 'so')
-        uri_eco = Config.ONTOLOGY_CONFIG.get('uris', 'eco')
-
-        opentargets_ontologyutils.eco_so.load_evidence_classes(self.evidence_ontology, uri_so, uri_eco)
+        opentargets_ontologyutils.eco_so.load_evidence_classes(self.evidence_ontology, 
+            self.so_uri, self.eco_uri)
 
         for uri,label in self.evidence_ontology.current_classes.items():
             eco = ECO(uri,
@@ -66,11 +66,11 @@ class EcoProcess():
 
     def _store_eco(self):
         for eco_id, eco_obj in self.ecos.items():
-            self.loader.put(index_name=Config.ELASTICSEARCH_ECO_INDEX_NAME,
-                            doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
+            self.loader.put(index_name=Const.ELASTICSEARCH_ECO_INDEX_NAME,
+                            doc_type=Const.ELASTICSEARCH_ECO_DOC_NAME,
                             ID=eco_id,
                             body=eco_obj)
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_ECO_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_ECO_INDEX_NAME)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

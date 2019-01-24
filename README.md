@@ -204,20 +204,9 @@ This will run a tagged version, so if you want use something else or to make you
 
 Here the list to change, enable or disable functionality:
 
-* `CTTV_EV_LIMIT` string `true` to enable otherwise `false` or delete (WIP)
 * `CTTV_MINIMAL` string `true` to enable otherwise `false` or delete
 * `CTTV_DATA_VERSION` indexes prefix a name to enable otherwise `17.04`
-* `CTTV_EL_LOADER` the name of the section of the ES config file db.ini default `dev`
 * `ELASTICSEARCH_NODES` default is `['http://127.0.0.1:9200']`
-* `WORKERS_NUMBER` is an number and by default is `multiprocessing.cpu_count()`
-* `CTTV_DUMP_FOLDER` is a string of a writable path and by default is `tempfile.gettempdir()`
-* `DUMP_REMOTE_API_URL` a string and by default is `http://beta.opentargets.io`
-* `DUMP_REMOTE_API_PORT` a number and by default is `80`
-* `DUMP_REMOTE_API_SECRET` a string and by default is `None`
-* `DUMP_REMOTE_API_APPNAME` a string and by default is `None`
-* `CTTV_DRY_RUN_OUTPUT` string `true` to enable otherwise is `false` by default
-* `CTTV_DRY_RUN_OUTPUT_DELETE` string `true` to enable otherwise is `false` by fefault
-* `CTTV_DRY_RUN_OUTPUT_COUNT` number `1000` by default
 * `CTTV_ES_CUSTOM_IDXS` `true` to enable it and by default is `false`
 
 ## Contributing

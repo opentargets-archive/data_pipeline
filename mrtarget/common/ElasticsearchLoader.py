@@ -36,10 +36,6 @@ class Loader():
         self.dry_run = dry_run
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
-        self._tmp_fd = None
-        self._tmp_fd_enable = Config.DRY_RUN_OUTPUT
-        self._tmp_fd_delete = Config.DRY_RUN_OUTPUT_DELETE
-        self._tmp_fd_count = Config.DRY_RUN_OUTPUT_COUNT
 
     @staticmethod
     def get_versioned_index(index_name, check_custom_idxs=False):
@@ -143,23 +139,6 @@ class Loader():
             bulk(self.es,
                  self.cache,
                  stats_only=True)
-        else:
-            # create a temporal file if necessary
-            if self._tmp_fd_enable and self._tmp_fd_count > 0:
-                if self._tmp_fd is None:
-                    self._tmp_fd = tempfile.NamedTemporaryFile(
-                        delete=self._tmp_fd_delete)
-                    self.logger.info('create temporary file to output '
-                                     'generated index docs while dry_run '
-                                     'is activated with file %s',
-                                     self._tmp_fd.name)
-
-
-                # flush self.cache into temp file converted as text lines
-                self._tmp_fd.writelines([json.dumps(el) + '\n'
-                                         for el in self.cache])
-                self._tmp_fd_count = self._tmp_fd_count - len(self.cache) if \
-                    self._tmp_fd_count > 0 else 0
 
     def close(self):
         self.flush()

@@ -2,13 +2,11 @@ import logging
 import os
 import time
 
-from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
-import opentargets_ontologyutils.hpo
 import opentargets_ontologyutils.mp
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
@@ -24,9 +22,7 @@ class LookUpData():
         self.available_hpa = None
         self.uni2ens = None
         self.non_reference_genes = None
-        self.chembl = None
 
-        self.hpo_ontology = None
         self.mp_ontology = None
 
     def set_r_server(self, r_server):
@@ -48,11 +44,8 @@ class LookUpData():
 class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
-    EFO = 'efo'
-    HPO = 'hpo'
     ECO = 'eco'
     MP = 'mp'
-    CHEMBL_DRUGS = 'chembl_drugs'
     HPA = 'hpa'
 
 
@@ -61,21 +54,20 @@ class LookUpDataRetriever(object):
                  es,
                  r_server,
                  targets,
-                 data_types
+                 data_types,
+                 hpo_uri = None,
+                 mp_uri = None
                  ):
-
         self.es = es
         self.r_server = r_server
 
-        require_all(self.es is not None, self.r_server is not None)
-
         self.lookup = LookUpData()
+
         self._logger = logging.getLogger(__name__)
 
         # TODO: run the steps in parallel to speedup loading times
         for dt in data_types:
             self._logger.info("get %s info"%dt)
-        for dt in data_types:
             start_time = time.time()
             if dt == LookUpDataType.TARGET:
                 self._get_gene_info(targets, True)
@@ -85,12 +77,7 @@ class LookUpDataRetriever(object):
                 self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.MP:
                 self._logger.debug("get MP info")
-                self._get_mp()
-            elif dt == LookUpDataType.HPO:
-                self._logger.debug("get HPO info")
-                self._get_hpo()
-            elif dt == LookUpDataType.CHEMBL_DRUGS:
-                self._get_available_chembl_mappings()
+                self._get_mp(mp_uri)
             elif dt == LookUpDataType.HPA:
                 self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP', self.r_server)
 
@@ -125,41 +112,16 @@ class LookUpDataRetriever(object):
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
 
-    def _get_hpo(self):
-        '''
-        Load HPO to accept phenotype terms that are not in EFO
-        :return:
-        '''
-        obj = OntologyClassReader()
-        hpo_uri = Config.ONTOLOGY_CONFIG.get('uris', 'hpo')
-        opentargets_ontologyutils.hpo.get_hpo(obj, hpo_uri)
-        obj.rdf_graph = None
-        self.lookup.hpo_ontology = obj
-
-    def _get_mp(self):
+    def _get_mp(self, mp_uri):
         '''
         Load MP to accept phenotype terms that are not in EFO
         :return:
         '''
         obj = OntologyClassReader()
-        mp_uri = Config.ONTOLOGY_CONFIG.get('uris', 'mp')
         opentargets_ontologyutils.mp.load_mammalian_phenotype_ontology(obj, mp_uri)
         obj.rdf_graph = None
         self.lookup.mp_ontology = obj
 
-    def _get_available_chembl_mappings(self):
-        chembl_handler = ChEMBLLookup()
-        chembl_handler.get_molecules_from_evidence()
-        all_molecules = set()
-        for target, molecules in  chembl_handler.target2molecule.items():
-            all_molecules = all_molecules|molecules
-        all_molecules = list(all_molecules)
-        query_batch_size = 100
-        for i in range(0, len(all_molecules) + 1, query_batch_size):
-            chembl_handler._populate_synonyms_for_molecule(all_molecules[i:i + query_batch_size],
-                                                           chembl_handler.molecule2synonyms,
-                                                           chembl_handler._logger)
-        self.lookup.chembl = chembl_handler
         
 
 

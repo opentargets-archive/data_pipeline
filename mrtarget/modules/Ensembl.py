@@ -2,15 +2,15 @@ import json
 import logging
 import more_itertools
 import functional
+import configargparse
 
 from mrtarget.common import URLZSource
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 
 class EnsemblProcess(object):
     """
     Load a set of Ensembl genes from a JSON file into Elasticsearch.
-    The file is specifided in Settings.py as Config.ENSEMBL_FILENAME
     It should be generated using the create_genes_dictionary.py script in opentargets/genetics_backend/makeLUTs
     e.g.
     python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38
@@ -21,8 +21,8 @@ class EnsemblProcess(object):
 
     def process(self, ensembl_filename):
         def _put_line(line):
-            self.loader.put(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
-                            Config.ELASTICSEARCH_ENSEMBL_DOC_NAME,
+            self.loader.put(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
+                            Const.ELASTICSEARCH_ENSEMBL_DOC_NAME,
                             line['id'],
                             json.dumps(line))
             return 1
@@ -37,7 +37,7 @@ class EnsemblProcess(object):
         self.logger.info("Read %d lines from %s", inserted_lines, ensembl_filename)
 
         self.logger.info("flush index")
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
 
     def qc(self, esquery):
         """

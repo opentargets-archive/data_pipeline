@@ -4,7 +4,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader, DiseaseUtils
 import opentargets_ontologyutils.efo
 from rdflib import URIRef
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 logger = logging.getLogger(__name__)
 
@@ -84,10 +84,19 @@ class EFO(JSONSerializable):
 class EfoProcess():
 
     def __init__(self,
-                 loader):
+                 loader,
+                 efo_uri,
+                 hpo_uri,
+                 mp_uri,
+                 disease_phenotype_uris
+                 ):
         self.loader = loader
         self.efos = OrderedDict()
         self.logger = logging.getLogger(__name__+".EfoProcess")
+        self.efo_uri = efo_uri
+        self.hpo_uri = hpo_uri
+        self.mp_uri = mp_uri
+        self.disease_phenotype_uris = disease_phenotype_uris
 
     def process_all(self):
         self._process_ontology_data()
@@ -96,17 +105,16 @@ class EfoProcess():
     def _process_ontology_data(self):
 
         self.disease_ontology = OntologyClassReader()
-        efo_uri = Config.ONTOLOGY_CONFIG.get('uris','efo')
-        opentargets_ontologyutils.efo.load_open_targets_disease_ontology(self.disease_ontology, efo_uri)
+        opentargets_ontologyutils.efo.load_open_targets_disease_ontology(self.disease_ontology,  self.efo_uri)
 
         '''
         Get all phenotypes
         '''
+        #becuse of opentargets_ontologyutils for legacy iterates over key,uri pairs
+        disease_phenotype_uris_counter = enumerate(self.disease_phenotype_uris)
+
         utils = DiseaseUtils()
-        uri_hpo = Config.ONTOLOGY_CONFIG.get('uris', 'hpo')
-        uri_mp = Config.ONTOLOGY_CONFIG.get('uris', 'mp')
-        uri_disease_phenotypes = Config.ONTOLOGY_CONFIG.items('disease_phenotypes_uris')
-        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology, uri_hpo, uri_mp, uri_disease_phenotypes)
+        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology, self.hpo_uri, self.mp_uri, disease_phenotype_uris_counter)
 
         for uri,label in self.disease_ontology.current_classes.items():
             properties = self.disease_ontology.parse_properties(URIRef(uri))
@@ -153,11 +161,11 @@ class EfoProcess():
     def _store_efo(self):
 
         for efo_id, efo_obj in self.efos.items():
-            self.loader.put(index_name=Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                            doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+            self.loader.put(index_name=Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                            doc_type=Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                             ID=efo_id,
                             body = efo_obj)
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects

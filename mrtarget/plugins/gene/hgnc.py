@@ -3,6 +3,7 @@ import logging
 
 from yapsy.IPlugin import IPlugin
 import simplejson as json
+import configargparse
 
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
@@ -14,13 +15,15 @@ class HGNC(IPlugin):
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
 
+
     def print_name(self):
         self._logger.info("HGNC gene data plugin")
 
-    def merge_data(self, genes, loader, r_server):
-        self._logger.info("HGNC parsing - requesting from URL %s" % Config.HGNC_COMPLETE_SET)
+    def merge_data(self, genes, loader, r_server, data_config):
 
-        with URLZSource(Config.HGNC_COMPLETE_SET).open() as source:
+        self._logger.info("HGNC parsing - requesting from URL %s", data_config.hgnc_complete_set)
+
+        with URLZSource(data_config.hgnc_complete_set).open() as source:
 
             data = json.load(source)
 

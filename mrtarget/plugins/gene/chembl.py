@@ -1,7 +1,7 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 import logging
-
+import configargparse
 
 class ChEMBL(IPlugin):
     def __init__(self, *args, **kwargs):
@@ -13,9 +13,16 @@ class ChEMBL(IPlugin):
     def print_name(self):
         self._logger.info("ChEMBL gene data plugin")
 
-    def merge_data(self, genes, loader, r_server):
+    def merge_data(self, genes, loader, r_server, data_config):
+
+        chembl_handler = ChEMBLLookup(
+            target_uri=data_config.chembl_target, 
+            mechanism_uri=data_config.chembl_mechanism,
+            component_uri=data_config.chembl_component,
+            protein_uri=data_config.chembl_protein,
+            molecule_set_uri_pattern=data_config.chembl_molecule_set_uri_pattern)
+
         self._logger.info("Retrieving ChEMBL Drug")
-        chembl_handler = ChEMBLLookup()
         chembl_handler.download_molecules_linked_to_target()
         self._logger.info("Retrieving ChEMBL Target Class ")
         chembl_handler.download_protein_classification()

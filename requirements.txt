@@ -4,7 +4,8 @@ redislite
 #AF 15/11/18 transitive pinning to 2.x.x to solve AttributeError: 'UnixDomainSocketConnection' object has no attribute '_buffer_cutoff' 
 redis<=2.10.6
 addict
-envparse
+envparse #TODO remove when migration to ConfigArgParse is complete
+ConfigArgParse[yaml]
 elasticsearch-dsl>=5.0.0,<6.0.0
 networkx
 

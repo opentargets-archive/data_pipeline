@@ -34,7 +34,6 @@ def json_serialize(obj):
 
 class JSONSerializable(object):
     def to_json(self):
-        # self.stamp_data_release()
         return json.dumps(self,
                           default=json_serialize,
                           sort_keys=True,
@@ -48,9 +47,6 @@ class JSONSerializable(object):
             self.__dict__.update(**data)
         else:
             raise AttributeError("cannot load JSON object from %s type"%str(type(data)))
-
-    def stamp_data_release(self):
-        self.__dict__['data_release'] = Config.RELEASE_VERSION.split('-')[-1]
 
 
 class TreeNode(object):

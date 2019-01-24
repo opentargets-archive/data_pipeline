@@ -6,6 +6,7 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from yapsy.PluginManager import PluginManager
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
@@ -388,8 +389,8 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
         geneid, gene = data
         '''process objects to simple search object'''
         gene.preprocess()
-        self.loader.put(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                       Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+        self.loader.put(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                       Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                        geneid,
                        gene.to_json(),
                        create_index=False)
@@ -407,11 +408,20 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
 class GeneManager():
     """
     Merge data available in ?elasticsearch into proper json objects
+
+
+    plugin_paths is a collection of filesystem paths to search for potential plugins
+
+    plugin_names is an ordered collection of class names of plugins which determines
+    the order they are handled in
+
     """
 
     def __init__(self,
                  loader,
-                 r_server):
+                 r_server,
+                 plugin_paths,
+                 plugin_order):
 
         self.loader = loader
         self.r_server = r_server
@@ -422,25 +432,28 @@ class GeneManager():
         # Build the manager
         self.simplePluginManager = PluginManager()
         # Tell it the default place(s) where to find plugins
-        self.simplePluginManager.setPluginPlaces(Config.GENE_DATA_PLUGIN_PLACES)
-        for dir in Config.GENE_DATA_PLUGIN_PLACES:
-            self._logger.info(dir)
+        self.simplePluginManager.setPluginPlaces(plugin_paths)
+        for dir in plugin_paths:
+            self._logger.debug("Looking for plugins in %s", dir)
         # Load all plugins
         self.simplePluginManager.collectPlugins()
 
+        self.plugin_order = plugin_order
 
-    def merge_all(self, dry_run = False):
 
-        for plugin_name in Config.GENE_DATA_PLUGIN_ORDER:
+    def merge_all(self, data_config, dry_run = False):
+
+        for plugin_name in self.plugin_order:
             plugin = self.simplePluginManager.getPluginByName(plugin_name)
             plugin.plugin_object.print_name()
-            plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server)
+            plugin.plugin_object.merge_data(genes=self.genes, 
+                loader=self.loader, r_server=self.r_server, data_config=data_config)
 
         self._store_data(dry_run=dry_run)
 
     def _store_data(self, dry_run = False):
 
-        self.loader.create_new_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        self.loader.create_new_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|gene_data_storage',
                            r_server=self.r_server,
                            serialiser='jsonpickle',
@@ -463,7 +476,7 @@ class GeneManager():
         for w in workers:
             w.join()
 
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         self._logger.info('all gene objects pushed to elasticsearch')
 
 

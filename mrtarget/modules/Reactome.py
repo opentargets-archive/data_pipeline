@@ -6,7 +6,7 @@ from networkx.algorithms import all_simple_paths
 
 from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 from mrtarget.common import URLZSource
 
 class ReactomeNode(TreeNode, JSONSerializable):
@@ -15,26 +15,28 @@ class ReactomeNode(TreeNode, JSONSerializable):
 
 
 class ReactomeDataDownloader():
-    ALLOWED_SPECIES = ['Homo sapiens']
-    HEADERS = ["id", "description", "species"]
-    HEADERS_PATHWAY_REL = ["id","related_id"]
 
-    def __init__(self):
+    def __init__(self, pathway_data_url, pathway_relation_url):
         self.logger = logging.getLogger(__name__)
+        self.allowed_species = ['Homo sapiens']
+        self.headers = ["id", "description", "species"]
+        self.headers_pathway_rel = ["id", "related_id"]
+        self.pathway_data_url = pathway_data_url
+        self.pathway_relation_url = pathway_relation_url
 
-    def get_pathway_data(self, uri=Config.REACTOME_PATHWAY_DATA):
+    def get_pathway_data(self):
         self.valid_pathway_ids = []
-        with URLZSource(uri).open() as source:
-            for i, row in enumerate(csv.DictReader(source, fieldnames=ReactomeDataDownloader.HEADERS, dialect='excel-tab'), start=1):
+        with URLZSource(self.pathway_data_url).open() as source:
+            for i, row in enumerate(csv.DictReader(source, fieldnames=self.headers, dialect='excel-tab'), start=1):
                 if len(row) != 3:
-                   raise ValueError('Reactome.py: Pathway file format unexpected at line %d.' % i)
+                    raise ValueError('Reactome.py: Pathway file format unexpected at line %d.' % i)
 
                 pathway_id = row["id"]
                 pathway_name = row["description"]
                 species = row["species"]
 
                 if pathway_id not in self.valid_pathway_ids:
-                    if species in self.ALLOWED_SPECIES:
+                    if species in self.allowed_species:
                         self.valid_pathway_ids.append(pathway_id)
                         yield dict(id=pathway_id,
                                 name=pathway_name,
@@ -47,11 +49,11 @@ class ReactomeDataDownloader():
 
         self.logger.info('parsed %i rows for reactome_pathway_data' % len(self.valid_pathway_ids))
 
-    def get_pathway_relations(self,uri=Config.REACTOME_PATHWAY_RELATION):
+    def get_pathway_relations(self):
         added_relations = []
-        with URLZSource(uri).open() as source:
+        with URLZSource(self.pathway_relation_url).open() as source:
             for i, row in enumerate(
-                    csv.DictReader(source, fieldnames=ReactomeDataDownloader.HEADERS_PATHWAY_REL, dialect='excel-tab'), start=1):
+                    csv.DictReader(source, fieldnames=self.headers_pathway_rel, dialect='excel-tab'), start=1):
                 if len(row) != 2:
                     raise ValueError('Reactome.py: Pathway Relation file format unexpected at line %d.' % i)
 
@@ -73,11 +75,12 @@ class ReactomeDataDownloader():
 
 
 class ReactomeProcess():
-    def __init__(self, loader):
+    def __init__(self, loader, pathway_data_url, pathway_relation_url):
         self.loader = loader
         self.g = nx.DiGraph(name="reactome")
         self.data = {}
-        self.downloader = ReactomeDataDownloader()
+        '''download data'''
+        self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
         self.logger = logging.getLogger(__name__)
 
     def process_all(self):
@@ -89,16 +92,15 @@ class ReactomeProcess():
             for row in self.downloader.get_pathway_data():
                 self.g.add_node(row['id'], name=row['name'], species=row['species'])
             children = set()
-
             for row in self.downloader.get_pathway_relations():
                 self.g.add_edge(row['id'], row['child'])
                 children.add(row['child'])
-            nodes_without_parent = set(self.g.nodes()) - children
 
+            nodes_without_parent = set(self.g.nodes()) - children
             for node in nodes_without_parent:
                 if node != root:
                     self.g.add_edge(root, node)
-
+                    
             for node, node_data in self.g.nodes(data=True):
                 if node != root:
                     ancestors = set()
@@ -112,8 +114,8 @@ class ReactomeProcess():
                     children = tuple(self.g.successors(node))
                     parents = tuple(self.g.predecessors(node))
 
-                    self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
-                        doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                    self.loader.put(index_name=Const.ELASTICSEARCH_REACTOME_INDEX_NAME,
+                        doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
                         ID=node,
                         body=dict(id=node,
                             label=node_data['name'],
@@ -124,10 +126,12 @@ class ReactomeProcess():
                             ancestors=list(ancestors)
                         ))
             #make sure the index is all ready for future operations before completing this step
-            self.loader.flush_all_and_wait(Config.ELASTICSEARCH_REACTOME_INDEX_NAME)
+            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_REACTOME_INDEX_NAME)
         except ValueError as error:
             self.logger.error(error)
             raise
+
+
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

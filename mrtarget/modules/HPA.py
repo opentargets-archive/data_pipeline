@@ -14,7 +14,8 @@ from mrtarget.common import URLZSource
 
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
 
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
+from mrtarget.Settings import Config #TODO remove this eventually
 from mrtarget.common.connection import new_es_client
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
@@ -120,11 +121,7 @@ class HPAExpression(Dict, JSONSerializable):
 
         return tissue
 
-    def stamp_data_release(self):
-        self.data_release = Config.RELEASE_VERSION
-
     def to_json(self):
-        # self.stamp_data_release()
         return json.dumps(self.to_dict(),
                           default=json_serialize,
                           sort_keys=True,
@@ -335,24 +332,36 @@ def hpa2tissues(hpa=None):
             'zscore': zscores}
 
 class HPADataDownloader():
-    def __init__(self):
+    def __init__(self, tissue_translation_map, 
+            tissue_curation_map,
+            normal_tissue_url,
+            rna_level_url,
+            rna_value_url,
+            rna_zscore_url):
         self.logger = logging.getLogger(__name__)
-        self.t2m = self.load_t2m()
+        self.tissue_translation_map = tissue_translation_map
+        self.tissue_curation_map = tissue_curation_map
+        self.normal_tissue_url = normal_tissue_url
+        self.rna_level_url = rna_level_url
+        self.rna_value_url = rna_value_url
+        self.rna_zscore_url = rna_zscore_url
 
-    def load_t2m(self):
+
+
+        #load t2m
         t2m = {'tissues': {} ,
                'curations': {}}
 
-        with URLZSource(Config.TISSUE_TRANSLATION_MAP_URL).open() as r_file:
+        with URLZSource(self.tissue_translation_map).open() as r_file:
             t2m['tissues'] = json.load(r_file)['tissues']
 
 
-        with URLZSource(Config.TISSUE_CURATION_MAP_URL).open() as r_file:
+        with URLZSource(self.tissue_curation_map).open() as r_file:
             t2m['curations'] = {el['name']: el['canonical']
                                     for el in csv.DictReader(r_file,
                                               fieldnames=['name', 'canonical'],
                                               delimiter='\t')}
-        return t2m
+        self.t2m = t2m
 
     def retrieve_normal_tissue_data(self):
         """Parse 'normal_tissue' csv file,
@@ -362,7 +371,7 @@ class HPADataDownloader():
         """
         self.logger.info('get normal tissue rows into dicts')
         table = (
-            petl.fromcsv(URLZSource(Config.HPA_NORMAL_TISSUE_URL), delimiter='\t')
+            petl.fromcsv(URLZSource(self.normal_tissue_url), delimiter='\t')
             .rename({'Tissue': 'tissue',
                      'Cell type': 'cell_type',
                      'Level': 'level',
@@ -412,7 +421,7 @@ class HPADataDownloader():
         self.logger.info('get rna tissue rows into dicts')
         self.logger.debug('melting rna level table into geneid tissue level')
 
-        t_level = (petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL), delimiter='\t')
+        t_level = (petl.fromcsv(URLZSource(self.rna_level_url), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_level')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
@@ -426,7 +435,7 @@ class HPADataDownloader():
             .cutout('tissue')
         )
 
-        t_value = (petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL), delimiter='\t')
+        t_value = (petl.fromcsv(URLZSource(self.rna_value_url), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_value')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
@@ -437,7 +446,7 @@ class HPADataDownloader():
             .cutout('tissue')
         )
 
-        t_zscore = (petl.fromcsv(URLZSource(Config.HPA_RNA_ZSCORE_URL), delimiter='\t')
+        t_zscore = (petl.fromcsv(URLZSource(self.rna_zscore_url), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='zscore_level')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
@@ -471,21 +480,21 @@ class HPADataDownloader():
         return t_join
 
 
-def write_on_start():
+def write_on_start(es_hosts):
     kwargs = {}
-    es_client = new_es_client()
+    es_client = new_es_client(es_hosts)
     kwargs['es_loader'] = Loader(es=es_client)
 
     return kwargs
 
 def write_on_done(status, resources):
-    resources['es_loader'].flush_all_and_wait(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+    resources['es_loader'].flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
     resources['es_loader'].close()
 
 def write_to_elastic(data, resources):
     hpa = data[0]
-    resources['es_loader'].put(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+    resources['es_loader'].put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
                 ID=hpa['gene'],
                 body=hpa,
                 create_index=False)
@@ -493,10 +502,23 @@ def write_to_elastic(data, resources):
 
 
 class HPAProcess():
-    def __init__(self, loader, r_server):
+    def __init__(self, loader, r_server, 
+            es_hosts,
+            tissue_translation_map_url, 
+            tissue_curation_map_url,
+            normal_tissue_url,
+            rna_level_url,
+            rna_value_url,
+            rna_zscore_url):
         self.loader = loader
         self.r_server = r_server
-        self.downloader = HPADataDownloader()
+        self.es_hosts = es_hosts
+        self.downloader = HPADataDownloader(tissue_translation_map_url, 
+            tissue_curation_map_url,
+            normal_tissue_url,
+            rna_level_url,
+            rna_value_url,
+            rna_zscore_url)
         self.logger = logging.getLogger(__name__)
         self.hpa_normal_table = None
         self.hpa_rna_table = None
@@ -531,19 +553,20 @@ class HPAProcess():
 
         self.logger.debug('calling to create new expression index')
 
-        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-
+        self.loader.create_new_index(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
         self.loader.prepare_for_bulk_indexing(
             self.loader.get_versioned_index(
-                Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
+                Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
 
         #actually store it into elasticsearch       
         self.logger.info('starting to write to elasticsearch') 
 
         data = self.hpa_merged_table.data()
 
+        write_on_start_partial = functools.partial(write_on_start, self.es_hosts)
+
         #handle everything on this main thread
-        resources = write_on_start()
+        resources = write_on_start_partial()
         more_itertools.consume(
             itertools.imap(write_to_elastic, 
                 data, itertools.repeat(resources)))
@@ -555,12 +578,12 @@ class HPAProcess():
         #setup the mulitprocesses but dont do much
         #pl_stage = pr.map(write_to_elastic, data,
         #    workers=Config.WORKERS_NUMBER, maxsize=1000,
-        #    on_start=write_on_start,
+        #    on_start=write_on_start_partial,
         #    on_done=write_on_done)
         #now wait for all the multiprocessing to actually finish
         #more_itertools.consume(pr.to_iterable(pl_stage))
 
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
         #restore old pre-load settings
         #note this automatically does all prepared indexes
         self.loader.restore_after_bulk_indexing()
