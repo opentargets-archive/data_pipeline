@@ -1,0 +1,11 @@
+
+#transitively includes pytest
+pytest-cov
+
+mock
+nose
+toolz
+pylint
+pipdeptree
+
+codecov

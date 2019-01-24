@@ -1,6 +1,8 @@
 # Makefile for Open Targets data pipeline
-# Based on steps in https://github.com/opentargets/data_release/wiki/OT011-Data-Processing-(Backend)
 
+#ensure pipes behave correctly in called processes
+SHELL = /bin/bash
+.SHELLFLAGS = -o pipefail -c
 
 #get the directory the makefile is in
 # from https://stackoverflow.com/questions/18136918
@@ -10,20 +12,9 @@ mkfile_dir := $(dir $(mkfile_path))
 # These variables can be overridden on the command-line. 
 # Note that if any of these are already specified by environment variables, 
 # the existing variables will take precedence
-ES_PREFIX ?= makefile
-ELASTICSEARCH_NODES?=http://localhost:9200
-LOG_LEVEL ?= DEBUG
-SCHEMA_VERSION ?= master
-NUMBER_TO_KEEP ?= 1000
+ELASTICSEARCH_NODES ?= http://localhost:9200
 
 LOG_PATH ?= $(mkfile_dir)/log
-LOG_HTTP ?= $(LOG_PATH)/http.log
-
-JSON_PATH ?= $(mkfile_dir)/json
-
-QC_PATH ?= $(mkfile_dir)/qc
-QC_FILE ?= $(QC_PATH)/qc.$(ES_PREFIX).tsv
-QC_FILE_OLD ?= $(QC_PATH)/qc.18.08.tsv
 
 # Allow specification of additional arguments for each stage on the command-line
 # Intended to be empty here and overriden from outside if needed
@@ -31,313 +22,118 @@ MRTARGET_ARGS ?=
 
 # Internal variables
 #command to run mrtarget with various logging
-MRTARGET_CMD = python -m mrtarget.CommandLine --log-level=$(LOG_LEVEL) --qc-out=$(QC_FILE) --log-http=$(LOG_HTTP) $(MRTARGET_ARGS)
-
-
-INDEX_CMD = python scripts/check_index.py --elasticsearch $(ELASTICSEARCH_NODES) --zero-fail --index
-
-#simple command to ping elasticsearch
-ELASTIC_CHECK_CMD = curl -sSf $(ELASTICSEARCH_NODES) -o /dev/null
+MRTARGET_ENTRYPOINT ?= $(mkfile_dir)/scripts/entrypoint.sh
+MRTARGET_CMD = $(MRTARGET_ENTRYPOINT)
 
 # First target is run by default if make is run with no arguments, so do something safe
-
 .PHONY: dry_run
 dry_run:
-	$(MRTARGET_CMD) --dry-run $(ES_PREFIX)
+	$(MRTARGET_CMD) --dry-run
 
-.PHONEY: rea
-rea: $(LOG_PATH)/out.$(ES_PREFIX).rea.log
+.PHONY: rea
+rea: $(LOG_PATH)/out.rea.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).rea.log : 
-	$(ELASTIC_CHECK_CMD)
-	$(MRTARGET_CMD) --rea $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).rea.log
+$(LOG_PATH)/out.rea.log : 
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --rea 2>&1 | tee $(LOG_PATH)/out.rea.log
 
 .PHONY: ens
-ens: $(LOG_PATH)/out.$(ES_PREFIX).ens.log
+ens: $(LOG_PATH)/out.ens.log 
 
-$(LOG_PATH)/out.$(ES_PREFIX).ens.log : 
-	$(ELASTIC_CHECK_CMD)
-	$(MRTARGET_CMD) --ens $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).ens.log
+$(LOG_PATH)/out.ens.log : 
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --ens 2>&1 | tee $(LOG_PATH)/out.ens.log
 
 .PHONY: unic
 unic: uni
 
 .PHONY: uni
-uni: $(LOG_PATH)/out.$(ES_PREFIX).uni.log
+uni: $(LOG_PATH)/out.uni.log
 
-#handle uniprot download and local file cache
-#not quite implemented yet, so were mostly ahead of the game wit this
-$(JSON_PATH)/uniprot.xml.gz:
-	curl --silent --output $(JSON_PATH)/uniprot.xml.gz "https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml"
-
-#$(LOG_PATH)/out.$(ES_PREFIX).uni.log :  $(JSON_PATH)/uniprot.xml.gz
-$(LOG_PATH)/out.$(ES_PREFIX).uni.log :
-	$(ELASTIC_CHECK_CMD)
-	$(MRTARGET_CMD) --unic $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).uni.log
+$(LOG_PATH)/out.uni.log :
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --unic 2>&1 | tee $(LOG_PATH)/out.uni.log
+	sleep 60
 
 .PHONY: hpa
-hpa: $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
+hpa: $(LOG_PATH)/out.hpa.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).hpa.log : 
-	$(ELASTIC_CHECK_CMD)
-	$(MRTARGET_CMD) --hpa $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
-
-.PHONY: mp
-mp: $(LOG_PATH)/out.$(ES_PREFIX).mp.log
-
-$(LOG_PATH)/out.$(ES_PREFIX).mp.log : 
-	$(ELASTIC_CHECK_CMD)
-	$(MRTARGET_CMD) --mp $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).mp.log
-
+$(LOG_PATH)/out.hpa.log : 
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --hpa 2>&1 | tee $(LOG_PATH)/out.hpa.log
+	sleep 60
 
 .PHONY: efo
-efo: $(LOG_PATH)/out.$(ES_PREFIX).efo.log
+efo: $(LOG_PATH)/out.efo.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).efo.log : 
-	$(ELASTIC_CHECK_CMD)
-	$(MRTARGET_CMD) --efo $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).efo.log
+$(LOG_PATH)/out.efo.log : 
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --efo 2>&1 | tee $(LOG_PATH)/out.efo.log
+	sleep 60
 
 
 .PHONY: eco
-eco: $(LOG_PATH)/out.$(ES_PREFIX).eco.log
+eco: $(LOG_PATH)/out.eco.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).eco.log : 
-	$(MRTARGET_CMD) --eco $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).eco.log
+$(LOG_PATH)/out.eco.log : 
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --eco 2>&1 | tee $(LOG_PATH)/out.eco.log
+	sleep 60
 
 
 .PHONY: base_gene
-base_gene: $(LOG_PATH)/out.$(ES_PREFIX).gen.log	
+base_gene: $(LOG_PATH)/out.gen.log	
 
-$(LOG_PATH)/out.$(ES_PREFIX).gen.log : $(LOG_PATH)/out.$(ES_PREFIX).rea.log $(LOG_PATH)/out.$(ES_PREFIX).ens.log $(LOG_PATH)/out.$(ES_PREFIX).uni.log $(LOG_PATH)/out.$(ES_PREFIX).hpa.log
-	$(ELASTIC_CHECK_CMD)
-	$(INDEX_CMD) $(ES_PREFIX)_reactome-data $(ES_PREFIX)_ensembl-data $(ES_PREFIX)_uniprot-data $(ES_PREFIX)_expression-data
-	$(MRTARGET_CMD) --gen $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).gen.log
+$(LOG_PATH)/out.gen.log : $(LOG_PATH)/out.rea.log $(LOG_PATH)/out.ens.log $(LOG_PATH)/out.uni.log
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --gen 2>&1 | tee $(LOG_PATH)/out.gen.log
+	sleep 60
 
 .PHONY: base
-base: base_gene mp efo eco
-
-.PHONY: validate_atlas
-validate_atlas : $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log
-
-$(JSON_PATH)/atlas.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/atlas-14-02-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/atlas.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log: $(JSON_PATH)/atlas.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/atlas.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log
-
-
-.PHONY: validate_chembl
-validate_chembl : $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log
-
-$(JSON_PATH)/chembl.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/chembl-02-08-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/chembl.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log : $(JSON_PATH)/chembl.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/chembl.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log
-
-
-.PHONY: validate_cosmic
-validate_cosmic : $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/cosmic.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/cosmic-24-05-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/cosmic.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log : $(JSON_PATH)/cosmic.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/cosmic.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log
-
-
-.PHONY: validate_europepmc
-validate_europepmc : $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/europepmc.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/europepmc-27-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/europepmc.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log : $(JSON_PATH)/europepmc.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/europepmc.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log
-
-
-.PHONY: validate_eva
-validate_eva : $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/eva.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/eva-02-08-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/eva.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.eva.log : $(JSON_PATH)/eva.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/eva.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log
-
-
-
-.PHONY: validate_gene2phenotype
-validate_gene2phenotype : $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/gene2phenotype.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/gene2phenotype-27-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gene2phenotype.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log :  $(JSON_PATH)/gene2phenotype.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/gene2phenotype.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log
-
-
-.PHONY: validate_genomics_england
-validate_genomics_england : $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/genomics_england.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/genomics_england-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/genomics_england.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log : $(JSON_PATH)/genomics_england.json.gz
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/genomics_england.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log
-
-
-.PHONY: validate_gwas
-validate_gwas : $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/gwas.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/gwas-06-08-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/gwas.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log : $(JSON_PATH)/gwas.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/gwas.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log
-
-
-.PHONY: validate_intogen
-validate_intogen : $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log 
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/intogen.json.gz :
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/intogen-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/intogen.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log : $(JSON_PATH)/intogen.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/intogen.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log
-
-
-.PHONY: validate_phenodigm
-validate_phenodigm: $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/phenodigm.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/phenodigm-17-08-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phenodigm.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log : $(JSON_PATH)/phenodigm.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/phenodigm.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log
-
-
-.PHONY: validate_phewas_catalog
-validate_phewas_catalog : $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/phewas_catalog.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/phewas_catalog-11-09-2017.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/phewas_catalog.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log : $(JSON_PATH)/phewas_catalog.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/phewas_catalog.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log
-
-
-.PHONY: validate_progeny
-validate_progeny : $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/progeny.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/progeny-23-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/progeny.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log : $(JSON_PATH)/progeny.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/progeny.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log
-
-
-.PHONY: validate_reactome
-validate_reactome : $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log 
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/reactome.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/reactome-19-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/reactome.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log : $(JSON_PATH)/reactome.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/reactome.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log
-
-
-.PHONY: validate_slapenrich
-validate_slapenrich : $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/slapenrich.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/slapenrich-27-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/slapenrich.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log : $(JSON_PATH)/slapenrich.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/slapenrich.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log
-
-
-.PHONY: validate_uniprot
-validate_uniprot : $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
-	$(VALIDATE_CMD)
-
-$(JSON_PATH)/uniprot.json.gz:
-	curl --silent https://storage.googleapis.com/ot-releases/18.08/uniprot-30-07-2018.json.gz | gunzip -c -- | shuf -n $(NUMBER_TO_KEEP) | gzip > $(JSON_PATH)/uniprot.json.gz
-
-$(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log : $(JSON_PATH)/uniprot.json.gz $(LOG_PATH)/out.$(ES_PREFIX).gen.log $(LOG_PATH)/out.$(ES_PREFIX).mp.log $(LOG_PATH)/out.$(ES_PREFIX).efo.log $(LOG_PATH)/out.$(ES_PREFIX).eco.log
-	$(INDEX_CMD) $(ES_PREFIX)_gene-data $(ES_PREFIX)_efo-data $(ES_PREFIX)_eco-data $(ES_PREFIX)_mp-data
-	$(MRTARGET_CMD) --schema-version $(SCHEMA_VERSION) --val --input-file $(JSON_PATH)/uniprot.json.gz $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
+base: base_gene efo eco hpa
 
 .PHONY: validate_all
-validate_all : validate_uniprot validate_slapenrich validate_reactome validate_progeny validate_phewas_catalog validate_phenodigm validate_intogen validate_gwas validate_genomics_england validate_gene2phenotype validate_eva validate_europepmc validate_cosmic validate_chembl validate_atlas
+validate_all : $(LOG_PATH)/out.val.log
 
-.PHONY: evidence_strings
-evidence_strings: $(LOG_PATH)/out.$(ES_PREFIX).evs.log
-
-$(LOG_PATH)/out.$(ES_PREFIX).evs.log : $(LOG_PATH)/out.$(ES_PREFIX).val.atlas.log $(LOG_PATH)/out.$(ES_PREFIX).val.chembl.log $(LOG_PATH)/out.$(ES_PREFIX).val.cosmic.log $(LOG_PATH)/out.$(ES_PREFIX).val.europepmc.log $(LOG_PATH)/out.$(ES_PREFIX).val.eva.log $(LOG_PATH)/out.$(ES_PREFIX).val.gene2phenotype.log $(LOG_PATH)/out.$(ES_PREFIX).val.genomics_england.log $(LOG_PATH)/out.$(ES_PREFIX).val.gwas.log $(LOG_PATH)/out.$(ES_PREFIX).val.intogen.log $(LOG_PATH)/out.$(ES_PREFIX).val.phenodigm.log $(LOG_PATH)/out.$(ES_PREFIX).val.phewas_catalog.log $(LOG_PATH)/out.$(ES_PREFIX).val.progeny.log $(LOG_PATH)/out.$(ES_PREFIX).val.reactome.log $(LOG_PATH)/out.$(ES_PREFIX).val.slapenrich.log $(LOG_PATH)/out.$(ES_PREFIX).val.uniprot.log
-	$(INDEX_CMD) $(ES_PREFIX)_validated-data-atlas $(ES_PREFIX)_validated-data-chembl $(ES_PREFIX)_validated-data-cosmic $(ES_PREFIX)_validated-data-europepmc $(ES_PREFIX)_validated-data-eva $(ES_PREFIX)_validated-data-gene2phenotype $(ES_PREFIX)_validated-data-genomics_england $(ES_PREFIX)_validated-data-gwas $(ES_PREFIX)_validated-data-intogen $(ES_PREFIX)_validated-data-phenodigm $(ES_PREFIX)_validated-data-phewas_catalog $(ES_PREFIX)_validated-data-progeny $(ES_PREFIX)_validated-data-reactome $(ES_PREFIX)_validated-data-slapenrich $(ES_PREFIX)_validated-data-uniprot
-	$(MRTARGET_CMD) --evs $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).evs.log
+$(LOG_PATH)/out.val.log : $(LOG_PATH)/out.gen.log $(LOG_PATH)/out.efo.log $(LOG_PATH)/out.eco.log
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --val 2>&1 | tee $(LOG_PATH)/out.val.log
+	sleep 60
 
 .PHONY: association_scores
-association_scores: $(LOG_PATH)/out.$(ES_PREFIX).as.log
+association_scores: $(LOG_PATH)/out.as.log 
 
-$(LOG_PATH)/out.$(ES_PREFIX).as.log : $(LOG_PATH)/out.$(ES_PREFIX).evs.log
-	$(INDEX_CMD) $(ES_PREFIX)_evidence-data-generic
-	$(MRTARGET_CMD) --as $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).as.log
+$(LOG_PATH)/out.as.log : $(LOG_PATH)/out.val.log $(LOG_PATH)/out.hpa.log
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --as 2>&1 | tee $(LOG_PATH)/out.as.log
 
 .PHONY: association_qc
-association_qc: $(LOG_PATH)/out.$(ES_PREFIX).qc.log
+association_qc: $(LOG_PATH)/out.qc.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).qc.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
-	$(INDEX_CMD) $(ES_PREFIX)_association-data
-	$(MRTARGET_CMD) --qc $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).qc.log
+$(LOG_PATH)/out.qc.log : $(LOG_PATH)/out.as.log
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --qc 2>&1 | tee $(LOG_PATH)/out.qc.log
 
 .PHONY: search_data
-search_data: $(LOG_PATH)/out.$(ES_PREFIX).sea.log
+search_data: $(LOG_PATH)/out.sea.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).sea.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
-	$(INDEX_CMD) $(ES_PREFIX)_association-data
-	$(MRTARGET_CMD) --sea $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).sea.log
+$(LOG_PATH)/out.sea.log : $(LOG_PATH)/out.as.log
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --sea 2>&1 | tee $(LOG_PATH)/out.sea.log
 
 .PHONY: relationship_data
-relationship_data: $(LOG_PATH)/out.$(ES_PREFIX).ddr.log
+relationship_data: $(LOG_PATH)/out.ddr.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).ddr.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
-	$(INDEX_CMD) $(ES_PREFIX)_association-data
-	$(MRTARGET_CMD) --ddr $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).ddr.log
+$(LOG_PATH)/out.ddr.log : $(LOG_PATH)/out.as.log
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --ddr 2>&1 | tee $(LOG_PATH)/out.ddr.log
 
 .PHONY: metrics
-metrics: $(LOG_PATH)/out.$(ES_PREFIX).metric.log
+metrics: $(LOG_PATH)/out.metric.log
 
-$(LOG_PATH)/out.$(ES_PREFIX).metric.log : $(LOG_PATH)/out.$(ES_PREFIX).as.log
-	$(INDEX_CMD) $(ES_PREFIX)_association-data
-	$(MRTARGET_CMD) --metric $(ES_PREFIX) 2>&1 | tee $(LOG_PATH)/out.$(ES_PREFIX).metric.log
+$(LOG_PATH)/out.metric.log : $(LOG_PATH)/out.as.log
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --metric 2>&1 | tee $(LOG_PATH)/out.metric.log
 
 .PHONY: all
 all: metrics relationship_data search_data association_qc
@@ -353,13 +149,9 @@ list:
 .PHONY: no_targets__ shell
 no_targets__:
 shell:
-	@ES_PREFIX="$(ES_PREFIX)" \
-	    ELASTICSEARCH_NODES="$(ELASTICSEARCH_NODES)" \
-	    LOG_LEVEL="$(LOG_LEVEL)" \
-	    SCHEMA_VERSION="$(SCHEMA_VERSION)" \
-	    NUMBER_TO_KEEP="$(NUMBER_TO_KEEP)" \
-	    MRTARGET_CMD="$(MRTARGET_CMD)" \
-	    bash
+	@ELASTICSEARCH_NODES="$(ELASTICSEARCH_NODES)" \
+	MRTARGET_CMD="$(MRTARGET_CMD)" \
+	bash
 
 .PHONY: list_indices
 list_indices:
@@ -373,14 +165,5 @@ clean_indices:
 clean_logs:
 	@rm -f $(LOG_PATH)/*.log
 
-.PHONY: clean_json
-clean_json:
-	@rm -f $(JSON_PATH)/*.json.gz
-
-.PHONY: clean_qc
-clean_qc:
-	@rm -f $(QC_PATH)/*.tsv
-
 .PHONY: clean
-clean: clean_logs clean_json clean_qc clean_indices
-
+clean: clean_logs clean_indices

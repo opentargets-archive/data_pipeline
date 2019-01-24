@@ -1,193 +1,103 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 
+import functools
 from contextlib import contextmanager
 import gzip
 import zipfile
 import logging
-import io
 import tempfile as tmp
 import requests as r
-import json
+import requests_file
+import os
 
 _l = logging.getLogger(__name__)
 
-def url_to_stream(url, *args, **kwargs):
-    '''request a url using requests pkg and pass *args and **kwargs to
-    requests.get function (useful for proxies) and returns the filled file
-    descriptor from a tempfile.NamedTemporaryFile
 
-    If you want to stream a raw uri (and not compressed) use the parameter
-    `enable_stream=True`
-    '''
-    f = r.get(url, *args, stream=True, **kwargs)
-    f.raise_for_status()
-
-    if f.encoding is None:
-        f.encoding = 'utf-8'
-
-    for line in f.iter_lines(decode_unicode=True):
-            yield line
-
-    f.close()
-
-
-@contextmanager
-def url_to_tmpfile(url, delete=True, *args, **kwargs):
-    '''request a url using requests pkg and pass *args and **kwargs to
-    requests.get function (useful for proxies) and returns the filled file
-    descriptor from a tempfile.NamedTemporaryFile
-    '''
-    f = None
-
-    if url.startswith('ftp://'):
-        raise NotImplementedError('finish ftp')
-
-    elif url.startswith('file://') or ('://' not in url):
-        filename = url[len('file://'):] if '://' in url else url
-        with open(filename, mode="r+b") as f:
-            yield f
-
+def urllify(string_name):
+    """return a file:// urlified simple path to a file:// is :// is not contained in it"""
+    if '://' in string_name:
+        return string_name
     else:
-        f = r.get(url, *args, stream=True, **kwargs)
-        f.raise_for_status()
-
-        with tmp.NamedTemporaryFile(mode='r+w+b', delete=delete) as fd:
-            # write data into file in streaming fashion
-            for block in f.iter_content(1024):
-                fd.write(block)
-
-            fd.seek(0)
-            yield fd
-
-        f.close()
+        return 'file://'+os.path.abspath(string_name)
 
 
 class URLZSource(object):
-    def __init__(self, *args, **kwargs):
-        '''A source extension for petl python package
+    def __init__(self, filename, *args, **kwargs):
+        """Easy way to open multiple types of URL protocol (e.g. http:// and file://)
+        as well as handling compressed content (e.g. .gz or .zip) if appropriate.
+
         Just in case you need to use proxies for url use it as normal
-        named arguments
+        named arguments to requests.
 
         >>> # proxies = {}
         >>> # if Config.HAS_PROXY:
         ...    # self.proxies = {"http": Config.PROXY,
         ...                      # "https": Config.PROXY}
         >>> # with URLZSource('http://var.foo/noname.csv',proxies=proxies).open() as f:
-        >>> from __futures__ import absolute_import
-        >>> import petl as p
-        >>> t = p.fromcsv(mpetl.URLZSource('https://raw.githubusercontent.com/opentargets/mappings/master/expression_uberon_mapping.csv'), delimiter='|')
-        >>> t.look()
 
-        +------------------------+-------------------+
-        | label                  | uberon_code       |
-        +========================+===================+
-        | u'stomach 2'           | u'UBERON_0000945' |
-        +------------------------+-------------------+
-        | u'stomach 1'           | u'UBERON_0000945' |
-        +------------------------+-------------------+
-        | u'mucosa of esophagus' | u'UBERON_0002469' |
-        +------------------------+-------------------+
-        | u'transverse colon'    | u'UBERON_0001157' |
-        +------------------------+-------------------+
-        | u'brain'               | u'UBERON_0000955' |
-        +------------------------+-------------------+
-        ...
-
-        '''
+        """
+        self._log = logging.getLogger(__name__)
+        self.filename = urllify(filename)
         self.args = args
         self.kwargs = kwargs
         self.proxies = None
+        self.r_session = r.Session()
+        self.r_session.mount('file://', requests_file.FileAdapter())
+
+    @contextmanager
+    def _open_local(self, filename, mode):
+        """
+        This is an internal function to handle opening the temporary file 
+        that the URL has been downloaded to, including handling compression
+        if appropriate
+        """
+        open_f = None
+
+        if filename.endswith('.gz'):
+            open_f = functools.partial(gzip.open, mode='rb')
+
+        elif filename.endswith('.zip'):
+            zipped_data = zipfile.ZipFile(filename)
+            info = zipped_data.getinfo(zipped_data.filelist[0].orig_filename)
+
+            filename = info
+            open_f = functools.partial(zipped_data.open)
+        else:
+            open_f = functools.partial(open, mode='r')
+
+        with open_f(filename) as fd:
+            yield fd
 
     @contextmanager
     def open(self, mode='r'):
-        if not mode.startswith('r'):
-            raise ValueError('source is read-only')
+        """
+        This downloads the URL to a temporary file, naming the file
+        based on the URL. 
+        """
 
-        zf = None
+        if self.filename.startswith('ftp://'):
+            self._log.error('Not implemented ftp protocol')
+            NotImplementedError('finish ftp')
 
-        with url_to_tmpfile(*self.args, **self.kwargs) as f:
-            buf = f
-
-            if self.args[0].endswith('.gz'):
-                zf = gzip.GzipFile(fileobj=buf)
-            elif self.args[0].endswith('.zip'):
-                zipped_data = zipfile.ZipFile(buf)
-                info = zipped_data.getinfo(
-                    zipped_data.filelist[0].orig_filename)
-                zf = zipped_data.open(info)
-            else:
-                zf = buf
-
-            yield zf
-        zf.close()
-
-
-class LogAccum(object):
-    def __init__(self, logger_o, elem_limit=1024):
-        if not logger_o:
-            raise TypeError('logger_o cannot have None value')
-
-        self._logger = logger_o
-        self._accum = {'counter': 0}
-        self._limit = elem_limit
-
-    def _flush(self, force=False):
-        if force or self._accum['counter'] >= self._limit:
-            keys = set(self._accum.iterkeys()) - set(['counter'])
-
-            for k in keys:
-                for msg in self._accum[k]:
-                    self._logger.log(k, msg[0], *msg[1])
-
-                # python indentation playing truth or dare
-                del self._accum[k][:]
-
-            # reset the accum
-            del(self._accum)
-            self._accum = {'counter': 0}
-
-    def flush(self, force=True):
-        self._flush(force)
-
-    def log(self, level, message, *args):
-        if level in self._accum:
-            self._accum[level].append((message, args))
         else:
-            self._accum[level] = [(message, args)]
+            local_filename = self.filename.split('://')[-1].split('/')[-1]
+            f = self.r_session.get(url=self.filename, stream=True, **self.kwargs)
+            f.raise_for_status()
+            file_to_open = None
+            #this has to be "delete=false" so that it can be re-opened with the same filename
+            #to be read out again
+            with tmp.NamedTemporaryFile(mode='wb', suffix=local_filename, delete=False) as fd:
+                # write data into file in streaming fashion
+                file_to_open = fd.name
+                for block in f.iter_content(1024):
+                    fd.write(block)
 
-        self._accum['counter'] += 1
-        self._flush()
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.flush(True)
+            with self._open_local(file_to_open, mode) as fd:
+                yield fd
 
 
 def require_all(*predicates):
     r_all = all(predicates)
     if not r_all:
-        print 'ERROR require_all failed checking all predicates true'
+        print('ERROR require_all failed checking all predicates true')
         _l.error('require_all failed checking all predicates true')
-
-def require_any(*predicates):
-    r_any = any(predicates)
-    if not r_any:
-        _l.error('requre_any failed checking at least one predicate true')
-
-
-# with thanks to: https://stackoverflow.com/questions/14897756/python-progress-bar-through-logging-module/41224909#41224909
-class TqdmToLogger(io.StringIO):
-    """
-        Output stream for TQDM which will output to logger module instead of
-        the StdOut.
-    """
-    logger = None
-    level = None
-    buf = ''
-    def __init__(self,logger,level=None):
-        super(TqdmToLogger, self).__init__()
-        self.logger = logger
-        self.level = level or logging.INFO
-    def write(self,buf):
-        self.buf = buf.strip('\r\n\t ')
-    def flush(self):
-        self.logger.log(self.level, self.buf)

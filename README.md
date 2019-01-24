@@ -1,238 +1,66 @@
-
-The code in this repository is used to process different data files that provide evidence for the target-disease 
-associations in the [Open Targets Platform](https://www.targetvalidation.org). Documentation on how to use the 
-platform can be found [here](https://docs.targetvalidation.org) and the evidence and association data dumps can be 
- found [here](https://www.targetvalidation.org/downloads/data). Please contact support [at] targetvalidation.org for 
- feedback.
- 
- This page contains the following information:
-- Overview of the pipeline
-- Running the pipeline locally
-- Running the pipeline using Docker
-- (Installation Instructions)
-- Using the Makefile
-- Using the Makefile within Docker
-- (Environment variables and how to use them)
-- Contributing
-- Copyright
-
-
 [![Build Status](https://travis-ci.com/opentargets/data_pipeline.svg?branch=master)](https://travis-ci.com/opentargets/data_pipeline)
-[quay.io](https://quay.io/repository/opentargets/mrtarget)
+
+[![Docker Repository on Quay.io](https://quay.io/repository/opentargets/mrtarget/status "Docker Repository on Quay.io")](https://quay.io/repository/opentargets/mrtarget)
+
+The code in this repository is used to process different data files that provide evidence for the target-disease associations in the [Open Targets Platform](https://www.targetvalidation.org). Documentation on how to use the platform can be found [here](https://docs.targetvalidation.org) and the evidence and association data dumps can be found [here](https://www.targetvalidation.org/downloads/data). Please contact support [at] argetvalidation.org for feedback.
 
 ---
 
-## Overview of the pipeline
+## Summary of the pipeline
 
-TO DO: Add overview diagram here
+### Overview
+The pipeline can be broken down in a number of steps, each of which can be run as a separate command. Each command typically reads data from one or more sources (such as a URL or local file, or Elasticsearch) and writes into one or more Elasticsearch indexes.
 
-#### 1. Loading the Base Data
-- All steps in this section are independent of each other and can be run in parallel and in any order as needed.
-- Each step will download, process and create indices in Elasticsearch for the different datasets (see diagram above).
-#### 2. Gene merging
-- Pre-requisites: Step 1 needs to be completed because Elasticsearch indices created for Expression Atlas, Reactome, 
-Uniprot and Ensembl are needed.
-- This step creates the index `${DATA_RELEASE_VERSION}_gene-data`.
-#### 3. Evidence Data Validation
-- Pre-requisites: Steps 1 and 2 need to be completed because Elasticsearch indices for efo, eco and gene-data indices 
-are needed. Any JSON schema changes that are required need to be finalised.
-- This step will create a new index per datasource e.g. `${DATA_RELEASE_VERSION}_validated-data-reactome`.
-- Data sources to include are specified in a 
-[config file.](https://github.com/opentargets/data_pipeline/blob/master/mrtarget/resources/evidences_sources.txt)
-This file can be edited to remove or add data sources.
-#### 4. Evidence String Processing
-- Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-- This step will create the index `${DATA_RELEASE_VERSION}_evidence_data_generic`
-#### 5. Association Score Calculation
-- Note: this step is run on 32 vCPUs, 208 GB memory Google Cloud machine
-- This step will create a new index `${DATA_RELEASE_VERSION}_association-data`
-#### 6. Association QC
-- This step will get all target-disease pairs from all evidence, and check if they are found in the computed association. 
-A list of associations expected but NOT found will be logged.
-#### 7. Search Data Processing
-- This step will create the index `${DATA_RELEASE_VERSION}_search-data` which is used for the search function in the platform.
-#### 8. Relationship Data Computation
-- Note: this step is run on 32 vCPUs, 208 GB memory Google Cloud machine.
-- This step will compute the target-to-target and disease-to-disease relationships that are stored in the `${DATA_RELEASE_VERSION}_relation-data` index.
-#### 9. Generation of Data Metrics (WIP)
-- This step produces a flat file with metrics of the current data release which is used to update this 
-[page.](https://github.com/opentargets/data_release/wiki/OT011a-Data-Metrics-&-Plots)
-
---- 
-### Running the pipeline locally
-Please note that if steps 4, 5, 7 and 8 are run on the full data sets, they are best run on a 32 vCPU, 208 GB Google Cloud machine.
-
-#### 0. Setting up
-- Ensure the data_pipeline/db.ini file points to the correct Elasticsearch server: 
-`ELASTICSEARCH_NODES = ["http://xxx.xxx.xxx:xxxx"]`
-- Ensure the `data_pipeline` branch is corrrect.
-- Update the cofiguration files as required (`mrtarget/Settings.py`, `mrtarget/resources/ontology_config.ini` & `mrtarget/resources/uris.ini`)
-
-mrtarget/Settings.py:
-```sh
-...
-ENSEMBL_RELEASE_VERSION = 93
-...
-```
-
-#### 1. Loading the Base Data
-```bash
-#Setting Data release version
-DATA_RELEASE_VERSION=18.10
-#Reactome: For input files see `mrtarget/resources/uris.ini`
-python -m mrtarget.CommandLine --rea --log-level DEBUG ${DATA_RELEASE_VERSION}
-# Ensembl: Extract via querying the public MySQL database
-python -m mrtarget.CommandLine --ens --log-level DEBUG ${DATA_RELEASE_VERSION}
-# Uniprot: Extract via querying the REST API (currently changing to downloaded file), return and store in XML format
-python -m mrtarget.CommandLine --unic --log-level DEBUG ${DATA_RELEASE_VERSION}
-# Baseline Expression: For input files see `mrtarget/resources/uris.ini`
-#  RNA: MetaAnalysis provided by the Expression Atlas Team, Protein: Human Protein Atlas
-python -m mrtarget.CommandLine --hpa --log-level DEBUG ${DATA_RELEASE_VERSION}
-# Mamalian Phenotype Ontology: For input files see `mrtarget/resources/ontology_config.ini`
-python -m mrtarget.CommandLine --mp --log-level DEBUG ${DATA_RELEASE_VERSION}
-EFO: For input files see `mrtarget/resources/ontology_config.ini`
-python -m mrtarget.CommandLine --efo --log-level DEBUG ${DATA_RELEASE_VERSION}
-# ECO: For input files see `mrtarget/resources/ontology_config.ini`
-python -m mrtarget.CommandLine --eco --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
-#### 2. Gene merging
-```bash
-python -m mrtarget.CommandLine --gen --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
-#### 3. Evidence Data Validation
-```bash
-# Specify JSON Schema Version
-SCHEMA_VERSION=1.2.8
-# Validate ALL data sources specified in mrtarget/resources/evidences_sources.txt
-python -m mrtarget.CommandLine --val --log-level DEBUG ${DATA_RELEASE_VERSION} \
---schema-version ${SCHEMA_VERSION}
-# Validate ONE specific data source
-python -m mrtarget.CommandLine --val --log-level DEBUG ${DATA_RELEASE_VERSION} \
---schema-version ${SCHEMA_VERSION} --input-file [PATH_TO_JSON_EVIDENCE_FILE.json.gz]
-```
-#### 4. Evidence String Processing
-> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```bash
-./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --evs   
-```
-#### 5. Association Score Calculation
-> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```bash
-./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --as
-```
-#### 6. Association QC
-```bash
-python -m mrtarget.CommandLine --qc --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
-#### 7. Search Data Processing
-> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```bash
-./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --sea
-```
-#### 8. Relationship Data Computation
-> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```bash
-./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --ddr   
-```
-#### 9. Generate Data Metrics
-```bash
-python -m mrtarget.CommandLine --metric --log-level DEBUG ${DATA_RELEASE_VERSION}
-```
-
----
-### Running the pipeline using Docker
-Only steps 1, 2, 3, 6 and 9 can be run locally on the complete data. All steps can be run with `--log-level DEBUG`
-```sh
-# Setting Data release version
-DATA_RELEASE_VERSION=18.08
-```
-#### 1. Loading the Base Data
-```bash
-#Reactome: For input files see `mrtarget/resources/uris.ini`
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --rea
-# Ensembl: Extract via querying the public MySQL database
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --ens
-# Uniprot: Extract via querying the REST API (currently changing to downloaded file), return and store in XML format
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --unic
-# Baseline Expression: For input files see `mrtarget/resources/uris.ini`
-#  RNA: MetaAnalysis provided by the Expression Atlas Team, Protein: Human Protein Atlas
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --hpa
-# Mamalian Phenotype Ontology: For input files see `mrtarget/resources/ontology_config.ini`
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --mp
-# EFO: For input files see `mrtarget/resources/ontology_config.ini`
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --efo
-# ECO: For input files see `mrtarget/resources/ontology_config.ini`
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --eco
-```
-#### 2. Gene merging
-```bash
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --gen
-```
-#### 3. Evidence Data Validation
-```bash
-# Specify JSON Schema Version
-SCHEMA_VERSION=1.2.8
-# Validate ALL data sources specified in mrtarget/resources/evidences_sources.txt
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --val --schema-version ${SCHEMA_VERSION}
-# Validate ONE specific data source
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --val 
---schema-version ${SCHEMA_VERSION} --input-file [PATH_TO_JSON_EVIDENCE_FILE.json.gz]
-# Validate one or more data source(s)
-./launch_mrtarget.sh [container_run_name] [container_branch] ${DATA_RELEASE_VERSION} --val 
---schema-version ${SCHEMA_VERSION} --input-file [PATH_TO_JSON_EVIDENCE_FILE.json.gz] 
---input-file [PATH_TO_JSON_EVIDENCE_FILE_2.json.gz]
-```
-#### 4. Evidence String Processing
-> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```bash
-./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --evs   
-```
-#### 5. Association Score Calculation
-> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```bash
-./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --as
-```
-#### 6. Association QC
-```bash
-./launch_mrtarget.sh [container_run_name] [container_branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --qc
-```
-#### 7. Search Data Processing
-> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```bash
-./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --sea
-```
-#### 8. Relationship Data Computation
-> Note: this step is run on a 32 vCPU, 208 GB memory Google Cloud machine
-```bash
-./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --ddr   
-```
-#### 9. Generate Data Metrics
-```bash
-./launch_mrtarget.sh [container-run-name] [container-branch] --log-level DEBUG ${DATA_RELEASE_VERSION} --metric
-```
+#### `--rea` Reactome
+Downloads and processes information into a local index for performance.
+#### `--ens` Ensembl
+Downloads and processes information into a local index for performance.
+#### `--unic` Uniprot
+Downloads and processes information into a local index for performance.
+#### `--hpa` Uniprot
+Downloads and processes information into a local index for performance.
+#### `--gen` Target
+Downloads and processes information from various sources. Is built around a "plugin" structure. Constructs an Elasticsarch index containg most of the information about each Target within the platform.
+It requires `--rea` reactome, `--ens` Ensembl, and `--unic` Uniprot steps.
+#### `--efo` Disease
+Downloads and processes the Experimental Factor Ontology, as well as Human Phenotype Ontology
+and other sources. Constructs an Elasticsarch index containg the information about each Disease within the platform.
+#### `--eco` Evidence Code
+Downloads and processes the Evidence Code Ontology and Sequence Ontology.
+#### `--val` Validation
+Read in evidence strings (either from filesystem or URLs) and validate. The validation includes syntatic JSON schema validation, as well as ensuring that the disease and target are appropriate.
+This step will also make some corrections to evidence, where appropriate. For example,replacing Uniprot protein identifiers with Ensembl gene identifiers.
+It requires `--gen` target, `--efo` disease, and `--eco` evidence code steps.
+#### `--as` Associations
+This step reads the valide evidence strings and calculates the appropriate assocations as well as calculated their scores.
+It requires `--val` validation, and `--hpa` expression steps.
+#### `--sea` Search
+This step will create the index `${DATA_RELEASE_VERSION}_search-data` which is used for the search function in the platform.
+It requires `--as` associations step.
+#### `--ddr` Relationships
+This step will compute the target-to-target and disease-to-disease relationships. 
+It requires `--as` associations step.
 
 ---
 
 ## Installation instructions
-TO DO: Move these to the relevant sections.
 
-### Useful prep
+### Preparation
+
+Please note that several steps require large amounts of CPU and memory, particularly on the full data set. It is recommended to use a machine with at least 16 CPU and 100GB RAM for the pipeline, and allow for a wallclock runtime of 18 hours or more.
 
 #### Elasticsearch
 
-You should have an elasticsearch instance running to use the pipeline code. Note that v6 is not 
-currently supported, and therefore 5.6 is the latest version (as of writing)
-You can run an instance locally using docker containers. 
+You should have Elasticsearch avaliable to be used the pipeline code. Note that Elasticsearch v6 is not currently supported by the pipeline, and therefore 5.6 is the latest version (as of writing). And Elasticsearch instance can be run using Docker containers. 
 
-After deploying elasticsearch, you should check that you can query its API.
-Typing `curl localhost:9200` should show something like:
+After deploying elasticsearch, you should check that you can query its API. Running `curl localhost:9200` should show something like:
 ```json
 {
   "name": "Wr5vnJs",
   "cluster_name": "elasticsearch",
   "cluster_uuid": "6BlykLd8Sj2mxswcump2wA",
   "version": {
-    "number": "5.6.11",
+    "number": "5.6.13",
     "build_hash": "bc3eef4",
     "build_date": "2018-08-16T15:25:17.293Z",
     "build_snapshot": false,
@@ -241,6 +69,8 @@ Typing `curl localhost:9200` should show something like:
   "tagline": "You Know, for Search"
 }
 ```
+
+For more information on Elasticsearch, see https://www.elastic.co/guide/en/elasticsearch/reference/5.6/getting-started.html
 
 #### Kibana
 
@@ -252,7 +82,26 @@ You can install Kibana in a variety of ways, including via [docker](https://www.
 
 Once Kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
 
-## Running the Pipeline using Container/Docker
+#### Configuration
+
+The configuration of the pipeline can be spit into three aspects - Operations, Data, and Legacy
+
+##### Operations
+Here the execution parameters of the pipeline can be controlled. For example, the address of the Elasticsearch server, use of an embedded Redis instance, number of worker threads, etc.
+
+It makes use of the [ConfigArgParse](https://pypi.org/project/ConfigArgParse/) library to allow these to be specified on the command line, environemnt varibale, or in a config file (in decreasing order of precendence). 
+
+See the default `mrtarget.ops.yml` file for detailed comments describing the avaliable options, or use the `--help` command line argument.
+
+##### Data
+These options describe how the data is to be processed. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. See the default `mrtarget.data.yml` file for detailed comments describing the avaliable options.
+
+##### Legacy
+This covers configuration that has not yet been updated to one of the options above. This might be becuase it is particularly tightly entwined within the rest of the codebase, or becuase there is little demand for it to be separated. It includes the files `mrtarget/Settings.py`, `mrtarget/constants.py`, and `mrtarget/ElasticsearchConfig.py`. Any changes to these settings typically require editing code files, though some may be modified via environment variables.
+
+### Execution
+
+#### Docker and Docker-compose
 
 If you have [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/) then you can start Elasticsearch and Kibana in the background with:
 
@@ -263,11 +112,10 @@ docker-compose up -d elasticsearch kibana
 By default, these will be accessible on http://localhost:9200 and http://localhost:5601 for Elasticsearch and Kibana respectively.
 
 
-
-You can run the pipeline with a command like:
+You can execute the pipeline with a command like:
 
 ```sh
-docker-compose run --rm mrtarget --dry-run my-elasticsearch-prefix
+docker-compose run --rm mrtarget --dry-run
 ```
 
 or:
@@ -276,14 +124,11 @@ or:
 docker-compose run --rm mrtarget --help
 ```
 
----
-## Using the Makefile
+#### Using the Makefile
 
-There is a Makefile which can be used to run all or parts of the pipeline, including checking for the existence of required indices.
+[Make](https://en.wikipedia.org/wiki/Make_(software)) is a venerable tool for automatically executing commands, including handling dependencies and partial updates. There is a Makefile which can be used to run all or parts of the pipeline, including checking for the existence of required indices. 
 
-### Usage
-
-Customise the variables at the top of `Makefile` to suit your needs, then run
+To use the makefile, customise the variables at the top of `Makefile` to suit your needs, then run
 
 `make <target>`
 
@@ -301,27 +146,23 @@ Each target checks that the required Elasticsearch indices exist (via `scripts/c
 
 There are several targets which speed up common tasks, such as 
  * `list_indices`
- * `clean` (see also `clean_json`, `clean_logs`, `clean_indice`)
+ * `clean` (see also `clean_json`, `clean_logs`, `clean_indices`)
  * `shell`
  * `dry_run`
 
-### Notes
+##### Notes
 
 *Shell completion*: most shells will complete the list of targets when `<TAB>` is pressed. This is a useful way of seeing which target(s) are available.
 
 *Parallel execution*: `make -j` will run all the dependencies of a target in parallel. Useful for the `load_data` and `validate_all` stages. Using a value will limit to only that number of jobs e.g. `-j 4` will limit to 4. Using `-l x` will only create new jobs if the total load on the machine is below that threashold - usefuul as several of the stages themselves run over multiple processess. These can be combined - for example `make -j 8 -l 4` will spawn up to 8 jobs at the same time as long as the load is less than 4 when creating them. Note that when commands that use Redis are run in parallel, they will each try to start an embedded Redis on the same port and all fail; to solve this, use an shared external Redis instance.
 
-*Variables*: the default values for the variables set at the top of the `Makefile` can be overridden on the command-line, e.g. `make "ES_PREFIX=test" ens` Note that if any of these are already specified by environment variables, those values will take precedence. There is a `MRTARGET_ARGS` variable which can be used to specify arbitrary additional parameters at run time. 
-
 *Partial execution*: the targets inside the makefile use absolute paths. While this is useful for running the makefile from a directory outside of the root of the project,
 when only a partial execution is desired (e.g. for testing) then the full path will be required.
 
-*Parital data*: By default, the makefile will only download and process up to 1000 evidence strings per data source. This is useful to keep the data processing to a manageable size and duration, but when used in production it is necessary to set it to a much higher value e.g. 
-`make "NUMBER_TO_KEEP=10000000" all`
+*Recovery*: Make is designed around files, and regneerating them when out of date. To work with the OpenTargets pipeline, the files it is based on are the log files produced by the various stages. This means that if you need to rerun a stage (e.g. to regenerate an Elasticsearch index) you will need to delete the appropriate log file and re-run make. If a stage is cancelled, Make will automatically delete the logfile - which may not be what you want to happen!
 
-*Recovery*: Make is designed around files, and regneerating them when out of date. To work with the OpenTargets pipeline, the files it is based on are the log files produced by the various stages. This means that if you need to rerun a stage (e.g. to regenerate an Elasticsearch index) you will need to delete the appropriate log file and re-run make.
 
-## Using the Makefile within Docker
+##### Using the Makefile within Docker
 
 It is possible to use both docker and the makefile together. You will need to override the default entrypoint of the docker image. For example:
 
@@ -329,99 +170,53 @@ It is possible to use both docker and the makefile together. You will need to ov
 docker-compose run --rm --entrypoint make mrtarget -j -l 8 -r -R -k all
 ```
 
+As discussed above, by default, the docker compose file will *not use a locally built image*. See above for how to work with this.
+
+##### Using Google Cloud Platform
+
+There is a script `scripts/run_on_gcp.sh` that puts together the information above to create a virtual machine on Google Cloud Platform (GCP), install Docker and Docker Compose, and execute the pipeline via the Makefile within a Docker container. The only prerequisite is [Google Cloud SDK](https://cloud.google.com/sdk/docs/quickstarts) (gcloud) and then run `scripts/run_on_gcp.sh`.
+
+This will run a tagged version, so if you want use something else or to make your own changes, then you'll need to do more in-depth investigation. Note, this will incur non-trivial costs on Google Cloud Platform; at current prices this may be around $25 USD, plus network and storage.
+
 ---
-
-## Environment variables and how to use them
-
-TO DO: Check if these are still correct and relevant.
-
-Here the list to change, enable or disable functionality:
-
-* `CTTV_EV_LIMIT` string `true` to enable otherwise `false` or delete (WIP)
-* `CTTV_MINIMAL` string `true` to enable otherwise `false` or delete
-* `CTTV_DATA_VERSION` indexes prefix a name to enable otherwise `17.04`
-* `CTTV_EL_LOADER` the name of the section of the ES config file db.ini default `dev`
-* `ELASTICSEARCH_NODES` default is `['http://127.0.0.1:9200']`
-* `CTTV_WORKERS_NUMBER` is an number and by default is `multiprocessing.cpu_count()`
-* `CTTV_DUMP_FOLDER` is a string of a writable path and by default is `tempfile.gettempdir()`
-* `DUMP_REMOTE_API_URL` a string and by default is `http://beta.opentargets.io`
-* `DUMP_REMOTE_API_PORT` a number and by default is `80`
-* `DUMP_REMOTE_API_SECRET` a string and by default is `None`
-* `DUMP_REMOTE_API_APPNAME` a string and by default is `None`
-* `CTTV_DRY_RUN_OUTPUT` string `true` to enable otherwise is `false` by default
-* `CTTV_DRY_RUN_OUTPUT_DELETE` string `true` to enable otherwise is `false` by fefault
-* `CTTV_DRY_RUN_OUTPUT_COUNT` number `1000` by default
-* `CTTV_ES_CUSTOM_IDXS` `true` to enable it and by default is `false`
 
 ## Contributing
 
-Here is the recipe to start coding on it:
+TODO: write me. 
 
-```bash
-$ git clone ${this_repo}
-$ cd ${this_repo}
-```
-Add a file `mrtarget/resources/db.ini` with contents similar to:
-```bash
-[dev]
-ELASTICSEARCH_NODES = [
-     "http://127.0.0.1:9200/"
-    ]
-```
-Install python dependencies and test run:
-```bash
-$ # create a new virtualenv 2.7.x (you know how to do it, right?)
-$ pip install -r requirements.txt
-$ mrtarget -h
-```
+### Development with docker-compose
 
-Now you are ready to contribute to this project. Note that the **resource files** are located in
-the folder `mrtarget/resources/`.
+Included in the repository is a `docker-compose.yml` file. This can be used by [docker-compose] (https://docs.docker.com/compose/) to orchestrate the relevant docker containers required to run the platform.
 
-Tests are run using pytest. For example:
+By default, the docker compose file will *not use a locally built image* because it will download the latest image from [quay.io/opentargets/mrtarget](https://www.quay.io/repository/opentargets/mrtarget). So any changes made will not be applied by default.
+
+Docker-compose has the ability to layer multiple docker-compose.yml files together; by default, `docker-compose.override.yml` will be added to `docker-compose.yml`. This can be used to use an override to build the image locally i.e.:
+
 ```sh
-pytest tests/test_score.py
+docker-compose run --rm -f docker-compose.yml -f docker-compose.dev.yml mrtarget --dry-run my-elasticsearch-prefix
 ```
 
-To skip running tests in the CI when pushing, append `[skip ci]` to the commit message.
+This is done because overrides cannot remove previous values, so once a build directive has been specified it will always be used. Therefore, the build instruction must be outside of the default docker-compose.yml to support cases where the pipeline should be run but not built.
 
-The elasticsearch guide can be very useful: https://www.elastic.co/guide/en/elasticsearch/guide/2.x/getting-started.html
-The important bits to run/understand the data pipeline are the `getting started`, `search in depth`, `aggregations`, and `modeling your data`.
+### Profiling with PyFlame
 
-### Internal features for developers
+There is some additional configuration to build a docker container that can run the pipeline while profiling it with [PyFlame ](https://github.com/uber/pyflame) to produce
+output that [FlameGraph](https://github.com/brendangregg/FlameGraph) can turn into pretty interactive svg images.
 
-#### Evidence Validation (--val step) limit (WIP)
+To do this, use the `Dockerfile.pyfile` to build the container, and run it ensuring that the kernel of the host has `kernel.yama.ptrace_scope=0` and `--cap-add=SYS_PTRACE` on the docker container. See the updated entrypoint `scripts/entrypoint.pyflame.sh` for more details.
 
-It will give up if too many evidence strings failed the JSON schema validation. 1000 docs is a
-reasonable limit per launched process.
+It will output to `logs/profile.*.svg` which can be opened with a browser e.g. Google Chrome. Note, while profiling performance may be slower.
 
-#### Minimal dataset
+### Other development tools
 
-In case you want to run steps with a minimal dataset you should specify `export CTTV_MINIMAL=true`. If you want
-to regenerate the data source files that were used, then run:
+To identify potentially removable code, [Vulture](https://pypi.org/project/vulture/) and/or [Coverage](https://coverage.readthedocs.io/en/v4.5.x/) may be useful.
 
-```bash
-$ cd scripts/
-$ bash generate_minimal_dataset.sh
-```
+To look inside Redis, [Redis Desktop Manager](https://redisdesktop.com/) may be useful.
 
-It should upload to gcloud storage and enable public links to files but you need to be logged in to the gcloud account.
-
-#### Redislite and/or remote redis
-
---redis-remote 'enable remote'
---redis-host 'by example 127.0.0.1'
---redis-port 'by example 8888'
-
-CTTV_REDIS_REMOTE=true
-CTTV_REDIS_SERVER=127.0.0.1:8888
-
-If you do not specify remote then it will try to bind to that host and port and the
-overwrite rule is env var then arguments overwrite
 
 # Copyright
 
-Copyright 2014-2018 Biogen, Celgene Corporation, EMBL - European Bioinformatics Institute, GlaxoSmithKline, Sanofi, Takeda Pharmaceutical Company and Wellcome Sanger Institute
+Copyright 2014-2019 Biogen, Celgene Corporation, EMBL - European Bioinformatics Institute, GlaxoSmithKline, Sanofi, Takeda Pharmaceutical Company and Wellcome Sanger Institute
 
 This software was developed as part of the Open Targets project. For more information please see: http://www.opentargets.org
 

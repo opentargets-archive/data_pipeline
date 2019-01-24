@@ -1,12 +1,15 @@
 from collections import OrderedDict
 
-from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
+import csv
+from mrtarget.common.IO import check_to_open, URLZSource
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.modules.Ontology import OntologyClassReader
-from mrtarget.Settings import Config
+from opentargets_ontologyutils.rdf_utils import OntologyClassReader
+from mrtarget.constants import Const
+import opentargets_ontologyutils.eco_so
+from mrtarget.Settings import Config #TODO remove
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,21 +39,22 @@ class ECO(JSONSerializable):
 
 class EcoProcess():
 
-    def __init__(self, loader):
+    def __init__(self, loader, eco_uri, so_uri):
         self.loader = loader
         self.ecos = OrderedDict()
         self.evidence_ontology = OntologyClassReader()
+        self.eco_uri = eco_uri
+        self.so_uri = so_uri
 
     def process_all(self):
         self._process_ontology_data()
-        #self._process_eco_data()
         self._store_eco()
 
     def _process_ontology_data(self):
+        opentargets_ontologyutils.eco_so.load_evidence_classes(self.evidence_ontology, 
+            self.so_uri, self.eco_uri)
 
-        self.evidence_ontology.load_evidence_classes()
         for uri,label in self.evidence_ontology.current_classes.items():
-            #logger.debug("URI: %s, label:%s"%(uri, label))
             eco = ECO(uri,
                       label,
                       self.evidence_ontology.classes_paths[uri]['all'],
@@ -62,10 +66,11 @@ class EcoProcess():
 
     def _store_eco(self):
         for eco_id, eco_obj in self.ecos.items():
-            self.loader.put(index_name=Config.ELASTICSEARCH_ECO_INDEX_NAME,
-                            doc_type=Config.ELASTICSEARCH_ECO_DOC_NAME,
+            self.loader.put(index_name=Const.ELASTICSEARCH_ECO_INDEX_NAME,
+                            doc_type=Const.ELASTICSEARCH_ECO_DOC_NAME,
                             ID=eco_id,
                             body=eco_obj)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_ECO_INDEX_NAME)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
@@ -76,8 +81,7 @@ class EcoProcess():
         #number of eco entries
         eco_count = 0
         #Note: try to avoid doing this more than once!
-        #for some reason, only the ECO get all need to explicitly be told to get all sources
-        for eco_entry in esquery.get_all_eco(True):
+        for eco_entry in esquery.get_all_eco():
             eco_count += 1
 
         #put the metrics into a single dict
@@ -85,3 +89,24 @@ class EcoProcess():
         metrics["eco.count"] = eco_count
 
         return metrics
+
+
+ECO_SCORES_HEADERS = ["uri", "code", "score"]
+
+def load_eco_scores_table(filename, eco_lut_obj):
+    table = {}
+    if check_to_open(filename):
+        with URLZSource(filename).open() as r_file:
+            for i, d in enumerate(csv.DictReader(r_file, fieldnames=ECO_SCORES_HEADERS, dialect='excel-tab'), start=1):
+                #lookup tables use short ids not full iri
+                eco_uri = d["uri"]
+                short_eco_code = ECOLookUpTable.get_ontology_code_from_url(eco_uri)
+                if short_eco_code in eco_lut_obj:
+                    table[eco_uri] = float(d["score"])
+                else:
+                    logger.error("eco uri '%s' from eco scores file at line %d is not part of the ECO LUT so not using it",
+                                 eco_uri, i)
+    else:
+        logger.error("eco_scores file %s does not exist", filename)
+
+    return table

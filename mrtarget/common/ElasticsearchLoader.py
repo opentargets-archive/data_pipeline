@@ -9,7 +9,6 @@ from elasticsearch.helpers import bulk
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.EvidenceJsonUtils import assertJSONEqual
 from mrtarget.common.Redis import RedisQueueWorkerProcess
-from mrtarget.common.connection import PipelineConnectors
 from mrtarget.Settings import Config
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 
@@ -21,22 +20,12 @@ class Loader():
     """
 
     def __init__(self,
-                 es = None,
+                 es,
                  chunk_size=1000,
                  dry_run = False,
                  max_flush_interval = random.choice(range(60,120))):
 
         self.logger = logging.getLogger(__name__)
-
-        if es is None and not dry_run:
-            connector = PipelineConnectors()
-            connector.init_services_connections()
-            es = connector.es
-            if es is None:
-                e = EnvironmentError('no elasticsearch connection '
-                                     'was properly setup')
-                self.logger.exception(e)
-                raise e
 
         self.es = es
         self.cache = []
@@ -47,10 +36,6 @@ class Loader():
         self.dry_run = dry_run
         self.max_flush_interval = max_flush_interval
         self._last_flush_time = time.time()
-        self._tmp_fd = None
-        self._tmp_fd_enable = Config.DRY_RUN_OUTPUT
-        self._tmp_fd_delete = Config.DRY_RUN_OUTPUT_DELETE
-        self._tmp_fd_count = Config.DRY_RUN_OUTPUT_COUNT
 
     @staticmethod
     def get_versioned_index(index_name, check_custom_idxs=False):
@@ -88,9 +73,6 @@ class Loader():
             else Config.RELEASE_VERSION + '_' + index_name
 
         return idx_name + suffix
-
-    def is_dry_run(self):
-        return self.dry_run
 
     def put(self,
             index_name,
@@ -157,27 +139,14 @@ class Loader():
             bulk(self.es,
                  self.cache,
                  stats_only=True)
-        else:
-            # create a temporal file if necessary
-            if self._tmp_fd_enable and self._tmp_fd_count > 0:
-                if self._tmp_fd is None:
-                    self._tmp_fd = tempfile.NamedTemporaryFile(
-                        delete=self._tmp_fd_delete)
-                    self.logger.info('create temporary file to output '
-                                     'generated index docs while dry_run '
-                                     'is activated with file %s',
-                                     self._tmp_fd.name)
-
-
-                # flush self.cache into temp file converted as text lines
-                self._tmp_fd.writelines([json.dumps(el) + '\n'
-                                         for el in self.cache])
-                self._tmp_fd_count = self._tmp_fd_count - len(self.cache) if \
-                    self._tmp_fd_count > 0 else 0
 
     def close(self):
         self.flush()
         self.restore_after_bulk_indexing()
+
+    def flush_all_and_wait(self, index_name):
+        self.flush()
+        self.es.indices.flush(self.get_versioned_index(index_name), wait_if_ongoing=True)
 
     def __enter__(self):
         return self
@@ -189,6 +158,9 @@ class Loader():
     def prepare_for_bulk_indexing(self, index_name):
         if not self.dry_run:
             old_cluster_settings = self.es.cluster.get_settings()
+
+            #try to turn of throttling of indexes
+            #removed in ES >= 6.0
             try:
                 if old_cluster_settings['persistent']['indices']['store']['throttle']['type']=='none':
                     pass
@@ -196,27 +168,30 @@ class Loader():
                     raise ValueError
             except (KeyError, ValueError):
                 transient_cluster_settings = {
-                                            "persistent" : {
-                                                "indices.store.throttle.type" : "none"
-                                            }
-                                        }
+                    "persistent" : {
+                        "indices.store.throttle.type" : "none"
+                    }
+                }
                 self.es.cluster.put_settings(transient_cluster_settings)
+
+            #temporary settins while indexing only
             old_index_settings = self.es.indices.get_settings(index=index_name)
             temp_index_settings = {
-                        "index" : {
-                            "refresh_interval" : "-1",
-                            "number_of_replicas" : 0,
-                            "translog.durability" : 'async',
-                        }
+                "index" : {
+                    "refresh_interval" : "-1",
+                    "number_of_replicas" : 0,
+                    "translog.durability" : 'async',
+                }
             }
             self.es.indices.put_settings(index=index_name,
                                          body =temp_index_settings)
+            #store the old settings so can be restored later
             self.indexes_optimised[index_name]= dict(settings_to_restore={
-                        "index" : {
-                            "refresh_interval" : "1s",
-                            "number_of_replicas" : old_index_settings[index_name]['settings']['index']['number_of_replicas'],
-                            "translog.durability": 'request',
-                        }
+                    "index" : {
+                        "refresh_interval" : "1s",
+                        "number_of_replicas" : old_index_settings[index_name]['settings']['index']['number_of_replicas'],
+                        "translog.durability": 'request',
+                    }
                 })
 
     def restore_after_bulk_indexing(self):
@@ -232,10 +207,7 @@ class Loader():
 
     def _safe_create_index(self, index_name, body={}, ignore=400):
         if not self.dry_run:
-            res = self.es.indices.create(index=index_name,
-                                         ignore=ignore,
-                                         body=body
-                                         )
+            res = self.es.indices.create(index=index_name, ignore=ignore, body=body )
             if not self._check_is_aknowledge(res):
                 if res['error']['root_cause'][0]['reason']== 'already exists':
                     self.logger.error('cannot create index %s because it already exists'%index_name) #TODO: remove this temporary workaround, and fail if the index exists
@@ -306,17 +278,6 @@ class Loader():
                 return True
         return False
 
-    def clear_index(self, index_name):
-        if not self.dry_run:
-            self.es.indices.delete(index=index_name)
-
-    def optimize_all(self):
-        if not self.dry_run:
-            try:
-                self.es.indices.optimize(index='', max_num_segments=5, wait_for_merge = False)
-            except:
-                self.logger.warn('optimisation of all indexes failed')
-
     def optimize_index(self, index_name):
         if not self.dry_run:
             try:
@@ -326,43 +287,3 @@ class Loader():
 
     def _check_is_aknowledge(self, res):
         return (u'acknowledged' in res) and (res[u'acknowledged'] == True)
-
-
-
-class LoaderWorker(RedisQueueWorkerProcess):
-    def __init__(self,
-                 queue_in,
-                 redis_path,
-                 queue_out = None,
-                 chunk_size = 1000,
-                 dry_run = False
-                 ):
-        super(LoaderWorker, self).__init__(queue_in, redis_path, queue_out)
-        self.chunk_size = chunk_size
-        self.es = None
-        self.loader = None
-        self.dry_run = dry_run
-        self.logger = logging.getLogger(__name__)
-
-
-    def process(self, data):
-        '''
-        expects an array of args and kwargs to pass to a loader.put method
-        :param data:
-        :return:
-        '''
-        if data:
-            args, kwargs = data
-            self.loader.put(*args,
-                            **kwargs
-                            )
-
-    def init(self):
-        super(LoaderWorker, self).init()
-        self.loader = Loader(chunk_size=self.chunk_size,
-                             dry_run=self.dry_run)
-
-    def close(self):
-        super(LoaderWorker, self).close()
-        self.loader.flush()
-        self.loader.close()

@@ -1,44 +1,47 @@
-from yapsy.IPlugin import IPlugin
-from StringIO import StringIO
-from mrtarget.Settings import Config
-from tqdm import tqdm
-import requests
+
 import csv
 import gzip
 import logging
-logging.basicConfig(level=logging.INFO)
+
+from yapsy.IPlugin import IPlugin
+import configargparse
+
+from mrtarget.Settings import Config
+from mrtarget.common import URLZSource
 
 class Orthologs(IPlugin):
 
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
 
+
     def print_name(self):
         self._logger.info("This is plugin ORTHOLOGS")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
-        self._logger.info("Ortholog parsing - requesting from URL %s" % Config.HGNC_ORTHOLOGS)
-        req = requests.get(Config.HGNC_ORTHOLOGS)
-        self._logger.info("Ortholog parsing - response code %s" % req.status_code)
-        req.raise_for_status()
+    def merge_data(self, genes, loader, r_server, data_config):
 
-        # io.BytesIO is StringIO.StringIO in python 2
-        for row in tqdm(csv.DictReader(gzip.GzipFile(fileobj=StringIO(req.content)), delimiter="\t"),
-                        desc='loading orthologues genes from HGNC',
-                        unit_scale=True,
-                        unit=' genes',
-                        file=tqdm_out,
-                        leave=False):
-            if row['human_ensembl_gene'] in genes:
-                self.add_ortholog_data_to_gene(gene=genes[row['human_ensembl_gene']], data=row)
+        #turn the species id/label mappings into a dict from the argument list
+        self.orthologs_species = dict()
+        if data_config.hgnc_orthologs_species:
+            for value in data_config.hgnc_orthologs_species:
+                code,label = value.split("-")
+                label = label.strip()
+                code = code.strip()
+                self.orthologs_species[code] = label
+
+        self._logger.info("Ortholog parsing - requesting from URL %s",data_config.hgnc_orthologs)
+
+        with URLZSource(data_config.hgnc_orthologs).open() as source:
+            reader = csv.DictReader(source, delimiter="\t")
+            for row in reader:
+                if row['human_ensembl_gene'] in genes:
+                    self.add_ortholog_data_to_gene(gene=genes[row['human_ensembl_gene']], data=row)
 
         self._logger.info("STATS AFTER HGNC ortholog PARSING:\n" + genes.get_stats())
 
     def add_ortholog_data_to_gene(self, gene, data):
-        '''loads data from the HCOP ortholog table
-        '''
         if 'ortholog_species' in data:
-            if data['ortholog_species'] in Config.HGNC_ORTHOLOGS_SPECIES:
+            if data['ortholog_species'] in self.orthologs_species:
                 # get rid of some redundant (ie.human) field that we are going to
                 # get from other sources anyways
                 ortholog_data = dict((k, v) for (k, v) in data.iteritems() if k.startswith('ortholog'))
@@ -50,7 +53,7 @@ class Orthologs(IPlugin):
                     ortholog_data['support'] = data['support'].split(',')
 
                 # use a readable key for the species in the ortholog dictionary
-                species = Config.HGNC_ORTHOLOGS_SPECIES[ortholog_data['ortholog_species']]
+                species = self.orthologs_species[ortholog_data['ortholog_species']]
 
                 try:
                     # I am appending because there are more than one records

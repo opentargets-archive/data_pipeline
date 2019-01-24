@@ -1,0 +1,102 @@
+#default data configuration 
+
+#evidence validation
+schema: https://raw.githubusercontent.com/opentargets/json_schema/1.5.0/opentargets.json
+input-file: ["https://storage.googleapis.com/ot-releases/18.12/evidences/atlas-2018-11-20.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/chembl-28-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/cosmic-27-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/europepmc-29-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/eva-01-10-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/gene2phenotype-29-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/genomics_england-02-10-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/gwas-28-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/intogen-23-07-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/phenodigm-12-10-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-28-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/progeny-23-07-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/reactome-03-09-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/slapenrich-29-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/sysbio-28-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/uniprot-15-11-2018.json.gz"]
+
+#reactome
+reactome-pathway-data: https://storage.googleapis.com/open-targets-data-releases/19.02/input/annotation-files/ReactomePathways-2019-01-09.txt
+reactome-pathway-relation: https://storage.googleapis.com/open-targets-data-releases/19.02/input/annotation-files/ReactomePathwaysRelation-2019-01-09.txt
+
+#uniprot
+uniprot-uri: https://storage.googleapis.com/ot-releases/18.12/annotations/uniprot-20181130.xml.gz
+
+#gene plugins
+gene-data-plugin-names: [HGNC,Orthologs,Ensembl,Uniprot,ChEMBL,MousePhenotypes,Hallmarks,CancerBiomarkers,ChemicalProbes,Tractability]
+
+#hgnc gene plugin
+#TODO move this to GCP https://github.com/opentargets/platform/issues/326
+hgnc-complete-set: http://ftp.ebi.ac.uk/pub/databases/genenames/new/json/hgnc_complete_set.json
+
+#ortholog gene plugin
+#TODO move this to GCP https://github.com/opentargets/platform/issues/326
+hgnc-orthologs: http://ftp.ebi.ac.uk/pub/databases/genenames/hcop/human_all_hcop_sixteen_column.txt.gz
+hgnc-orthologs-species: [9606-human,9598-chimpanzee,9544-macaque,10090-mouse,10116-rat,9615-dog,9823-pig,8364-frog,7955-zebrafish,7227-fly,6239-worm,4932-yeast]
+
+#mouse phenotype plugin
+#TODO move this to GCP https://github.com/opentargets/platform/issues/379
+mouse-phenotypes-orthology: http://www.informatics.jax.org/downloads/reports/HMD_HumanPhenotype.rpt
+#TODO move this to GCP https://github.com/opentargets/platform/issues/379
+mouse-phenotypes-report: http://www.informatics.jax.org/downloads/reports/MGI_PhenoGenoMP.rpt
+
+#cancer biomarkers plugin
+biomarker: https://storage.googleapis.com/ot-releases/18.12/annotations/cgi_biomarkers_per_variant.tsv
+
+#chemical probes plugin
+chemical-probes-1: https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_portalprobes_20181130.tsv
+chemical-probes-2: https://storage.googleapis.com/ot-releases/18.12/annotations/chemicalprobes_probeminer_20181015.tsv
+
+#hallmark plugin
+hallmark: https://storage.googleapis.com/ot-releases/18.12/annotations/cosmic-v87_hallmark_export.tsv
+
+#tractability plugin
+tractability : https://storage.googleapis.com/ot-releases/18.12/annotations/tractability_buckets-30-11-2018.tsv
+
+#ensembl
+ensembl-filename: https://storage.googleapis.com/ot-releases/18.12/annotations/homo_sapiens_core_94_38_genes.json.gz
+
+#hpa tissue specificity
+#TODO move this to GCP https://github.com/opentargets/platform/issues/328
+tissue-translation-map: https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/map_with_efos.json
+tissue-curation-map: https://raw.githubusercontent.com/opentargets/expression_hierarchy/master/process/curation.tsv
+hpa-normal-tissue: https://www.proteinatlas.org/download/normal_tissue.tsv.zip
+hpa-rna-level: https://storage.googleapis.com/atlas_baseline_expression/expatlas.blueprint2.baseline.binned_v2.tsv
+hpa-rna-value: https://storage.googleapis.com/atlas_baseline_expression/exp_summary_NormCounts_genes_all_Blueprint2_v2.txt
+hpa-rna-zscore: https://storage.googleapis.com/atlas_baseline_expression/expatlas.blueprint2.baseline.z-score.binned_v2.tsv
+
+#ontology
+ontology-hpo: https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/v2018-10-09/hp.owl
+#TODO move this to GCP https://github.com/opentargets/platform/issues/379
+ontology-mp: http://www.informatics.jax.org/downloads/reports/mp.owl
+ontology-efo: https://raw.githubusercontent.com/EBISPOT/efo/v2018-12-17/efo_inferred_all.owl
+#ontology-efo: https://github.com/EBISPOT/efo/releases/download/v3.2.0/efo.owl
+ontology-so: https://raw.githubusercontent.com/The-Sequence-Ontology/SO-Ontologies/v3.1/releases/so-xp.owl/so.owl
+ontology-eco: https://raw.githubusercontent.com/evidenceontology/evidenceontology/v2018-11-10/eco.owl
+
+#disease/phenotype mappings
+#TODO move this to GCP https://github.com/opentargets/platform/issues/389
+disease-phenotype:  ["https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/immune_disease_2_pheno.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareAlbuminuria_associations_03Jun15.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareIBDpheno.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ordo_hpo_mappings.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/charite_HP_ORDO_07Oct15.owl?format=raw"]
+
+#chembl
+#TODO remove API use https://github.com/opentargets/platform/issues/329
+chembl-target: https://www.ebi.ac.uk/chembl/api/data/target.json
+chembl-mechanism: https://www.ebi.ac.uk/chembl/api/data/mechanism.json
+chembl-protein: https://www.ebi.ac.uk/chembl/api/data/protein_class.json
+chembl-component: https://www.ebi.ac.uk/chembl/api/data/target_component.json
+chembl-molecule-set-uri-pattern: https://www.ebi.ac.uk/chembl/api/data/molecule/set/{}.json
+
+#eco_scores
+#TODO move this to GCP https://github.com/opentargets/platform/issues/391
+eco-scores: https://raw.githubusercontent.com/opentargets/data_pipeline/master/mrtarget/resources/eco_scores.tsv
+
+#target biotypes to exclude per data source
+excluded-biotypes:
+  expression_atlas:
+    - IG_C_pseudogene
+    - IG_J_pseudogene
+    - IG_pseudogene
+    - IG_V_pseudogene
+    - polymorphic_pseudogene
+    - processed_pseudogene
+    - pseudogene
+    - rRNA
+    - rRNA_pseudogene
+    - snoRNA
+    - snRNA
+    - transcribed_processed_pseudogene
+    - transcribed_unitary_pseudogene
+    - transcribed_unprocessed_pseudogene
+    - TR_J_pseudogene
+    - TR_V_pseudogene
+    - unitary_pseudogene
+    - unprocessed_pseudogene

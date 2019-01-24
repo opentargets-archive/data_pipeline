@@ -1,12 +1,13 @@
 import logging
+import csv
 
 import networkx as nx
-import requests
 from networkx.algorithms import all_simple_paths
 
 from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
+from mrtarget.common import URLZSource
 
 class ReactomeNode(TreeNode, JSONSerializable):
     def __init__(self, **kwargs):
@@ -14,85 +15,57 @@ class ReactomeNode(TreeNode, JSONSerializable):
 
 
 class ReactomeDataDownloader():
-    allowed_species = ['Homo sapiens']
 
-    def __init__(self):
+    def __init__(self, pathway_data_url, pathway_relation_url):
         self.logger = logging.getLogger(__name__)
-
-    def _download_data(self, url):
-        r = requests.get(url)
-        print "getting from " + url
-        try:
-            r.raise_for_status()
-        except:
-            print "failed to load file"
-            raise Exception("failed to download data from url: %s. Status code: %i" % (url, r.status_code))
-        return r.content
-
-    #
-    # def retrieve_pathway_gene_mappings(self):
-    #     data =  self._download_data(Config.REACTOME_ENSEMBL_MAPPINGS)
-    #     self._load_pathway_gene_mappings_to_pg(data)
-
-    #
-    # def _load_pathway_gene_mappings_to_pg(self, data):
-    #     self.relations = {}
-    #     added_relations=[]
-    #     for row in data.split('\n'):
-    #         if row:
-    #             ensembl_id, reactome_id,url, name, eco, species  = row.split('\t')
-    #             relation =(ensembl_id, reactome_id)
-    #             if relation not in added_relations:
-    #                 if (reactome_id in self.valid_pathway_ids) and (species in self.allowed_species):
-    #                     self.relations[relation]=dict(ensembl_id=ensembl_id,
-    #                                                              reactome_id=reactome_id,
-    #                                                              evidence_code=eco,
-    #                                                              species=species
-    #                                                          )
-    #                     added_relations.append(relation)
-    #                     if len(added_relations)% 1000 == 0:
-    #                         self.logger.info("%i rows parsed for reactome_ensembl_mapping"%len(added_relations))
-    #             else:
-    #                 self.logger.warn("Pathway mapping %s is already loaded, skipping duplicate data"%str(relation))
-    #     self.logger.info('parsed %i rows for reactome_ensembl_mapping'%len(added_relations))
-
+        self.allowed_species = ['Homo sapiens']
+        self.headers = ["id", "description", "species"]
+        self.headers_pathway_rel = ["id", "related_id"]
+        self.pathway_data_url = pathway_data_url
+        self.pathway_relation_url = pathway_relation_url
 
     def get_pathway_data(self):
         self.valid_pathway_ids = []
-        for row in self._download_data(Config.REACTOME_PATHWAY_DATA).split('\n'):
-            if row:
-                pathway_id, pathway_name, species = row.split('\t')
-                pathway_id = pathway_id[1:-1] if pathway_id[0] == '"' else pathway_id
-                pathway_name = pathway_name[1:-1] if pathway_name[0] == '"' else pathway_name
-                species = species[1:-1] if species[0] == '"' else species
+        with URLZSource(self.pathway_data_url).open() as source:
+            for i, row in enumerate(csv.DictReader(source, fieldnames=self.headers, dialect='excel-tab'), start=1):
+                if len(row) != 3:
+                    raise ValueError('Reactome.py: Pathway file format unexpected at line %d.' % i)
+
+                pathway_id = row["id"]
+                pathway_name = row["description"]
+                species = row["species"]
 
                 if pathway_id not in self.valid_pathway_ids:
                     if species in self.allowed_species:
                         self.valid_pathway_ids.append(pathway_id)
                         yield dict(id=pathway_id,
-                                   name=pathway_name,
-                                   species=species,
-                                   )
+                                name=pathway_name,
+                                species=species,
+                                )
                         if len(self.valid_pathway_ids) % 1000 == 0:
                             self.logger.debug("%i rows parsed for reactome_pathway_data" % len(self.valid_pathway_ids))
                 else:
                     self.logger.warn("Pathway id %s is already loaded, skipping duplicate data" % pathway_id)
+
         self.logger.info('parsed %i rows for reactome_pathway_data' % len(self.valid_pathway_ids))
 
     def get_pathway_relations(self):
         added_relations = []
-        for row in self._download_data(Config.REACTOME_PATHWAY_RELATION).split('\n'):
-            if row:
-                parent_id, child_id = row.split('\t')
-                parent_id = parent_id[1:-1] if parent_id[0] == '"' else parent_id
-                child_id = child_id[1:-1] if child_id[0] == '"' else child_id
+        with URLZSource(self.pathway_relation_url).open() as source:
+            for i, row in enumerate(
+                    csv.DictReader(source, fieldnames=self.headers_pathway_rel, dialect='excel-tab'), start=1):
+                if len(row) != 2:
+                    raise ValueError('Reactome.py: Pathway Relation file format unexpected at line %d.' % i)
+
+                parent_id = row["id"]
+                child_id = row["related_id"]
 
                 relation = (parent_id, child_id)
                 if relation not in added_relations:
                     if parent_id in self.valid_pathway_ids:
                         yield dict(id=parent_id,
-                                   child=child_id,
-                                   )
+                                child=child_id,
+                                )
                         added_relations.append(relation)
                         if len(added_relations) % 1000 == 0:
                             self.logger.debug("%i rows parsed from reactome_pathway_relation" % len(added_relations))
@@ -102,58 +75,64 @@ class ReactomeDataDownloader():
 
 
 class ReactomeProcess():
-    def __init__(self, loader):
+    def __init__(self, loader, pathway_data_url, pathway_relation_url):
         self.loader = loader
         self.g = nx.DiGraph(name="reactome")
         self.data = {}
         '''download data'''
-        self.downloader = ReactomeDataDownloader()
+        self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
         self.logger = logging.getLogger(__name__)
 
     def process_all(self):
-        self._process_pathway_hierarchy()
-        self.loader.flush()
-        self.loader.close()
-
-    def _process_pathway_hierarchy(self):
         root = 'root'
         self.relations = dict()
         self.g.add_node(root, name="", species="")
-        for row in self.downloader.get_pathway_data():
-            self.g.add_node(row['id'], name=row['name'], species=row['species'])
-        children = set()
-        for row in self.downloader.get_pathway_relations():
-            self.g.add_edge(row['id'], row['child'])
-            children.add(row['child'])
-        nodes_without_parent = set(self.g.nodes()) - children
-        for node in nodes_without_parent:
-            if node != root:
-                self.g.add_edge(root, node)
-        for node, node_data in self.g.nodes(data=True):
-            if node != root:
-                ancestors = set()
-                paths = list(all_simple_paths(self.g, root, node))
-                for path in paths:
-                    for p in path:
-                        ancestors.add(p)
 
-                #ensure these are real tuples, not generators
-                #otherwise they can't be serialized to json
-                children = tuple(self.g.successors(node))
-                parents = tuple(self.g.predecessors(node))
+        try:
+            for row in self.downloader.get_pathway_data():
+                self.g.add_node(row['id'], name=row['name'], species=row['species'])
+            children = set()
+            for row in self.downloader.get_pathway_relations():
+                self.g.add_edge(row['id'], row['child'])
+                children.add(row['child'])
 
-                self.loader.put(index_name=Config.ELASTICSEARCH_REACTOME_INDEX_NAME,
-                                doc_type=Config.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                                ID=node,
-                                body=dict(id=node,
-                                          label=node_data['name'],
-                                          path=paths,
-                                          children=children,
-                                          parents=parents,
-                                          is_root=node == root,
-                                          ancestors=list(ancestors)
-                                          ))
-                                          
+            nodes_without_parent = set(self.g.nodes()) - children
+            for node in nodes_without_parent:
+                if node != root:
+                    self.g.add_edge(root, node)
+                    
+            for node, node_data in self.g.nodes(data=True):
+                if node != root:
+                    ancestors = set()
+                    paths = list(all_simple_paths(self.g, root, node))
+                    for path in paths:
+                        for p in path:
+                            ancestors.add(p)
+
+                    #ensure these are real tuples, not generators
+                    #otherwise they can't be serialized to json
+                    children = tuple(self.g.successors(node))
+                    parents = tuple(self.g.predecessors(node))
+
+                    self.loader.put(index_name=Const.ELASTICSEARCH_REACTOME_INDEX_NAME,
+                        doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
+                        ID=node,
+                        body=dict(id=node,
+                            label=node_data['name'],
+                            path=paths,
+                            children=children,
+                            parents=parents,
+                            is_root=node == root,
+                            ancestors=list(ancestors)
+                        ))
+            #make sure the index is all ready for future operations before completing this step
+            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_REACTOME_INDEX_NAME)
+        except ValueError as error:
+            self.logger.error(error)
+            raise
+
+
+
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects

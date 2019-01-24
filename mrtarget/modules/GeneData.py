@@ -1,15 +1,12 @@
 import logging
 from collections import OrderedDict
-from tqdm import tqdm
 import traceback
-from mrtarget.common import TqdmToLogger
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisQueue, RedisQueueStatusReporter, RedisQueueWorkerProcess
-
+from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.Settings import Config
-
+from mrtarget.constants import Const
 from yapsy.PluginManager import PluginManager
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
@@ -383,24 +380,24 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
 
     def __init__(self, es, r_server, queue, dry_run=False):
         super(GeneObjectStorer, self).__init__(queue, None)
-        self.es = None
+        self.es = es
         self.r_server = None
-        self.loader = None
+        self.loader = None # will be set in init()
         self.dry_run = dry_run
 
     def process(self, data):
         geneid, gene = data
         '''process objects to simple search object'''
         gene.preprocess()
-        self.loader.put(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                       Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+        self.loader.put(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                       Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                        geneid,
                        gene.to_json(),
                        create_index=False)
 
     def init(self):
         super(GeneObjectStorer, self).init()
-        self.loader = Loader(dry_run=self.dry_run)
+        self.loader = Loader(self.es, dry_run=self.dry_run)
 
     def close(self):
         super(GeneObjectStorer, self).close()
@@ -411,11 +408,20 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
 class GeneManager():
     """
     Merge data available in ?elasticsearch into proper json objects
+
+
+    plugin_paths is a collection of filesystem paths to search for potential plugins
+
+    plugin_names is an ordered collection of class names of plugins which determines
+    the order they are handled in
+
     """
 
     def __init__(self,
                  loader,
-                 r_server):
+                 r_server,
+                 plugin_paths,
+                 plugin_order):
 
         self.loader = loader
         self.r_server = r_server
@@ -426,53 +432,33 @@ class GeneManager():
         # Build the manager
         self.simplePluginManager = PluginManager()
         # Tell it the default place(s) where to find plugins
-        self.simplePluginManager.setPluginPlaces(Config.GENE_DATA_PLUGIN_PLACES)
-        for dir in Config.GENE_DATA_PLUGIN_PLACES:
-            self._logger.info(dir)
+        self.simplePluginManager.setPluginPlaces(plugin_paths)
+        for dir in plugin_paths:
+            self._logger.debug("Looking for plugins in %s", dir)
         # Load all plugins
         self.simplePluginManager.collectPlugins()
 
-        self.tqdm_out = TqdmToLogger(self._logger,level=logging.INFO)
+        self.plugin_order = plugin_order
 
 
-    def merge_all(self, dry_run = False):
+    def merge_all(self, data_config, dry_run = False):
 
-        plugin_count = len(self.simplePluginManager.getAllPlugins())
-        bar = tqdm(desc='Merging data from available databases',
-                   total=plugin_count,
-                   unit='steps',
-                   file=self.tqdm_out)
-
-        for plugin_name in Config.GENE_DATA_PLUGIN_ORDER:
-            try:
-                plugin = self.simplePluginManager.getPluginByName(plugin_name)
-                plugin.plugin_object.print_name()
-                plugin.plugin_object.merge_data(genes=self.genes, loader=self.loader, r_server=self.r_server, tqdm_out=self.tqdm_out)
-
-            except AttributeError:
-                self._logger.exception("the current plugin %s wasn't loaded", plugin_name)
-
-            except Exception as error:
-                self._logger.error('plugin %s failed with an exception', plugin_name)
-                self._logger.exception(str(error))
-
-            finally:
-                bar.update()
+        for plugin_name in self.plugin_order:
+            plugin = self.simplePluginManager.getPluginByName(plugin_name)
+            plugin.plugin_object.print_name()
+            plugin.plugin_object.merge_data(genes=self.genes, 
+                loader=self.loader, r_server=self.r_server, data_config=data_config)
 
         self._store_data(dry_run=dry_run)
-        bar.update()
 
     def _store_data(self, dry_run = False):
 
-        self.loader.create_new_index(Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        self.loader.create_new_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|gene_data_storage',
                            r_server=self.r_server,
                            serialiser='jsonpickle',
                            max_size=10000,
                            job_timeout=600)
-
-        q_reporter = RedisQueueStatusReporter([queue])
-        q_reporter.start()
 
         workers = [GeneObjectStorer(self.loader.es,
                                     None,
@@ -490,10 +476,7 @@ class GeneManager():
         for w in workers:
             w.join()
 
-        # any queue process should join at the end using inverse order
-        self._logger.info('join queue reporter')
-        q_reporter.join()
-
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         self._logger.info('all gene objects pushed to elasticsearch')
 
 

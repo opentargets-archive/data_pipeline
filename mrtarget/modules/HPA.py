@@ -2,24 +2,23 @@ from __future__ import absolute_import
 import logging
 import re
 import csv
-import hashlib
 import ujson as json
-import functools as ft
-import itertools as it
+import itertools
+import functools
 import operator as oper
-from tqdm import tqdm
-from mrtarget.common import TqdmToLogger
 
+import pypeln.process as pr
 import petl
+import more_itertools
 from mrtarget.common import URLZSource
 
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
-from mrtarget.common.Redis import RedisQueueStatusReporter, RedisQueueWorkerProcess, RedisQueue
 
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
+from mrtarget.Settings import Config #TODO remove this eventually
+from mrtarget.common.connection import new_es_client
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
-import pprint
 
 
 _missing_tissues = {'names': {},
@@ -122,11 +121,7 @@ class HPAExpression(Dict, JSONSerializable):
 
         return tissue
 
-    def stamp_data_release(self):
-        self.data_release = Config.RELEASE_VERSION
-
     def to_json(self):
-        self.stamp_data_release()
         return json.dumps(self.to_dict(),
                           default=json_serialize,
                           sort_keys=True,
@@ -187,10 +182,10 @@ def format_expression_with_rna(rec):
         new_tissues = []
         has_tissues = len(exp.tissues) > 0
 
-        t_set = ft.reduce(lambda x, y: x.union(set([y['efo_code']])),
+        t_set = functools.reduce(lambda x, y: x.union(set([y['efo_code']])),
                           exp.tissues, set()) \
                     if has_tissues else set()
-        nt_set = ft.reduce(lambda x, y: x.union(set([y[0]])),
+        nt_set = functools.reduce(lambda x, y: x.union(set([y[0]])),
                           rec['data'], set())
 
         intersection = t_set.intersection(nt_set)
@@ -296,19 +291,19 @@ def hpa2tissues(hpa=None):
     def _split_tissue(k, v):
         rna_level = v['rna']['level'] if v['rna'] else -1
         '''from tissue dict to rna and protein dicts pair'''
-        rna = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+        rna = list(itertools.imap(lambda e: {'id': '_'.join([str(e), k]),
                                       'level': e} if v['rna'] else {},
                            xrange(0, rna_level + 1) if rna_level >= 0 else xrange(-1, 0)))
 
         zscore_level = v['rna']['zscore'] if v['rna'] else -1
         '''from tissue dict to rna and protein dicts pair'''
-        zscore = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+        zscore = list(itertools.imap(lambda e: {'id': '_'.join([str(e), k]),
                                       'level': e} if v['rna'] else {},
                            xrange(0, zscore_level + 1) if zscore_level >= 0 else xrange(-1, 0)))
 
 
         pro_level = v['protein']['level'] if v['protein'] else -1
-        protein = list(it.imap(lambda e: {'id': '_'.join([str(e), k]),
+        protein = list(itertools.imap(lambda e: {'id': '_'.join([str(e), k]),
                                           'level': e} if v['protein'] else {},
                                xrange(0, pro_level + 1) if pro_level >= 0 else xrange(-1, 0)))
 
@@ -337,24 +332,36 @@ def hpa2tissues(hpa=None):
             'zscore': zscores}
 
 class HPADataDownloader():
-    def __init__(self):
+    def __init__(self, tissue_translation_map, 
+            tissue_curation_map,
+            normal_tissue_url,
+            rna_level_url,
+            rna_value_url,
+            rna_zscore_url):
         self.logger = logging.getLogger(__name__)
-        self.t2m = self.load_t2m()
+        self.tissue_translation_map = tissue_translation_map
+        self.tissue_curation_map = tissue_curation_map
+        self.normal_tissue_url = normal_tissue_url
+        self.rna_level_url = rna_level_url
+        self.rna_value_url = rna_value_url
+        self.rna_zscore_url = rna_zscore_url
 
-    def load_t2m(self):
+
+
+        #load t2m
         t2m = {'tissues': {} ,
                'curations': {}}
 
-        with URLZSource(Config.TISSUE_TRANSLATION_MAP_URL).open() as r_file:
+        with URLZSource(self.tissue_translation_map).open() as r_file:
             t2m['tissues'] = json.load(r_file)['tissues']
 
 
-        with URLZSource(Config.TISSUE_CURATION_MAP_URL).open() as r_file:
+        with URLZSource(self.tissue_curation_map).open() as r_file:
             t2m['curations'] = {el['name']: el['canonical']
                                     for el in csv.DictReader(r_file,
                                               fieldnames=['name', 'canonical'],
                                               delimiter='\t')}
-        return t2m
+        self.t2m = t2m
 
     def retrieve_normal_tissue_data(self):
         """Parse 'normal_tissue' csv file,
@@ -364,7 +371,7 @@ class HPADataDownloader():
         """
         self.logger.info('get normal tissue rows into dicts')
         table = (
-            petl.fromcsv(URLZSource(Config.HPA_NORMAL_TISSUE_URL), delimiter='\t')
+            petl.fromcsv(URLZSource(self.normal_tissue_url), delimiter='\t')
             .rename({'Tissue': 'tissue',
                      'Cell type': 'cell_type',
                      'Level': 'level',
@@ -414,7 +421,7 @@ class HPADataDownloader():
         self.logger.info('get rna tissue rows into dicts')
         self.logger.debug('melting rna level table into geneid tissue level')
 
-        t_level = (petl.fromcsv(URLZSource(Config.HPA_RNA_LEVEL_URL), delimiter='\t')
+        t_level = (petl.fromcsv(URLZSource(self.rna_level_url), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_level')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
@@ -428,7 +435,7 @@ class HPADataDownloader():
             .cutout('tissue')
         )
 
-        t_value = (petl.fromcsv(URLZSource(Config.HPA_RNA_VALUE_URL), delimiter='\t')
+        t_value = (petl.fromcsv(URLZSource(self.rna_value_url), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='rna_value')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
@@ -439,7 +446,7 @@ class HPADataDownloader():
             .cutout('tissue')
         )
 
-        t_zscore = (petl.fromcsv(URLZSource(Config.HPA_RNA_ZSCORE_URL), delimiter='\t')
+        t_zscore = (petl.fromcsv(URLZSource(self.rna_zscore_url), delimiter='\t')
             .melt(key='ID', variablefield='tissue', valuefield='zscore_level')
             .rename({'ID': 'gene'})
             .addfield('tissue_label',
@@ -472,39 +479,46 @@ class HPADataDownloader():
 
         return t_join
 
-class ExpressionObjectStorer(RedisQueueWorkerProcess):
 
-    def __init__(self, es, r_server, queue, dry_run=False):
-        super(ExpressionObjectStorer, self).__init__(queue, None)
-        self.es = None
-        self.r_server = None
-        self.loader = None
-        self.dry_run = dry_run
+def write_on_start(es_hosts):
+    kwargs = {}
+    es_client = new_es_client(es_hosts)
+    kwargs['es_loader'] = Loader(es=es_client)
 
-    def process(self, data):
-        geneid, gene = data
-        self.loader.put(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                       Config.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                       ID=geneid,
-                       body=gene,
-                       create_index=False)
+    return kwargs
 
-    def init(self):
-        super(ExpressionObjectStorer, self).init()
-        self.loader = Loader(dry_run=self.dry_run)
+def write_on_done(status, resources):
+    resources['es_loader'].flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+    resources['es_loader'].close()
 
-    def close(self):
-        super(ExpressionObjectStorer, self).close()
-        self.loader.flush()
-        self.loader.close()
+def write_to_elastic(data, resources):
+    hpa = data[0]
+    resources['es_loader'].put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+                ID=hpa['gene'],
+                body=hpa,
+                create_index=False)
+
 
 
 class HPAProcess():
-    def __init__(self, loader, r_server):
+    def __init__(self, loader, r_server, 
+            es_hosts,
+            tissue_translation_map_url, 
+            tissue_curation_map_url,
+            normal_tissue_url,
+            rna_level_url,
+            rna_value_url,
+            rna_zscore_url):
         self.loader = loader
-        self.esquery = ESQuery(loader.es)
         self.r_server = r_server
-        self.downloader = HPADataDownloader()
+        self.es_hosts = es_hosts
+        self.downloader = HPADataDownloader(tissue_translation_map_url, 
+            tissue_curation_map_url,
+            normal_tissue_url,
+            rna_level_url,
+            rna_value_url,
+            rna_zscore_url)
         self.logger = logging.getLogger(__name__)
         self.hpa_normal_table = None
         self.hpa_rna_table = None
@@ -515,9 +529,8 @@ class HPAProcess():
         self.hpa_rna_table = self.process_rna()
         self.hpa_merged_table = self.process_join()
 
-        self.store_data(dry_run=dry_run)
-        self.loader.flush()
-        self.loader.close()
+        if not dry_run:
+            self.store_data()
 
     def process_normal_tissue(self):
         return self.downloader.retrieve_normal_tissue_data()
@@ -535,49 +548,50 @@ class HPAProcess():
         return hpa_merged_table
 
 
-    def store_data(self, dry_run=False):
+    def store_data(self):
         self.logger.info('store_data called')
 
         self.logger.debug('calling to create new expression index')
-        overwrite_indices = not dry_run
-        self.loader.create_new_index(Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                                     recreate=overwrite_indices)
+
+        self.loader.create_new_index(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
         self.loader.prepare_for_bulk_indexing(
             self.loader.get_versioned_index(
-                Config.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
+                Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
 
-        queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|expression_data_storage',
-                           r_server=self.r_server,
-                           serialiser='json',
-                           max_size=10000,
-                           job_timeout=600)
+        #actually store it into elasticsearch       
+        self.logger.info('starting to write to elasticsearch') 
 
-        q_reporter = RedisQueueStatusReporter([queue])
-        q_reporter.start()
-        loaders = min([16, Config.WORKERS_NUMBER])
+        data = self.hpa_merged_table.data()
 
-        workers = [ExpressionObjectStorer(self.loader.es,
-                                    None,
-                                    queue,
-                                    dry_run=dry_run) for _ in range(loaders)]
+        write_on_start_partial = functools.partial(write_on_start, self.es_hosts)
 
-        for w in workers:
-            w.start()
+        #handle everything on this main thread
+        resources = write_on_start_partial()
+        more_itertools.consume(
+            itertools.imap(write_to_elastic, 
+                data, itertools.repeat(resources)))
+        write_on_done(None, resources)
 
-        for row in self.hpa_merged_table.data():
-            # just one field with all data frommated into a dict
-            hpa = row[0]
-            queue.put((hpa['gene'], hpa), self.r_server)
+        #this is a way to do it using pypyeln mulitprocessing
+        #but this is 33% slower than the main thread version
+        #
+        #setup the mulitprocesses but dont do much
+        #pl_stage = pr.map(write_to_elastic, data,
+        #    workers=Config.WORKERS_NUMBER, maxsize=1000,
+        #    on_start=write_on_start_partial,
+        #    on_done=write_on_done)
+        #now wait for all the multiprocessing to actually finish
+        #more_itertools.consume(pr.to_iterable(pl_stage))
 
-        queue.set_submission_finished(r_server=self.r_server)
-
-        for w in workers:
-            w.join()
-
-        q_reporter.join()
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+        #restore old pre-load settings
+        #note this automatically does all prepared indexes
+        self.loader.restore_after_bulk_indexing()
+        
+        self.logger.info('all expressions objects pushed to elasticsearch')
 
         self.logger.info('missing tissues %s', str(_missing_tissues))
-        self.logger.info('all expressions objects pushed to elasticsearch')
+
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

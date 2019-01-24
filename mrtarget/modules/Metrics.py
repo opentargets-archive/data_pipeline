@@ -1,14 +1,13 @@
 import logging
-from mrtarget.common import TqdmToLogger
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.Settings import Config
+import mrtarget.cfg
 
 class Metrics:
     def __init__(self, es):
         self.logger = logging.getLogger(__name__)
         self.esquery = ESQuery(es)
-        self.filename = Config.METRICS_FILENAME
-        tqdm_out = TqdmToLogger(self.logger, level=logging.INFO)
+        self.filename = mrtarget.cfg.Configuration().args.metric_file
 
     def generate_metrics(self):
         self.logger.info("Producing data release metrics")

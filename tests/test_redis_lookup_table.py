@@ -1,5 +1,6 @@
 from mrtarget.common.Redis import RedisLookupTable, RedisLookupTableJson, RedisLookupTablePickle
 import unittest
+from mrtarget.common.connection import RedisManager
 
 
 class PicklableObject(object):
@@ -11,26 +12,29 @@ class PicklableObject(object):
 class LookupTableTestCase(unittest.TestCase):
 
     def test_base_lookup(self):
-        table = RedisLookupTable()
+        with RedisManager():
+            table = RedisLookupTable()
 
-        test = 'this is a string test that does not need to be serialized'
-        key = 'test_key'
-        table.set(key, test)
-        self.assertEquals(table.get(key), test)
+            test = 'this is a string test that does not need to be serialized'
+            key = 'test_key'
+            table.set(key, test)
+            self.assertEquals(table.get(key), test)
 
 
     def test_json_lookup(self):
-        table = RedisLookupTableJson()
+        with RedisManager():
+            table = RedisLookupTableJson()
 
-        test = {'json test':'this is a test object that can be serialized to json'}
-        key = 'test_key'
-        table.set(key, test)
-        self.assertEquals(table.get(key), test)
+            test = {'json test':'this is a test object that can be serialized to json'}
+            key = 'test_key'
+            table.set(key, test)
+            self.assertEquals(table.get(key), test)
 
     def test_pickle_lookup(self):
-        table = RedisLookupTablePickle()
+        with RedisManager():
+            table = RedisLookupTablePickle()
 
-        test = PicklableObject()
-        key = 'test_key'
-        table.set(key, test)
-        self.assertEquals(table.get(key), test)
+            test = PicklableObject()
+            key = 'test_key'
+            table.set(key, test)
+            self.assertEquals(table.get(key), test)

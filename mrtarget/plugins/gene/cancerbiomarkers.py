@@ -1,9 +1,17 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.Settings import Config
-from tqdm import tqdm
+from mrtarget.common import URLZSource
 import traceback
 import logging
-logging.basicConfig(level=logging.DEBUG)
+import csv
+import configargparse
+
+# Not used at the moment, but good to have here to check that the column names are correct
+cancerbiomarker_columns = ("Alteration", "AlterationType", "AssayType", "Association", "Biomarker", "Comments",
+                           "CurationDate", "Curator", "Drug", "DrugFamily", "DrugFullName", "DrugStatus",
+                           "EvidenceLevel", "Gene", "MetastaticTumorType", "PrimaryTumorAcronym",
+                           "PrimaryTumorTypeFullName", "Source", "TCGIincluded", "Targeting", "cDNA", "gDNA",
+                           "IndividualMutation", "Info", "Region", "Strand", "Transcript", "PrimaryTumorType")
 
 BIOMARKER_SOURCE_MAPPINGS = {
     "AACR 2012" : { 'url' : "http://cancerres.aacrjournals.org/content/72/8_Supplement", 'label' : "American Association for Cancer Research Annual Meeting 2012" },
@@ -147,48 +155,40 @@ class CancerBiomarkers(IPlugin):
         self.ensembl_current = {}
         self.symbols = {}
         self.cancerbiomarkers = {}
-        self.tqdm_out = None
 
     def print_name(self):
         self._logger.info("Cancer Biomarkers plugin")
 
-    def merge_data(self, genes, loader, r_server, tqdm_out):
+    def merge_data(self, genes, loader, r_server, data_config):
 
         self.loader = loader
         self.r_server = r_server
-        self.tqdm_out = tqdm_out
 
         try:
             # Parse cancer biomarker data into self.cancerbiomarkers
-            self.build_json(filename=Config.BIOMARKER_FILENAME)
+            self.build_json(filename=data_config.biomarker)
 
             # Iterate through all genes and add cancer biomarkers data if gene symbol is present
             self._logger.info("Generating Cancer Biomarker data injection")
-            for gene_id, gene in tqdm(genes.iterate(),
-                                      desc='Adding Cancer Biomarker data',
-                                      unit=' gene',
-                                      file=self.tqdm_out):
+            for gene_id, gene in genes.iterate():
                 # Extend gene with related Cancer Biomarker data
                 if gene.approved_symbol in self.cancerbiomarkers:
-                    self._logger.debug("Adding Cancer Biomarker data to gene %s", gene.approved_symbol)
                     gene.cancerbiomarkers=self.cancerbiomarkers[gene.approved_symbol]
 
         except Exception as ex:
             self._logger.exception(str(ex), exc_info=1)
             raise ex
 
-    def build_json(self, filename=Config.BIOMARKER_FILENAME):
+    def build_json(self, filename):
 
-        with open(filename, 'r') as input:
-            next(input)
-            for row in input:
+        with URLZSource(filename).open() as r_file:
+            # fieldnames=cancerbiomarker_columns not used at the moment
+            for i, row in enumerate(csv.DictReader(r_file, dialect='excel-tab'), start=1):
 
-                (Alteration, AlterationType, AssayType, Association, Biomarker, Comments, CurationDate,
-                 Curator, Drug, DrugFamily, DrugFullName, DrugStatus, EvidenceLevel,
-                 Gene, MetastaticTumorType, PrimaryTumorAcronym, PrimaryTumorTypeFullName,
-                 Source, TCGIincluded, Targeting, cDNA, gDNA, IndividualMutation, Info,
-                 Region, Strand, Transcript, PrimaryTumorType) = \
-                    tuple(row.rstrip().split('\t'))
+                Source = row["Source"]
+                Gene = row["Gene"]
+                IndividualMutation = row["IndividualMutation"]
+                PrimaryTumorTypeFullName = row["PrimaryTumorTypeFullName"]
 
                 # Split Source and Gene to separate out multiple entries
                 mSource = map(str.strip, Source.split(";"))
@@ -250,14 +250,14 @@ class CancerBiomarkers(IPlugin):
 
                     line = {
                         "gene": singleGene,
-                        "biomarker": Biomarker,
-                        "individualbiomarker": IndividualMutation,
-                        "association": Association,
-                        "drug": Drug,
-                        "drugfamily": DrugFamily,
-                        "drugfullname": DrugFullName,
+                        "biomarker": row["Biomarker"],
+                        "individualbiomarker": row["IndividualMutation"],
+                        "association": row["Association"],
+                        "drug": row["Drug"],
+                        "drugfamily": row["DrugFamily"],
+                        "drugfullname": row["DrugFullName"],
                         "diseases": diseases,
-                        "evidencelevel": EvidenceLevel,
+                        "evidencelevel": row["EvidenceLevel"],
                         "references": myReferences
                     }
                     # Add data for current biomarker to self.cancerbiomarkers

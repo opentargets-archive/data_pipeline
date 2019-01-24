@@ -1,15 +1,12 @@
 import logging
 from collections import OrderedDict
-from tqdm import tqdm 
-from mrtarget.common import TqdmToLogger
-from mrtarget.common.connection import PipelineConnectors
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.modules.Ontology import OntologyClassReader, DiseaseUtils
+from opentargets_ontologyutils.rdf_utils import OntologyClassReader, DiseaseUtils
+import opentargets_ontologyutils.efo
 from rdflib import URIRef
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 logger = logging.getLogger(__name__)
-tqdm_out = TqdmToLogger(logger,level=logging.INFO)
 
 '''
 Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 
@@ -87,10 +84,19 @@ class EFO(JSONSerializable):
 class EfoProcess():
 
     def __init__(self,
-                 loader):
+                 loader,
+                 efo_uri,
+                 hpo_uri,
+                 mp_uri,
+                 disease_phenotype_uris
+                 ):
         self.loader = loader
         self.efos = OrderedDict()
         self.logger = logging.getLogger(__name__+".EfoProcess")
+        self.efo_uri = efo_uri
+        self.hpo_uri = hpo_uri
+        self.mp_uri = mp_uri
+        self.disease_phenotype_uris = disease_phenotype_uris
 
     def process_all(self):
         self._process_ontology_data()
@@ -99,18 +105,25 @@ class EfoProcess():
     def _process_ontology_data(self):
 
         self.disease_ontology = OntologyClassReader()
-        self.disease_ontology.load_open_targets_disease_ontology()
+        opentargets_ontologyutils.efo.load_open_targets_disease_ontology(self.disease_ontology,  self.efo_uri)
+
         '''
         Get all phenotypes
         '''
+        #becuse of opentargets_ontologyutils for legacy iterates over key,uri pairs
+        disease_phenotype_uris_counter = enumerate(self.disease_phenotype_uris)
+
         utils = DiseaseUtils()
-        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology)
+        disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology, self.hpo_uri, self.mp_uri, disease_phenotype_uris_counter)
 
         for uri,label in self.disease_ontology.current_classes.items():
             properties = self.disease_ontology.parse_properties(URIRef(uri))
+
+            #create a text block definition/description by joining others together
             definition = ''
-            if 'http://www.ebi.ac.uk/efo/definition' in properties:
-                definition = ". ".join(properties['http://www.ebi.ac.uk/efo/definition'])
+            if 'http://purl.obolibrary.org/obo/IAO_0000115' in properties:
+                definition = ". ".join(properties['http://purl.obolibrary.org/obo/IAO_0000115'])
+
             synonyms = []
             if 'http://www.ebi.ac.uk/efo/alternative_term' in properties:
                 synonyms = properties['http://www.ebi.ac.uk/efo/alternative_term']
@@ -148,10 +161,11 @@ class EfoProcess():
     def _store_efo(self):
 
         for efo_id, efo_obj in self.efos.items():
-            self.loader.put(index_name=Config.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                            doc_type=Config.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+            self.loader.put(index_name=Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                            doc_type=Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
                             ID=efo_id,
                             body = efo_obj)
+        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
@@ -191,39 +205,3 @@ class EfoProcess():
         #return the metrics to the caller so they can write to file or further compare
         self.logger.info("Finished QC")
         return metrics
- 
-
-
-
-class DiseaseGraph:
-    """
-    A DAG of disease nodes whose elements are instances of class DiseaseNode
-    Input: g - an RDFLib-generated ConjugativeGraph, i.e. list of RDF triples
-    """
-
-    def __init__(self, g):
-        self.g = g
-        self.root = None
-        self.node_map = {}
-        self.node_cnt = 0
-        self.print_rdf_tree_from_root(g)
-        self.make_node_graph(g)
-
-    def print_rdf_tree_from_root(self, g):
-        print("STUB for method: print_rdf_tree_from_root()")
-
-    def make_node_graph(self, g):
-        print("STUB for method: make_node_graph()")
-
-
-class DiseaseNode:
-    """
-    A class representing all triples associated with a particular disease subject
-    e.g. asthma: http://www.ebi.ac.uk/efo/EFO_0000270
-    and its parents and children
-    """
-
-    def __init__(self, name="name", parents = [], children = []):
-        self.name = name,
-        self.parents = parents
-        self.children = children
