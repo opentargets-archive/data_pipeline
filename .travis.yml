@@ -44,13 +44,3 @@ after_success:
       docker tag "${QUAY_REPO}:${TRAVIS_BRANCH}" "${QUAY_REPO}:latest"
       docker push "${QUAY_REPO}:latest"
     fi
-#  - if [ ! -d "google-cloud-sdk/bin" ]; then rm -rf "google-cloud-sdk"; curl 'https://sdk.cloud.google.com' | bash; fi
-#  - source google-cloud-sdk/path.bash.inc
-#  - gcloud version
-#  - gcloud --quiet components update
-#  - echo $GCLOUD_KEY | base64 --decode > gcloud.p12
-#  - gcloud auth activate-service-account $GCLOUD_EMAIL --key-file gcloud.p12
-#  - ssh-keygen -f ~/.ssh/google_compute_engine -N ""
-#  # Push to Google container registry
-#  - docker build -t gcr.io/$CLOUDSDK_CORE_PROJECT/$CLOUDSDK_CORE_PROJECT:v1 .
-#  - gcloud docker push gcr.io/$CLOUDSDK_CORE_PROJECT/$CLOUDSDK_CORE_PROJECT:v1 > /dev/null
