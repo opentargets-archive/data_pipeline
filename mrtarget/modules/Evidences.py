@@ -26,7 +26,7 @@ def fix_and_score_evidence(validated_evs, process_context):
     fix_evidence, and if valid then score_evidence, extend data and inject loci
     """
     left, right = None, None
-    ev = Evidence(validated_evs.line)
+    ev = Evidence(validated_evs.line, process_context.kwargs.datasources_to_datatypes)
 
     (fixed_ev, _) = process_context.kwargs.evidence_manager.fix_evidence(ev)
 
@@ -66,7 +66,7 @@ def process_evidence(line, process_context):
     return left, right
 
 
-def process_evidence_on_start(luts, eco_scores_uri, schema_uri, excluded_biotypes):
+def process_evidence_on_start(luts, eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes):
     """this function is called once per started process and return a ProcessContext per process."""
     pc = ProcessContext()
     pc.logger.debug("called validate_evidence on_start from %s", str(os.getpid()))
@@ -77,7 +77,9 @@ def process_evidence_on_start(luts, eco_scores_uri, schema_uri, excluded_biotype
     pc.kwargs.luts = luts
     pc.kwargs.redis_c = new_redis_client()
     pc.kwargs.luts.set_r_server(pc.kwargs.redis_c)
-    pc.kwargs.evidence_manager = EvidenceManager(pc.kwargs.luts, eco_scores_uri, excluded_biotypes)
+    pc.kwargs.datasources_to_datatypes = datasources_to_datatypes
+    pc.kwargs.evidence_manager = EvidenceManager(pc.kwargs.luts, eco_scores_uri, 
+        excluded_biotypes, datasources_to_datatypes)
     return pc
 
 
@@ -143,7 +145,7 @@ def validate_evidence(line, process_context):
         data_source = parsed_line['sourceID']
         validated_evs.data_source = data_source
 
-        if data_source not in Config.DATASOURCE_TO_DATATYPE_MAPPING:
+        if data_source not in process_context.kwargs.datasources_to_datatypes:
             validated_evs.explanation_type = 'unsupported_datasource'
             validated_evs.explanation_str = data_source
             return validated_evs, None
@@ -297,7 +299,8 @@ def write_evidences(x, process_context):
 def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
                                dry_run, enable_output_to_es, output_folder,
                                num_workers, num_writers, max_queued_events, 
-                               eco_scores_uri, schema_uri, es_hosts, excluded_biotypes):
+                               eco_scores_uri, schema_uri, es_hosts, excluded_biotypes, 
+                               datasources_to_datatypes):
     logger = logging.getLogger(__name__)
 
     if not filenames:
@@ -323,8 +326,10 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     evs = IO.make_iter_lines(checked_filenames, first_n)
 
     #create functions with pre-baked arguments
-    validate_evidence_on_start_f = functools.partial(process_evidence_on_start, lookup_data, eco_scores_uri, schema_uri, excluded_biotypes)
-    write_evidences_on_start_f = functools.partial(create_process_context, enable_output_to_es, output_folder, es_hosts, dry_run)
+    validate_evidence_on_start_f = functools.partial(process_evidence_on_start, 
+        lookup_data, eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes)
+    write_evidences_on_start_f = functools.partial(create_process_context, 
+        enable_output_to_es, output_folder, es_hosts, dry_run)
 
     #perform any single-thread setup
     logger.debug('context setup')

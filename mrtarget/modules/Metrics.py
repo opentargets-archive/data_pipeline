@@ -4,10 +4,11 @@ from mrtarget.Settings import Config
 import mrtarget.cfg
 
 class Metrics:
-    def __init__(self, es):
+    def __init__(self, es, filename, datasources_to_datatypes):
         self.logger = logging.getLogger(__name__)
         self.esquery = ESQuery(es)
-        self.filename = mrtarget.cfg.Configuration().args.metric_file
+        self.filename = filename
+        self.datasources_to_datatypes = datasources_to_datatypes
 
     def generate_metrics(self):
         self.logger.info("Producing data release metrics")
@@ -39,7 +40,7 @@ class Metrics:
                 "evidence link to trinucleotide expansion:\t" + str(count_trinucleotide_evidence['hits']['total']) + "\n"
             )
 
-            for ds in Config.DATASOURCE_TO_DATATYPE_MAPPING.iterkeys():
+            for ds in self.datasources_to_datatypes.iterkeys():
                 count_datasource_evidence = self.esquery.count_datasource_evidence(ds)
                 metrics_output.write("evidence from datasource " + ds + ":\t" + str(count_datasource_evidence['hits']['total']) + "\n")
 

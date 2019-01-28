@@ -11,3 +11,4 @@ gen-plugin-places: [mrtarget/plugins/gene]
 
 val-workers-validator: 8
 val-workers-writer: 8
+val-queue-validator-writer: 10

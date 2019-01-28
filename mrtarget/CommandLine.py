@@ -154,14 +154,17 @@ def main():
                     eco_scores_uri=data_config.eco_scores,
                     schema_uri = data_config.schema,
                     es_hosts=args.elasticseach_nodes,
-                    excluded_biotypes = data_config.excluded_biotypes)
+                    excluded_biotypes = data_config.excluded_biotypes,
+                    datasources_to_datatypes = data_config.datasources_to_datatypes)
 
                 #TODO qc
 
             if args.assoc:
                 process = ScoringProcess(loader, redis)
                 if not args.qc_only:
-                    process.process_all(targets = args.targets, 
+                    process.process_all(data_config.scoring_weights, 
+                        data_config.is_direct_do_not_propagate,
+                        data_config.datasources_to_datatypes,
                         dry_run=args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
@@ -188,7 +191,8 @@ def main():
                 #TODO qc
 
             if args.metric:
-                process = Metrics(es).generate_metrics()
+                process = Metrics(es, args.metric_file, 
+                    data_config.datasources_to_datatypes).generate_metrics()
 
     if args.qc_in:
         #handle reading in previous qc from filename provided, and adding comparitive metrics

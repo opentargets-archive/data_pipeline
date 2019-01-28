@@ -100,3 +100,39 @@ excluded-biotypes:
     - TR_V_pseudogene
     - unitary_pseudogene
     - unprocessed_pseudogene
+
+#weighting of different data sources
+scoring_weights:
+  phenodigm: 0.2
+  expression_atlas: 0.2
+  europepmc: 0.2
+  slapenrich: 0.5
+  progeny: 0.5
+  sysbio: 0.5
+
+#do not use indirect evidence from these data sources to discover associations
+is_direct_do_not_propagate:
+  - expression_atlas  
+
+#mapping between datasources and data types
+datasources_to_datatypes:
+  expression_atlas: rna_expression
+  phenodigm: animal_model
+  chembl: known_drug
+  europepmc: literature
+  reactome: affected_pathway
+  slapenrich: affected_pathway
+  intogen: somatic_mutation
+  eva_somatic: somatic_mutation
+  uniprot_somatic: somatic_mutation
+  cancer_gene_census: somatic_mutation
+  eva: genetic_association
+  gwas_catalog: genetic_association
+  postgap: genetic_association
+  uniprot: genetic_association
+  uniprot_literature: genetic_association
+  gene2phenotype: genetic_association
+  phewas_catalog: genetic_association
+  genomics_england: genetic_association
+  progeny: affected_pathway
+  sysbio: affected_pathway

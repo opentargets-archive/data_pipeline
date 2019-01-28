@@ -526,9 +526,8 @@ class RedisLookupTable(object):
                  namespace = None,
                  r_server = None,
                  ttl = 60*60*24+2):
-        self.lt_reuse = Config.LT_REUSE
         if namespace is None:
-            namespace = uuid.uuid4() if (not Config.LT_NAMESPACE) else Config.LT_NAMESPACE
+            namespace = uuid.uuid4()
 
         self.namespace = self.LOOK_UPTABLE_NAMESPACE % {'namespace': namespace}
         self.r_server = new_redis_client() if not r_server else r_server
@@ -537,13 +536,9 @@ class RedisLookupTable(object):
         require_all(self.r_server is not None)
 
     def set(self, key, obj, r_server = None, ttl = None):
-        # if not (isinstance(obj, str) or isinstance(obj, unicode)):
-        #     raise AttributeError('Only str and unicode types are accepted as object value. Use the \
-        #     RedisLookupTablePickle subclass for generic objects.')
-        if not self.lt_reuse:
-            self._get_r_server(r_server).setex(self._get_key_namespace(key),
-                                  self._encode(obj),
-                                  ttl or self.default_ttl)
+        self._get_r_server(r_server).setex(self._get_key_namespace(key),
+                                self._encode(obj),
+                                ttl or self.default_ttl)
 
     def get(self, key, r_server = None):
         server = self._get_r_server(r_server)
