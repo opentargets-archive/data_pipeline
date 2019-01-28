@@ -151,8 +151,6 @@ def _generate_1chunk_analyzer():
 
 
 class ElasticSearchConfiguration():
-    available_databases = Config().DATASOURCE_TO_DATATYPE_MAPPING.keys()
-    available_databases.append('other')
 
     generic_shard_number = '9'
     generic_replicas_number = '0'
