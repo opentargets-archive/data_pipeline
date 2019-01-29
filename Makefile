@@ -159,7 +159,7 @@ list_indices:
 
 .PHONY: clean_indices
 clean_indices:
-	curl -X "DELETE" "$(ELASTICSEARCH_NODES)/$(ES_PREFIX)*"
+	curl -X "DELETE" "$(ELASTICSEARCH_NODES)/*_*"
 
 .PHONY: clean_logs
 clean_logs:
@@ -167,3 +167,7 @@ clean_logs:
 
 .PHONY: clean
 clean: clean_logs clean_indices
+
+.PHONY: help
+help:
+	$(MRTARGET_CMD) --help
