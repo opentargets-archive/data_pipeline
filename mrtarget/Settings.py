@@ -97,11 +97,7 @@ class Config():
     # to the number of CPUs available
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
-
-    # setup a minimum score value for an evidence string to be accepted.
-    SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
-    SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
-
+                                 
     REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
                                    cast=bool, default=False)
     REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
