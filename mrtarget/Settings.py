@@ -98,10 +98,6 @@ class Config():
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
 
-    # setup a minimum score value for an evidence string to be accepted.
-    SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
-    SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
-    
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 
     # This config file is like this and no prefixes or version will be
