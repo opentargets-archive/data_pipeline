@@ -2,7 +2,7 @@ import logging
 import time
 import os
 import tempfile as tmp
-from elasticsearch import Elasticsearch, ConnectionTimeout
+from elasticsearch import Elasticsearch
 from elasticsearch import RequestsHttpConnection
 from redislite import Redis
 import redis.exceptions as redis_ex
