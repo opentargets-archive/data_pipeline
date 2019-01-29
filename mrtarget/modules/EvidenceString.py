@@ -688,14 +688,6 @@ class Evidence(JSONSerializable):
             self.logger.error(
                 "Cannot score evidence %s of type %s. Error: %s" % (self.evidence['id'], self.evidence['type'], e))
 
-        # Check for minimum score
-        if self.evidence['scores']['association_score'] < Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]:
-            raise AttributeError(
-                "Evidence String datasource:%s rejected since score is too low: %s. score: %f, min score: %f" % (
-                    self.evidence['sourceID'], self.get_id(), self.evidence['scores']['association_score'],
-                    Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]))
-
-
         # Apply rescaling to scores
         if self.evidence['sourceID'] in modifiers:
             self.evidence['scores']['association_score'] = modifiers[self.evidence['sourceID']](
