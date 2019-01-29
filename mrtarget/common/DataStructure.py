@@ -88,19 +88,3 @@ class RelationType(object):
     SHARED_DISEASE = 'shared-disease'
     SHARED_TARGET = 'shared-target'
 
-
-def denormDict(adict, defval=(0.0, 0.0)):
-    """Return 2 dicts in a pair all initialised with `defval`.
-    As following this example as test
-
-    >>> d = {"a": 1, "b": 2}
-    >>> (d1, d2) = denormDict(d)
-    >>> d1
-    {'a': 0.0, 'b': 0.0}
-    >>> d2
-    {1: 0.0, 2: 0.0}
-
-    """
-    # more pythonic and practically same O(n)
-    return ({k: defval[0] for k, _ in adict.iteritems()},
-            {v: defval[1] for _, v in adict.iteritems()})

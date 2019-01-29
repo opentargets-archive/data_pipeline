@@ -3,10 +3,11 @@ import copy
 
 import functional
 import itertools
+from collections import defaultdict
 
 from mrtarget.Settings import Config
 from mrtarget.constants import Const
-from mrtarget.common.DataStructure import JSONSerializable, denormDict
+from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import new_es_client
@@ -21,19 +22,18 @@ from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 
 class AssociationScore(JSONSerializable):
 
-    def __init__(self):
-        self.init_scores()
-
-    def init_scores(self):
-        """init scores to 0.0 and map to 2-maps init with 0.0"""
-        self.overall = 0.0
-        (self.datasources, self.datatypes) = denormDict(
-            Config.DATASOURCE_TO_DATATYPE_MAPPING, (0.0, 0.0))
+    def __init__(self, datasources, datatypes):
+        self.datasources = {}
+        for datasource in datasources:
+            self.datasources[datasource] = 0.0
+        self.datatypes = {}
+        for datatype in datatypes:
+            self.datatypes[datatype] = 0.0
 
 
 class Association(JSONSerializable):
 
-    def __init__(self, target, disease, is_direct):
+    def __init__(self, target, disease, is_direct, datasources, datatypes):
         self.target = {'id': target}
         self.disease = {'id': disease}
         self.is_direct = is_direct
@@ -41,15 +41,22 @@ class Association(JSONSerializable):
 
         for method_key, method in ScoringMethods.__dict__.items():
             if not method_key.startswith('_'):
-                self.set_scoring_method(method, AssociationScore())
+                self.set_scoring_method(method, AssociationScore(datasources, datatypes))
 
         self.evidence_count = dict(total=0.0,
                                    datatypes={},
                                    datasources={})
 
-        (self.evidence_count['datasources'],
-         self.evidence_count['datatypes']) = denormDict(
-            Config.DATASOURCE_TO_DATATYPE_MAPPING, (0.0, 0.0))
+        self.evidence_count['datasources'] = {}
+        for datasource in datasources:
+            self.evidence_count['datasources'][datasource] = 0.0
+
+        self.evidence_count['datatypes'] = {}
+        for datatype in datatypes:
+            self.evidence_count['datatypes'][datatype] = 0.0
+
+
+
 
         self.private = {}
         self.private['facets'] = dict(datatype=[],
@@ -237,9 +244,13 @@ class Scorer():
     def __init__(self):
         pass
 
-    def score(self,target, disease, evidence_scores, is_direct, method  = None):
+    def score(self,target, disease, evidence_scores, is_direct, datasources_to_datatypes):
 
-        association = Association(target, disease, is_direct)
+
+        datasources = datasources_to_datatypes.keys()
+        datatypes = set(datasources_to_datatypes.values())
+
+        association = Association(target, disease, is_direct, datasources, datatypes)
 
         # set evidence counts
         for e in evidence_scores:
@@ -254,18 +265,14 @@ class Scorer():
                 association.set_available_datatype(e.datatype)
                 association.set_available_datasource(e.datasource)
 
-        # compute scores
-        if (method == ScoringMethods.HARMONIC_SUM) or (method is None):
-            '''computing harmonic sum with quadratic (scale_factor) degradation'''
-            self._harmonic_sum(evidence_scores, association, scale_factor=2)
-        if (method == ScoringMethods.SUM) or (method is None):
-            self._sum(evidence_scores, association)
-        if (method == ScoringMethods.MAX) or (method is None):
-            self._max(evidence_scores, association)
+        # compute harmonic sum with quadratic (scale_factor) degradation
+        #limit to first 100 entries and scale with afactor of 2
+        self._harmonic_sum(evidence_scores, association, 100, 2, datasources_to_datatypes)
 
         return association
 
-    def _harmonic_sum(self, evidence_scores, association, max_entries = 100, scale_factor = 1):
+    def _harmonic_sum(self, evidence_scores, association, 
+            max_entries, scale_factor, datasources_to_datatypes):
         har_sum_score = association.get_scoring_method(ScoringMethods.HARMONIC_SUM)
         datasource_scorers = {}
         for e in evidence_scores:
@@ -282,7 +289,7 @@ class Scorer():
         '''compute datatype scores'''
         datatypes_scorers = dict()
         for ds in har_sum_score.datasources:
-            dt = Config.DATASOURCE_TO_DATATYPE_MAPPING[ds]
+            dt = datasources_to_datatypes[ds]
             if dt not in datatypes_scorers:
                 datatypes_scorers[dt]= HarmonicSumScorer(buffer=max_entries)
             datatypes_scorers[dt].add(har_sum_score.datasources[ds])
@@ -293,27 +300,6 @@ class Scorer():
 
         return association
 
-    def _sum(self, evidence_scores, ass):
-        sum_score = ass.get_scoring_method(ScoringMethods.SUM)
-        for e in evidence_scores:
-            sum_score.overall+=e.score
-            sum_score.datatypes[e.datatype]+=e.score
-            sum_score.datasources[e.datasource]+=e.score
-
-        return
-
-    def _max(self, evidence_score, ass):
-        max_score = ass.get_scoring_method(ScoringMethods.MAX)
-        for e in evidence_score:
-            if e.score > max_score.datasources[e.datasource]:
-                max_score.datasources[e.datatype] = e.score
-                if e.score > max_score.datatypes[e.datatype]:
-                    max_score.datatypes[e.datatype]=e.score
-                    if e.score > max_score.overall:
-                        max_score.overall=e.score
-
-        return
-
 
 
 
@@ -323,12 +309,18 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                  target_q,
                  r_path,
                  target_disease_pair_q,
-                 es
+                 es,
+                 scoring_weights,
+                 is_direct_do_not_propagate,
+                 datasource_to_datatypes
                  ):
         super(TargetDiseaseEvidenceProducer, self).__init__(queue_in=target_q,
                                                             redis_path=r_path,
                                                             queue_out=target_disease_pair_q)
         self.es = es
+        self.scoring_weights = scoring_weights
+        self.is_direct_do_not_propagate = is_direct_do_not_propagate
+        self.datasource_to_datatypes = datasource_to_datatypes
 
     def process(self, data):
         self.data_cache = {}
@@ -339,7 +331,7 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
             evidence_iterator = self.es_query.get_evidence_for_target_simple(target, available_evidence)
             for evidence in evidence_iterator:
                 efo_list = [evidence['disease']['id']] \
-                    if evidence['sourceID'] in Config.IS_DIRECT_DO_NOT_PROPAGATE \
+                    if evidence['sourceID'] in self.is_direct_do_not_propagate \
                     else evidence['private']['efo_codes']
 
                 for efo in efo_list:
@@ -347,8 +339,8 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                     if key not in self.data_cache:
                         self.data_cache[key] = []
                     row = EvidenceScore(
-                        score=evidence['scores']['association_score'] * Config.SCORING_WEIGHTS[evidence['sourceID']],
-                        datatype=Config.DATASOURCE_TO_DATATYPE_MAPPING[evidence['sourceID']],
+                        score=evidence['scores']['association_score'] * self.scoring_weights[evidence['sourceID']],
+                        datatype=self.datasource_to_datatypes[evidence['sourceID']],
                         datasource=evidence['sourceID'],
                         is_direct=efo == evidence['disease']['id'])
                     self.data_cache[key].append(row)
@@ -384,6 +376,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                  score_q,
                  lookup_data,
                  es,
+                 datasources_to_datatypes,
                  chunk_size = 1e4,
                  dry_run = False
                  ):
@@ -399,6 +392,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
         self.dry_run = dry_run
         self.es = es
         self.loader = None
+        self.datasources_to_datatypes = datasources_to_datatypes
 
     def init(self):
         super(ScoreProducer, self).init()
@@ -415,7 +409,8 @@ class ScoreProducer(RedisQueueWorkerProcess):
     def process(self, data):
         target, disease, evidence, is_direct = data
         if evidence:
-            score = self.scorer.score(target, disease, evidence, is_direct)
+            score = self.scorer.score(target, disease, evidence, is_direct, 
+                self.datasources_to_datatypes)
             if score: # skip associations only with data with score 0
 
                 # look for the gene in the lru cache
@@ -499,23 +494,16 @@ class ScoringProcess():
         self.r_server = r_server
 
     def process_all(self,
-                    targets = [],
+                    scoring_weights,
+                    is_direct_do_not_propagate,
+                    datasources_to_datatypes,
                     dry_run = False):
-        self.score_target_disease_pairs(targets=targets,
-                                        dry_run=dry_run)
-
-    def score_target_disease_pairs(self,
-                                   targets = [],
-                                   dry_run = False):
 
         overwrite_indices = not dry_run
-        if overwrite_indices:
-            overwrite_indices = not bool(targets)
-
 
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
-                                          targets=targets,
+                                          targets=[],
                                           data_types=(
                                               LookUpDataType.DISEASE,
                                               LookUpDataType.TARGET,
@@ -523,8 +511,7 @@ class ScoringProcess():
                                               LookUpDataType.HPA
                                           )).lookup
 
-        if not targets:
-            targets = list(self.es_query.get_all_target_ids_with_evidence_data())
+        targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
 
         self.es_loader.create_new_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
@@ -557,6 +544,7 @@ class ScoringProcess():
             None,
             lookup_data,
             self.es,
+            datasources_to_datatypes,
             chunk_size=1000,
             dry_run=dry_run
             ) for _ in range(number_of_storers)]
@@ -569,7 +557,10 @@ class ScoringProcess():
         readers = [TargetDiseaseEvidenceProducer(target_q,
             None,
             target_disease_pair_q,
-            self.es
+            self.es,
+            scoring_weights,
+            is_direct_do_not_propagate,
+            datasources_to_datatypes
             ) for _ in range(number_of_workers)]
 
         for w in readers:

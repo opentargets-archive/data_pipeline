@@ -160,7 +160,7 @@ class ChEMBLLookup(object):
 
     def get_molecules_from_evidence(self, es_query):
         self._logger.debug('get_molecules_from_evidence')
-        datatype = Config.DATASOURCE_TO_DATATYPE_MAPPING['chembl']
+        datatype = 'known_drug' # TODO not hard-code this!
         for c, e in enumerate(es_query.get_all_evidence_for_datatype(datatype,
                 fields=['target.id','disease.id', 'evidence.target2drug.urls'])):
             #get information from URLs that we need to extract short ids

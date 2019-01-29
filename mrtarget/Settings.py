@@ -97,46 +97,7 @@ class Config():
     # to the number of CPUs available
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
-
-    DATASOURCE_TO_DATATYPE_MAPPING = {}
-    DATASOURCE_TO_DATATYPE_MAPPING['expression_atlas'] = 'rna_expression'
-    DATASOURCE_TO_DATATYPE_MAPPING['phenodigm'] = 'animal_model'
-    DATASOURCE_TO_DATATYPE_MAPPING['chembl'] = 'known_drug'
-    DATASOURCE_TO_DATATYPE_MAPPING['europepmc'] = 'literature'
-    DATASOURCE_TO_DATATYPE_MAPPING['reactome'] = 'affected_pathway'
-    DATASOURCE_TO_DATATYPE_MAPPING['slapenrich'] = 'affected_pathway'
-    DATASOURCE_TO_DATATYPE_MAPPING['intogen'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['eva_somatic'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_somatic'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['cancer_gene_census'] = 'somatic_mutation'
-    DATASOURCE_TO_DATATYPE_MAPPING['eva'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['gwas_catalog'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['postgap'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['uniprot_literature'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['gene2phenotype'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['phewas_catalog'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['genomics_england'] = 'genetic_association'
-    DATASOURCE_TO_DATATYPE_MAPPING['progeny'] = 'affected_pathway'
-    DATASOURCE_TO_DATATYPE_MAPPING['sysbio'] = 'affected_pathway'
-
-    # setup the weights for evidence strings score
-    SCORING_WEIGHTS = defaultdict(lambda: 1)
-    SCORING_WEIGHTS['phenodigm'] = 0.2
-    SCORING_WEIGHTS['expression_atlas'] = 0.2
-    SCORING_WEIGHTS['europepmc'] = 0.2
-    SCORING_WEIGHTS['slapenrich'] = 0.5
-    SCORING_WEIGHTS['progeny'] = 0.5
-    SCORING_WEIGHTS['sysbio'] = 0.5
-
-    # setup a minimum score value for an evidence string to be accepted.
-    SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
-    SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
-
-    IS_DIRECT_DO_NOT_PROPAGATE = ['expression_atlas']
-
-    LT_REUSE = False
-    LT_NAMESPACE = ""
+                                 
     REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
                                    cast=bool, default=False)
     REDISLITE_DB_HOST, REDISLITE_DB_PORT = \

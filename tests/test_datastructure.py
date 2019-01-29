@@ -5,12 +5,6 @@ from toolz import curry
 
 
 class DataStructureTests(unittest.TestCase):
-    def test_denormdict(self):
-        d = {'a': 1, 'b': 2}
-
-        self.assertTrue(dt.denormDict(d) == ({'a': 0.0, 'b': 0.0},
-                                             {1: 0.0, 2: 0.0}),
-                        'Failed to denormalise the dict')
 
     def test_sparsefloatdict(self):
         fd = dt.SparseFloatDict()

@@ -130,7 +130,7 @@ class ExtendedInfoECO(ExtendedInfo):
 
 
 class EvidenceManager():
-    def __init__(self, lookup_data, eco_scores_uri, excluded_biotypes):
+    def __init__(self, lookup_data, eco_scores_uri, excluded_biotypes, datasources_to_datatypes):
         self.logger = logging.getLogger(__name__)
         self.available_genes = lookup_data.available_genes
         self.available_efos = lookup_data.available_efos
@@ -142,6 +142,7 @@ class EvidenceManager():
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
 
         self.excluded_biotypes = excluded_biotypes
+        self.datasources_to_datatypes = datasources_to_datatypes
 
         self._get_score_modifiers()
 
@@ -264,7 +265,7 @@ class EvidenceManager():
             self.logger.warning("No valid ECO could be found in evidence: %s. original ECO mapping: %s" % (
                 evidence['id'], str(eco_ids)[:100]))
 
-        return Evidence(evidence), fixed
+        return Evidence(evidence,self.datasources_to_datatypes), fixed
 
     @staticmethod
     def normalise_target_id(evidence, uni2ens, available_genes,non_reference_genes ):
@@ -499,7 +500,7 @@ class EvidenceManager():
         if target_class['level1']:
             extended_evidence['private']['facets']['target_class'] = target_class
 
-        return Evidence(extended_evidence)
+        return Evidence(extended_evidence, self.datasources_to_datatypes)
 
     def _get_gene_obj(self, geneid):
         gene = Gene(geneid)
@@ -558,7 +559,7 @@ class EvidenceManager():
 
 
 class Evidence(JSONSerializable):
-    def __init__(self, evidence, datasource=""):
+    def __init__(self, evidence, datasources_to_datatypes):
         self.logger = logging.getLogger(__name__)
         if isinstance(evidence, str) or isinstance(evidence, unicode):
             self.load_json(evidence)
@@ -567,23 +568,11 @@ class Evidence(JSONSerializable):
         else:
             raise AttributeError(
                 "the evidence should be a dict or a json string to parse, not a " + str(type(evidence)))
-        self.datasource = self.evidence['sourceID'] or datasource
-        self._set_datatype()
-
-    def _set_datatype(self, ):
-
-        # if 'type' in self.evidence:
-        #     self.datatype = self.evidence['type']
-        # else:
-        translate_database = Config.DATASOURCE_TO_DATATYPE_MAPPING
-        try:
-            self.database = self.evidence['sourceID'].lower()
-        except KeyError:
-            self.database = self.datasource.lower()
-        self.datatype = translate_database[self.database]
+        self.datasource = self.evidence['sourceID']
+        self.datatype = datasources_to_datatypes[self.datasource]
 
     def get_doc_name(self):
-        return Const.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.database
+        return Const.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.datasource.lower()
 
     def get_id(self):
         return self.evidence['id']
@@ -698,14 +687,6 @@ class Evidence(JSONSerializable):
         except Exception as e:
             self.logger.error(
                 "Cannot score evidence %s of type %s. Error: %s" % (self.evidence['id'], self.evidence['type'], e))
-
-        # Check for minimum score
-        if self.evidence['scores']['association_score'] < Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]:
-            raise AttributeError(
-                "Evidence String datasource:%s rejected since score is too low: %s. score: %f, min score: %f" % (
-                    self.evidence['sourceID'], self.get_id(), self.evidence['scores']['association_score'],
-                    Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]))
-
 
         # Apply rescaling to scores
         if self.evidence['sourceID'] in modifiers:
