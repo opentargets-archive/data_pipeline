@@ -2,6 +2,7 @@ import os
 import yaml
 import configargparse
 import addict
+import mrtarget.common.connection
 from mrtarget.common import URLZSource
 
 def setup_ops_parser():
@@ -35,12 +36,12 @@ def setup_ops_parser():
     # use an external redis rather than spawning one ourselves
     p.add("--redis-remote", help="connect to a remote redis, instead of starting an embedded one",
         action='store_true', default=False,
-        env_var='CTTV_REDIS_REMOTE')  # TODO use a different env variable
+        env_var='REDIS_REMOTE')  # TODO use a different env variable
     p.add("--redis-host", help="redis host",
         action='store', default='localhost',
         env_var='REDIS_HOST')
     p.add("--redis-port", help="redis port",
-        action='store', default='35000',
+        action='store', default='6379',
         env_var='REDIS_PORT')
 
     # elasticsearch
@@ -124,6 +125,7 @@ def setup_ops_parser():
     p.add("--metric-file", help="generate metrics", 
         env_var="METRIC_FILE", default='release_metrics.txt')
 
+
     return p
 
 def get_ops_args():
@@ -134,6 +136,12 @@ def get_ops_args():
 
     #output all configuration values, useful for debugging
     p.print_values()
+
+    #WARNING
+    #this is a horrible hack and should be removed 
+    #once lookup and queues are handled better
+    mrtarget.common.connection.default_host = args.redis_host
+    mrtarget.common.connection.default_port = args.redis_port
 
     return args
 
