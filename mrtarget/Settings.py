@@ -101,12 +101,7 @@ class Config():
     # setup a minimum score value for an evidence string to be accepted.
     SCORING_MIN_VALUE_FILTER = defaultdict(lambda: 0)
     SCORING_MIN_VALUE_FILTER['phenodigm'] = 0.4
-
-    REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
-                                   cast=bool, default=False)
-    REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
-        read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
-
+    
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 
     # This config file is like this and no prefixes or version will be

@@ -12,7 +12,7 @@ class PicklableObject(object):
 class LookupTableTestCase(unittest.TestCase):
 
     def test_base_lookup(self):
-        with RedisManager():
+        with RedisManager(False):
             table = RedisLookupTable()
 
             test = 'this is a string test that does not need to be serialized'
@@ -22,7 +22,7 @@ class LookupTableTestCase(unittest.TestCase):
 
 
     def test_json_lookup(self):
-        with RedisManager():
+        with RedisManager(False):
             table = RedisLookupTableJson()
 
             test = {'json test':'this is a test object that can be serialized to json'}
@@ -31,7 +31,7 @@ class LookupTableTestCase(unittest.TestCase):
             self.assertEquals(table.get(key), test)
 
     def test_pickle_lookup(self):
-        with RedisManager():
+        with RedisManager(False):
             table = RedisLookupTablePickle()
 
             test = PicklableObject()
