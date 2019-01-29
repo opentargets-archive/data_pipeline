@@ -337,11 +337,14 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     main_process_context.single_before(es_client=es_client)
 
     #here is the pipeline definition
-    pl_stage = pr.map(process_evidence, evs, workers=num_workers, maxsize=max_queued_events,
-                      on_start=validate_evidence_on_start_f, on_done=process_evidence_on_done)
-    pl_stage = pr.map(write_evidences, pl_stage, workers=num_writers, maxsize=max_queued_events,
-                      on_start=write_evidences_on_start_f,
-                      on_done=close_writers_on_done)
+    pl_stage = pr.map(process_evidence, evs, 
+        workers=num_workers, maxsize=max_queued_events,
+        on_start=validate_evidence_on_start_f, 
+        on_done=process_evidence_on_done)
+    pl_stage = pr.map(write_evidences, pl_stage, 
+        workers=num_writers, maxsize=max_queued_events,
+        on_start=write_evidences_on_start_f,
+        on_done=close_writers_on_done)
 
     logger.info('run evidence processing pipeline')
     results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))

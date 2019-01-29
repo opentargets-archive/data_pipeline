@@ -97,11 +97,6 @@ class Config():
     # to the number of CPUs available
     WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
                                  default=mp.cpu_count())
-                                 
-    REDISLITE_REMOTE = read_option('CTTV_REDIS_REMOTE',
-                                   cast=bool, default=False)
-    REDISLITE_DB_HOST, REDISLITE_DB_PORT = \
-        read_option('CTTV_REDIS_SERVER', cast=str, default='127.0.0.1:35000').split(':')
 
     UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
 

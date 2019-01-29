@@ -338,10 +338,17 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
                     key = (evidence['target']['id'], efo)
                     if key not in self.data_cache:
                         self.data_cache[key] = []
+
+                    data_source = evidence['sourceID']
+                    
+                    score = evidence['scores']['association_score']
+                    if data_source in self.scoring_weights:
+                        score = score * self.scoring_weights[data_source]
+                        
                     row = EvidenceScore(
-                        score=evidence['scores']['association_score'] * self.scoring_weights[evidence['sourceID']],
-                        datatype=self.datasource_to_datatypes[evidence['sourceID']],
-                        datasource=evidence['sourceID'],
+                        score=score,
+                        datatype=self.datasource_to_datatypes[data_source],
+                        datasource=data_source,
                         is_direct=efo == evidence['disease']['id'])
                     self.data_cache[key].append(row)
 
