@@ -576,9 +576,8 @@ class RedisLookupTable(object):
                  r_server=self._get_r_server(r_server))
 
     def __setitem__(self, key, value,  r_server=None):
-        if not self.lt_reuse:
-            self.set(self._get_key_namespace(key), value,
-                     r_server=self._get_r_server(r_server))
+        self.set(self._get_key_namespace(key), value,
+                    r_server=self._get_r_server(r_server))
 
 
 class RedisLookupTableJson(RedisLookupTable):

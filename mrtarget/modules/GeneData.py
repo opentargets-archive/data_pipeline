@@ -381,7 +381,7 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
     def __init__(self, es, r_server, queue, dry_run=False):
         super(GeneObjectStorer, self).__init__(queue, None)
         self.es = es
-        self.r_server = None
+        self.r_server = r_server
         self.loader = None # will be set in init()
         self.dry_run = dry_run
 
@@ -461,7 +461,7 @@ class GeneManager():
                            job_timeout=600)
 
         workers = [GeneObjectStorer(self.loader.es,
-                                    None,
+                                    self.r_server,
                                     queue,
                                     dry_run=dry_run) for i in range(4)]
         for w in workers:
