@@ -62,8 +62,9 @@ services:
       - redis
     environment:
       - ELASTICSEARCH_NODES=http://elasticsearch:9200
-      - CTTV_REDIS_REMOTE=true
-      - CTTV_REDIS_SERVER=redis:6379
+      - REDIS_REMOTE=true
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     volumes:
       - ./log:/usr/src/app/log
       - ./json:/usr/src/app/json
