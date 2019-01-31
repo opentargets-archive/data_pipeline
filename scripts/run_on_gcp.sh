@@ -13,9 +13,11 @@ set -u # unset variables are errors
 set -o pipefail # a pipe fails if any command in it fails
 shopt -s failglob # empty globs are errors
 
-NOW=`date +'%y%m%d-%k%M%S'`
+NOW=`date +'%y%m%d-%H%M%S'`
+TAG_DATA="1902-dev"
+TAG_IMAGE="19.02-dev"
 #underscores are not allowed
-NAME=data-pipeline-latest-$NOW
+NAME=data-pipeline-$TAG_DATA-$NOW
 
 #create an instance
 #  n1-standard-8 is 8 vCPUs and 30GB memory
@@ -136,18 +138,15 @@ services:
       retries: 60
     
   mrtarget:
-    image: quay.io/opentargets/mrtarget:latest
+    image: quay.io/opentargets/mrtarget:$TAG_IMAGE
     depends_on:
       - elasticsearch
       - redis
     environment:
-      - ELASTICSEARCH_NODES=http://elasticsearch:9200
-      - CTTV_REDIS_REMOTE=true
-      - CTTV_REDIS_SERVER=redis:6379
-      - SCHEMA_VERSION=1.3.0
-      - NUMBER_TO_KEEP=100000000
-      - ES_PREFIX=latest
+      - OPS_CONFIG=/usr/src/app/conf/mrtarget.ops.yml
+      - DATA_CONFIG=/usr/src/app/mrtarget.data.yml
     volumes:
+      - ./conf:/usr/src/app/conf
       - ./log:/usr/src/app/log
       - ./json:/usr/src/app/json
       - ./qc:/usr/src/app/qc
@@ -160,7 +159,7 @@ services:
       - elasticsearch
     environment:
       - ELASTICSEARCH_URL=http://elasticsearch:9200
-      - OPENTARGETS_DATA_VERSION=latest
+      - OPENTARGETS_DATA_VERSION=$TAG_DATA
     healthcheck:
       test: ["CMD", "curl", "http://localhost:80/v3/platform/public/utils/stats"]
       interval: 30s
@@ -189,6 +188,26 @@ volumes:
   esdata:
     driver: local
 
+EOF
+
+
+#add ops config file to the remote machine
+gcloud compute ssh $NAME --command "mkdir -p conf"
+gcloud compute ssh $NAME --command "cat > conf/mrtarget.ops.yml" <<EOF
+log-config: mrtarget/resources/logging.ini
+release-tag: $TAG_DATA
+
+gen-plugin-places: [mrtarget/plugins/gene]
+
+val-workers-validator: 16
+val-workers-writer: 8
+val-queue-validator-writer: 4000
+
+redis-remote: true
+redis-host: redis
+redis-port: 6379
+
+elasticseach-nodes: http://elasticsearch:9200
 EOF
 
 #start services (elastic, redis), then wait a bit
