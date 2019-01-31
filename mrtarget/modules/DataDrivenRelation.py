@@ -146,13 +146,15 @@ class DistanceComputationWorker(RedisQueueWorkerProcess):
 
 class DistanceStorageWorker(RedisQueueWorkerProcess):
         def __init__(self,
-                     queue_in,
-                     redis_host, redis_port,
-                     queue_out=None,
-                     dry_run = False,
-                     chunk_size=1000):
+                queue_in,
+                redis_host, redis_port,
+                es,
+                queue_out=None,
+                dry_run = False,
+                chunk_size=1000):
             super(DistanceStorageWorker, self).__init__(queue_in, redis_host, redis_port, queue_out)
             self.loader = None
+            self.es = es
             self.chunk_size = chunk_size
             self.dry_run = dry_run
 
@@ -177,8 +179,9 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
 
         def init(self):
             super(DistanceStorageWorker, self).init()
-            self.loader = Loader(chunk_size=self.chunk_size,
-                                 dry_run=self.dry_run)
+            self.loader = Loader(self.es, 
+                chunk_size=self.chunk_size,
+                dry_run=self.dry_run)
 
         def close(self):
             super(DistanceStorageWorker, self).close()
@@ -396,9 +399,12 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
                           for i in range(Config.WORKERS_NUMBER)]
         for w in pair_producers:
             w.start()
+
+        r_server = new_redis_client(self.redis_host, self.redis_port)
+
         for i in range(len(subject_ids[:limit])):
-            subject_analysis_queue.put(i, self.r_server)
-        subject_analysis_queue.set_submission_finished(self.r_server)
+            subject_analysis_queue.put(i, r_server)
+        subject_analysis_queue.set_submission_finished(r_server)
 
         for w in pair_producers:
             w.join()
@@ -561,6 +567,7 @@ class DataDrivenRelationProcess(object):
         
         storage_workers = [DistanceStorageWorker(queue_storage,
                                                  self.redis_host, self.redis_port,
+                                                 self.es,
                                                  dry_run=dry_run,
                                                  chunk_size=queue_per_worker,
                                                  # ) for i in range(multiprocessing.cpu_count())]
