@@ -20,6 +20,7 @@ import math
 
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.constants import Const
+from mrtarget.Settings import Config
 from mrtarget.common.connection import new_redis_client
 
 
@@ -56,7 +57,7 @@ class D2DRelation(JSONSerializable):
 class DistanceComputationWorker(RedisQueueWorkerProcess):
     def __init__(self,
                  queue_in,
-                 r_server,
+                 redis_host, redis_port,
                  queue_out,
                  type,
                  row_labels,
@@ -66,7 +67,7 @@ class DistanceComputationWorker(RedisQueueWorkerProcess):
                  auto_signal_submission_finished = True
                  ):
         super(DistanceComputationWorker, self).__init__(queue_in,
-                                                        r_server,
+                                                        redis_host, redis_port,
                                                         queue_out,
                                                         auto_signal_submission_finished = auto_signal_submission_finished)
         self.type = type
@@ -146,11 +147,11 @@ class DistanceComputationWorker(RedisQueueWorkerProcess):
 class DistanceStorageWorker(RedisQueueWorkerProcess):
         def __init__(self,
                      queue_in,
-                     redis_path,
+                     redis_host, redis_port,
                      queue_out=None,
                      dry_run = False,
                      chunk_size=1000):
-            super(DistanceStorageWorker, self).__init__(queue_in, redis_path, queue_out)
+            super(DistanceStorageWorker, self).__init__(queue_in, redis_host, redis_port, queue_out)
             self.loader = None
             self.chunk_size = chunk_size
             self.dry_run = dry_run
@@ -185,35 +186,6 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
             self.loader.close()
 
 
-class MatrixIteratorWorker(RedisQueueWorkerProcess):
-
-    def __init__(self,
-                 queue_in,
-                 redis_path,
-                 queue_out=None,
-                 matrix_data = None,
-                 key_list = None,
-                 labels = None
-                 ):
-        super(MatrixIteratorWorker, self).__init__(queue_in,redis_path, queue_out)
-        self.matrix_data = matrix_data
-        self.keys = key_list
-        self.labels = labels
-
-    def process(self, data):
-        i = data
-        for j in range(len(self.keys)):
-            if j >= i:
-                subj_id = self.keys[i]
-                obj_id = self.keys[j]
-                if set(self.matrix_data[subj_id].keys()) & set(self.matrix_data[obj_id].keys()):
-                    self.put_into_queue_out((subj_id,
-                                             self.matrix_data[subj_id],
-                                             self.labels[subj_id], obj_id,
-                                             self.matrix_data[obj_id],
-                                             self.labels[obj_id]),
-                                            )
-
 
 class LocalTfidfTransformer(TfidfTransformer):
 
@@ -241,59 +213,6 @@ class LocalTfidfTransformer(TfidfTransformer):
 
         return self
 
-class RedisRelationHandler(object):
-    '''
-    A Redis backend to optimise storage and lookup ot target-disease relations
-
-    '''
-
-    SCORE = "score:%(key)s"#sorted set with target/disease as key, disease/target as value and association score as sorting score
-    SUM = "sum:%(key)s"#store a float for each target or disease
-    WEIGHT = "weight:%(key)s"#store a float for each target or disease
-    RELATIONS= "weight:%(key)s"#sorted set with target/disease as key, target/disease as value and target/disease sum as sorting score
-
-    def __init__(self,
-                 target_data,
-                 disease_data,
-                 r_server=None,
-                 use_quantitiative_scores = False
-                 ):
-        '''
-        :param queue_id: queue id to attach to preconfigured queues
-        :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
-                             will not be pickable
-        :param max_size: maximum size of the queue. queue will block if full, and allow put only if smaller than the
-                         maximum size.
-        :return:
-        '''
-
-        self.r_server = r_server
-        if self.r_server is None:
-            self.r_server = new_redis_client()
-
-        self.target_data = target_data
-        self.disease_data = disease_data
-        self.available_targets = target_data.keys()
-        self.available_diseases = disease_data.keys()
-        vectorizer = DictVectorizer(sparse=True)
-        target_tdidf_transformer = LocalTfidfTransformer(smooth_idf=False, norm=None)
-        # target_tdidf_transformer = TfidfTransformer(smooth_idf=False, norm=None)
-        target_data_vector = vectorizer.fit_transform([target_data[i] for i in self.available_targets])
-        if not use_quantitiative_scores:
-            target_data_vector = target_data_vector > 0
-            target_data_vector = target_data_vector.astype(int)
-        transformed_targets = target_tdidf_transformer.fit_transform(target_data_vector)
-        for i in range(len(self.available_targets)):
-            target=self.available_targets[i]
-            vector= transformed_targets[i].toarray()[0]
-            pipe = self.r_server.pipeline()
-            for v in range(len(vector)):
-                if vector[v]:
-                    pipe.zadd(self.SCORE%dict(key=target), vectorizer.get_feature_names()[v], vector[v])
-            pipe.execute()
-            weighted_sum = vector.sum()
-            # self.r_server.add(self.SUM%dict(key=target), weighted_sum)
-            print i, target, weighted_sum
 
 class RelationHandler(object):
     '''
@@ -306,7 +225,7 @@ class RelationHandler(object):
                  disease_data,
                  ordered_target_keys,
                  ordered_disease_keys,
-                 r_server=None,
+                 redis_host, redis_port,
                  use_quantitiative_scores = False
                  ):
         '''
@@ -318,9 +237,8 @@ class RelationHandler(object):
         :return:
         '''
 
-        self.r_server = r_server
-        if self.r_server is None:
-            self.r_server = new_redis_client()
+        self.redis_host = redis_host
+        self.redis_port = redis_port
 
         self.target_data = target_data
         self.disease_data = disease_data
@@ -328,35 +246,39 @@ class RelationHandler(object):
         self.available_diseases = ordered_disease_keys
         self.use_quantitiative_scores = use_quantitiative_scores
 
-    def produce_d2d_pairs(self, subject_analysis_queue=None, produced_pairs_queue=None, redis_path=None):
-        '''trigger production of disease to disease distances using carefully selected euristics threshold'''
+    def produce_d2d_pairs(self, subject_analysis_queue=None, 
+        produced_pairs_queue=None):
+        '''trigger production of disease to disease distances 
+        using carefully selected euristics threshold'''
 
         # produce disease pairs
         self._produce_pairs(self.disease_data,
                                      self.available_diseases,
                                      self.target_data,
-                                     sample_size= 1024,
-                                     threshold=0.19,
-                                     subject_analysis_queue=subject_analysis_queue,
-                                     produced_pairs_queue=produced_pairs_queue,
-                                     redis_path = redis_path)
+                                     0.19,
+                                     1024,
+                                     subject_analysis_queue,
+                                     produced_pairs_queue)
 
-    def produce_t2t_pairs(self,  subject_analysis_queue=None, produced_pairs_queue=None, redis_path=None):
-        '''trigger production of target to target distances using carefully selected euristics threshold'''
+    def produce_t2t_pairs(self,  subject_analysis_queue=None, 
+        produced_pairs_queue=None):
+        '''trigger production of target to target distances 
+        using carefully selected euristics threshold'''
 
         # #produce target pairs
         self._produce_pairs(self.target_data,
                                      self.available_targets,
                                      self.disease_data,
-                                     sample_size= 1024,
-                                     threshold=0.19,
-                                     subject_analysis_queue=subject_analysis_queue,
-                                     produced_pairs_queue=produced_pairs_queue,
-                                     redis_path = redis_path)
+                                     0.19,
+                                     1024,
+                                     subject_analysis_queue,
+                                     produced_pairs_queue)
 
 
 
-    def _produce_pairs(self, subject_data, subject_ids, shared_ids, threshold=0.2, sample_size=128,  subject_analysis_queue = None, produced_pairs_queue = None, redis_path = None):
+    def _produce_pairs(self, subject_data, subject_ids, shared_ids, 
+            threshold, sample_size,  subject_analysis_queue, 
+            produced_pairs_queue):
         raise NotImplementedError()
 
 
@@ -431,8 +353,9 @@ class OverlapDistance(object):
 
 class RelationHandlerEuristicOverlapEstimation(RelationHandler):
 
-    def _produce_pairs(self, subject_data, subject_ids, shared_ids, threshold=0.5, sample_size=512, subject_analysis_queue = None, produced_pairs_queue = None, redis_path = None):
-        self.r_server = redis_path if redis_path else new_redis_client()
+    def _produce_pairs(self, subject_data, subject_ids, shared_ids, threshold, 
+        sample_size, subject_analysis_queue, produced_pairs_queue):
+        
 
         vectorizer = DictVectorizer(sparse=True)
         tdidf_transformer = LocalTfidfTransformer(smooth_idf=False, )
@@ -460,7 +383,7 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
 
 
         pair_producers = [RelationHandlerEuristicOverlapEstimationPairProducer(subject_analysis_queue,
-                                                                               None,
+                                                                               self.redis_host, self.redis_port,
                                                                                produced_pairs_queue,
                                                                                vector_hashes,
                                                                                buckets,
@@ -474,8 +397,8 @@ class RelationHandlerEuristicOverlapEstimation(RelationHandler):
         for w in pair_producers:
             w.start()
         for i in range(len(subject_ids[:limit])):
-            subject_analysis_queue.put(i, r_server=self.r_server)
-        subject_analysis_queue.set_submission_finished(r_server=self.r_server)
+            subject_analysis_queue.put(i, self.r_server)
+        subject_analysis_queue.set_submission_finished(self.r_server)
 
         for w in pair_producers:
             w.join()
@@ -492,7 +415,7 @@ class RelationHandlerEuristicOverlapEstimationPairProducer(RedisQueueWorkerProce
 
     def __init__(self,
                  queue_in,
-                 redis_path,
+                 redis_host, redis_port,
                  queue_out,
                  vector_hashes,
                  buckets,
@@ -502,7 +425,8 @@ class RelationHandlerEuristicOverlapEstimationPairProducer(RedisQueueWorkerProce
                  idf=None,
                  idf_=None,
                  ):
-        super(RelationHandlerEuristicOverlapEstimationPairProducer, self).__init__(queue_in, redis_path, queue_out)
+        super(RelationHandlerEuristicOverlapEstimationPairProducer, self).__init__(queue_in, 
+            redis_host, redis_port, queue_out)
         self.vector_hashes = vector_hashes
         self.buckets = buckets
         self.threshold = threshold
@@ -545,10 +469,12 @@ class RelationHandlerProduceAll(RelationHandler):
 class DataDrivenRelationProcess(object):
 
 
-    def __init__(self, es, r_server):
+    def __init__(self, es, redis_host, redis_port):
         self.es = es
         self.es_query=ESQuery(self.es)
-        self.r_server = r_server
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.r_server = new_redis_client(self.redis_host, self.redis_port)
 
     @staticmethod
     def cap_to_one(i):
@@ -634,7 +560,7 @@ class DataDrivenRelationProcess(object):
         '''start shared workers'''
         
         storage_workers = [DistanceStorageWorker(queue_storage,
-                                                 None,
+                                                 self.redis_host, self.redis_port,
                                                  dry_run=dry_run,
                                                  chunk_size=queue_per_worker,
                                                  # ) for i in range(multiprocessing.cpu_count())]
@@ -646,7 +572,7 @@ class DataDrivenRelationProcess(object):
         '''start workers for d2d'''
 
         d2d_workers = [DistanceComputationWorker(d2d_queue_processing,
-                                                 None,
+                                                 self.redis_host, self.redis_port,
                                                  queue_storage,
                                                  RelationType.SHARED_TARGET,
                                                  disease_labels,
@@ -660,23 +586,20 @@ class DataDrivenRelationProcess(object):
 
         logger.debug('call relationhandlereuristicoverlapestimation')
         # rel_handler = RelationHandlerProduceAll(target_data=target_data,
-        rel_handler = RelationHandlerEuristicOverlapEstimation(target_data=target_data,
-                                                               disease_data=disease_data,
-                                                               ordered_target_keys=target_keys,
-                                                               ordered_disease_keys=disease_keys,
-                                                               r_server=self.r_server,
-                                                               use_quantitiative_scores=False)
+        rel_handler = RelationHandlerEuristicOverlapEstimation(target_data,
+            disease_data, target_keys, disease_keys, self.redis_host, self.redis_port,
+            False)
         ''' compute disease to disease distances'''
         logger.info('Starting to push pairs for disease to disease distances computation')
         '''use cartesian product'''
-        rel_handler.produce_d2d_pairs(d2d_pair_producing, d2d_queue_processing, self.r_server)
+        rel_handler.produce_d2d_pairs(d2d_pair_producing, d2d_queue_processing)
 
         logger.info('disease to disease distances pair push done')
 
         '''start workers for t2t'''
 
         t2t_workers = [DistanceComputationWorker(t2t_queue_processing,
-                                                 None,
+                                                 self.redis_host, self.redis_port,
                                                  queue_storage,
                                                  RelationType.SHARED_DISEASE,
                                                  target_labels,
@@ -689,7 +612,7 @@ class DataDrivenRelationProcess(object):
 
         ''' compute target to target distances'''
         logger.info('Starting to push pairs for target to target distances computation')
-        rel_handler.produce_t2t_pairs(t2t_pair_producing, t2t_queue_processing, self.r_server)
+        rel_handler.produce_t2t_pairs(t2t_pair_producing, t2t_queue_processing)
         logger.info('target to target distances pair push done')
 
         '''stop d2d specifc workers'''

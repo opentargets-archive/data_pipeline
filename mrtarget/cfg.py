@@ -137,12 +137,6 @@ def get_ops_args():
     #output all configuration values, useful for debugging
     p.print_values()
 
-    #WARNING
-    #this is a horrible hack and should be removed 
-    #once lookup and queues are handled better
-    mrtarget.common.connection.default_host = args.redis_host
-    mrtarget.common.connection.default_port = args.redis_port
-
     return args
 
 

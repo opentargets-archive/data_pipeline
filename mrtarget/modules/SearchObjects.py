@@ -9,6 +9,7 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
+from mrtarget.common.connection import new_redis_client
 
 from mrtarget.constants import Const
 from mrtarget.Settings import Config
@@ -186,7 +187,7 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
 
     def __init__(self,
             queue,
-            redis_path,
+            redis_host, redis_port,
             es,
             chembl_target_uri, 
             chembl_mechanism_uri, 
@@ -195,7 +196,7 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
             chembl_molecule_set_uri_pattern,
             dry_run = False,
             chunk_size = 0):
-        super(SearchObjectAnalyserWorker, self).__init__(queue,redis_path)
+        super(SearchObjectAnalyserWorker, self).__init__(queue,redis_host, redis_port)
         self.queue = queue
         self.es = es
         self.loader = None
@@ -306,10 +307,13 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
 class SearchObjectProcess(object):
     def __init__(self,
                  loader,
-                 r_server):
+                 redis_host, 
+                 redis_port):
         self.loader = loader
         self.esquery = ESQuery(loader.es)
-        self.r_server = r_server
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.r_server = new_redis_client(self.redis_host, self.redis_port)
         self.logger = logging.getLogger(__name__)
 
     def process_all(self, 
@@ -333,7 +337,7 @@ class SearchObjectProcess(object):
 
 
         workers = [SearchObjectAnalyserWorker(queue,
-            None,
+            self.redis_host, self.redis_port,
             self.loader.es,
             chembl_target_uri = chembl_target_uri,
             chembl_mechanism_uri = chembl_mechanism_uri,
@@ -358,7 +362,7 @@ class SearchObjectProcess(object):
                 disease[SearchObjectTypes.__ROOT__] = SearchObjectTypes.DISEASE
                 queue.put(disease, self.r_server)
 
-        queue.set_submission_finished(r_server=self.r_server)
+        queue.set_submission_finished(self.r_server)
 
         for w in workers:
             w.join()

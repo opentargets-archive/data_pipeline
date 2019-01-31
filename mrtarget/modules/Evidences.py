@@ -66,8 +66,10 @@ def process_evidence(line, process_context):
     return left, right
 
 
-def process_evidence_on_start(luts, eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes):
-    """this function is called once per started process and return a ProcessContext per process."""
+def process_evidence_on_start(luts, eco_scores_uri, schema_uri, excluded_biotypes, 
+        datasources_to_datatypes):
+    """this function is called once per child process (within the child) and 
+    return a ProcessContext"""
     pc = ProcessContext()
     pc.logger.debug("called validate_evidence on_start from %s", str(os.getpid()))
 
@@ -75,8 +77,9 @@ def process_evidence_on_start(luts, eco_scores_uri, schema_uri, excluded_biotype
     pc.kwargs.validator = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
 
     pc.kwargs.luts = luts
-    pc.kwargs.redis_c = new_redis_client()
-    pc.kwargs.luts.set_r_server(pc.kwargs.redis_c)
+    #TODO remove this if it works without, redis client info shuld be in luts object
+    #pc.kwargs.redis_c = new_redis_client()
+    #pc.kwargs.luts.set_r_server(pc.kwargs.redis_c)
     pc.kwargs.datasources_to_datatypes = datasources_to_datatypes
     pc.kwargs.evidence_manager = EvidenceManager(pc.kwargs.luts, eco_scores_uri, 
         excluded_biotypes, datasources_to_datatypes)

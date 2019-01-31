@@ -18,6 +18,7 @@ from mrtarget.modules.EFO import EFO
 from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
+from mrtarget.common.connection import new_redis_client
 
 
 class AssociationScore(JSONSerializable):
@@ -307,16 +308,15 @@ class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
 
     def __init__(self,
                  target_q,
-                 r_path,
+                 redis_host, redis_port,
                  target_disease_pair_q,
                  es,
                  scoring_weights,
                  is_direct_do_not_propagate,
                  datasource_to_datatypes
                  ):
-        super(TargetDiseaseEvidenceProducer, self).__init__(queue_in=target_q,
-                                                            redis_path=r_path,
-                                                            queue_out=target_disease_pair_q)
+        super(TargetDiseaseEvidenceProducer, self).__init__(target_q,
+            redis_host, redis_port, target_disease_pair_q)
         self.es = es
         self.scoring_weights = scoring_weights
         self.is_direct_do_not_propagate = is_direct_do_not_propagate
@@ -379,7 +379,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
 
     def __init__(self,
                  evidence_data_q,
-                 r_path,
+                 redis_host, redis_path,
                  score_q,
                  lookup_data,
                  es,
@@ -387,9 +387,8 @@ class ScoreProducer(RedisQueueWorkerProcess):
                  chunk_size = 1e4,
                  dry_run = False
                  ):
-        super(ScoreProducer, self).__init__(queue_in=evidence_data_q,
-                                            redis_path=r_path,
-                                            queue_out=score_q)
+        super(ScoreProducer, self).__init__(evidence_data_q,
+            redis_host,redis_path, score_q)
 
 
         self.evidence_data_q = evidence_data_q
@@ -491,14 +490,16 @@ class ScoringProcess():
 
     def __init__(self,
                  loader,
-                 r_server):
+                 redis_host, redis_port):
 
         self.logger = logging.getLogger(__name__)
 
         self.es_loader = loader
         self.es = loader.es
         self.es_query = ESQuery(loader.es)
-        self.r_server = r_server
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.r_server = new_redis_client(self.redis_host, self.redis_port)
 
     def process_all(self,
                     scoring_weights,
@@ -535,19 +536,17 @@ class ScoringProcess():
         target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
                               max_size=number_of_workers * queue_per_worker,
                               job_timeout=3600,
-                              r_server=self.r_server,
                               serialiser='jsonpickle',
                               total=len(targets))
         target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
             max_size=queue_per_worker * number_of_storers,
             job_timeout=1200,
             batch_size=10,
-            r_server=self.r_server,
             serialiser='jsonpickle')
 
         # storage is located inside this code because the serialisation time
         scorers = [ScoreProducer(target_disease_pair_q,
-            None,
+            self.redis_host, self.redis_port,
             None,
             lookup_data,
             self.es,
@@ -562,7 +561,7 @@ class ScoringProcess():
 
         '''start target-disease evidence producer'''
         readers = [TargetDiseaseEvidenceProducer(target_q,
-            None,
+            self.redis_host, self.redis_port,
             target_disease_pair_q,
             self.es,
             scoring_weights,
@@ -574,8 +573,8 @@ class ScoringProcess():
             w.start()
 
         for target in targets:
-            target_q.put(target)
-        target_q.set_submission_finished()
+            target_q.put(target, self.r_server)
+        target_q.set_submission_finished(self.r_server)
 
         self.logger.info("collecting readers and scorers")
         for w in readers:

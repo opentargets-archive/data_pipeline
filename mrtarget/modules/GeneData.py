@@ -5,6 +5,7 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
+from mrtarget.common.connection import new_redis_client
 from mrtarget.Settings import Config
 from mrtarget.constants import Const
 from yapsy.PluginManager import PluginManager
@@ -378,10 +379,9 @@ class GeneSet():
 
 class GeneObjectStorer(RedisQueueWorkerProcess):
 
-    def __init__(self, es, r_server, queue, dry_run=False):
-        super(GeneObjectStorer, self).__init__(queue, None)
+    def __init__(self, es, redis_host, redis_port, queue, dry_run=False):
+        super(GeneObjectStorer, self).__init__(queue, redis_host, redis_port)
         self.es = es
-        self.r_server = r_server
         self.loader = None # will be set in init()
         self.dry_run = dry_run
 
@@ -419,12 +419,13 @@ class GeneManager():
 
     def __init__(self,
                  loader,
-                 r_server,
+                 redis_host, redis_port,
                  plugin_paths,
                  plugin_order):
 
         self.loader = loader
-        self.r_server = r_server
+        self.redis_host = redis_host
+        self.redis_port = redis_port
         self.genes = GeneSet()
         self._logger = logging.getLogger(__name__)
 
@@ -443,11 +444,13 @@ class GeneManager():
 
     def merge_all(self, data_config, dry_run = False):
 
+        r_server = new_redis_client(self.redis_host, self.redis_port)
+
         for plugin_name in self.plugin_order:
             plugin = self.simplePluginManager.getPluginByName(plugin_name)
             plugin.plugin_object.print_name()
             plugin.plugin_object.merge_data(genes=self.genes, 
-                loader=self.loader, r_server=self.r_server, data_config=data_config)
+                loader=self.loader, r_server=r_server, data_config=data_config)
 
         self._store_data(dry_run=dry_run)
 
@@ -455,22 +458,23 @@ class GeneManager():
 
         self.loader.create_new_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
         queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|gene_data_storage',
-                           r_server=self.r_server,
                            serialiser='jsonpickle',
                            max_size=10000,
                            job_timeout=600)
 
         workers = [GeneObjectStorer(self.loader.es,
-                                    self.r_server,
+                                    self.redis_host, self.redis_port,
                                     queue,
                                     dry_run=dry_run) for i in range(4)]
         for w in workers:
             w.start()
 
+        r_server = new_redis_client(self.redis_host, self.redis_port)
+        
         for geneid, gene in self.genes.iterate():
-            queue.put((geneid, gene), self.r_server)
+            queue.put((geneid, gene), r_server)
 
-        queue.set_submission_finished(r_server=self.r_server)
+        queue.set_submission_finished(r_server)
 
         self._logger.info('join workers')
         for w in workers:

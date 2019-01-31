@@ -113,7 +113,7 @@ def main():
                     qc_metrics.update(process.qc(esquery))     
 
             if args.gen:
-                process = GeneManager(loader, redis,
+                process = GeneManager(loader, args.redis_host, args.redis_port,
                     args.gen_plugin_places, data_config.gene_data_plugin_names,
                     )
                 if not args.qc_only:
@@ -162,7 +162,7 @@ def main():
                 #TODO qc
 
             if args.assoc:
-                process = ScoringProcess(loader, redis)
+                process = ScoringProcess(loader, args.redis_host, args.redis_port)
                 if not args.qc_only:
                     process.process_all(data_config.scoring_weights, 
                         data_config.is_direct_do_not_propagate,
@@ -173,13 +173,13 @@ def main():
                     pass
                 
             if args.ddr:
-                process = DataDrivenRelationProcess(es, redis)
+                process = DataDrivenRelationProcess(es, args.redis_host, args.redis_port)
                 if not args.qc_only:
                     process.process_all(dry_run = args.dry_run)
                 #TODO qc
 
             if args.sea:
-                process = SearchObjectProcess(loader, redis)
+                process = SearchObjectProcess(loader, args.redis_host, args.redis_port)
                 if not args.qc_only:
                     process.process_all(
                         data_config.chembl_target, 

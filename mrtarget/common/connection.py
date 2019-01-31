@@ -12,13 +12,8 @@ from mrtarget.Settings import Config
 # just one redis instance per app
 r_instance = {'instance': None}
 
-#TODO hackily use globals for now, replace with proper passing
-#once lookup and queues are handled better
-default_host = "localhost"
-default_port = 6379
 
-
-def new_redis_client(host=default_host, port=default_port):
+def new_redis_client(host, port):
     return Redis(host=host, port=port)
 
 def new_es_client(hosts):

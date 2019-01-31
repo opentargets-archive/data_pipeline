@@ -1,4 +1,4 @@
-from mrtarget.common.Redis import RedisLookupTable, RedisLookupTableJson, RedisLookupTablePickle
+from mrtarget.common.Redis import RedisLookupTable, RedisLookupTablePickle
 import unittest
 from mrtarget.common.connection import RedisManager, new_redis_client
 
@@ -17,17 +17,6 @@ class LookupTableTestCase(unittest.TestCase):
             table = RedisLookupTable(r_server=r_server)
 
             test = 'this is a string test that does not need to be serialized'
-            key = 'test_key'
-            table.set(key, test)
-            self.assertEquals(table.get(key), test)
-
-
-    def test_json_lookup(self):
-        with RedisManager(False, "localhost", 35000):
-            r_server = new_redis_client("localhost", 35000)
-            table = RedisLookupTableJson(r_server=r_server)
-
-            test = {'json test':'this is a test object that can be serialized to json'}
             key = 'test_key'
             table.set(key, test)
             self.assertEquals(table.get(key), test)

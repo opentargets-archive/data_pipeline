@@ -76,11 +76,6 @@ class RedisQueue(object):
     the message it should signal it with the :func:`self.done` method,
     eventually flagging if there was a processing error.
 
-    It is possible to detect jobs that were picked up but not completed in time
-    with the :func:`self.get_timedout_jobs` and resubmit them in the queue with
-    the :func:`self.put_back_timedout_jobs` method.
-
-
     Once done (completely or partially) the :func:`self.close` method must be
     called to clean up data stored in redis.
 
@@ -144,10 +139,6 @@ class RedisQueue(object):
         self.batch_size = batch_size  # todo: store in redis
         self.started = False
         self.start_time = time.time()
-        if total is not None:
-            self.total = total
-            if r_server is not None:
-                self.set_total(total, r_server)
 
     def dumps(self, element):
         if self.serialiser == 'json':
@@ -169,13 +160,12 @@ class RedisQueue(object):
         else:
             return pickle.loads(base64.decodestring(element))
 
-    def put(self, element, r_server=None):
+    def put(self, element, r_server):
         if element is None:
             pass
         if not self.started:
             self.start_time = time.time()
             self.started = True
-        r_server = self._get_r_server(r_server)
         queue_size = r_server.llen(self.main_queue)
         if queue_size:
             while queue_size >= self.max_queue_size:
@@ -193,14 +183,13 @@ class RedisQueue(object):
         pipe.execute()
         return key
 
-    def get(self, r_server=None, timeout = 30):
+    def get(self, r_server, timeout = 30):
         '''
 
         :param r_server:
         :param wait_on_empty:
         :return: message id, message content
         '''
-        r_server = self._get_r_server(r_server)
         response = r_server.brpop(self.main_queue, timeout= timeout)
         if response is None:
             return
@@ -214,8 +203,7 @@ class RedisQueue(object):
             return key, self.loads(serialised)
         return None
 
-    def done(self,key, r_server=None, error = False):
-        r_server = self._get_r_server(r_server)
+    def done(self,key, r_server, error = False):
         pipe = r_server.pipeline()
         pipe.zrem(self.processing_key, key)
         pipe.delete(self._get_value_key(key))
@@ -229,118 +217,25 @@ class RedisQueue(object):
     def _get_value_key(self, key):
         return self.VALUE_STORE % dict(queue = self.queue_id, key =key)
 
-    def get_total(self, r_server = None):
-        r_server = self._get_r_server(r_server)
-        total = r_server.get(self.total_key)
-        if total is None:
-            return
-        return int(total)
-
-    def set_total(self, total, r_server=None):
-        r_server = self._get_r_server(r_server)
-        r_server.set(self.total_key, total)
-
-    def incr_total(self, increment, r_server=None):
-        r_server = self._get_r_server(r_server)
-        return r_server.incr(self.total_key, increment)
-
-    def get_processing_jobs(self, r_server = None):
-        r_server = self._get_r_server(r_server)
-        return r_server.zrange(self.processing_key, 0, -1, withscores=True)
-
-
-    def get_timedout_jobs(self, r_server = None, timeout=None):
-        r_server = self._get_r_server(r_server)
-        if timeout is None:
-            timeout = self.job_timeout
-        timedout_jobs = [i[0] for i in r_server.zrange(self.processing_key, 0, -1, withscores=True) if time.time() - i[1] > timeout]
-        if timedout_jobs:
-            self.logger.debug('%i jobs timedout jobs in queue %s'%(len(timedout_jobs), self.queue_id))
-        return timedout_jobs
-
-    def put_back(self, key, r_server=None, ):
-        r_server = self._get_r_server(r_server)
-        if r_server.zrem(self.processing_key, key):
-            r_server.lpush(self.queue_id, key)
-
-    def put_back_timedout_jobs(self, r_server=None, timeout=None):
-        r_server = self._get_r_server(r_server)
-        if timeout is None:
-            timeout = self.job_timeout
-        for key in r_server.zrange(self.processing_key, 0, -1, withscores=True):
-            if time.time()-key[1]>timeout:
-                if r_server.zrem(self.processing_key, key[0]):
-                    r_server.lpush(self.main_queue, key[0])
-                    self.logger.debug('%s job is timedout and was put back in queue %s' %(key[0],self.queue_id))
-                else:
-                    self.logger.debug('%s job is timedout and was NOT put back in queue %s' % (key[0], self.queue_id))
-
     def __str__(self):
         return self.queue_id
 
-    def get_status(self, r_server=None):
-        r_server = self._get_r_server(r_server)
-        data = dict(queue_id=self.queue_id,
-                    submitted_counter=int(r_server.get(self.submitted_counter) or 0),
-                    processed_counter=int(r_server.get(self.processed_counter) or 0),
-                    errors_counter=int(r_server.get(self.errors_counter) or 0),
-                    submission_done=bool(r_server.getbit(self.submission_done, 1)),
-                    start_time=self.start_time,
-                    queue_size=self.get_size(r_server),
-                    max_queue_size=self.max_queue_size,
-                    processing_jobs=len(self.get_processing_jobs(r_server)),
-                    timedout_jobs=len(self.get_timedout_jobs(r_server)),
-                    total=self.get_total(r_server),
-                    client_data = r_server.info('clients'),
-                    )
-        # todo: add proper support for timedout jobs, possibly kill them: http://stackoverflow.com/questions/25027122/break-the-function-after-certain-time
-        # if data['timedout_jobs']:
-        #     self.put_back_timedout_jobs(r_server=r_server)
-        return data
-
-    def close(self, r_server=None):
-        r_server = self._get_r_server(r_server)
-        # values_left = r_server.keys(self.VALUE_STORE % dict(queue = self.queue_id, key ='*')) #slow
-        # implementation. it will look over ALL the keys in redis. is slow if may other things are there.
-        values_left = [self.VALUE_STORE % dict(queue=self.queue_id, key=key) \
-                       for key in r_server.lrange(self.main_queue, 0, -1)]  # fast implementation
-        pipe = r_server.pipeline()
-        for key in values_left:
-            pipe.delete(key)
-        pipe.delete(self.main_queue)
-        pipe.delete(self.processing_key)
-        pipe.delete(self.processed_counter)
-        pipe.delete(self.submitted_counter)
-        pipe.delete(self.errors_counter)
-        pipe.execute()
-
-    def get_size(self, r_server=None):
-        r_server = self._get_r_server(r_server)
+    def get_size(self, r_server):
         return r_server.llen(self.main_queue)
 
-    def get_value_for_key(self, key, r_server=None):
-        r_server = self._get_r_server(r_server)
-        value = r_server.get(self._get_value_key(key))
-        if value:
-            return pickle.loads(value)
-        return None
-
-    def set_submission_finished(self, r_server=None):
-        r_server = self._get_r_server(r_server)
+    def set_submission_finished(self, r_server):
         pipe = r_server.pipeline()
         pipe.setbit(self.submission_done, 1, 1)
         pipe.expire(self.submission_done, self.default_ttl)
         pipe.execute()
 
-    def is_submission_finished(self, r_server=None):
-        r_server = self._get_r_server(r_server)
+    def is_submission_finished(self, r_server):
         return r_server.getbit(self.submission_done, 1)
 
-    def is_empty(self, r_server=None):
-        return self.get_size(self._get_r_server(r_server)) == 0
+    def is_empty(self, r_server):
+        return self.get_size(r_server) == 0
 
-    def is_done(self, r_server=None):
-        r_server = self._get_r_server(r_server)
+    def is_done(self, r_server):
         if self.is_submission_finished(r_server) and self.is_empty(r_server):
             pipe = r_server.pipeline()
             pipe.get(self.submitted_counter)
@@ -351,8 +246,6 @@ class RedisQueue(object):
             return submitted <= processed
         return False
 
-    def _get_r_server(self, r_server=None):
-        return r_server if r_server else self.r_server
 
 
 
@@ -366,7 +259,7 @@ class RedisQueueWorkerProcess(Process):
     '''
     def __init__(self,
                     queue_in,
-                    redis_path,
+                    redis_host, redis_port,
                     queue_out=None,
                     auto_signal_submission_finished=True,
                     ignore_errors =[],
@@ -377,7 +270,8 @@ class RedisQueueWorkerProcess(Process):
         super(RedisQueueWorkerProcess, self).__init__(**kwargs)
         self.queue_in = queue_in #TODO: add support for multiple queues with different priorities
         self.queue_out = queue_out
-        self.redis_path = redis_path
+        self.redis_host = redis_host
+        self.redis_port = redis_port
         self.auto_signal = auto_signal_submission_finished
         self.queue_in_as_batch = queue_in.batch_size >1
         if self.queue_out:
@@ -421,7 +315,7 @@ class RedisQueueWorkerProcess(Process):
                 else:
                     signal.alarm(0)
 
-                self.queue_in.done(key, error=error, r_server=self.r_server)
+                self.queue_in.done(key, self.r_server, error=error)
             else:
                 # self.logger.info('nothing to do in '+self.name)
                 time.sleep(.01)
@@ -490,7 +384,7 @@ class RedisQueueWorkerProcess(Process):
         raise NotImplementedError('please add an implementation to process the data')
 
     def _init(self):
-        self.r_server = new_redis_client()
+        self.r_server = new_redis_client(self.redis_host, self.redis_port)
         # TODO move 1000 to a conf
         self.lru_cache = lru.lrucache(10000)
         self.init()
@@ -578,20 +472,6 @@ class RedisLookupTable(object):
     def __setitem__(self, key, value,  r_server=None):
         self.set(self._get_key_namespace(key), value,
                     r_server=self._get_r_server(r_server))
-
-
-class RedisLookupTableJson(RedisLookupTable):
-    '''
-    Simple Redis-based key value store for Json serialised objects
-    By default keys will expire in 2 days
-    '''
-
-    def _encode(self, obj):
-        return json.dumps(obj)
-
-    def _decode(self, obj):
-        return json.loads(obj)
-
 
 
 class RedisLookupTablePickle(RedisLookupTable):
