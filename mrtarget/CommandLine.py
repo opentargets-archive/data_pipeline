@@ -108,7 +108,7 @@ def main():
                     data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
                     data_config.hpa_rna_value, data_config.hpa_rna_zscore)
                 if not args.qc_only:
-                    process.process_all(dry_run=args.dry_run)
+                    process.process_all(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))     
 

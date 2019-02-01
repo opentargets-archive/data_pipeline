@@ -524,13 +524,12 @@ class HPAProcess():
         self.hpa_rna_table = None
         self.hpa_merged_table = None
 
-    def process_all(self, dry_run=False):
+    def process_all(self, dry_run):
         self.hpa_normal_table = self.process_normal_tissue()
         self.hpa_rna_table = self.process_rna()
         self.hpa_merged_table = self.process_join()
 
-        if not dry_run:
-            self.store_data()
+        self.store_data(dry_run)
 
     def process_normal_tissue(self):
         return self.downloader.retrieve_normal_tissue_data()
@@ -548,45 +547,37 @@ class HPAProcess():
         return hpa_merged_table
 
 
-    def store_data(self):
+    def store_data(self, dry_run):
         self.logger.info('store_data called')
 
         self.logger.debug('calling to create new expression index')
 
-        self.loader.create_new_index(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-        self.loader.prepare_for_bulk_indexing(
-            self.loader.get_versioned_index(
-                Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
-
-        #actually store it into elasticsearch       
+        #setup elasticsearch
+        if not dry_run:
+            self.loader.create_new_index(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+            #need to directly get the versioned index name for this function
+            self.loader.prepare_for_bulk_indexing(
+                self.loader.get_versioned_index(
+                    Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
+  
         self.logger.info('starting to write to elasticsearch') 
 
-        data = self.hpa_merged_table.data()
 
-        write_on_start_partial = functools.partial(write_on_start, self.es_hosts)
+        for entry in self.hpa_merged_table.data():
+            hpa = entry[0]
+            if not dry_run:
+                self.loader.put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
+                    Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+                    ID=hpa['gene'], body=hpa,
+                    create_index=False)
+            
 
-        #handle everything on this main thread
-        resources = write_on_start_partial()
-        more_itertools.consume(
-            itertools.imap(write_to_elastic, 
-                data, itertools.repeat(resources)))
-        write_on_done(None, resources)
-
-        #this is a way to do it using pypyeln mulitprocessing
-        #but this is 33% slower than the main thread version
-        #
-        #setup the mulitprocesses but dont do much
-        #pl_stage = pr.map(write_to_elastic, data,
-        #    workers=Config.WORKERS_NUMBER, maxsize=1000,
-        #    on_start=write_on_start_partial,
-        #    on_done=write_on_done)
-        #now wait for all the multiprocessing to actually finish
-        #more_itertools.consume(pr.to_iterable(pl_stage))
-
-        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-        #restore old pre-load settings
-        #note this automatically does all prepared indexes
-        self.loader.restore_after_bulk_indexing()
+        #cleanup elasticsearch
+        if not dry_run:
+            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+            #restore old pre-load settings
+            #note this automatically does all prepared indexes
+            self.loader.restore_after_bulk_indexing()
         
         self.logger.info('all expressions objects pushed to elasticsearch')
 
