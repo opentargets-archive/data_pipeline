@@ -22,6 +22,7 @@ class UniprotDownloader(object):
         self.logger.debug("to generate this file you have to call this url "
                             "https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml")
 
+        #setup elasticsearch
         if not dry_run:
             self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
             self.loader.create_new_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
