@@ -135,7 +135,7 @@ class ReactomeProcess():
                 if not dry_run:
                     self.loader.put(index_name=Const.ELASTICSEARCH_REACTOME_INDEX_NAME,
                         doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                        ID=node, body=body, create_index=False)
+                        ID=node, body=body)
                     
         #cleanup elasticsearch
         if not dry_run:

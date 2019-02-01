@@ -282,10 +282,8 @@ class SearchObjectAnalyserWorker(RedisQueueWorkerProcess):
         '''store search objects'''
         #print so.to_json()
         self.loader.put(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
-                   Const.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
-                   so.id,
-                   so.to_json(),
-                   create_index=False)
+            Const.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
+            so.id, so.to_json())
 
     def _summarise_association(self, data):
         def cap_score(value):

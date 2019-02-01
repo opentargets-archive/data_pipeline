@@ -25,7 +25,7 @@ class UniprotDownloader(object):
         #setup elasticsearch
         if not dry_run:
             self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
-            self.loader.create_new_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
+            self.loader.create_new_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
             #need to directly get the versioned index name for this function
             self.loader.prepare_for_bulk_indexing(
                 self.loader.get_versioned_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME))
@@ -45,7 +45,7 @@ class UniprotDownloader(object):
                 if not dry_run:
                     self.loader.put(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME, 
                         Const.ELASTICSEARCH_UNIPROT_DOC_NAME, entry.id, 
-                        {'entry': json_seqrec}, create_index=False)
+                        {'entry': json_seqrec})
 
                 self.total_entries += 1
 

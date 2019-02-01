@@ -479,9 +479,7 @@ class ScoreProducer(RedisQueueWorkerProcess):
                 element_id = '%s-%s' % (target, disease)
                 self.loader.put(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
                                        Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                       element_id,
-                                       score,
-                                       create_index=False)
+                                       element_id, score)
 
             else:
                 self.logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
@@ -506,8 +504,6 @@ class ScoringProcess():
                     datasources_to_datatypes,
                     dry_run = False):
 
-        overwrite_indices = not dry_run
-
         lookup_data = LookUpDataRetriever(self.es,
                                           self.r_server,
                                           targets=[],
@@ -521,7 +517,7 @@ class ScoringProcess():
         targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
 
-        self.es_loader.create_new_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME, recreate=overwrite_indices)
+        self.es_loader.create_new_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
         self.es_loader.prepare_for_bulk_indexing(
             self.es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
 

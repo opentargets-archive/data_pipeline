@@ -390,10 +390,8 @@ class GeneObjectStorer(RedisQueueWorkerProcess):
         '''process objects to simple search object'''
         gene.preprocess()
         self.loader.put(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                       Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                       geneid,
-                       gene.to_json(),
-                       create_index=False)
+            Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+            geneid, gene.to_json())
 
     def init(self):
         super(GeneObjectStorer, self).init()

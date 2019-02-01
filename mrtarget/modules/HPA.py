@@ -494,10 +494,8 @@ def write_on_done(status, resources):
 def write_to_elastic(data, resources):
     hpa = data[0]
     resources['es_loader'].put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                ID=hpa['gene'],
-                body=hpa,
-                create_index=False)
+        Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
+        ID=hpa['gene'], body=hpa)
 
 
 
@@ -568,8 +566,7 @@ class HPAProcess():
             if not dry_run:
                 self.loader.put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
                     Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                    ID=hpa['gene'], body=hpa,
-                    create_index=False)
+                    ID=hpa['gene'], body=hpa)
             
 
         #cleanup elasticsearch
