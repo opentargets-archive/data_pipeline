@@ -132,7 +132,7 @@ def main():
             if args.eco:
                 process = EcoProcess(loader, data_config.ontology_eco, data_config.ontology_so)
                 if not args.qc_only:
-                    process.process_all()
+                    process.process_all(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
 
