@@ -15,7 +15,7 @@ from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer
 from mrtarget.modules.EFO import EFO
-from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
+from mrtarget.common.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 

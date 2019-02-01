@@ -136,11 +136,10 @@ def main():
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
 
-            if args.val:            
-                es_output = True
+            if args.val:
                 es_output_folder = None
-                if "elasticsearch_folder" in vars(args) and args.elasticsearch_folder is not None:
-                    es_output = False
+                if "elasticsearch_folder" in vars(args) 
+                        and args.elasticsearch_folder is not None:
                     es_output_folder = args.elasticsearch_folder
 
                 process_evidences_pipeline(filenames=data_config.input_file,
@@ -148,7 +147,6 @@ def main():
                     es_client=es,
                     redis_client=redis,
                     dry_run=args.dry_run,
-                    enable_output_to_es=es_output,
                     output_folder=es_output_folder,
                     num_workers=args.val_workers_validator,
                     num_writers=args.val_workers_writer,
