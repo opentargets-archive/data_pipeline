@@ -97,9 +97,9 @@ def main():
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.unic:
-                process = UniprotDownloader(loader, dry_run=args.dry_run)
+                process = UniprotDownloader(loader)
                 if not args.qc_only:
-                    process.cache_human_entries(data_config.uniprot_uri)
+                    process.process(data_config.uniprot_uri, args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.hpa:
