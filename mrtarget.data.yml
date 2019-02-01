@@ -2,7 +2,23 @@
 
 #evidence validation
 schema: https://raw.githubusercontent.com/opentargets/json_schema/1.5.0/opentargets.json
-input-file: ["https://storage.googleapis.com/ot-releases/18.12/evidences/atlas-2018-11-20.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/chembl-28-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/cosmic-27-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/europepmc-29-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/eva-01-10-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/gene2phenotype-29-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/genomics_england-02-10-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/gwas-28-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/intogen-23-07-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/phenodigm-12-10-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-28-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/progeny-23-07-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/reactome-03-09-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/slapenrich-29-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/sysbio-28-11-2018.json.gz", "https://storage.googleapis.com/ot-releases/18.12/evidences/uniprot-15-11-2018.json.gz"]
+input-file:
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/atlas-2018-11-20.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/chembl-28-11-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/cosmic-27-11-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/europepmc-29-11-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/eva-01-10-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/gene2phenotype-29-11-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/genomics_england-02-10-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/gwas-28-11-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/intogen-23-07-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/phenodigm-12-10-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/phewas_catalog-28-11-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/progeny-23-07-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/reactome-03-09-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/slapenrich-29-11-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/sysbio-28-11-2018.json.gz"
+  - "https://storage.googleapis.com/ot-releases/18.12/evidences/uniprot-15-11-2018.json.gz"
 
 #reactome
 reactome-pathway-data: https://storage.googleapis.com/open-targets-data-releases/19.02/input/annotation-files/ReactomePathways-2019-01-09.txt
@@ -65,7 +81,13 @@ ontology-eco: https://raw.githubusercontent.com/evidenceontology/evidenceontolog
 
 #disease/phenotype mappings
 #TODO move this to GCP https://github.com/opentargets/platform/issues/389
-disease-phenotype:  ["https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/immune_disease_2_pheno.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareAlbuminuria_associations_03Jun15.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareIBDpheno.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ordo_hpo_mappings.owl?format=raw", "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/charite_HP_ORDO_07Oct15.owl?format=raw"]
+disease-phenotype:  
+  - "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ibd_2_pheno_associations.owl?format=raw"
+  - "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/immune_disease_2_pheno.owl?format=raw"
+  - "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareAlbuminuria_associations_03Jun15.owl?format=raw"
+  - "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/rareIBDpheno.owl?format=raw"
+  - "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/ordo_hpo_mappings.owl?format=raw"
+  - "https://sourceforge.net/p/efo/code/HEAD/tree/trunk/src/efoassociations/charite_HP_ORDO_07Oct15.owl?format=raw"
 
 #chembl
 #TODO remove API use https://github.com/opentargets/platform/issues/329
