@@ -2,7 +2,7 @@
 import logging
 
 from yapsy.IPlugin import IPlugin
-import ujson as json
+import simplejson as json
 import configargparse
 
 from mrtarget.common import URLZSource

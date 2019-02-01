@@ -2,21 +2,19 @@
 # -*- coding: utf-8 -*-
 
 import base64
-import ujson as json
+import simplejson as json
 from collections import Counter
 import pylru as lru
 
 import jsonpickle
 from mrtarget.common import require_all
 from mrtarget.common.connection import new_redis_client
-jsonpickle.set_preferred_backend('ujson')
+jsonpickle.set_preferred_backend('simplejson')
 import logging
 import uuid
 import datetime
-from threading import Thread
 
 import numpy as np
-import psutil
 import cProfile
 np.seterr(divide='warn', invalid='warn')
 
@@ -28,7 +26,6 @@ except ImportError:
     import pickle
 import time
 from multiprocessing import Process, current_process
-from colorama import Fore, Back, Style
 
 logger = logging.getLogger(__name__)
 
