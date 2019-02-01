@@ -87,19 +87,19 @@ def main():
                 process = ReactomeProcess(loader, 
                     data_config.reactome_pathway_data, data_config.reactome_pathway_relation)
                 if not args.qc_only:
-                    process.process_all()
+                    process.process_all(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.ens:
                 process = EnsemblProcess(loader)
                 if not args.qc_only:
-                    process.process(data_config.ensembl_filename)
+                    process.process(data_config.ensembl_filename, args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.unic:
-                process = UniprotDownloader(loader, dry_run=args.dry_run)
+                process = UniprotDownloader(loader)
                 if not args.qc_only:
-                    process.cache_human_entries(data_config.uniprot_uri)
+                    process.process(data_config.uniprot_uri, args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.hpa:
@@ -108,7 +108,7 @@ def main():
                     data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
                     data_config.hpa_rna_value, data_config.hpa_rna_zscore)
                 if not args.qc_only:
-                    process.process_all(dry_run=args.dry_run)
+                    process.process_all(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))     
 
@@ -126,13 +126,13 @@ def main():
                 process = EfoProcess(loader, data_config.ontology_efo, data_config.ontology_hpo, 
                     data_config.ontology_mp, data_config.disease_phenotype)
                 if not args.qc_only:
-                    process.process_all()
+                    process.process_all(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.eco:
                 process = EcoProcess(loader, data_config.ontology_eco, data_config.ontology_so)
                 if not args.qc_only:
-                    process.process_all()
+                    process.process_all(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
 
