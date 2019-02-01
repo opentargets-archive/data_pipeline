@@ -1,11 +1,8 @@
 import logging
 from collections import OrderedDict
-import traceback
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
-from mrtarget.Settings import Config
 from mrtarget.constants import Const
 from yapsy.PluginManager import PluginManager
 
@@ -374,37 +371,6 @@ class GeneSet():
                          ens_active, ens_active / tot * 100.)
         return stats
 
-
-
-class GeneObjectStorer(RedisQueueWorkerProcess):
-
-    def __init__(self, es, r_server, queue, dry_run=False):
-        super(GeneObjectStorer, self).__init__(queue, None)
-        self.es = es
-        self.r_server = None
-        self.loader = None # will be set in init()
-        self.dry_run = dry_run
-
-    def process(self, data):
-        geneid, gene = data
-        '''process objects to simple search object'''
-        gene.preprocess()
-        self.loader.put(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                       Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                       geneid,
-                       gene.to_json(),
-                       create_index=False)
-
-    def init(self):
-        super(GeneObjectStorer, self).init()
-        self.loader = Loader(self.es, dry_run=self.dry_run)
-
-    def close(self):
-        super(GeneObjectStorer, self).close()
-        self.loader.flush()
-        self.loader.close()
-
-
 class GeneManager():
     """
     Merge data available in ?elasticsearch into proper json objects
@@ -453,30 +419,25 @@ class GeneManager():
 
     def _store_data(self, dry_run = False):
 
-        self.loader.create_new_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
-        queue = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|gene_data_storage',
-                           r_server=self.r_server,
-                           serialiser='jsonpickle',
-                           max_size=10000,
-                           job_timeout=600)
-
-        workers = [GeneObjectStorer(self.loader.es,
-                                    None,
-                                    queue,
-                                    dry_run=dry_run) for i in range(4)]
-        for w in workers:
-            w.start()
+        if not dry_run:
+            self.loader.create_new_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+            #need to directly get the versioned index name for this function
+            self.loader.prepare_for_bulk_indexing(
+                self.loader.get_versioned_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME))
 
         for geneid, gene in self.genes.iterate():
-            queue.put((geneid, gene), self.r_server)
+            gene.preprocess()
+            if not dry_run:
+                self.loader.put(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                    Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                    geneid, gene.to_json(),
+                    create_index=False)
 
-        queue.set_submission_finished(r_server=self.r_server)
-
-        self._logger.info('join workers')
-        for w in workers:
-            w.join()
-
-        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+        if not dry_run:
+            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
+            #restore old pre-load settings
+            #note this automatically does all prepared indexes
+            self.loader.restore_after_bulk_indexing()
         self._logger.info('all gene objects pushed to elasticsearch')
 
 
