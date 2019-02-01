@@ -4,7 +4,6 @@ import itertools
 import gzip
 import logging
 import os.path
-import glob
 import requests as r
 import requests_file
 
