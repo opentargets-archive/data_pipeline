@@ -2,8 +2,6 @@ import logging
 import jsonpickle
 import base64
 import lxml.etree as etree
-import itertools as iters
-import more_itertools as miters
 
 from mrtarget.common.UniprotIO import Parser
 from mrtarget.common import URLZSource

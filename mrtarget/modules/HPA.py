@@ -2,10 +2,9 @@ from __future__ import absolute_import
 import logging
 import re
 import csv
-import ujson as json
+import simplejson as json
 import itertools
 import functools
-import operator as oper
 
 import pypeln.process as pr
 import petl
