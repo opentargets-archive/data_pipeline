@@ -126,7 +126,7 @@ def main():
                 process = EfoProcess(loader, data_config.ontology_efo, data_config.ontology_hpo, 
                     data_config.ontology_mp, data_config.disease_phenotype)
                 if not args.qc_only:
-                    process.process_all()
+                    process.process_all(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.eco:
