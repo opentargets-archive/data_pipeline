@@ -238,6 +238,9 @@ class SearchObjectProcess(object):
         #cleanup elasticsearch
         if not dry_run:
             self.loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
+            #restore old pre-load settings
+            #note this automatically does all prepared indexes
+            self.loader.restore_after_bulk_indexing()
 
         self.logger.info("DONE")
 
