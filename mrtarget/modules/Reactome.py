@@ -83,53 +83,66 @@ class ReactomeProcess():
         self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self):
+    def process_all(self, dry_run):
         root = 'root'
         self.relations = dict()
         self.g.add_node(root, name="", species="")
 
-        try:
-            for row in self.downloader.get_pathway_data():
-                self.g.add_node(row['id'], name=row['name'], species=row['species'])
-            children = set()
-            for row in self.downloader.get_pathway_relations():
-                self.g.add_edge(row['id'], row['child'])
-                children.add(row['child'])
+        for row in self.downloader.get_pathway_data():
+            self.g.add_node(row['id'], name=row['name'], species=row['species'])
+        children = set()
+        for row in self.downloader.get_pathway_relations():
+            self.g.add_edge(row['id'], row['child'])
+            children.add(row['child'])
 
-            nodes_without_parent = set(self.g.nodes()) - children
-            for node in nodes_without_parent:
-                if node != root:
-                    self.g.add_edge(root, node)
-                    
-            for node, node_data in self.g.nodes(data=True):
-                if node != root:
-                    ancestors = set()
-                    paths = list(all_simple_paths(self.g, root, node))
-                    for path in paths:
-                        for p in path:
-                            ancestors.add(p)
+        nodes_without_parent = set(self.g.nodes()) - children
+        for node in nodes_without_parent:
+            if node != root:
+                self.g.add_edge(root, node)
+                
 
-                    #ensure these are real tuples, not generators
-                    #otherwise they can't be serialized to json
-                    children = tuple(self.g.successors(node))
-                    parents = tuple(self.g.predecessors(node))
+        #setup elasticsearch
+        if not dry_run:
+            self.loader.create_new_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME)
+            #need to directly get the versioned index name for this function
+            self.loader.prepare_for_bulk_indexing(
+                self.loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME))
 
+
+        for node, node_data in self.g.nodes(data=True):
+            if node != root:
+                ancestors = set()
+                paths = list(all_simple_paths(self.g, root, node))
+                for path in paths:
+                    for p in path:
+                        ancestors.add(p)
+
+                #ensure these are real tuples, not generators
+                #otherwise they can't be serialized to json
+                children = tuple(self.g.successors(node))
+                parents = tuple(self.g.predecessors(node))
+
+                body = dict(id=node,
+                    label=node_data['name'],
+                    path=paths,
+                    children=children,
+                    parents=parents,
+                    is_root=node == root,
+                    ancestors=list(ancestors)
+                )
+
+                #store in elasticsearch if not dry running
+                if not dry_run:
                     self.loader.put(index_name=Const.ELASTICSEARCH_REACTOME_INDEX_NAME,
                         doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                        ID=node,
-                        body=dict(id=node,
-                            label=node_data['name'],
-                            path=paths,
-                            children=children,
-                            parents=parents,
-                            is_root=node == root,
-                            ancestors=list(ancestors)
-                        ))
-            #make sure the index is all ready for future operations before completing this step
+                        ID=node, body=body, create_index=False)
+                    
+        #cleanup elasticsearch
+        if not dry_run:
             self.loader.flush_all_and_wait(Const.ELASTICSEARCH_REACTOME_INDEX_NAME)
-        except ValueError as error:
-            self.logger.error(error)
-            raise
+            #restore old pre-load settings
+            #note this automatically does all prepared indexes
+            self.loader.restore_after_bulk_indexing()
 
 
 
