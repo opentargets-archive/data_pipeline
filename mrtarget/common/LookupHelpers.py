@@ -6,8 +6,7 @@ from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
-from opentargets_ontologyutils.rdf_utils import OntologyClassReader
-import opentargets_ontologyutils.mp
+
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.common import require_all
 
@@ -45,7 +44,6 @@ class LookUpDataType(object):
     TARGET = 'target'
     DISEASE = 'disease'
     ECO = 'eco'
-    MP = 'mp'
     HPA = 'hpa'
 
 
@@ -75,9 +73,6 @@ class LookUpDataRetriever(object):
                 self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.ECO:
                 self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
-            elif dt == LookUpDataType.MP:
-                self._logger.debug("get MP info")
-                self._get_mp(mp_uri)
             elif dt == LookUpDataType.HPA:
                 self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP', self.r_server)
 
@@ -111,16 +106,6 @@ class LookUpDataRetriever(object):
                 self.lookup.non_reference_genes[symbol]['reference']=ensg
             else:
                 self.lookup.non_reference_genes[symbol]['alternative'].append(ensg)
-
-    def _get_mp(self, mp_uri):
-        '''
-        Load MP to accept phenotype terms that are not in EFO
-        :return:
-        '''
-        obj = OntologyClassReader()
-        opentargets_ontologyutils.mp.load_mammalian_phenotype_ontology(obj, mp_uri)
-        obj.rdf_graph = None
-        self.lookup.mp_ontology = obj
 
         
 

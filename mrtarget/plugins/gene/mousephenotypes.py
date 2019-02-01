@@ -6,7 +6,8 @@ import simplejson as json
 import configargparse
 
 from mrtarget.common import URLZSource
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from opentargets_ontologyutils.rdf_utils import OntologyClassReader
+import opentargets_ontologyutils.mp
 from mrtarget.Settings import Config
 
 #TODO move this to config
@@ -49,7 +50,6 @@ class MousePhenotypes(IPlugin):
         self.r_server = None
         self.mouse_genes = {}
         self.ancestors = {}
-        self.lookup_data = None
         self.mps = {}
         self.mp_labels = {}
         self.mp_to_label = {}
@@ -83,26 +83,22 @@ class MousePhenotypes(IPlugin):
 
     def _get_mp_classes(self, mp_uri):
         self._logger.debug("_get_mp_classes")
-        #TODO replace this lookup table with simply loading the ontology itself
-        self.lookup_data = LookUpDataRetriever(self.loader.es,
-                                               self.r_server,
-                                               [],
-                                               (LookUpDataType.MP,),
-                                               None,
-                                               mp_uri
-                                               ).lookup
+        
+        #load the onotology
+        self.mp_ontology = OntologyClassReader()
+        opentargets_ontologyutils.mp.load_mammalian_phenotype_ontology(self.mp_ontology, mp_uri)
 
         #TODO this is a moderately hideous bit of pointless munging, but I don't have time fix it now!
 
-        for mp_id,label in self.lookup_data.mp_ontology.current_classes.items():
+        for mp_id,label in self.mp_ontology.current_classes.items():
 
             mp_class = {}
             mp_class["label"] = label
-            if mp_id not in self.lookup_data.mp_ontology.classes_paths:
+            if mp_id not in self.mp_ontology.classes_paths:
                 self._logger.warning("cannot find paths for "+mp_id)
                 continue
-            mp_class["path"] = self.lookup_data.mp_ontology.classes_paths[mp_id]['all']
-            mp_class["path_codes"] = self.lookup_data.mp_ontology.classes_paths[mp_id]['ids']
+            mp_class["path"] = self.mp_ontology.classes_paths[mp_id]['all']
+            mp_class["path_codes"] = self.mp_ontology.classes_paths[mp_id]['ids']
 
             mp_id_key = mp_id.split("/")[-1].replace(":", "_")
             self.mps[mp_id_key] = mp_class
