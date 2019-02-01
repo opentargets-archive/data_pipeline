@@ -35,7 +35,7 @@ NAME=data-pipeline-$TAG_DATA-$NOW
 gcloud compute instances create $NAME \
   --image-project debian-cloud \
   --image-family debian-9 \
-  --machine-type n1-highmem-16 \
+  --machine-type n1-standard-32 \
   --boot-disk-size 250 \
   --boot-disk-type pd-ssd --boot-disk-device-name $NAME
   
@@ -93,7 +93,7 @@ services:
       - 9200:9200
     environment:
       # assign more memory to JVM 
-      - "ES_JAVA_OPTS=-Xms12g -Xmx12g"
+      - "ES_JAVA_OPTS=-Xms16g -Xmx16g"
       #disable xpack as not OSS
       - "xpack.security.enabled=false"
       #disable memory swapping to disk for performance
