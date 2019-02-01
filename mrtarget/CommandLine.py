@@ -62,11 +62,13 @@ def main():
         logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
     enable_profiling(args.profile)
+
     
-    with RedisManager():
+    
+    with RedisManager(args.redis_remote,args.redis_host, args.redis_port):
 
         es = new_es_client(args.elasticseach_nodes)
-        redis = new_redis_client()
+        redis = new_redis_client(args.redis_host, args.redis_port)
 
         #create a single query object for future use
         esquery = ESQuery(es)
