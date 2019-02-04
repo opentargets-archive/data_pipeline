@@ -430,8 +430,7 @@ class GeneManager():
             if not dry_run:
                 self.loader.put(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
                     Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                    geneid, gene.to_json(),
-                    create_index=False)
+                    geneid, gene.to_json())
 
         if not dry_run:
             self.loader.flush_all_and_wait(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
