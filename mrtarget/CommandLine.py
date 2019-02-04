@@ -162,7 +162,8 @@ def main():
                 #TODO qc
 
             if args.assoc:
-                process = ScoringProcess(loader, redis)
+                process = ScoringProcess(args.redis_host, args.redis_port,
+                    args.elasticseach_nodes)
                 if not args.qc_only:
                     process.process_all(data_config.scoring_weights, 
                         data_config.is_direct_do_not_propagate,
