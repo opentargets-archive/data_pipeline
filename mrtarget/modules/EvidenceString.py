@@ -731,7 +731,7 @@ class Evidence(JSONSerializable):
                 self.evidence['scores']['association_score'] = score
 
         except Exception as e:
-            self.logger.error(
+            logging.getLogger(__name__).error(
                 "Cannot score evidence %s of type %s. Error: %s" % (self.evidence['id'], self.evidence['type'], e))
 
         # Check for minimum score
