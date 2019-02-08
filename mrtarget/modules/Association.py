@@ -2,6 +2,7 @@ import logging
 import copy
 
 import functional
+import functools
 import itertools
 from collections import defaultdict
 
@@ -10,7 +11,7 @@ from mrtarget.constants import Const
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.common.connection import new_es_client
+from mrtarget.common.connection import new_es_client, new_redis_client
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
 from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer
@@ -18,6 +19,9 @@ from mrtarget.modules.EFO import EFO
 from mrtarget.modules.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
+
+import pylru as lru
+import pypeln.process as pr
 
 
 class AssociationScore(JSONSerializable):
@@ -217,23 +221,10 @@ class Association(JSONSerializable):
 
 
 class EvidenceScore():
-    def __init__(self,
-                 evidence_string = None,
-                 score= None,
-                 datatype = None,
-                 datasource = None,
-                 is_direct = None):
-        if evidence_string is not None:
-            e = Evidence(evidence_string).evidence
-            self.score = e['scores']['association_score']
-            self.datatype = e['type']
-            self.datasource = e['sourceID']
-        if score is not None:
-            self.score = score
-        if datatype is not None:
-            self.datatype = datatype
-        if datasource is not None:
-            self.datasource = datasource
+    def __init__(self, score, datatype, datasource, is_direct):
+        self.score = score
+        self.datatype = datatype
+        self.datasource = datasource
         self.is_direct = is_direct
 
 
@@ -300,288 +291,236 @@ class Scorer():
 
         return association
 
+def produce_evidence_local_init(es_hosts, 
+        scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
+    es = new_es_client(es_hosts)
+    es_query = ESQuery(es)
+    return es_query, scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes
 
+def produce_evidence(data, es_query, 
+        scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
+    data_cache = {}
+    target = data
 
+    return_values = []
 
-class TargetDiseaseEvidenceProducer(RedisQueueWorkerProcess):
+    available_evidence = es_query.count_evidence_for_target(target)
+    if available_evidence:
+        evidence_iterator = es_query.get_evidence_for_target_simple(target, available_evidence)
+        for evidence in evidence_iterator:
+            efo_list = [evidence['disease']['id']] \
+                if evidence['sourceID'] in is_direct_do_not_propagate \
+                else evidence['private']['efo_codes']
 
-    def __init__(self,
-                 target_q,
-                 r_path,
-                 target_disease_pair_q,
-                 es,
-                 scoring_weights,
-                 is_direct_do_not_propagate,
-                 datasource_to_datatypes
-                 ):
-        super(TargetDiseaseEvidenceProducer, self).__init__(queue_in=target_q,
-                                                            redis_path=r_path,
-                                                            queue_out=target_disease_pair_q)
-        self.es = es
-        self.scoring_weights = scoring_weights
-        self.is_direct_do_not_propagate = is_direct_do_not_propagate
-        self.datasource_to_datatypes = datasource_to_datatypes
+            for efo in efo_list:
+                key = (evidence['target']['id'], efo)
+                if key not in data_cache:
+                    data_cache[key] = []
 
-    def process(self, data):
-        self.data_cache = {}
-        target = data
-
-        available_evidence = self.es_query.count_evidence_for_target(target)
-        if available_evidence:
-            evidence_iterator = self.es_query.get_evidence_for_target_simple(target, available_evidence)
-            for evidence in evidence_iterator:
-                efo_list = [evidence['disease']['id']] \
-                    if evidence['sourceID'] in self.is_direct_do_not_propagate \
-                    else evidence['private']['efo_codes']
-
-                for efo in efo_list:
-                    key = (evidence['target']['id'], efo)
-                    if key not in self.data_cache:
-                        self.data_cache[key] = []
-
-                    data_source = evidence['sourceID']
+                data_source = evidence['sourceID']
+                
+                score = evidence['scores']['association_score']
+                if data_source in scoring_weights:
+                    score = score * scoring_weights[data_source]
                     
-                    score = evidence['scores']['association_score']
-                    if data_source in self.scoring_weights:
-                        score = score * self.scoring_weights[data_source]
-                        
-                    row = EvidenceScore(
-                        score=score,
-                        datatype=self.datasource_to_datatypes[data_source],
-                        datasource=data_source,
-                        is_direct=efo == evidence['disease']['id'])
-                    self.data_cache[key].append(row)
+                is_direct = (efo == evidence['disease']['id'])
+                data_type = datasources_to_datatypes[data_source]
 
-            self.produce_pairs()
-        self.data_cache.clear()
+                row = EvidenceScore(score, data_type, data_source, is_direct)
+                data_cache[key].append(row)
 
-    def produce_pairs(self):
-        for key,evidence in self.data_cache.items():
+        for key,evidence in data_cache.items():
+            #if any of the evidence is direct, the assication is direct
             is_direct = False
             for e in evidence:
                 if e.is_direct:
                     is_direct = True
                     break
 
-            self.put_into_queue_out((key[0],key[1], evidence, is_direct))
+            return_values.append((key[0],key[1], evidence, is_direct))
 
-    def init(self):
-        super(TargetDiseaseEvidenceProducer, self).init()
-        self.es_query = ESQuery(self.es)
+    return return_values
 
-    def close(self):
-        super(TargetDiseaseEvidenceProducer, self).close()
-
+def produce_evidence_local_shutdown(status, es_query, 
+        scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
+    pass
 
 
+def score_producer_local_init(es_hosts, redis_host, redis_port, 
+        lookup_data, datasources_to_datatypes, dry_run):
 
-class ScoreProducer(RedisQueueWorkerProcess):
+    #set the R server to lookup into
+    r_server = new_redis_client(redis_host, redis_port)
 
-    def __init__(self,
-                 evidence_data_q,
-                 r_path,
-                 score_q,
-                 lookup_data,
-                 es,
-                 datasources_to_datatypes,
-                 chunk_size = 1e4,
-                 dry_run = False
-                 ):
-        super(ScoreProducer, self).__init__(queue_in=evidence_data_q,
-                                            redis_path=r_path,
-                                            queue_out=score_q)
+    scorer = Scorer()
+    
+    lru_cache = lru.lrucache(10000)
 
+    loader = Loader(new_es_client(es_hosts))
 
-        self.evidence_data_q = evidence_data_q
-        self.score_q = score_q
-        self.lookup_data = lookup_data
-        self.chunk_size = chunk_size
-        self.dry_run = dry_run
-        self.es = es
-        self.loader = None
-        self.datasources_to_datatypes = datasources_to_datatypes
+    return scorer, loader, r_server, lru_cache, lookup_data, datasources_to_datatypes, dry_run
 
-    def init(self):
-        super(ScoreProducer, self).init()
-        self.scorer = Scorer()
-        self.lookup_data.set_r_server(self.r_server)
-        self.loader = Loader(self.es, chunk_size=self.chunk_size,
-                             dry_run=self.dry_run)
+def score_producer(data, 
+        scorer, loader, r_server, lru_cache, lookup_data, datasources_to_datatypes, dry_run):
+    target, disease, evidence, is_direct = data
 
-    def close(self):
-        super(ScoreProducer, self).close()
-        self.loader.flush()
-        self.loader.close()
+    logger = logging.getLogger(__name__)
 
-    def process(self, data):
-        target, disease, evidence, is_direct = data
-        if evidence:
-            score = self.scorer.score(target, disease, evidence, is_direct, 
-                self.datasources_to_datatypes)
-            if score: # skip associations only with data with score 0
+    if evidence:
+        score = scorer.score(target, disease, evidence, is_direct, 
+            datasources_to_datatypes)
+        if score: # skip associations only with data with score 0
 
-                # look for the gene in the lru cache
-                gene_data = None
-                hpa_data = None
-                if target in self.lru_cache:
-                    gene_data, hpa_data = self.lru_cache[target]
+            # look for the gene in the lru cache
+            gene_data = None
+            hpa_data = None
+            if target in lru_cache:
+                gene_data, hpa_data = lru_cache[target]
 
-                if not gene_data:
-                    gene_data = Gene()
-                    try:
-                        gene_data.load_json(
-                            self.lookup_data.available_genes.get_gene(target,
-                                                                      self.r_server))
-
-                    except KeyError as e:
-                        self.logger.debug('Cannot find gene code "%s" '
-                                          'in lookup table' % target)
-                        self.logger.exception(e)
-
-                score.set_target_data(gene_data)
-
-                # create a hpa expression empty jsonserializable class
-                # to fill from Redis cache lookup_data
-                if not hpa_data:
-                    hpa_data = HPAExpression()
-                    try:
-                        hpa_data.update(
-                            self.lookup_data.available_hpa.get_hpa(target,
-                                                                   self.r_server))
-                    except KeyError:
-                        pass
-                    except Exception as e:
-                        self.logger.exception(e)
-
-                    # set everything in the lru_cache
-                    self.lru_cache[target] = (gene_data, hpa_data)
-
+            if not gene_data:
+                gene_data = Gene()
                 try:
-                    score.set_hpa_data(hpa_data)
+                    gene_data.load_json(
+                        lookup_data.available_genes.get_gene(target, r_server))
+
+                except KeyError as e:
+                    logger.debug('Cannot find gene code "%s" '
+                                        'in lookup table' % target)
+                    logger.exception(e)
+
+            score.set_target_data(gene_data)
+
+            # create a hpa expression empty jsonserializable class
+            # to fill from Redis cache lookup_data
+            if not hpa_data:
+                hpa_data = HPAExpression()
+                try:
+                    hpa_data.update(
+                        lookup_data.available_hpa.get_hpa(target, r_server))
                 except KeyError:
                     pass
                 except Exception as e:
-                    self.logger.exception(e)
+                    logger.exception(e)
 
-                disease_data = EFO()
-                try:
-                    disease_data.load_json(
-                        self.lookup_data.available_efos.get_efo(disease, self.r_server))
+                # set everything in the lru_cache
+                lru_cache[target] = (gene_data, hpa_data)
 
-                except KeyError as e:
-                    self.logger.debug('Cannot find EFO code "%s" '
-                                      'in lookup table' % disease)
-                    self.logger.exception(e)
+            try:
+                score.set_hpa_data(hpa_data)
+            except KeyError:
+                pass
+            except Exception as e:
+                logger.exception(e)
 
-                score.set_disease_data(disease_data)
+            disease_data = EFO()
+            try:
+                disease_data.load_json(
+                    lookup_data.available_efos.get_efo(disease, r_server))
+
+            except KeyError as e:
+                logger.debug('Cannot find EFO code "%s" '
+                                    'in lookup table' % disease)
+                logger.exception(e)
+
+            score.set_disease_data(disease_data)
 
 
-                element_id = '%s-%s' % (target, disease)
-                self.loader.put(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-                                       Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                       element_id, score)
+            element_id = '%s-%s' % (target, disease)
+            if not dry_run:
+                loader.put(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
+                    Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
+                    element_id, score)
 
-            else:
-                self.logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
+        else:
+            logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
 
+    return True
+
+def score_producer_local_shutdown(status, 
+        scorer, loader, r_server, lru_cache, lookup_data, datasources_to_datatypes, dry_run):
+
+    #cleanup elasticsearch
+    if not dry_run:
+        loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
 
 class ScoringProcess():
 
-    def __init__(self,
-                 loader,
-                 r_server):
+    def __init__(self, redis_host, redis_port, es_hosts):
 
         self.logger = logging.getLogger(__name__)
 
-        self.es_loader = loader
-        self.es = loader.es
-        self.es_query = ESQuery(loader.es)
-        self.r_server = r_server
+        self.es_hosts = es_hosts
+        self.es = new_es_client(self.es_hosts)
+        self.es_loader = Loader(self.es)
+        self.es_query = ESQuery(self.es)
 
-    def process_all(self,
-                    scoring_weights,
-                    is_direct_do_not_propagate,
-                    datasources_to_datatypes,
-                    dry_run = False):
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.r_server = new_redis_client(self.redis_host, self.redis_port)
 
-        lookup_data = LookUpDataRetriever(self.es,
-                                          self.r_server,
-                                          targets=[],
-                                          data_types=(
-                                              LookUpDataType.DISEASE,
-                                              LookUpDataType.TARGET,
-                                              LookUpDataType.ECO,
-                                              LookUpDataType.HPA
-                                          )).lookup
+    def process_all(self, scoring_weights, is_direct_do_not_propagate,
+            datasources_to_datatypes, dry_run):
+
+        lookup_data = LookUpDataRetriever(self.es, self.r_server,
+            targets=[],
+            data_types=(
+                LookUpDataType.DISEASE,
+                LookUpDataType.TARGET,
+                LookUpDataType.ECO,
+                LookUpDataType.HPA
+            )).lookup
 
         targets = list(self.es_query.get_all_target_ids_with_evidence_data())
 
+        #setup elasticsearch
+        if not dry_run:
+            self.es_loader.create_new_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
+            self.es_loader.prepare_for_bulk_indexing(
+                self.es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
 
-        self.es_loader.create_new_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
-        self.es_loader.prepare_for_bulk_indexing(
-            self.es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
+        self.logger.info('setting up stages')
 
-        '''create queues'''
-        number_of_workers = Config.WORKERS_NUMBER
-        # too many storers
-        number_of_storers = min(16, number_of_workers)
-        queue_per_worker = 250
-        if targets and len(targets) < number_of_workers:
-            number_of_workers = len(targets)
-        target_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_q',
-                              max_size=number_of_workers * queue_per_worker,
-                              job_timeout=3600,
-                              r_server=self.r_server,
-                              serialiser='jsonpickle',
-                              total=len(targets))
-        target_disease_pair_q = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|target_disease_pair_q',
-            max_size=queue_per_worker * number_of_storers,
-            job_timeout=1200,
-            batch_size=10,
-            r_server=self.r_server,
-            serialiser='jsonpickle')
+        #bake the arguments for the setup into function objects
+        produce_evidence_local_init_baked = functools.partial(produce_evidence_local_init, 
+            self.es_hosts, scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes)
+        score_producer_local_init_baked = functools.partial(score_producer_local_init, 
+            self.es_hosts, self.redis_host, self.redis_port,
+            lookup_data, datasources_to_datatypes, dry_run)
+        
+        #TODO move this config into external config
+        num_workers_produce = 4
+        num_workers_score = 4
+        max_queued_produce_to_score = 10
+        max_queued_score_out = 10
 
-        # storage is located inside this code because the serialisation time
-        scorers = [ScoreProducer(target_disease_pair_q,
-            None,
-            None,
-            lookup_data,
-            self.es,
-            datasources_to_datatypes,
-            chunk_size=1000,
-            dry_run=dry_run
-            ) for _ in range(number_of_storers)]
+        #pipeline stage for making the lists of the target/disease pairs and evidence
+        pipeline_stage = pr.map(produce_evidence, targets, 
+            workers=num_workers_produce,
+            maxsize=max_queued_produce_to_score,
+            on_start=produce_evidence_local_init_baked, 
+            on_done=produce_evidence_local_shutdown)
 
-        for w in scorers:
-            w.start()
+        #flatten the evidence producing collections between the stages
+        target_disease_pairs = itertools.chain.from_iterable(pr.to_iterable(pipeline_stage))
 
+        #pipeline stage for scoring the evidence sets
+        pipeline_stage = pr.map(score_producer, target_disease_pairs, 
+            workers=num_workers_score,
+            maxsize=max_queued_score_out,
+            on_start=score_producer_local_init_baked, 
+            on_done=score_producer_local_shutdown)
 
-        '''start target-disease evidence producer'''
-        readers = [TargetDiseaseEvidenceProducer(target_q,
-            None,
-            target_disease_pair_q,
-            self.es,
-            scoring_weights,
-            is_direct_do_not_propagate,
-            datasources_to_datatypes
-            ) for _ in range(number_of_workers)]
+        #loop over the end of the pipeline to make sure everything is finished
+        for result in pr.to_iterable(pipeline_stage):
+            pass
 
-        for w in readers:
-            w.start()
-
-        for target in targets:
-            target_q.put(target)
-        target_q.set_submission_finished()
-
-        self.logger.info("collecting readers and scorers")
-        for w in readers:
-            w.join()
-        for w in scorers:
-            w.join()
-
-        self.logger.info('flushing data to index')
-        self.es_loader.es.indices.flush('%s*'%Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME),
-                                        wait_if_ongoing =True)
+        #cleanup elasticsearch
+        if not dry_run:
+            self.logger.info('flushing data to index')
+            self.es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
+            #restore old pre-load settings
+            #note this automatically does all prepared indexes
+            self.es_loader.restore_after_bulk_indexing()
 
         self.logger.info("DONE")
 
