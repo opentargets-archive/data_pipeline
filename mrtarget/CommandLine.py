@@ -8,7 +8,6 @@ import os.path
 import itertools
 
 from mrtarget.modules.Evidences import process_evidences_pipeline
-from mrtarget.common.Redis import enable_profiling
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import RedisManager, new_es_client, new_redis_client
@@ -61,7 +60,7 @@ def main():
         Config.RELEASE_VERSION = args.release_tag
         logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
-    enable_profiling(args.profile)
+
 
     
     
