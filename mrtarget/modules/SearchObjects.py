@@ -296,5 +296,4 @@ class SearchObjectProcess(object):
         if not dry_run:
             self.loader.put(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
                 Const.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
-                so.id, so.to_json(),
-                create_index=False)
+                so.id, so.to_json())
