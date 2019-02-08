@@ -12,18 +12,21 @@ class UniprotDownloader(object):
     NS = "{http://uniprot.org/uniprot}"
     def __init__(self, loader, dry_run=False):
         self.logger = logging.getLogger(__name__)
-        self.dry_run = dry_run
         self.total_entries = None
         self.loader = loader
 
-    def cache_human_entries(self, uri):
+    def process(self, uri, dry_run):
         self.logger.debug("download uniprot uri %s", uri)
         self.logger.debug("to generate this file you have to call this url "
                             "https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml")
 
-        if not self.dry_run:
+        #setup elasticsearch
+        if not dry_run:
             self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
-            self.loader.create_new_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME, recreate=True)
+            self.loader.create_new_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
+            #need to directly get the versioned index name for this function
+            self.loader.prepare_for_bulk_indexing(
+                self.loader.get_versioned_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME))
 
         with URLZSource(uri).open() as r_file:
             self.logger.debug("iterate through the whole uniprot xml file")
@@ -37,10 +40,10 @@ class UniprotDownloader(object):
                 #have already (re-)created the index so don't do it again
                 json_seqrec = base64.b64encode(jsonpickle.encode(entry))
                 #we canskip this bit (and only this bit!) if dry running
-                if not self.dry_run:
+                if not dry_run:
                     self.loader.put(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME, 
                         Const.ELASTICSEARCH_UNIPROT_DOC_NAME, entry.id, 
-                        {'entry': json_seqrec}, create_index=False)
+                        {'entry': json_seqrec})
 
                 self.total_entries += 1
 
@@ -48,8 +51,13 @@ class UniprotDownloader(object):
 
         #flush and wait for the index to be complete and ready before ending this step
 
-        if not self.dry_run:
+
+        #cleanup elasticsearch
+        if not dry_run:
             self.loader.flush_all_and_wait(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
+            #restore old pre-load settings
+            #note this automatically does all prepared indexes
+            self.loader.restore_after_bulk_indexing()
 
     def qc(self, esquery):
         """Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

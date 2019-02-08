@@ -122,15 +122,12 @@ class ProcessContextESWriter(ProcessContext):
         (left, right) = line
         if right is not None:
             self.kwargs.es_loader.put(body=right['line'], ID=right['hash'],
-                                      index_name=self.kwargs.index_name_validated,
-                                      doc_type=self.kwargs.doc_type_validated,
-                                      create_index=False, auto_optimise=True)
+                index_name=self.kwargs.index_name_validated,
+                doc_type=self.kwargs.doc_type_validated)
         elif left is not None:
             self.kwargs.es_loader.put(body=serialise_object_to_json(left), ID=left['id'],
-                                      index_name=self.kwargs.index_name_invalidated,
-                                      doc_type=self.kwargs.doc_type_invalidated,
-                                      create_index=False,
-                                      auto_optimise=True)
+                index_name=self.kwargs.index_name_invalidated,
+                doc_type=self.kwargs.doc_type_invalidated)
 
     def __del__(self):
         self.close()

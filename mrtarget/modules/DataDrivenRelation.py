@@ -159,9 +159,7 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
             r = data
             self.loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
                        Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
-                       r.id,
-                       r.to_json(),
-                       create_index=False)
+                       r.id, r.to_json())
             subj = copy(r.subject)
             obj = copy(r.object)
             if subj['id'] != obj['id']:
@@ -170,9 +168,7 @@ class DistanceStorageWorker(RedisQueueWorkerProcess):
                 r.set_id()
                 self.loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
                            Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
-                           r.id,
-                           r.to_json(),
-                           create_index=False)
+                           r.id, r.to_json())
 
         def init(self):
             super(DistanceStorageWorker, self).init()
@@ -595,7 +591,7 @@ class DataDrivenRelationProcess(object):
 
         '''create the index'''
         self.loader = Loader(self.es, dry_run=dry_run)
-        self.loader.create_new_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME, recreate=True)
+        self.loader.create_new_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME)
         self.loader.prepare_for_bulk_indexing(self.loader.get_versioned_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME))
 
 
