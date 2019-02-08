@@ -231,7 +231,7 @@ class OverlapDistance(object):
         return distance, x_nz, y_nz, xy_intersection, xy_union
 
     @staticmethod
-    def estimate_above_threshold(x_sum, y_sum, threshold = 0.19):
+    def estimate_above_threshold(x_sum, y_sum, threshold):
         shared_wc=float(min(x_sum, y_sum))
         union_wc = max(x_sum, y_sum)
         # union_wc = (x_sum+y_sum)/2.
@@ -240,178 +240,57 @@ class OverlapDistance(object):
         return ratio_wc<ratio_above_threshold
 
 
-
-class RelationHandlerEuristicOverlapEstimation(object):
-
-
-    def __init__(self,
-                 target_data,
-                 disease_data,
-                 ordered_target_keys,
-                 ordered_disease_keys,
-                 r_server=None,
-                 use_quantitiative_scores = False
-                 ):
-        '''
-        :param queue_id: queue id to attach to preconfigured queues
-        :param r_server: a redis.Redis instance to be used in methods. If supplied the RedisQueue object
-                             will not be pickable
-        :param max_size: maximum size of the queue. queue will block if full, and allow put only if smaller than the
-                         maximum size.
-        :return:
-        '''
-
-        self.r_server = r_server
-        if self.r_server is None:
-            self.r_server = new_redis_client()
-
-        self.target_data = target_data
-        self.disease_data = disease_data
-        self.available_targets = ordered_target_keys
-        self.available_diseases = ordered_disease_keys
-        self.use_quantitiative_scores = use_quantitiative_scores
-
-    def produce_d2d_pairs(self, subject_analysis_queue, produced_pairs_queue, redis_path):
-        '''trigger production of disease to disease distances using carefully selected euristics threshold'''
-
-        # produce disease pairs
-        self._produce_pairs(self.disease_data,
-                                     self.available_diseases,
-                                     self.target_data,
-                                     sample_size= 1024,
-                                     threshold=0.19,
-                                     subject_analysis_queue=subject_analysis_queue,
-                                     produced_pairs_queue=produced_pairs_queue,
-                                     redis_path = redis_path)
-
-    def produce_t2t_pairs(self,  subject_analysis_queue, produced_pairs_queue, redis_path):
-        '''trigger production of target to target distances using carefully selected euristics threshold'''
-
-        # #produce target pairs
-        self._produce_pairs(self.target_data,
-                                     self.available_targets,
-                                     self.disease_data,
-                                     sample_size= 1024,
-                                     threshold=0.19,
-                                     subject_analysis_queue=subject_analysis_queue,
-                                     produced_pairs_queue=produced_pairs_queue,
-                                     redis_path = redis_path)
-
-    def _produce_pairs(self, subject_data, subject_ids, shared_ids, threshold, sample_size, subject_analysis_queue, produced_pairs_queue, redis_path):
-        self.r_server = redis_path if redis_path else new_redis_client()
-
-        vectorizer = DictVectorizer(sparse=True)
-        tdidf_transformer = LocalTfidfTransformer(smooth_idf=False, )
-        # tdidf_transformer = TfidfTransformer(smooth_idf=False,)
-        data_vector = vectorizer.fit_transform([subject_data[i] for i in subject_ids])
-        if not self.use_quantitiative_scores:
-            data_vector = data_vector > 0
-            data_vector = data_vector.astype(int)
-        transformed_data = tdidf_transformer.fit_transform(data_vector)
-        sums_vector = np.squeeze(np.asarray(transformed_data.sum(1)).ravel())#sum by row
-        limit = -1  # use for faster debug
-        buckets_number = sample_size
-        '''put vectors in buckets'''
-        buckets = {}
-        for i in range(buckets_number):
-            buckets[i]=[]
-        vector_hashes = {}
-        for i in range(len(subject_ids[:limit])):
-            vector = transformed_data[i].toarray()[0]
-            digested = self.digest_in_buckets(vector, buckets_number)
-            for bucket in digested:
-                buckets[bucket].append(i)
-            vector_hashes[i]=digested
-
-
-
-        pair_producers = [RelationHandlerEuristicOverlapEstimationPairProducer(subject_analysis_queue,
-                                                                               None,
-                                                                               produced_pairs_queue,
-                                                                               vector_hashes,
-                                                                               buckets,
-                                                                               threshold,
-                                                                               sums_vector,
-                                                                               data_vector,
-                                                                               idf= dict(zip(vectorizer.feature_names_, list(tdidf_transformer.idf_))),
-                                                                               idf_ = 1-tdidf_transformer.idf_,
-                                                                               )
-                          for i in range(Config.WORKERS_NUMBER)]
-        for w in pair_producers:
-            w.start()
-        for i in range(len(subject_ids[:limit])):
-            subject_analysis_queue.put(i, r_server=self.r_server)
-        subject_analysis_queue.set_submission_finished(r_server=self.r_server)
-
-        for w in pair_producers:
-            w.join()
-
-    @staticmethod
-    def digest_in_buckets(v, buckets_number):
-        digested =set()
-        for i in np.flatnonzero(v).flat:
-            digested.add(i%buckets_number)
-        return tuple(digested)
-
-class RelationHandlerEuristicOverlapEstimationPairProducer(RedisQueueWorkerProcess):
-
-
-    def __init__(self,
-                 queue_in,
-                 redis_path,
-                 queue_out,
-                 vector_hashes,
-                 buckets,
-                 threshold,
-                 sums_vector,
-                 data_vector,
-                 idf=None,
-                 idf_=None,
-                 ):
-        super(RelationHandlerEuristicOverlapEstimationPairProducer, self).__init__(queue_in, redis_path, queue_out)
-        self.vector_hashes = vector_hashes
-        self.buckets = buckets
-        self.threshold = threshold
-        self.sums_vector = sums_vector
-        self.data_vector = data_vector
-        self.idf = idf #dictionary
-        self.idf_ = idf_ #inverted idf np array
-
-    def process(self, data):
-        i=data
-        compared = set()
-        for bucket in self.vector_hashes[i]:
-            for j in self.buckets[bucket]:
-                if j not in compared:
-                    if i > j:
-                        if OverlapDistance.estimate_above_threshold(self.sums_vector[i], self.sums_vector[j],  #only works with binary data, not floats
-                                                                    threshold=self.threshold):
-                            self.put_into_queue_out((i, self.data_vector[i], j, self.data_vector[j], self.idf, self.idf_))
-                compared.add(j)
-
 """
 Consumes the iterable passed in and loads into into provided loader
 whilst also respecting the dry run flag given
 """
 def store_in_elasticsearch(iterable, loader, dry_run):
     for r in iterable
-        if not dry_run:
-            loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
-                Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
-                r.id, r.to_json())
-        subj = copy(r.subject)
-        obj = copy(r.object)
-        if subj['id'] != obj['id']:
-            r.subject = obj
-            r.object = subj
-            r.set_id()
+        #ensure its not null
+        if r:
             if not dry_run:
                 loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
                     Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
                     r.id, r.to_json())
+            subj = copy(r.subject)
+            obj = copy(r.object)
+            if subj['id'] != obj['id']:
+                r.subject = obj
+                r.object = subj
+                r.set_id()
+                if not dry_run:
+                    loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
+                        Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
+                        r.id, r.to_json())
 
-def produce_pairs(self, subject_data, subject_ids, threshold, buckets_number):
+def digest_in_buckets(v, buckets_number):
+    digested =set()
+    for i in np.flatnonzero(v).flat:
+        digested.add(i%buckets_number)
+    return tuple(digested)
 
+
+"""
+Dummy function to bake arguments into 
+"""
+def calculate_pairs_local_init(type, row_labels, rows_ids, column_ids, threshold, idf, idf_):
+    return (type, row_labels, rows_ids, column_ids, threshold, idf, idf_)
+
+"""
+Dummy function to bake arguments into 
+"""
+def produce_pairs_local_init(vector_hashes, buckets, threshold, sums_vector, data_vector):
+    return ( vector_hashes, buckets, threshold, sums_vector, data_vector)
+
+"""
+handles producing pairs for a particular set of inputs
+spawns multiple processess as needed
+used to standardize d2d and t2t code path
+"""
+def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids, 
+        threshold, buckets_number, dry_run):
+
+    #do some initial setup
     vectorizer = DictVectorizer(sparse=True)
     tdidf_transformer = LocalTfidfTransformer(smooth_idf=False, )
     data_vector = vectorizer.fit_transform([subject_data[i] for i in subject_ids])
@@ -426,28 +305,88 @@ def produce_pairs(self, subject_data, subject_ids, threshold, buckets_number):
     vector_hashes = {}
     for i in range(len(subject_ids[:limit])):
         vector = transformed_data[i].toarray()[0]
-        digested = self.digest_in_buckets(vector, buckets_number)
+        digested = digest_in_buckets(vector, buckets_number)
         for bucket in digested:
             buckets[bucket].append(i)
         vector_hashes[i]=digested
 
+    idf = dict(zip(vectorizer.feature_names_, list(tdidf_transformer.idf_)))
+    idf_ = 1-tdidf_transformer.idf_
+
+    #now everything is computed that can be baked into the function arguments
+
+    produce_pairs_local_init_baked = functools.partial(produce_pairs_local_init, 
+        vector_hashes, buckets, threshold, sums_vector, data_vector)
+
+    calculate_pairs_local_init_baked = functools.partial(calculate_pairs_local_init, 
+        type, subject_labels, subject_ids, other_ids, threshold, idf, idf_)
+
+    #create stage for producing disease-to-disease
+    pipeline_stage = pr.map(produce_pairs, range(len(subject_ids)), 
+        workers=8, #TODO argumentize
+        maxsize=16, #TODO argumentize
+        on_start=produce_pairs_local_init_baked)
+
+    #create stage to calculate disease-to-disease
+    pipeline_stage = pr.map(calculate_pair, pr.to_iterable(pipeline_stage), 
+        workers=8, #TODO argumentize
+        maxsize=16, #TODO argumentize
+        on_start=calculate_pairs_local_init_baked)
+
+    #store in elasticsearch
+    store_in_elasticsearch(pr.to_iterable(pipeline_stage), self.loader, dry_run)
 
 
-    pair_producers = [RelationHandlerEuristicOverlapEstimationPairProducer(subject_analysis_queue,
-            None,
-            produced_pairs_queue,
-            vector_hashes,
-            buckets,
-            threshold,
-            sums_vector,
-            data_vector,
-            idf= dict(zip(vectorizer.feature_names_, list(tdidf_transformer.idf_))),
-            idf_ = 1-tdidf_transformer.idf_,
-            )
-        for i in range(Config.WORKERS_NUMBER)]
+def produce_pairs(i, vector_hashes, buckets, threshold, sums_vector, data_vector)
+    compared = set()
+    result = []
+    for bucket in vector_hashes[i]:
+        for j in buckets[bucket]:
+            if j not in compared:
+                if i > j:
+                    if OverlapDistance.estimate_above_threshold(sums_vector[i], sums_vector[j], threshold):
+                        result.append((i, self.data_vector[i], j, self.data_vector[j]))
+            compared.add(j)
+    return result
 
-    for i in range(len(subject_ids)):
-        subject_analysis_queue.put(i, r_server=self.r_server)
+def calculate_pair(data, type, row_labels, rows_ids, column_ids, threshold, idf, idf_)
+
+    subject_index, subject_data, object_index, object_data = data
+    
+    distance, subject_nz, subject_nz, intersection, union = OverlapDistance.compute_weighted_distance(subject_data, object_data, idf_)
+
+    #sanity checks, shouldn't really happen often
+    if (distance <= threshold) or (not intersection) :
+        return None
+
+    subject = dict(id=rows_ids[subject_index],
+                    label=row_labels[subject_index],
+                    links={})
+    object = dict(id=rows_ids[object_index],
+                    label=row_labels[object_index],
+                    links={})
+    dist = {
+        'overlap': distance,
+    }
+    body = dict()
+    body['counts'] = {'shared_count': len(intersection),
+                        'union_count': len(union),
+                        }
+    '''sort shared items by idf score'''
+    weighted_shared_labels = sorted([(idf[column_ids[i]],column_ids[i])  for i in intersection])
+    '''sort shared entities by significance'''
+    shared_labels = [i[1] for i in weighted_shared_labels]
+    if type == RelationType.SHARED_TARGET:
+        subject['links']['targets_count'] = subject_data.getnnz()
+        object['links']['targets_count'] = object_data.getnnz()
+        body['shared_targets'] = shared_labels
+    elif type == RelationType.SHARED_DISEASE:
+        subject['links']['diseases_count'] = subject_data.getnnz()
+        object['links']['diseases_count'] = object_data.getnnz()
+        body['shared_diseases'] = shared_labels
+    #create the relation object
+    r = Relation(subject, object, dist, type, **body)
+    return r
 
 
 class DataDrivenRelationProcess(object):
@@ -486,19 +425,12 @@ class DataDrivenRelationProcess(object):
         disease_keys = sorted(disease_data.keys())
         target_keys = sorted(target_data.keys())
 
-        number_of_workers = Config.WORKERS_NUMBER
-        number_of_storers = number_of_workers / 2
-        queue_per_worker =150
-
-
         self.logger.info('getting disese labels')
         disease_id_to_label = self.es_query.get_disease_labels(disease_keys)
         disease_labels = [disease_id_to_label[hit_id] for hit_id in disease_keys]
         self.logger.info('getting target labels')
         target_id_to_label = self.es_query.get_target_labels(target_keys)
         target_labels = [target_id_to_label[hit_id] for hit_id in target_keys]
-
-
 
         #setup elasticsearch
         self.loader = Loader(self.es, dry_run=dry_run)
@@ -508,15 +440,13 @@ class DataDrivenRelationProcess(object):
             self.loader.prepare_for_bulk_indexing(self.loader.get_versioned_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME))
 
 
-        #TODO create stage for producing disease-to-disease
-        #TODO calculate disease-to-disease
-        #TODO store in elasticsearch
-        store_in_elasticsearch(iterable, self.loader, dry_run)
+        #calculate and store disease-to-disease in multiple processess
+        handle_pairs(RelationType.SHARED_TARGET, disease_labels, disease_data, disease_keys, 
+            target_keys, 0.19, 1024)
 
-        #TODO create stage for producing target-to-target
-        #TODO calculate target-to-target
-        #TODO store in elasticsearch
-        store_in_elasticsearch(iterable, self.loader, dry_run)
+        #calculate and store target-to-target in multiple processess
+        handle_pairs(RelationType.SHARED_DISEASE, target_labels, target_data, target_keys, 
+            disease_keys, 0.19, 1024)
 
         #cleanup elasticsearch
         if not dry_run:
@@ -524,119 +454,4 @@ class DataDrivenRelationProcess(object):
             #restore old pre-load settings
             #note this automatically does all prepared indexes
             self.loader.restore_after_bulk_indexing()
-
-
-
-
-
-        '''create the queues'''
-        d2d_pair_producing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_pair_producting',
-                                        max_size=number_of_workers* 5,
-                                        job_timeout=60 * 60 * 24,
-                                        batch_size=1,
-                                        ttl=60 * 60 * 24 * 14,
-                                        serialiser='json')
-        t2t_pair_producing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_pair_producting',
-                                        max_size=number_of_workers * 5,
-                                        job_timeout=60 * 60 * 24,
-                                        batch_size=1,
-                                        ttl=60 * 60 * 24 * 14,
-                                        serialiser='json')
-
-        d2d_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_d2d_processing',
-                                          max_size=number_of_workers * queue_per_worker,
-                                          job_timeout=300,
-                                          batch_size=10,
-                                          ttl=60 * 60 * 24 * 14,
-                                          serialiser='pickle')
-        t2t_queue_processing = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_t2t_processing',
-                                          max_size=number_of_workers * queue_per_worker,
-                                          job_timeout=300,
-                                          batch_size=10,
-                                          ttl=60 * 60 * 24 * 14,
-                                          serialiser='pickle')
-
-        queue_storage = RedisQueue(queue_id=Config.UNIQUE_RUN_ID + '|ddr_storage',
-                                   max_size=int(queue_per_worker * number_of_storers*10),
-                                   batch_size=10,
-                                   job_timeout=300,
-                                   serialiser='pickle')
-        '''start shared workers'''
-        
-        storage_workers = [DistanceStorageWorker(queue_storage,
-                                                 None,
-                                                 dry_run=dry_run,
-                                                 chunk_size=queue_per_worker,
-                                                 # ) for i in range(multiprocessing.cpu_count())]
-                                                 ) for _ in range(number_of_storers)]
-
-        for w in storage_workers:
-            w.start()
-
-        '''start workers for d2d'''
-
-        d2d_workers = [DistanceComputationWorker(d2d_queue_processing,
-                                                 None,
-                                                 queue_storage,
-                                                 RelationType.SHARED_TARGET,
-                                                 disease_labels,
-                                                 disease_keys,
-                                                 target_keys,
-                                                 0.2,
-                                                 auto_signal_submission_finished = False,# don't signal submission is done until t2t workers are done
-                                                 ) for _ in range(number_of_workers*2)]
-        for w in d2d_workers:
-            w.start()
-
-        self.logger.debug('call relationhandlereuristicoverlapestimation')
-        rel_handler = RelationHandlerEuristicOverlapEstimation(target_data=target_data,
-                                                               disease_data=disease_data,
-                                                               ordered_target_keys=target_keys,
-                                                               ordered_disease_keys=disease_keys,
-                                                               r_server=self.r_server,
-                                                               use_quantitiative_scores=False)
-        ''' compute disease to disease distances'''
-        self.logger.info('Starting to push pairs for disease to disease distances computation')
-        '''use cartesian product'''
-        rel_handler.produce_d2d_pairs(d2d_pair_producing, d2d_queue_processing, self.r_server)
-
-        self.logger.info('disease to disease distances pair push done')
-
-        '''start workers for t2t'''
-
-        t2t_workers = [DistanceComputationWorker(t2t_queue_processing,
-                                                 None,
-                                                 queue_storage,
-                                                 RelationType.SHARED_DISEASE,
-                                                 target_labels,
-                                                 target_keys,
-                                                 disease_keys,
-                                                 0.2,
-                                                 ) for _ in range(number_of_workers*2)]
-        for w in t2t_workers:
-            w.start()
-
-        ''' compute target to target distances'''
-        self.logger.info('Starting to push pairs for target to target distances computation')
-        rel_handler.produce_t2t_pairs(t2t_pair_producing, t2t_queue_processing, self.r_server)
-        self.logger.info('target to target distances pair push done')
-
-        '''stop d2d specifc workers'''
-        for w in d2d_workers:
-            w.join()
-
-        '''stop t2t specifc workers'''
-        for w in t2t_workers:
-            w.join()
-
-        '''stop storage workers'''
-        queue_storage.set_submission_finished(self.r_server)
-        for w in storage_workers:
-            w.join()
-
-        self.logger.info('flushing data to index')
-        if not dry_run:
-            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_RELATION_INDEX_NAME)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
+    
