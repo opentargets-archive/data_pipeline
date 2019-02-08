@@ -349,9 +349,8 @@ class ElasticSearchConfiguration():
                              }
 
     relation_mappings = {}
-    from mrtarget.common.DataStructure import RelationType
-    for rt in [RelationType.SHARED_DISEASE,
-               RelationType.SHARED_TARGET,
+    for rt in ['shared-disease',
+               'shared-target',
                ]:
         relation_mappings[Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + rt] = _get_relation_generic_mapping()
 

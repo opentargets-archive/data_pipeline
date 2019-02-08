@@ -177,7 +177,7 @@ def main():
                     pass
                 
             if args.ddr:
-                process = DataDrivenRelationProcess(es, redis)
+                process = DataDrivenRelationProcess(es)
                 if not args.qc_only:
                     process.process_all(dry_run = args.dry_run)
                 #TODO qc
