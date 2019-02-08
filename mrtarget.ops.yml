@@ -56,8 +56,17 @@ data-config: https://storage.googleapis.com/open-targets-data-releases/19.02/inp
 #as-workers-production: 4
 #number of processess to use for scoring assocation pairs
 #as-workers-score: 4
-#size of queue between validators and writers
+#size of queue between producers and scorers
 #as-queue-production-score: 1000
+
+#number of processess to use for producing relationship pairs
+#ddr-workers-production: 4
+#number of processess to use for scoring relationship pairs
+#ddr-workers-score: 4
+#size of queue between producers and scorers
+#ddr-queue-production-score: 1000
+#size of queue between scorers and result
+#ddr-queue-score-result: 1000
 
 
 #path to read gene plugins from

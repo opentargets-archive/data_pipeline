@@ -179,7 +179,11 @@ def main():
             if args.ddr:
                 process = DataDrivenRelationProcess(es)
                 if not args.qc_only:
-                    process.process_all(dry_run = args.dry_run)
+                    process.process_all(args.dry_run
+                        args.ddr_workers_production,
+                        args.ddr_workers_score,
+                        args.ddr_queue_production_score,
+                        args.ddr_queue_score_result)
                 #TODO qc
 
             if args.sea:

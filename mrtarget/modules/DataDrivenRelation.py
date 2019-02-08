@@ -192,7 +192,9 @@ spawns multiple processess as needed
 used to standardize d2d and t2t code path
 """
 def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids, 
-        threshold, buckets_number, loader, dry_run):
+        threshold, buckets_number, loader, dry_run, 
+        workers_production, workers_score,
+        queue_production_score, queue_score_result):
 
     #do some initial setup
     vectorizer = DictVectorizer(sparse=True)
@@ -227,8 +229,8 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
 
     #create stage for producing disease-to-disease
     pipeline_stage = pr.map(produce_pairs, range(len(subject_ids)), 
-        workers=8, #TODO argumentize
-        maxsize=16, #TODO argumentize
+        workers=workers_production,
+        maxsize=queue_production_score,
         on_start=produce_pairs_local_init_baked)
 
     #flatten the evidence producing collections between the stages
@@ -236,8 +238,8 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
 
     #create stage to calculate disease-to-disease
     pipeline_stage = pr.map(calculate_pair, subject_pairs, 
-        workers=8, #TODO argumentize
-        maxsize=16, #TODO argumentize
+        workers=workers_score,
+        maxsize=queue_score_result,
         on_start=calculate_pairs_local_init_baked)
 
     #store in elasticsearch
@@ -305,7 +307,11 @@ class DataDrivenRelationProcess(object):
         self.es_query=ESQuery(self.es)
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self, dry_run= False):
+    def process_all(self, dry_run, 
+            ddr_workers_production,
+            ddr_workers_score,
+            ddr_queue_production_score,
+            ddr_queue_score_result):
         start_time = time.time()
 
         target_data, disease_data = self.es_query.get_disease_to_targets_vectors()
@@ -336,13 +342,17 @@ class DataDrivenRelationProcess(object):
         #calculate and store disease-to-disease in multiple processess
         self.logger.info('handling disease-to-disease')
         handle_pairs(RelationType.SHARED_TARGET, disease_labels, disease_data, disease_keys, 
-            target_keys, 0.19, 1024, self.loader, dry_run)
+            target_keys, 0.19, 1024, self.loader, dry_run, 
+            ddr_workers_production, ddr_workers_score, 
+            ddr_queue_production_score, ddr_queue_score_result)
         self.logger.info('handled disease-to-disease')
 
         #calculate and store target-to-target in multiple processess
         self.logger.info('handling target-to-target')
         handle_pairs(RelationType.SHARED_DISEASE, target_labels, target_data, target_keys, 
-            disease_keys, 0.19, 1024, self.loader, dry_run)
+            disease_keys, 0.19, 1024, self.loader, dry_run, 
+            ddr_workers_production, ddr_workers_score, 
+            ddr_queue_production_score, ddr_queue_score_result)
         self.logger.info('handled target-to-target')
 
         #cleanup elasticsearch
