@@ -17,11 +17,11 @@ data-config: https://storage.googleapis.com/open-targets-data-releases/19.02/inp
 #release-tag: master
 
 #location to write a tab separated qc summary
-#qc-out: out.qc.tsv
+#qc-out:
 
 #locaton to read a tab separated qc summary
 #difference from will be added to output
-#qc-in: in.qc.tsv
+#qc-in:
 
 #only run the qc for each stage, don't change the data
 #qc-only: false

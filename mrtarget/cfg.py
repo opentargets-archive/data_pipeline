@@ -26,8 +26,8 @@ def setup_ops_parser():
         env_var="ES_PREFIX", action='store', default="master")
 
     # handle stage-specific QC
-    p.add("--qc-out", help="TSV file to write/update qc information", default="out.qc.tsv")
-    p.add("--qc-in", help="TSV file to read qc information for comparison", default="in.qc.tsv")
+    p.add("--qc-out", help="TSV file to write/update qc information")
+    p.add("--qc-in", help="TSV file to read qc information for comparison")
     p.add("--qc-only", help="only run the qc and not the stage itself",
         action="store_true", default=False)
     p.add("--skip-qc", help="do not run the qc for this stage",
