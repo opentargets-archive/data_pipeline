@@ -38,8 +38,11 @@ class Relation(JSONSerializable):
 
         #add any other arugments as appropriate
         self.__dict__.update(**kwargs)
+        self.set_id()
 
-        #create an identifier for this relation
+    #create an identifier for this relation
+    #used when the parts change
+    def set_id(self):
         self.id = '-'.join([self.subject['id'], self.object['id']])
 
 class T2TRelation(JSONSerializable):
