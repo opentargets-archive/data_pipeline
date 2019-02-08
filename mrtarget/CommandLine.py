@@ -168,7 +168,10 @@ def main():
                     process.process_all(data_config.scoring_weights, 
                         data_config.is_direct_do_not_propagate,
                         data_config.datasources_to_datatypes,
-                        dry_run=args.dry_run)
+                        args.dry_run,
+                        args.as_workers_production,
+                        args.as_workers_score,
+                        args.as_queue_production_score)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
                     pass
@@ -188,9 +191,7 @@ def main():
                         data_config.chembl_component, 
                         data_config.chembl_protein, 
                         data_config.chembl_molecule_set_uri_pattern,
-                        dry_run = args.dry_run,
-                        skip_targets=args.skip_targets, 
-                        skip_diseases=args.skip_diseases)
+                        args.dry_run)
                 #TODO qc
 
             if args.metric:

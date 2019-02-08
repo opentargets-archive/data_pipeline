@@ -23,20 +23,20 @@ def setup_ops_parser():
 
     # take the release tag from the command line, but fall back to environment or ini files
     p.add('--release-tag', help="identifier for data storage for this release",
-        env_var="ES_PREFIX", action='store')
+        env_var="ES_PREFIX", action='store', default="master")
 
     # handle stage-specific QC
-    p.add("--qc-out", help="TSV file to write/update qc information")
-    p.add("--qc-in", help="TSV file to read qc information for comparison")
+    p.add("--qc-out", help="TSV file to write/update qc information", default="out.qc.tsv")
+    p.add("--qc-in", help="TSV file to read qc information for comparison", default="in.qc.tsv")
     p.add("--qc-only", help="only run the qc and not the stage itself",
-        action="store_true")
+        action="store_true", default=False)
     p.add("--skip-qc", help="do not run the qc for this stage",
-        action="store_true")
+        action="store_true", default=False)
 
     # use an external redis rather than spawning one ourselves
     p.add("--redis-remote", help="connect to a remote redis, instead of starting an embedded one",
         action='store_true', default=False,
-        env_var='REDIS_REMOTE')  # TODO use a different env variable
+        env_var='REDIS_REMOTE')
     p.add("--redis-host", help="redis host",
         action='store', default='localhost',
         env_var='REDIS_HOST')
@@ -53,8 +53,8 @@ def setup_ops_parser():
 
     # process handling
     #note this is the number of workers for each parallel operation
-    #if there are multiple parallel operations happening at once, then 
-    #this could be many more than that
+    #if there are multiple parallel operations happening at once, and
+    #there usually are, then this could be many more than that
 
     p.add("--val-workers-validator", help="# of procs for validation workers",
         env_var="VAL_WORKERS_VALIDATOR", action='store', default=4, type=int)
@@ -63,12 +63,15 @@ def setup_ops_parser():
     p.add("--val-queue-validator-writer", help="size of validation writer to worker queue",
         env_var="VAL_QUEUE_VALIDATOR_WRITER", action='store', default=1000, type=int)
 
+    p.add("--as-workers-production", help="# of procs for assocation pair producers",
+        env_var="AS_WORKERS_PRODUCTION", action='store', default=4, type=int)
+    p.add("--as-workers-score", help="# of procs for assocation pair scoring",
+        env_var="AS_WORKERS_SCORE", action='store', default=4, type=int)
+    p.add("--as-queue-production-score", help="size of assocation producer to scorer queue",
+        env_var="AS_QUEUE_PRODUCTION_SCORE", action='store', default=1000, type=int)
+
     # for debugging
-    p.add("--dump", help="dump core data to local gzipped files",
-        action="store_true")
     p.add("--dry-run", help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
-        action='store_true', default=False)
-    p.add("--profile", help="magically profiling process() per process",
         action='store_true', default=False)
 
     # load supplemental and genetic informtaion from various external resources
@@ -86,7 +89,7 @@ def setup_ops_parser():
         action="store_true")
     #paths to plugins to ensure discoverability
     p.add("--gen-plugin-places", help="paths to check for gene plugins",
-        action='append')
+        action='append', default=["mrtarget/plugins/gene"])
 
 
     # load various ontologies into various indexes
@@ -104,16 +107,10 @@ def setup_ops_parser():
     # this has to be stored as "assoc" instead of "as" because "as" is a reserved name when accessing it later e.g. `args.as`
     p.add("--as", help="compute association scores, store in elasticsearch",
         action="store_true", dest="assoc")
-    p.add("--targets", help="just process data for this target. Does not work with all the steps!!",
-        action='append')
 
     # these are related to generated in a search index
     p.add("--sea", help="compute search results, store in elasticsearch",
         action="store_true")
-    p.add("--skip-diseases", help="Skip adding diseases to the search index",
-        action='store_true', default=False)
-    p.add("--skip-targets", help="Skip adding targets to the search index",
-        action='store_true', default=False)
 
     # additional information to add
     p.add("--ddr", help="compute data driven t2t and d2d relations, store in elasticsearch",
