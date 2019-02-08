@@ -2,14 +2,9 @@ import logging
 from collections import Counter
 import sys, os
 import numpy as np
-
-import pickle
-
 import scipy.sparse as sp
-
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
-
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -17,13 +12,11 @@ from scipy.spatial.distance import pdist
 import time
 from copy import copy
 import math
-
-from mrtarget.common.Redis import RedisQueue, RedisQueueWorkerProcess
+import functools
+import itertools
 from mrtarget.constants import Const
 from mrtarget.Settings import Config
-from mrtarget.common.connection import new_redis_client
-
-
+import pypeln.process as pr
 
 class RelationType(object):
     SHARED_DISEASE = 'shared-disease'
@@ -31,23 +24,22 @@ class RelationType(object):
 
 
 class Relation(JSONSerializable):
-    type = ''
 
     def __init__(self,
                  subject,
                  object,
                  scores,
-                 type = '',
+                 type,
                  **kwargs):
         self.subject = subject
         self.object = object
         self.scores = scores
-        if type:
-            self.type = type
-        self.__dict__.update(**kwargs)
-        self.set_id()
+        self.type = type
 
-    def set_id(self):
+        #add any other arugments as appropriate
+        self.__dict__.update(**kwargs)
+
+        #create an identifier for this relation
         self.id = '-'.join([self.subject['id'], self.object['id']])
 
 class T2TRelation(JSONSerializable):
@@ -55,96 +47,6 @@ class T2TRelation(JSONSerializable):
 
 class D2DRelation(JSONSerializable):
     type = RelationType.SHARED_TARGET
-
-class DistanceComputationWorker(RedisQueueWorkerProcess):
-    def __init__(self,
-                 queue_in,
-                 r_server,
-                 queue_out,
-                 type,
-                 row_labels,
-                 rows_ids,
-                 column_ids,
-                 threshold = 0.,
-                 auto_signal_submission_finished = True
-                 ):
-        super(DistanceComputationWorker, self).__init__(queue_in,
-                                                        r_server,
-                                                        queue_out,
-                                                        auto_signal_submission_finished = auto_signal_submission_finished)
-        self.type = type
-        self.row_labels = row_labels
-        self.rows_ids = rows_ids
-        self.column_ids = column_ids
-        self.threshold = threshold
-
-    def process(self, data):
-        subject_index, subject_data, object_index, object_data, idf, idf_ = data
-        # distance, subject_nz, subject_nz, intersection, union = OverlapDistance.compute_distance(subject_data, object_data)
-        distance, subject_nz, subject_nz, intersection, union = OverlapDistance.compute_weighted_distance(subject_data, object_data, idf_)
-
-        if (distance <= self.threshold) or (not intersection) :
-            return
-        subject = dict(id=self.rows_ids[subject_index],
-                       label=self.row_labels[subject_index],
-                       links={})
-        object = dict(id=self.rows_ids[object_index],
-                      label=self.row_labels[object_index],
-                      links={})
-        dist = {
-            'overlap': distance,
-        }
-        body = dict()
-        body['counts'] = {'shared_count': len(intersection),
-                          'union_count': len(union),
-                          }
-        '''sort shared items by idf score'''
-        weighted_shared_labels = sorted([(idf[self.column_ids[i]],self.column_ids[i])  for i in intersection])
-        '''sort shared entities by significance'''
-        shared_labels = [i[1] for i in weighted_shared_labels]
-        if self.type == RelationType.SHARED_TARGET:
-            subject['links']['targets_count'] = subject_data.getnnz()
-            object['links']['targets_count'] = object_data.getnnz()
-            body['shared_targets'] = shared_labels
-        elif self.type == RelationType.SHARED_DISEASE:
-            subject['links']['diseases_count'] = subject_data.getnnz()
-            object['links']['diseases_count'] = object_data.getnnz()
-            body['shared_diseases'] = shared_labels
-        r = Relation(subject, object, dist, self.type, **body)
-        return r
-
-    def _get_ordered_keys(self, subject_data, object_data, keys):
-        ordered_keys = sorted([(max(subject_data[key], object_data[key]), key) for key in keys], reverse=True)
-        return list((i[1] for i in ordered_keys))
-
-    def _compute_vector_based_distances(self, subject_data, object_data, keys):
-        '''calculate a normlized inverted euclidean distance.
-        return 1 for perfect match
-        returns 0 if nothing is in common'''
-        subj_vector_capped = [DataDrivenRelationProcess.cap_to_one(i) for i in
-                       [subject_data[k] for k in keys]]
-        obj_vector_capped = [DataDrivenRelationProcess.cap_to_one(i) for i in
-                      [object_data[k] for k in keys]]
-        subj_vector = [DataDrivenRelationProcess.transform_for_euclidean_distance(i) for i in subj_vector_capped]
-        obj_vector = [DataDrivenRelationProcess.transform_for_euclidean_distance(i) for i in obj_vector_capped]
-        # subj_vector_b = [i==0. for i in subj_vector]
-        # obj_vector_b = [i==0. for i in obj_vector]
-        vectors = np.array([subj_vector, obj_vector])
-        # vectors_b = np.array([subj_vector_b, obj_vector_b])
-        correlation = pdist(vectors, 'correlation')[0]
-        if math.isnan(correlation):
-            correlation = 0.0
-        return dict(euclidean = 1.-(pdist(vectors, 'euclidean')[0]/(math.sqrt(len(keys))*2)),
-                     # jaccard_formal= pdist(vectors, 'jaccard')[0],
-                     # matching=pdist(vectors, 'matching')[0],
-                     # matching_b=pdist(vectors_b, 'matching')[0],
-                     # cosine=pdist([subj_vector_capped, obj_vector_capped], 'cosine')[0],
-                     # correlation=correlation,
-                     cityblock=1-(pdist(vectors, 'cityblock')[0]/(len(keys)*2)),
-                     # hamming=pdist(vectors, 'hamming')[0],
-                     # hamming_b=pdist(vectors_b, 'hamming')[0],
-                     )
-
 
 class LocalTfidfTransformer(TfidfTransformer):
 
@@ -168,8 +70,7 @@ class LocalTfidfTransformer(TfidfTransformer):
             # idf = np.log(df / n_samples)
             idf = df / n_samples
             self._idf_diag = sp.spdiags(idf,
-                                        diags=0, m=n_features, n=n_features)
-
+                diags=0, m=n_features, n=n_features)
         return self
 
 
@@ -245,7 +146,7 @@ Consumes the iterable passed in and loads into into provided loader
 whilst also respecting the dry run flag given
 """
 def store_in_elasticsearch(iterable, loader, dry_run):
-    for r in iterable
+    for r in iterable:
         #ensure its not null
         if r:
             if not dry_run:
@@ -288,7 +189,7 @@ spawns multiple processess as needed
 used to standardize d2d and t2t code path
 """
 def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids, 
-        threshold, buckets_number, dry_run):
+        threshold, buckets_number, loader, dry_run):
 
     #do some initial setup
     vectorizer = DictVectorizer(sparse=True)
@@ -303,7 +204,7 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
     for i in range(buckets_number):
         buckets[i]=[]
     vector_hashes = {}
-    for i in range(len(subject_ids[:limit])):
+    for i in range(len(subject_ids)):
         vector = transformed_data[i].toarray()[0]
         digested = digest_in_buckets(vector, buckets_number)
         for bucket in digested:
@@ -327,17 +228,22 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
         maxsize=16, #TODO argumentize
         on_start=produce_pairs_local_init_baked)
 
+    #flatten the evidence producing collections between the stages
+    subject_pairs = itertools.chain.from_iterable(pr.to_iterable(pipeline_stage))
+
     #create stage to calculate disease-to-disease
-    pipeline_stage = pr.map(calculate_pair, pr.to_iterable(pipeline_stage), 
+    pipeline_stage = pr.map(calculate_pair, subject_pairs, 
         workers=8, #TODO argumentize
         maxsize=16, #TODO argumentize
         on_start=calculate_pairs_local_init_baked)
 
     #store in elasticsearch
-    store_in_elasticsearch(pr.to_iterable(pipeline_stage), self.loader, dry_run)
+    store_in_elasticsearch(pr.to_iterable(pipeline_stage), loader, dry_run)
 
-
-def produce_pairs(i, vector_hashes, buckets, threshold, sums_vector, data_vector)
+"""
+Function to run in child processess
+"""
+def produce_pairs(i, vector_hashes, buckets, threshold, sums_vector, data_vector):
     compared = set()
     result = []
     for bucket in vector_hashes[i]:
@@ -345,11 +251,11 @@ def produce_pairs(i, vector_hashes, buckets, threshold, sums_vector, data_vector
             if j not in compared:
                 if i > j:
                     if OverlapDistance.estimate_above_threshold(sums_vector[i], sums_vector[j], threshold):
-                        result.append((i, self.data_vector[i], j, self.data_vector[j]))
+                        result.append((i, data_vector[i], j, data_vector[j]))
             compared.add(j)
     return result
 
-def calculate_pair(data, type, row_labels, rows_ids, column_ids, threshold, idf, idf_)
+def calculate_pair(data, type, row_labels, rows_ids, column_ids, threshold, idf, idf_):
 
     subject_index, subject_data, object_index, object_data = data
     
@@ -391,26 +297,10 @@ def calculate_pair(data, type, row_labels, rows_ids, column_ids, threshold, idf,
 
 class DataDrivenRelationProcess(object):
 
-
-    def __init__(self, es, r_server):
+    def __init__(self, es):
         self.es = es
         self.es_query=ESQuery(self.es)
-        self.r_server = r_server
         self.logger = logging.getLogger(__name__)
-
-
-    @staticmethod
-    def cap_to_one(i):
-        if i>1.:
-            return 1.
-        return i
-
-    @staticmethod
-    def transform_for_euclidean_distance(i):
-        if i == 0:
-            i=-1.
-        return DataDrivenRelationProcess.cap_to_one(i)
-
 
     def process_all(self, dry_run= False):
         start_time = time.time()
@@ -441,12 +331,16 @@ class DataDrivenRelationProcess(object):
 
 
         #calculate and store disease-to-disease in multiple processess
+        self.logger.info('handling disease-to-disease')
         handle_pairs(RelationType.SHARED_TARGET, disease_labels, disease_data, disease_keys, 
-            target_keys, 0.19, 1024)
+            target_keys, 0.19, 1024, self.loader, dry_run)
+        self.logger.info('handled disease-to-disease')
 
         #calculate and store target-to-target in multiple processess
+        self.logger.info('handling target-to-target')
         handle_pairs(RelationType.SHARED_DISEASE, target_labels, target_data, target_keys, 
-            disease_keys, 0.19, 1024)
+            disease_keys, 0.19, 1024, self.loader, dry_run)
+        self.logger.info('handled target-to-target')
 
         #cleanup elasticsearch
         if not dry_run:
