@@ -98,9 +98,9 @@ class EfoProcess():
         self.mp_uri = mp_uri
         self.disease_phenotype_uris = disease_phenotype_uris
 
-    def process_all(self):
+    def process_all(self, dry_run):
         self._process_ontology_data()
-        self._store_efo()
+        self._store_efo(dry_run)
 
     def _process_ontology_data(self):
 
@@ -158,14 +158,28 @@ class EfoProcess():
                 newlist.append(item)
         return newlist
 
-    def _store_efo(self):
+    def _store_efo(self, dry_run):
+
+        #setup elasticsearch
+        if not dry_run:
+            self.loader.create_new_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
+            #need to directly get the versioned index name for this function
+            self.loader.prepare_for_bulk_indexing(
+                self.loader.get_versioned_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME))
 
         for efo_id, efo_obj in self.efos.items():
-            self.loader.put(index_name=Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                            doc_type=Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                            ID=efo_id,
-                            body = efo_obj)
-        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
+            if not dry_run:
+                self.loader.put(index_name=Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
+                                doc_type=Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
+                                ID=efo_id,
+                                body = efo_obj)
+
+        #cleanup elasticsearch
+        if not dry_run:
+            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
+            #restore old pre-load settings
+            #note this automatically does all prepared indexes
+            self.loader.restore_after_bulk_indexing()
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects

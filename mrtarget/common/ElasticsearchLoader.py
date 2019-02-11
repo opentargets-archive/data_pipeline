@@ -8,7 +8,6 @@ from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import bulk
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.EvidenceJsonUtils import assertJSONEqual
-from mrtarget.common.Redis import RedisQueueWorkerProcess
 from mrtarget.Settings import Config
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 
@@ -74,34 +73,13 @@ class Loader():
 
         return idx_name + suffix
 
-    def put(self,
-            index_name,
-            doc_type,
-            ID,
-            body,
-            create_index = True,
-            operation= None,
-            routing = None,
-            parent = None,
-            auto_optimise = False):
+    def put(self, index_name, doc_type, ID, body):
 
-        if index_name not in self.indexes_created:
-            if create_index:
-                self.create_new_index(index_name)
-            self.indexes_created.append(index_name)
         versioned_index_name = self.get_versioned_index(index_name)
-        if auto_optimise and (versioned_index_name not in self.indexes_optimised):
-            self.prepare_for_bulk_indexing(versioned_index_name)
         if isinstance(body, JSONSerializable):
             body = body.to_json()
         submission_dict = dict(_index=versioned_index_name,
-                               _type=doc_type,
-                               _id=ID,
-                               _source=body)
-        if operation is not None:
-            submission_dict['_op_type']=operation
-        if parent is not None:
-            submission_dict['_parent']=parent
+            _type=doc_type, _id=ID, _source=body)
         self.cache.append(submission_dict)
 
         if self.cache and ((len(self.cache) == self.chunk_size) or
@@ -119,7 +97,7 @@ class Loader():
                     retry+=1
                     if retry >= max_retry:
                         self.logger.exception("push to elasticsearch failed for chunk, giving up...")
-                        break
+                        raise e
                     else:
                         time_to_wait = 5*retry
                         self.logger.warning("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
@@ -127,13 +105,6 @@ class Loader():
 
             del self.cache[:]
 
-
-        # if index_name:
-        # self.cache[index_name] = []
-        # else:
-        #     for index_name in self.cache:
-        #         self.cache[index_name] = []
-    # @profile
     def _flush(self):
         if not self.dry_run:
             bulk(self.es,
@@ -159,7 +130,7 @@ class Loader():
         if not self.dry_run:
             old_cluster_settings = self.es.cluster.get_settings()
 
-            #try to turn of throttling of indexes
+            #try to turn off throttling of indexes
             #removed in ES >= 6.0
             try:
                 if old_cluster_settings['persistent']['indices']['store']['throttle']['type']=='none':
@@ -198,11 +169,18 @@ class Loader():
         if not self.dry_run:
             for index_name in self.indexes_optimised:
                 self.logger.debug('restoring to normal and flushing index: %s'%index_name)
-                self.es.indices.flush(index_name,
-                                      wait_if_ongoing=True)
+
+                #flush elasticsearch to ensure all transactions are written to index
+                self.es.indices.flush(index_name, wait_if_ongoing=True)
+
+                #reduce elasticsearch to a single "segment" in each shard
+                #https://www.elastic.co/blog/found-elasticsearch-from-the-bottom-up#index-segments
+                self.es.indices.forcemerge(index=index_name, max_num_segments=1)
+
+                #set the indexes back to wha they were before
                 self.es.indices.put_settings(index=index_name,
-                                             body=self.indexes_optimised[index_name]['settings_to_restore'])
-                self.optimize_index(index_name)
+                    body=self.indexes_optimised[index_name]['settings_to_restore'])
+
 
 
     def _safe_create_index(self, index_name, body={}, ignore=400):
@@ -239,25 +217,21 @@ class Loader():
                 except ValueError as e:
                     self.logger.exception("elasticsearch settings error")
 
-    def create_new_index(self, index_name, recreate = False):
+    def create_new_index(self, index_name):
         if not self.dry_run:
             index_name = self.get_versioned_index(index_name)
             if self.es.indices.exists(index_name):
-                if recreate:
-                    res = self.es.indices.delete(index_name)
-                    if not self._check_is_aknowledge(res):
-                        raise ValueError(
-                            'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
-                    time.sleep(0.5)#wait for the index to be deleted
-                    try:
-                        self.es.indices.flush(index_name,  wait_if_ongoing =True)
-                    except NotFoundError:
-                        pass
-                    self.logger.debug("%s index deleted: %s" %(index_name, str(res)))
+                res = self.es.indices.delete(index_name)
+                if not self._check_is_aknowledge(res):
+                    raise ValueError(
+                        'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
+                time.sleep(0.5)#wait for the index to be deleted
+                try:
+                    self.es.indices.flush(index_name,  wait_if_ongoing =True)
+                except NotFoundError:
+                    pass
+                self.logger.debug("%s index deleted: %s" %(index_name, str(res)))
 
-                else:
-                    self.logger.info("%s index already existing" % index_name)
-                    return
 
             index_created = False
             for index_root,mapping in ElasticSearchConfiguration.INDEX_MAPPPINGS.items():
@@ -277,13 +251,6 @@ class Loader():
             if index_root in index_name:
                 return True
         return False
-
-    def optimize_index(self, index_name):
-        if not self.dry_run:
-            try:
-                self.es.indices.optimize(index=index_name, max_num_segments=5, wait_for_merge = False)
-            except:
-                self.logger.warn('optimisation of index %s failed'%index_name)
 
     def _check_is_aknowledge(self, res):
         return (u'acknowledged' in res) and (res[u'acknowledged'] == True)

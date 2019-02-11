@@ -11,9 +11,7 @@ networkx
 
 requests
 
-ujson
 
-SPARQLWrapper>=1.7.6
 jsonpickle
 simplejson
 
@@ -24,9 +22,9 @@ opentargets-validator>=0.4.0
 opentargets-ontologyutils>=1.1.0
 
 numpy
-scipy
 
 #used by data driven relations
+scipy
 scikit-learn
 
 biopython
@@ -34,11 +32,9 @@ petl
 
 pyfunctional
 requests-file
-toolz
 pypeln<=0.1.6
 
 rdflib
-colorama
 psutil
 pylru
 yapsy

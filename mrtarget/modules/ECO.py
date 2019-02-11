@@ -46,9 +46,9 @@ class EcoProcess():
         self.eco_uri = eco_uri
         self.so_uri = so_uri
 
-    def process_all(self):
+    def process_all(self, dry_run):
         self._process_ontology_data()
-        self._store_eco()
+        self._store_eco(dry_run)
 
     def _process_ontology_data(self):
         opentargets_ontologyutils.eco_so.load_evidence_classes(self.evidence_ontology, 
@@ -64,13 +64,27 @@ class EcoProcess():
             id = self.evidence_ontology.classes_paths[uri]['ids'][0][-1]
             self.ecos[id] = eco
 
-    def _store_eco(self):
+    def _store_eco(self, dry_run):
+
+        #setup elasticsearch
+        if not dry_run:
+            self.loader.create_new_index(Const.ELASTICSEARCH_ECO_INDEX_NAME)
+            #need to directly get the versioned index name for this function
+            self.loader.prepare_for_bulk_indexing(
+                self.loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME))
+
         for eco_id, eco_obj in self.ecos.items():
-            self.loader.put(index_name=Const.ELASTICSEARCH_ECO_INDEX_NAME,
-                            doc_type=Const.ELASTICSEARCH_ECO_DOC_NAME,
-                            ID=eco_id,
-                            body=eco_obj)
-        self.loader.flush_all_and_wait(Const.ELASTICSEARCH_ECO_INDEX_NAME)
+            if not dry_run:
+                self.loader.put(index_name=Const.ELASTICSEARCH_ECO_INDEX_NAME,
+                    doc_type=Const.ELASTICSEARCH_ECO_DOC_NAME,
+                    ID=eco_id, body=eco_obj)
+
+        #cleanup elasticsearch
+        if not dry_run:
+            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_ECO_INDEX_NAME)
+            #restore old pre-load settings
+            #note this automatically does all prepared indexes
+            self.loader.restore_after_bulk_indexing()
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
