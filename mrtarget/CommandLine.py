@@ -8,7 +8,6 @@ import os.path
 import itertools
 
 from mrtarget.modules.Evidences import process_evidences_pipeline
-from mrtarget.common.Redis import enable_profiling
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import RedisManager, new_es_client, new_redis_client
@@ -61,7 +60,7 @@ def main():
         Config.RELEASE_VERSION = args.release_tag
         logger.info('setting release version %s' % Config.RELEASE_VERSION)
 
-    enable_profiling(args.profile)
+
 
     
     
@@ -168,7 +167,10 @@ def main():
                     process.process_all(data_config.scoring_weights, 
                         data_config.is_direct_do_not_propagate,
                         data_config.datasources_to_datatypes,
-                        dry_run=args.dry_run)
+                        args.dry_run,
+                        args.as_workers_production,
+                        args.as_workers_score,
+                        args.as_queue_production_score)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
                     pass
@@ -176,7 +178,11 @@ def main():
             if args.ddr:
                 process = DataDrivenRelationProcess(es)
                 if not args.qc_only:
-                    process.process_all(dry_run = args.dry_run)
+                    process.process_all(args.dry_run,
+                        args.ddr_workers_production,
+                        args.ddr_workers_score,
+                        args.ddr_queue_production_score,
+                        args.ddr_queue_score_result)
                 #TODO qc
 
             if args.sea:
@@ -188,9 +194,7 @@ def main():
                         data_config.chembl_component, 
                         data_config.chembl_protein, 
                         data_config.chembl_molecule_set_uri_pattern,
-                        dry_run = args.dry_run,
-                        skip_targets=args.skip_targets, 
-                        skip_diseases=args.skip_diseases)
+                        args.dry_run)
                 #TODO qc
 
             if args.metric:
