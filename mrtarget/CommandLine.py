@@ -138,8 +138,7 @@ def main():
 
             if args.val:
                 es_output_folder = None
-                if "elasticsearch_folder" in vars(args) 
-                        and args.elasticsearch_folder is not None:
+                if "elasticsearch_folder" in vars(args) and args.elasticsearch_folder is not None:
                     es_output_folder = args.elasticsearch_folder
 
                 process_evidences_pipeline(filenames=data_config.input_file,
