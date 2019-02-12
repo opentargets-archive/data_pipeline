@@ -458,7 +458,8 @@ class ScoringProcess():
         self.r_server = new_redis_client(self.redis_host, self.redis_port)
 
     def process_all(self, scoring_weights, is_direct_do_not_propagate,
-            datasources_to_datatypes, dry_run):
+            datasources_to_datatypes, dry_run, 
+            num_workers_produce, num_workers_score, max_queued_produce_to_score):
 
         lookup_data = LookUpDataRetriever(self.es, self.r_server,
             targets=[],
@@ -486,24 +487,20 @@ class ScoringProcess():
             self.es_hosts, self.redis_host, self.redis_port,
             lookup_data, datasources_to_datatypes, dry_run)
         
-        #TODO move this config into external config
-        num_workers_produce = 4
-        num_workers_score = 4
-        max_queued_produce_to_score = 10
-        max_queued_score_out = 10
+        #this doesn't need to be in the external config, since its so content light
+        #as to be meaningless
+        max_queued_score_out = 10000
 
         #pipeline stage for making the lists of the target/disease pairs and evidence
-        pipeline_stage = pr.map(produce_evidence, targets, 
+        pipeline_stage = pr.flat_map(produce_evidence, targets, 
             workers=num_workers_produce,
             maxsize=max_queued_produce_to_score,
             on_start=produce_evidence_local_init_baked, 
             on_done=produce_evidence_local_shutdown)
 
-        #flatten the evidence producing collections between the stages
-        target_disease_pairs = itertools.chain.from_iterable(pr.to_iterable(pipeline_stage))
-
         #pipeline stage for scoring the evidence sets
-        pipeline_stage = pr.map(score_producer, target_disease_pairs, 
+        #includes writing to elasticsearch
+        pipeline_stage = pr.map(score_producer, pr.to_iterable(pipeline_stage), 
             workers=num_workers_score,
             maxsize=max_queued_score_out,
             on_start=score_producer_local_init_baked, 

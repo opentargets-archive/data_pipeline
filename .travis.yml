@@ -21,7 +21,7 @@ install:
   - pipdeptree
 script:
   - mkdir log
-  - export DATA_CONFIG=mrtarget.data.yml && export ES_PREFIX=master && make dry_run 
+  - export DATA_CONFIG="https://storage.googleapis.com/open-targets-data-releases/19.02/input/mrtarget.data-2019-02-05.v3.yml" && make help dry_run 
   - pytest --cov=mrtarget --cov-report term tests/ --fulltrace
 notifications:
   email:

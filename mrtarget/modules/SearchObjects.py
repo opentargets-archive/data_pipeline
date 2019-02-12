@@ -190,9 +190,7 @@ class SearchObjectProcess(object):
             chembl_component_uri, 
             chembl_protein_uri, 
             chembl_molecule_set_uri_pattern,
-            dry_run=False, 
-            skip_targets=False, 
-            skip_diseases=False):
+            dry_run):
         ''' process all the objects that needs to be returned by the search method
         :return:
         '''
@@ -221,19 +219,17 @@ class SearchObjectProcess(object):
                 self.loader.get_versioned_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME))
 
         #process targets
-        if not skip_targets:
-            '''get gene simplified objects and push them to the processing queue'''
-            for i,target in enumerate(self.esquery.get_all_targets()):
-                target[SearchObjectTypes.__ROOT__] = SearchObjectTypes.TARGET
-                self.handle_search_object(target, dry_run)
+        '''get gene simplified objects and push them to the processing queue'''
+        for i,target in enumerate(self.esquery.get_all_targets()):
+            target[SearchObjectTypes.__ROOT__] = SearchObjectTypes.TARGET
+            self.handle_search_object(target, dry_run)
 
         #process diseases
-        if not skip_diseases:
-            '''get disease objects  and push them to the processing queue'''
-            self.logger.info('get disease objects and push them to the processing queue')
-            for i,disease in enumerate(self.esquery.get_all_diseases()):
-                disease[SearchObjectTypes.__ROOT__] = SearchObjectTypes.DISEASE
-                self.handle_search_object(disease, dry_run)
+        '''get disease objects  and push them to the processing queue'''
+        self.logger.info('get disease objects and push them to the processing queue')
+        for i,disease in enumerate(self.esquery.get_all_diseases()):
+            disease[SearchObjectTypes.__ROOT__] = SearchObjectTypes.DISEASE
+            self.handle_search_object(disease, dry_run)
 
         #cleanup elasticsearch
         if not dry_run:

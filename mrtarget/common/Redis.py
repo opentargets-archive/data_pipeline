@@ -39,11 +39,6 @@ def timeout_handler(signum, frame):
 
 signal.signal(signal.SIGALRM, timeout_handler)
 
-_redis_queue_worker_base = {'profiling': False}
-
-def enable_profiling(enable=True):
-    _redis_queue_worker_base['profiling'] = enable
-
 def millify(n):
     try:
         n = float(n)
