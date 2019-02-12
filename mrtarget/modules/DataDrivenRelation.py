@@ -148,24 +148,23 @@ class OverlapDistance(object):
 Consumes the iterable passed in and loads into into provided loader
 whilst also respecting the dry run flag given
 """
-def store_in_elasticsearch(iterable, loader, dry_run):
-    for r in iterable:
-        #ensure its not null
-        if r:
+def store_in_elasticsearch(r, loader, dry_run):
+    #ensure its not null
+    if r:
+        if not dry_run:
+            loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
+                Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
+                r.id, r.to_json())
+        subj = copy(r.subject)
+        obj = copy(r.object)
+        if subj['id'] != obj['id']:
+            r.subject = obj
+            r.object = subj
+            r.set_id()
             if not dry_run:
                 loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
                     Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
                     r.id, r.to_json())
-            subj = copy(r.subject)
-            obj = copy(r.object)
-            if subj['id'] != obj['id']:
-                r.subject = obj
-                r.object = subj
-                r.set_id()
-                if not dry_run:
-                    loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
-                        Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
-                        r.id, r.to_json())
 
 def digest_in_buckets(v, buckets_number):
     digested =set()
@@ -228,22 +227,21 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
         type, subject_labels, subject_ids, other_ids, threshold, idf, idf_)
 
     #create stage for producing disease-to-disease
-    pipeline_stage = pr.map(produce_pairs, range(len(subject_ids)), 
+    pipeline_stage = pr.flat_map(produce_pairs, range(len(subject_ids)), 
         workers=workers_production,
         maxsize=queue_production_score,
         on_start=produce_pairs_local_init_baked)
 
-    #flatten the evidence producing collections between the stages
-    subject_pairs = itertools.chain.from_iterable(pr.to_iterable(pipeline_stage))
-
     #create stage to calculate disease-to-disease
-    pipeline_stage = pr.map(calculate_pair, subject_pairs, 
+    pipeline_stage = pr.map(calculate_pair, pipeline_stage, 
         workers=workers_score,
         maxsize=queue_score_result,
         on_start=calculate_pairs_local_init_baked)
 
     #store in elasticsearch
-    store_in_elasticsearch(pr.to_iterable(pipeline_stage), loader, dry_run)
+    #this could be multi process, but just use a single for now
+    for r in pipeline_stage:
+        store_in_elasticsearch(r, loader, dry_run)
 
 """
 Function to run in child processess

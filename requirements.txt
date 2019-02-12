@@ -36,7 +36,6 @@ pypeln<=0.1.6
 
 rdflib
 psutil
-pylru
 yapsy
 lxml
 more-itertools
