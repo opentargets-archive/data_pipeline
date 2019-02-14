@@ -161,10 +161,10 @@ def store_in_elasticsearch(r, loader, dry_run):
             r.subject = obj
             r.object = subj
             r.set_id()
-            if not dry_run:
-                loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
-                    Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
-                    r.id, r.to_json())
+        if not dry_run:
+            loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
+                Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
+                r.id, r.to_json())
 
 def digest_in_buckets(v, buckets_number):
     digested =set()
