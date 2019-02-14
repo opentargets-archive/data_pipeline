@@ -35,7 +35,6 @@ requests-file
 pypeln<=0.1.6
 
 rdflib
-psutil
 yapsy
 lxml
 more-itertools
