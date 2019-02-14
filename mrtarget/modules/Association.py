@@ -19,7 +19,6 @@ from mrtarget.common.EvidenceString import Evidence, ExtendedInfoGene, ExtendedI
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 
-import pylru as lru
 import pypeln.process as pr
 
 
@@ -352,15 +351,13 @@ def score_producer_local_init(es_hosts, redis_host, redis_port,
     r_server = new_redis_client(redis_host, redis_port)
 
     scorer = Scorer()
-    
-    lru_cache = lru.lrucache(10000)
 
     loader = Loader(new_es_client(es_hosts))
 
-    return scorer, loader, r_server, lru_cache, lookup_data, datasources_to_datatypes, dry_run
+    return scorer, loader, r_server, lookup_data, datasources_to_datatypes, dry_run
 
 def score_producer(data, 
-        scorer, loader, r_server, lru_cache, lookup_data, datasources_to_datatypes, dry_run):
+        scorer, loader, r_server, lookup_data, datasources_to_datatypes, dry_run):
     target, disease, evidence, is_direct = data
 
     logger = logging.getLogger(__name__)
@@ -368,54 +365,42 @@ def score_producer(data,
     if evidence:
         score = scorer.score(target, disease, evidence, is_direct, 
             datasources_to_datatypes)
-        if score: # skip associations only with data with score 0
+        # skip associations only with data with score 0
+        if score: 
 
-            # look for the gene in the lru cache
-            gene_data = None
-            hpa_data = None
-            if target in lru_cache:
-                gene_data, hpa_data = lru_cache[target]
+            gene_data = Gene()
+            try:
+                gene_data.load_json(
+                    lookup_data.available_genes.get_gene(target, r_server))
 
-            if not gene_data:
-                gene_data = Gene()
-                try:
-                    gene_data.load_json(
-                        lookup_data.available_genes.get_gene(target, r_server))
-
-                except KeyError as e:
-                    logger.debug('Cannot find gene code "%s" '
-                                        'in lookup table' % target)
-                    logger.exception(e)
-
+            except KeyError as e:
+                logger.debug('Cannot find gene code "%s" '
+                                    'in lookup table' % target)
+                raise e
             score.set_target_data(gene_data)
 
             # create a hpa expression empty jsonserializable class
             # to fill from Redis cache lookup_data
-            if not hpa_data:
-                hpa_data = HPAExpression()
-                try:
-                    hpa_data.update(
-                        lookup_data.available_hpa.get_hpa(target, r_server))
-                except KeyError:
-                    pass
-                except Exception as e:
-                    logger.exception(e)
-
-                # set everything in the lru_cache
-                lru_cache[target] = (gene_data, hpa_data)
-
+            hpa_data = HPAExpression()
+            try:
+                hpa_data.update(
+                    lookup_data.available_hpa.get_hpa(target, r_server))
+            except KeyError:
+                pass
+            except Exception as e:
+                raise e
             try:
                 score.set_hpa_data(hpa_data)
             except KeyError:
                 pass
             except Exception as e:
-                logger.exception(e)
+                raise e
+
 
             disease_data = EFO()
             try:
                 disease_data.load_json(
                     lookup_data.available_efos.get_efo(disease, r_server))
-
             except KeyError as e:
                 logger.debug('Cannot find EFO code "%s" '
                                     'in lookup table' % disease)
@@ -433,10 +418,8 @@ def score_producer(data,
         else:
             logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
 
-    return True
-
 def score_producer_local_shutdown(status, 
-        scorer, loader, r_server, lru_cache, lookup_data, datasources_to_datatypes, dry_run):
+        scorer, loader, r_server, lookup_data, datasources_to_datatypes, dry_run):
 
     #cleanup elasticsearch
     if not dry_run:
@@ -500,15 +483,17 @@ class ScoringProcess():
 
         #pipeline stage for scoring the evidence sets
         #includes writing to elasticsearch
-        pipeline_stage = pr.map(score_producer, pr.to_iterable(pipeline_stage), 
+        pipeline_stage = pr.each(score_producer, pipeline_stage, 
             workers=num_workers_score,
             maxsize=max_queued_score_out,
             on_start=score_producer_local_init_baked, 
             on_done=score_producer_local_shutdown)
 
+
         #loop over the end of the pipeline to make sure everything is finished
-        for result in pr.to_iterable(pipeline_stage):
-            pass
+        self.logger.info('stages created, running scoring and writing')
+        pr.run(pipeline_stage)
+        self.logger.info('stages created, ran scoring and writing')
 
         #cleanup elasticsearch
         if not dry_run:
@@ -517,6 +502,7 @@ class ScoringProcess():
             #restore old pre-load settings
             #note this automatically does all prepared indexes
             self.es_loader.restore_after_bulk_indexing()
+            self.logger.info('flushed data to index')
 
         self.logger.info("DONE")
 

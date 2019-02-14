@@ -4,7 +4,6 @@
 import base64
 import simplejson as json
 from collections import Counter
-import pylru as lru
 
 import jsonpickle
 from mrtarget.common import require_all

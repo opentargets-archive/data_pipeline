@@ -69,15 +69,13 @@ def elasticsearch_main(line, es_loader):
         #valid
         es_loader.put(body=right['line'], ID=right['hash'],
             index_name=Const.ELASTICSEARCH_DATA_INDEX_NAME,
-            doc_type=Const.ELASTICSEARCH_DATA_DOC_NAME,
-            create_index=False)
+            doc_type=Const.ELASTICSEARCH_DATA_DOC_NAME)
         return (0,1)
     elif left is not None:
         #invalid
         es_loader.put(body=serialise_object_to_json(left), ID=left['id'],
             index_name=Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME,
-            doc_type=Const.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME,
-            create_index=False)
+            doc_type=Const.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME)
         return (1,0)
 
 
