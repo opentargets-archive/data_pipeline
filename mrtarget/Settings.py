@@ -93,13 +93,6 @@ class Config():
 
     RELEASE_VERSION = read_option('CTTV_DATA_VERSION', default='')    
 
-    # setup the number of workers to use for data processing. if None defaults
-    # to the number of CPUs available
-    WORKERS_NUMBER = read_option('WORKERS_NUMBER',cast=int,
-                                 default=mp.cpu_count())
-
-    UNIQUE_RUN_ID = str(uuid.uuid4()).replace('-', '')[:16]
-
     # This config file is like this and no prefixes or version will be
     # appended
     #
