@@ -1,7 +1,6 @@
 import functools
 import logging
 
-import requests
 import itertools
 import shelve
 import dumbdbm
@@ -46,6 +45,9 @@ class ChEMBLLookup(object):
 
 
     def populate_molecules_dict(self):
+        self._logger.info('ChEMBL getting Molecule from ' + self.molecule_set_uri_pattern)
+        # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
+        # dumbdbm creates an empty database file. In this way shelve can open it properly.
         t_filename = tempfile.NamedTemporaryFile(delete=False).name
         dumb_dict = dumbdbm.open(t_filename)
         shelve_out = shelve.Shelf(dict=dumb_dict)
@@ -53,6 +55,8 @@ class ChEMBLLookup(object):
             for line in f_obj:
                 mol = json.loads(line)
                 shelve_out[str(mol["molecule_chembl_id"])] = mol
+
+        self._logger.info('ChEMBL Molecule loading done. ')
         return shelve_out
 
 
