@@ -40,7 +40,7 @@ after_success:
   - docker tag "${QUAY_REPO}" "${QUAY_REPO}:${git_sha}-${TRAVIS_BRANCH}"
   #only push non-PRs
   - |
-    if ["${TRAVIS_PULL_REQUEST}" = "false"]; then
+    if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then
       docker push "${QUAY_REPO}:${TRAVIS_BRANCH}" && docker push "${QUAY_REPO}:${git_sha}-${TRAVIS_BRANCH}"
       if [ "${TRAVIS_BRANCH}" = "master" ]; then
         docker tag "${QUAY_REPO}:${TRAVIS_BRANCH}" "${QUAY_REPO}:latest"
