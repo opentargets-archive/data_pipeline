@@ -4,6 +4,7 @@ from mrtarget.common import URLZSource
 import traceback
 import logging
 import csv
+import configargparse
 logging.basicConfig(level=logging.DEBUG)
 
 class ChemicalProbes(IPlugin):
@@ -21,14 +22,15 @@ class ChemicalProbes(IPlugin):
     def print_name(self):
         self._logger.info("Chemical Probes plugin")
 
-    def merge_data(self, genes, loader, r_server):
+    def merge_data(self, genes, loader, r_server, data_config):
 
         self.loader = loader
         self.r_server = r_server
 
         try:
             # Parse chemical probes data into self.chemicalprobes
-            self.build_json(filename1=Config.CHEMICALPROBES_FILENAME1, filename2=Config.CHEMICALPROBES_FILENAME2)
+            self.build_json(filename1=data_config.chemical_probes_1, 
+                filename2=data_config.chemical_probes_2)
 
             # Iterate through all genes and add chemical probes data if gene symbol is present
             self._logger.info("Generating Chemical Probes data injection")
@@ -41,7 +43,7 @@ class ChemicalProbes(IPlugin):
             self._logger.exception(str(ex), exc_info=1)
             raise ex
 
-    def build_json(self, filename1=Config.CHEMICALPROBES_FILENAME1, filename2=Config.CHEMICALPROBES_FILENAME2):
+    def build_json(self, filename1, filename2):
         # *** Work through manually curated chemical probes from the different portals ***
         # chemicalprobes column names are Probe, Target, SGClink, CPPlink, OSPlink, Note
         with URLZSource(filename1).open() as r_file:

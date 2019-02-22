@@ -1,7 +1,7 @@
 import unittest
 
 from mrtarget.common.Scoring import HarmonicSumScorer
-from mrtarget.modules.EvidenceString import DataNormaliser, Evidence
+from mrtarget.common.EvidenceString import DataNormaliser, Evidence
 
 
 class HarmonicSumTestCase(unittest.TestCase):

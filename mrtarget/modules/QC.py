@@ -6,7 +6,7 @@ from numbers import Number
 
 
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 class QCRunner(object):
 
@@ -22,7 +22,7 @@ class QCRunner(object):
     def run_evidence2associationQC(self):
         computed_assocations_ids = set(self.esquery.get_all_associations_ids())
         missing_assocations_ids = set()
-        total_evidence = self.esquery.count_elements_in_index(Config.ELASTICSEARCH_DATA_INDEX_NAME+'*')
+        total_evidence = self.esquery.count_elements_in_index(Const.ELASTICSEARCH_DATA_INDEX_NAME+'*')
         self._logger.info('Starting to analyse %i evidence'%total_evidence)
         for as_id in self.esquery.get_all_target_disease_pair_from_evidence():
             if as_id not in computed_assocations_ids:

@@ -23,7 +23,6 @@ from Bio import Seq
 from Bio import SeqFeature
 from Bio import Alphabet
 from Bio.SeqRecord import SeqRecord
-from Bio._py3k import StringIO
 
 __docformat__ = "restructuredtext en"
 

@@ -20,7 +20,8 @@ install:
   - pip install -e .
   - pipdeptree
 script:
-  - make dry_run
+  - mkdir log
+  - export DATA_CONFIG="https://storage.googleapis.com/open-targets-data-releases/19.02/input/mrtarget.data-2019-02-05.v3.yml" && make help dry_run 
   - pytest --cov=mrtarget --cov-report term tests/ --fulltrace
 notifications:
   email:
@@ -31,25 +32,18 @@ notifications:
 after_success:
   - codecov
   - docker pull "${QUAY_REPO}:${TRAVIS_BRANCH}" || true
+  #pull the previous built image to use as a cache if possible
   - docker build --pull --cache-from "${QUAY_REPO}:${TRAVIS_BRANCH}" --tag "${QUAY_REPO}" .
   - docker login -u="${QUAY_USER}" -p="${QUAY_PASSWORD}" quay.io
-#   - git_sha="$(git rev-parse --short HEAD)" # removed since travis provides a better one to use
   - git_sha="${TRAVIS_COMMIT}"
   - docker tag "${QUAY_REPO}" "${QUAY_REPO}:${TRAVIS_BRANCH}"
   - docker tag "${QUAY_REPO}" "${QUAY_REPO}:${git_sha}-${TRAVIS_BRANCH}"
-  - docker push "${QUAY_REPO}:${TRAVIS_BRANCH}" && docker push "${QUAY_REPO}:${git_sha}-${TRAVIS_BRANCH}"
+  #only push non-PRs
   - |
-    if [ "${TRAVIS_BRANCH}" = "master" ]; then
-      docker tag "${QUAY_REPO}:${TRAVIS_BRANCH}" "${QUAY_REPO}:latest"
-      docker push "${QUAY_REPO}:latest"
+    if [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then
+      docker push "${QUAY_REPO}:${TRAVIS_BRANCH}" && docker push "${QUAY_REPO}:${git_sha}-${TRAVIS_BRANCH}"
+      if [ "${TRAVIS_BRANCH}" = "master" ]; then
+        docker tag "${QUAY_REPO}:${TRAVIS_BRANCH}" "${QUAY_REPO}:latest"
+        docker push "${QUAY_REPO}:latest"
+      fi
     fi
-#  - if [ ! -d "google-cloud-sdk/bin" ]; then rm -rf "google-cloud-sdk"; curl 'https://sdk.cloud.google.com' | bash; fi
-#  - source google-cloud-sdk/path.bash.inc
-#  - gcloud version
-#  - gcloud --quiet components update
-#  - echo $GCLOUD_KEY | base64 --decode > gcloud.p12
-#  - gcloud auth activate-service-account $GCLOUD_EMAIL --key-file gcloud.p12
-#  - ssh-keygen -f ~/.ssh/google_compute_engine -N ""
-#  # Push to Google container registry
-#  - docker build -t gcr.io/$CLOUDSDK_CORE_PROJECT/$CLOUDSDK_CORE_PROJECT:v1 .
-#  - gcloud docker push gcr.io/$CLOUDSDK_CORE_PROJECT/$CLOUDSDK_CORE_PROJECT:v1 > /dev/null

@@ -5,6 +5,7 @@ import re
 import traceback
 import logging
 import csv
+import configargparse
 logging.basicConfig(level=logging.DEBUG)
 
 class Hallmarks(IPlugin):
@@ -32,14 +33,13 @@ class Hallmarks(IPlugin):
     def print_name(self):
         self._logger.info("Hallmarks of cancer gene data plugin")
 
-    def merge_data(self, genes, loader, r_server):
-
+    def merge_data(self, genes, loader, r_server, data_config):
         self.loader = loader
         self.r_server = r_server
 
         try:
 
-            self.build_json(filename=Config.HALLMARK_FILENAME)
+            self.build_json(filename=data_config.hallmark)
 
             for gene_id, gene in genes.iterate():
                 ''' extend gene with related Hallmark data '''
@@ -53,7 +53,7 @@ class Hallmarks(IPlugin):
             self._logger.error('Error %s' % ex)
             raise ex
 
-    def build_json(self, filename=Config.HALLMARK_FILENAME):
+    def build_json(self, filename):
         # Just for reference: column names are: "ID_CENSUS_ANNOT", "ID_CENSUS", "ID_GENE", "GENE_NAME", "CELL_TYPE",
         # "PUBMED_PMID", "ID_DATA_CATEGORY", "DESCRIPTION", "DISPLAY", "SHORT", "CELL_LINE", "DESCRIPTION_1")
         with URLZSource(filename).open() as r_file:

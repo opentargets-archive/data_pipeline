@@ -1,7 +1,7 @@
 import logging
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
-from mrtarget.Settings import Config
+from mrtarget.constants import Const
 
 class HPALookUpTable(object):
     """
@@ -101,8 +101,8 @@ class GeneLookUpTable(object):
         except KeyError:
             try:
                 target = self._es_query.get_objects_by_id(target_id,
-                                                          Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                                          Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+                                                          Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                                          Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                                                           source_exclude='ortholog.*'
                                                           ).next()
             except Exception as e:
@@ -122,8 +122,8 @@ class GeneLookUpTable(object):
         if redis_contain:
             return True
         if not redis_contain:
-            return self._es_query.exists(index=Config.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                         doc_type=Config.ELASTICSEARCH_GENE_NAME_DOC_NAME,
+            return self._es_query.exists(index=Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
+                                         doc_type=Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
                                          id=key,
                                          )
 

@@ -8,13 +8,17 @@ import logging
 import tempfile as tmp
 import requests as r
 import requests_file
+import os
 
 _l = logging.getLogger(__name__)
 
 
 def urllify(string_name):
     """return a file:// urlified simple path to a file:// is :// is not contained in it"""
-    return string_name if '://' in string_name else 'file://' + string_name
+    if '://' in string_name:
+        return string_name
+    else:
+        return 'file://'+os.path.abspath(string_name)
 
 
 class URLZSource(object):

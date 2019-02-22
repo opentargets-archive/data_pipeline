@@ -1,5 +1,6 @@
 from mrtarget.common.Redis import RedisLookupTable, RedisLookupTableJson, RedisLookupTablePickle
 import unittest
+from mrtarget.common.connection import RedisManager, new_redis_client
 
 
 class PicklableObject(object):
@@ -11,26 +12,32 @@ class PicklableObject(object):
 class LookupTableTestCase(unittest.TestCase):
 
     def test_base_lookup(self):
-        table = RedisLookupTable()
+        with RedisManager(False, "localhost", 35000):
+            r_server = new_redis_client("localhost", 35000)
+            table = RedisLookupTable(r_server=r_server)
 
-        test = 'this is a string test that does not need to be serialized'
-        key = 'test_key'
-        table.set(key, test)
-        self.assertEquals(table.get(key), test)
+            test = 'this is a string test that does not need to be serialized'
+            key = 'test_key'
+            table.set(key, test)
+            self.assertEquals(table.get(key), test)
 
 
     def test_json_lookup(self):
-        table = RedisLookupTableJson()
+        with RedisManager(False, "localhost", 35000):
+            r_server = new_redis_client("localhost", 35000)
+            table = RedisLookupTableJson(r_server=r_server)
 
-        test = {'json test':'this is a test object that can be serialized to json'}
-        key = 'test_key'
-        table.set(key, test)
-        self.assertEquals(table.get(key), test)
+            test = {'json test':'this is a test object that can be serialized to json'}
+            key = 'test_key'
+            table.set(key, test)
+            self.assertEquals(table.get(key), test)
 
     def test_pickle_lookup(self):
-        table = RedisLookupTablePickle()
+        with RedisManager(False, "localhost", 35000):
+            r_server = new_redis_client("localhost", 35000)
+            table = RedisLookupTablePickle(r_server=r_server)
 
-        test = PicklableObject()
-        key = 'test_key'
-        table.set(key, test)
-        self.assertEquals(table.get(key), test)
+            test = PicklableObject()
+            key = 'test_key'
+            table.set(key, test)
+            self.assertEquals(table.get(key), test)

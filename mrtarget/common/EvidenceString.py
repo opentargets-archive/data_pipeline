@@ -6,6 +6,7 @@ import math
 import csv
 
 from mrtarget.Settings import Config, file_or_resource
+from mrtarget.constants import Const
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.IO import check_to_open, URLZSource
 from mrtarget.modules import GeneData
@@ -129,16 +130,19 @@ class ExtendedInfoECO(ExtendedInfo):
 
 
 class EvidenceManager():
-    def __init__(self, lookup_data):
+    def __init__(self, lookup_data, eco_scores_uri, excluded_biotypes, datasources_to_datatypes):
         self.logger = logging.getLogger(__name__)
         self.available_genes = lookup_data.available_genes
         self.available_efos = lookup_data.available_efos
         self.available_ecos = lookup_data.available_ecos
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
-        self._get_eco_scoring_values(eco_lut_obj=self.available_ecos)
+        self._get_eco_scoring_values(self.available_ecos, eco_scores_uri)
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
+
+        self.excluded_biotypes = excluded_biotypes
+        self.datasources_to_datatypes = datasources_to_datatypes
 
         self._get_score_modifiers()
 
@@ -261,7 +265,7 @@ class EvidenceManager():
             self.logger.warning("No valid ECO could be found in evidence: %s. original ECO mapping: %s" % (
                 evidence['id'], str(eco_ids)[:100]))
 
-        return Evidence(evidence), fixed
+        return Evidence(evidence,self.datasources_to_datatypes), fixed
 
     @staticmethod
     def normalise_target_id(evidence, uni2ens, available_genes,non_reference_genes ):
@@ -294,9 +298,9 @@ class EvidenceManager():
 
     def is_excluded_by_biotype(self, datasource, gene_id):
         is_excluded = False
-        if datasource in Config.EXCLUDED_BIOTYPES_BY_DATASOURCE:
+        if datasource in self.excluded_biotypes:
             gene_obj = self.available_genes[gene_id]
-            if gene_obj['biotype'] in Config.EXCLUDED_BIOTYPES_BY_DATASOURCE[datasource]:
+            if gene_obj['biotype'] in self.excluded_biotypes[datasource]:
                 is_excluded = True
 
         return is_excluded
@@ -496,7 +500,7 @@ class EvidenceManager():
         if target_class['level1']:
             extended_evidence['private']['facets']['target_class'] = target_class
 
-        return Evidence(extended_evidence)
+        return Evidence(extended_evidence, self.datasources_to_datatypes)
 
     def _get_gene_obj(self, geneid):
         gene = Gene(geneid)
@@ -544,17 +548,18 @@ class EvidenceManager():
             ensemblid = EvidenceManager._map_to_reference_ensembl_gene(ensemblid, non_reference_genes) or ensemblid
         return ensemblid
 
-    def _get_eco_scoring_values(self, eco_lut_obj):
-        self.eco_scores = load_eco_scores_table(filename=Config.ECO_SCORES_URL, eco_lut_obj=eco_lut_obj)
+    def _get_eco_scoring_values(self, eco_lut_obj, eco_scores_uri):
+        self.eco_scores = load_eco_scores_table(
+            filename=eco_scores_uri, 
+            eco_lut_obj=eco_lut_obj)
 
+    #TODO remove this
     def _get_score_modifiers(self):
         self.score_modifiers = {}
-        for datasource, values in Config.DATASOURCE_EVIDENCE_SCORE_AUTO_EXTEND_RANGE.items():
-            self.score_modifiers[datasource] = DataNormaliser(values['min'], values['max'])
 
 
 class Evidence(JSONSerializable):
-    def __init__(self, evidence, datasource=""):
+    def __init__(self, evidence, datasources_to_datatypes):
         self.logger = logging.getLogger(__name__)
         if isinstance(evidence, str) or isinstance(evidence, unicode):
             self.load_json(evidence)
@@ -563,29 +568,16 @@ class Evidence(JSONSerializable):
         else:
             raise AttributeError(
                 "the evidence should be a dict or a json string to parse, not a " + str(type(evidence)))
-        self.datasource = self.evidence['sourceID'] or datasource
-        self._set_datatype()
-
-    def _set_datatype(self, ):
-
-        # if 'type' in self.evidence:
-        #     self.datatype = self.evidence['type']
-        # else:
-        translate_database = Config.DATASOURCE_TO_DATATYPE_MAPPING
-        try:
-            self.database = self.evidence['sourceID'].lower()
-        except KeyError:
-            self.database = self.datasource.lower()
-        self.datatype = translate_database[self.database]
+        self.datasource = self.evidence['sourceID']
+        self.datatype = datasources_to_datatypes[self.datasource]
 
     def get_doc_name(self):
-        return Config.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.database
+        return Const.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.datasource.lower()
 
     def get_id(self):
         return self.evidence['id']
 
     def to_json(self):
-        # self.stamp_data_release()
         return json.dumps(self.evidence,
                           sort_keys=True,
                           # indent=4,
@@ -695,22 +687,6 @@ class Evidence(JSONSerializable):
         except Exception as e:
             self.logger.error(
                 "Cannot score evidence %s of type %s. Error: %s" % (self.evidence['id'], self.evidence['type'], e))
-
-        # Check for minimum score
-        if self.evidence['scores']['association_score'] < Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]:
-            raise AttributeError(
-                "Evidence String datasource:%s rejected since score is too low: %s. score: %f, min score: %f" % (
-                    self.evidence['sourceID'], self.get_id(), self.evidence['scores']['association_score'],
-                    Config.SCORING_MIN_VALUE_FILTER[self.evidence['sourceID']]))
-
-
-        # Modify scores according to weights
-        datasource_weight = Config.DATASOURCE_EVIDENCE_SCORE_WEIGHT.get(self.evidence['sourceID'], 1.)
-        if datasource_weight != 1:
-            weighted_score = self.evidence['scores']['association_score'] * datasource_weight
-            if weighted_score > 1:
-                weighted_score = 1.
-            self.evidence['scores']['association_score'] = weighted_score
 
         # Apply rescaling to scores
         if self.evidence['sourceID'] in modifiers:

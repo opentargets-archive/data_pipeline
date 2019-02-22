@@ -1,16 +1,13 @@
-import json
+import simplejson as json
 import logging
 import more_itertools
-import functional
 
 from mrtarget.common import URLZSource
-from mrtarget.Settings import Config
-
+from mrtarget.constants import Const
 
 class EnsemblProcess(object):
     """
     Load a set of Ensembl genes from a JSON file into Elasticsearch.
-    The file is specifided in Settings.py as Config.ENSEMBL_FILENAME
     It should be generated using the create_genes_dictionary.py script in opentargets/genetics_backend/makeLUTs
     e.g.
     python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38
@@ -19,25 +16,39 @@ class EnsemblProcess(object):
         self.loader = loader
         self.logger = logging.getLogger(__name__)
 
-    def process(self, ensembl_filename):
+    def process(self, ensembl_filename, dry_run):
         def _put_line(line):
-            self.loader.put(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
-                            Config.ELASTICSEARCH_ENSEMBL_DOC_NAME,
-                            line['id'],
-                            json.dumps(line))
             return 1
 
         self.logger.info('Reading Ensembl gene info from %s' % ensembl_filename)
 
-        inserted_lines = functional.seq(more_itertools.with_iter(URLZSource(ensembl_filename).open()))\
-            .map(json.loads)\
-            .map(_put_line)\
-            .len()
+        #setup elasticsearch
+        if not dry_run:
+            self.loader.create_new_index(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
+            #need to directly get the versioned index name for this function
+            self.loader.prepare_for_bulk_indexing(
+                self.loader.get_versioned_index(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME))
+
+        inserted_lines = 0
+        for line in more_itertools.with_iter(URLZSource(ensembl_filename).open()):
+            entry = json.loads(line)
+            #store in elasticsearch if not dry running
+            if not dry_run:
+                self.loader.put(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
+                    Const.ELASTICSEARCH_ENSEMBL_DOC_NAME,
+                    entry['id'], line)
+            inserted_lines += 1
 
         self.logger.info("Read %d lines from %s", inserted_lines, ensembl_filename)
 
         self.logger.info("flush index")
-        self.loader.flush_all_and_wait(Config.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
+
+        #cleanup elasticsearch
+        if not dry_run:
+            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
+            #restore old pre-load settings
+            #note this automatically does all prepared indexes
+            self.loader.restore_after_bulk_indexing()
 
     def qc(self, esquery):
         """
