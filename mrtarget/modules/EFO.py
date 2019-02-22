@@ -148,8 +148,7 @@ class EfoProcess():
             if uri in disease_phenotypes:
                 phenotypes = disease_phenotypes[uri]['phenotypes']
 
-            therapeutic_labels = [item[0] for item in self.disease_ontology.classes_paths[uri]['labels']]
-            therapeutic_labels = self._remove_duplicates(therapeutic_labels)
+            therapeutic_labels = self.disease_ontology.therapeutic_labels[uri]
 
             efo = EFO(code=uri,
                       label=label,
@@ -165,15 +164,6 @@ class EfoProcess():
             if uri in self.disease_ontology.children:
                 efo.children = self.disease_ontology.children[uri]
             self.efos[id] = efo
-
-    def _remove_duplicates(self, xs):
-
-        newlist = []
-
-        for item in xs:
-            if item not in newlist:
-                newlist.append(item)
-        return newlist
 
     def _store_efo(self, dry_run):
 
