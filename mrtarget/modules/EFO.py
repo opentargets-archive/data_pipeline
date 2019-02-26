@@ -148,19 +148,26 @@ class EfoProcess():
             if uri in disease_phenotypes:
                 phenotypes = disease_phenotypes[uri]['phenotypes']
 
+            if uri not in self.disease_ontology.classes_paths:
+                logger.warning("Unable to find %s", uri)
+                continue
+
+
             therapeutic_labels = self.disease_ontology.therapeutic_labels[uri]
+            classes_path = self.disease_ontology.classes_paths[uri]
 
             efo = EFO(code=uri,
                       label=label,
                       synonyms=synonyms,
                       phenotypes=phenotypes,
-                      path=self.disease_ontology.classes_paths[uri]['all'],
-                      path_codes=self.disease_ontology.classes_paths[uri]['ids'],
-                      path_labels=self.disease_ontology.classes_paths[uri]['labels'],
+                      path=classes_path['all'],
+                      path_codes=classes_path['ids'],
+                      path_labels=classes_path['labels'],
                       therapeutic_labels=therapeutic_labels,
                       definition=definition
                       )
-            id = self.disease_ontology.classes_paths[uri]['ids'][0][-1]
+
+            id = classes_path['ids'][0][-1]
             if uri in self.disease_ontology.children:
                 efo.children = self.disease_ontology.children[uri]
             self.efos[id] = efo
