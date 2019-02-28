@@ -163,16 +163,19 @@ class EfoProcess():
                       path=classes_path['all'],
                       path_codes=classes_path['ids'],
                       path_labels=classes_path['labels'],
-                      therapeutic_labels=therapeutic_labels,
+                      therapeutic_labels=sorted(therapeutic_labels),
                       definition=definition
                       )
 
-            id = classes_path['ids'][0][-1]
             if uri in self.disease_ontology.children:
                 efo.children = self.disease_ontology.children[uri]
+
+            #get the short code form of the uri
+            id = classes_path['ids'][0][-1]
             self.efos[id] = efo
 
     def _store_efo(self, dry_run):
+        logger.info("writing to elasticsearch")
 
         #setup elasticsearch
         if not dry_run:
@@ -190,10 +193,16 @@ class EfoProcess():
 
         #cleanup elasticsearch
         if not dry_run:
+            logger.debug("Flushing elasticsearch")
             self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
             #restore old pre-load settings
             #note this automatically does all prepared indexes
             self.loader.restore_after_bulk_indexing()
+            logger.debug("Flushed elasticsearch")
+
+        logger.info("wrote to elasticsearch")
+
+        
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects

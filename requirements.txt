@@ -17,9 +17,9 @@ simplejson
 
 #when installing from GitHub, a specific commit must be used for consistency
 #and to ensure dependency caching works as intended
-#git+https://github.com/opentargets/ontology-utils.git@473b2e5632c30ebf73f3c371b21b9acf1f29150f#egg=opentargets-ontologyutils
+git+https://github.com/opentargets/ontology-utils.git@fafac5bdcfcbaf94413a549bd63dcf6c64de39bb#egg=opentargets-ontologyutils
 opentargets-validator==0.4.0
-opentargets-ontologyutils==1.2.1
+#opentargets-ontologyutils==1.2.1
 
 numpy
 
