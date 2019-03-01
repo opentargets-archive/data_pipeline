@@ -118,8 +118,8 @@ def load_eco_scores_table(filename, eco_lut_obj):
                 if short_eco_code in eco_lut_obj:
                     table[eco_uri] = float(d["score"])
                 else:
-                    logger.error("eco uri '%s' from eco scores file at line %d is not part of the ECO LUT so not using it",
-                                 eco_uri, i)
+                    #logger.error("eco uri '%s' from eco scores file at line %d is not part of the ECO LUT so not using it", eco_uri, i)
+                    pass
     else:
         logger.error("eco_scores file %s does not exist", filename)
 
