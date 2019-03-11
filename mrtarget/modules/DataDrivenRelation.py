@@ -312,11 +312,14 @@ class DataDrivenRelationProcess(object):
             ddr_queue_score_result):
         start_time = time.time()
 
-        target_data, disease_data = self.es_query.get_disease_to_targets_vectors()
+        target_data, disease_data = self.es_query.get_disease_to_targets_vectors(treshold=0.1, evidence_count=3)
 
-        self.logger.info('Retrieved all the associations data in %i s'%(time.time()-start_time))
+        self.logger.info('Found qualifying associations in %i s'%(time.time()-start_time))
         self.logger.info('target data length: %s size in memory: %f Kb'%(len(target_data),sys.getsizeof(target_data)/1024.))
         self.logger.info('disease data length: %s size in memory: %f Kb' % (len(disease_data),sys.getsizeof(disease_data)/1024.))
+        if len(target_data) == 0 or len(disease_data) == 0:
+            raise Exception('Could not find a set of targets AND diseases that had the sufficient number'
+                            ' of evidences or acceptable harmonic sum score')
 
         '''sort the lists and keep using always the same order in all the steps'''
         disease_keys = sorted(disease_data.keys())
