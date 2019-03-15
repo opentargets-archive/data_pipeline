@@ -122,6 +122,9 @@ class EfoProcess():
             classes_path = self.disease_ontology.classes_paths[uri]
             id = classes_path['ids'][0][-1]
             label = classes_path['labels'][0][-1]
+            if uri != classes_path["all"][0][-1]["uri"]:
+                raise RuntimeError('mismatch between uri and classes_path["all"][0][-1]["uri"] %s %s' % (uri, classes_path["all"][0][-1]["uri"]))
+
 
             properties = self.disease_ontology.parse_properties(URIRef(uri))
 
@@ -161,7 +164,7 @@ class EfoProcess():
 
             therapeutic_labels = self.disease_ontology.therapeutic_labels[uri]
             therapeutic_uris = self.disease_ontology.therapeutic_uris[uri]
-            therapeutic_codes = [self.disease_ontology.classes_paths[uri]['ids'][0][-1] for uri in therapeutic_uris]
+            therapeutic_codes = [self.disease_ontology.classes_paths[ta_uri]['ids'][0][-1] for ta_uri in therapeutic_uris]
 
 
             efo = EFO(code=uri,
@@ -179,8 +182,8 @@ class EfoProcess():
             if uri in self.disease_ontology.children:
                 efo.children = self.disease_ontology.children[uri]
 
-            logger.debug(str(classes_path['ids']))
-            logger.debug("done %s %s %s %s", id, uri, label, classes_path['labels'][0][-1])
+            #logger.debug(str(classes_path['ids']))
+            logger.debug("done %s %s %s", id, uri, label)
 
             if id in self.efos:
                 logger.warning("duplicate %s", id)
