@@ -7,7 +7,8 @@ import os.path
 import requests as r
 import requests_file
 
-from mrtarget.common import URLZSource, urllify
+from opentargets_urlzsource import URLZSource
+from mrtarget.common import urllify
 
 
 _l = logging.getLogger(__name__)

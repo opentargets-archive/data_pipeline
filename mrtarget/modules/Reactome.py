@@ -7,7 +7,7 @@ from networkx.algorithms import all_simple_paths
 from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.constants import Const
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 
 class ReactomeNode(TreeNode, JSONSerializable):
     def __init__(self, **kwargs):
