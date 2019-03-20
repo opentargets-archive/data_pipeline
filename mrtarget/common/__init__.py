@@ -6,8 +6,6 @@ import gzip
 import zipfile
 import logging
 import tempfile as tmp
-import requests as r
-import requests_file
 import os
 
 _l = logging.getLogger(__name__)

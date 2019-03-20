@@ -1,4 +1,3 @@
-requests
 future
 redislite
 #AF 15/11/18 transitive pinning to 2.x.x to solve AttributeError: 'UnixDomainSocketConnection' object has no attribute '_buffer_cutoff' 
@@ -32,7 +31,6 @@ biopython
 petl
 
 pyfunctional
-requests-file
 pypeln<=0.1.6
 
 rdflib
