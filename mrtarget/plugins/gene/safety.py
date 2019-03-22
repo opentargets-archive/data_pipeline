@@ -1,5 +1,5 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 import traceback
 import logging
 import json
