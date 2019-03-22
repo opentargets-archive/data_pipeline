@@ -9,7 +9,7 @@ import functools
 import pypeln.process as pr
 import petl
 import more_itertools
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
 

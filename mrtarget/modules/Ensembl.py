@@ -2,7 +2,7 @@ import simplejson as json
 import logging
 import more_itertools
 
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 from mrtarget.constants import Const
 
 class EnsemblProcess(object):
