@@ -7,7 +7,7 @@ from yapsy.IPlugin import IPlugin
 import configargparse
 
 from mrtarget.Settings import Config
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 
 class Orthologs(IPlugin):
 

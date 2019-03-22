@@ -6,7 +6,7 @@ import shelve
 import dumbdbm
 import tempfile
 
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 import json
 
 

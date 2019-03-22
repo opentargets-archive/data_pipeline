@@ -1,4 +1,3 @@
-requests
 future
 redislite
 #AF 15/11/18 transitive pinning to 2.x.x to solve AttributeError: 'UnixDomainSocketConnection' object has no attribute '_buffer_cutoff' 
@@ -20,6 +19,7 @@ simplejson
 #git+https://github.com/opentargets/ontology-utils.git@f92222b5abf89b0c3a9c2d3cd0e683676620b380#egg=opentargets-ontologyutils
 opentargets-validator>=0.4.0
 opentargets-ontologyutils>=1.1.0
+opentargets-urlzsource==1.0.0
 
 numpy
 
@@ -31,7 +31,6 @@ biopython
 petl
 
 pyfunctional
-requests-file
 pypeln<=0.1.6
 
 rdflib
