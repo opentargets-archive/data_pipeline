@@ -5,7 +5,7 @@ from yapsy.IPlugin import IPlugin
 import simplejson as json
 import configargparse
 
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
 import opentargets_ontologyutils.mp
 from mrtarget.Settings import Config

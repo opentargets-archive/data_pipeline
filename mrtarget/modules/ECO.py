@@ -1,7 +1,8 @@
 from collections import OrderedDict
 
 import csv
-from mrtarget.common.IO import check_to_open, URLZSource
+from opentargets_urlzsource import URLZSource
+from mrtarget.common.IO import check_to_open
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
