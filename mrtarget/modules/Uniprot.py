@@ -4,7 +4,7 @@ import base64
 import lxml.etree as etree
 
 from mrtarget.common.UniprotIO import Parser
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 from mrtarget.constants import Const
 
 

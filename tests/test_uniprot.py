@@ -1,7 +1,7 @@
 import unittest
 import os
 
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 from mrtarget.modules.Uniprot import UniprotDownloader
 from mrtarget.common.UniprotIO import Parser
 

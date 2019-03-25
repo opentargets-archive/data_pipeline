@@ -7,7 +7,7 @@ import configargparse
 
 from mrtarget.modules.GeneData import Gene
 from mrtarget.Settings import Config
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 
 
 class HGNC(IPlugin):

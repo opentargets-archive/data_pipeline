@@ -303,6 +303,7 @@ class ESQuery(object):
         c=0
         for hit in res:
             c+=1
+            pair_id = str(hit['_id'])
             hit = hit['_source']
             if hit['evidence_count']['total']>=evidence_count and \
                 hit['harmonic-sum']['overall'] >=treshold:
@@ -320,6 +321,9 @@ class ESQuery(object):
 
                 if c%10000 == 0:
                     self.logger.debug('%d elements retrieved', c)
+            else:
+                self.logger.debug('Not enough evidences or too low harmonic-sum score for pair: %s ' % pair_id)
+
 
         return target_results, disease_results
 

@@ -8,7 +8,7 @@ import csv
 from mrtarget.Settings import Config, file_or_resource
 from mrtarget.constants import Const
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
-from mrtarget.common.IO import check_to_open, URLZSource
+from mrtarget.common.IO import check_to_open
 from mrtarget.modules import GeneData
 from mrtarget.modules.ECO import ECO, load_eco_scores_table
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url

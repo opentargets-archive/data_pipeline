@@ -3,7 +3,7 @@ import yaml
 import configargparse
 import addict
 import mrtarget.common.connection
-from mrtarget.common import URLZSource
+from opentargets_urlzsource import URLZSource
 
 def setup_ops_parser():
     p = configargparse.get_argument_parser(config_file_parser_class=configargparse.YAMLConfigFileParser)
