@@ -78,11 +78,11 @@ class MousePhenotypes(IPlugin):
         for gene_id, gene in genes.iterate():
             ''' extend gene with related mouse phenotype data '''
             if gene.approved_symbol in self.human_genes:
-                    self._logger.debug("Adding %i phenotype data from MGI to gene %s" % (len(self.human_genes[gene.approved_symbol]["mouse_orthologs"][0]["phenotypes"]), gene.approved_symbol))
+                    #self._logger.debug("Adding %i phenotype data from MGI to gene %s" % (len(self.human_genes[gene.approved_symbol]["mouse_orthologs"][0]["phenotypes"]), gene.approved_symbol))
                     gene.mouse_phenotypes = self.human_genes[gene.approved_symbol]["mouse_orthologs"]
 
     def _get_mp_classes(self, mp_uri):
-        self._logger.debug("_get_mp_classes")
+        #self._logger.debug("_get_mp_classes")
         
         #load the onotology
         self.mp_ontology = OntologyClassReader()
@@ -116,7 +116,7 @@ class MousePhenotypes(IPlugin):
 
     def assign_to_human_genes(self):
 
-        self._logger.debug("Assigning %i entries to human genes ", len(self.mouse_genes))
+        #self._logger.debug("Assigning %i entries to human genes ", len(self.mouse_genes))
 
         # for any mouse gene...
         for _, gene in self.mouse_genes.iteritems():
@@ -125,10 +125,10 @@ class MousePhenotypes(IPlugin):
             for ortholog in gene["human_orthologs"]:
                 human_gene_symbol = ortholog["gene_symbol"]
 
-                self._logger.debug("Assign %i phenotype categories from mouse %s to human %s",
-                                    len(gene["phenotypes"]),
-                                    gene["gene_symbol"],
-                                    human_gene_symbol)
+                #self._logger.debug("Assign %i phenotype categories from mouse %s to human %s",
+                #                    len(gene["phenotypes"]),
+                #                    gene["gene_symbol"],
+                #                    human_gene_symbol)
                 # assign all the phenotypes for this specific gene
                 # all phenotypes are classified per category
                 self.human_genes[human_gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : gene["gene_id"],
@@ -136,9 +136,9 @@ class MousePhenotypes(IPlugin):
                                                                           "phenotypes" : gene["phenotypes"].values()})
 
     def get_genotype_phenotype(self):
-        self._logger.debug("get_genotype_phenotype")
+        #self._logger.debug("get_genotype_phenotype")
         with URLZSource(self.data_config.mouse_phenotypes_orthology).open() as fi:
-            self._logger.debug("get %s", self.data_config.mouse_phenotypes_orthology)
+            #self._logger.debug("get %s", self.data_config.mouse_phenotypes_orthology)
 
             for li, line in enumerate(fi):
                 # a way too many false spaces just to bother people
@@ -164,22 +164,22 @@ class MousePhenotypes(IPlugin):
                         except Exception as e:
                             self._logger.debug("exception processing a line %d: %s", li, str(e))
 
-        self._logger.info("Retrieved %i mouse genes", len(self.mouse_genes))
+        #self._logger.info("Retrieved %i mouse genes", len(self.mouse_genes))
 
         count_symbols = set()
         count_accepted_symbols = set()
 
         with URLZSource(self.data_config.mouse_phenotypes_report).open() as fi:
             # lines = response.readlines()
-            self._logger.debug("get lines from mgi report phenotyes file %s",
-                                self.data_config.mouse_phenotypes_report)
+            #self._logger.debug("get lines from mgi report phenotyes file %s",
+            #                    self.data_config.mouse_phenotypes_report)
 
             # Allelic Composition	Allele Symbol(s)	Genetic Background	Mammalian Phenotype ID	PubMed ID	MGI Marker Accession ID
             for li, line in enumerate(fi):
                 # a way too many false spaces just to bother people
                 array = map(str.strip, line.strip().split("\t"))
 
-                self._logger.debug('mouse KO array %s in line %d', str(array), li)
+                #self._logger.debug('mouse KO array %s in line %d', str(array), li)
 
                 if len(array) == 6:
                     (allelic_composition, allele_symbol, genetic_background, mp_id, pmid, mouse_gene_ids) = array
@@ -189,13 +189,13 @@ class MousePhenotypes(IPlugin):
                         count_symbols.add(mouse_gene_id)
 
                         mp_id_key = mp_id.split("/")[-1].replace(":", "_")
-                        self._logger.debug("Looking for mouse_gene_id "+mouse_gene_id)
-                        self._logger.debug("Looking for mp_id_key "+mp_id_key)
+                        #self._logger.debug("Looking for mouse_gene_id "+mouse_gene_id)
+                        #self._logger.debug("Looking for mp_id_key "+mp_id_key)
 
                         if mouse_gene_id in self.mouse_genes and mp_id_key in self.mps:
-                            self._logger.debug('process mouse KO gene %s', mouse_gene_id)
+                            #self._logger.debug('process mouse KO gene %s', mouse_gene_id)
                             count_accepted_symbols.add(mouse_gene_id)
-                            self._logger.debug('get class for %s'% mp_id)
+                            #self._logger.debug('get class for %s'% mp_id)
                             mp_class = self.mps[mp_id_key]
                             mp_label = mp_class["label"]
 
