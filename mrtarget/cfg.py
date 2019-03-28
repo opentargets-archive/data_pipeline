@@ -74,10 +74,14 @@ def setup_ops_parser():
         env_var="DDR_WORKERS_PRODUCTION", action='store', default=4, type=int)
     p.add("--ddr-workers-score", help="# of procs for relation pair scoring",
         env_var="DDR_WORKERS_SCORE", action='store', default=4, type=int)
+    p.add("--ddr-workers-write", help="# of threads for relation writing",
+        env_var="DDR_WORKERS_WRITE", action='store', default=8, type=int)
     p.add("--ddr-queue-production-score", help="size of relation producer to scorer queue",
         env_var="DDR_QUEUE_PRODUCTION_SCORE", action='store', default=1000, type=int)
     p.add("--ddr-queue-score-result", help="size of relation scorer result queue",
         env_var="DDR_QUEUE_SCORE_RESULT", action='store', default=1000, type=int)
+    p.add("--ddr-queue-write", help="size of relation writer queue (in chunks)",
+        env_var="DDR_QUEUE_WRITE", action='store', default=8, type=int)
 
     # for debugging
     p.add("--dry-run", help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",

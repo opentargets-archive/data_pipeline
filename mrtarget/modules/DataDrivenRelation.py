@@ -1,22 +1,23 @@
 import logging
-from collections import Counter
 import sys, os
+import time
+from copy import copy
+import math
+import functools
+
 import numpy as np
 import scipy.sparse as sp
+from scipy.spatial.distance import pdist
+import pypeln.process as pr
+import elasticsearch
+
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from scipy.spatial.distance import pdist
-import time
-from copy import copy
-import math
-import functools
-import itertools
 from mrtarget.constants import Const
 from mrtarget.Settings import Config
-import pypeln.process as pr
 
 class RelationType(object):
     SHARED_DISEASE = 'shared-disease'
@@ -147,24 +148,54 @@ class OverlapDistance(object):
 """
 Consumes the iterable passed in and loads into into provided loader
 whilst also respecting the dry run flag given
+
+Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
+performance loading
 """
-def store_in_elasticsearch(r, loader, dry_run):
-    #ensure its not null
-    if r:
-        if not dry_run:
-            loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
-                Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
-                r.id, r.to_json())
-        subj = copy(r.subject)
-        obj = copy(r.object)
-        if subj['id'] != obj['id']:
-            r.subject = obj
-            r.object = subj
-            r.set_id()
-        if not dry_run:
-            loader.put(Const.ELASTICSEARCH_RELATION_INDEX_NAME,
-                Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type,
-                r.id, r.to_json())
+def store_in_elasticsearch(results, loader, dry_run, workers_write, queue_write):
+    client = loader.es
+    index = loader.get_versioned_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME)
+    thread_count = workers_write
+    queue_size = queue_write
+    chunk_size = 1000 #TODO make configurable
+    actions = elasticsearch_actions(results, dry_run, index)
+    failcount = 0
+    for result in elasticsearch.helpers.parallel_bulk(client, actions,
+            thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
+        success, details = result
+        if not success:
+            failcount += 1
+
+    if failcount:
+        raise RuntimeError("%s relations failed to index" % failcount)
+
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(results, dry_run, index):
+    for r in results:
+        if r:
+            subj = copy(r.subject)
+            obj = copy(r.object)
+            if subj['id'] != obj['id']:
+                r.subject = obj
+                r.object = subj
+                r.set_id()
+
+            if not dry_run:
+                action = {}
+                action["_index"] = index
+                action["_type"] = Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type
+                action["_id"] = r.id
+                #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+                #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+                action["_source"] = r.to_json()
+
+                yield action
+
+
 
 def digest_in_buckets(v, buckets_number):
     digested =set()
@@ -192,8 +223,8 @@ used to standardize d2d and t2t code path
 """
 def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids, 
         threshold, buckets_number, loader, dry_run, 
-        workers_production, workers_score,
-        queue_production_score, queue_score_result):
+        workers_production, workers_score, workers_write,
+        queue_production_score, queue_score_result, queue_write):
 
     #do some initial setup
     vectorizer = DictVectorizer(sparse=True)
@@ -240,8 +271,7 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
 
     #store in elasticsearch
     #this could be multi process, but just use a single for now
-    for r in pipeline_stage:
-        store_in_elasticsearch(r, loader, dry_run)
+    store_in_elasticsearch(pipeline_stage, loader, dry_run, workers_write, queue_write)
 
 """
 Function to run in child processess
@@ -308,8 +338,10 @@ class DataDrivenRelationProcess(object):
     def process_all(self, dry_run, 
             ddr_workers_production,
             ddr_workers_score,
+            ddr_workers_write,
             ddr_queue_production_score,
-            ddr_queue_score_result):
+            ddr_queue_score_result,
+            ddr_queue_write):
         start_time = time.time()
 
         target_data, disease_data = self.es_query.get_disease_to_targets_vectors(treshold=0.1, evidence_count=3)
@@ -344,16 +376,16 @@ class DataDrivenRelationProcess(object):
         self.logger.info('handling disease-to-disease')
         handle_pairs(RelationType.SHARED_TARGET, disease_labels, disease_data, disease_keys, 
             target_keys, 0.19, 1024, self.loader, dry_run, 
-            ddr_workers_production, ddr_workers_score, 
-            ddr_queue_production_score, ddr_queue_score_result)
+            ddr_workers_production, ddr_workers_score, ddr_workers_write,
+            ddr_queue_production_score, ddr_queue_score_result, ddr_queue_write)
         self.logger.info('handled disease-to-disease')
 
         #calculate and store target-to-target in multiple processess
         self.logger.info('handling target-to-target')
         handle_pairs(RelationType.SHARED_DISEASE, target_labels, target_data, target_keys, 
             disease_keys, 0.19, 1024, self.loader, dry_run, 
-            ddr_workers_production, ddr_workers_score, 
-            ddr_queue_production_score, ddr_queue_score_result)
+            ddr_workers_production, ddr_workers_score, ddr_workers_write,
+            ddr_queue_production_score, ddr_queue_score_result, ddr_queue_write)
         self.logger.info('handled target-to-target')
 
         #cleanup elasticsearch
