@@ -178,8 +178,10 @@ def main():
                     process.process_all(args.dry_run,
                         args.ddr_workers_production,
                         args.ddr_workers_score,
+                        args.ddr_workers_write,
                         args.ddr_queue_production_score,
-                        args.ddr_queue_score_result)
+                        args.ddr_queue_score_result,
+                        args.ddr_queue_write)
                 #TODO qc
 
             if args.sea:
