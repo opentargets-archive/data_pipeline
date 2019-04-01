@@ -31,6 +31,7 @@ Downloads and processes the Evidence Code Ontology and Sequence Ontology.
 Read in evidence strings (either from filesystem or URLs) and validate. The validation includes syntatic JSON schema validation, as well as ensuring that the disease and target are appropriate.
 This step will also make some corrections to evidence, where appropriate. For example,replacing Uniprot protein identifiers with Ensembl gene identifiers.
 It requires `--gen` target, `--efo` disease, and `--eco` evidence code steps.
+It is expecting JSON matching schema [1.6.0](https://raw.githubusercontent.com/opentargets/json_schema/1.6.0/opentargets.json).
 #### `--as` Associations
 This step reads the valide evidence strings and calculates the appropriate assocations as well as calculated their scores.
 It requires `--val` validation, and `--hpa` expression steps.
