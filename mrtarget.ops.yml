@@ -3,10 +3,13 @@
 #this is read by ConfigArgParse
 #it uses a sub-set of YAML
 #for details see https://pypi.org/project/ConfigArgParse/
+#this can be specified with --ops-config on the command line
+#or with OPS_CONFIG environment variable
 
 
 #location to read the data configuration from
-data-config: https://storage.googleapis.com/open-targets-data-releases/19.02/input/mrtarget.data-2019-02-05.v3.yml
+# see the technical release notes for the location of this file for each release
+#data-config: 
 
 
 #python logging file location
@@ -15,6 +18,9 @@ data-config: https://storage.googleapis.com/open-targets-data-releases/19.02/inp
 
 #elasticsearch data prefix
 #release-tag: master
+
+#QC related
+#note, not complete
 
 #location to write a tab separated qc summary
 #qc-out:
@@ -28,6 +34,7 @@ data-config: https://storage.googleapis.com/open-targets-data-releases/19.02/inp
 
 #skip running the qc
 #skip-qc: false
+
 
 
 #if this is true, an embedded redis will never be created
@@ -63,10 +70,15 @@ data-config: https://storage.googleapis.com/open-targets-data-releases/19.02/inp
 #ddr-workers-production: 4
 #number of processess to use for scoring relationship pairs
 #ddr-workers-score: 4
+#number of threads to use for writing to elasticsearch
+#ddr-workers-write: 8
 #size of queue between producers and scorers
 #ddr-queue-production-score: 1000
 #size of queue between scorers and result
 #ddr-queue-score-result: 1000
+#size of queue to writers
+#note this is in number of chunks of 1000 documents
+#ddr-queue-write: 8
 
 
 #path to read gene plugins from
