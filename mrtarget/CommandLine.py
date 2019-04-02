@@ -50,6 +50,7 @@ def main():
         logging.basicConfig()
         logger = logging.getLogger(__name__+".main()")
 
+    logger.info('`'+" ".join(sys.argv)+'` - starting')
 
     if not args.release_tag:
         logger.error('A [release-tag] has to be specified.')
