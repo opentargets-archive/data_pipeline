@@ -51,7 +51,6 @@ def main():
         logging.basicConfig()
         logger = logging.getLogger(__name__+".main()")
 
-
     if not args.release_tag:
         logger.error('A [release-tag] has to be specified.')
         print('A [release-tag] has to be specified.', file=sys.stderr)
@@ -129,7 +128,8 @@ def main():
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.eco:
-                process = EcoProcess(loader, data_config.ontology_eco, data_config.ontology_so)
+                process = EcoProcess(loader, data_config.ontology_eco, data_config.ontology_so,
+                    args.eco_workers_writer, args.eco_queue_write)
                 if not args.qc_only:
                     process.process_all(args.dry_run)
                 if not args.skip_qc:

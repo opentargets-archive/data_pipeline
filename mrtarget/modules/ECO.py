@@ -10,6 +10,7 @@ from mrtarget.constants import Const
 import opentargets_ontologyutils.eco_so
 from mrtarget.Settings import Config #TODO remove
 import logging
+import elasticsearch
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +39,34 @@ class ECO(JSONSerializable):
         # return self.code
         return ECOLookUpTable.get_ontology_code_from_url(self.code)
 
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(items, dry_run, index):
+    for eco_id, eco_obj in items:
+        if not dry_run:
+            action = {}
+            action["_index"] = index
+            action["_type"] = Const.ELASTICSEARCH_ECO_INDEX_NAME
+            action["_id"] = eco_id
+            #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+            #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+            action["_source"] = eco_obj.to_json()
+
+            yield action
+
 class EcoProcess():
 
-    def __init__(self, loader, eco_uri, so_uri):
+    def __init__(self, loader, eco_uri, so_uri, workers_write, queue_write):
         self.loader = loader
         self.ecos = OrderedDict()
         self.evidence_ontology = OntologyClassReader()
         self.eco_uri = eco_uri
         self.so_uri = so_uri
+        self.workers_write = workers_write
+        self.queue_write = queue_write
 
     def process_all(self, dry_run):
         self._process_ontology_data()
@@ -74,11 +95,17 @@ class EcoProcess():
             self.loader.prepare_for_bulk_indexing(
                 self.loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME))
 
-        for eco_id, eco_obj in self.ecos.items():
-            if not dry_run:
-                self.loader.put(index_name=Const.ELASTICSEARCH_ECO_INDEX_NAME,
-                    doc_type=Const.ELASTICSEARCH_ECO_DOC_NAME,
-                    ID=eco_id, body=eco_obj)
+        #write into elasticsearch
+        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME)
+        chunk_size = 1000 #TODO make configurable
+        actions = elasticsearch_actions(self.ecos.items(), dry_run, index)
+        failcount = 0
+        for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
+                thread_count=self.workers_write, queue_size=self.queue_write, 
+                chunk_size=chunk_size):
+            success, details = result
+            if not success:
+                failcount += 1
 
         #cleanup elasticsearch
         if not dry_run:
@@ -86,6 +113,9 @@ class EcoProcess():
             #restore old pre-load settings
             #note this automatically does all prepared indexes
             self.loader.restore_after_bulk_indexing()
+
+        if failcount:
+            raise RuntimeError("%s relations failed to index" % failcount)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
