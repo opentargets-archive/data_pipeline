@@ -95,7 +95,7 @@ It makes use of the [ConfigArgParse](https://pypi.org/project/ConfigArgParse/) l
 See the default `mrtarget.ops.yml` file for detailed comments describing the avaliable options, or use the `--help` command line argument.
 
 ##### Data
-These options describe how the data is to be processed. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. See the default `mrtarget.data.yml` file for detailed comments describing the avaliable options.
+These options describe how the data is to be processed. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. See the [OpenTargets blog](https://blog.opentargets.org/) for links to technical notes with the relevant file for each release. 
 
 ##### Legacy
 This covers configuration that has not yet been updated to one of the options above. This might be becuase it is particularly tightly entwined within the rest of the codebase, or becuase there is little demand for it to be separated. It includes the files `mrtarget/Settings.py`, `mrtarget/constants.py`, and `mrtarget/ElasticsearchConfig.py`. Any changes to these settings typically require editing code files, though some may be modified via environment variables.
