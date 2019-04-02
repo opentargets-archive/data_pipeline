@@ -129,13 +129,6 @@ def setup_ops_parser():
     p.add("--ddr", help="compute data driven t2t and d2d relations, store in elasticsearch",
         action="store_true")
 
-    # generate some high-level summary metrics over the release
-    #TODO cleanup and possibly delete eventually
-    p.add("--metric", help="generate metrics", action="store_true")
-    p.add("--metric-file", help="generate metrics", 
-        env_var="METRIC_FILE", default='release_metrics.txt')
-
-
     return p
 
 def get_ops_args():
