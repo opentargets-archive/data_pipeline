@@ -6,7 +6,6 @@ import simplejson as json
 from collections import Counter
 
 import jsonpickle
-from mrtarget.common import require_all
 from mrtarget.common.connection import new_redis_client
 jsonpickle.set_preferred_backend('simplejson')
 import logging
