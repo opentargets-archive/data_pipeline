@@ -74,7 +74,9 @@ class RedisLookupTable(object):
         self.r_server = new_redis_client() if not r_server else r_server
         self.default_ttl = ttl
 
-        require_all(self.r_server is not None)
+        if self.r_server is None:
+            raise RuntimeException("r_server must not be None")
+
 
     def set(self, key, obj, r_server = None, ttl = None):
         self._get_r_server(r_server).setex(self._get_key_namespace(key),

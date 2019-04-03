@@ -8,11 +8,18 @@ import requests as r
 import requests_file
 
 from opentargets_urlzsource import URLZSource
-from mrtarget.common import urllify
 
 
 _l = logging.getLogger(__name__)
 
+
+
+def urllify(string_name):
+    """return a file:// urlified simple path to a file:// is :// is not contained in it"""
+    if '://' in string_name:
+        return string_name
+    else:
+        return 'file://'+os.path.abspath(string_name)
 
 def check_to_open(filename):
     """check if `filename` is a fetchable uri and returns True in the case is true False otherwise"""
