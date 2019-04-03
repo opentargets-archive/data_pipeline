@@ -216,10 +216,7 @@ class EvidenceManager():
                     if available_score != self.eco_scores[eco_uri]:
                         fixed = True
             else:
-                #logging in child processess can lead to hung threads
-                # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/                
-                #self.logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
-                pass
+                self.logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
         # Remove identifiers.org from genes and map to ensembl ids
         self.fix_target_id(evidence,
@@ -468,10 +465,7 @@ class EvidenceManager():
                 if eco is not None:
                     ecos_info.append(ExtendedInfoECO(eco))
                 else:
-                    #logging in child processess can lead to hung threads
-                    # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/    
-                    #self.logger.warning("eco uri %s is not in the ECO LUT so it will not be considered as included", eco_id)
-                    pass
+                    self.logger.warning("eco uri %s is not in the ECO LUT so it will not be considered as included", eco_id)
 
             if ecos_info:
                 data = []
