@@ -15,7 +15,7 @@ def setup_ops_parser():
 
     # configuration file with data related settings
     p.add('--data-config', help='path to data config file (YAML)',
-        env_var="DATA_CONFIG", action='store', default="mrtarget.data.yml")
+        env_var="DATA_CONFIG", action='store')
 
     # logging
     p.add("--log-config", help="logging configuration file",
@@ -128,13 +128,6 @@ def setup_ops_parser():
     # additional information to add
     p.add("--ddr", help="compute data driven t2t and d2d relations, store in elasticsearch",
         action="store_true")
-
-    # generate some high-level summary metrics over the release
-    #TODO cleanup and possibly delete eventually
-    p.add("--metric", help="generate metrics", action="store_true")
-    p.add("--metric-file", help="generate metrics", 
-        env_var="METRIC_FILE", default='release_metrics.txt')
-
 
     return p
 

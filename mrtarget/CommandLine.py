@@ -23,7 +23,6 @@ from mrtarget.modules.QC import QCMetrics
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
 from mrtarget.modules.Uniprot import UniprotDownloader
-from mrtarget.modules.Metrics import Metrics
 from mrtarget.Settings import Config, file_or_resource
 
 import mrtarget.cfg
@@ -51,6 +50,7 @@ def main():
         logging.basicConfig()
         logger = logging.getLogger(__name__+".main()")
 
+    logger.info('`'+" ".join(sys.argv)+'` - starting')
 
     if not args.release_tag:
         logger.error('A [release-tag] has to be specified.')
@@ -195,10 +195,6 @@ def main():
                         data_config.chembl_molecule_set_uri_pattern,
                         args.dry_run)
                 #TODO qc
-
-            if args.metric:
-                process = Metrics(es, args.metric_file, 
-                    data_config.datasources_to_datatypes).generate_metrics()
 
     if args.qc_in:
         #handle reading in previous qc from filename provided, and adding comparitive metrics
