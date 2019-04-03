@@ -25,8 +25,6 @@ except ImportError:
 import time
 from multiprocessing import Process, current_process
 
-logger = logging.getLogger(__name__)
-
 import signal
 
 class TimeoutException(Exception):
@@ -74,7 +72,7 @@ class RedisLookupTable(object):
         self.default_ttl = ttl
 
         if self.r_server is None:
-            raise RuntimeException("r_server must not be None")
+            raise RuntimeError("r_server must not be None")
 
 
     def set(self, key, obj, r_server = None, ttl = None):
