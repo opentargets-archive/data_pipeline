@@ -14,8 +14,6 @@ from mrtarget.modules.ECO import ECO, load_eco_scores_table
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
 
-logger = logging.getLogger(__name__)
-
 
 class DataNormaliser(object):
     def __init__(self, min_value, max_value, old_min_value=0., old_max_value=1., cap=True):
@@ -224,7 +222,7 @@ class EvidenceManager():
                 pass
 
         # Remove identifiers.org from genes and map to ensembl ids
-        EvidenceManager.fix_target_id(evidence,
+        self.fix_target_id(evidence,
                                       self.uni2ens,
                                       self.available_genes,
                                       self.non_reference_genes
@@ -237,7 +235,7 @@ class EvidenceManager():
             evidence['target']['activity'] = evidence['target']['activity'].split('/')[-1]
 
         # Remove identifiers.org from efos
-        EvidenceManager.fix_disease_id(evidence)
+        self.fix_disease_id(evidence)
 
         # Remove identifiers.org from ecos
         new_eco_ids = []
@@ -270,8 +268,7 @@ class EvidenceManager():
 
         return Evidence(evidence,self.datasources_to_datatypes), fixed
 
-    @staticmethod
-    def normalise_target_id(evidence, uni2ens, available_genes,non_reference_genes ):
+    def normalise_target_id(self, evidence, uni2ens, available_genes,non_reference_genes ):
 
         target_id = evidence['target']['id']
         new_target_id = None
@@ -282,19 +279,19 @@ class EvidenceManager():
                     target_id = target_id.split('-')[0]
                 uniprotid = target_id.split(GeneData.UNI_ID_ORG_PREFIX)[1].strip()
                 ensemblid = uni2ens[uniprotid]
-                new_target_id = EvidenceManager.get_reference_ensembl_id(ensemblid,
+                new_target_id = self.get_reference_ensembl_id(ensemblid,
                                                                          available_genes=available_genes,
                                                                          non_reference_genes=non_reference_genes)
             elif target_id.startswith(GeneData.ENS_ID_ORG_PREFIX):
                 ensemblid = target_id.split(GeneData.ENS_ID_ORG_PREFIX)[1].strip()
-                new_target_id = EvidenceManager.get_reference_ensembl_id(ensemblid,
+                new_target_id = self.get_reference_ensembl_id(ensemblid,
                                                                          available_genes=available_genes,
                                                                          non_reference_genes=non_reference_genes)
             else:
-                logger.warning("could not recognize target.id: %s | not added" % target_id)
+                self.logger.warning("could not recognize target.id: %s | not added" % target_id)
                 id_not_in_ensembl = True
         except KeyError:
-            logger.error("cannot find an ensembl ID for: %s" % target_id)
+            self.logger.error("cannot find an ensembl ID for: %s" % target_id)
             id_not_in_ensembl = True
 
         return new_target_id, id_not_in_ensembl
@@ -308,35 +305,33 @@ class EvidenceManager():
 
         return is_excluded
 
-    @staticmethod
-    def fix_target_id(evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
+    def fix_target_id(self, evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
         target_id = evidence['target']['id']
 
         try:
-            new_target_id, id_not_in_ensembl = EvidenceManager.normalise_target_id(evidence,
+            new_target_id, id_not_in_ensembl = self.normalise_target_id(evidence,
                                                                                    uni2ens,
                                                                                    available_genes,
                                                                                    non_reference_genes)
         except KeyError:
-            logger.error("cannot find an ensembl ID for: %s" % target_id)
+            self.logger.error("cannot find an ensembl ID for: %s" % target_id)
             id_not_in_ensembl = True
             new_target_id = target_id
 
         if id_not_in_ensembl:
-            logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s",
+            self.logger.warning("cannot find any ensembl ID for evidence for: %s. Offending target.id: %s",
                             evidence['target']['id'], target_id)
 
         evidence['target']['id'] = new_target_id
 
-    @staticmethod
-    def fix_disease_id(evidence, logger=logging.getLogger(__name__)):
+    def fix_disease_id(self, evidence, logger=logging.getLogger(__name__)):
         disease_id = evidence['disease']['id']
         new_disease_id = get_ontology_code_from_url(disease_id)
         if len(new_disease_id.split('_')) != 2:
-            logger.warning("could not recognize disease.id: %s | added anyway" % disease_id)
+            self.logger.warning("could not recognize disease.id: %s | added anyway" % disease_id)
         evidence['disease']['id'] = new_disease_id
         if not new_disease_id:
-            logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
+            self.logger.warning("No valid disease.id could be found in evidence: %s. Offending disease.id: %s" % (
                 evidence['id'], disease_id))
 
 
