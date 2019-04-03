@@ -11,8 +11,6 @@ import opentargets_ontologyutils.eco_so
 from mrtarget.Settings import Config #TODO remove
 import logging
 
-logger = logging.getLogger(__name__)
-
 
 '''
 Module to Fetch the ECO ontology and store it in ElasticSearch to be used in evidence and association processing. 
@@ -109,6 +107,9 @@ class EcoProcess():
 ECO_SCORES_HEADERS = ["uri", "code", "score"]
 
 def load_eco_scores_table(filename, eco_lut_obj):
+    #logger has to be built inside the process when multiprocessing
+    logger = logging.getLogger(__name__)
+
     table = {}
     if check_to_open(filename):
         with URLZSource(filename).open() as r_file:
@@ -119,10 +120,7 @@ def load_eco_scores_table(filename, eco_lut_obj):
                 if short_eco_code in eco_lut_obj:
                     table[eco_uri] = float(d["score"])
                 else:
-                    #logging in child processess can lead to hung threads
-                    # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/    
-                    #logger.error("eco uri '%s' from eco scores file at line %d is not part of the ECO LUT so not using it", eco_uri, i)
-                    pass
+                    logger.error("eco uri '%s' from eco scores file at line %d is not part of the ECO LUT so not using it", eco_uri, i)
     else:
         logger.error("eco_scores file %s does not exist", filename)
 
