@@ -1,4 +1,3 @@
-
 import logging
 
 from yapsy.IPlugin import IPlugin
@@ -6,7 +5,6 @@ import simplejson as json
 import configargparse
 
 from mrtarget.modules.GeneData import Gene
-from mrtarget.Settings import Config
 from opentargets_urlzsource import URLZSource
 
 
