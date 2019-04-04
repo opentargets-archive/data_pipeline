@@ -4,6 +4,25 @@ import more_itertools
 
 from opentargets_urlzsource import URLZSource
 from mrtarget.constants import Const
+import elasticsearch
+
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(lines, dry_run, index):
+    for line in lines:
+        entry = json.loads(line)
+        if not dry_run:
+            action = {}
+            action["_index"] = index
+            action["_type"] = Const.ELASTICSEARCH_ENSEMBL_DOC_NAME
+            action["_id"] = entry['id']
+            action["_source"] = line
+
+            yield action
+
 
 class EnsemblProcess(object):
     """
@@ -12,15 +31,19 @@ class EnsemblProcess(object):
     e.g.
     python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38
     """
-    def __init__(self, loader):
+    def __init__(self, loader, workers_write, queue_write):
         self.loader = loader
         self.logger = logging.getLogger(__name__)
+        self.workers_write = workers_write
+        self.queue_write = queue_write
 
     def process(self, ensembl_filename, dry_run):
         def _put_line(line):
             return 1
 
         self.logger.info('Reading Ensembl gene info from %s' % ensembl_filename)
+
+        lines = more_itertools.with_iter(URLZSource(ensembl_filename).open())
 
         #setup elasticsearch
         if not dry_run:
@@ -29,19 +52,17 @@ class EnsemblProcess(object):
             self.loader.prepare_for_bulk_indexing(
                 self.loader.get_versioned_index(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME))
 
-        inserted_lines = 0
-        for line in more_itertools.with_iter(URLZSource(ensembl_filename).open()):
-            entry = json.loads(line)
-            #store in elasticsearch if not dry running
-            if not dry_run:
-                self.loader.put(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME,
-                    Const.ELASTICSEARCH_ENSEMBL_DOC_NAME,
-                    entry['id'], line)
-            inserted_lines += 1
-
-        self.logger.info("Read %d lines from %s", inserted_lines, ensembl_filename)
-
-        self.logger.info("flush index")
+        #write into elasticsearch
+        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
+        chunk_size = 1000 #TODO make configurable
+        actions = elasticsearch_actions(lines, dry_run, index)
+        failcount = 0
+        for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
+                thread_count=self.workers_write, queue_size=self.queue_write, 
+                chunk_size=chunk_size):
+            success, details = result
+            if not success:
+                failcount += 1
 
         #cleanup elasticsearch
         if not dry_run:
@@ -49,6 +70,9 @@ class EnsemblProcess(object):
             #restore old pre-load settings
             #note this automatically does all prepared indexes
             self.loader.restore_after_bulk_indexing()
+
+        if failcount:
+            raise RuntimeError("%s failed to index" % failcount)
 
     def qc(self, esquery):
         """
