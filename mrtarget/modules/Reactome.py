@@ -8,6 +8,7 @@ from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.constants import Const
 from opentargets_urlzsource import URLZSource
+import elasticsearch
 
 class ReactomeNode(TreeNode, JSONSerializable):
     def __init__(self, **kwargs):
@@ -73,15 +74,59 @@ class ReactomeDataDownloader():
                     self.logger.warn("Pathway relation %s is already loaded, skipping duplicate data" % str(relation))
         self.logger.info('parsed %i rows from reactome_pathway_relation' % len(added_relations))
 
+def generate_documents(g):
+    for node, node_data in g.nodes(data=True):
+        if node != root:
+            ancestors = set()
+            paths = list(all_simple_paths(g, root, node))
+            for path in paths:
+                for p in path:
+                    ancestors.add(p)
+
+            #ensure these are real tuples, not generators
+            #otherwise they can't be serialized to json
+            children = tuple(g.successors(node))
+            parents = tuple(g.predecessors(node))
+
+            body = dict(id=node,
+                label=node_data['name'],
+                path=paths,
+                children=children,
+                parents=parents,
+                is_root=node == root,
+                ancestors=list(ancestors)
+            )
+            yield body
+
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(docs, dry_run, index):
+    for doc in docs:
+        if not dry_run:
+            action = {}
+            action["_index"] = index
+            action["_type"] = Const.ELASTICSEARCH_REACTOME_DOC_NAME
+            action["_id"] = doc["id"]
+            #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+            #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+            action["_source"] = doc
+
+            yield action
 
 class ReactomeProcess():
-    def __init__(self, loader, pathway_data_url, pathway_relation_url):
+    def __init__(self, loader, pathway_data_url, pathway_relation_url,
+            workers_write, queue_write):
         self.loader = loader
         self.g = nx.DiGraph(name="reactome")
         self.data = {}
         '''download data'''
         self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
         self.logger = logging.getLogger(__name__)
+        self.workers_write = workers_write
+        self.queue_write = queue_write
 
     def process_all(self, dry_run):
         root = 'root'
@@ -109,33 +154,19 @@ class ReactomeProcess():
                 self.loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME))
 
 
-        for node, node_data in self.g.nodes(data=True):
-            if node != root:
-                ancestors = set()
-                paths = list(all_simple_paths(self.g, root, node))
-                for path in paths:
-                    for p in path:
-                        ancestors.add(p)
-
-                #ensure these are real tuples, not generators
-                #otherwise they can't be serialized to json
-                children = tuple(self.g.successors(node))
-                parents = tuple(self.g.predecessors(node))
-
-                body = dict(id=node,
-                    label=node_data['name'],
-                    path=paths,
-                    children=children,
-                    parents=parents,
-                    is_root=node == root,
-                    ancestors=list(ancestors)
-                )
-
-                #store in elasticsearch if not dry running
-                if not dry_run:
-                    self.loader.put(index_name=Const.ELASTICSEARCH_REACTOME_INDEX_NAME,
-                        doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                        ID=node, body=body)
+        #write into elasticsearch
+        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME)
+        chunk_size = 1000 #TODO make configurable
+        docs = generate_documents(self.g)
+        actions = elasticsearch_actions(docs, dry_run, index)
+        failcount = 0
+        if not dry_run:
+            for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
+                    thread_count=self.workers_write, queue_size=self.queue_write, 
+                    chunk_size=chunk_size):
+                success, details = result
+                if not success:
+                    failcount += 1
                     
         #cleanup elasticsearch
         if not dry_run:
@@ -144,6 +175,8 @@ class ReactomeProcess():
             #note this automatically does all prepared indexes
             self.loader.restore_after_bulk_indexing()
 
+        if failcount:
+            raise RuntimeError("%s failed to index" % failcount)
 
 
     """
