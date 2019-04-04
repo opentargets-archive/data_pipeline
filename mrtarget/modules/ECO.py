@@ -49,7 +49,7 @@ def elasticsearch_actions(items, dry_run, index):
         if not dry_run:
             action = {}
             action["_index"] = index
-            action["_type"] = Const.ELASTICSEARCH_ECO_INDEX_NAME
+            action["_type"] = Const.ELASTICSEARCH_ECO_DOC_NAME
             action["_id"] = eco_id
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -115,7 +115,7 @@ class EcoProcess():
             self.loader.restore_after_bulk_indexing()
 
         if failcount:
-            raise RuntimeError("%s relations failed to index" % failcount)
+            raise RuntimeError("%s failed to index" % failcount)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
