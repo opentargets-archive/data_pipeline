@@ -6,8 +6,6 @@ import opentargets_ontologyutils.efo
 from rdflib import URIRef
 from mrtarget.constants import Const
 
-logger = logging.getLogger(__name__)
-
 '''
 Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 
 WHenever an evidence or association has an EFO code, we use this module to decorate and expand the information around the code and ultimately save it in the objects.
