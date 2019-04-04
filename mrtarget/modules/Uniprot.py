@@ -61,16 +61,17 @@ class UniprotDownloader(object):
 
 
         #write into elasticsearch
-        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
-        chunk_size = 1000 #TODO make configurable
-        actions = elasticsearch_actions(generate_uniprot(uri), dry_run, index)
         failcount = 0
-        for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
-                thread_count=self.workers_write, queue_size=self.queue_write, 
-                chunk_size=chunk_size):
-            success, details = result
-            if not success:
-                failcount += 1
+        if not dry_run:
+            index = self.loader.get_versioned_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
+            chunk_size = 1000 #TODO make configurable
+            actions = elasticsearch_actions(generate_uniprot(uri), dry_run, index)
+            for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
+                    thread_count=self.workers_write, queue_size=self.queue_write, 
+                    chunk_size=chunk_size):
+                success, details = result
+                if not success:
+                    failcount += 1
 
         #cleanup elasticsearch
         if not dry_run:
