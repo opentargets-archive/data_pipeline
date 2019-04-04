@@ -114,9 +114,9 @@ def main():
             if args.gen:
                 process = GeneManager(loader, redis,
                     args.gen_plugin_places, data_config.gene_data_plugin_names,
-                    )
+                    args.gen_workers_writer, args.gen_queue_write )
                 if not args.qc_only:
-                    process.merge_all(data_config, dry_run=args.dry_run)
+                    process.merge_all(data_config, args.dry_run)
 
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))     
