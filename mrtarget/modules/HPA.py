@@ -10,6 +10,7 @@ import pypeln.process as pr
 import petl
 import more_itertools
 from opentargets_urlzsource import URLZSource
+import elasticsearch
 
 from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
 
@@ -478,48 +479,44 @@ class HPADataDownloader():
 
         return t_join
 
+"""
+Generates elasticsearch action objects from the results iterator
 
-def write_on_start(es_hosts):
-    kwargs = {}
-    es_client = new_es_client(es_hosts)
-    kwargs['es_loader'] = Loader(es=es_client)
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(hpa_merged_table, dry_run, index):
+    for entry in hpa_merged_table.data():
+        hpa = entry[0]
+        if not dry_run:
+            action = {}
+            action["_index"] = index
+            action["_type"] = Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME
+            action["_id"] = hpa['gene']
+            #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+            #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+            action["_source"] = hpa
 
-    return kwargs
-
-def write_on_done(status, resources):
-    resources['es_loader'].flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-    resources['es_loader'].close()
-
-def write_to_elastic(data, resources):
-    hpa = data[0]
-    resources['es_loader'].put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-        Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-        ID=hpa['gene'], body=hpa)
-
-
+            yield action
 
 class HPAProcess():
-    def __init__(self, loader, r_server, 
-            es_hosts,
+    def __init__(self, loader, r_server, es_hosts,
             tissue_translation_map_url, 
             tissue_curation_map_url,
             normal_tissue_url,
-            rna_level_url,
-            rna_value_url,
-            rna_zscore_url):
+            rna_level_url, rna_value_url, rna_zscore_url, 
+            workers_write, queue_write):
         self.loader = loader
         self.r_server = r_server
         self.es_hosts = es_hosts
         self.downloader = HPADataDownloader(tissue_translation_map_url, 
-            tissue_curation_map_url,
-            normal_tissue_url,
-            rna_level_url,
-            rna_value_url,
-            rna_zscore_url)
+            tissue_curation_map_url, normal_tissue_url,
+            rna_level_url, rna_value_url, rna_zscore_url)
         self.logger = logging.getLogger(__name__)
         self.hpa_normal_table = None
         self.hpa_rna_table = None
         self.hpa_merged_table = None
+        self.workers_write = workers_write
+        self.queue_write = queue_write
 
     def process_all(self, dry_run):
         self.hpa_normal_table = self.process_normal_tissue()
@@ -557,16 +554,17 @@ class HPAProcess():
                 self.loader.get_versioned_index(
                     Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
   
-        self.logger.info('starting to write to elasticsearch') 
-
-
-        for entry in self.hpa_merged_table.data():
-            hpa = entry[0]
-            if not dry_run:
-                self.loader.put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                    Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                    ID=hpa['gene'], body=hpa)
-            
+        #write into elasticsearch
+        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+        chunk_size = 1000 #TODO make configurable
+        actions = elasticsearch_actions(self.hpa_merged_table, dry_run, index)
+        failcount = 0
+        for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
+                thread_count=self.workers_write, queue_size=self.queue_write, 
+                chunk_size=chunk_size):
+            success, details = result
+            if not success:
+                failcount += 1
 
         #cleanup elasticsearch
         if not dry_run:
@@ -575,7 +573,8 @@ class HPAProcess():
             #note this automatically does all prepared indexes
             self.loader.restore_after_bulk_indexing()
         
-        self.logger.info('all expressions objects pushed to elasticsearch')
+        if failcount:
+            raise RuntimeError("%s failed to index" % failcount)
 
         self.logger.info('missing tissues %s', str(_missing_tissues))
 

@@ -105,7 +105,8 @@ def main():
                 process = HPAProcess(loader,redis, args.elasticseach_nodes,
                     data_config.tissue_translation_map, data_config.tissue_curation_map,
                     data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
-                    data_config.hpa_rna_value, data_config.hpa_rna_zscore)
+                    data_config.hpa_rna_value, data_config.hpa_rna_zscore,
+                    args.hpa_workers_writer, args.hpa_queue_write)
                 if not args.qc_only:
                     process.process_all(args.dry_run)
                 if not args.skip_qc:
