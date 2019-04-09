@@ -58,17 +58,23 @@ def setup_ops_parser():
 
     p.add("--val-workers-validator", help="# of procs for validation workers",
         env_var="VAL_WORKERS_VALIDATOR", action='store', default=4, type=int)
+    p.add("--val-queue-validator", help="size of validation validator queue",
+        env_var="VAL_QUEUE_VALIDATOR", action='store', default=1000, type=int)
     p.add("--val-workers-writer", help="# of procs for validation writers",
         env_var="VAL_WORKERS_WRITER", action='store', default=4, type=int)
-    p.add("--val-queue-validator-writer", help="size of validation writer to worker queue",
-        env_var="VAL_QUEUE_VALIDATOR_WRITER", action='store', default=1000, type=int)
+    p.add("--val-queue-validator-writer", help="size of validation writer queue (in chunks)",
+        env_var="VAL_QUEUE_VALIDATOR_WRITER", action='store', default=8, type=int)
 
     p.add("--as-workers-production", help="# of procs for assocation pair producers",
         env_var="AS_WORKERS_PRODUCTION", action='store', default=4, type=int)
     p.add("--as-workers-score", help="# of procs for assocation pair scoring",
         env_var="AS_WORKERS_SCORE", action='store', default=4, type=int)
+    p.add("--as-workers-writer", help="# of procs for association pair writers",
+        env_var="AS_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--as-queue-production-score", help="size of assocation producer to scorer queue",
         env_var="AS_QUEUE_PRODUCTION_SCORE", action='store', default=1000, type=int)
+    p.add("--as-queue-write", help="size of association pair writer queue (in chunks)",
+        env_var="AS_QUEUE_WRITE", action='store', default=8, type=int)
 
     p.add("--ddr-workers-production", help="# of procs for relation pair producers",
         env_var="DDR_WORKERS_PRODUCTION", action='store', default=4, type=int)

@@ -19,6 +19,7 @@ from mrtarget.common.EvidenceString import Evidence, ExtendedInfoGene, ExtendedI
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 
+import elasticsearch
 import pypeln.process as pr
 
 
@@ -297,6 +298,7 @@ def produce_evidence_local_init(es_hosts,
 
 def produce_evidence(data, es_query, 
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
+    #print(data)
     data_cache = {}
     target = data
 
@@ -339,12 +341,7 @@ def produce_evidence(data, es_query,
 
     return return_values
 
-def produce_evidence_local_shutdown(status, es_query, 
-        scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
-    pass
-
-
-def score_producer_local_init(es_hosts, redis_host, redis_port, 
+def score_producer_local_init(redis_host, redis_port, 
         lookup_data, datasources_to_datatypes, dry_run):
 
     #set the R server to lookup into
@@ -352,12 +349,11 @@ def score_producer_local_init(es_hosts, redis_host, redis_port,
 
     scorer = Scorer()
 
-    loader = Loader(new_es_client(es_hosts))
-
-    return scorer, loader, r_server, lookup_data, datasources_to_datatypes, dry_run
+    return scorer, r_server, lookup_data, datasources_to_datatypes, dry_run
 
 def score_producer(data, 
-        scorer, loader, r_server, lookup_data, datasources_to_datatypes, dry_run):
+        scorer, r_server, lookup_data, datasources_to_datatypes, dry_run):
+    #print(data)
     target, disease, evidence, is_direct = data
 
     logger = logging.getLogger(__name__)
@@ -410,24 +406,61 @@ def score_producer(data,
 
 
             element_id = '%s-%s' % (target, disease)
-            if not dry_run:
-                loader.put(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-                    Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                    element_id, score)
+
+            return (element_id, score)
 
         else:
             logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
+            
+        return None
 
-def score_producer_local_shutdown(status, 
-        scorer, loader, r_server, lookup_data, datasources_to_datatypes, dry_run):
+"""
+Consumes the iterable passed in and loads into into provided loader
+whilst also respecting the dry run flag given
 
-    #cleanup elasticsearch
-    if not dry_run:
-        loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
+Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
+performance loading
+"""
+def store_in_elasticsearch(results, loader, dry_run, workers_write, queue_write):
+    client = loader.es
+    index = loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
+    thread_count = workers_write
+    queue_size = queue_write
+    chunk_size = 1000 #TODO make configurable
+    actions = elasticsearch_actions(results, dry_run, index)
+    failcount = 0
+    for result in elasticsearch.helpers.parallel_bulk(client, actions,
+            thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
+        success, details = result
+        if not success:
+            failcount += 1
+
+    if failcount:
+        raise RuntimeError("%s relations failed to index" % failcount)
+
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(results, dry_run, index):
+    for r in results:
+        if r is not None:
+            element_id, score = r
+            if not dry_run:
+                action = {}
+                action["_index"] = index
+                action["_type"] = Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME
+                action["_id"] = element_id
+                #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+                #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+                action["_source"] = score.to_json()
+                yield action
 
 class ScoringProcess():
 
-    def __init__(self, redis_host, redis_port, es_hosts):
+    def __init__(self, redis_host, redis_port, es_hosts, 
+            workers_write, queue_write):
 
         self.logger = logging.getLogger(__name__)
 
@@ -439,6 +472,9 @@ class ScoringProcess():
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.r_server = new_redis_client(self.redis_host, self.redis_port)
+        self.workers_write = workers_write
+        self.queue_write = queue_write
+
 
     def process_all(self, scoring_weights, is_direct_do_not_propagate,
             datasources_to_datatypes, dry_run, 
@@ -467,32 +503,25 @@ class ScoringProcess():
         produce_evidence_local_init_baked = functools.partial(produce_evidence_local_init, 
             self.es_hosts, scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes)
         score_producer_local_init_baked = functools.partial(score_producer_local_init, 
-            self.es_hosts, self.redis_host, self.redis_port,
-            lookup_data, datasources_to_datatypes, dry_run)
+            self.redis_host, self.redis_port, lookup_data, datasources_to_datatypes, dry_run)
         
-        #this doesn't need to be in the external config, since its so content light
-        #as to be meaningless
-        max_queued_score_out = 10000
-
         #pipeline stage for making the lists of the target/disease pairs and evidence
-        pipeline_stage = pr.flat_map(produce_evidence, targets, 
+        pipeline_stage1 = pr.flat_map(produce_evidence, targets, 
             workers=num_workers_produce,
             maxsize=max_queued_produce_to_score,
-            on_start=produce_evidence_local_init_baked, 
-            on_done=produce_evidence_local_shutdown)
+            on_start=produce_evidence_local_init_baked)
 
         #pipeline stage for scoring the evidence sets
         #includes writing to elasticsearch
-        pipeline_stage = pr.each(score_producer, pipeline_stage, 
+        pipeline_stage2 = pr.map(score_producer, pipeline_stage1, 
             workers=num_workers_score,
-            maxsize=max_queued_score_out,
-            on_start=score_producer_local_init_baked, 
-            on_done=score_producer_local_shutdown)
+            maxsize=max_queued_produce_to_score, #TODO configure this
+            on_start=score_producer_local_init_baked)
 
-
-        #loop over the end of the pipeline to make sure everything is finished
+        #load into elasticsearch
         self.logger.info('stages created, running scoring and writing')
-        pr.run(pipeline_stage)
+        store_in_elasticsearch(pipeline_stage2, self.es_loader, dry_run, 
+            self.workers_write, self.queue_write)
         self.logger.info('stages created, ran scoring and writing')
 
         #cleanup elasticsearch
