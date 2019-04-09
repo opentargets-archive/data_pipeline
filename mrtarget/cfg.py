@@ -56,6 +56,11 @@ def setup_ops_parser():
     #if there are multiple parallel operations happening at once, and
     #there usually are, then this could be many more than that
 
+    p.add("--sea-workers-writer", help="# of procs for sea writers",
+        env_var="SEA_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--sea-queue-write", help="size of sea writer queue (in chunks)",
+        env_var="SEA_QUEUE_WRITE", action='store', default=8, type=int)
+
     p.add("--val-workers-validator", help="# of procs for validation workers",
         env_var="VAL_WORKERS_VALIDATOR", action='store', default=4, type=int)
     p.add("--val-workers-writer", help="# of procs for validation writers",

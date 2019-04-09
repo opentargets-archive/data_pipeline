@@ -185,7 +185,8 @@ def main():
                 #TODO qc
 
             if args.sea:
-                process = SearchObjectProcess(loader, redis)
+                process = SearchObjectProcess(loader, redis,
+                    args.sea_workers_writer, args.sea_queue_write)
                 if not args.qc_only:
                     process.process_all(
                         data_config.chembl_target, 
