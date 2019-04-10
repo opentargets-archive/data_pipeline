@@ -356,7 +356,7 @@ def score_producer(data,
     #print(data)
     target, disease, evidence, is_direct = data
 
-    logger = logging.getLogger(__name__)
+    #logger = logging.getLogger(__name__)
 
     if evidence:
         score = scorer.score(target, disease, evidence, is_direct, 
@@ -370,8 +370,8 @@ def score_producer(data,
                     lookup_data.available_genes.get_gene(target, r_server))
 
             except KeyError as e:
-                logger.debug('Cannot find gene code "%s" '
-                                    'in lookup table' % target)
+                #logger.debug('Cannot find gene code "%s" '
+                #                    'in lookup table' % target)
                 raise e
             score.set_target_data(gene_data)
 
@@ -398,9 +398,10 @@ def score_producer(data,
                 disease_data.load_json(
                     lookup_data.available_efos.get_efo(disease, r_server))
             except KeyError as e:
-                logger.debug('Cannot find EFO code "%s" '
-                                    'in lookup table' % disease)
-                logger.exception(e)
+                #logger.debug('Cannot find EFO code "%s" '
+                #                    'in lookup table' % disease)
+                #logger.exception(e)
+                raise e
 
             score.set_disease_data(disease_data)
 
@@ -409,53 +410,11 @@ def score_producer(data,
 
             return (element_id, score)
 
-        else:
-            logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
+#        else:
+#            logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
             
         return None
 
-"""
-Consumes the iterable passed in and loads into into provided loader
-whilst also respecting the dry run flag given
-
-Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
-performance loading
-"""
-def store_in_elasticsearch(results, loader, dry_run, workers_write, queue_write):
-    client = loader.es
-    index = loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
-    thread_count = workers_write
-    queue_size = queue_write
-    chunk_size = 1000 #TODO make configurable
-    actions = elasticsearch_actions(results, dry_run, index)
-    failcount = 0
-    for result in elasticsearch.helpers.parallel_bulk(client, actions,
-            thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
-        success, details = result
-        if not success:
-            failcount += 1
-
-    if failcount:
-        raise RuntimeError("%s relations failed to index" % failcount)
-
-"""
-Generates elasticsearch action objects from the results iterator
-
-Output suitable for use with elasticsearch.helpers 
-"""
-def elasticsearch_actions(results, dry_run, index):
-    for r in results:
-        if r is not None:
-            element_id, score = r
-            if not dry_run:
-                action = {}
-                action["_index"] = index
-                action["_type"] = Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME
-                action["_id"] = element_id
-                #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
-                #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
-                action["_source"] = score.to_json()
-                yield action
 
 class ScoringProcess():
 
@@ -520,8 +479,7 @@ class ScoringProcess():
 
         #load into elasticsearch
         self.logger.info('stages created, running scoring and writing')
-        store_in_elasticsearch(pipeline_stage2, self.es_loader, dry_run, 
-            self.workers_write, self.queue_write)
+        self.store_in_elasticsearch(pipeline_stage2, dry_run)
         self.logger.info('stages created, ran scoring and writing')
 
         #cleanup elasticsearch
@@ -535,6 +493,57 @@ class ScoringProcess():
 
         self.logger.info("DONE")
 
+    """
+    Consumes the iterable passed in and loads into into provided loader
+    whilst also respecting the dry run flag given
+
+    Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
+    performance loading
+    """
+    def store_in_elasticsearch(self, results, dry_run):
+        client = self.es_loader.es
+        index = self.es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
+        chunk_size = 100 #TODO make configurable
+        actions = self.elasticsearch_actions(results, dry_run, index)
+        failcount = 0
+        successcount = 0
+    #trying to use multiple threads hangs for some reason
+    #    for result in elasticsearch.helpers.parallel_bulk(client, actions,
+    #            thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
+    #    for result in elasticsearch.helpers.streaming_bulk(client, actions,
+    #            chunk_size=chunk_size):
+        for result in elasticsearch.helpers.bulk(new_es_client(self.es_hosts), actions,
+                chunk_size=chunk_size):    
+            success, details = result
+            if not success:
+                failcount += 1
+            if success:
+                successcount += 1
+                self.logger.debug("successcount = %d", successcount)
+
+        if failcount:
+            raise RuntimeError("%s relations failed to index" % failcount)
+
+    """
+    Generates elasticsearch action objects from the results iterator
+
+    Output suitable for use with elasticsearch.helpers 
+    """
+    def elasticsearch_actions(self, results, dry_run, index):
+        for r in results:
+            if r is not None:
+                element_id, score = r
+                if not dry_run:
+                    action = {}
+                    action["_index"] = index
+                    action["_type"] = Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME
+                    action["_id"] = element_id
+                    #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+                    #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+                    action["_source"] = score.to_json()
+                    self.logger.debug("Generated action for %s", element_id)
+                    yield action
+                    
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
