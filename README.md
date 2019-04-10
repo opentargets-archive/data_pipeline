@@ -22,6 +22,7 @@ Downloads and processes information into a local index for performance.
 #### `--gen` Target
 Downloads and processes information from various sources. Is built around a "plugin" structure. Constructs an Elasticsarch index containg most of the information about each Target within the platform.
 It requires `--rea` reactome, `--ens` Ensembl, and `--unic` Uniprot steps.
+Note: HGNC,Ensembl,Uniprot plugins should always be first, as they initialize the gene list used in other plugins.
 #### `--efo` Disease
 Downloads and processes the Experimental Factor Ontology, as well as Human Phenotype Ontology
 and other sources. Constructs an Elasticsarch index containg the information about each Disease within the platform.
