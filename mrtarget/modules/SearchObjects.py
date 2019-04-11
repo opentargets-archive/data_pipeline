@@ -11,10 +11,9 @@ from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.constants import Const
 from mrtarget.Settings import Config
 
-
+import elasticsearch
 
 class SearchObjectTypes(object):
-    __ROOT__ = 'search_type'
     TARGET = 'target'
     DISEASE = 'disease'
     GENERIC = 'generic'
@@ -167,16 +166,47 @@ class SearchObjectDisease(SearchObject, object):
         # self.min_path_len-=1#correct for cttv_root
         self.phenotypes = json_input['phenotypes']
 
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(items, dry_run, index):
+    for so in items:
+        if not dry_run:
+            action = {}
+            doc_type = Const.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type
+            action["_index"] = index
+            action["_type"] = doc_type
+            action["_id"] = so.id
+            #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+            #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+            action["_source"] = so.to_json()
+
+            yield action
+
+def store_in_elasticsearch(so_it, dry_run, index, loader, workers_write, queue_write):
+    #write into elasticsearch
+    index = loader.get_versioned_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
+    chunk_size = 1000 #TODO make configurable
+    actions = elasticsearch_actions(so_it, dry_run, index)
+    failcount = 0
+    for result in elasticsearch.helpers.parallel_bulk(loader.es, actions,
+            thread_count=workers_write, queue_size=queue_write, 
+            chunk_size=chunk_size):
+        success, details = result
+        if not success:
+            failcount += 1
 
 class SearchObjectProcess(object):
-    def __init__(self,
-                 loader,
-                 r_server):
+    def __init__(self, loader, r_server, workers_write, queue_write):
         self.loader = loader
         self.esquery = ESQuery(loader.es)
         self.r_server = r_server
-        self.logger = logging.getLogger(__name__)
+        self.workers_write = workers_write
+        self.queue_write = queue_write
 
+        self.logger = logging.getLogger(__name__)
 
         '''define data processing handlers'''
         self.data_handlers = defaultdict(lambda: SearchObject)
@@ -211,25 +241,27 @@ class SearchObjectProcess(object):
             self.chembl_handler.populate_synonyms_for_molecule(all_molecules[i:i + query_batch_size],
                 self.chembl_handler.molecule2synonyms)
 
+        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
+
         #setup elasticsearch
         if not dry_run:
             self.loader.create_new_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
             #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(
-                self.loader.get_versioned_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME))
+            self.loader.prepare_for_bulk_indexing(index)
 
         #process targets
         '''get gene simplified objects and push them to the processing queue'''
-        for i,target in enumerate(self.esquery.get_all_targets()):
-            target[SearchObjectTypes.__ROOT__] = SearchObjectTypes.TARGET
-            self.handle_search_object(target, dry_run)
+        self.logger.info('get target objects and push them to the processing queue')
+        targets = self.esquery.get_all_targets()
+        so_it = self.handle_search_object(targets, dry_run, SearchObjectTypes.TARGET)
+        store_in_elasticsearch(so_it, dry_run, index, self.loader, self.workers_write, self.queue_write)
 
         #process diseases
         '''get disease objects  and push them to the processing queue'''
         self.logger.info('get disease objects and push them to the processing queue')
-        for i,disease in enumerate(self.esquery.get_all_diseases()):
-            disease[SearchObjectTypes.__ROOT__] = SearchObjectTypes.DISEASE
-            self.handle_search_object(disease, dry_run)
+        diseases = self.esquery.get_all_diseases()
+        so_it = self.handle_search_object(diseases, dry_run, SearchObjectTypes.DISEASE)
+        store_in_elasticsearch(so_it, dry_run, index, self.loader, self.workers_write, self.queue_write)
 
         #cleanup elasticsearch
         if not dry_run:
@@ -253,43 +285,41 @@ class SearchObjectProcess(object):
                                 score = cap_score(data_point['harmonic-sum']['overall'])) for data_point in data['direct']]
             )
 
-    def handle_search_object(self, data, dry_run):
-        '''process objects to simple search object'''
-        so = self.data_handlers[data[SearchObjectTypes.__ROOT__]]()
-        so.digest(json_input=data)
+    def handle_search_object(self, data_it, dry_run, search_type):
+        for data in data_it:
+            data["search_type"] = search_type
+            '''process objects to simple search object'''
+            so = self.data_handlers[data["search_type"]]()
+            so.digest(json_input=data)
 
-        '''inject drug data'''
-        if not hasattr(so, 'drugs'):
-            so.drugs = {}
-        so.drugs['evidence_data'] = []
+            '''inject drug data'''
+            if not hasattr(so, 'drugs'):
+                so.drugs = {}
+            so.drugs['evidence_data'] = []
 
-        '''count associations '''
-        if data[SearchObjectTypes.__ROOT__] == SearchObjectTypes.TARGET:
-            ass_data = self.esquery.get_associations_for_target(data['id'], fields=['id','harmonic-sum.overall'], size = 20)
-            so.set_associations(self.summarise_association(ass_data.top_associations),
-                ass_data.associations_count)
-            if so.id in self.chembl_handler.target2molecule:
-                drugs_synonyms = set()
-                for molecule in self.chembl_handler.target2molecule[so.id]:
-                    if molecule in self.chembl_handler.molecule2synonyms:
-                        drugs_synonyms = drugs_synonyms | set(self.chembl_handler.molecule2synonyms[molecule])
-                so.drugs['evidence_data'] = list(drugs_synonyms)
+            '''count associations '''
+            if data["search_type"] == SearchObjectTypes.TARGET:
+                ass_data = self.esquery.get_associations_for_target(data['id'], fields=['id','harmonic-sum.overall'], size = 20)
+                so.set_associations(self.summarise_association(ass_data.top_associations),
+                    ass_data.associations_count)
+                if so.id in self.chembl_handler.target2molecule:
+                    drugs_synonyms = set()
+                    for molecule in self.chembl_handler.target2molecule[so.id]:
+                        if molecule in self.chembl_handler.molecule2synonyms:
+                            drugs_synonyms = drugs_synonyms | set(self.chembl_handler.molecule2synonyms[molecule])
+                    so.drugs['evidence_data'] = list(drugs_synonyms)
 
-        elif data[SearchObjectTypes.__ROOT__] == SearchObjectTypes.DISEASE:
-            ass_data = self.esquery.get_associations_for_disease(data['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
-            so.set_associations(self.summarise_association(ass_data.top_associations),
-                ass_data.associations_count)
-            if so.id in self.chembl_handler.disease2molecule:
-                drugs_synonyms = set()
-                for molecule in self.chembl_handler.disease2molecule[so.id]:
-                    if molecule in self.chembl_handler.molecule2synonyms:
-                        drugs_synonyms = drugs_synonyms | set(self.chembl_handler.molecule2synonyms[molecule])
-                so.drugs['evidence_data'] = list(drugs_synonyms)
-        else:
-            so.set_associations()
+            elif data["search_type"] == SearchObjectTypes.DISEASE:
+                ass_data = self.esquery.get_associations_for_disease(data['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
+                so.set_associations(self.summarise_association(ass_data.top_associations),
+                    ass_data.associations_count)
+                if so.id in self.chembl_handler.disease2molecule:
+                    drugs_synonyms = set()
+                    for molecule in self.chembl_handler.disease2molecule[so.id]:
+                        if molecule in self.chembl_handler.molecule2synonyms:
+                            drugs_synonyms = drugs_synonyms | set(self.chembl_handler.molecule2synonyms[molecule])
+                    so.drugs['evidence_data'] = list(drugs_synonyms)
+            else:
+                so.set_associations()
 
-        '''store search objects'''
-        if not dry_run:
-            self.loader.put(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME,
-                Const.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type,
-                so.id, so.to_json())
+            yield so
