@@ -76,9 +76,9 @@ class ReactomeDataDownloader():
 
 def generate_documents(g):
     for node, node_data in g.nodes(data=True):
-        if node != root:
+        if node != 'root':
             ancestors = set()
-            paths = list(all_simple_paths(g, root, node))
+            paths = list(all_simple_paths(g, 'root', node))
             for path in paths:
                 for p in path:
                     ancestors.add(p)
@@ -93,7 +93,7 @@ def generate_documents(g):
                 path=paths,
                 children=children,
                 parents=parents,
-                is_root=node == root,
+                is_root=node == 'root',
                 ancestors=list(ancestors)
             )
             yield body
@@ -108,7 +108,7 @@ def elasticsearch_actions(docs, dry_run, index):
         if not dry_run:
             action = {}
             action["_index"] = index
-            action["_type"] = Const.ELASTICSEARCH_REACTOME_DOC_NAME
+            action["_type"] = Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME
             action["_id"] = doc["id"]
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -129,9 +129,8 @@ class ReactomeProcess():
         self.queue_write = queue_write
 
     def process_all(self, dry_run):
-        root = 'root'
         self.relations = dict()
-        self.g.add_node(root, name="", species="")
+        self.g.add_node('root', name="", species="")
 
         for row in self.downloader.get_pathway_data():
             self.g.add_node(row['id'], name=row['name'], species=row['species'])
@@ -142,8 +141,8 @@ class ReactomeProcess():
 
         nodes_without_parent = set(self.g.nodes()) - children
         for node in nodes_without_parent:
-            if node != root:
-                self.g.add_edge(root, node)
+            if node != 'root':
+                self.g.add_edge('root', node)
                 
 
         #setup elasticsearch
@@ -155,7 +154,7 @@ class ReactomeProcess():
 
 
         #write into elasticsearch
-        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME)
+        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME)
         chunk_size = 1000 #TODO make configurable
         docs = generate_documents(self.g)
         actions = elasticsearch_actions(docs, dry_run, index)
