@@ -1,12 +1,10 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.Settings import Config
 from opentargets_urlzsource import URLZSource
 import re
 import traceback
 import logging
 import csv
 import configargparse
-logging.basicConfig(level=logging.DEBUG)
 
 class Hallmarks(IPlugin):
 
