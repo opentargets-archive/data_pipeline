@@ -84,7 +84,8 @@ def main():
 
             if args.rea:
                 process = ReactomeProcess(loader, 
-                    data_config.reactome_pathway_data, data_config.reactome_pathway_relation)
+                    data_config.reactome_pathway_data, data_config.reactome_pathway_relation,
+                    args.rea_workers_writer, args.rea_queue_write)
                 if not args.qc_only:
                     process.process_all(args.dry_run)
                 if not args.skip_qc:
