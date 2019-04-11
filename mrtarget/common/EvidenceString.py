@@ -102,17 +102,12 @@ class ExtendedInfoEFO(ExtendedInfo):
             raise AttributeError("you need to pass a EFO not a: " + str(type(efo)))
 
     def extract_info(self, efo):
-        therapeutic_area_codes = set()
-        therapeutic_area_labels = set()
-        for i, path_codes in enumerate(efo.path_codes):
-            if len(path_codes) > 1:
-                therapeutic_area_codes.add(path_codes[0])
-                therapeutic_area_labels.add(efo.path_labels[i][0])
         self.data = dict(efo_id=efo.get_id(),
-                         label=efo.label,
-                         path=efo.path_codes,
-                         therapeutic_area=dict(codes=list(therapeutic_area_codes),
-                                               labels=list(therapeutic_area_labels)))
+            label=efo.label,
+            path=efo.path_codes,
+            therapeutic_area=dict(
+                codes=list(efo.therapeutic_codes),
+                labels=list(efo.therapeutic_labels)))
 
 
 class ExtendedInfoECO(ExtendedInfo):
@@ -219,7 +214,7 @@ class EvidenceManager():
                         fixed = True
             else:
                 #logging in child processess can lead to hung threads
-                # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/                
+                # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/
                 #self.logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
                 pass
 
@@ -474,7 +469,7 @@ class EvidenceManager():
                     ecos_info.append(ExtendedInfoECO(eco))
                 else:
                     #logging in child processess can lead to hung threads
-                    # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/    
+                    # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/
                     #self.logger.warning("eco uri %s is not in the ECO LUT so it will not be considered as included", eco_id)
                     pass
 
