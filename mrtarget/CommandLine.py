@@ -123,7 +123,8 @@ def main():
     
             if args.efo:
                 process = EfoProcess(loader, data_config.ontology_efo, data_config.ontology_hpo, 
-                    data_config.ontology_mp, data_config.disease_phenotype)
+                    data_config.ontology_mp, data_config.disease_phenotype,
+                    args.efo_workers_writer, args.efo_queue_write)
                 if not args.qc_only:
                     process.process_all(args.dry_run)
                 if not args.skip_qc:
