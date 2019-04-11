@@ -56,11 +56,6 @@ def setup_ops_parser():
     #if there are multiple parallel operations happening at once, and
     #there usually are, then this could be many more than that
 
-    p.add("--eco-workers-writer", help="# of procs for eco writers",
-        env_var="ECO_WORKERS_WRITER", action='store', default=4, type=int)
-    p.add("--eco-queue-write", help="size of eco writer queue (in chunks)",
-        env_var="ECO_QUEUE_WRITE", action='store', default=8, type=int)
-
     p.add("--rea-workers-writer", help="# of procs for rea writers",
         env_var="REA_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--rea-queue-write", help="size of rea writer queue (in chunks)",
@@ -76,21 +71,26 @@ def setup_ops_parser():
     p.add("--uni-queue-write", help="size of uni writer queue (in chunks)",
         env_var="UNI_QUEUE_WRITE", action='store', default=8, type=int)
         
+    p.add("--gen-workers-writer", help="# of procs for gen writers",
+        env_var="GEN_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--gen-queue-write", help="size of gen writer queue (in chunks)",
+        env_var="GEN_QUEUE_WRITE", action='store', default=8, type=int)
+
+    p.add("--eco-workers-writer", help="# of procs for eco writers",
+        env_var="ECO_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--eco-queue-write", help="size of eco writer queue (in chunks)",
+        env_var="ECO_QUEUE_WRITE", action='store', default=8, type=int)
+
+    p.add("--efo-workers-writer", help="# of procs for efo writers",
+        env_var="EFO_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--efo-queue-write", help="size of efo writer queue (in chunks)",
+        env_var="EFO_QUEUE_WRITE", action='store', default=8, type=int)
+        
     p.add("--hpa-workers-writer", help="# of procs for hpa writers",
         env_var="HPA_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--hpa-queue-write", help="size of hpa writer queue (in chunks)",
         env_var="HPA_QUEUE_WRITE", action='store', default=8, type=int)
         
-    p.add("--gen-workers-writer", help="# of procs for gen writers",
-        env_var="GEN_WORKERS_WRITER", action='store', default=4, type=int)
-    p.add("--gen-queue-write", help="size of gen writer queue (in chunks)",
-        env_var="GEN_QUEUE_WRITE", action='store', default=8, type=int)
-        
-    p.add("--sea-workers-writer", help="# of procs for sea writers",
-        env_var="SEA_WORKERS_WRITER", action='store', default=4, type=int)
-    p.add("--sea-queue-write", help="size of sea writer queue (in chunks)",
-        env_var="SEA_QUEUE_WRITE", action='store', default=8, type=int)
-
     p.add("--val-workers-validator", help="# of procs for validation workers",
         env_var="VAL_WORKERS_VALIDATOR", action='store', default=4, type=int)
     p.add("--val-queue-validator", help="size of validation validator queue",
@@ -110,6 +110,11 @@ def setup_ops_parser():
         env_var="AS_QUEUE_PRODUCTION_SCORE", action='store', default=1000, type=int)
     p.add("--as-queue-write", help="size of association pair writer queue (in chunks)",
         env_var="AS_QUEUE_WRITE", action='store', default=8, type=int)
+        
+    p.add("--sea-workers-writer", help="# of procs for sea writers",
+        env_var="SEA_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--sea-queue-write", help="size of sea writer queue (in chunks)",
+        env_var="SEA_QUEUE_WRITE", action='store', default=8, type=int)
 
     p.add("--ddr-workers-production", help="# of procs for relation pair producers",
         env_var="DDR_WORKERS_PRODUCTION", action='store', default=4, type=int)

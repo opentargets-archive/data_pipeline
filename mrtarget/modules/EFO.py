@@ -5,8 +5,7 @@ from opentargets_ontologyutils.rdf_utils import OntologyClassReader, DiseaseUtil
 import opentargets_ontologyutils.efo
 from rdflib import URIRef
 from mrtarget.constants import Const
-
-logger = logging.getLogger(__name__)
+import elasticsearch
 
 '''
 Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 
@@ -81,14 +80,30 @@ class EFO(JSONSerializable):
         self._private['suggestions']['input'].append(self.get_id())
 
 
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(items, dry_run, index):
+    for efo_id, efo_obj in items:
+        if not dry_run:
+            action = {}
+            action["_index"] = index
+            action["_type"] = Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME
+            action["_id"] = efo_id
+            #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+            #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+            action["_source"] = efo_obj.to_json()
+
+            yield action
+
 class EfoProcess():
 
-    def __init__(self,
-                 loader,
-                 efo_uri,
-                 hpo_uri,
-                 mp_uri,
-                 disease_phenotype_uris
+    def __init__(self, loader,
+                 efo_uri, hpo_uri, mp_uri,
+                 disease_phenotype_uris,
+                 workers_write, queue_write
                  ):
         self.loader = loader
         self.efos = OrderedDict()
@@ -97,6 +112,8 @@ class EfoProcess():
         self.hpo_uri = hpo_uri
         self.mp_uri = mp_uri
         self.disease_phenotype_uris = disease_phenotype_uris
+        self.workers_write = workers_write
+        self.queue_write = queue_write
 
     def process_all(self, dry_run):
         self._process_ontology_data()
@@ -158,7 +175,7 @@ class EfoProcess():
                 phenotypes = disease_phenotypes[uri]['phenotypes']
 
             if uri not in self.disease_ontology.classes_paths:
-                logger.warning("Unable to find %s", uri)
+                self.logger.warning("Unable to find %s", uri)
                 continue
 
 
@@ -183,15 +200,15 @@ class EfoProcess():
                 efo.children = self.disease_ontology.children[uri]
 
             #logger.debug(str(classes_path['ids']))
-            logger.debug("done %s %s %s", id, uri, label)
+            self.logger.debug("done %s %s %s", id, uri, label)
 
             if id in self.efos:
-                logger.warning("duplicate %s", id)
+                self.logger.warning("duplicate %s", id)
                 continue
             self.efos[id] = efo
 
     def _store_efo(self, dry_run):
-        logger.info("writing to elasticsearch")
+        self.logger.info("writing to elasticsearch")
 
         #setup elasticsearch
         if not dry_run:
@@ -200,24 +217,29 @@ class EfoProcess():
             self.loader.prepare_for_bulk_indexing(
                 self.loader.get_versioned_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME))
 
-        for efo_id, efo_obj in self.efos.items():
-            if not dry_run:
-                logger.debug("putting %s", efo_id)
-                self.loader.put(index_name=Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                                doc_type=Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                                ID=efo_id,
-                                body = efo_obj)
+        #write into elasticsearch
+        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
+        chunk_size = 1000 #TODO make configurable
+        actions = elasticsearch_actions(self.efos.items(), dry_run, index)
+        failcount = 0
+        for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
+                thread_count=self.workers_write, queue_size=self.queue_write, 
+                chunk_size=chunk_size):
+            success, details = result
+            if not success:
+                failcount += 1
+
 
         #cleanup elasticsearch
         if not dry_run:
-            logger.debug("Flushing elasticsearch")
+            self.logger.debug("Flushing elasticsearch")
             self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
             #restore old pre-load settings
             #note this automatically does all prepared indexes
             self.loader.restore_after_bulk_indexing()
-            logger.debug("Flushed elasticsearch")
+            self.logger.debug("Flushed elasticsearch")
 
-        logger.info("wrote to elasticsearch")
+        self.logger.info("wrote to elasticsearch")
 
         
     """
