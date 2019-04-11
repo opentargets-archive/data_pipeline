@@ -91,7 +91,7 @@ def main():
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.ens:
-                process = EnsemblProcess(loader)
+                process = EnsemblProcess(loader, args.ens_workers_writer, args.ens_queue_write)
                 if not args.qc_only:
                     process.process(data_config.ensembl_filename, args.dry_run)
                 if not args.skip_qc:
