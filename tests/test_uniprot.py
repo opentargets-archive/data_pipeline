@@ -10,7 +10,5 @@ class UniprotTestCase(unittest.TestCase):
         resources_path = os.path.dirname(os.path.realpath(__file__))
         uniprot_uri = resources_path + os.path.sep + "resources" + os.path.sep + "uniprot.xml.gz"
 
-        downloader = UniprotDownloader(None, True)
+        downloader = UniprotDownloader(None, 1, 1)
         downloader.process(uniprot_uri, True)
-
-        self.assertEqual(downloader.total_entries, 1)
