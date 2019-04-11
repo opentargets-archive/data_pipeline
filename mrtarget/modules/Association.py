@@ -298,7 +298,6 @@ def produce_evidence_local_init(es_hosts,
 
 def produce_evidence(data, es_query, 
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
-    #print(data)
     data_cache = {}
     target = data
 
@@ -353,10 +352,7 @@ def score_producer_local_init(redis_host, redis_port,
 
 def score_producer(data, 
         scorer, r_server, lookup_data, datasources_to_datatypes, dry_run):
-    #print(data)
     target, disease, evidence, is_direct = data
-
-    #logger = logging.getLogger(__name__)
 
     if evidence:
         score = scorer.score(target, disease, evidence, is_direct, 
@@ -365,14 +361,8 @@ def score_producer(data,
         if score: 
 
             gene_data = Gene()
-            try:
-                gene_data.load_json(
-                    lookup_data.available_genes.get_gene(target, r_server))
-
-            except KeyError as e:
-                #logger.debug('Cannot find gene code "%s" '
-                #                    'in lookup table' % target)
-                raise e
+            gene_data.load_json(
+                lookup_data.available_genes.get_gene(target, r_server))
             score.set_target_data(gene_data)
 
             # create a hpa expression empty jsonserializable class
@@ -394,25 +384,18 @@ def score_producer(data,
 
 
             disease_data = EFO()
-            try:
-                disease_data.load_json(
-                    lookup_data.available_efos.get_efo(disease, r_server))
-            except KeyError as e:
-                #logger.debug('Cannot find EFO code "%s" '
-                #                    'in lookup table' % disease)
-                #logger.exception(e)
-                raise e
+            disease_data.load_json(
+                lookup_data.available_efos.get_efo(disease, r_server))
 
             score.set_disease_data(disease_data)
 
 
             element_id = '%s-%s' % (target, disease)
 
-            return (element_id, score)
+            #convert the score into a JSON-compatible object
+            #otherwise Python serialization consumes too much memory
+            return (element_id, score.to_json())
 
-#        else:
-#            logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
-            
         return None
 
 
@@ -503,23 +486,19 @@ class ScoringProcess():
     def store_in_elasticsearch(self, results, dry_run):
         client = self.es_loader.es
         index = self.es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
-        chunk_size = 100 #TODO make configurable
+        chunk_size = 1000 #TODO make configurable
         actions = self.elasticsearch_actions(results, dry_run, index)
         failcount = 0
-        successcount = 0
-    #trying to use multiple threads hangs for some reason
-    #    for result in elasticsearch.helpers.parallel_bulk(client, actions,
-    #            thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
+
+        for result in elasticsearch.helpers.parallel_bulk(client, actions,
+                thread_count=self.workers_write, queue_size=self.queue_write, chunk_size=chunk_size):
     #    for result in elasticsearch.helpers.streaming_bulk(client, actions,
     #            chunk_size=chunk_size):
-        for result in elasticsearch.helpers.bulk(new_es_client(self.es_hosts), actions,
-                chunk_size=chunk_size):    
+    #    for result in elasticsearch.helpers.bulk(new_es_client(self.es_hosts), actions,
+    #            chunk_size=chunk_size):    
             success, details = result
             if not success:
                 failcount += 1
-            if success:
-                successcount += 1
-                self.logger.debug("successcount = %d", successcount)
 
         if failcount:
             raise RuntimeError("%s relations failed to index" % failcount)
@@ -540,8 +519,7 @@ class ScoringProcess():
                     action["_id"] = element_id
                     #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
                     #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
-                    action["_source"] = score.to_json()
-                    self.logger.debug("Generated action for %s", element_id)
+                    action["_source"] = score
                     yield action
                     
     """
