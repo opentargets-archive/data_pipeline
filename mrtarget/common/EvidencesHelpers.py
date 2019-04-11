@@ -85,10 +85,13 @@ writing to elasticsearch
 It is passed the output from the local init function as additional arguments.
 """
 def elasticsearch_local_shutdown(status, es_loader):
+    logger = logging.getLogger(__name__)
+    logger.debug('local shutdown started') 
     #flush but dont close because it changes index settings
     #and that needs to be done in a single place outside of multiprocessing
     es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_INDEX_NAME)
     es_loader.flush_all_and_wait(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+    logger.debug('local shutdown finished') 
 
 
 """
@@ -101,13 +104,14 @@ the instance has to be shared between init and shutdown
 """
 def elasticsearch_global_shutdown(es_loader):
     logger = logging.getLogger(__name__)
-    logger.debug('flushing elasticsearch indexs')  
+    logger.debug('flushing elasticsearch indexes')  
     #ensure everything pending has been flushed to index
     es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_INDEX_NAME)
     es_loader.flush_all_and_wait(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
     #restore old pre-load settings
     #note this automatically does all prepared indexes
     es_loader.restore_after_bulk_indexing()
+    logger.debug('flushed elasticsearch indexes')  
 
 
 def dry_run_main(line):

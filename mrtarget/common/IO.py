@@ -24,7 +24,7 @@ def check_to_open(filename):
         is_ok = True
 
         #logging in child processess can lead to hung threads
-        # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/    
+        # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/
         #_l.debug("check to open uri %s", url_name)
         try:
             f.raise_for_status()
@@ -47,7 +47,7 @@ def open_to_write(filename):
 def open_to_read(filename):
     """return an iterator from izip (filename, (enumerate(file_handle, start=1))"""
     #logging in child processess can lead to hung threads
-    # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/    
+    # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/
     #_l.debug('generate an iterator of (filename,enumerate) for filename %s', filename)
     it = more_itertools.with_iter(URLZSource(filename).open())
     return itertools.izip(itertools.cycle([filename]), enumerate(it, start=1))
