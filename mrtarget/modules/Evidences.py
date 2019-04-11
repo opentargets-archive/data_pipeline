@@ -8,11 +8,14 @@ import codecs
 import functools
 import itertools
 
+import elasticsearch
+
 import opentargets_validator.helpers
 import mrtarget.common.IO as IO
 
+from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.Settings import Config
-
+from mrtarget.constants import Const
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.EvidencesHelpers import make_validated_evs_obj, reduce_tuple_with_sum, setup_writers
 from mrtarget.common.EvidenceString import EvidenceManager, Evidence
@@ -264,13 +267,65 @@ def validate_evidence(line, logger, validator, luts, datasources_to_datatypes):
         validated_evs.explanation_str = str(e)
         return validated_evs, None
 
+"""
+Consumes the iterable passed in and loads into into provided loader
+whilst also respecting the dry run flag given
+
+Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
+performance loading
+"""
+def store_in_elasticsearch(results, loader, dry_run, workers_write, queue_write):
+    client = loader.es
+    index_valid = loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME)
+    index_invalid = loader.get_versioned_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+    thread_count = workers_write
+    queue_size = queue_write
+    chunk_size = 1000 #TODO make configurable
+    actions = elasticsearch_actions(results, dry_run, index_valid, index_invalid)
+    failcount = 0
+    for result in elasticsearch.helpers.parallel_bulk(client, actions,
+            thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
+        success, details = result
+        if not success:
+            failcount += 1
+
+    if failcount:
+        raise RuntimeError("%s relations failed to index" % failcount)
+
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(lines, dry_run, index_valid, index_invalid):
+    for line in lines:
+        (left, right) = line
+        if right is not None:
+            #valid
+            if not dry_run:
+                action = {}
+                action["_index"] = index_valid
+                action["_type"] = Const.ELASTICSEARCH_DATA_INDEX_NAME
+                action["_id"] = right['hash']
+                action["_source"] = right['line']
+                yield action
+        elif left is not None:
+            #invalid
+            if not dry_run:
+                action = {}
+                action["_index"] = index_invalid
+                action["_type"] = Const.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME
+                action["_id"] = left['id']
+                action["_source"] = left
+                yield action
 
 def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
-        dry_run, output_folder,
-        num_workers, num_writers, max_queued_events, 
-        eco_scores_uri, schema_uri, es_hosts, excluded_biotypes, 
+        dry_run, workers_validation, queue_validation, workers_write, queue_write, 
+        eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
+
     logger = logging.getLogger(__name__)
+    es_loader = Loader(es_client)
 
     if not filenames:
         logger.error('tried to run with no filenames at all')
@@ -291,7 +346,7 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     #load lookup tables
     lookup_data = LookUpDataRetriever(es_client,
         redis_client, [], 
-        ( LookUpDataType.TARGET, LookUpDataType.DISEASE,LookUpDataType.ECO)).lookup
+        ( LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO )).lookup
 
     #create a iterable of lines from all file handles
     evs = IO.make_iter_lines(checked_filenames, first_n)
@@ -300,32 +355,36 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     validation_on_start_baked = functools.partial(validation_on_start, 
         lookup_data, eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes)
 
-    writer_global_init, writer_local_init, writer_main, writer_local_shutdown, writer_global_shutdown = setup_writers(
-        dry_run, es_hosts, output_folder)
-    if writer_global_init:
-        writer_global_init()
+    #setup elasticsearch
+    if not dry_run:
+        es_loader.create_new_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        es_loader.prepare_for_bulk_indexing(
+            es_loader.get_versioned_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME))
+        es_loader.create_new_index(Const.ELASTICSEARCH_DATA_INDEX_NAME)
+        es_loader.prepare_for_bulk_indexing(
+            es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME))
 
     #here is the pipeline definition
     pl_stage = pr.map(process_evidence, evs, 
-        workers=num_workers, maxsize=max_queued_events,
+        workers=workers_validation, maxsize=queue_validation,
         on_start=validation_on_start_baked)
 
-    pl_stage = pr.map(writer_main, pl_stage, 
-        workers=num_writers, maxsize=max_queued_events,
-        on_start=writer_local_init,
-        on_done=writer_local_shutdown)
+    #load into elasticsearch
+    logger.info('stages created, running scoring and writing')
+    store_in_elasticsearch(pl_stage, es_loader, dry_run, workers_write, queue_write)
+    logger.info('stages created, ran scoring and writing')
+    
+    #cleanup elasticsearch
+    if not dry_run:
+        logger.info('flushing data to index')
+        es_loader.flush_all_and_wait(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
+        es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_INDEX_NAME)
+        #restore old pre-load settings
+        #note this automatically does all prepared indexes
+        es_loader.restore_after_bulk_indexing()
+        logger.info('flushed data to index')
 
-    logger.info('run evidence processing pipeline')
-    results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
-
-    #perform any single-thread cleanup
-    if writer_global_shutdown:
-        writer_global_shutdown()
-
-    logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
     if failed_filenames:
         raise RuntimeError('unable to handle %s', str(failed_filenames))
 
-    if not results[1]:
-        raise RuntimeError("No evidence was sucessful!")
 
