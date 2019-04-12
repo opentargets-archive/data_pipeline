@@ -568,7 +568,9 @@ class HPAProcess():
 
         #cleanup elasticsearch
         if not dry_run:
-            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
+            self.loader.es.indices.flush(self.loader.get_versioned_index(
+                Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME), 
+                wait_if_ongoing=True)
             #restore old pre-load settings
             #note this automatically does all prepared indexes
             self.loader.restore_after_bulk_indexing()

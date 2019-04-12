@@ -468,7 +468,9 @@ class ScoringProcess():
         #cleanup elasticsearch
         if not dry_run:
             self.logger.info('flushing data to index')
-            self.es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
+            self.es_loader.es.indices.flush(self.es_loader.get_versioned_index(
+                Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME), 
+                wait_if_ongoing=True)
             #restore old pre-load settings
             #note this automatically does all prepared indexes
             self.es_loader.restore_after_bulk_indexing()
