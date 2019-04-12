@@ -406,7 +406,7 @@ class EvidenceManager():
         # try:
         gene = self._get_gene_obj(geneid)
         genes_info = ExtendedInfoGene(gene)
-        if 'reactome' in gene._private['facets']:
+        if 'facets' in gene._private and 'reactome' in gene._private['facets']:
             pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
             pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
             # except Exception:

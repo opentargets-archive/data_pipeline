@@ -73,9 +73,7 @@ validation
 """
 def validation_on_start(luts, eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
-    logger = logging.getLogger(__name__ + '_' + str(os.getpid()))
-
-    logger.debug("called validate_evidence on_start from %s", str(os.getpid()))
+    logger = logging.getLogger(__name__)
 
     validator = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
 
@@ -283,11 +281,17 @@ def store_in_elasticsearch(results, loader, dry_run, workers_write, queue_write)
     chunk_size = 1000 #TODO make configurable
     actions = elasticsearch_actions(results, dry_run, index_valid, index_invalid)
     failcount = 0
+    sucesscount = 0
+    
     for result in elasticsearch.helpers.parallel_bulk(client, actions,
             thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
+    #for result in elasticsearch.helpers.streaming_bulk(client, actions,
+    #        chunk_size=chunk_size):
         success, details = result
         if not success:
             failcount += 1
+        if success:
+            sucesscount += 1
 
     if failcount:
         raise RuntimeError("%s relations failed to index" % failcount)
@@ -308,6 +312,7 @@ def elasticsearch_actions(lines, dry_run, index_valid, index_invalid):
                 action["_type"] = Const.ELASTICSEARCH_DATA_INDEX_NAME
                 action["_id"] = right['hash']
                 action["_source"] = right['line']
+                #print("  valid %s" % action["_id"])
                 yield action
         elif left is not None:
             #invalid
@@ -317,6 +322,7 @@ def elasticsearch_actions(lines, dry_run, index_valid, index_invalid):
                 action["_type"] = Const.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME
                 action["_id"] = left['id']
                 action["_source"] = left
+                #print("invalid %s" % action["_id"])
                 yield action
 
 def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
