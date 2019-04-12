@@ -73,50 +73,10 @@ class Loader():
 
         return idx_name + suffix
 
-    def put(self, index_name, doc_type, ID, body):
-
-        versioned_index_name = self.get_versioned_index(index_name)
-        if isinstance(body, JSONSerializable):
-            body = body.to_json()
-        submission_dict = dict(_index=versioned_index_name,
-            _type=doc_type, _id=ID, _source=body)
-        self.cache.append(submission_dict)
-
-        if self.cache and ((len(self.cache) == self.chunk_size) or
-                (time.time() - self._last_flush_time >= self.max_flush_interval)):
-            self.flush()
-
-    def flush(self, max_retry=10):
-        if self.cache:
-            retry = 0
-            while 1:
-                try:
-                    self._flush()
-                    break
-                except Exception as e:
-                    retry+=1
-                    if retry >= max_retry:
-                        self.logger.exception("push to elasticsearch failed for chunk, giving up...")
-                        raise e
-                    else:
-                        time_to_wait = 5*retry
-                        self.logger.warning("push to elasticsearch failed for chunk: %s.  retrying in %is..."%(str(e),time_to_wait))
-                        time.sleep(time_to_wait)
-
-            del self.cache[:]
-
-    def _flush(self):
-        if not self.dry_run:
-            bulk(self.es,
-                 self.cache,
-                 stats_only=True)
-
     def close(self):
-        self.flush()
         self.restore_after_bulk_indexing()
 
     def flush_all_and_wait(self, index_name):
-        self.flush()
         self.es.indices.flush(self.get_versioned_index(index_name), wait_if_ongoing=True)
 
     def __enter__(self):
