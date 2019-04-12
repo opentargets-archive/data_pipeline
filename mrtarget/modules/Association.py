@@ -6,8 +6,8 @@ import functools
 import itertools
 from collections import defaultdict
 
-from mrtarget.Settings import Config
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
@@ -401,28 +401,39 @@ def score_producer(data,
 
 class ScoringProcess():
 
-    def __init__(self, redis_host, redis_port, es_hosts, 
-            workers_write, queue_write):
+    def __init__(self, es_hosts, es_index, es_doc, redis_host, redis_port, 
+            workers_write, workers_production, workers_score, 
+            queue_score, queue_produce, queue_write, 
+            scoring_weights, is_direct_do_not_propagate,
+            datasources_to_datatypes):
 
         self.logger = logging.getLogger(__name__)
 
         self.es_hosts = es_hosts
-        self.es = new_es_client(self.es_hosts)
-        self.es_loader = Loader(self.es)
-        self.es_query = ESQuery(self.es)
+        self.es_index = es_index
+        self.es_doc = es_doc
 
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.r_server = new_redis_client(self.redis_host, self.redis_port)
         self.workers_write = workers_write
+        self.workers_production = workers_production
+        self.workers_score = workers_score
         self.queue_write = queue_write
+        self.queue_produce = queue_produce
+        self.queue_score = queue_score
+
+        self.scoring_weights = scoring_weights
+        self.is_direct_do_not_propagate = is_direct_do_not_propagate
+        self.datasources_to_datatypes = datasources_to_datatypes
 
 
-    def process_all(self, scoring_weights, is_direct_do_not_propagate,
-            datasources_to_datatypes, dry_run, 
-            num_workers_produce, num_workers_score, max_queued_produce_to_score):
+    def process_all(self, dry_run, 
+            ):
 
-        lookup_data = LookUpDataRetriever(self.es, self.r_server,
+        es = new_es_client(self.es_hosts)
+
+        lookup_data = LookUpDataRetriever(es, self.r_server,
             targets=[],
             data_types=(
                 LookUpDataType.DISEASE,
@@ -431,93 +442,70 @@ class ScoringProcess():
                 LookUpDataType.HPA
             )).lookup
 
-        targets = list(self.es_query.get_all_target_ids_with_evidence_data())
-
-        #setup elasticsearch
-        if not dry_run:
-            self.es_loader.create_new_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
-            self.es_loader.prepare_for_bulk_indexing(
-                self.es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
+        es_query = ESQuery(es)
+        targets = list(es_query.get_all_target_ids_with_evidence_data())
 
         self.logger.info('setting up stages')
 
         #bake the arguments for the setup into function objects
         produce_evidence_local_init_baked = functools.partial(produce_evidence_local_init, 
-            self.es_hosts, scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes)
+            self.es_hosts, self.scoring_weights, self.is_direct_do_not_propagate, 
+            self.datasources_to_datatypes)
         score_producer_local_init_baked = functools.partial(score_producer_local_init, 
-            self.redis_host, self.redis_port, lookup_data, datasources_to_datatypes, dry_run)
+            self.redis_host, self.redis_port, lookup_data, self.datasources_to_datatypes, 
+            dry_run)
         
         #pipeline stage for making the lists of the target/disease pairs and evidence
         pipeline_stage1 = pr.flat_map(produce_evidence, targets, 
-            workers=num_workers_produce,
-            maxsize=max_queued_produce_to_score,
+            workers=self.workers_production,
+            maxsize=self.queue_produce,
             on_start=produce_evidence_local_init_baked)
 
         #pipeline stage for scoring the evidence sets
         #includes writing to elasticsearch
         pipeline_stage2 = pr.map(score_producer, pipeline_stage1, 
-            workers=num_workers_score,
-            maxsize=max_queued_produce_to_score, #TODO configure this
+            workers=self.workers_score,
+            maxsize=self.queue_score,
             on_start=score_producer_local_init_baked)
 
-        #load into elasticsearch
-        self.logger.info('stages created, running scoring and writing')
-        self.store_in_elasticsearch(pipeline_stage2, dry_run)
-        self.logger.info('stages created, ran scoring and writing')
+        with ElasticsearchBulkIndexManager(es, self.es_index):
 
-        #cleanup elasticsearch
-        if not dry_run:
-            self.logger.info('flushing data to index')
-            self.es_loader.es.indices.flush(self.es_loader.get_versioned_index(
-                Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME), 
-                wait_if_ongoing=True)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.es_loader.restore_after_bulk_indexing()
-            self.logger.info('flushed data to index')
+            #load into elasticsearch
+            self.logger.info('stages created, running scoring and writing')
+            client = es
+            chunk_size = 1000 #TODO make configurable
+            actions = self.elasticsearch_actions(pipeline_stage2, dry_run, 
+                self.es_index, self.es_doc)
+            failcount = 0
+
+            for result in elasticsearch.helpers.parallel_bulk(client, actions,
+                    thread_count=self.workers_write, queue_size=self.queue_write, chunk_size=chunk_size):
+        #    for result in elasticsearch.helpers.streaming_bulk(client, actions,
+        #            chunk_size=chunk_size):
+        #    for result in elasticsearch.helpers.bulk(new_es_client(self.es_hosts), actions,
+        #            chunk_size=chunk_size):    
+                success, details = result
+                if not success:
+                    failcount += 1
+
+            if failcount:
+                raise RuntimeError("%s relations failed to index" % failcount)
 
         self.logger.info("DONE")
-
-    """
-    Consumes the iterable passed in and loads into into provided loader
-    whilst also respecting the dry run flag given
-
-    Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
-    performance loading
-    """
-    def store_in_elasticsearch(self, results, dry_run):
-        client = self.es_loader.es
-        index = self.es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
-        chunk_size = 1000 #TODO make configurable
-        actions = self.elasticsearch_actions(results, dry_run, index)
-        failcount = 0
-
-        for result in elasticsearch.helpers.parallel_bulk(client, actions,
-                thread_count=self.workers_write, queue_size=self.queue_write, chunk_size=chunk_size):
-    #    for result in elasticsearch.helpers.streaming_bulk(client, actions,
-    #            chunk_size=chunk_size):
-    #    for result in elasticsearch.helpers.bulk(new_es_client(self.es_hosts), actions,
-    #            chunk_size=chunk_size):    
-            success, details = result
-            if not success:
-                failcount += 1
-
-        if failcount:
-            raise RuntimeError("%s relations failed to index" % failcount)
 
     """
     Generates elasticsearch action objects from the results iterator
 
     Output suitable for use with elasticsearch.helpers 
     """
-    def elasticsearch_actions(self, results, dry_run, index):
+    def elasticsearch_actions(self, results, dry_run, index, doc):
         for r in results:
             if r is not None:
                 element_id, score = r
                 if not dry_run:
                     action = {}
                     action["_index"] = index
-                    action["_type"] = Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME
+                    action["_type"] = doc
                     action["_id"] = element_id
                     #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
                     #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.

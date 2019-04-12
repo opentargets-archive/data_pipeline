@@ -85,7 +85,7 @@ def main():
         with Loader(es, args.dry_run) as loader:
 
             if args.rea:
-                process = ReactomeProcess( 
+                process = ReactomeProcess(args.elasticseach_nodes, es_config.rea.name, es_config.rea.doc, 
                     data_config.reactome_pathway_data, data_config.reactome_pathway_relation,
                     args.rea_workers_writer, args.rea_queue_write)
                 if not args.qc_only:
@@ -93,40 +93,33 @@ def main():
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.ens:
-                process = EnsemblProcess(loader, args.ens_workers_writer, args.ens_queue_write)
+                process = EnsemblProcess(args.elasticseach_nodes, es_config.ens.name, es_config.ens.doc,
+                    data_config.ensembl_filename, args.ens_workers_writer, args.ens_queue_write)
                 if not args.qc_only:
-                    process.process(data_config.ensembl_filename, args.dry_run)
+                    process.process(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.unic:
-                process = UniprotDownloader(loader, args.uni_workers_writer, args.uni_queue_write)
+                process = UniprotDownloader(args.elasticseach_nodes, es_config.uni.name, es_config.uni.doc,
+                    data_config.uniprot_uri, args.uni_workers_writer, args.uni_queue_write)
                 if not args.qc_only:
-                    process.process(data_config.uniprot_uri, args.dry_run)
+                    process.process(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
-            if args.hpa:
-                process = HPAProcess(loader,redis, args.elasticseach_nodes,
-                    data_config.tissue_translation_map, data_config.tissue_curation_map,
-                    data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
-                    data_config.hpa_rna_value, data_config.hpa_rna_zscore,
-                    args.hpa_workers_writer, args.hpa_queue_write)
-                if not args.qc_only:
-                    process.process_all(args.dry_run)
-                if not args.skip_qc:
-                    qc_metrics.update(process.qc(esquery))     
 
             if args.gen:
-                process = GeneManager(loader, redis,
+                process = GeneManager(args.elasticseach_nodes, es_config.gen.name, es_config.gen.doc, redis,
                     args.gen_plugin_places, data_config.gene_data_plugin_names,
+                    data_config, 
                     args.gen_workers_writer, args.gen_queue_write )
                 if not args.qc_only:
-                    process.merge_all(data_config, args.dry_run)
-
+                    process.merge_all(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))     
     
             if args.efo:
-                process = EfoProcess(loader, data_config.ontology_efo, data_config.ontology_hpo, 
+                process = EfoProcess(args.elasticseach_nodes, es_config.efo.name, es_config.efo.doc, 
+                    data_config.ontology_efo, data_config.ontology_hpo, 
                     data_config.ontology_mp, data_config.disease_phenotype,
                     args.efo_workers_writer, args.efo_queue_write)
                 if not args.qc_only:
@@ -134,7 +127,8 @@ def main():
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
             if args.eco:
-                process = EcoProcess(loader, data_config.ontology_eco, data_config.ontology_so,
+                process = EcoProcess(args.elasticseach_nodes, es_config.eco.name, es_config.eco.doc,
+                    data_config.ontology_eco, data_config.ontology_so,
                     args.eco_workers_writer, args.eco_queue_write)
                 if not args.qc_only:
                     process.process_all(args.dry_run)
@@ -143,7 +137,8 @@ def main():
 
             if args.val:
                 process_evidences_pipeline(data_config.input_file, args.val_first_n,
-                    es, redis, args.dry_run, 
+                    args.elasticseach_nodes, es_config.val_right.name, es_config.val_wrong.name, 
+                    es_config.val_right.doc, es_config.val_wrong.doc, redis, args.dry_run, 
                     args.val_workers_validator, args.val_queue_validator,
                     args.val_workers_writer, args.val_queue_validator_writer,
                     data_config.eco_scores, data_config.schema,
@@ -151,44 +146,55 @@ def main():
 
                 #TODO qc
 
-            if args.assoc:
-                process = ScoringProcess(args.redis_host, args.redis_port,
-                    args.elasticseach_nodes, args.as_workers_writer, args.as_queue_write)
+            if args.hpa:
+                process = HPAProcess(args.elasticseach_nodes, es_config.hpa.name, es_config.hpa.doc, redis, 
+                        data_config.tissue_translation_map, data_config.tissue_curation_map,
+                        data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
+                        data_config.hpa_rna_value, data_config.hpa_rna_zscore,
+                        args.hpa_workers_writer, args.hpa_queue_write)
                 if not args.qc_only:
-                    process.process_all(data_config.scoring_weights, 
-                        data_config.is_direct_do_not_propagate,
-                        data_config.datasources_to_datatypes,
-                        args.dry_run,
-                        args.as_workers_production,
-                        args.as_workers_score,
-                        args.as_queue_production_score)
+                    process.process_all(args.dry_run)
+                if not args.skip_qc:
+                    qc_metrics.update(process.qc(esquery))     
+
+            if args.assoc:
+                process = ScoringProcess(args.elasticseach_nodes, es_config.asc.name, es_config.asc.doc,
+                        args.redis_host, args.redis_port,
+                        args.as_workers_writer, args.as_workers_production, args.as_workers_score, 
+                        args.as_queue_score, args.as_queue_produce, args.as_queue_write,
+                        data_config.scoring_weights, data_config.is_direct_do_not_propagate,
+                        data_config.datasources_to_datatypes)
+                if not args.qc_only:
+                    process.process_all(args.dry_run)
                 if not args.skip_qc:
                     qc_metrics.update(process.qc(esquery))
                     pass
                 
             if args.ddr:
-                process = DataDrivenRelationProcess(es)
-                if not args.qc_only:
-                    process.process_all(args.dry_run,
+                process = DataDrivenRelationProcess(args.elasticseach_nodes, 
+                        es_config.ddr.name, es_config.ddr.doc,
                         args.ddr_workers_production,
                         args.ddr_workers_score,
                         args.ddr_workers_write,
                         args.ddr_queue_production_score,
                         args.ddr_queue_score_result,
                         args.ddr_queue_write)
+                if not args.qc_only:
+                    process.process_all(args.dry_run)
                 #TODO qc
 
             if args.sea:
-                process = SearchObjectProcess(loader, redis,
-                    args.sea_workers_writer, args.sea_queue_write)
-                if not args.qc_only:
-                    process.process_all(
+                process = SearchObjectProcess(args.elasticseach_nodes, 
+                        es_config.sea.name, es_config.sea.doc, redis,
+                        args.sea_workers_writer, 
+                        args.sea_queue_write, 
                         data_config.chembl_target, 
                         data_config.chembl_mechanism, 
                         data_config.chembl_component, 
                         data_config.chembl_protein, 
-                        data_config.chembl_molecule_set_uri_pattern,
-                        args.dry_run)
+                        data_config.chembl_molecule_set_uri_pattern)
+                if not args.qc_only:
+                    process.process_all(args.dry_run)
                 #TODO qc
 
     if args.qc_in:

@@ -1,37 +1,36 @@
-indices:
-  rea:
-    name: master_reactome-data
-    doc: reactome-reaction
-  ens:
-    name: master_ensembl-data
-    doc: ensembl-gene
-  unic:
-    name: master_uniprot-data
-    doc: uniprot-gene
-  efo:
-    name: master_efo-data
-    doc: efo
-  eco:
-    name: master_eco-data
-    doc: eco
-  hpa:
-    name: master_expression-data
-    doc: expression
-  gen:
-    name: master_gene-data
-    doc: genedata
-  val-right:
-    name: master_evidence-data
-    doc: evidencestring
-  val-wrong:
-    name: master_invalid-evidence-data
-    doc: evidencestring
-  as:
-    name: master_association-data
-    doc: association
-  sea:
-    name: master_search-data
-    doc: search-object
-  ddr:
-    name: master_relation-data
-    doc: relation
+rea:
+  name: master_reactome-data
+  doc: reactome-reaction
+ens:
+  name: master_ensembl-data
+  doc: ensembl-gene
+uni:
+  name: master_uniprot-data
+  doc: uniprot-gene
+efo:
+  name: master_efo-data
+  doc: efo
+eco:
+  name: master_eco-data
+  doc: eco
+hpa:
+  name: master_expression-data
+  doc: expression
+gen:
+  name: master_gene-data
+  doc: genedata
+val-right:
+  name: master_evidence-data
+  doc: evidencestring
+val-wrong:
+  name: master_invalid-evidence-data
+  doc: evidencestring
+asc:
+  name: master_association-data
+  doc: association
+sea:
+  name: master_search-data
+  doc: search-object
+ddr:
+  name: master_relation-data
+  doc: relation

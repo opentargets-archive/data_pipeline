@@ -3,7 +3,8 @@ from collections import OrderedDict
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from yapsy.PluginManager import PluginManager
 import elasticsearch
 
@@ -378,12 +379,12 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(genes, dry_run, index):
+def elasticsearch_actions(genes, dry_run, index, doc):
     for geneid, gene in genes.iterate():
         if not dry_run:
             action = {}
             action["_index"] = index
-            action["_type"] = Const.ELASTICSEARCH_GENE_NAME_DOC_NAME
+            action["_type"] = doc
             action["_id"] = geneid
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -404,16 +405,24 @@ class GeneManager():
 
     """
 
-    def __init__(self, loader, r_server,
+    def __init__(self, es_hosts, es_index, es_doc, r_server,
                  plugin_paths, plugin_order, 
+                 data_config,
                  workers_write, queue_write):
 
-        self.loader = loader
+        self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
         self.r_server = r_server
+        self.plugin_order = plugin_order
+        self.data_config = data_config
+        self.workers_write = workers_write
+        self.queue_write = queue_write
+
         self.genes = GeneSet()
         self._logger = logging.getLogger(__name__)
 
-        self._logger.info("Preparing the plug in management system")
+        self._logger.debug("Preparing the plug in management system")
         # Build the manager
         self.simplePluginManager = PluginManager()
         # Tell it the default place(s) where to find plugins
@@ -423,46 +432,35 @@ class GeneManager():
         # Load all plugins
         self.simplePluginManager.collectPlugins()
 
-        self.plugin_order = plugin_order
-        self.workers_write = workers_write
-        self.queue_write = queue_write
+
+    def merge_all(self,  dry_run):
 
 
-    def merge_all(self, data_config, dry_run):
+        es = new_es_client(self.es_hosts)
+        
+        loader = Loader(es, dry_run)
 
         #run the actual plugins
         for plugin_name in self.plugin_order:
             plugin = self.simplePluginManager.getPluginByName(plugin_name)
             plugin.plugin_object.print_name()
             plugin.plugin_object.merge_data(genes=self.genes, 
-                loader=self.loader, r_server=self.r_server, data_config=data_config)
+                loader=loader, r_server=self.r_server, 
+                data_config=self.data_config)
 
-        if not dry_run:
-            self.loader.create_new_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
-            #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(
-                self.loader.get_versioned_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME))
+        with ElasticsearchBulkIndexManager(es, self.es_index):
 
-        #write into elasticsearch
-        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
-        chunk_size = 1000 #TODO make configurable
-        actions = elasticsearch_actions(self.genes, dry_run, index)
-        failcount = 0
-        for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
-                thread_count=self.workers_write, queue_size=self.queue_write, 
-                chunk_size=chunk_size):
-            success, details = result
-            if not success:
-                failcount += 1
+            #write into elasticsearch
+            chunk_size = 1000 #TODO make configurable
+            actions = elasticsearch_actions(self.genes, dry_run, self.es_index, self.es_doc)
+            failcount = 0
+            for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                    thread_count=self.workers_write, queue_size=self.queue_write, 
+                    chunk_size=chunk_size):
+                success, details = result
+                if not success:
+                    failcount += 1
 
-        if not dry_run:
-            self.loader.es.indices.flush(self.loader.get_versioned_index(
-                Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME), 
-                wait_if_ongoing=True)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
-        self._logger.info('all gene objects pushed to elasticsearch')
 
 
     """

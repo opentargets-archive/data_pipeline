@@ -7,9 +7,8 @@ from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
-
-from mrtarget.constants import Const
-from mrtarget.Settings import Config
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 
 import elasticsearch
 
@@ -171,13 +170,12 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(items, dry_run, index):
+def elasticsearch_actions(items, dry_run, index, doc):
     for so in items:
         if not dry_run:
             action = {}
-            doc_type = Const.ELASTICSEARCH_DATA_SEARCH_DOC_NAME+'-'+so.type
             action["_index"] = index
-            action["_type"] = doc_type
+            action["_type"] = doc+'-'+so.type
             action["_id"] = so.id
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -185,26 +183,38 @@ def elasticsearch_actions(items, dry_run, index):
 
             yield action
 
-def store_in_elasticsearch(so_it, dry_run, index, loader, workers_write, queue_write):
-    #write into elasticsearch
-    index = loader.get_versioned_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
-    chunk_size = 1000 #TODO make configurable
-    actions = elasticsearch_actions(so_it, dry_run, index)
-    failcount = 0
-    for result in elasticsearch.helpers.parallel_bulk(loader.es, actions,
-            thread_count=workers_write, queue_size=queue_write, 
-            chunk_size=chunk_size):
-        success, details = result
-        if not success:
-            failcount += 1
+def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_write):
+    with ElasticsearchBulkIndexManager(es, index):
+        #write into elasticsearch
+        chunk_size = 1000 #TODO make configurable
+        actions = elasticsearch_actions(so_it, dry_run, index, doc)
+        failcount = 0
+        for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                thread_count=workers_write, queue_size=queue_write, 
+                chunk_size=chunk_size):
+            success, details = result
+            if not success:
+                failcount += 1
 
 class SearchObjectProcess(object):
-    def __init__(self, loader, r_server, workers_write, queue_write):
-        self.loader = loader
-        self.esquery = ESQuery(loader.es)
+    def __init__(self, es_hosts, es_index, es_doc, 
+            r_server, workers_write, queue_write,
+            chembl_target_uri, 
+            chembl_mechanism_uri, 
+            chembl_component_uri, 
+            chembl_protein_uri, 
+            chembl_molecule_set_uri_pattern):
+        self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
         self.r_server = r_server
         self.workers_write = workers_write
         self.queue_write = queue_write
+        self.chembl_target_uri = chembl_target_uri
+        self.chembl_mechanism_uri = chembl_mechanism_uri
+        self.chembl_component_uri = chembl_component_uri
+        self.chembl_protein_uri = chembl_protein_uri
+        self.chembl_molecule_set_uri_pattern = chembl_molecule_set_uri_pattern
 
         self.logger = logging.getLogger(__name__)
 
@@ -215,23 +225,21 @@ class SearchObjectProcess(object):
 
 
     def process_all(self, 
-            chembl_target_uri, 
-            chembl_mechanism_uri, 
-            chembl_component_uri, 
-            chembl_protein_uri, 
-            chembl_molecule_set_uri_pattern,
             dry_run):
         ''' process all the objects that needs to be returned by the search method
         :return:
         '''
 
+        es = new_es_client(self.es_hosts)
+        esquery = ESQuery(es)
+
         #setup chembl handler
-        self.chembl_handler = ChEMBLLookup(chembl_target_uri, 
-            chembl_mechanism_uri, 
-            chembl_component_uri, 
-            chembl_protein_uri, 
-            chembl_molecule_set_uri_pattern)
-        self.chembl_handler.get_molecules_from_evidence(self.esquery)
+        self.chembl_handler = ChEMBLLookup(self.chembl_target_uri, 
+            self.chembl_mechanism_uri, 
+            self.chembl_component_uri, 
+            self.chembl_protein_uri, 
+            self.chembl_molecule_set_uri_pattern)
+        self.chembl_handler.get_molecules_from_evidence(esquery)
         all_molecules = set()
         for target, molecules in  self.chembl_handler.target2molecule.items():
             all_molecules = all_molecules|molecules
@@ -241,36 +249,23 @@ class SearchObjectProcess(object):
             self.chembl_handler.populate_synonyms_for_molecule(all_molecules[i:i + query_batch_size],
                 self.chembl_handler.molecule2synonyms)
 
-        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
-
-        #setup elasticsearch
-        if not dry_run:
-            self.loader.create_new_index(Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME)
-            #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(index)
 
         #process targets
         '''get gene simplified objects and push them to the processing queue'''
         self.logger.info('get target objects and push them to the processing queue')
-        targets = self.esquery.get_all_targets()
-        so_it = self.handle_search_object(targets, dry_run, SearchObjectTypes.TARGET)
-        store_in_elasticsearch(so_it, dry_run, index, self.loader, self.workers_write, self.queue_write)
+        targets = esquery.get_all_targets()
+        so_it = self.handle_search_object(targets, esquery, SearchObjectTypes.TARGET)
+        store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
+            self.workers_write, self.queue_write)
 
         #process diseases
         '''get disease objects  and push them to the processing queue'''
         self.logger.info('get disease objects and push them to the processing queue')
-        diseases = self.esquery.get_all_diseases()
-        so_it = self.handle_search_object(diseases, dry_run, SearchObjectTypes.DISEASE)
-        store_in_elasticsearch(so_it, dry_run, index, self.loader, self.workers_write, self.queue_write)
+        diseases = esquery.get_all_diseases()
+        so_it = self.handle_search_object(diseases, esquery, SearchObjectTypes.DISEASE)
+        store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
+            self.workers_write, self.queue_write)
 
-        #cleanup elasticsearch
-        if not dry_run:
-            self.loader.es.indices.flush(self.loader.get_versioned_index(
-                Const.ELASTICSEARCH_DATA_SEARCH_INDEX_NAME), 
-                wait_if_ongoing=True)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
 
         self.logger.info("DONE")
 
@@ -287,7 +282,7 @@ class SearchObjectProcess(object):
                                 score = cap_score(data_point['harmonic-sum']['overall'])) for data_point in data['direct']]
             )
 
-    def handle_search_object(self, data_it, dry_run, search_type):
+    def handle_search_object(self, data_it, esquery, search_type):
         for data in data_it:
             data["search_type"] = search_type
             '''process objects to simple search object'''
@@ -301,7 +296,7 @@ class SearchObjectProcess(object):
 
             '''count associations '''
             if data["search_type"] == SearchObjectTypes.TARGET:
-                ass_data = self.esquery.get_associations_for_target(data['id'], fields=['id','harmonic-sum.overall'], size = 20)
+                ass_data = esquery.get_associations_for_target(data['id'], fields=['id','harmonic-sum.overall'], size = 20)
                 so.set_associations(self.summarise_association(ass_data.top_associations),
                     ass_data.associations_count)
                 if so.id in self.chembl_handler.target2molecule:
@@ -312,7 +307,7 @@ class SearchObjectProcess(object):
                     so.drugs['evidence_data'] = list(drugs_synonyms)
 
             elif data["search_type"] == SearchObjectTypes.DISEASE:
-                ass_data = self.esquery.get_associations_for_disease(data['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
+                ass_data = esquery.get_associations_for_disease(data['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
                 so.set_associations(self.summarise_association(ass_data.top_associations),
                     ass_data.associations_count)
                 if so.id in self.chembl_handler.disease2molecule:

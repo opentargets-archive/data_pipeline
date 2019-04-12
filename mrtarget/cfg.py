@@ -110,8 +110,10 @@ def setup_ops_parser():
         env_var="AS_WORKERS_SCORE", action='store', default=4, type=int)
     p.add("--as-workers-writer", help="# of procs for association pair writers",
         env_var="AS_WORKERS_WRITER", action='store', default=4, type=int)
-    p.add("--as-queue-production-score", help="size of assocation producer to scorer queue",
-        env_var="AS_QUEUE_PRODUCTION_SCORE", action='store', default=1000, type=int)
+    p.add("--as-queue-production", help="size of assocation production queue",
+        env_var="AS_QUEUE_PRODUCTION", action='store', default=1000, type=int)
+    p.add("--as-queue-score", help="size of assocation score queue",
+        env_var="AS_QUEUE_SCORE", action='store', default=1000, type=int)
     p.add("--as-queue-write", help="size of association pair writer queue (in chunks)",
         env_var="AS_QUEUE_WRITE", action='store', default=8, type=int)
         

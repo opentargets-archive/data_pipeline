@@ -14,8 +14,8 @@ import opentargets_validator.helpers
 import mrtarget.common.IO as IO
 
 from mrtarget.common.ElasticsearchLoader import Loader
-from mrtarget.Settings import Config
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.EvidenceString import EvidenceManager, Evidence
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
@@ -271,42 +271,11 @@ def validate_evidence(line, logger, validator, luts, datasources_to_datatypes):
         return validated_evs, None
 
 """
-Consumes the iterable passed in and loads into into provided loader
-whilst also respecting the dry run flag given
-
-Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
-performance loading
-"""
-def store_in_elasticsearch(results, loader, dry_run, workers_write, queue_write):
-    client = loader.es
-    index_valid = loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME)
-    index_invalid = loader.get_versioned_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
-    thread_count = workers_write
-    queue_size = queue_write
-    chunk_size = 1000 #TODO make configurable
-    actions = elasticsearch_actions(results, dry_run, index_valid, index_invalid)
-    failcount = 0
-    sucesscount = 0
-    
-    for result in elasticsearch.helpers.parallel_bulk(client, actions,
-            thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
-    #for result in elasticsearch.helpers.streaming_bulk(client, actions,
-    #        chunk_size=chunk_size):
-        success, details = result
-        if not success:
-            failcount += 1
-        if success:
-            sucesscount += 1
-
-    if failcount:
-        raise RuntimeError("%s relations failed to index" % failcount)
-
-"""
 Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(lines, dry_run, index_valid, index_invalid):
+def elasticsearch_actions(lines, dry_run, index_valid, index_invalid, doc_valid, doc_invalid):
     for line in lines:
         (left, right) = line
         if right is not None:
@@ -314,7 +283,7 @@ def elasticsearch_actions(lines, dry_run, index_valid, index_invalid):
             if not dry_run:
                 action = {}
                 action["_index"] = index_valid
-                action["_type"] = Const.ELASTICSEARCH_DATA_INDEX_NAME
+                action["_type"] = doc_valid
                 action["_id"] = right['hash']
                 action["_source"] = right['line']
                 #print("  valid %s" % action["_id"])
@@ -324,19 +293,20 @@ def elasticsearch_actions(lines, dry_run, index_valid, index_invalid):
             if not dry_run:
                 action = {}
                 action["_index"] = index_invalid
-                action["_type"] = Const.ELASTICSEARCH_VALIDATED_DATA_DOC_NAME
+                action["_type"] = doc_invalid
                 action["_id"] = left['id']
                 action["_source"] = left
                 #print("invalid %s" % action["_id"])
                 yield action
 
-def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
+def process_evidences_pipeline(filenames, first_n, 
+        es_hosts, es_index_valid, es_index_invalid, es_doc_valid, es_doc_invalid, redis_client,
         dry_run, workers_validation, queue_validation, workers_write, queue_write, 
         eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
 
     logger = logging.getLogger(__name__)
-    es_loader = Loader(es_client, dry_run)
+    es = new_es_client(es_hosts)
 
     if not filenames:
         logger.error('tried to run with no filenames at all')
@@ -355,8 +325,7 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     logger.info('start evidence processing pipeline')
 
     #load lookup tables
-    lookup_data = LookUpDataRetriever(es_client,
-        redis_client, [], 
+    lookup_data = LookUpDataRetriever(es, redis_client, [], 
         ( LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO )).lookup
 
     #create a iterable of lines from all file handles
@@ -366,38 +335,40 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     validation_on_start_baked = functools.partial(validation_on_start, 
         lookup_data, eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes)
 
-    #setup elasticsearch
-    if not dry_run:
-        es_loader.create_new_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME)
-        es_loader.prepare_for_bulk_indexing(
-            es_loader.get_versioned_index(Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME))
-        es_loader.create_new_index(Const.ELASTICSEARCH_DATA_INDEX_NAME)
-        es_loader.prepare_for_bulk_indexing(
-            es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME))
-
     #here is the pipeline definition
     pl_stage = pr.map(process_evidence, evs, 
         workers=workers_validation, maxsize=queue_validation,
         on_start=validation_on_start_baked)
 
-    #load into elasticsearch
     logger.info('stages created, running scoring and writing')
-    store_in_elasticsearch(pl_stage, es_loader, dry_run, workers_write, queue_write)
-    logger.info('stages created, ran scoring and writing')
-    
-    #cleanup elasticsearch
-    if not dry_run:
-        logger.info('flushing data to index')
-        es_loader.es.indices.flush(es_loader.get_versioned_index(
-            Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME), 
-            wait_if_ongoing=True)
-        es_loader.es.indices.flush(es_loader.get_versioned_index(
-            Const.ELASTICSEARCH_DATA_INDEX_NAME), 
-            wait_if_ongoing=True)
-        #restore old pre-load settings
-        #note this automatically does all prepared indexes
-        es_loader.restore_after_bulk_indexing()
-        logger.info('flushed data to index')
+
+    with ElasticsearchBulkIndexManager(es, es_index_valid):
+        with ElasticsearchBulkIndexManager(es, es_index_invalid):
+
+            #load into elasticsearch
+            thread_count = workers_write
+            queue_size = queue_write
+            chunk_size = 1000 #TODO make configurable
+            actions = elasticsearch_actions(pl_stage, dry_run, 
+                es_index_valid, es_index_invalid, 
+                es_doc_valid, es_doc_invalid)
+            failcount = 0
+            sucesscount = 0
+            
+            for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                    thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
+            #for result in elasticsearch.helpers.streaming_bulk(client, actions,
+            #        chunk_size=chunk_size):
+                success, details = result
+                if not success:
+                    failcount += 1
+                if success:
+                    sucesscount += 1
+
+            if failcount:
+                raise RuntimeError("%s relations failed to index" % failcount)
+            logger.info('stages created, ran scoring and writing')
+
 
     if failed_filenames:
         raise RuntimeError('unable to handle %s', str(failed_filenames))

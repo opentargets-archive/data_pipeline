@@ -5,7 +5,8 @@ import lxml.etree as etree
 
 from mrtarget.common.UniprotIO import Parser
 from opentargets_urlzsource import URLZSource
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 import elasticsearch
 
 
@@ -14,7 +15,7 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(entries, dry_run, index):
+def elasticsearch_actions(entries, dry_run, index, doc):
     for entry in entries:
         #horrible hack, just save it as a blob
         json_seqrec = base64.b64encode(jsonpickle.encode(entry))
@@ -22,7 +23,7 @@ def elasticsearch_actions(entries, dry_run, index):
         if not dry_run:
             action = {}
             action["_index"] = index
-            action["_type"] = Const.ELASTICSEARCH_UNIPROT_DOC_NAME
+            action["_type"] = doc
             action["_id"] = entry.id
             action["_source"] = {'entry': json_seqrec}
 
@@ -40,47 +41,37 @@ def generate_uniprot(uri):
             yield entry
 
 class UniprotDownloader(object):
-    def __init__(self, loader, workers_write, queue_write):
-        self.logger = logging.getLogger(__name__)
-        self.loader = loader
+    def __init__(self, es_hosts, es_index, es_doc, uri, workers_write, queue_write):
+        self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
+        self.uri = uri
         self.workers_write = workers_write
         self.queue_write = queue_write
 
-    def process(self, uri, dry_run):
-        self.logger.debug("download uniprot uri %s", uri)
+        self.logger = logging.getLogger(__name__)
+
+    def process(self, dry_run):
+        self.logger.debug("download uniprot uri %s", self.uri)
         self.logger.debug("to generate this file you have to call this url "
                             "https://www.uniprot.org/uniprot/?query=reviewed%3Ayes%2BAND%2Borganism%3A9606&compress=yes&format=xml")
 
-        #setup elasticsearch
-        if not dry_run:
-            self.logger.debug("re-create index as we don't want duplicated entries but a fresh index")
-            self.loader.create_new_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
-            #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(
-                self.loader.get_versioned_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME))
+        es = new_es_client(self.es_hosts)
+        with ElasticsearchBulkIndexManager(es, self.es_index):
 
+            items = generate_uniprot(self.uri)
 
-        #write into elasticsearch
-        failcount = 0
-        if not dry_run:
-            index = self.loader.get_versioned_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
-            chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(generate_uniprot(uri), dry_run, index)
-            for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
-                    thread_count=self.workers_write, queue_size=self.queue_write, 
-                    chunk_size=chunk_size):
-                success, details = result
-                if not success:
-                    failcount += 1
-
-        #cleanup elasticsearch
-        if not dry_run:
-            self.loader.es.indices.flush(self.loader.get_versioned_index(
-                Const.ELASTICSEARCH_UNIPROT_INDEX_NAME), 
-                wait_if_ongoing=True)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
+            #write into elasticsearch
+            failcount = 0
+            if not dry_run:
+                chunk_size = 1000 #TODO make configurable
+                actions = elasticsearch_actions(items, dry_run, self.es_index, self.es_doc)
+                for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, 
+                        chunk_size=chunk_size):
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
         if failcount:
             raise RuntimeError("%s failed to index" % failcount)

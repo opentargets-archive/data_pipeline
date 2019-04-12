@@ -6,7 +6,8 @@ from networkx.algorithms import all_simple_paths
 
 from mrtarget.common.DataStructure import TreeNode, JSONSerializable
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from opentargets_urlzsource import URLZSource
 import elasticsearch
 
@@ -103,12 +104,12 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(docs, dry_run, index):
+def elasticsearch_actions(docs, dry_run, index, doc):
     for doc in docs:
         if not dry_run:
             action = {}
             action["_index"] = index
-            action["_type"] = Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME
+            action["_type"] = doc
             action["_id"] = doc["id"]
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -117,18 +118,22 @@ def elasticsearch_actions(docs, dry_run, index):
             yield action
 
 class ReactomeProcess():
-    def __init__(self, loader, pathway_data_url, pathway_relation_url,
+    def __init__(self, es_hosts, es_index, es_doc, 
+            pathway_data_url, pathway_relation_url,
             workers_write, queue_write):
-        self.loader = loader
+        self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
+        self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
+
+        self.logger = logging.getLogger(__name__)
         self.g = nx.DiGraph(name="reactome")
         self.data = {}
-        '''download data'''
-        self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
-        self.logger = logging.getLogger(__name__)
         self.workers_write = workers_write
         self.queue_write = queue_write
 
     def process_all(self, dry_run):
+
         self.relations = dict()
         self.g.add_node('root', name="", species="")
 
@@ -143,41 +148,25 @@ class ReactomeProcess():
         for node in nodes_without_parent:
             if node != 'root':
                 self.g.add_edge('root', node)
-                
 
-        #setup elasticsearch
-        if not dry_run:
-            self.loader.create_new_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME)
-            #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(
-                self.loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME))
+        es = new_es_client(self.es_hosts)
+        with ElasticsearchBulkIndexManager(es, self.es_index):
 
+            #write into elasticsearch
+            chunk_size = 1000 #TODO make configurable
+            docs = generate_documents(self.g)
+            actions = elasticsearch_actions(docs, dry_run, self.es_index, self.es_doc)
+            failcount = 0
+            if not dry_run:
+                for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, 
+                        chunk_size=chunk_size):
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
-        #write into elasticsearch
-        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME)
-        chunk_size = 1000 #TODO make configurable
-        docs = generate_documents(self.g)
-        actions = elasticsearch_actions(docs, dry_run, index)
-        failcount = 0
-        if not dry_run:
-            for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
-                    thread_count=self.workers_write, queue_size=self.queue_write, 
-                    chunk_size=chunk_size):
-                success, details = result
-                if not success:
-                    failcount += 1
-                    
-        #cleanup elasticsearch
-        if not dry_run:
-            self.loader.es.indices.flush(self.loader.get_versioned_index(
-                Const.ELASTICSEARCH_REACTOME_INDEX_NAME), 
-                wait_if_ongoing=True)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
-
-        if failcount:
-            raise RuntimeError("%s failed to index" % failcount)
+            if failcount:
+                raise RuntimeError("%s failed to index" % failcount)
 
 
     """

@@ -6,7 +6,8 @@ from mrtarget.common.IO import check_to_open
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 import opentargets_ontologyutils.eco_so
 from mrtarget.Settings import Config #TODO remove
 import logging
@@ -44,12 +45,12 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(items, dry_run, index):
+def elasticsearch_actions(items, dry_run, index, doc):
     for eco_id, eco_obj in items:
         if not dry_run:
             action = {}
             action["_index"] = index
-            action["_type"] = Const.ELASTICSEARCH_ECO_DOC_NAME
+            action["_type"] = doc
             action["_id"] = eco_id
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -59,14 +60,18 @@ def elasticsearch_actions(items, dry_run, index):
 
 class EcoProcess():
 
-    def __init__(self, loader, eco_uri, so_uri, workers_write, queue_write):
-        self.loader = loader
-        self.ecos = OrderedDict()
-        self.evidence_ontology = OntologyClassReader()
+    def __init__(self, es_hosts, es_index, es_doc, 
+            eco_uri, so_uri, workers_write, queue_write):
+        self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
         self.eco_uri = eco_uri
         self.so_uri = so_uri
         self.workers_write = workers_write
         self.queue_write = queue_write
+
+        self.ecos = OrderedDict()
+        self.evidence_ontology = OntologyClassReader()
 
     def process_all(self, dry_run):
         self._process_ontology_data()
@@ -88,36 +93,22 @@ class EcoProcess():
 
     def _store_eco(self, dry_run):
 
-        #setup elasticsearch
-        if not dry_run:
-            self.loader.create_new_index(Const.ELASTICSEARCH_ECO_INDEX_NAME)
-            #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(
-                self.loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME))
+        es = new_es_client(self.es_hosts)
+        with ElasticsearchBulkIndexManager(es, self.es_index):
 
-        #write into elasticsearch
-        index = self.loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME)
-        chunk_size = 1000 #TODO make configurable
-        actions = elasticsearch_actions(self.ecos.items(), dry_run, index)
-        failcount = 0
-        for result in elasticsearch.helpers.parallel_bulk(self.loader.es, actions,
-                thread_count=self.workers_write, queue_size=self.queue_write, 
-                chunk_size=chunk_size):
-            success, details = result
-            if not success:
-                failcount += 1
+            #write into elasticsearch
+            chunk_size = 1000 #TODO make configurable
+            actions = elasticsearch_actions(self.ecos.items(), dry_run, self.es_index, self.es_doc)
+            failcount = 0
+            for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                    thread_count=self.workers_write, queue_size=self.queue_write, 
+                    chunk_size=chunk_size):
+                success, details = result
+                if not success:
+                    failcount += 1
 
-        #cleanup elasticsearch
-        if not dry_run:
-            self.loader.es.indices.flush(self.loader.get_versioned_index(
-                Const.ELASTICSEARCH_ECO_INDEX_NAME), 
-                wait_if_ongoing=True)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
-
-        if failcount:
-            raise RuntimeError("%s failed to index" % failcount)
+            if failcount:
+                raise RuntimeError("%s failed to index" % failcount)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

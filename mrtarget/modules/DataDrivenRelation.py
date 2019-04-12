@@ -16,8 +16,8 @@ from sklearn.feature_extraction.text import TfidfTransformer, _document_frequenc
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.constants import Const
-from mrtarget.Settings import Config
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 
 class RelationType(object):
     SHARED_DISEASE = 'shared-disease'
@@ -152,13 +152,12 @@ whilst also respecting the dry run flag given
 Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
 performance loading
 """
-def store_in_elasticsearch(results, loader, dry_run, workers_write, queue_write):
+def store_in_elasticsearch(results, loader, dry_run, workers_write, queue_write, index, doc):
     client = loader.es
-    index = loader.get_versioned_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME)
     thread_count = workers_write
     queue_size = queue_write
     chunk_size = 1000 #TODO make configurable
-    actions = elasticsearch_actions(results, dry_run, index)
+    actions = elasticsearch_actions(results, dry_run, index, doc)
     failcount = 0
     for result in elasticsearch.helpers.parallel_bulk(client, actions,
             thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
@@ -174,7 +173,7 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(results, dry_run, index):
+def elasticsearch_actions(results, dry_run, index, doc):
     for r in results:
         if r:
             subj = copy(r.subject)
@@ -187,7 +186,7 @@ def elasticsearch_actions(results, dry_run, index):
             if not dry_run:
                 action = {}
                 action["_index"] = index
-                action["_type"] = Const.ELASTICSEARCH_RELATION_DOC_NAME + '-' + r.type
+                action["_type"] = doc + '-' + r.type
                 action["_id"] = r.id
                 #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
                 #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -224,7 +223,7 @@ used to standardize d2d and t2t code path
 def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids, 
         threshold, buckets_number, loader, dry_run, 
         workers_production, workers_score, workers_write,
-        queue_production_score, queue_score_result, queue_write):
+        queue_production_score, queue_score_result, queue_write, index, doc):
 
     #do some initial setup
     vectorizer = DictVectorizer(sparse=True)
@@ -271,7 +270,8 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
 
     #store in elasticsearch
     #this could be multi process, but just use a single for now
-    store_in_elasticsearch(pipeline_stage, loader, dry_run, workers_write, queue_write)
+    store_in_elasticsearch(pipeline_stage, loader, dry_run, workers_write, queue_write,
+        index, doc)
 
 """
 Function to run in child processess
@@ -330,25 +330,32 @@ def calculate_pair(data, type, row_labels, rows_ids, column_ids, threshold, idf,
 
 class DataDrivenRelationProcess(object):
 
-    def __init__(self, es):
-        self.es = es
-        self.es_query=ESQuery(self.es)
-        self.logger = logging.getLogger(__name__)
-
-    def process_all(self, dry_run, 
+    def __init__(self, es_hosts, es_index, es_doc, 
             ddr_workers_production,
             ddr_workers_score,
             ddr_workers_write,
             ddr_queue_production_score,
             ddr_queue_score_result,
             ddr_queue_write):
-        start_time = time.time()
+        self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
+        self.ddr_workers_production = ddr_workers_production
+        self.ddr_workers_score = ddr_workers_score
+        self.ddr_workers_write = ddr_workers_write
+        self.ddr_queue_production_score = ddr_queue_production_score
+        self.ddr_queue_score_result = ddr_queue_score_result
+        self.ddr_queue_write = ddr_queue_write
 
-        target_data, disease_data = self.es_query.get_disease_to_targets_vectors(treshold=0.1, evidence_count=3)
+        self.logger = logging.getLogger(__name__)
 
-        self.logger.info('Found qualifying associations in %i s'%(time.time()-start_time))
-        self.logger.info('target data length: %s size in memory: %f Kb'%(len(target_data),sys.getsizeof(target_data)/1024.))
-        self.logger.info('disease data length: %s size in memory: %f Kb' % (len(disease_data),sys.getsizeof(disease_data)/1024.))
+    def process_all(self, dry_run):
+
+        es = new_es_client(self.es_hosts)
+        es_query=ESQuery(es)
+
+        target_data, disease_data = es_query.get_disease_to_targets_vectors(treshold=0.1, evidence_count=3)
+
         if len(target_data) == 0 or len(disease_data) == 0:
             raise Exception('Could not find a set of targets AND diseases that had the sufficient number'
                             ' of evidences or acceptable harmonic sum score')
@@ -358,42 +365,30 @@ class DataDrivenRelationProcess(object):
         target_keys = sorted(target_data.keys())
 
         self.logger.info('getting disese labels')
-        disease_id_to_label = self.es_query.get_disease_labels(disease_keys)
+        disease_id_to_label = es_query.get_disease_labels(disease_keys)
         disease_labels = [disease_id_to_label[hit_id] for hit_id in disease_keys]
         self.logger.info('getting target labels')
-        target_id_to_label = self.es_query.get_target_labels(target_keys)
+        target_id_to_label = es_query.get_target_labels(target_keys)
         target_labels = [target_id_to_label[hit_id] for hit_id in target_keys]
 
-        #setup elasticsearch
-        self.loader = Loader(self.es, dry_run=dry_run)
-        if not dry_run:
-            #need to directly get the versioned index name for this function
-            self.loader.create_new_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME)
-            self.loader.prepare_for_bulk_indexing(self.loader.get_versioned_index(Const.ELASTICSEARCH_RELATION_INDEX_NAME))
 
+        with ElasticsearchBulkIndexManager(es, self.es_index):
 
-        #calculate and store disease-to-disease in multiple processess
-        self.logger.info('handling disease-to-disease')
-        handle_pairs(RelationType.SHARED_TARGET, disease_labels, disease_data, disease_keys, 
-            target_keys, 0.19, 1024, self.loader, dry_run, 
-            ddr_workers_production, ddr_workers_score, ddr_workers_write,
-            ddr_queue_production_score, ddr_queue_score_result, ddr_queue_write)
-        self.logger.info('handled disease-to-disease')
+            #calculate and store disease-to-disease in multiple processess
+            self.logger.info('handling disease-to-disease')
+            handle_pairs(RelationType.SHARED_TARGET, disease_labels, disease_data, disease_keys, 
+                target_keys, 0.19, 1024, es, dry_run, 
+                self.ddr_workers_production, self.ddr_workers_score, self.ddr_workers_write,
+                self.ddr_queue_production_score, self.ddr_queue_score_result, self.ddr_queue_write, 
+                self.es_index, self.es_doc)
+            self.logger.info('handled disease-to-disease')
 
-        #calculate and store target-to-target in multiple processess
-        self.logger.info('handling target-to-target')
-        handle_pairs(RelationType.SHARED_DISEASE, target_labels, target_data, target_keys, 
-            disease_keys, 0.19, 1024, self.loader, dry_run, 
-            ddr_workers_production, ddr_workers_score, ddr_workers_write,
-            ddr_queue_production_score, ddr_queue_score_result, ddr_queue_write)
-        self.logger.info('handled target-to-target')
+            #calculate and store target-to-target in multiple processess
+            self.logger.info('handling target-to-target')
+            handle_pairs(RelationType.SHARED_DISEASE, target_labels, target_data, target_keys, 
+                disease_keys, 0.19, 1024, es, dry_run, 
+                self.ddr_workers_production, self.ddr_workers_score, self.ddr_workers_write,
+                self.ddr_queue_production_score, self.ddr_queue_score_result, self.ddr_queue_write, 
+                self.es_index, self.es_doc)
+            self.logger.info('handled target-to-target')
 
-        #cleanup elasticsearch
-        if not dry_run:
-            self.loader.es.indices.flush(self.loader.get_versioned_index(
-                Const.ELASTICSEARCH_RELATION_INDEX_NAME), 
-                wait_if_ongoing=True)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
-    
