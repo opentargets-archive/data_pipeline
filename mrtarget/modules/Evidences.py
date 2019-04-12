@@ -17,9 +17,14 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.Settings import Config
 from mrtarget.constants import Const
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
-from mrtarget.common.EvidencesHelpers import make_validated_evs_obj, reduce_tuple_with_sum, setup_writers
 from mrtarget.common.EvidenceString import EvidenceManager, Evidence
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+
+def make_validated_evs_obj(filename, hash, line, line_n, is_valid=False, explanation_type='', explanation_str='',
+                           target_id=None, efo_id=None, data_type=None, id=None):
+    return addict.Dict(is_valid=is_valid, explanation_type=explanation_type, explanation_str=explanation_str,
+                       target_id=target_id, efo_id=efo_id, data_type=data_type, id=id, line=line, line_n=line_n,
+                       filename=filename, hash=hash)
 
 
 def fix_and_score_evidence(validated_evs, datasources_to_datatypes, evidence_manager):
