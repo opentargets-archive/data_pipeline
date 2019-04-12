@@ -389,10 +389,10 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     if not dry_run:
         logger.info('flushing data to index')
         es_loader.es.indices.flush(es_loader.get_versioned_index(
-            Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME), 
+            Const.ELASTICSEARCH_VALIDATED_DATA_INDEX_NAME), 
             wait_if_ongoing=True)
         es_loader.es.indices.flush(es_loader.get_versioned_index(
-            Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME), 
+            Const.ELASTICSEARCH_DATA_INDEX_NAME), 
             wait_if_ongoing=True)
         #restore old pre-load settings
         #note this automatically does all prepared indexes
