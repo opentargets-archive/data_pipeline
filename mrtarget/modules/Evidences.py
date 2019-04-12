@@ -336,7 +336,7 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
         datasources_to_datatypes):
 
     logger = logging.getLogger(__name__)
-    es_loader = Loader(es_client)
+    es_loader = Loader(es_client, dry_run)
 
     if not filenames:
         logger.error('tried to run with no filenames at all')

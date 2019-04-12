@@ -20,21 +20,14 @@ class Loader():
 
     def __init__(self,
                  es,
-                 chunk_size=1000,
-                 dry_run = False,
-                 max_flush_interval = random.choice(range(60,120))):
+                 dry_run = False):
 
         self.logger = logging.getLogger(__name__)
 
         self.es = es
-        self.cache = []
-        self.results = defaultdict(list)
-        self.chunk_size = chunk_size
         self.indexes_created = []
         self.indexes_optimised = {}
         self.dry_run = dry_run
-        self.max_flush_interval = max_flush_interval
-        self._last_flush_time = time.time()
 
     @staticmethod
     def get_versioned_index(index_name, check_custom_idxs=False):

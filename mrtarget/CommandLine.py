@@ -66,24 +66,26 @@ def main():
     
     with RedisManager(args.redis_remote,args.redis_host, args.redis_port):
 
+        #read the data configuration
+        data_config = mrtarget.cfg.get_config(args.data_config)
+
+        #read the es configuration
+        es_config = mrtarget.cfg.get_config(args.es_config)
+
         es = new_es_client(args.elasticseach_nodes)
         redis = new_redis_client(args.redis_host, args.redis_port)
+        #es clients can't be pased around
 
-        #create a single query object for future use
+        #create a single query object for future use by QC
         esquery = ESQuery(es)
-
-        #read the data configuration
-        data_config = mrtarget.cfg.get_data_config(args.data_config)
 
         #create something to accumulate qc metrics into over various steps
         qc_metrics = QCMetrics()
 
-        with Loader(es,
-                    chunk_size=ElasticSearchConfiguration.bulk_load_chunk,
-                    dry_run = args.dry_run) as loader:
+        with Loader(es, args.dry_run) as loader:
 
             if args.rea:
-                process = ReactomeProcess(loader, 
+                process = ReactomeProcess( 
                     data_config.reactome_pathway_data, data_config.reactome_pathway_relation,
                     args.rea_workers_writer, args.rea_queue_write)
                 if not args.qc_only:

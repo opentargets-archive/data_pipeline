@@ -17,6 +17,10 @@ def setup_ops_parser():
     p.add('--data-config', help='path to data config file (YAML)',
         env_var="DATA_CONFIG", action='store')
 
+    # configuration file with es related settings
+    p.add('--es-config', help='path to elasticsearch config file (YAML)',
+        env_var="ES_CONFIG", action='store')
+
     # logging
     p.add("--log-config", help="logging configuration file",
         env_var="LOG_CONFIG", action='store', default='mrtarget/resources/logging.ini')
@@ -195,8 +199,8 @@ def get_ops_args():
     return args
 
 
-def get_data_config(data_url):  
-    with URLZSource(data_url).open() as r_file:
+def get_config(url):  
+    with URLZSource(url).open() as r_file:
         #note us safe loading as described at https://pyyaml.org/wiki/PyYAMLDocumentation
         #TL;DR - only dicts and lists and primitives
         data_config = yaml.safe_load(r_file)
