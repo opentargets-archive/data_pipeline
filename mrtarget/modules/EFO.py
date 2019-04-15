@@ -9,6 +9,7 @@ from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 import elasticsearch
 import simplejson as json
 from opentargets_urlzsource import URLZSource
+from mrtarget.constants import Const
 
 '''
 Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 

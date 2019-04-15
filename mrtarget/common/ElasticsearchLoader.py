@@ -7,7 +7,6 @@ import json
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import bulk
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.EvidenceJsonUtils import assertJSONEqual
 from mrtarget.Settings import Config
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 

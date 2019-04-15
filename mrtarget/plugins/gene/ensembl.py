@@ -5,7 +5,6 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from elasticsearch.exceptions import NotFoundError
 import sys
 import logging
-logging.basicConfig(level=logging.INFO)
 
 class Ensembl(IPlugin):
 

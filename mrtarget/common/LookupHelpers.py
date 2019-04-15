@@ -8,7 +8,6 @@ from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 
 from mrtarget.Settings import Config, file_or_resource
-from mrtarget.common import require_all
 
 
 class LookUpData():
