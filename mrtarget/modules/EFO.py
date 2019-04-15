@@ -7,6 +7,8 @@ from rdflib import URIRef
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 import elasticsearch
+import simplejson as json
+from opentargets_urlzsource import URLZSource
 
 '''
 Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 
@@ -86,22 +88,21 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(items, dry_run, index, doc):
+def elasticsearch_actions(items, index, doc):
     for efo_id, efo_obj in items:
-        if not dry_run:
-            action = {}
-            action["_index"] = index
-            action["_type"] = doc
-            action["_id"] = efo_id
-            #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
-            #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
-            action["_source"] = efo_obj.to_json()
+        action = {}
+        action["_index"] = index
+        action["_type"] = doc
+        action["_id"] = efo_id
+        #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+        #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+        action["_source"] = efo_obj.to_json()
 
-            yield action
+        yield action
 
 class EfoProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, 
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
                  efo_uri, hpo_uri, mp_uri,
                  disease_phenotype_uris,
                  workers_write, queue_write
@@ -109,6 +110,7 @@ class EfoProcess():
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
+        self.es_mappings = es_mappings
         self.efo_uri = efo_uri
         self.hpo_uri = hpo_uri
         self.mp_uri = mp_uri
@@ -212,20 +214,27 @@ class EfoProcess():
             self.efos[id] = efo
 
     def _store_efo(self, dry_run):
+
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
+
         es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index):
+        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
 
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(self.efos.items(), dry_run, self.es_index, self.es_doc)
+            actions = elasticsearch_actions(self.efos.items(), self.es_index, self.es_doc)
             failcount = 0
-            for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                    thread_count=self.workers_write, queue_size=self.queue_write, 
-                    chunk_size=chunk_size):
-                success, details = result
-                if not success:
-                    failcount += 1
+            if not dry_run:
+                for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, 
+                        chunk_size=chunk_size):
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
+                if failcount:
+                    raise RuntimeError("%s failed to index" % failcount)
 
         
     """

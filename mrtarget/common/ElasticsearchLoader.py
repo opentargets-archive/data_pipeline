@@ -20,13 +20,11 @@ class Loader():
 
     def __init__(self,
                  es,
-                 dry_run = False):
+                 dry_run):
 
         self.logger = logging.getLogger(__name__)
 
         self.es = es
-        self.indexes_created = []
-        self.indexes_optimised = {}
         self.dry_run = dry_run
 
     @staticmethod
@@ -65,141 +63,3 @@ class Loader():
             else Config.RELEASE_VERSION + '_' + index_name
 
         return idx_name + suffix
-
-    def close(self):
-        self.restore_after_bulk_indexing()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()
-
-    def prepare_for_bulk_indexing(self, index_name):
-        if not self.dry_run:
-            old_cluster_settings = self.es.cluster.get_settings()
-
-            #try to turn off throttling of indexes
-            #removed in ES >= 6.0
-            try:
-                if old_cluster_settings['persistent']['indices']['store']['throttle']['type']=='none':
-                    pass
-                else:
-                    raise ValueError
-            except (KeyError, ValueError):
-                transient_cluster_settings = {
-                    "persistent" : {
-                        "indices.store.throttle.type" : "none"
-                    }
-                }
-                self.es.cluster.put_settings(transient_cluster_settings)
-
-            #temporary settins while indexing only
-            old_index_settings = self.es.indices.get_settings(index=index_name)
-            temp_index_settings = {
-                "index" : {
-                    "refresh_interval" : "-1",
-                    "number_of_replicas" : 0,
-                    "translog.durability" : 'async',
-                }
-            }
-            self.es.indices.put_settings(index=index_name,
-                                         body =temp_index_settings)
-            #store the old settings so can be restored later
-            self.indexes_optimised[index_name]= dict(settings_to_restore={
-                    "index" : {
-                        "refresh_interval" : "1s",
-                        "number_of_replicas" : old_index_settings[index_name]['settings']['index']['number_of_replicas'],
-                        "translog.durability": 'request',
-                    }
-                })
-
-    def restore_after_bulk_indexing(self):
-        if not self.dry_run:
-            for index_name in self.indexes_optimised:
-                self.logger.debug('restoring to normal and flushing index: %s'%index_name)
-
-                #flush elasticsearch to ensure all transactions are written to index
-                self.es.indices.flush(index_name, wait_if_ongoing=True)
-
-                #reduce elasticsearch to a single "segment" in each shard
-                #https://www.elastic.co/blog/found-elasticsearch-from-the-bottom-up#index-segments
-                self.es.indices.forcemerge(index=index_name, max_num_segments=1)
-
-                #set the indexes back to wha they were before
-                self.es.indices.put_settings(index=index_name,
-                    body=self.indexes_optimised[index_name]['settings_to_restore'])
-
-
-
-    def _safe_create_index(self, index_name, body={}, ignore=400):
-        if not self.dry_run:
-            res = self.es.indices.create(index=index_name, ignore=ignore, body=body )
-            if not self._check_is_aknowledge(res):
-                if 'already exists' in res['error']['root_cause'][0]['reason']:
-                    self.logger.warning('cannot create index %s because it already exists'%index_name) #TODO: move the creation of index to the main thread to avoid all threads trying this
-                    return
-                else:
-                    raise ValueError('creation of index %s was not acknowledged. ERROR:%s'%(index_name,str(res['error'])))
-            if self._enforce_mapping(index_name):
-                mappings = self.es.indices.get_mapping(index=index_name)
-                settings = self.es.indices.get_settings(index=index_name)
-
-                try:
-                    if 'mappings' in body:
-                        datatypes = body['mappings'].keys()
-                        for dt in datatypes:
-                            if dt != '_default_':
-                                keys = body['mappings'][dt].keys()
-                                if 'dynamic_templates' in keys:
-                                    del keys[keys.index('dynamic_templates')]
-                                assertJSONEqual(mappings[index_name]['mappings'][dt],
-                                                body['mappings'][dt],
-                                                msg='mappings in elasticsearch are different from the ones sent for datatype %s'%dt,
-                                                keys = keys)
-                    if 'settings' in body:
-                        assertJSONEqual(settings[index_name]['settings']['index'],
-                                        body['settings'],
-                                        msg='settings in elasticsearch are different from the ones sent',
-                                        keys=body['settings'].keys(),#['number_of_replicas','number_of_shards','refresh_interval']
-                                        )
-                except ValueError as e:
-                    self.logger.exception("elasticsearch settings error")
-
-    def create_new_index(self, index_name):
-        if not self.dry_run:
-            index_name = self.get_versioned_index(index_name)
-            if self.es.indices.exists(index_name):
-                res = self.es.indices.delete(index_name)
-                if not self._check_is_aknowledge(res):
-                    raise ValueError(
-                        'deletion of index %s was not acknowledged. ERROR:%s' % (index_name, str(res['error'])))
-                time.sleep(0.5)#wait for the index to be deleted
-                try:
-                    self.es.indices.flush(index_name,  wait_if_ongoing =True)
-                except NotFoundError:
-                    pass
-                self.logger.debug("%s index deleted: %s" %(index_name, str(res)))
-
-
-            index_created = False
-            for index_root,mapping in ElasticSearchConfiguration.INDEX_MAPPPINGS.items():
-                if index_root in index_name:
-                    self._safe_create_index(index_name, mapping)
-                    index_created=True
-                    break
-
-            if not index_created:
-                self._safe_create_index(index_name)
-                self.logger.warning('Index %s created without explicit mappings' % index_name)
-            self.logger.info("%s index created" % index_name)
-            return
-
-    def _enforce_mapping(self, index_name):
-        for index_root in ElasticSearchConfiguration.INDEX_MAPPPINGS:
-            if index_root in index_name:
-                return True
-        return False
-
-    def _check_is_aknowledge(self, res):
-        return (u'acknowledged' in res) and (res[u'acknowledged'] == True)

@@ -12,6 +12,7 @@ import opentargets_ontologyutils.eco_so
 from mrtarget.Settings import Config #TODO remove
 import logging
 import elasticsearch
+import simplejson as json
 
 logger = logging.getLogger(__name__)
 
@@ -45,26 +46,26 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(items, dry_run, index, doc):
+def elasticsearch_actions(items, index, doc):
     for eco_id, eco_obj in items:
-        if not dry_run:
-            action = {}
-            action["_index"] = index
-            action["_type"] = doc
-            action["_id"] = eco_id
-            #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
-            #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
-            action["_source"] = eco_obj.to_json()
+        action = {}
+        action["_index"] = index
+        action["_type"] = doc
+        action["_id"] = eco_id
+        #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+        #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+        action["_source"] = eco_obj.to_json()
 
-            yield action
+        yield action
 
 class EcoProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, 
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
             eco_uri, so_uri, workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
+        self.es_mappings = es_mappings
         self.eco_uri = eco_uri
         self.so_uri = so_uri
         self.workers_write = workers_write
@@ -93,22 +94,26 @@ class EcoProcess():
 
     def _store_eco(self, dry_run):
 
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
+
         es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index):
+        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
 
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(self.ecos.items(), dry_run, self.es_index, self.es_doc)
+            actions = elasticsearch_actions(self.ecos.items(), self.es_index, self.es_doc)
             failcount = 0
-            for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                    thread_count=self.workers_write, queue_size=self.queue_write, 
-                    chunk_size=chunk_size):
-                success, details = result
-                if not success:
-                    failcount += 1
+            if not dry_run:
+                for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, 
+                        chunk_size=chunk_size):
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
-            if failcount:
-                raise RuntimeError("%s failed to index" % failcount)
+                if failcount:
+                    raise RuntimeError("%s failed to index" % failcount)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

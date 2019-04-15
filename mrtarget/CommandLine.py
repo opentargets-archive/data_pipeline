@@ -8,7 +8,6 @@ import os.path
 import itertools
 
 from mrtarget.modules.Evidences import process_evidences_pipeline
-from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import RedisManager, new_es_client, new_redis_client
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
@@ -82,120 +81,129 @@ def main():
         #create something to accumulate qc metrics into over various steps
         qc_metrics = QCMetrics()
 
-        with Loader(es, args.dry_run) as loader:
 
-            if args.rea:
-                process = ReactomeProcess(args.elasticseach_nodes, es_config.rea.name, es_config.rea.doc, 
-                    data_config.reactome_pathway_data, data_config.reactome_pathway_relation,
-                    args.rea_workers_writer, args.rea_queue_write)
-                if not args.qc_only:
-                    process.process_all(args.dry_run)
-                if not args.skip_qc:
-                    qc_metrics.update(process.qc(esquery))
-            if args.ens:
-                process = EnsemblProcess(args.elasticseach_nodes, es_config.ens.name, es_config.ens.doc,
-                    data_config.ensembl_filename, args.ens_workers_writer, args.ens_queue_write)
-                if not args.qc_only:
-                    process.process(args.dry_run)
-                if not args.skip_qc:
-                    qc_metrics.update(process.qc(esquery))
-            if args.unic:
-                process = UniprotDownloader(args.elasticseach_nodes, es_config.uni.name, es_config.uni.doc,
-                    data_config.uniprot_uri, args.uni_workers_writer, args.uni_queue_write)
-                if not args.qc_only:
-                    process.process(args.dry_run)
-                if not args.skip_qc:
-                    qc_metrics.update(process.qc(esquery))
+        if args.rea:
+            process = ReactomeProcess(args.elasticseach_nodes, es_config.rea.name, 
+                es_config.rea.doc, es_config.rea.mapping,
+                data_config.reactome_pathway_data, data_config.reactome_pathway_relation,
+                args.rea_workers_writer, args.rea_queue_write)
+            if not args.qc_only:
+                process.process_all(args.dry_run)
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
+        if args.ens:
+            process = EnsemblProcess(args.elasticseach_nodes, es_config.ens.name, 
+                es_config.ens.doc, es_config.ens.mapping,
+                data_config.ensembl_filename, args.ens_workers_writer, args.ens_queue_write)
+            if not args.qc_only:
+                process.process(args.dry_run)
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
+        if args.unic:
+            process = UniprotDownloader(args.elasticseach_nodes, es_config.uni.name, 
+                es_config.uni.doc, es_config.uni.mapping,
+                data_config.uniprot_uri, args.uni_workers_writer, args.uni_queue_write)
+            if not args.qc_only:
+                process.process(args.dry_run)
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
 
-            if args.gen:
-                process = GeneManager(args.elasticseach_nodes, es_config.gen.name, es_config.gen.doc, redis,
-                    args.gen_plugin_places, data_config.gene_data_plugin_names,
-                    data_config, 
-                    args.gen_workers_writer, args.gen_queue_write )
-                if not args.qc_only:
-                    process.merge_all(args.dry_run)
-                if not args.skip_qc:
-                    qc_metrics.update(process.qc(esquery))     
-    
-            if args.efo:
-                process = EfoProcess(args.elasticseach_nodes, es_config.efo.name, es_config.efo.doc, 
-                    data_config.ontology_efo, data_config.ontology_hpo, 
-                    data_config.ontology_mp, data_config.disease_phenotype,
-                    args.efo_workers_writer, args.efo_queue_write)
-                if not args.qc_only:
-                    process.process_all(args.dry_run)
-                if not args.skip_qc:
-                    qc_metrics.update(process.qc(esquery))
-            if args.eco:
-                process = EcoProcess(args.elasticseach_nodes, es_config.eco.name, es_config.eco.doc,
-                    data_config.ontology_eco, data_config.ontology_so,
-                    args.eco_workers_writer, args.eco_queue_write)
-                if not args.qc_only:
-                    process.process_all(args.dry_run)
-                if not args.skip_qc:
-                    qc_metrics.update(process.qc(esquery))
+        if args.gen:
+            process = GeneManager(args.elasticseach_nodes, es_config.gen.name, 
+                es_config.gen.doc, es_config.gen.mapping, redis,
+                args.gen_plugin_places, data_config.gene_data_plugin_names,
+                data_config, 
+                args.gen_workers_writer, args.gen_queue_write )
+            if not args.qc_only:
+                process.merge_all(args.dry_run)
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))     
 
-            if args.val:
-                process_evidences_pipeline(data_config.input_file, args.val_first_n,
-                    args.elasticseach_nodes, es_config.val_right.name, es_config.val_wrong.name, 
-                    es_config.val_right.doc, es_config.val_wrong.doc, redis, args.dry_run, 
-                    args.val_workers_validator, args.val_queue_validator,
-                    args.val_workers_writer, args.val_queue_validator_writer,
-                    data_config.eco_scores, data_config.schema,
-                    data_config.excluded_biotypes, data_config.datasources_to_datatypes)
+        if args.efo:
+            process = EfoProcess(args.elasticseach_nodes, es_config.efo.name, 
+                es_config.efo.doc, es_config.efo.mapping, 
+                data_config.ontology_efo, data_config.ontology_hpo, 
+                data_config.ontology_mp, data_config.disease_phenotype,
+                args.efo_workers_writer, args.efo_queue_write)
+            if not args.qc_only:
+                process.process_all(args.dry_run)
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
+        if args.eco:
+            process = EcoProcess(args.elasticseach_nodes, es_config.eco.name, 
+                es_config.eco.doc, es_config.eco.mapping,
+                data_config.ontology_eco, data_config.ontology_so,
+                args.eco_workers_writer, args.eco_queue_write)
+            if not args.qc_only:
+                process.process_all(args.dry_run)
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
 
-                #TODO qc
+        if args.val:
+            process_evidences_pipeline(data_config.input_file, args.val_first_n,
+                args.elasticseach_nodes, es_config.val_right.name, es_config.val_wrong.name, 
+                es_config.val_right.doc, es_config.val_wrong.doc, 
+                es_config.val_right.mapping, es_config.val_wrong.mapping, 
+                redis, args.dry_run, 
+                args.val_workers_validator, args.val_queue_validator,
+                args.val_workers_writer, args.val_queue_validator_writer,
+                data_config.eco_scores, data_config.schema,
+                data_config.excluded_biotypes, data_config.datasources_to_datatypes)
 
-            if args.hpa:
-                process = HPAProcess(args.elasticseach_nodes, es_config.hpa.name, es_config.hpa.doc, redis, 
-                        data_config.tissue_translation_map, data_config.tissue_curation_map,
-                        data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
-                        data_config.hpa_rna_value, data_config.hpa_rna_zscore,
-                        args.hpa_workers_writer, args.hpa_queue_write)
-                if not args.qc_only:
-                    process.process_all(args.dry_run)
-                if not args.skip_qc:
-                    qc_metrics.update(process.qc(esquery))     
+            #TODO qc
 
-            if args.assoc:
-                process = ScoringProcess(args.elasticseach_nodes, es_config.asc.name, es_config.asc.doc,
-                        args.redis_host, args.redis_port,
-                        args.as_workers_writer, args.as_workers_production, args.as_workers_score, 
-                        args.as_queue_score, args.as_queue_produce, args.as_queue_write,
-                        data_config.scoring_weights, data_config.is_direct_do_not_propagate,
-                        data_config.datasources_to_datatypes)
-                if not args.qc_only:
-                    process.process_all(args.dry_run)
-                if not args.skip_qc:
-                    qc_metrics.update(process.qc(esquery))
-                    pass
-                
-            if args.ddr:
-                process = DataDrivenRelationProcess(args.elasticseach_nodes, 
-                        es_config.ddr.name, es_config.ddr.doc,
-                        args.ddr_workers_production,
-                        args.ddr_workers_score,
-                        args.ddr_workers_write,
-                        args.ddr_queue_production_score,
-                        args.ddr_queue_score_result,
-                        args.ddr_queue_write)
-                if not args.qc_only:
-                    process.process_all(args.dry_run)
-                #TODO qc
+        if args.hpa:
+            process = HPAProcess(args.elasticseach_nodes, es_config.hpa.name, es_config.hpa.doc, redis, 
+                    data_config.tissue_translation_map, data_config.tissue_curation_map,
+                    data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
+                    data_config.hpa_rna_value, data_config.hpa_rna_zscore,
+                    args.hpa_workers_writer, args.hpa_queue_write)
+            if not args.qc_only:
+                process.process_all(args.dry_run)
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))     
 
-            if args.sea:
-                process = SearchObjectProcess(args.elasticseach_nodes, 
-                        es_config.sea.name, es_config.sea.doc, redis,
-                        args.sea_workers_writer, 
-                        args.sea_queue_write, 
-                        data_config.chembl_target, 
-                        data_config.chembl_mechanism, 
-                        data_config.chembl_component, 
-                        data_config.chembl_protein, 
-                        data_config.chembl_molecule_set_uri_pattern)
-                if not args.qc_only:
-                    process.process_all(args.dry_run)
-                #TODO qc
+        if args.assoc:
+            process = ScoringProcess(args.elasticseach_nodes, es_config.asc.name, 
+                    es_config.asc.doc, es_config.asc.mapping,
+                    args.redis_host, args.redis_port,
+                    args.as_workers_writer, args.as_workers_production, args.as_workers_score, 
+                    args.as_queue_score, args.as_queue_produce, args.as_queue_write,
+                    data_config.scoring_weights, data_config.is_direct_do_not_propagate,
+                    data_config.datasources_to_datatypes)
+            if not args.qc_only:
+                process.process_all(args.dry_run)
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(esquery))
+                pass
+            
+        if args.ddr:
+            process = DataDrivenRelationProcess(args.elasticseach_nodes, 
+                    es_config.ddr.name, es_config.ddr.doc, es_config.ddr.mapping,
+                    args.ddr_workers_production,
+                    args.ddr_workers_score,
+                    args.ddr_workers_write,
+                    args.ddr_queue_production_score,
+                    args.ddr_queue_score_result,
+                    args.ddr_queue_write)
+            if not args.qc_only:
+                process.process_all(args.dry_run)
+            #TODO qc
+
+        if args.sea:
+            process = SearchObjectProcess(args.elasticseach_nodes, 
+                    es_config.sea.name, es_config.sea.doc, 
+                    es_config.sea.mapping, redis,
+                    args.sea_workers_writer, 
+                    args.sea_queue_write, 
+                    data_config.chembl_target, 
+                    data_config.chembl_mechanism, 
+                    data_config.chembl_component, 
+                    data_config.chembl_protein, 
+                    data_config.chembl_molecule_set_uri_pattern)
+            if not args.qc_only:
+                process.process_all(args.dry_run)
+            #TODO qc
 
     if args.qc_in:
         #handle reading in previous qc from filename provided, and adding comparitive metrics

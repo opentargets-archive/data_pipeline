@@ -12,7 +12,7 @@ import more_itertools
 from opentargets_urlzsource import URLZSource
 import elasticsearch
 
-from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
+from mrtarget.common.ElasticsearchQuery import ESQuery
 
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager

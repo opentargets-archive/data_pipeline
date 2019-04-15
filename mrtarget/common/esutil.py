@@ -85,17 +85,18 @@ class ElasticsearchBulkIndexManager(object):
         self.client.indices.forcemerge(index=self.index_name)
 
         #wait for everthing to sort itself out
-        self.wait_for_green()
+        self.wait_for_status(u"yellow")
+        #self.wait_for_status(u"green")
 
         #don't return True to indicate any exceptions have been handled
         #this contex manager is only for cleanup
         return None
 
-    def wait_for_green(self):
+    def wait_for_status(self, desired):
         #TODO implement a timeout?
         self.logger.debug("Checking index status %s", self.index_name)
         status = None
-        while status != u"green":
+        while status != desired:
             time.sleep(1)
             status = self.client.cat.indices(index=self.index_name).strip().split()[0]
             self.logger.debug("Status of %s is %s", self.index_name, status)

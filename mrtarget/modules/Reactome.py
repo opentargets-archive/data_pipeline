@@ -11,6 +11,8 @@ from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from opentargets_urlzsource import URLZSource
 import elasticsearch
 
+import simplejson as json
+
 class ReactomeNode(TreeNode, JSONSerializable):
     def __init__(self, **kwargs):
         super(ReactomeNode, self).__init__(**kwargs)
@@ -104,26 +106,26 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(docs, dry_run, index, doc):
-    for doc in docs:
-        if not dry_run:
-            action = {}
-            action["_index"] = index
-            action["_type"] = doc
-            action["_id"] = doc["id"]
-            #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
-            #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
-            action["_source"] = doc
+def elasticsearch_actions(reactions, index, doc):
+    for reaction in reactions:
+        action = {}
+        action["_index"] = index
+        action["_type"] = doc
+        action["_id"] = reaction["id"]
+        #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+        #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+        action["_source"] = reaction
 
-            yield action
+        yield action
 
 class ReactomeProcess():
-    def __init__(self, es_hosts, es_index, es_doc, 
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
             pathway_data_url, pathway_relation_url,
             workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
+        self.es_mappings = es_mappings
         self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
 
         self.logger = logging.getLogger(__name__)
@@ -149,13 +151,15 @@ class ReactomeProcess():
             if node != 'root':
                 self.g.add_edge('root', node)
 
-        es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index):
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
 
+        es = new_es_client(self.es_hosts)
+        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
             docs = generate_documents(self.g)
-            actions = elasticsearch_actions(docs, dry_run, self.es_index, self.es_doc)
+            actions = elasticsearch_actions(docs, self.es_index, self.es_doc)
             failcount = 0
             if not dry_run:
                 for result in elasticsearch.helpers.parallel_bulk(es, actions,
@@ -165,8 +169,8 @@ class ReactomeProcess():
                     if not success:
                         failcount += 1
 
-            if failcount:
-                raise RuntimeError("%s failed to index" % failcount)
+                if failcount:
+                    raise RuntimeError("%s failed to index" % failcount)
 
 
     """

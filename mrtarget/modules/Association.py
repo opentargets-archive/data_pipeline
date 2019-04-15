@@ -9,7 +9,6 @@ from collections import defaultdict
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import new_es_client, new_redis_client
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
@@ -18,9 +17,11 @@ from mrtarget.modules.EFO import EFO
 from mrtarget.common.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
+from opentargets_urlzsource import URLZSource
 
 import elasticsearch
 import pypeln.process as pr
+import simplejson as json
 
 
 class AssociationScore(JSONSerializable):
@@ -401,7 +402,8 @@ def score_producer(data,
 
 class ScoringProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, redis_host, redis_port, 
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
+            redis_host, redis_port, 
             workers_write, workers_production, workers_score, 
             queue_score, queue_produce, queue_write, 
             scoring_weights, is_direct_do_not_propagate,
@@ -412,6 +414,7 @@ class ScoringProcess():
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
+        self.es_mappings = es_mappings
 
         self.redis_host = redis_host
         self.redis_port = redis_port
@@ -468,28 +471,32 @@ class ScoringProcess():
             maxsize=self.queue_score,
             on_start=score_producer_local_init_baked)
 
-        with ElasticsearchBulkIndexManager(es, self.es_index):
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
+
+        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
 
             #load into elasticsearch
             self.logger.info('stages created, running scoring and writing')
             client = es
             chunk_size = 1000 #TODO make configurable
-            actions = self.elasticsearch_actions(pipeline_stage2, dry_run, 
+            actions = self.elasticsearch_actions(pipeline_stage2, 
                 self.es_index, self.es_doc)
             failcount = 0
 
-            for result in elasticsearch.helpers.parallel_bulk(client, actions,
-                    thread_count=self.workers_write, queue_size=self.queue_write, chunk_size=chunk_size):
-        #    for result in elasticsearch.helpers.streaming_bulk(client, actions,
-        #            chunk_size=chunk_size):
-        #    for result in elasticsearch.helpers.bulk(new_es_client(self.es_hosts), actions,
-        #            chunk_size=chunk_size):    
-                success, details = result
-                if not success:
-                    failcount += 1
+            if not dry_run:
+                for result in elasticsearch.helpers.parallel_bulk(client, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, chunk_size=chunk_size):
+            #    for result in elasticsearch.helpers.streaming_bulk(client, actions,
+            #            chunk_size=chunk_size):
+            #    for result in elasticsearch.helpers.bulk(new_es_client(self.es_hosts), actions,
+            #            chunk_size=chunk_size):    
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
-            if failcount:
-                raise RuntimeError("%s relations failed to index" % failcount)
+                if failcount:
+                    raise RuntimeError("%s relations failed to index" % failcount)
 
         self.logger.info("DONE")
 
@@ -498,7 +505,7 @@ class ScoringProcess():
 
     Output suitable for use with elasticsearch.helpers 
     """
-    def elasticsearch_actions(self, results, dry_run, index, doc):
+    def elasticsearch_actions(self, results, index, doc):
         for r in results:
             if r is not None:
                 element_id, score = r

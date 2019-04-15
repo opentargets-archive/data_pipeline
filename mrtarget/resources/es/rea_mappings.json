@@ -1,0 +1,63 @@
+{
+  "reactome-reaction": {
+    "properties": {
+      "ancestors": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "children": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "id": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "is_root": {
+        "type": "boolean"
+      },
+      "label": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "parents": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "path": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      }
+    }
+  }
+}

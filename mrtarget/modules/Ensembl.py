@@ -12,17 +12,16 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(lines, dry_run, index, doc):
+def elasticsearch_actions(lines, index, doc):
     for line in lines:
         entry = json.loads(line)
-        if not dry_run:
-            action = {}
-            action["_index"] = index
-            action["_type"] = doc
-            action["_id"] = entry['id']
-            action["_source"] = line
+        action = {}
+        action["_index"] = index
+        action["_type"] = doc
+        action["_id"] = entry['id']
+        action["_source"] = line
 
-            yield action
+        yield action
 
 
 class EnsemblProcess(object):
@@ -32,10 +31,12 @@ class EnsemblProcess(object):
     e.g.
     python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38
     """
-    def __init__(self, es_hosts, es_index, es_doc, ensembl_filename, workers_write, queue_write):
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, 
+            ensembl_filename, workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
+        self.es_mappings = es_mappings
         self.ensembl_filename = ensembl_filename
         self.logger = logging.getLogger(__name__)
         self.workers_write = workers_write
@@ -49,21 +50,25 @@ class EnsemblProcess(object):
 
         lines = more_itertools.with_iter(URLZSource(self.ensembl_filename).open())
 
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
+
         es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index):   
+        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):   
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(lines, dry_run, self.es_index, self.es_doc)
+            actions = elasticsearch_actions(lines, self.es_index, self.es_doc)
             failcount = 0
-            for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                    thread_count=self.workers_write, queue_size=self.queue_write, 
-                    chunk_size=chunk_size):
-                success, details = result
-                if not success:
-                    failcount += 1
+            if not dry_run:
+                for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, 
+                        chunk_size=chunk_size):
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
-        if failcount:
-            raise RuntimeError("%s failed to index" % failcount)
+                if failcount:
+                    raise RuntimeError("%s failed to index" % failcount)
 
     def qc(self, esquery):
         """

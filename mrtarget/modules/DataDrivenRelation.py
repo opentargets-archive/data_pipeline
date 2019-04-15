@@ -14,7 +14,6 @@ import elasticsearch
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
@@ -330,7 +329,7 @@ def calculate_pair(data, type, row_labels, rows_ids, column_ids, threshold, idf,
 
 class DataDrivenRelationProcess(object):
 
-    def __init__(self, es_hosts, es_index, es_doc, 
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
             ddr_workers_production,
             ddr_workers_score,
             ddr_workers_write,
@@ -340,6 +339,7 @@ class DataDrivenRelationProcess(object):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
+        self.es_mappings = es_mappings
         self.ddr_workers_production = ddr_workers_production
         self.ddr_workers_score = ddr_workers_score
         self.ddr_workers_write = ddr_workers_write
@@ -352,7 +352,7 @@ class DataDrivenRelationProcess(object):
     def process_all(self, dry_run):
 
         es = new_es_client(self.es_hosts)
-        es_query=ESQuery(es)
+        es_query = ESQuery(es)
 
         target_data, disease_data = es_query.get_disease_to_targets_vectors(treshold=0.1, evidence_count=3)
 
@@ -372,7 +372,10 @@ class DataDrivenRelationProcess(object):
         target_labels = [target_id_to_label[hit_id] for hit_id in target_keys]
 
 
-        with ElasticsearchBulkIndexManager(es, self.es_index):
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
+
+        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
 
             #calculate and store disease-to-disease in multiple processess
             self.logger.info('handling disease-to-disease')

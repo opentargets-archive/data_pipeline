@@ -1,7 +1,7 @@
 import hashlib
 import logging
 import os
-import json
+import simplejson as json
 import pypeln.process as pr
 import addict
 import codecs
@@ -13,12 +13,12 @@ import elasticsearch
 import opentargets_validator.helpers
 import mrtarget.common.IO as IO
 
-from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.EvidenceString import EvidenceManager, Evidence
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from opentargets_urlzsource import URLZSource
 
 def make_validated_evs_obj(filename, hash, line, line_n, is_valid=False, explanation_type='', explanation_str='',
                            target_id=None, efo_id=None, data_type=None, id=None):
@@ -275,32 +275,31 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(lines, dry_run, index_valid, index_invalid, doc_valid, doc_invalid):
+def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_invalid):
     for line in lines:
         (left, right) = line
         if right is not None:
             #valid
-            if not dry_run:
-                action = {}
-                action["_index"] = index_valid
-                action["_type"] = doc_valid
-                action["_id"] = right['hash']
-                action["_source"] = right['line']
-                #print("  valid %s" % action["_id"])
-                yield action
+            action = {}
+            action["_index"] = index_valid
+            action["_type"] = doc_valid
+            action["_id"] = right['hash']
+            action["_source"] = right['line']
+            #print("  valid %s" % action["_id"])
+            yield action
         elif left is not None:
             #invalid
-            if not dry_run:
-                action = {}
-                action["_index"] = index_invalid
-                action["_type"] = doc_invalid
-                action["_id"] = left['id']
-                action["_source"] = left
-                #print("invalid %s" % action["_id"])
-                yield action
+            action = {}
+            action["_index"] = index_invalid
+            action["_type"] = doc_invalid
+            action["_id"] = left['id']
+            action["_source"] = left
+            #print("invalid %s" % action["_id"])
+            yield action
 
 def process_evidences_pipeline(filenames, first_n, 
-        es_hosts, es_index_valid, es_index_invalid, es_doc_valid, es_doc_invalid, redis_client,
+        es_hosts, es_index_valid, es_index_invalid, es_doc_valid, es_doc_invalid, 
+        es_mappings_valid, es_mappings_invalid, redis_client,
         dry_run, workers_validation, queue_validation, workers_write, queue_write, 
         eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
@@ -342,31 +341,36 @@ def process_evidences_pipeline(filenames, first_n,
 
     logger.info('stages created, running scoring and writing')
 
-    with ElasticsearchBulkIndexManager(es, es_index_valid):
-        with ElasticsearchBulkIndexManager(es, es_index_invalid):
+    with URLZSource(es_mappings_valid).open() as mappings_file:
+        mappings_valid = json.load(mappings_file)
+
+    with URLZSource(es_mappings_invalid).open() as mappings_file:
+        mappings_invalid = json.load(mappings_file)
+
+    with ElasticsearchBulkIndexManager(es, es_index_valid, mappings=mappings_valid):
+        with ElasticsearchBulkIndexManager(es, es_index_invalid, mappings=mappings_invalid):
 
             #load into elasticsearch
             thread_count = workers_write
             queue_size = queue_write
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(pl_stage, dry_run, 
+            actions = elasticsearch_actions(pl_stage, 
                 es_index_valid, es_index_invalid, 
                 es_doc_valid, es_doc_invalid)
             failcount = 0
-            sucesscount = 0
             
-            for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                    thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
-            #for result in elasticsearch.helpers.streaming_bulk(client, actions,
-            #        chunk_size=chunk_size):
-                success, details = result
-                if not success:
-                    failcount += 1
-                if success:
-                    sucesscount += 1
+            if not dry_run:
+                #parallel_bulk can hang since it uses threads, safer to use streaming
+                #for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                #        thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
+                for result in elasticsearch.helpers.streaming_bulk(es, actions,
+                        chunk_size=chunk_size):
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
-            if failcount:
-                raise RuntimeError("%s relations failed to index" % failcount)
+                if failcount:
+                    raise RuntimeError("%s relations failed to index" % failcount)
             logger.info('stages created, ran scoring and writing')
 
 

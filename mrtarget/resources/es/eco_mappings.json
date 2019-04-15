@@ -1,0 +1,46 @@
+{
+  "eco": {
+    "properties": {
+      "code": {
+        "type": "keyword"
+      },
+      "label": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "path": {
+        "properties": {
+          "label": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "uri": {
+            "type": "keyword"
+          }
+        }
+      },
+      "path_codes": {
+        "type": "keyword"
+      },
+      "path_labels": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      }
+    }
+  }
+}
