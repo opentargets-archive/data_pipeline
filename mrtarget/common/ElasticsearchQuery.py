@@ -8,6 +8,8 @@ from collections import Counter
 import addict
 import jsonpickle
 from elasticsearch import helpers, TransportError
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
 from mrtarget.Settings import Config
 from mrtarget.constants import Const
@@ -46,41 +48,10 @@ class ESQuery(object):
         self.logger = logging.getLogger(__name__)
 
     @staticmethod
-
     def _get_source_from_fields(fields = None):
         if not fields:
             return True
         return fields
-
-    def get_all_targets(self, fields = None):
-        source = self._get_source_from_fields(fields)
-        res = helpers.scan(client=self.handler,
-                            query={"query": {
-                                      "match_all": {}
-                                    },
-                                   '_source': source,
-                                   'size': 100,
-                                   },
-                            scroll='12h',
-                            doc_type=Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                            index=Loader.get_versioned_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,True),
-                            timeout="30m",
-                            )
-        for hit in res:
-            yield hit['_source']
-
-    def get_targets_by_id(self, ids, fields = None):
-        if not isinstance(ids, list):
-            ids = [ids]
-
-        self.get_objects_by_id(ids,
-                               Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                               Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                               fields)
-
-    def count_all_targets(self):
-
-        return self.count_elements_in_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
 
     def get_all_diseases(self, fields = None):
         source = self._get_source_from_fields(fields)
@@ -135,15 +106,14 @@ class ESQuery(object):
         for hit in res:
             yield hit['_source']
 
-    def get_associations_for_target(self, target, fields = None, size = 100, get_top_hits = True):
+    def get_associations_for_target(self, target, fields = None, size = 100):
         source = self._get_source_from_fields(fields)
 
         aggs = addict.Dict()
-        if get_top_hits:
-            aggs.direct_associations.filter.term.is_direct = True
-            aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
-            aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
-            aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
+        aggs.direct_associations.filter.term.is_direct = True
+        aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
+        aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
+        aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
 
         q = addict.Dict()
         q.query.constant_score.filter.terms['target.id'] = [target]
@@ -158,15 +128,14 @@ class ESQuery(object):
                                   )
         return AssociationSummary(res)
 
-    def get_associations_for_disease(self, disease, fields = None, size = 100, get_top_hits = True):
+    def get_associations_for_disease(self, disease, fields = None, size = 100):
         source = self._get_source_from_fields(fields)
 
         aggs = addict.Dict()
-        if get_top_hits:
-            aggs.direct_associations.filter.term.is_direct = True
-            aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
-            aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
-            aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
+        aggs.direct_associations.filter.term.is_direct = True
+        aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
+        aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
+        aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
 
         q = addict.Dict()
         q.query.constant_score.filter.terms['disease.id'] = [disease]
@@ -211,21 +180,6 @@ class ESQuery(object):
         for hit in res:
             yield jsonpickle.decode(base64.b64decode(hit['_source']['entry']))
 
-    def get_all_reactions(self):
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                           },
-                               '_source': True,
-                               'size': 1000,
-                           },
-                           scroll='1h',
-                            doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME,True),
-                           timeout="10m",
-                           )
-        for hit in res:
-            yield hit['_source']
 
     def get_reaction(self, reaction_id):
         res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME,True),

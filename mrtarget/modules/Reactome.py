@@ -9,7 +9,10 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from opentargets_urlzsource import URLZSource
+
 import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
 import simplejson as json
 
@@ -177,13 +180,13 @@ class ReactomeProcess():
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
         self.logger.info("Starting QC")
 
         #number of reactions
         reaction_count = 0
         #Note: try to avoid doing this more than once!
-        for reaction in esquery.get_all_reactions():
+        for reaction in Search().using(es).index(index).query(MatchAll()).scan():
             reaction_count += 1
 
         #put the metrics into a single dict

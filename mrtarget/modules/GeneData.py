@@ -5,10 +5,13 @@ from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
+from opentargets_urlzsource import URLZSource
+
+import simplejson as json
 from yapsy.PluginManager import PluginManager
 import elasticsearch
-import simplejson as json
-from opentargets_urlzsource import URLZSource
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
 ENS_ID_ORG_PREFIX = 'http://identifiers.org/ensembl/'
@@ -476,12 +479,12 @@ class GeneManager():
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
 
         #number of gene entries
         gene_count = 0
         #Note: try to avoid doing this more than once!
-        for gene_entry in esquery.get_all_targets():
+        for gene_entry in Search().using(es).index(index).query(MatchAll()).scan():
             gene_count += 1
 
         #put the metrics into a single dict

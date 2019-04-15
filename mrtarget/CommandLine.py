@@ -90,7 +90,7 @@ def main():
             if not args.qc_only:
                 process.process_all(args.dry_run)
             if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
+                qc_metrics.update(process.qc(es, es_config.rea.name))
         if args.ens:
             process = EnsemblProcess(args.elasticseach_nodes, es_config.ens.name, 
                 es_config.ens.doc, es_config.ens.mapping,
@@ -117,7 +117,7 @@ def main():
             if not args.qc_only:
                 process.merge_all(args.dry_run)
             if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))     
+                qc_metrics.update(process.qc(es, es_config.gen.name))     
 
         if args.efo:
             process = EfoProcess(args.elasticseach_nodes, es_config.efo.name, 
@@ -144,6 +144,7 @@ def main():
                 args.elasticseach_nodes, es_config.val_right.name, es_config.val_wrong.name, 
                 es_config.val_right.doc, es_config.val_wrong.doc, 
                 es_config.val_right.mapping, es_config.val_wrong.mapping, 
+                es_config.gen.name,
                 redis, args.dry_run, 
                 args.val_workers_validator, args.val_queue_validator,
                 args.val_workers_writer, args.val_queue_validator_writer,
@@ -165,7 +166,7 @@ def main():
 
         if args.assoc:
             process = ScoringProcess(args.elasticseach_nodes, es_config.asc.name, 
-                    es_config.asc.doc, es_config.asc.mapping,
+                    es_config.asc.doc, es_config.asc.mapping, es_config.gen.name,
                     args.redis_host, args.redis_port,
                     args.as_workers_writer, args.as_workers_production, args.as_workers_score, 
                     args.as_queue_score, args.as_queue_production, args.as_queue_write,
@@ -193,7 +194,7 @@ def main():
         if args.sea:
             process = SearchObjectProcess(args.elasticseach_nodes, 
                     es_config.sea.name, es_config.sea.doc, 
-                    es_config.sea.mapping, redis,
+                    es_config.sea.mapping, es_config.gen.name, redis,
                     args.sea_workers_writer, 
                     args.sea_queue_write, 
                     data_config.chembl_target, 

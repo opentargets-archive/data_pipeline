@@ -299,7 +299,7 @@ def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_inva
 
 def process_evidences_pipeline(filenames, first_n, 
         es_hosts, es_index_valid, es_index_invalid, es_doc_valid, es_doc_invalid, 
-        es_mappings_valid, es_mappings_invalid, redis_client,
+        es_mappings_valid, es_mappings_invalid, es_index_gene, redis_client,
         dry_run, workers_validation, queue_validation, workers_write, queue_write, 
         eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
@@ -324,8 +324,13 @@ def process_evidences_pipeline(filenames, first_n,
     logger.info('start evidence processing pipeline')
 
     #load lookup tables
-    lookup_data = LookUpDataRetriever(es, redis_client, [], 
-        ( LookUpDataType.TARGET, LookUpDataType.DISEASE, LookUpDataType.ECO )).lookup
+    lookup_data = LookUpDataRetriever(es, redis_client, 
+        ( 
+            LookUpDataType.TARGET, 
+            LookUpDataType.DISEASE, 
+            LookUpDataType.ECO 
+        ),
+        gene_index=es_index_gene).lookup
 
     #create a iterable of lines from all file handles
     evs = IO.make_iter_lines(checked_filenames, first_n)

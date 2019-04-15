@@ -50,10 +50,10 @@ class LookUpDataRetriever(object):
     def __init__(self,
                  es,
                  r_server,
-                 targets,
                  data_types,
                  hpo_uri = None,
-                 mp_uri = None
+                 mp_uri = None,
+                 gene_index = None
                  ):
         self.es = es
         self.r_server = r_server
@@ -67,7 +67,7 @@ class LookUpDataRetriever(object):
             self._logger.info("get %s info"%dt)
             start_time = time.time()
             if dt == LookUpDataType.TARGET:
-                self._get_gene_info(targets, True)
+                self._get_gene_info(gene_index)
             elif dt == LookUpDataType.DISEASE:
                 self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.ECO:
@@ -81,13 +81,9 @@ class LookUpDataRetriever(object):
         self.r_server = r_server
         self.lookup.set_r_server(r_server)
 
-    def _get_gene_info(self, targets=[], autoload = True):
+    def _get_gene_info(self, gene_index):
         self._logger.info('getting gene info')
-        self.lookup.available_genes = GeneLookUpTable(self.es,
-                                                      'GENE_LOOKUP',
-                                                      self.r_server,
-                                                      targets = targets,
-                                                      autoload = autoload)
+        self.lookup.available_genes = GeneLookUpTable(self.es, gene_index, 'GENE_LOOKUP', self.r_server)
         self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
         self._get_non_reference_gene_mappings()
 

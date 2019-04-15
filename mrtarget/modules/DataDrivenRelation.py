@@ -11,6 +11,10 @@ from scipy.spatial.distance import pdist
 import pypeln.process as pr
 import elasticsearch
 
+import simplejson as json
+
+from opentargets_urlzsource import URLZSource
+
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
 from mrtarget.common.DataStructure import JSONSerializable

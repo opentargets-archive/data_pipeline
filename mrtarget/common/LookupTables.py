@@ -2,6 +2,8 @@ import logging
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.constants import Const
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll,Match
 
 class HPALookUpTable(object):
     """
@@ -60,15 +62,12 @@ class GeneLookUpTable(object):
     A redis-based pickable gene look up table
     """
 
-    def __init__(self,
-                 es=None,
-                 namespace = None,
-                 r_server = None,
-                 ttl = 60*60*24+7,
-                 targets = [],
-                 autoload=True):
+    def __init__(self, es, es_index,
+                 namespace, r_server,
+                 ttl = 60*60*24+7):
         self._logger = logging.getLogger(__name__)
         self._es = es
+        self._es_index = es_index
         self.r_server = r_server
         self._es_query = ESQuery(self._es)
         self._table = RedisLookupTablePickle(namespace = namespace,
@@ -76,24 +75,18 @@ class GeneLookUpTable(object):
                                             ttl = ttl)
         self._logger = logging.getLogger(__name__)
         self.uniprot2ensembl = {}
-        if self.r_server and autoload:
-            self.load_gene_data(self.r_server, targets)
+        if self.r_server:
+            self.load_gene_data(self.r_server)
 
-    def load_gene_data(self, r_server = None, targets = []):
-        data = None
-        if targets:
-            data = self._es_query.get_targets_by_id(targets)
-            total = len(targets)
-        if data is None:
-            data = self._es_query.get_all_targets()
-            total = self._es_query.count_all_targets()
+    def load_gene_data(self, r_server):
+        #load all targets
+        data = Search().using(self._es).index(self._es_index).query(MatchAll()).scan()
         for target in data:
-            self._table.set(target['id'],target, r_server=self._get_r_server(r_server))#TODO can be improved by sending elements in batches
+            self._table.set(target['id'],target, r_server=self._get_r_server(r_server))
             if target['uniprot_id']:
                 self.uniprot2ensembl[target['uniprot_id']] = target['id']
             for accession in target['uniprot_accessions']:
                 self.uniprot2ensembl[accession] = target['id']
-
 
     def get_gene(self, target_id, r_server = None):
         try:
@@ -118,14 +111,7 @@ class GeneLookUpTable(object):
         return self._table.keys(r_server = self._get_r_server(r_server))
 
     def __contains__(self, key, r_server=None):
-        redis_contain = self._table.__contains__(key, r_server=self._get_r_server(r_server))
-        if redis_contain:
-            return True
-        if not redis_contain:
-            return self._es_query.exists(index=Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                         doc_type=Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                                         id=key,
-                                         )
+        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
 
     def __getitem__(self, key, r_server = None):
         return self.get_gene(key, self._get_r_server(r_server))
@@ -134,7 +120,8 @@ class GeneLookUpTable(object):
         self._table.set(key, value, self._get_r_server(r_server))
 
     def __missing__(self, key):
-        print key
+        #do nothing
+        pass
 
     def keys(self, r_server=None):
         return self._table.keys(self._get_r_server(r_server))

@@ -8,9 +8,12 @@ from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
+
 from opentargets_urlzsource import URLZSource
 
 import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
 class SearchObjectTypes(object):
     TARGET = 'target'
@@ -196,7 +199,7 @@ def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_
                 failcount += 1
 
 class SearchObjectProcess(object):
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_index_gene,
             r_server, workers_write, queue_write,
             chembl_target_uri, 
             chembl_mechanism_uri, 
@@ -207,6 +210,7 @@ class SearchObjectProcess(object):
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_index_gene = es_index_gene
         self.r_server = r_server
         self.workers_write = workers_write
         self.queue_write = queue_write
@@ -255,7 +259,7 @@ class SearchObjectProcess(object):
         with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
             #process targets
             self.logger.info('handling targets')
-            targets = esquery.get_all_targets()
+            targets = Search().using(es).index(self.es_index_gene).query(MatchAll()).scan()
             so_it = self.handle_search_object(targets, esquery, SearchObjectTypes.TARGET)
             store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
                 self.workers_write, self.queue_write)

@@ -402,7 +402,7 @@ def score_producer(data,
 
 class ScoringProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_index_gene,
             redis_host, redis_port, 
             workers_write, workers_production, workers_score, 
             queue_score, queue_produce, queue_write, 
@@ -415,6 +415,7 @@ class ScoringProcess():
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_index_gene = es_index_gene
 
         self.redis_host = redis_host
         self.redis_port = redis_port
@@ -437,13 +438,13 @@ class ScoringProcess():
         es = new_es_client(self.es_hosts)
 
         lookup_data = LookUpDataRetriever(es, self.r_server,
-            targets=[],
-            data_types=(
+            (
                 LookUpDataType.DISEASE,
                 LookUpDataType.TARGET,
                 LookUpDataType.ECO,
                 LookUpDataType.HPA
-            )).lookup
+            ),
+            gene_index=self.es_index_gene).lookup
 
         es_query = ESQuery(es)
         targets = list(es_query.get_all_target_ids_with_evidence_data())
