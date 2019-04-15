@@ -8,9 +8,6 @@ import pkg_resources as res
 from envparse import env, ConfigurationError
 import mrtarget
 import multiprocessing as mp
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 def ini_from_file_or_resource(*filenames):
