@@ -168,7 +168,7 @@ def main():
                     es_config.asc.doc, es_config.asc.mapping,
                     args.redis_host, args.redis_port,
                     args.as_workers_writer, args.as_workers_production, args.as_workers_score, 
-                    args.as_queue_score, args.as_queue_produce, args.as_queue_write,
+                    args.as_queue_score, args.as_queue_production, args.as_queue_write,
                     data_config.scoring_weights, data_config.is_direct_do_not_propagate,
                     data_config.datasources_to_datatypes)
             if not args.qc_only:
