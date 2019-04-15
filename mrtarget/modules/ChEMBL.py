@@ -7,7 +7,7 @@ import dumbdbm
 import tempfile
 
 from opentargets_urlzsource import URLZSource
-import json
+import simplejson as json
 
 
 def get_chembl_info_by_file(uri):

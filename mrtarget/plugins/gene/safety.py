@@ -2,7 +2,7 @@ from yapsy.IPlugin import IPlugin
 from opentargets_urlzsource import URLZSource
 import traceback
 import logging
-import json
+import simplejson as json
 logging.basicConfig(level=logging.DEBUG)
 
 class Safety(IPlugin):
