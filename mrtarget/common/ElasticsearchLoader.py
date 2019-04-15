@@ -7,7 +7,6 @@ import json
 from elasticsearch.exceptions import NotFoundError
 from elasticsearch.helpers import bulk
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.EvidenceJsonUtils import assertJSONEqual
 from mrtarget.Settings import Config
 from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 
@@ -204,16 +203,6 @@ class Loader():
                                 keys = body['mappings'][dt].keys()
                                 if 'dynamic_templates' in keys:
                                     del keys[keys.index('dynamic_templates')]
-                                assertJSONEqual(mappings[index_name]['mappings'][dt],
-                                                body['mappings'][dt],
-                                                msg='mappings in elasticsearch are different from the ones sent for datatype %s'%dt,
-                                                keys = keys)
-                    if 'settings' in body:
-                        assertJSONEqual(settings[index_name]['settings']['index'],
-                                        body['settings'],
-                                        msg='settings in elasticsearch are different from the ones sent',
-                                        keys=body['settings'].keys(),#['number_of_replicas','number_of_shards','refresh_interval']
-                                        )
                 except ValueError as e:
                     self.logger.exception("elasticsearch settings error")
 
