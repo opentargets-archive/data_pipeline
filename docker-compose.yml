@@ -1,4 +1,4 @@
-version: "3.6"
+version: "2.4"
 services:
       
   elasticsearch:
@@ -8,15 +8,10 @@ services:
     ports:
       - 9200:9200
     environment:
-      # assign more memory to JVM 
-      - "ES_JAVA_OPTS=-Xms12g -Xmx12g"
       #disable xpack as not OSS
       - "xpack.security.enabled=false"
       #disable memory swapping to disk for performance
       - "bootstrap.memory_lock=true"
-      #increase the buffer is used to store newly indexed documents
-      #defaults to 10% of heap but more is better for heavy indexing
-      - "indices.memory.index_buffer_size=4g"
       #allow downloading from google buckets
       - repositories.url.allowed_urls=https://storage.googleapis.com/*,https://*.amazonaws.com/*
     volumes:
