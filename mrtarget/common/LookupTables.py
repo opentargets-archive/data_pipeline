@@ -82,6 +82,7 @@ class GeneLookUpTable(object):
         #load all targets
         data = Search().using(self._es).index(self._es_index).query(MatchAll()).scan()
         for target in data:
+            target = target.to_dict()
             self._table.set(target['id'],target, r_server=self._get_r_server(r_server))
             if target['uniprot_id']:
                 self.uniprot2ensembl[target['uniprot_id']] = target['id']
