@@ -692,6 +692,9 @@
           "disease_acronym": {
             "type": "text"
           },
+          "disease_id": {
+            "type": "text"
+          },
           "disease_iri": {
             "type": "text"
           },

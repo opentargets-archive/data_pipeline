@@ -122,13 +122,14 @@ def elasticsearch_actions(reactions, index, doc):
         yield action
 
 class ReactomeProcess():
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
             pathway_data_url, pathway_relation_url,
             workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
 
         self.logger = logging.getLogger(__name__)
@@ -157,8 +158,11 @@ class ReactomeProcess():
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
         es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
             docs = generate_documents(self.g)

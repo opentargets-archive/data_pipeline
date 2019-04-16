@@ -1,0 +1,64 @@
+{
+  "index": {
+    "refresh_interval": "1s",
+    "number_of_shards": "9",
+    "translog": {
+      "durability": "request"
+    },
+    "analysis": {
+      "filter": {
+        "edgeNGram_filter": {
+          "token_chars": [
+            "letter",
+            "digit",
+            "punctuation",
+            "symbol"
+          ],
+          "min_gram": "4",
+          "type": "ngram",
+          "max_gram": "10"
+        },
+        "wordDelimiter_filter": {
+          "split_on_numerics": "false",
+          "generate_word_parts": "true",
+          "preserve_original": "true",
+          "catenate_words": "false",
+          "generate_number_parts": "true",
+          "catenate_all": "false",
+          "split_on_case_change": "false",
+          "type": "word_delimiter",
+          "catenate_numbers": "false",
+          "stem_english_possessive": "true"
+        }
+      },
+      "analyzer": {
+        "whitespace_analyzer": {
+          "filter": [
+            "lowercase",
+            "wordDelimiter_filter"
+          ],
+          "type": "custom",
+          "tokenizer": "whitespace"
+        },
+        "default": {
+          "filter": [
+            "lowercase",
+            "wordDelimiter_filter"
+          ],
+          "type": "custom",
+          "tokenizer": "whitespace"
+        },
+        "edgeNGram_analyzer": {
+          "filter": [
+            "lowercase",
+            "wordDelimiter_filter",
+            "edgeNGram_filter"
+          ],
+          "type": "custom",
+          "tokenizer": "whitespace"
+        }
+      }
+    },
+    "number_of_replicas": "0"
+  }
+}

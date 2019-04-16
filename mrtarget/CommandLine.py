@@ -84,7 +84,7 @@ def main():
 
         if args.rea:
             process = ReactomeProcess(args.elasticseach_nodes, es_config.rea.name, 
-                es_config.rea.doc, es_config.rea.mapping,
+                es_config.rea.doc, es_config.rea.mapping, es_config.rea.setting,
                 data_config.reactome_pathway_data, data_config.reactome_pathway_relation,
                 args.rea_workers_writer, args.rea_queue_write)
             if not args.qc_only:
