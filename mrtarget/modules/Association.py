@@ -510,15 +510,14 @@ class ScoringProcess():
         for r in results:
             if r is not None:
                 element_id, score = r
-                if not dry_run:
-                    action = {}
-                    action["_index"] = index
-                    action["_type"] = doc
-                    action["_id"] = element_id
-                    #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
-                    #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
-                    action["_source"] = score
-                    yield action
+                action = {}
+                action["_index"] = index
+                action["_type"] = doc
+                action["_id"] = element_id
+                #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+                #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+                action["_source"] = score
+                yield action
                     
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
