@@ -155,14 +155,13 @@ whilst also respecting the dry run flag given
 Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
 performance loading
 """
-def store_in_elasticsearch(results, loader, dry_run, workers_write, queue_write, index, doc):
-    client = loader.es
+def store_in_elasticsearch(results, es, dry_run, workers_write, queue_write, index, doc):
     thread_count = workers_write
     queue_size = queue_write
     chunk_size = 1000 #TODO make configurable
     actions = elasticsearch_actions(results, dry_run, index, doc)
     failcount = 0
-    for result in elasticsearch.helpers.parallel_bulk(client, actions,
+    for result in elasticsearch.helpers.parallel_bulk(es, actions,
             thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
         success, details = result
         if not success:
@@ -224,7 +223,7 @@ spawns multiple processess as needed
 used to standardize d2d and t2t code path
 """
 def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids, 
-        threshold, buckets_number, loader, dry_run, 
+        threshold, buckets_number, es, dry_run, 
         workers_production, workers_score, workers_write,
         queue_production_score, queue_score_result, queue_write, index, doc):
 
@@ -273,7 +272,7 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
 
     #store in elasticsearch
     #this could be multi process, but just use a single for now
-    store_in_elasticsearch(pipeline_stage, loader, dry_run, workers_write, queue_write,
+    store_in_elasticsearch(pipeline_stage, es, dry_run, workers_write, queue_write,
         index, doc)
 
 """
