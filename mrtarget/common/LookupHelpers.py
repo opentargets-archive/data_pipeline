@@ -53,7 +53,8 @@ class LookUpDataRetriever(object):
                  data_types,
                  hpo_uri = None,
                  mp_uri = None,
-                 gene_index = None
+                 gene_index = None,
+                 eco_index = None
                  ):
         self.es = es
         self.r_server = r_server
@@ -69,11 +70,14 @@ class LookUpDataRetriever(object):
             if dt == LookUpDataType.TARGET:
                 self._get_gene_info(gene_index)
             elif dt == LookUpDataType.DISEASE:
-                self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
+                self.lookup.available_efos = EFOLookUpTable(self.es, 
+                    'EFO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.ECO:
-                self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
+                self.lookup.available_ecos = ECOLookUpTable(self.es, 
+                    eco_index, 'ECO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.HPA:
-                self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP', self.r_server)
+                self.lookup.available_hpa = HPALookUpTable(self.es, 
+                    'HPA_LOOKUP', self.r_server)
 
             self._logger.info("loaded %s in %ss" % (dt, str(int(time.time() - start_time))))
 

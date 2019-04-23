@@ -138,7 +138,7 @@ class ECOLookUpTable(object):
 
 
     def __init__(self,
-                 es,
+                 es, es_index,
                  namespace=None,
                  r_server=None,
                  ttl=60 * 60 * 24 + 7):
@@ -146,7 +146,7 @@ class ECOLookUpTable(object):
                                              r_server=r_server,
                                              ttl=ttl)
         self._es = es
-        self._es_query = ESQuery(es)
+        self._es_index = es_index
         self.r_server = r_server
         self._logger = logging.getLogger(__name__)
         if r_server is not None:
@@ -164,10 +164,10 @@ class ECOLookUpTable(object):
             return url
 
     def _load_eco_data(self, r_server=None):
-        self._logger = logging.getLogger(__name__)
-        for eco in self._es_query.get_all_eco():
+        data = Search().using(self._es).index(self._es_index).query(MatchAll()).scan()
+        for eco in data:
             self._table.set(self.get_ontology_code_from_url(eco['code']), eco,
-                            r_server=self._get_r_server(r_server))  # TODO can be improved by sending elements in batches
+                r_server=self._get_r_server(r_server))  
 
 
     def get_eco(self, efo_id, r_server=None):
@@ -175,7 +175,8 @@ class ECOLookUpTable(object):
 
 
     def set_eco(self, eco, r_server=None):
-        self._table.set(self.get_ontology_code_from_url(eco['code']), eco, r_server=self._get_r_server(r_server))
+        self._table.set(self.get_ontology_code_from_url(eco['code']), eco, 
+            r_server=self._get_r_server(r_server))
 
 
     def get_available_eco_ids(self, r_server=None):

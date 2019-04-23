@@ -7,6 +7,8 @@ from rdflib import URIRef
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 import simplejson as json
 from opentargets_urlzsource import URLZSource
 from mrtarget.constants import Const
@@ -103,7 +105,7 @@ def elasticsearch_actions(items, index, doc):
 
 class EfoProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
                  efo_uri, hpo_uri, mp_uri,
                  disease_phenotype_uris,
                  workers_write, queue_write
@@ -112,6 +114,7 @@ class EfoProcess():
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.efo_uri = efo_uri
         self.hpo_uri = hpo_uri
         self.mp_uri = mp_uri
@@ -219,8 +222,11 @@ class EfoProcess():
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
         es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
@@ -242,7 +248,7 @@ class EfoProcess():
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
         self.logger.info("Starting QC")
         #number of EFO terms
         efo_term_count = 0
@@ -255,7 +261,8 @@ class EfoProcess():
 
         #loop over all efo terms and calculate the metrics
         #Note: try to avoid doing this more than once!
-        for efo_term in esquery.get_all_diseases():
+        for efo_term in Search().using(es).index(index).query(MatchAll()).scan():
+            efo_term = EFO().load_json(efo_term)
             efo_term_count += 1
 
             #path_labels is a list of lists of all paths to the root

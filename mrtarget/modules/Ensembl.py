@@ -6,6 +6,8 @@ from opentargets_urlzsource import URLZSource
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
 """
 Generates elasticsearch action objects from the results iterator
@@ -31,12 +33,13 @@ class EnsemblProcess(object):
     e.g.
     python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38
     """
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, 
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
             ensembl_filename, workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.ensembl_filename = ensembl_filename
         self.logger = logging.getLogger(__name__)
         self.workers_write = workers_write
@@ -53,8 +56,11 @@ class EnsemblProcess(object):
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
         es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):   
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):   
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
             actions = elasticsearch_actions(lines, self.es_index, self.es_doc)
@@ -70,7 +76,7 @@ class EnsemblProcess(object):
                 if failcount:
                     raise RuntimeError("%s failed to index" % failcount)
 
-    def qc(self, esquery):
+    def qc(self, es, index):
         """
         Run a series of QC tests on the Ensembl Elasticsearch index. Returns a dictionary
         of string test names and result objects
@@ -79,7 +85,7 @@ class EnsemblProcess(object):
         # number of genes
         ensembl_count = 0
         # Note: try to avoid doing this more than once!
-        for _ in esquery.get_all_ensembl_genes():
+        for e in Search().using(es).index(index).query(MatchAll()).scan():
             ensembl_count += 1
 
         # put the metrics into a single dict

@@ -1,7 +1,7 @@
 {
   "index": {
     "refresh_interval": "1s",
-    "number_of_shards": "9",
+    "number_of_shards": "64",
     "translog": {
       "durability": "request"
     },

@@ -85,8 +85,8 @@ class ElasticsearchBulkIndexManager(object):
         self.client.indices.forcemerge(index=self.index_name)
 
         #wait for everthing to sort itself out
-        self.wait_for_status(u"yellow")
-        #self.wait_for_status(u"green")
+        #self.wait_for_status(u"yellow")
+        self.wait_for_status(u"green")
 
         #don't return True to indicate any exceptions have been handled
         #this contex manager is only for cleanup

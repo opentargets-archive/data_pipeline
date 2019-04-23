@@ -70,24 +70,6 @@ class ESQuery(object):
         for hit in res:
             yield hit['_source']
 
-    def get_all_eco(self, fields=None):
-        source = self._get_source_from_fields(fields)
-
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                           },
-                               '_source': source,
-                               'size': 1000,
-                           },
-                           scroll='2h',
-                           doc_type=Const.ELASTICSEARCH_ECO_DOC_NAME,
-                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME,True),
-                           timeout="10m",
-                           )
-        for hit in res:
-            yield hit['_source']
-
     def get_all_hpa(self, fields=None):
         source = self._get_source_from_fields(fields)
 

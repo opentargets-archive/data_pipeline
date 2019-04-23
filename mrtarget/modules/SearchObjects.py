@@ -199,7 +199,8 @@ def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_
                 failcount += 1
 
 class SearchObjectProcess(object):
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_index_gene,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
+            es_index_gene,
             r_server, workers_write, queue_write,
             chembl_target_uri, 
             chembl_mechanism_uri, 
@@ -210,6 +211,7 @@ class SearchObjectProcess(object):
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.es_index_gene = es_index_gene
         self.r_server = r_server
         self.workers_write = workers_write
@@ -256,7 +258,10 @@ class SearchObjectProcess(object):
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
-        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
             #process targets
             self.logger.info('handling targets')
             targets = Search().using(es).index(self.es_index_gene).query(MatchAll()).scan()

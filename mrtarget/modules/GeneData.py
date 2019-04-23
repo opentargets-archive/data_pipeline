@@ -409,15 +409,17 @@ class GeneManager():
 
     """
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, r_server,
-                 plugin_paths, plugin_order, 
-                 data_config,
-                 workers_write, queue_write):
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, 
+            es_settings, r_server,
+            plugin_paths, plugin_order, 
+            data_config,
+            workers_write, queue_write):
 
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.r_server = r_server
         self.plugin_order = plugin_order
         self.data_config = data_config
@@ -456,7 +458,10 @@ class GeneManager():
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
-        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable

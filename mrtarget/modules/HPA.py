@@ -500,7 +500,8 @@ def elasticsearch_actions(hpa_merged_table, dry_run, index, doc):
             yield action
 
 class HPAProcess():
-    def __init__(self, es_hosts, es_index, es_doc, r_server, 
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
+            r_server, 
             tissue_translation_map_url, 
             tissue_curation_map_url,
             normal_tissue_url,
@@ -509,6 +510,8 @@ class HPAProcess():
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
+        self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.r_server = r_server
 
         self.workers_write = workers_write
@@ -544,8 +547,14 @@ class HPAProcess():
 
         self.logger.debug('calling to create new expression index')
 
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
+
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
         es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index):   
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
   
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable

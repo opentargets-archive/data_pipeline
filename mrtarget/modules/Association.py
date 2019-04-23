@@ -402,7 +402,8 @@ def score_producer(data,
 
 class ScoringProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_index_gene,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+            es_index_gene, es_index_eco,
             redis_host, redis_port, 
             workers_write, workers_production, workers_score, 
             queue_score, queue_produce, queue_write, 
@@ -415,7 +416,9 @@ class ScoringProcess():
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.es_index_gene = es_index_gene
+        self.es_index_eco = es_index_eco
 
         self.redis_host = redis_host
         self.redis_port = redis_port
@@ -444,7 +447,8 @@ class ScoringProcess():
                 LookUpDataType.ECO,
                 LookUpDataType.HPA
             ),
-            gene_index=self.es_index_gene).lookup
+            gene_index=self.es_index_gene,
+            eco_index=self.es_index_eco).lookup
 
         es_query = ESQuery(es)
         targets = list(es_query.get_all_target_ids_with_evidence_data())
@@ -475,7 +479,10 @@ class ScoringProcess():
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
-        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
             #load into elasticsearch
             self.logger.info('stages created, running scoring and writing')

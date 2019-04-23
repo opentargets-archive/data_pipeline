@@ -8,6 +8,8 @@ from opentargets_urlzsource import URLZSource
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 import simplejson as json
 
 """
@@ -40,12 +42,13 @@ def generate_uniprot(uri):
             yield entry
 
 class UniprotDownloader(object):
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
             uri, workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.uri = uri
         self.workers_write = workers_write
         self.queue_write = queue_write
@@ -60,8 +63,11 @@ class UniprotDownloader(object):
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
         es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
             items = generate_uniprot(self.uri)
 
@@ -80,7 +86,7 @@ class UniprotDownloader(object):
                 if failcount:
                     raise RuntimeError("%s failed to index" % failcount)
 
-    def qc(self, esquery):
+    def qc(self, es, index):
         """Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
         of string test names and result objects
         """
@@ -88,7 +94,7 @@ class UniprotDownloader(object):
         #number of uniprot entries
         uniprot_count = 0
         #Note: try to avoid doing this more than once!
-        for unprot_entry in esquery.get_all_uniprot_entries():
+        for unprot_entry in Search().using(es).index(index).query(MatchAll()).scan():
             uniprot_count += 1
 
             if uniprot_count % 1000 == 0:

@@ -299,7 +299,10 @@ def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_inva
 
 def process_evidences_pipeline(filenames, first_n, 
         es_hosts, es_index_valid, es_index_invalid, es_doc_valid, es_doc_invalid, 
-        es_mappings_valid, es_mappings_invalid, es_index_gene, redis_client,
+        es_mappings_valid, es_mappings_invalid, 
+        es_settings_valid, es_settings_invalid, 
+        es_index_gene, es_index_eco,
+        redis_client,
         dry_run, workers_validation, queue_validation, workers_write, queue_write, 
         eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
@@ -330,7 +333,8 @@ def process_evidences_pipeline(filenames, first_n,
             LookUpDataType.DISEASE, 
             LookUpDataType.ECO 
         ),
-        gene_index=es_index_gene).lookup
+        gene_index=es_index_gene,
+        eco_index=es_index_eco).lookup
 
     #create a iterable of lines from all file handles
     evs = IO.make_iter_lines(checked_filenames, first_n)
@@ -352,8 +356,14 @@ def process_evidences_pipeline(filenames, first_n,
     with URLZSource(es_mappings_invalid).open() as mappings_file:
         mappings_invalid = json.load(mappings_file)
 
-    with ElasticsearchBulkIndexManager(es, es_index_valid, mappings=mappings_valid):
-        with ElasticsearchBulkIndexManager(es, es_index_invalid, mappings=mappings_invalid):
+    with URLZSource(es_settings_valid).open() as settings_file:
+        settings_valid = json.load(settings_file)
+
+    with URLZSource(es_settings_invalid).open() as settings_file:
+        settings_invalid = json.load(settings_file)
+
+    with ElasticsearchBulkIndexManager(es, es_index_valid, settings_valid, mappings_valid):
+        with ElasticsearchBulkIndexManager(es, es_index_invalid, settings_invalid, mappings_invalid):
 
             #load into elasticsearch
             thread_count = workers_write

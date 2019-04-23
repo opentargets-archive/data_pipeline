@@ -333,7 +333,7 @@ def calculate_pair(data, type, row_labels, rows_ids, column_ids, threshold, idf,
 
 class DataDrivenRelationProcess(object):
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
             ddr_workers_production,
             ddr_workers_score,
             ddr_workers_write,
@@ -344,6 +344,7 @@ class DataDrivenRelationProcess(object):
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.ddr_workers_production = ddr_workers_production
         self.ddr_workers_score = ddr_workers_score
         self.ddr_workers_write = ddr_workers_write
@@ -379,7 +380,10 @@ class DataDrivenRelationProcess(object):
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
-        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
             #calculate and store disease-to-disease in multiple processess
             self.logger.info('handling disease-to-disease')

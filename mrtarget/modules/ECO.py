@@ -13,6 +13,8 @@ from mrtarget.Settings import Config #TODO remove
 import logging
 import elasticsearch
 import simplejson as json
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
 
 '''
@@ -58,12 +60,13 @@ def elasticsearch_actions(items, index, doc):
 
 class EcoProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
             eco_uri, so_uri, workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
         self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.eco_uri = eco_uri
         self.so_uri = so_uri
         self.workers_write = workers_write
@@ -95,8 +98,11 @@ class EcoProcess():
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
         es = new_es_client(self.es_hosts)
-        with ElasticsearchBulkIndexManager(es, self.es_index, mappings=mappings):
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
@@ -117,12 +123,12 @@ class EcoProcess():
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
 
         #number of eco entries
         eco_count = 0
         #Note: try to avoid doing this more than once!
-        for eco_entry in esquery.get_all_eco():
+        for eco_entry in Search().using(es).index(index).query(MatchAll()).scan():
             eco_count += 1
 
         #put the metrics into a single dict
