@@ -10,7 +10,6 @@ import itertools
 from mrtarget.modules.Evidences import process_evidences_pipeline
 from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import RedisManager, new_es_client, new_redis_client
-from mrtarget.ElasticsearchConfig import ElasticSearchConfiguration
 from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
 from mrtarget.modules.ECO import EcoProcess
@@ -113,7 +112,7 @@ def main():
                 es_config.gen.doc, es_config.gen.mapping, es_config.gen.setting, 
                 redis,
                 args.gen_plugin_places, data_config.gene_data_plugin_names,
-                data_config, 
+                data_config, es_config,
                 args.gen_workers_writer, args.gen_queue_write )
             if not args.qc_only:
                 process.merge_all(args.dry_run)
@@ -129,7 +128,7 @@ def main():
             if not args.qc_only:
                 process.process_all(args.dry_run)
             if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
+                qc_metrics.update(process.qc(es, es_config.efo.name))
         if args.eco:
             process = EcoProcess(args.elasticseach_nodes, es_config.eco.name, 
                 es_config.eco.doc, es_config.eco.mapping, es_config.eco.setting,
@@ -166,7 +165,7 @@ def main():
             if not args.qc_only:
                 process.process_all(args.dry_run)
             if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))     
+                qc_metrics.update(process.qc(es, es_config.hpa.name))     
 
         if args.assoc:
             process = ScoringProcess(args.elasticseach_nodes, es_config.asc.name, 
@@ -180,7 +179,7 @@ def main():
             if not args.qc_only:
                 process.process_all(args.dry_run)
             if not args.skip_qc:
-                qc_metrics.update(process.qc(esquery))
+                qc_metrics.update(process.qc(es, es_config.asc.name))
                 pass
             
         if args.ddr:

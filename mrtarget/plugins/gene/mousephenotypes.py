@@ -44,8 +44,6 @@ class MousePhenotypes(IPlugin):
 
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        self.loader = None
-        self.r_server = None
         self.mouse_genes = {}
         self.ancestors = {}
         self.mps = {}
@@ -58,13 +56,8 @@ class MousePhenotypes(IPlugin):
         self.human_ensembl_gene_ids = {}
         self.data_config = None
 
-    def print_name(self):
-        self._logger.debug("MousePhenotypes gene data plugin")
+    def merge_data(self, genes, es, r_server, data_config, es_config):
 
-    def merge_data(self, genes, loader, r_server, data_config):
-
-        self.loader = loader
-        self.r_server = r_server
         self.data_config = data_config
 
         self._get_mp_classes(self.data_config.ontology_mp)

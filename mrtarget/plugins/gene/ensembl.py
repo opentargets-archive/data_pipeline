@@ -1,8 +1,8 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.modules.GeneData import Gene
 from mrtarget.constants import Const
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from elasticsearch.exceptions import NotFoundError
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 import sys
 import logging
 
@@ -11,21 +11,12 @@ class Ensembl(IPlugin):
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
 
-    def print_name(self):
-        self._logger.info("ENSEMBL gene data plugin")
+    def merge_data(self, genes, loader, r_server, data_config, es_config):
 
-    def merge_data(self, genes, loader, r_server, data_config):
+        es = loader.es
+        index = es_config.ens.name
 
-        esquery = ESQuery(loader.es)
-
-        try:
-            count = esquery.count_elements_in_index(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME)
-        except NotFoundError as ex:
-            self._logger.error('no Ensembl index in ES. Skipping. Has the --ensembl step been run? Are you pointing to the correct index? %s' % ex)
-            raise ex
-
-
-        for row in esquery.get_all_ensembl_genes():
+        for row in Search().using(es).index(index).query(MatchAll()).scan():
             if row['id'] in genes:
                 gene = genes.get_gene(row['id'])
                 gene.load_ensembl_data(row)

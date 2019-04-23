@@ -201,21 +201,3 @@ class ReactomeProcess():
         return metrics
 
 
-
-class ReactomeRetriever():
-    """
-    Will retrieve a Reactome object form the processed json stored in elasticsearch
-    """
-
-    def __init__(self,
-                 es):
-        self.es_query = ESQuery(es)
-        self._cache = {}
-        self.logger = logging.getLogger(__name__)
-
-    def get_reaction(self, reaction_id):
-        if reaction_id not in self._cache:
-            reaction = ReactomeNode()
-            reaction.load_json(self.es_query.get_reaction(reaction_id))
-            self._cache[reaction_id] = reaction
-        return self._cache[reaction_id]

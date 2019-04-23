@@ -10,10 +10,7 @@ class ChEMBL(IPlugin):
     def _gen_chembl_map(self, chembl_id, synonyms):
         return {'id': chembl_id, 'synonyms': synonyms}
 
-    def print_name(self):
-        self._logger.info("ChEMBL gene data plugin")
-
-    def merge_data(self, genes, loader, r_server, data_config):
+    def merge_data(self, genes, es, r_server, data_config, es_config):
 
         chembl_handler = ChEMBLLookup(
             target_uri=data_config.chembl_target, 

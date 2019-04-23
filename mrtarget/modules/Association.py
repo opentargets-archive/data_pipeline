@@ -20,6 +20,8 @@ from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 from opentargets_urlzsource import URLZSource
 
 import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 import pypeln.process as pr
 import simplejson as json
 
@@ -304,40 +306,38 @@ def produce_evidence(data, es_query,
 
     return_values = []
 
-    available_evidence = es_query.count_evidence_for_target(target)
-    if available_evidence:
-        evidence_iterator = es_query.get_evidence_for_target_simple(target, available_evidence)
-        for evidence in evidence_iterator:
-            efo_list = [evidence['disease']['id']] \
-                if evidence['sourceID'] in is_direct_do_not_propagate \
-                else evidence['private']['efo_codes']
+    evidence_iterator = es_query.get_evidence_for_target_simple(target)
+    for evidence in evidence_iterator:
+        efo_list = [evidence['disease']['id']] \
+            if evidence['sourceID'] in is_direct_do_not_propagate \
+            else evidence['private']['efo_codes']
 
-            for efo in efo_list:
-                key = (evidence['target']['id'], efo)
-                if key not in data_cache:
-                    data_cache[key] = []
+        for efo in efo_list:
+            key = (evidence['target']['id'], efo)
+            if key not in data_cache:
+                data_cache[key] = []
 
-                data_source = evidence['sourceID']
+            data_source = evidence['sourceID']
+            
+            score = evidence['scores']['association_score']
+            if data_source in scoring_weights:
+                score = score * scoring_weights[data_source]
                 
-                score = evidence['scores']['association_score']
-                if data_source in scoring_weights:
-                    score = score * scoring_weights[data_source]
-                    
-                is_direct = (efo == evidence['disease']['id'])
-                data_type = datasources_to_datatypes[data_source]
+            is_direct = (efo == evidence['disease']['id'])
+            data_type = datasources_to_datatypes[data_source]
 
-                row = EvidenceScore(score, data_type, data_source, is_direct)
-                data_cache[key].append(row)
+            row = EvidenceScore(score, data_type, data_source, is_direct)
+            data_cache[key].append(row)
 
-        for key,evidence in data_cache.items():
-            #if any of the evidence is direct, the assication is direct
-            is_direct = False
-            for e in evidence:
-                if e.is_direct:
-                    is_direct = True
-                    break
+    for key,evidence in data_cache.items():
+        #if any of the evidence is direct, the assication is direct
+        is_direct = False
+        for e in evidence:
+            if e.is_direct:
+                is_direct = True
+                break
 
-            return_values.append((key[0],key[1], evidence, is_direct))
+        return_values.append((key[0],key[1], evidence, is_direct))
 
     return return_values
 
@@ -450,8 +450,7 @@ class ScoringProcess():
             gene_index=self.es_index_gene,
             eco_index=self.es_index_eco).lookup
 
-        es_query = ESQuery(es)
-        targets = list(es_query.get_all_target_ids_with_evidence_data())
+        targets = Search().using(es).index(self.es_index_gene).query(MatchAll()).scan()
 
         self.logger.info('setting up stages')
 
@@ -530,12 +529,12 @@ class ScoringProcess():
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
 
         #number of eco entries
         association_count = 0
         #Note: try to avoid doing this more than once!
-        for association in esquery.get_all_associations():
+        for association in Search().using(es).index(index).query(MatchAll()).scan():
             association_count += 1
             if association_count % 1000 == 0:
                 self.logger.debug("checking %d", association_count)

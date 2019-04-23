@@ -149,20 +149,11 @@ class CancerBiomarkers(IPlugin):
     # Initiate CancerBiomarker object
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        self.loader = None
-        self.r_server = None
-        self.esquery = None
         self.ensembl_current = {}
         self.symbols = {}
         self.cancerbiomarkers = {}
 
-    def print_name(self):
-        self._logger.info("Cancer Biomarkers plugin")
-
-    def merge_data(self, genes, loader, r_server, data_config):
-
-        self.loader = loader
-        self.r_server = r_server
+    def merge_data(self, genes, es, r_server, data_config, es_config):
 
         try:
             # Parse cancer biomarker data into self.cancerbiomarkers

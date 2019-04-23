@@ -11,6 +11,8 @@ import petl
 import more_itertools
 from opentargets_urlzsource import URLZSource
 import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
 from mrtarget.common.ElasticsearchQuery import ESQuery
 
@@ -577,13 +579,13 @@ class HPAProcess():
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
         self.logger.info("Starting QC")
 
         #number of hpa entries
         hpa_count = 0
         #Note: try to avoid doing this more than once!
-        for hpa_entry in esquery.get_all_hpa():
+        for hpa_entry in Search().using(es).index(index).query(MatchAll()).scan():
             hpa_count += 1
 
         #put the metrics into a single dict

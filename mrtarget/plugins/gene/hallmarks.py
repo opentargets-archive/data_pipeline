@@ -10,9 +10,6 @@ class Hallmarks(IPlugin):
 
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        self.loader = None
-        self.r_server = None
-        self.esquery = None
         self.ensembl_current = {}
         self.symbols = {}
         self.hallmarks = {}
@@ -28,28 +25,15 @@ class Hallmarks(IPlugin):
                                   "escaping immune response to cancer",
                                   "proliferative signalling"]
 
-    def print_name(self):
-        self._logger.info("Hallmarks of cancer gene data plugin")
+    def merge_data(self, genes, loader, r_server, data_config, es_config):
 
-    def merge_data(self, genes, loader, r_server, data_config):
-        self.loader = loader
-        self.r_server = r_server
+        self.build_json(filename=data_config.hallmark)
 
-        try:
-
-            self.build_json(filename=data_config.hallmark)
-
-            for gene_id, gene in genes.iterate():
-                ''' extend gene with related Hallmark data '''
-                if gene.approved_symbol in self.hallmarks:
-                        gene.hallmarks = dict()
-                        gene.hallmarks = self.hallmarks[gene.approved_symbol]
-
-        except Exception as ex:
-            tb = traceback.format_exc()
-            self._logger.error(tb)
-            self._logger.error('Error %s' % ex)
-            raise ex
+        for gene_id, gene in genes.iterate():
+            ''' extend gene with related Hallmark data '''
+            if gene.approved_symbol in self.hallmarks:
+                    gene.hallmarks = dict()
+                    gene.hallmarks = self.hallmarks[gene.approved_symbol]
 
     def build_json(self, filename):
         # Just for reference: column names are: "ID_CENSUS_ANNOT", "ID_CENSUS", "ID_GENE", "GENE_NAME", "CELL_TYPE",

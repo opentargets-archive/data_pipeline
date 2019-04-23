@@ -80,8 +80,7 @@ class GeneLookUpTable(object):
 
     def load_gene_data(self, r_server):
         #load all targets
-        data = Search().using(self._es).index(self._es_index).query(MatchAll()).scan()
-        for target in data:
+        for target in Search().using(self._es).index(self._es_index).query(MatchAll()).scan():
             target = target.to_dict()
             self._table.set(target['id'],target, r_server=self._get_r_server(r_server))
             if target['uniprot_id']:

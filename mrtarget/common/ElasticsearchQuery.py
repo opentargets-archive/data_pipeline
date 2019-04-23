@@ -132,51 +132,6 @@ class ESQuery(object):
                                   )
         return AssociationSummary(res)
 
-    def get_all_ensembl_genes(self):
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                           },
-                               '_source': True,
-                               'size': 1000,
-                           },
-                           scroll='1h',
-                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_ENSEMBL_INDEX_NAME,True),
-                           timeout="10m",
-                           )
-        for hit in res:
-            yield hit['_source']
-
-    def get_all_uniprot_entries(self):
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                           },
-                               '_source': True,
-                               'size': 100,
-                           },
-                           scroll='12h',
-                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME,True),
-                           timeout="10m",
-                           )
-        for hit in res:
-            yield jsonpickle.decode(base64.b64decode(hit['_source']['entry']))
-
-
-    def get_reaction(self, reaction_id):
-        res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_REACTOME_INDEX_NAME,True),
-                                  doc_type=Const.ELASTICSEARCH_REACTOME_REACTION_DOC_NAME,
-                                  body={"query": {
-                                            "ids" : {
-                                                "values" : [reaction_id]
-                                              }
-                                          },
-                                          '_source': True,
-                                          'size': 1,
-                                      }
-                                  )
-        for hit in res['hits']['hits']:
-            return hit['_source']
 
     def get_disease_to_targets_vectors(self,
                                        treshold=0.1,
@@ -272,37 +227,7 @@ class ESQuery(object):
 
         return dict((hit['_id'],hit['_source']['label']) for hit in res)
 
-    def count_elements_in_index(self, index_name, doc_type=None, query = None):
-        if query is None:
-            query =  {"match_all": {}}
-        res = self.handler.search(index=Loader.get_versioned_index(index_name,True),
-                                  doc_type=doc_type,
-                                  body={"query": query,
-                                      '_source': False,
-                                      'size': 0,
-                                  }
-                                  )
-        return res['hits']['total']
-
-    def get_all_target_ids_with_evidence_data(self):
-        #TODO: use an aggregation to get those with just data
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                           },
-                               '_source': False,
-                               'size': 100,
-                           },
-                           scroll='12h',
-                           doc_type=Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,True),
-                           timeout="30m",
-                           )
-        for target in res:
-            yield  target['_id']
-
-
-    def get_evidence_for_target_simple(self, target, expected = None):
+    def get_evidence_for_target_simple(self, target):
         query_body = {
             "query": {
                 "constant_score": {
@@ -323,42 +248,16 @@ class ESQuery(object):
                              ]},
         }
 
-        if expected is not None and expected <10000:
-            query_body['size']=10000
-            res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME,True),
-                                      body=query_body
-                                      )
-            for hit in res['hits']['hits']:
-                yield hit['_source']
-        else:
-            res = helpers.scan(client=self.handler,
-                               query=query_body,
-                               scroll='1h',
-                               index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME,True),
-                               timeout="1h",
-                               request_timeout=2 * 60 * 60,
-                               size=1000
-                               )
-            for hit in res:
-                yield hit['_source']
-
-    def count_evidence_for_target(self, target):
-        res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME, True),
-                                  body={
-                                        "query": {
-                                            "constant_score": {
-                                              "filter": {
-                                                "term": {
-                                                  "target.id": target
-                                                }
-                                              }
-                                            }
-                                        },
-                                        '_source': [],
-                                        'size': 0
-                                    }
-                                  )
-        return res['hits']['total']
+        res = helpers.scan(client=self.handler,
+                            query=query_body,
+                            scroll='1h',
+                            index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME,True),
+                            timeout="1h",
+                            request_timeout=2 * 60 * 60,
+                            size=1000
+                            )
+        for hit in res:
+            yield hit['_source']
 
     def get_objects_by_id(self,
                           ids,
@@ -416,41 +315,6 @@ class ESQuery(object):
             except TransportError as te:
                 if te.status_code == 404:
                     raise KeyError('object with id %s not found' % ids)
-
-
-    def get_all_associations(self,):
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                           },
-                               '_source': True,
-                               'size': 1000,
-                           },
-                           scroll='1h',
-                           index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
-                           timeout="10m",
-                           )
-        for hit in res:
-            yield hit['_source']
-
-    def get_all_evidence(self, fields = None):
-        index_name = Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME, True)
-        doc_type = None
-        res = helpers.scan(client=self.handler,
-                           query={"query":  {"match_all": {}},
-                               '_source': self._get_source_from_fields(fields),
-                               'size': 1000,
-                           },
-                           scroll='12h',
-                           index=index_name,
-                           timeout="10m",
-                           )
-
-        # res = list(res)
-        for hit in res:
-            yield hit['_source']
-
-
 
     def get_all_evidence_for_datatype(self, datatype, fields = None, ):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html

@@ -412,7 +412,7 @@ class GeneManager():
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, 
             es_settings, r_server,
             plugin_paths, plugin_order, 
-            data_config,
+            data_config, es_config,
             workers_write, queue_write):
 
         self.es_hosts = es_hosts
@@ -423,6 +423,7 @@ class GeneManager():
         self.r_server = r_server
         self.plugin_order = plugin_order
         self.data_config = data_config
+        self.es_config = es_config
         self.workers_write = workers_write
         self.queue_write = queue_write
 
@@ -450,10 +451,9 @@ class GeneManager():
         #run the actual plugins
         for plugin_name in self.plugin_order:
             plugin = self.simplePluginManager.getPluginByName(plugin_name)
-            plugin.plugin_object.print_name()
-            plugin.plugin_object.merge_data(genes=self.genes, 
-                loader=loader, r_server=self.r_server, 
-                data_config=self.data_config)
+            plugin.plugin_object.merge_data(self.genes, 
+                loader, self.r_server, 
+                self.data_config, self.es_config)
 
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
