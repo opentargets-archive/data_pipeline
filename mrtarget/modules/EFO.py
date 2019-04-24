@@ -262,7 +262,6 @@ class EfoProcess():
         #loop over all efo terms and calculate the metrics
         #Note: try to avoid doing this more than once!
         for efo_term in Search().using(es).index(index).query(MatchAll()).scan():
-            efo_term = EFO().load_json(efo_term)
             efo_term_count += 1
 
             #path_labels is a list of lists of all paths to the root
