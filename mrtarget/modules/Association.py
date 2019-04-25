@@ -431,7 +431,7 @@ def score_producer(data,
 class ScoringProcess():
 
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
-            es_index_gene, es_index_eco, es_index_val_right,
+            es_index_gene, es_index_eco, es_index_val_right, es_index_hpa, es_index_efo,
             redis_host, redis_port, 
             workers_write, workers_production, workers_score, 
             queue_score, queue_produce, queue_write, 
@@ -448,6 +448,8 @@ class ScoringProcess():
         self.es_index_gene = es_index_gene
         self.es_index_eco = es_index_eco
         self.es_index_val_right = es_index_val_right
+        self.es_index_hpa = es_index_hpa
+        self.es_index_efo = es_index_efo
 
         self.redis_host = redis_host
         self.redis_port = redis_port
@@ -481,7 +483,9 @@ class ScoringProcess():
                 LookUpDataType.HPA
             ),
             gene_index=self.es_index_gene,
-            eco_index=self.es_index_eco).lookup
+            eco_index=self.es_index_eco,
+            hpa_index=self.es_index_hpa,
+            efo_index=self.es_index_efo).lookup
 
         targets = self.get_targets(es)
 

@@ -54,7 +54,9 @@ class LookUpDataRetriever(object):
                  hpo_uri = None,
                  mp_uri = None,
                  gene_index = None,
-                 eco_index = None
+                 eco_index = None,
+                 hpa_index = None,
+                 efo_index = None
                  ):
         self.es = es
         self.r_server = r_server
@@ -63,7 +65,6 @@ class LookUpDataRetriever(object):
 
         self._logger = logging.getLogger(__name__)
 
-        # TODO: run the steps in parallel to speedup loading times
         for dt in data_types:
             self._logger.info("get %s info"%dt)
             start_time = time.time()
@@ -71,13 +72,13 @@ class LookUpDataRetriever(object):
                 self._get_gene_info(gene_index)
             elif dt == LookUpDataType.DISEASE:
                 self.lookup.available_efos = EFOLookUpTable(self.es, 
-                    'EFO_LOOKUP', self.r_server)
+                    efo_index, 'EFO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.ECO:
                 self.lookup.available_ecos = ECOLookUpTable(self.es, 
                     eco_index, 'ECO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.HPA:
                 self.lookup.available_hpa = HPALookUpTable(self.es, 
-                    'HPA_LOOKUP', self.r_server)
+                    hpa_index, 'HPA_LOOKUP', self.r_server)
 
             self._logger.info("loaded %s in %ss" % (dt, str(int(time.time() - start_time))))
 

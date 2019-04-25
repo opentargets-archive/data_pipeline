@@ -200,7 +200,7 @@ def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_
 
 class SearchObjectProcess(object):
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
-            es_index_gene,
+            es_index_gene, es_index_efo,
             r_server, workers_write, queue_write,
             chembl_target_uri, 
             chembl_mechanism_uri, 
@@ -213,6 +213,7 @@ class SearchObjectProcess(object):
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.es_index_gene = es_index_gene
+        self.es_index_efo = es_index_efo
         self.r_server = r_server
         self.workers_write = workers_write
         self.queue_write = queue_write
@@ -271,7 +272,7 @@ class SearchObjectProcess(object):
 
             #process diseases
             self.logger.info('handling diseases')
-            diseases = esquery.get_all_diseases()
+            diseases = Search().using(es).index(self.es_index_efo).query(MatchAll()).scan()
             so_it = self.handle_search_object(diseases, esquery, SearchObjectTypes.DISEASE)
             store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
                 self.workers_write, self.queue_write)

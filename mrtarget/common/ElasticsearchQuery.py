@@ -53,41 +53,6 @@ class ESQuery(object):
             return True
         return fields
 
-    def get_all_diseases(self, fields = None):
-        source = self._get_source_from_fields(fields)
-        res = helpers.scan(client=self.handler,
-                            query={"query": {
-                                      "match_all": {}
-                                    },
-                                   '_source': source,
-                                   'size': 1000,
-                                   },
-                            scroll='12h',
-                            doc_type=Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                            index=Loader.get_versioned_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,True),
-                            timeout="10m",
-                            )
-        for hit in res:
-            yield hit['_source']
-
-    def get_all_hpa(self, fields=None):
-        source = self._get_source_from_fields(fields)
-
-        res = helpers.scan(client=self.handler,
-                           query={"query": {
-                               "match_all": {}
-                            },
-                            '_source': source,
-                            'size': 100,
-                           },
-                           scroll='12h',
-                           doc_type=Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                           index=Loader.get_versioned_index(
-                               Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME, True),
-                           timeout="10m")
-        for hit in res:
-            yield hit['_source']
-
     def get_associations_for_target(self, target, fields = None, size = 100):
         source = self._get_source_from_fields(fields)
 
@@ -227,64 +192,6 @@ class ESQuery(object):
 
         return dict((hit['_id'],hit['_source']['label']) for hit in res)
 
-
-    def get_objects_by_id(self,
-                          ids,
-                          index,
-                          doc_type,
-                          source = True,
-                          source_exclude=[],
-                          realtime = False):
-        '''
-
-        :param ids: list of idientifiers for documents
-        :param index: index for all the documents
-        :param doc_type: doc type for all the documents
-        :return: generator of documents
-        '''
-        if isinstance(ids, (list, tuple)):
-            res = self.handler.mget(index=Loader.get_versioned_index(index,True),
-                                    doc_type=doc_type,
-                                    body=dict(ids=ids),
-                                    _source=source,
-                                    _source_exclude=source_exclude,
-                                    realtime=True,
-                                    )
-            if not res:
-                time.sleep(0.1)
-                res = self.handler.mget(index=Loader.get_versioned_index(index,True),
-                                        doc_type=doc_type,
-                                        body=dict(ids=ids),
-                                        _source=source,
-                                        _source_exclude=source_exclude,
-                                        realtime=True,
-                                        )
-            for doc in res['docs']:
-                if doc['found']:
-                    yield doc['_source']
-                else:
-                    raise KeyError('object with id %s not found' % (doc['_id']))
-
-        else:
-
-            try:
-                res = self.handler.get(index=Loader.get_versioned_index(index, True),
-                                       doc_type=doc_type,
-                                       id=ids,
-                                       _source=source,
-                                       _source_exclude=source_exclude,
-                                       realtime=True,
-                                       )
-                try:
-                    yield res['_source']
-                except Exception as e:
-                    self.logger.exception('cannot retrieve single object by id %s ' % ids)
-                    raise KeyError('object with id %s not found' % ids)
-
-            except TransportError as te:
-                if te.status_code == 404:
-                    raise KeyError('object with id %s not found' % ids)
-
     def get_all_evidence_for_datatype(self, datatype, fields = None, ):
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-multi-get.html
         index_name = Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME, True)
@@ -307,8 +214,3 @@ class ESQuery(object):
         for hit in res:
             yield hit['_source']
 
-    def exists(self, index, doc_type, id,realtime = False):
-        return self.handler.exists(index = Loader.get_versioned_index(index,True),
-                                   doc_type =doc_type,
-                                   id = id,
-                                   realtime = realtime)

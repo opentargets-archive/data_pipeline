@@ -301,7 +301,7 @@ def process_evidences_pipeline(filenames, first_n,
         es_hosts, es_index_valid, es_index_invalid, es_doc_valid, es_doc_invalid, 
         es_mappings_valid, es_mappings_invalid, 
         es_settings_valid, es_settings_invalid, 
-        es_index_gene, es_index_eco,
+        es_index_gene, es_index_eco, es_index_efo,
         redis_client,
         dry_run, workers_validation, queue_validation, workers_write, queue_write, 
         eco_scores_uri, schema_uri, excluded_biotypes, 
@@ -334,7 +334,8 @@ def process_evidences_pipeline(filenames, first_n,
             LookUpDataType.ECO 
         ),
         gene_index=es_index_gene,
-        eco_index=es_index_eco).lookup
+        eco_index=es_index_eco,
+        efo_index=es_index_efo).lookup
 
     #create a iterable of lines from all file handles
     evs = IO.make_iter_lines(checked_filenames, first_n)

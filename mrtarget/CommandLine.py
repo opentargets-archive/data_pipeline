@@ -145,7 +145,7 @@ def main():
                 es_config.val_right.doc, es_config.val_wrong.doc, 
                 es_config.val_right.mapping, es_config.val_wrong.mapping, 
                 es_config.val_right.setting, es_config.val_wrong.setting, 
-                es_config.gen.name, es_config.eco.name,
+                es_config.gen.name, es_config.eco.name, es_config.efo.name,
                 redis, args.dry_run, 
                 args.val_workers_validator, args.val_queue_validator,
                 args.val_workers_writer, args.val_queue_validator_writer,
@@ -170,7 +170,7 @@ def main():
         if args.assoc:
             process = ScoringProcess(args.elasticseach_nodes, es_config.asc.name, 
                     es_config.asc.doc, es_config.asc.mapping, es_config.asc.setting,
-                    es_config.gen.name, es_config.eco.name, es_config.val_right.name,
+                    es_config.gen.name, es_config.eco.name, es_config.val_right.name, es_config.hpa.name, es_config.efo.name,
                     args.redis_host, args.redis_port,
                     args.as_workers_writer, args.as_workers_production, args.as_workers_score, 
                     args.as_queue_score, args.as_queue_production, args.as_queue_write,
@@ -199,7 +199,8 @@ def main():
         if args.sea:
             process = SearchObjectProcess(args.elasticseach_nodes, 
                     es_config.sea.name, es_config.sea.doc, 
-                    es_config.sea.mapping, es_config.sea.setting, es_config.gen.name, 
+                    es_config.sea.mapping, es_config.sea.setting, 
+                    es_config.gen.name, es_config.efo.name, 
                     redis,
                     args.sea_workers_writer, 
                     args.sea_queue_write, 

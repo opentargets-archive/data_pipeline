@@ -12,13 +12,14 @@ class HPALookUpTable(object):
     """
 
     def __init__(self,
-                 es=None,
-                 namespace=None,
-                 r_server=None,
+                 es, index,
+                 namespace,
+                 r_server,
                  ttl=(60 * 60 * 24 + 7)):
         self._es = es
         self.r_server = r_server
         self._es_query = ESQuery(self._es)
+        self._es_index = index
         self._table = RedisLookupTablePickle(namespace=namespace,
                                              r_server=self.r_server,
                                              ttl=ttl)
@@ -28,22 +29,21 @@ class HPALookUpTable(object):
             self._load_hpa_data(self.r_server)
 
     def _load_hpa_data(self, r_server=None):
-        for el in self._es_query.get_all_hpa():
+        for el in Search().using(self._es).index(self._es_index).query(MatchAll()).scan():
+            el = el.to_dict()
             self.set_hpa(el, r_server=self._get_r_server(r_server))
 
     def get_hpa(self, idx, r_server=None):
         return self._table.get(idx, r_server=self._get_r_server(r_server))
 
     def set_hpa(self, hpa, r_server=None):
-        self._table.set(hpa['gene'], hpa,
-                        r_server=self._get_r_server(r_server))
+        
 
     def get_available_hpa_ids(self, r_server=None):
         return self._table.keys(self._get_r_server(r_server))
 
     def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key,
-                                        r_server=self._get_r_server(r_server))
+        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
 
     def __getitem__(self, key, r_server=None):
         return self.get_hpa(key, r_server=self._get_r_server(r_server))
@@ -88,22 +88,6 @@ class GeneLookUpTable(object):
             for accession in target['uniprot_accessions']:
                 self.uniprot2ensembl[accession] = target['id']
 
-    def get_gene(self, target_id, r_server = None):
-        try:
-            return self._table.get(target_id, r_server=self._get_r_server(r_server))
-        except KeyError:
-            try:
-                target = self._es_query.get_objects_by_id(target_id,
-                                                          Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                                                          Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                                                          source_exclude='ortholog.*'
-                                                          ).next()
-            except Exception as e:
-                self._logger.exception('Cannot retrieve target from elasticsearch')
-                raise KeyError()
-            self.set_gene(target, r_server)
-            return target
-
     def set_gene(self, target, r_server = None):
         self._table.set(target['id'],target, r_server=self._get_r_server(r_server))
 
@@ -114,7 +98,15 @@ class GeneLookUpTable(object):
         return self._table.__contains__(key, r_server=self._get_r_server(r_server))
 
     def __getitem__(self, key, r_server = None):
-        return self.get_gene(key, self._get_r_server(r_server))
+        if key in self:
+            return self._table.get(target_id, r_server=self._get_r_server(r_server))
+
+        #not in redis, get from elastic
+        response = Search().using(self.es).index(self.index).query(Match(_id=key))[0:1].execute()
+        gene = response.hits[0]
+        #store it in redis for later
+        self.set_gene(gene, r_server)
+        return gene
 
     def __setitem__(self, key, value, r_server=None):
         self._table.set(key, value, self._get_r_server(r_server))
@@ -208,11 +200,12 @@ class EFOLookUpTable(object):
     """
 
     def __init__(self,
-                 es=None,
-                 namespace=None,
-                 r_server=None,
+                 es, index,
+                 namespace,
+                 r_server,
                  ttl = 60*60*24+7):
         self._es = es
+        self._es_index = index
         self.r_server = r_server
         self._es_query = ESQuery(self._es)
         self._table = RedisLookupTablePickle(namespace = namespace,
@@ -234,19 +227,14 @@ class EFOLookUpTable(object):
             return url
 
     def _load_efo_data(self, r_server = None):
-        self._logger = logging.getLogger(__name__)
-        for i,efo in enumerate(self._es_query.get_all_diseases()):
-            #TODO can be improved by sending elements in batches
-            self.set_efo(efo, r_server=self._get_r_server(r_server))
-            if i % 1000 == 0:
-                self._logger.debug("Loaded %s efo", i)                
+
+        data = Search().using(self._es).index(self._es_index).query(MatchAll()).scan()
+        for efo in data:
+            efo_key = efo['path_codes'][0][-1]
+            self._table.set(efo_key,efo, r_server=self._get_r_server(r_server))
 
     def get_efo(self, efo_id, r_server=None):
         return self._table.get(efo_id, r_server=self._get_r_server(r_server))
-
-    def set_efo(self, efo, r_server=None):
-        efo_key = efo['path_codes'][0][-1]
-        self._table.set(efo_key,efo, r_server=self._get_r_server(r_server))
 
     def get_available_gefo_ids(self, r_server=None):
         return self._table.keys(r_server=self._get_r_server(r_server))
