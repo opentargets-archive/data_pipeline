@@ -200,7 +200,7 @@ def main():
             process = SearchObjectProcess(args.elasticseach_nodes, 
                     es_config.sea.name, es_config.sea.doc, 
                     es_config.sea.mapping, es_config.sea.setting, 
-                    es_config.gen.name, es_config.efo.name, 
+                    es_config.gen.name, es_config.efo.name, es_config.val_right.name, 
                     redis,
                     args.sea_workers_writer, 
                     args.sea_queue_write, 

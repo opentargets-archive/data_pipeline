@@ -200,7 +200,7 @@ def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_
 
 class SearchObjectProcess(object):
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
-            es_index_gene, es_index_efo,
+            es_index_gene, es_index_efo, es_index_val_right,
             r_server, workers_write, queue_write,
             chembl_target_uri, 
             chembl_mechanism_uri, 
@@ -214,6 +214,7 @@ class SearchObjectProcess(object):
         self.es_settings = es_settings
         self.es_index_gene = es_index_gene
         self.es_index_efo = es_index_efo
+        self.es_index_val_right = es_index_val_right
         self.r_server = r_server
         self.workers_write = workers_write
         self.queue_write = queue_write
@@ -246,7 +247,7 @@ class SearchObjectProcess(object):
             self.chembl_component_uri, 
             self.chembl_protein_uri, 
             self.chembl_molecule_set_uri_pattern)
-        self.chembl_handler.get_molecules_from_evidence(esquery)
+        self.chembl_handler.get_molecules_from_evidence(es, self.es_index_val_right)
         all_molecules = set()
         for target, molecules in  self.chembl_handler.target2molecule.items():
             all_molecules = all_molecules|molecules
@@ -265,18 +266,26 @@ class SearchObjectProcess(object):
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
             #process targets
             self.logger.info('handling targets')
-            targets = Search().using(es).index(self.es_index_gene).query(MatchAll()).scan()
+            targets = self.get_targets(es)
             so_it = self.handle_search_object(targets, esquery, SearchObjectTypes.TARGET)
             store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
                 self.workers_write, self.queue_write)
 
             #process diseases
             self.logger.info('handling diseases')
-            diseases = Search().using(es).index(self.es_index_efo).query(MatchAll()).scan()
+            diseases = self.get_diseases(es)
             so_it = self.handle_search_object(diseases, esquery, SearchObjectTypes.DISEASE)
             store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
                 self.workers_write, self.queue_write)
 
+
+    def get_targets(self, es):
+        for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).scan():
+            yield target.to_dict()
+    
+    def get_diseases(self, es):
+        for disease in Search().using(es).index(self.es_index_efo).query(MatchAll()).scan():
+            yield disease.to_dict()
 
     def summarise_association(self, data):
         def cap_score(value):

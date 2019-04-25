@@ -5,6 +5,8 @@ import itertools
 import shelve
 import dumbdbm
 import tempfile
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import Match
 
 from opentargets_urlzsource import URLZSource
 import simplejson as json
@@ -155,20 +157,18 @@ class ChEMBLLookup(object):
                 label = v['label']
         self.protein_class_label_to_id[label] = protein_class_id
 
-    def get_molecules_from_evidence(self, es_query):
-        self._logger.debug('get_molecules_from_evidence')
-        datatype = 'known_drug' # TODO not hard-code this!
-        for c, e in enumerate(es_query.get_all_evidence_for_datatype(datatype,
-                fields=['target.id','disease.id', 'evidence.target2drug.urls'])):
+    def get_molecules_from_evidence(self, es, index):
+
+        fields = ['target.id','disease.id', 'evidence.target2drug.urls']
+        for e in Search().using(es).index(index).query(
+            Match(type="known_drug")).source(include=fields).scan():
+            e = e.to_dict()
             #get information from URLs that we need to extract short ids
             #e.g. https://www.ebi.ac.uk/chembl/compound/inspect/CHEMBL502835
             molecule_ids = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
                            '/compound/' in i['url']]
             if molecule_ids:
                 molecule_id=molecule_ids[0]
-
-                if c % 200 == 0:
-                    self._logger.debug('retrieving ChEMBL evidence... %s', molecule_id)
 
                 disease_id = e['disease']['id']
                 target_id = e['target']['id']
