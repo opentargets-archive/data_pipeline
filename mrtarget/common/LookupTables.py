@@ -37,7 +37,8 @@ class HPALookUpTable(object):
         return self._table.get(idx, r_server=self._get_r_server(r_server))
 
     def set_hpa(self, hpa, r_server=None):
-        
+        self._table.set(hpa['gene'], hpa,
+                r_server=self._get_r_server(r_server))
 
     def get_available_hpa_ids(self, r_server=None):
         return self._table.keys(self._get_r_server(r_server))
