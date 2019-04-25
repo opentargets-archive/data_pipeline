@@ -170,7 +170,7 @@ def main():
         if args.assoc:
             process = ScoringProcess(args.elasticseach_nodes, es_config.asc.name, 
                     es_config.asc.doc, es_config.asc.mapping, es_config.asc.setting,
-                    es_config.gen.name, es_config.eco.name,
+                    es_config.gen.name, es_config.eco.name, es_config.val_right.name,
                     args.redis_host, args.redis_port,
                     args.as_workers_writer, args.as_workers_production, args.as_workers_score, 
                     args.as_queue_score, args.as_queue_production, args.as_queue_write,

@@ -20,6 +20,7 @@ from mrtarget.modules.HPA import HPAExpression, hpa2tissues
 from opentargets_urlzsource import URLZSource
 
 import elasticsearch
+from elasticsearch import helpers
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import MatchAll
 import pypeln.process as pr
@@ -293,24 +294,51 @@ class Scorer():
 
         return association
 
-def produce_evidence_local_init(es_hosts, 
+def produce_evidence_local_init(es_hosts, es_index_val_right,
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
     es = new_es_client(es_hosts)
-    es_query = ESQuery(es)
-    return es_query, scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes
+    return (es, es_index_val_right, scoring_weights, 
+        is_direct_do_not_propagate, datasources_to_datatypes)
 
-def produce_evidence(data, es_query, 
+def get_evidence_for_target_simple(es, target, index):
+    query_body = {
+        "query": {
+            "constant_score": {
+                "filter": {
+                    "term": {
+                        "target.id": str(target)
+                    }
+                }
+            }
+        },
+        '_source': {
+            "includes": 
+                ["target.id",
+                    "private.efo_codes",
+                    "disease.id",
+                    "scores.association_score",
+                    "sourceID",
+                    "id",
+                ]},
+    }
+
+    for ev in helpers.scan(client=es, query=query_body,
+        index=index, size=1000):
+        yield ev.to_dict()
+
+def produce_evidence(target, es, es_index_val_right,
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
     data_cache = {}
-    target = data
-
     return_values = []
+    for evidence in get_evidence_for_target_simple(es, target, es_index_val_right):
 
-    evidence_iterator = es_query.get_evidence_for_target_simple(target)
-    for evidence in evidence_iterator:
-        efo_list = [evidence['disease']['id']] \
-            if evidence['sourceID'] in is_direct_do_not_propagate \
-            else evidence['private']['efo_codes']
+        
+
+        if evidence['sourceID'] in is_direct_do_not_propagate:
+            efo_list = [evidence['disease']['id']]
+        else:
+            efo_list = evidence['private']['efo_codes']
+
 
         for efo in efo_list:
             key = (evidence['target']['id'], efo)
@@ -337,7 +365,7 @@ def produce_evidence(data, es_query,
                 is_direct = True
                 break
 
-        return_values.append((key[0],key[1], evidence, is_direct))
+        return_values.append((key[0],key[1], evidence.to_json(), is_direct))
 
     return return_values
 
@@ -403,7 +431,7 @@ def score_producer(data,
 class ScoringProcess():
 
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
-            es_index_gene, es_index_eco,
+            es_index_gene, es_index_eco, es_index_val_right,
             redis_host, redis_port, 
             workers_write, workers_production, workers_score, 
             queue_score, queue_produce, queue_write, 
@@ -419,6 +447,7 @@ class ScoringProcess():
         self.es_settings = es_settings
         self.es_index_gene = es_index_gene
         self.es_index_eco = es_index_eco
+        self.es_index_val_right = es_index_val_right
 
         self.redis_host = redis_host
         self.redis_port = redis_port
@@ -435,6 +464,10 @@ class ScoringProcess():
         self.datasources_to_datatypes = datasources_to_datatypes
 
 
+    def get_targets(self, es):
+        for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).scan():
+            yield str(target.meta.id)
+
     def process_all(self, dry_run, 
             ):
 
@@ -450,13 +483,14 @@ class ScoringProcess():
             gene_index=self.es_index_gene,
             eco_index=self.es_index_eco).lookup
 
-        targets = Search().using(es).index(self.es_index_gene).query(MatchAll()).scan()
+        targets = self.get_targets(es)
 
         self.logger.info('setting up stages')
 
         #bake the arguments for the setup into function objects
         produce_evidence_local_init_baked = functools.partial(produce_evidence_local_init, 
-            self.es_hosts, self.scoring_weights, self.is_direct_do_not_propagate, 
+            self.es_hosts, self.es_index_val_right,
+            self.scoring_weights, self.is_direct_do_not_propagate, 
             self.datasources_to_datatypes)
         score_producer_local_init_baked = functools.partial(score_producer_local_init, 
             self.redis_host, self.redis_port, lookup_data, self.datasources_to_datatypes, 

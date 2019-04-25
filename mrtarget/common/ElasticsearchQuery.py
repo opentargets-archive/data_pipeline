@@ -227,37 +227,6 @@ class ESQuery(object):
 
         return dict((hit['_id'],hit['_source']['label']) for hit in res)
 
-    def get_evidence_for_target_simple(self, target):
-        query_body = {
-            "query": {
-                "constant_score": {
-                    "filter": {
-                        "term": {
-                            "target.id": target
-                        }
-                    }
-                }
-            },
-            '_source': {
-                "includes": ["target.id",
-                             "private.efo_codes",
-                             "disease.id",
-                             "scores.association_score",
-                             "sourceID",
-                             "id",
-                             ]},
-        }
-
-        res = helpers.scan(client=self.handler,
-                            query=query_body,
-                            scroll='1h',
-                            index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_INDEX_NAME,True),
-                            timeout="1h",
-                            request_timeout=2 * 60 * 60,
-                            size=1000
-                            )
-        for hit in res:
-            yield hit['_source']
 
     def get_objects_by_id(self,
                           ids,
