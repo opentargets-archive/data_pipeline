@@ -41,6 +41,7 @@ class EFO(JSONSerializable):
                  path_labels=[],
                  therapeutic_labels=[],
                  therapeutic_codes=[],
+                 # id_org=None,
                  definition=""):
         self.code = code
         self.label = label
@@ -57,6 +58,7 @@ class EFO(JSONSerializable):
 
     def get_id(self):
         return self.code
+        # return get_ontology_code_from_url(self.path_codes[0][-1])
 
     def create_suggestions(self):
 
@@ -116,16 +118,7 @@ class EfoProcess():
         utils = DiseaseUtils()
         disease_phenotypes = utils.get_disease_phenotypes(self.disease_ontology, self.hpo_uri, self.mp_uri, disease_phenotype_uris_counter)
 
-        #for uri,label in self.disease_ontology.current_classes.items():
-        for uri in self.disease_ontology.classes_paths:
-            #get the short code form of the uri
-            classes_path = self.disease_ontology.classes_paths[uri]
-            id = classes_path['ids'][0][-1]
-            label = classes_path['labels'][0][-1]
-            if uri != classes_path["all"][0][-1]["uri"]:
-                raise RuntimeError('mismatch between uri and classes_path["all"][0][-1]["uri"] %s %s' % (uri, classes_path["all"][0][-1]["uri"]))
-
-
+        for uri,label in self.disease_ontology.current_classes.items():
             properties = self.disease_ontology.parse_properties(URIRef(uri))
 
             #create a text block definition/description by joining others together
@@ -133,62 +126,42 @@ class EfoProcess():
             if 'http://purl.obolibrary.org/obo/IAO_0000115' in properties:
                 definition = ". ".join(properties['http://purl.obolibrary.org/obo/IAO_0000115'])
 
-            #build a set of all the relevant synonyms
-            synonyms = set()            
-            #exact synonyms
-            if 'http://www.geneontology.org/formats/oboInOwl#hasExactSynonym' in properties:
-                synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasExactSynonym'])
-
-            #related synonyms (partially overlapping)
-            if 'http://www.geneontology.org/formats/oboInOwl#hasRelatedSynonym' in properties:
-                synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasRelatedSynonym'])
-
-            #generic synoynms
-            if 'http://www.geneontology.org/formats/oboInOwl#hasSynonym' in properties:
-                synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasSynonym'])
-
-            #narrow synonyms
-            if 'http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym' in properties:
-                synonyms.update(properties['http://www.geneontology.org/formats/oboInOwl#hasNarrowSynonym'])
-
-            #could have http://www.geneontology.org/formats/oboInOwl#hasBroadSynonym, but that is better captured by parent term
-
+            synonyms = []
+            if 'http://www.ebi.ac.uk/efo/alternative_term' in properties:
+                synonyms = properties['http://www.ebi.ac.uk/efo/alternative_term']
             phenotypes = []
             if uri in disease_phenotypes:
                 phenotypes = disease_phenotypes[uri]['phenotypes']
 
-            if uri not in self.disease_ontology.classes_paths:
-                logger.warning("Unable to find %s", uri)
-                continue
-
-
-            therapeutic_labels = self.disease_ontology.therapeutic_labels[uri]
-            therapeutic_uris = self.disease_ontology.therapeutic_uris[uri]
-            therapeutic_codes = [self.disease_ontology.classes_paths[ta_uri]['ids'][0][-1] for ta_uri in therapeutic_uris]
-
-
+            therapeutic_labels = [item[0] for item in self.disease_ontology.classes_paths[uri]['labels']]
+            therapeutic_labels = self._remove_duplicates(therapeutic_labels)
+            therapeutic_codes = [item[0] for item in self.disease_ontology.classes_paths[uri]['ids']]
+            therapeutic_codes = self._remove_duplicates(therapeutic_codes)
+            
             efo = EFO(code=uri,
                       label=label,
                       synonyms=synonyms,
                       phenotypes=phenotypes,
-                      path=classes_path['all'],
-                      path_codes=classes_path['ids'],
-                      path_labels=classes_path['labels'],
+                      path=self.disease_ontology.classes_paths[uri]['all'],
+                      path_codes=self.disease_ontology.classes_paths[uri]['ids'],
+                      path_labels=self.disease_ontology.classes_paths[uri]['labels'],
                       therapeutic_labels=therapeutic_labels,
                       therapeutic_codes=therapeutic_codes,
                       definition=definition
                       )
-
+            id = self.disease_ontology.classes_paths[uri]['ids'][0][-1]
             if uri in self.disease_ontology.children:
                 efo.children = self.disease_ontology.children[uri]
-
-            #logger.debug(str(classes_path['ids']))
-            logger.debug("done %s %s %s", id, uri, label)
-
-            if id in self.efos:
-                logger.warning("duplicate %s", id)
-                continue
             self.efos[id] = efo
+
+    def _remove_duplicates(self, xs):
+
+        newlist = []
+
+        for item in xs:
+            if item not in newlist:
+                newlist.append(item)
+        return newlist
 
     def _store_efo(self, dry_run):
         logger.info("writing to elasticsearch")
@@ -219,7 +192,6 @@ class EfoProcess():
 
         logger.info("wrote to elasticsearch")
 
-        
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
