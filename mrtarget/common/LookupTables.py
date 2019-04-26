@@ -100,11 +100,11 @@ class GeneLookUpTable(object):
 
     def __getitem__(self, key, r_server = None):
         if key in self:
-            return self._table.get(target_id, r_server=self._get_r_server(r_server))
+            return self._table.get(key, r_server=self._get_r_server(r_server))
 
         #not in redis, get from elastic
-        response = Search().using(self.es).index(self.index).query(Match(_id=key))[0:1].execute()
-        gene = response.hits[0]
+        response = Search().using(self._es).index(self._es_index).query(Match(_id=key))[0:1].execute()
+        gene = response.hits[0].to_dict()
         #store it in redis for later
         self.set_gene(gene, r_server)
         return gene
@@ -158,6 +158,7 @@ class ECOLookUpTable(object):
     def _load_eco_data(self, r_server=None):
         data = Search().using(self._es).index(self._es_index).query(MatchAll()).scan()
         for eco in data:
+            eco = eco.to_dict()
             self._table.set(self.get_ontology_code_from_url(eco['code']), eco,
                 r_server=self._get_r_server(r_server))  
 
@@ -231,6 +232,7 @@ class EFOLookUpTable(object):
 
         data = Search().using(self._es).index(self._es_index).query(MatchAll()).scan()
         for efo in data:
+            efo = efo.to_dict()
             efo_key = efo['path_codes'][0][-1]
             self._table.set(efo_key,efo, r_server=self._get_r_server(r_server))
 
