@@ -16,7 +16,6 @@ from elasticsearch_dsl.query import MatchAll
 
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
-from mrtarget.Settings import Config #TODO remove this eventually
 from mrtarget.common.connection import new_es_client
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
@@ -48,8 +47,6 @@ def reliability_from_text(key):
 class HPAExpression(Dict, JSONSerializable):
     def __init__(self, *args, **kwargs):
         super(HPAExpression, self).__init__(*args, **kwargs)
-        if 'data_release' not in self:
-            self.data_release = Config.RELEASE_VERSION
 
         if 'tissues' not in self:
             self.tissues = []
@@ -137,8 +134,7 @@ class HPAExpression(Dict, JSONSerializable):
 
 
 def format_expression(rec):
-    d = HPAExpression(gene=rec['gene'],
-                      data_release=Config.RELEASE_VERSION)
+    d = HPAExpression(gene=rec['gene'])
 
     # for each tissue
     for el in rec['data']:
@@ -173,8 +169,7 @@ def format_expression(rec):
 
 def format_expression_with_rna(rec):
     # get gene,result,data = rec
-    exp = HPAExpression(gene=rec['gene'],
-                        data_release=Config.RELEASE_VERSION)
+    exp = HPAExpression(gene=rec['gene'])
 
     if rec['result']:
         exp.update(rec['result'])

@@ -20,7 +20,6 @@ from mrtarget.modules.QC import QCMetrics
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
 from mrtarget.modules.Uniprot import UniprotDownloader
-from mrtarget.Settings import Config, file_or_resource
 
 import mrtarget.cfg
 
