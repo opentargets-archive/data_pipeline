@@ -25,10 +25,6 @@ def setup_ops_parser():
     p.add("--log-config", help="logging configuration file",
         env_var="LOG_CONFIG", action='store', default='mrtarget/resources/logging.ini')
 
-    # take the release tag from the command line, but fall back to environment or ini files
-    p.add('--release-tag', help="identifier for data storage for this release",
-        env_var="ES_PREFIX", action='store', default="master")
-
     # handle stage-specific QC
     p.add("--qc-out", help="TSV file to write/update qc information")
     p.add("--qc-in", help="TSV file to read qc information for comparison")

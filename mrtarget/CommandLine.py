@@ -48,18 +48,7 @@ def main():
         logger = logging.getLogger(__name__+".main()")
 
     logger.info('`'+" ".join(sys.argv)+'` - starting')
-
-    if not args.release_tag:
-        logger.error('A [release-tag] has to be specified.')
-        print('A [release-tag] has to be specified.', file=sys.stderr)
-        return 1
-    else:
-        Config.RELEASE_VERSION = args.release_tag
-        logger.info('setting release version %s' % Config.RELEASE_VERSION)
-
-
-
-    
+   
     
     with RedisManager(args.redis_remote,args.redis_host, args.redis_port):
 
