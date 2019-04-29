@@ -7,7 +7,7 @@ from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 
-from mrtarget.Settings import file_or_resource
+from mrtarget.common.IO import file_or_resource
 
 
 class LookUpData():

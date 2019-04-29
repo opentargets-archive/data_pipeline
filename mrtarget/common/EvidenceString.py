@@ -5,9 +5,8 @@ import math
 
 import csv
 
-from mrtarget.Settings import file_or_resource
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
-from mrtarget.common.IO import check_to_open
+from mrtarget.common.IO import check_to_open,file_or_resource
 from mrtarget.modules import GeneData
 from mrtarget.modules.ECO import ECO, load_eco_scores_table
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
