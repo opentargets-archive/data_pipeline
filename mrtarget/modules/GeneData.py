@@ -1,7 +1,6 @@
 import logging
 from collections import OrderedDict
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchLoader import Loader
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from opentargets_urlzsource import URLZSource
@@ -444,14 +443,12 @@ class GeneManager():
 
 
         es = new_es_client(self.es_hosts)
-        
-        loader = Loader(es, dry_run)
 
         #run the actual plugins
         for plugin_name in self.plugin_order:
             plugin = self.simplePluginManager.getPluginByName(plugin_name)
             plugin.plugin_object.merge_data(self.genes, 
-                loader, self.r_server, 
+                es, self.r_server, 
                 self.data_config, self.es_config)
 
         with URLZSource(self.es_mappings).open() as mappings_file:
