@@ -4,7 +4,6 @@ import base64
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import MatchAll, Match
 import logging
-logging.basicConfig(level=logging.INFO)
 
 
 class ReactomeRetriever():
