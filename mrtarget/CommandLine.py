@@ -8,7 +8,6 @@ import os.path
 import itertools
 
 from mrtarget.modules.Evidences import process_evidences_pipeline
-from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import RedisManager, new_es_client, new_redis_client
 from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
@@ -73,9 +72,6 @@ def main():
         es = new_es_client(args.elasticseach_nodes)
         redis = new_redis_client(args.redis_host, args.redis_port)
         #es clients can't be pased around
-
-        #create a single query object for future use by QC
-        esquery = ESQuery(es)
 
         #create something to accumulate qc metrics into over various steps
         qc_metrics = QCMetrics()
@@ -200,7 +196,8 @@ def main():
             process = SearchObjectProcess(args.elasticseach_nodes, 
                     es_config.sea.name, es_config.sea.doc, 
                     es_config.sea.mapping, es_config.sea.setting, 
-                    es_config.gen.name, es_config.efo.name, es_config.val_right.name, 
+                    es_config.gen.name, es_config.efo.name, es_config.val_right.name,
+                    es_config.asc.name,  
                     redis,
                     args.sea_workers_writer, 
                     args.sea_queue_write, 

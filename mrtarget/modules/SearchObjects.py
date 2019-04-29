@@ -4,7 +4,6 @@ import logging
 from collections import defaultdict
 
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.modules.ChEMBL import ChEMBLLookup
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
@@ -13,7 +12,7 @@ from opentargets_urlzsource import URLZSource
 
 import elasticsearch
 from elasticsearch_dsl import Search
-from elasticsearch_dsl.query import MatchAll
+from elasticsearch_dsl.query import MatchAll,ConstantScore
 
 class SearchObjectTypes(object):
     TARGET = 'target'
@@ -45,11 +44,9 @@ class SearchObject(JSONSerializable, object):
         self._create_suggestions()
 
     def set_associations(self,
-                         top_associations =  dict(total = [], direct = []),
-                         association_counts = dict(total = 0, direct = 0),
-                         max_top = 20):
-        self.top_associations = dict(total = top_associations['total'][:max_top],
-                                     direct = top_associations['direct'][:max_top])
+                         top_associations,
+                         association_counts):
+        self.top_associations = top_associations
         self.association_counts = association_counts
 
     def _create_suggestions(self):
@@ -200,7 +197,7 @@ def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_
 
 class SearchObjectProcess(object):
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
-            es_index_gene, es_index_efo, es_index_val_right,
+            es_index_gene, es_index_efo, es_index_val_right,es_index_assoc,
             r_server, workers_write, queue_write,
             chembl_target_uri, 
             chembl_mechanism_uri, 
@@ -215,6 +212,7 @@ class SearchObjectProcess(object):
         self.es_index_gene = es_index_gene
         self.es_index_efo = es_index_efo
         self.es_index_val_right = es_index_val_right
+        self.es_index_assoc = es_index_assoc
         self.r_server = r_server
         self.workers_write = workers_write
         self.queue_write = queue_write
@@ -239,8 +237,6 @@ class SearchObjectProcess(object):
         '''
 
         es = new_es_client(self.es_hosts)
-        esquery = ESQuery(es)
-
         #setup chembl handler
         self.chembl_handler = ChEMBLLookup(self.chembl_target_uri, 
             self.chembl_mechanism_uri, 
@@ -267,14 +263,14 @@ class SearchObjectProcess(object):
             #process targets
             self.logger.info('handling targets')
             targets = self.get_targets(es)
-            so_it = self.handle_search_object(targets, esquery, SearchObjectTypes.TARGET)
+            so_it = self.handle_search_object(targets, es, SearchObjectTypes.TARGET)
             store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
                 self.workers_write, self.queue_write)
 
             #process diseases
             self.logger.info('handling diseases')
             diseases = self.get_diseases(es)
-            so_it = self.handle_search_object(diseases, esquery, SearchObjectTypes.DISEASE)
+            so_it = self.handle_search_object(diseases, es, SearchObjectTypes.DISEASE)
             store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
                 self.workers_write, self.queue_write)
 
@@ -287,20 +283,7 @@ class SearchObjectProcess(object):
         for disease in Search().using(es).index(self.es_index_efo).query(MatchAll()).scan():
             yield disease.to_dict()
 
-    def summarise_association(self, data):
-        def cap_score(value):
-            if value > 1:
-                return 1.0
-            elif value < -1:
-                return -1
-            return value
-        return dict(total = [dict(id = data_point['id'],
-                                score = cap_score(data_point['harmonic-sum']['overall'])) for data_point in data['total']],
-                    direct = [dict(id = data_point['id'],
-                                score = cap_score(data_point['harmonic-sum']['overall'])) for data_point in data['direct']]
-            )
-
-    def handle_search_object(self, data_it, esquery, search_type):
+    def handle_search_object(self, data_it, es, search_type):
         for data in data_it:
             data["search_type"] = search_type
             '''process objects to simple search object'''
@@ -314,9 +297,8 @@ class SearchObjectProcess(object):
 
             '''count associations '''
             if data["search_type"] == SearchObjectTypes.TARGET:
-                ass_data = esquery.get_associations_for_target(data['id'], fields=['id','harmonic-sum.overall'], size = 20)
-                so.set_associations(self.summarise_association(ass_data.top_associations),
-                    ass_data.associations_count)
+                ass_data,ass_count = self.get_associations(data['id'], None, es)
+                so.set_associations(ass_data,ass_count)
                 if so.id in self.chembl_handler.target2molecule:
                     drugs_synonyms = set()
                     for molecule in self.chembl_handler.target2molecule[so.id]:
@@ -325,9 +307,8 @@ class SearchObjectProcess(object):
                     so.drugs['evidence_data'] = list(drugs_synonyms)
 
             elif data["search_type"] == SearchObjectTypes.DISEASE:
-                ass_data = esquery.get_associations_for_disease(data['path_codes'][0][-1], fields=['id','harmonic-sum.overall'], size = 20)
-                so.set_associations(self.summarise_association(ass_data.top_associations),
-                    ass_data.associations_count)
+                ass_data,ass_count = self.get_associations(None, data['path_codes'][0][-1], es)
+                so.set_associations(ass_data,ass_count)
                 if so.id in self.chembl_handler.disease2molecule:
                     drugs_synonyms = set()
                     for molecule in self.chembl_handler.disease2molecule[so.id]:
@@ -335,6 +316,33 @@ class SearchObjectProcess(object):
                             drugs_synonyms = drugs_synonyms | set(self.chembl_handler.molecule2synonyms[molecule])
                     so.drugs['evidence_data'] = list(drugs_synonyms)
             else:
-                so.set_associations()
+                so.set_associations({"total":[],"direct":[]},{"total":0,"direct":0})
 
             yield so
+
+    def get_associations(self, target_id, disease_id, es):
+        s = Search().using(es).index(self.es_index_assoc)[:20]
+        if target_id:
+            s = s.query(ConstantScore(filter={"term":{"target.id":target_id}}))
+        if disease_id:
+            s = s.query(ConstantScore(filter={"term":{"disease.id":target_id}}))
+        s = s.sort("-harmonic-sum.overall")
+        s._source = ['id','harmonic-sum.overall']
+        s.aggs.bucket("direct_associations","filter",
+            term={"is_direct":"true"}).bucket(
+                "top_direct_ass","top_hits",
+                sort={"harmonic-sum.overall":{"order":"desc"}},
+                size=20,
+                _source = ['id','harmonic-sum.overall'])
+
+        r = s.execute()
+
+        #{"total"=[{"id":"xxx","score":"y.y"}],"direct"=[{"id":"xxx","score":"y.y"}]}
+        return ({
+                "total": [{"id":h.id,"score":min(h["harmonic-sum"]["overall"],1.0)} for h in r.hits],
+                "direct": [{"id":h.id,"score":min(h["harmonic-sum"]["overall"],1.0)} for h in r.aggregations.direct_associations.top_direct_ass.hits]
+            },
+            {
+                "total":r.hits.total,
+                "direct":r.aggregations.direct_associations.top_direct_ass.hits.total,
+            })

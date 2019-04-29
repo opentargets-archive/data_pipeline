@@ -17,85 +17,12 @@ from mrtarget.common.DataStructure import SparseFloatDict
 from mrtarget.common.ElasticsearchLoader import Loader
 
 
-class AssociationSummary(object):
-
-    def __init__(self, res):
-        self.top_associations = dict(total = [], direct =[])
-        self.associations_count = dict(total = 0, direct =0)
-        if res['hits']['total']:
-            self.associations_count['total'] = res['hits']['total']
-            for hit in res['hits']['hits']:
-                if '_source' in hit:
-                    self.top_associations['total'].append(hit['_source'])
-                elif 'fields' in hit:
-                    self.top_associations['total'].append(hit['fields'])
-            self.associations_count['direct'] = res['aggregations']['direct_associations']['doc_count']
-            for hit in res['aggregations']['direct_associations']['top_direct_ass']['hits']['hits']:
-                if '_source' in hit:
-                    self.top_associations['direct'].append(hit['_source'])
-                elif 'fields' in hit:
-                    self.top_associations['direct'].append(hit['fields'])
-
-
-
-
-
 class ESQuery(object):
 
     def __init__(self, es, dry_run = False):
         self.handler = es
         self.dry_run = dry_run
         self.logger = logging.getLogger(__name__)
-
-    @staticmethod
-    def _get_source_from_fields(fields = None):
-        if not fields:
-            return True
-        return fields
-
-    def get_associations_for_target(self, target, fields = None, size = 100):
-        source = self._get_source_from_fields(fields)
-
-        aggs = addict.Dict()
-        aggs.direct_associations.filter.term.is_direct = True
-        aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
-        aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
-        aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
-
-        q = addict.Dict()
-        q.query.constant_score.filter.terms['target.id'] = [target]
-        q.sort['harmonic-sum.overall'].order = 'desc'
-        q._source = source
-        q.aggs = aggs
-        q.size = size
-
-        res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
-                                  doc_type=Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                  body=q.to_dict()
-                                  )
-        return AssociationSummary(res)
-
-    def get_associations_for_disease(self, disease, fields = None, size = 100):
-        source = self._get_source_from_fields(fields)
-
-        aggs = addict.Dict()
-        aggs.direct_associations.filter.term.is_direct = True
-        aggs.direct_associations.aggs.top_direct_ass.top_hits.sort['harmonic-sum.overall'].order = 'desc'
-        aggs.direct_associations.aggs.top_direct_ass.top_hits._source = source
-        aggs.direct_associations.aggs.top_direct_ass.top_hits.size = size
-
-        q = addict.Dict()
-        q.query.constant_score.filter.terms['disease.id'] = [disease]
-        q.sort['harmonic-sum.overall'].order = 'desc'
-        q._source = source
-        q.aggs = aggs
-        q.size = size
-
-        res = self.handler.search(index=Loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,True),
-                                  doc_type=Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                                  body=q.to_dict()
-                                  )
-        return AssociationSummary(res)
 
 
     def get_disease_to_targets_vectors(self,
