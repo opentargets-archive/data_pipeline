@@ -18,9 +18,9 @@ from opentargets_urlzsource import URLZSource
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer, _document_frequency
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
+from mrtarget.common.DataStructure import SparseFloatDict
 
 class RelationType(object):
     SHARED_DISEASE = 'shared-disease'
@@ -205,6 +205,94 @@ def digest_in_buckets(v, buckets_number):
     return tuple(digested)
 
 
+def get_disease_to_targets_vectors(threshold, evidence_count, es, index):
+    '''
+    Get all the association objects that are:
+    - direct -> to avoid ontology inflation
+    - > 3 evidence count -> remove noise
+    - overall score > threshold -> remove very lo quality noise
+    :param threshold: minimum overall score threshold to consider for fetching association data
+    :param evidence_count: minimum number of evidence consider for fetching association data
+    :return: two dictionaries mapping target to disease  and the reverse
+    '''
+    res = elasticsearch.helpers.scan(client=es,
+            query={
+                "query": {
+                    "term": {
+                        "is_direct": True,
+                    }
+                },
+                '_source': {
+                    'includes':
+                        ["target.id", 'disease.id', 'harmonic-sum', 'evidence_count']},
+                'size': 1000,
+            },
+            index=index
+        )
+
+    target_results = dict()
+    disease_results = dict()
+
+    c=0
+    for hit in res:
+        c+=1
+        pair_id = str(hit['_id'])
+        hit = hit['_source']
+        if hit['evidence_count']['total']>= evidence_count and \
+            hit['harmonic-sum']['overall'] >= threshold:
+            '''store target associations'''
+            if hit['target']['id'] not in target_results:
+                target_results[hit['target']['id']] = SparseFloatDict()
+            #TODO: return all counts and scores up to datasource level
+            target_results[hit['target']['id']][hit['disease']['id']]=hit['harmonic-sum']['overall']
+
+            '''store disease associations'''
+            if hit['disease']['id'] not in disease_results:
+                disease_results[hit['disease']['id']] = SparseFloatDict()
+            # TODO: return all counts and scores up to datasource level
+            disease_results[hit['disease']['id']][hit['target']['id']] = hit['harmonic-sum']['overall']
+
+    return target_results, disease_results
+
+def get_target_labels(ids, es, index):
+    res = elasticsearch.helpers.scan(client=es,
+            query={"query": {
+                "ids": {
+                    "values": ids,
+                }
+            },
+                '_source': 'approved_symbol',
+                'size': 1,
+            },
+            index=index
+        )
+
+
+
+    return dict((hit['_id'],hit['_source']['approved_symbol']) for hit in res)
+
+def get_disease_labels(ids, es, index):
+    res = elasticsearch.helpers.scan(client=es,
+            query={
+                "query": {
+                    "ids": {
+                        "values": ids,
+                    }
+                },
+                '_source': 'label',
+                'size': 1,
+            },
+            index=index
+        )
+
+    return dict((hit['_id'],hit['_source']['label']) for hit in res)
+
+
+
+
+
+
+
 """
 Dummy function to bake arguments into 
 """
@@ -332,7 +420,9 @@ def calculate_pair(data, type, row_labels, rows_ids, column_ids, threshold, idf,
 
 class DataDrivenRelationProcess(object):
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+    def __init__(self, es_hosts, es_index, es_doc, 
+            es_mappings, es_settings,
+            es_index_efo, es_index_gen, es_index_assoc,
             ddr_workers_production,
             ddr_workers_score,
             ddr_workers_write,
@@ -344,6 +434,9 @@ class DataDrivenRelationProcess(object):
         self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
+        self.es_index_efo = es_index_efo
+        self.es_index_gen = es_index_gen
+        self.es_index_assoc = es_index_assoc
         self.ddr_workers_production = ddr_workers_production
         self.ddr_workers_score = ddr_workers_score
         self.ddr_workers_write = ddr_workers_write
@@ -356,9 +449,8 @@ class DataDrivenRelationProcess(object):
     def process_all(self, dry_run):
 
         es = new_es_client(self.es_hosts)
-        es_query = ESQuery(es)
 
-        target_data, disease_data = es_query.get_disease_to_targets_vectors(treshold=0.1, evidence_count=3)
+        target_data, disease_data = get_disease_to_targets_vectors(0.1, 3, es, self.es_index_assoc)
 
         if len(target_data) == 0 or len(disease_data) == 0:
             raise Exception('Could not find a set of targets AND diseases that had the sufficient number'
@@ -369,10 +461,10 @@ class DataDrivenRelationProcess(object):
         target_keys = sorted(target_data.keys())
 
         self.logger.info('getting disese labels')
-        disease_id_to_label = es_query.get_disease_labels(disease_keys)
+        disease_id_to_label = get_disease_labels(disease_keys, es, self.es_index_efo)
         disease_labels = [disease_id_to_label[hit_id] for hit_id in disease_keys]
         self.logger.info('getting target labels')
-        target_id_to_label = es_query.get_target_labels(target_keys)
+        target_id_to_label = get_target_labels(target_keys, es, self.es_index_gen)
         target_labels = [target_id_to_label[hit_id] for hit_id in target_keys]
 
 

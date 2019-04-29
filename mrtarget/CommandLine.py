@@ -182,6 +182,7 @@ def main():
             process = DataDrivenRelationProcess(args.elasticseach_nodes, 
                     es_config.ddr.name, es_config.ddr.doc, 
                     es_config.ddr.mapping, es_config.ddr.setting,
+                    es_config.efo.name, es_config.gen.name, es_config.asc.name, 
                     args.ddr_workers_production,
                     args.ddr_workers_score,
                     args.ddr_workers_write,
