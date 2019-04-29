@@ -2,7 +2,6 @@ import logging
 from collections import OrderedDict
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.ElasticsearchLoader import Loader
-from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from opentargets_urlzsource import URLZSource

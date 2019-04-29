@@ -14,8 +14,6 @@ import elasticsearch
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import MatchAll
 
-from mrtarget.common.ElasticsearchQuery import ESQuery
-
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.Settings import Config #TODO remove this eventually

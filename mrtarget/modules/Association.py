@@ -9,7 +9,6 @@ from collections import defaultdict
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import new_es_client, new_redis_client
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer

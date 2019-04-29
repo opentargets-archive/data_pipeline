@@ -1,5 +1,4 @@
 import logging
-from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.Redis import RedisLookupTablePickle
 from mrtarget.constants import Const
 from elasticsearch_dsl import Search
@@ -18,7 +17,6 @@ class HPALookUpTable(object):
                  ttl=(60 * 60 * 24 + 7)):
         self._es = es
         self.r_server = r_server
-        self._es_query = ESQuery(self._es)
         self._es_index = index
         self._table = RedisLookupTablePickle(namespace=namespace,
                                              r_server=self.r_server,
@@ -70,7 +68,6 @@ class GeneLookUpTable(object):
         self._es = es
         self._es_index = es_index
         self.r_server = r_server
-        self._es_query = ESQuery(self._es)
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = self.r_server,
                                             ttl = ttl)
@@ -209,7 +206,6 @@ class EFOLookUpTable(object):
         self._es = es
         self._es_index = index
         self.r_server = r_server
-        self._es_query = ESQuery(self._es)
         self._table = RedisLookupTablePickle(namespace = namespace,
                                             r_server = self.r_server,
                                             ttl = ttl)
