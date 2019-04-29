@@ -19,7 +19,7 @@ def setup_ops_parser():
 
     # configuration file with es related settings
     p.add('--es-config', help='path to elasticsearch config file (YAML)',
-        env_var="ES_CONFIG", action='store')
+        env_var="ES_CONFIG", action='store', default="mrtarget.es.yml")
 
     # logging
     p.add("--log-config", help="logging configuration file",
