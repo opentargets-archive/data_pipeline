@@ -5,8 +5,7 @@ import math
 
 import csv
 
-from mrtarget.Settings import Config, file_or_resource
-from mrtarget.constants import Const
+from mrtarget.Settings import file_or_resource
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.IO import check_to_open
 from mrtarget.modules import GeneData
@@ -560,9 +559,6 @@ class Evidence(JSONSerializable):
                 "the evidence should be a dict or a json string to parse, not a " + str(type(evidence)))
         self.datasource = self.evidence['sourceID']
         self.datatype = datasources_to_datatypes[self.datasource]
-
-    def get_doc_name(self):
-        return Const.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.datasource.lower()
 
     def get_id(self):
         return self.evidence['id']

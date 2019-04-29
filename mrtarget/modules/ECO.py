@@ -9,7 +9,6 @@ from opentargets_ontologyutils.rdf_utils import OntologyClassReader
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 import opentargets_ontologyutils.eco_so
-from mrtarget.Settings import Config #TODO remove
 import logging
 import elasticsearch
 import simplejson as json

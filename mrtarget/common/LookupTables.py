@@ -1,6 +1,5 @@
 import logging
 from mrtarget.common.Redis import RedisLookupTablePickle
-from mrtarget.constants import Const
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import MatchAll,Match
 

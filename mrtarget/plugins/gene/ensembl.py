@@ -1,6 +1,5 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.modules.GeneData import Gene
-from mrtarget.constants import Const
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import MatchAll
 import sys

@@ -1,6 +1,5 @@
 import logging
 from yapsy.IPlugin import IPlugin
-from mrtarget.Settings import Config
 from opentargets_urlzsource import URLZSource
 from mrtarget.common.safercast import SaferBool, SaferFloat, SaferInt
 from itertools import compress

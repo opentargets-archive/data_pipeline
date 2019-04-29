@@ -4,8 +4,6 @@ import csv
 import os.path
 from numbers import Number
 
-from mrtarget.constants import Const
-
 class QCMetrics(object):
     def __init__(self):
         self.metrics = dict()

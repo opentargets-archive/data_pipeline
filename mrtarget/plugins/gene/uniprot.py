@@ -1,5 +1,4 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.constants import Const
 import jsonpickle
 import base64
 from elasticsearch_dsl import Search
