@@ -25,7 +25,7 @@ class Hallmarks(IPlugin):
                                   "escaping immune response to cancer",
                                   "proliferative signalling"]
 
-    def merge_data(self, genes, loader, r_server, data_config, es_config):
+    def merge_data(self, genes, es, r_server, data_config, es_config):
 
         self.build_json(filename=data_config.hallmark)
 
