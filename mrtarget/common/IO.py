@@ -6,7 +6,8 @@ import logging
 import os.path
 import requests as r
 import requests_file
-
+import mrtarget
+import pkg_resources as res
 from opentargets_urlzsource import URLZSource
 
 
