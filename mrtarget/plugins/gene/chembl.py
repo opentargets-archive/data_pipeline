@@ -1,5 +1,5 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.modules.ChEMBL import ChEMBLLookup
+from mrtarget.common.chembl_lookup import ChEMBLLookup
 import logging
 import configargparse
 

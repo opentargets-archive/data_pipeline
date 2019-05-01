@@ -4,7 +4,7 @@ import logging
 from collections import defaultdict
 
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.modules.ChEMBL import ChEMBLLookup
+from mrtarget.common.chembl_lookup import ChEMBLLookup
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 
