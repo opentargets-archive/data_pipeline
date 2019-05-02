@@ -20,6 +20,7 @@ from mrtarget.modules.QC import QCMetrics
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
 from mrtarget.modules.Uniprot import UniprotDownloader
+from mrtarget.modules.Drug import DrugProcess
 
 import mrtarget.cfg
 
@@ -164,7 +165,6 @@ def main():
                 process.process_all(args.dry_run)
             if not args.skip_qc:
                 qc_metrics.update(process.qc(es, es_config.asc.name))
-                pass
             
         if args.ddr:
             process = DataDrivenRelationProcess(args.elasticseach_nodes, 
@@ -198,6 +198,21 @@ def main():
             if not args.qc_only:
                 process.process_all(args.dry_run)
             #TODO qc
+
+        if args.drg:
+            process = DrugProcess(args.elasticseach_nodes, es_config.drg.name, 
+                es_config.drg.doc, es_config.drg.mapping, es_config.drg.setting,
+                args.drg_workers_writer, args.drg_queue_write, 
+                    data_config.chembl_target, 
+                    data_config.chembl_mechanism, 
+                    data_config.chembl_component, 
+                    data_config.chembl_protein, 
+                    data_config.chembl_molecule_set_uri_pattern,
+                    data_config.chembl_indication)
+            if not args.qc_only:
+                process.process_all(args.dry_run)
+            if not args.skip_qc:
+                qc_metrics.update(process.qc(es, es_config.drg.name))
 
     if args.qc_in:
         #handle reading in previous qc from filename provided, and adding comparitive metrics

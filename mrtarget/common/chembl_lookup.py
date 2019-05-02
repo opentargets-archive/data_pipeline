@@ -3,7 +3,7 @@ import logging
 
 import itertools
 import shelve
-import dumbdbm
+import dbm
 import tempfile
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import Match
@@ -13,7 +13,7 @@ import simplejson as json
 
 class ChEMBLLookup(object):
     def __init__(self, target_uri, mechanism_uri, component_uri, protein_uri, 
-            molecule_set_uri_pattern):
+            molecule_uri):
         super(ChEMBLLookup, self).__init__()
         self._logger = logging.getLogger(__name__)
         
@@ -22,7 +22,7 @@ class ChEMBLLookup(object):
         self.mechanism_uri = mechanism_uri
         self.component_uri = component_uri
         self.protein_uri = protein_uri
-        self.molecule_set_uri_pattern = molecule_set_uri_pattern
+        self.molecule_uri = molecule_uri
 
         self.protein_class = dict()
         self.target_component = dict()
@@ -37,15 +37,19 @@ class ChEMBLLookup(object):
         self.protein_class_label_to_id = {}
         self.molecules_dict = self.populate_molecules_dict()
 
+    '''
+    Internal function to populate a dictionary like object on creation
+    '''
     def populate_molecules_dict(self):
-        self._logger.debug('ChEMBL getting Molecule from ' + self.molecule_set_uri_pattern)
+        self._logger.debug('ChEMBL getting Molecule from ' + self.molecule_uri)
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
         t_filename = tempfile.NamedTemporaryFile(delete=False).name
-        dumb_dict = dumbdbm.open(t_filename)
+        dumb_dict = dbm.open(t_filename, 'n')
         shelve_out = shelve.Shelf(dict=dumb_dict)
-        with URLZSource(self.molecule_set_uri_pattern).open() as f_obj:
+        with URLZSource(self.molecule_uri).open() as f_obj:
             for line in f_obj:
+                #TODO handle malformed JSON lines better
                 mol = json.loads(line)
                 shelve_out[str(mol["molecule_chembl_id"])] = mol
 
