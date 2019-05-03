@@ -36,12 +36,12 @@ class DrugProcess(object):
 
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
             workers_write, queue_write,
-            chembl_target_uri, 
-            chembl_mechanism_uri, 
-            chembl_component_uri, 
-            chembl_protein_uri, 
-            chembl_molecule_uri,
-            chembl_indication_uri):
+            chembl_target_uris, 
+            chembl_mechanism_uris, 
+            chembl_component_uris, 
+            chembl_protein_uris, 
+            chembl_molecule_uris,
+            chembl_indication_uris):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
@@ -49,12 +49,12 @@ class DrugProcess(object):
         self.es_settings = es_settings
         self.workers_write = workers_write
         self.queue_write = queue_write
-        self.chembl_target_uri = chembl_target_uri
-        self.chembl_mechanism_uri = chembl_mechanism_uri
-        self.chembl_component_uri = chembl_component_uri
-        self.chembl_protein_uri = chembl_protein_uri
-        self.chembl_molecule_uri = chembl_molecule_uri
-        self.chembl_indication_uri = chembl_indication_uri
+        self.chembl_target_uris = chembl_target_uris
+        self.chembl_mechanism_uris = chembl_mechanism_uris
+        self.chembl_component_uris = chembl_component_uris
+        self.chembl_protein_uris = chembl_protein_uris
+        self.chembl_molecule_uris = chembl_molecule_uris
+        self.chembl_indication_uris = chembl_indication_uris
 
         self.logger = logging.getLogger(__name__)
 
@@ -63,45 +63,47 @@ class DrugProcess(object):
         self.store(dry_run, drugs)
 
 
-    def create_shelf(self, uri, key_f):
+    def create_shelf(self, uris, key_f):
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
         #note: this file is never deleted!
         filename = tempfile.NamedTemporaryFile(delete=False).name
         shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
-        with URLZSource(uri).open() as f_obj:
-            for line_no, line in enumerate(f_obj):
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError as e:
-                    self.logger.error("Unable to read line %d %s", line_no, e)
-                    raise e
-                    
-                key = key_f(obj)
-                shelf[str(key)] = obj
+        for uri in uris:
+            with URLZSource(uri).open() as f_obj:
+                for line_no, line in enumerate(f_obj):
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError as e:
+                        self.logger.error("Unable to read line %d %s", line_no, e)
+                        raise e
+                        
+                    key = key_f(obj)
+                    shelf[str(key)] = obj
         return shelf
 
-    def create_shelf_multi(self, uri, key_f):
+    def create_shelf_multi(self, uris, key_f):
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
         #note: this file is never deleted!
         filename = tempfile.NamedTemporaryFile(delete=False).name
         shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
-        with URLZSource(uri).open() as f_obj:
-            for line_no, line in enumerate(f_obj):
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError as e:
-                    self.logger.error("Unable to read line %d", line_no)
-                    raise e
+        for uri in uris:
+            with URLZSource(uri).open() as f_obj:
+                for line_no, line in enumerate(f_obj):
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError as e:
+                        self.logger.error("Unable to read line %d", line_no)
+                        raise e
 
-                key = str(key_f(obj))
-                if key not in shelf:
-                    shelf[key] = [obj]
-                else:
-                    shelf[key] = shelf[key]+[obj]
+                    key = str(key_f(obj))
+                    if key not in shelf:
+                        shelf[key] = [obj]
+                    else:
+                        shelf[key] = shelf[key]+[obj]
         return shelf
 
     def generate(self):
@@ -109,9 +111,12 @@ class DrugProcess(object):
         # pre-load into indexed shelf dicts
 
         self.logger.debug("Starting pre-loading")
-        mols = self.create_shelf(self.chembl_molecule_uri, lambda x : x["molecule_chembl_id"])
-        indications = self.create_shelf_multi(self.chembl_indication_uri, lambda x : x["molecule_chembl_id"])
-        mechanisms = self.create_shelf_multi(self.chembl_mechanism_uri, lambda x : x["molecule_chembl_id"])
+        # these are all separate files
+        # intentional, partly because its what chembl API gives us, and partly because
+        # it is easier for partners to add information to existing chembl records
+        mols = self.create_shelf(self.chembl_molecule_uris, lambda x : x["molecule_chembl_id"])
+        indications = self.create_shelf_multi(self.chembl_indication_uris, lambda x : x["molecule_chembl_id"])
+        mechanisms = self.create_shelf_multi(self.chembl_mechanism_uris, lambda x : x["molecule_chembl_id"])
         self.logger.debug("Completed pre-loading")
 
         drugs = {}
@@ -140,8 +145,8 @@ class DrugProcess(object):
                 for indication in indications[ident]:
                     out = {}
 
-                    if "efo_id" in indication and 
-                            indication["efo_id"] is not None
+                    if "efo_id" in indication \
+                            and indication["efo_id"] is not None \
                             and indication["efo_id"] is not "*":
                         #TODO ideally we want a full URI here
                         #TODO make sure this is an ID we care about

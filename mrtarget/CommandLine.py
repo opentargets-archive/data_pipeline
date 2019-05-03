@@ -194,7 +194,7 @@ def main():
                     data_config.chembl_mechanism, 
                     data_config.chembl_component, 
                     data_config.chembl_protein, 
-                    data_config.chembl_molecule_set_uri_pattern)
+                    data_config.chembl_molecule)
             if not args.qc_only:
                 process.process_all(args.dry_run)
             #TODO qc
@@ -207,7 +207,7 @@ def main():
                     data_config.chembl_mechanism, 
                     data_config.chembl_component, 
                     data_config.chembl_protein, 
-                    data_config.chembl_molecule_set_uri_pattern,
+                    data_config.chembl_molecule,
                     data_config.chembl_indication)
             if not args.qc_only:
                 process.process_all(args.dry_run)
