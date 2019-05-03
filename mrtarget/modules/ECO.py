@@ -6,10 +6,14 @@ from mrtarget.common.IO import check_to_open
 from mrtarget.common.LookupTables import ECOLookUpTable
 from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 import opentargets_ontologyutils.eco_so
-from mrtarget.Settings import Config #TODO remove
 import logging
+import elasticsearch
+import simplejson as json
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
 
 '''
@@ -36,14 +40,39 @@ class ECO(JSONSerializable):
         # return self.code
         return ECOLookUpTable.get_ontology_code_from_url(self.code)
 
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(items, index, doc):
+    for eco_id, eco_obj in items:
+        action = {}
+        action["_index"] = index
+        action["_type"] = doc
+        action["_id"] = eco_id
+        #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+        #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+        action["_source"] = eco_obj.to_json()
+
+        yield action
+
 class EcoProcess():
 
-    def __init__(self, loader, eco_uri, so_uri):
-        self.loader = loader
-        self.ecos = OrderedDict()
-        self.evidence_ontology = OntologyClassReader()
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+            eco_uri, so_uri, workers_write, queue_write):
+        self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
+        self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.eco_uri = eco_uri
         self.so_uri = so_uri
+        self.workers_write = workers_write
+        self.queue_write = queue_write
+
+        self.ecos = OrderedDict()
+        self.evidence_ontology = OntologyClassReader()
 
     def process_all(self, dry_run):
         self._process_ontology_data()
@@ -65,36 +94,40 @@ class EcoProcess():
 
     def _store_eco(self, dry_run):
 
-        #setup elasticsearch
-        if not dry_run:
-            self.loader.create_new_index(Const.ELASTICSEARCH_ECO_INDEX_NAME)
-            #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(
-                self.loader.get_versioned_index(Const.ELASTICSEARCH_ECO_INDEX_NAME))
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
 
-        for eco_id, eco_obj in self.ecos.items():
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
+        es = new_es_client(self.es_hosts)
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
+
+            #write into elasticsearch
+            chunk_size = 1000 #TODO make configurable
+            actions = elasticsearch_actions(self.ecos.items(), self.es_index, self.es_doc)
+            failcount = 0
             if not dry_run:
-                self.loader.put(index_name=Const.ELASTICSEARCH_ECO_INDEX_NAME,
-                    doc_type=Const.ELASTICSEARCH_ECO_DOC_NAME,
-                    ID=eco_id, body=eco_obj)
+                for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, 
+                        chunk_size=chunk_size):
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
-        #cleanup elasticsearch
-        if not dry_run:
-            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_ECO_INDEX_NAME)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
+                if failcount:
+                    raise RuntimeError("%s failed to index" % failcount)
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
 
         #number of eco entries
         eco_count = 0
         #Note: try to avoid doing this more than once!
-        for eco_entry in esquery.get_all_eco():
+        for eco_entry in Search().using(es).index(index).query(MatchAll()).scan():
             eco_count += 1
 
         #put the metrics into a single dict

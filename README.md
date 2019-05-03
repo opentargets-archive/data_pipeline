@@ -85,22 +85,23 @@ You can install Kibana in a variety of ways, including via [docker](https://www.
 
 Once Kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
 
-#### Configuration
+### Configuration
 
 The configuration of the pipeline can be spit into three aspects - Operations, Data, and Legacy
 
-##### Operations
+#### Operations
 Here the execution parameters of the pipeline can be controlled. For example, the address of the Elasticsearch server, use of an embedded Redis instance, number of worker threads, etc.
 
 It makes use of the [ConfigArgParse](https://pypi.org/project/ConfigArgParse/) library to allow these to be specified on the command line, environemnt varibale, or in a config file (in decreasing order of precendence). 
 
 See the default `mrtarget.ops.yml` file for detailed comments describing the avaliable options, or use the `--help` command line argument.
 
-##### Data
+#### Data
 These options describe how the data is to be processed. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. See the [OpenTargets blog](https://blog.opentargets.org/) for links to technical notes with the relevant file for each release. 
 
-##### Legacy
-This covers configuration that has not yet been updated to one of the options above. This might be becuase it is particularly tightly entwined within the rest of the codebase, or becuase there is little demand for it to be separated. It includes the files `mrtarget/Settings.py`, `mrtarget/constants.py`, and `mrtarget/ElasticsearchConfig.py`. Any changes to these settings typically require editing code files, though some may be modified via environment variables.
+#### Elasticsearch
+These options describe how Elasticsearch is to be configured. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. Default settings are included
+in the respository as they are specific to a particular version of the pipeline and are not expected to change substantially between releases.
 
 ### Execution
 

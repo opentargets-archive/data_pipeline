@@ -5,10 +5,8 @@ import math
 
 import csv
 
-from mrtarget.Settings import Config, file_or_resource
-from mrtarget.constants import Const
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
-from mrtarget.common.IO import check_to_open
+from mrtarget.common.IO import check_to_open,file_or_resource
 from mrtarget.modules import GeneData
 from mrtarget.modules.ECO import ECO, load_eco_scores_table
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
@@ -398,7 +396,7 @@ class EvidenceManager():
         # try:
         gene = self._get_gene_obj(geneid)
         genes_info = ExtendedInfoGene(gene)
-        if 'reactome' in gene._private['facets']:
+        if 'facets' in gene._private and 'reactome' in gene._private['facets']:
             pathway_data['pathway_type_code'].extend(gene._private['facets']['reactome']['pathway_type_code'])
             pathway_data['pathway_code'].extend(gene._private['facets']['reactome']['pathway_code'])
             # except Exception:
@@ -560,9 +558,6 @@ class Evidence(JSONSerializable):
                 "the evidence should be a dict or a json string to parse, not a " + str(type(evidence)))
         self.datasource = self.evidence['sourceID']
         self.datatype = datasources_to_datatypes[self.datasource]
-
-    def get_doc_name(self):
-        return Const.ELASTICSEARCH_DATA_DOC_NAME + '-' + self.datasource.lower()
 
     def get_id(self):
         return self.evidence['id']

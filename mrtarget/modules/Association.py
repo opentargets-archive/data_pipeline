@@ -6,11 +6,9 @@ import functools
 import itertools
 from collections import defaultdict
 
-from mrtarget.Settings import Config
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchLoader import Loader
-from mrtarget.common.ElasticsearchQuery import ESQuery
 from mrtarget.common.connection import new_es_client, new_redis_client
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer
@@ -18,8 +16,14 @@ from mrtarget.modules.EFO import EFO
 from mrtarget.common.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
 from mrtarget.modules.GeneData import Gene
 from mrtarget.modules.HPA import HPAExpression, hpa2tissues
+from opentargets_urlzsource import URLZSource
 
+import elasticsearch
+from elasticsearch import helpers
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 import pypeln.process as pr
+import simplejson as json
 
 
 class AssociationScore(JSONSerializable):
@@ -289,62 +293,82 @@ class Scorer():
 
         return association
 
-def produce_evidence_local_init(es_hosts, 
+def produce_evidence_local_init(es_hosts, es_index_val_right,
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
     es = new_es_client(es_hosts)
-    es_query = ESQuery(es)
-    return es_query, scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes
+    return (es, es_index_val_right, scoring_weights, 
+        is_direct_do_not_propagate, datasources_to_datatypes)
 
-def produce_evidence(data, es_query, 
+def get_evidence_for_target_simple(es, target, index):
+    query_body = {
+        "query": {
+            "constant_score": {
+                "filter": {
+                    "term": {
+                        "target.id": str(target)
+                    }
+                }
+            }
+        },
+        '_source': {
+            "includes": 
+                ["target.id",
+                    "private.efo_codes",
+                    "disease.id",
+                    "scores.association_score",
+                    "sourceID",
+                    "id",
+                ]},
+    }
+
+    for ev in helpers.scan(client=es, query=query_body,
+        index=index, size=1000):
+        yield ev.to_dict()
+
+def produce_evidence(target, es, es_index_val_right,
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
     data_cache = {}
-    target = data
-
     return_values = []
+    for evidence in get_evidence_for_target_simple(es, target, es_index_val_right):
 
-    available_evidence = es_query.count_evidence_for_target(target)
-    if available_evidence:
-        evidence_iterator = es_query.get_evidence_for_target_simple(target, available_evidence)
-        for evidence in evidence_iterator:
-            efo_list = [evidence['disease']['id']] \
-                if evidence['sourceID'] in is_direct_do_not_propagate \
-                else evidence['private']['efo_codes']
+        
 
-            for efo in efo_list:
-                key = (evidence['target']['id'], efo)
-                if key not in data_cache:
-                    data_cache[key] = []
+        if evidence['sourceID'] in is_direct_do_not_propagate:
+            efo_list = [evidence['disease']['id']]
+        else:
+            efo_list = evidence['private']['efo_codes']
 
-                data_source = evidence['sourceID']
+
+        for efo in efo_list:
+            key = (evidence['target']['id'], efo)
+            if key not in data_cache:
+                data_cache[key] = []
+
+            data_source = evidence['sourceID']
+            
+            score = evidence['scores']['association_score']
+            if data_source in scoring_weights:
+                score = score * scoring_weights[data_source]
                 
-                score = evidence['scores']['association_score']
-                if data_source in scoring_weights:
-                    score = score * scoring_weights[data_source]
-                    
-                is_direct = (efo == evidence['disease']['id'])
-                data_type = datasources_to_datatypes[data_source]
+            is_direct = (efo == evidence['disease']['id'])
+            data_type = datasources_to_datatypes[data_source]
 
-                row = EvidenceScore(score, data_type, data_source, is_direct)
-                data_cache[key].append(row)
+            row = EvidenceScore(score, data_type, data_source, is_direct)
+            data_cache[key].append(row)
 
-        for key,evidence in data_cache.items():
-            #if any of the evidence is direct, the assication is direct
-            is_direct = False
-            for e in evidence:
-                if e.is_direct:
-                    is_direct = True
-                    break
+    for key,evidence in data_cache.items():
+        #if any of the evidence is direct, the assication is direct
+        is_direct = False
+        for e in evidence:
+            if e.is_direct:
+                is_direct = True
+                break
 
-            return_values.append((key[0],key[1], evidence, is_direct))
+        return_values.append((key[0],key[1], evidence.to_json(), is_direct))
 
     return return_values
 
-def produce_evidence_local_shutdown(status, es_query, 
-        scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
-    pass
-
-
-def score_producer_local_init(es_hosts, redis_host, redis_port, 
+def score_producer_local_init(redis_host, redis_port, 
         lookup_data, datasources_to_datatypes, dry_run):
 
     #set the R server to lookup into
@@ -352,15 +376,11 @@ def score_producer_local_init(es_hosts, redis_host, redis_port,
 
     scorer = Scorer()
 
-    loader = Loader(new_es_client(es_hosts))
-
-    return scorer, loader, r_server, lookup_data, datasources_to_datatypes, dry_run
+    return scorer, r_server, lookup_data, datasources_to_datatypes, dry_run
 
 def score_producer(data, 
-        scorer, loader, r_server, lookup_data, datasources_to_datatypes, dry_run):
+        scorer, r_server, lookup_data, datasources_to_datatypes, dry_run):
     target, disease, evidence, is_direct = data
-
-    logger = logging.getLogger(__name__)
 
     if evidence:
         score = scorer.score(target, disease, evidence, is_direct, 
@@ -369,14 +389,8 @@ def score_producer(data,
         if score: 
 
             gene_data = Gene()
-            try:
-                gene_data.load_json(
-                    lookup_data.available_genes.get_gene(target, r_server))
-
-            except KeyError as e:
-                logger.debug('Cannot find gene code "%s" '
-                                    'in lookup table' % target)
-                raise e
+            gene_data.load_json(
+                lookup_data.available_genes.get_gene(target, r_server))
             score.set_target_data(gene_data)
 
             # create a hpa expression empty jsonserializable class
@@ -398,124 +412,166 @@ def score_producer(data,
 
 
             disease_data = EFO()
-            try:
-                disease_data.load_json(
-                    lookup_data.available_efos.get_efo(disease, r_server))
-            except KeyError as e:
-                logger.debug('Cannot find EFO code "%s" '
-                                    'in lookup table' % disease)
-                logger.exception(e)
+            disease_data.load_json(
+                lookup_data.available_efos.get_efo(disease, r_server))
 
             score.set_disease_data(disease_data)
 
 
             element_id = '%s-%s' % (target, disease)
-            if not dry_run:
-                loader.put(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME,
-                    Const.ELASTICSEARCH_DATA_ASSOCIATION_DOC_NAME,
-                    element_id, score)
 
-        else:
-            logger.warning('Skipped association with score 0: %s-%s' % (target, disease))
+            #convert the score into a JSON-compatible object
+            #otherwise Python serialization consumes too much memory
+            return (element_id, score.to_json())
 
-def score_producer_local_shutdown(status, 
-        scorer, loader, r_server, lookup_data, datasources_to_datatypes, dry_run):
+        return None
 
-    #cleanup elasticsearch
-    if not dry_run:
-        loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
 
 class ScoringProcess():
 
-    def __init__(self, redis_host, redis_port, es_hosts):
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+            es_index_gene, es_index_eco, es_index_val_right, es_index_hpa, es_index_efo,
+            redis_host, redis_port, 
+            workers_write, workers_production, workers_score, 
+            queue_score, queue_produce, queue_write, 
+            scoring_weights, is_direct_do_not_propagate,
+            datasources_to_datatypes):
 
         self.logger = logging.getLogger(__name__)
 
         self.es_hosts = es_hosts
-        self.es = new_es_client(self.es_hosts)
-        self.es_loader = Loader(self.es)
-        self.es_query = ESQuery(self.es)
+        self.es_index = es_index
+        self.es_doc = es_doc
+        self.es_mappings = es_mappings
+        self.es_settings = es_settings
+        self.es_index_gene = es_index_gene
+        self.es_index_eco = es_index_eco
+        self.es_index_val_right = es_index_val_right
+        self.es_index_hpa = es_index_hpa
+        self.es_index_efo = es_index_efo
 
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.r_server = new_redis_client(self.redis_host, self.redis_port)
+        self.workers_write = workers_write
+        self.workers_production = workers_production
+        self.workers_score = workers_score
+        self.queue_write = queue_write
+        self.queue_produce = queue_produce
+        self.queue_score = queue_score
 
-    def process_all(self, scoring_weights, is_direct_do_not_propagate,
-            datasources_to_datatypes, dry_run, 
-            num_workers_produce, num_workers_score, max_queued_produce_to_score):
+        self.scoring_weights = scoring_weights
+        self.is_direct_do_not_propagate = is_direct_do_not_propagate
+        self.datasources_to_datatypes = datasources_to_datatypes
 
-        lookup_data = LookUpDataRetriever(self.es, self.r_server,
-            targets=[],
-            data_types=(
+
+    def get_targets(self, es):
+        for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).scan():
+            yield str(target.meta.id)
+
+    def process_all(self, dry_run, 
+            ):
+
+        es = new_es_client(self.es_hosts)
+
+        lookup_data = LookUpDataRetriever(es, self.r_server,
+            (
                 LookUpDataType.DISEASE,
                 LookUpDataType.TARGET,
                 LookUpDataType.ECO,
                 LookUpDataType.HPA
-            )).lookup
+            ),
+            gene_index=self.es_index_gene,
+            eco_index=self.es_index_eco,
+            hpa_index=self.es_index_hpa,
+            efo_index=self.es_index_efo).lookup
 
-        targets = list(self.es_query.get_all_target_ids_with_evidence_data())
-
-        #setup elasticsearch
-        if not dry_run:
-            self.es_loader.create_new_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
-            self.es_loader.prepare_for_bulk_indexing(
-                self.es_loader.get_versioned_index(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME))
+        targets = self.get_targets(es)
 
         self.logger.info('setting up stages')
 
         #bake the arguments for the setup into function objects
         produce_evidence_local_init_baked = functools.partial(produce_evidence_local_init, 
-            self.es_hosts, scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes)
+            self.es_hosts, self.es_index_val_right,
+            self.scoring_weights, self.is_direct_do_not_propagate, 
+            self.datasources_to_datatypes)
         score_producer_local_init_baked = functools.partial(score_producer_local_init, 
-            self.es_hosts, self.redis_host, self.redis_port,
-            lookup_data, datasources_to_datatypes, dry_run)
+            self.redis_host, self.redis_port, lookup_data, self.datasources_to_datatypes, 
+            dry_run)
         
-        #this doesn't need to be in the external config, since its so content light
-        #as to be meaningless
-        max_queued_score_out = 10000
-
         #pipeline stage for making the lists of the target/disease pairs and evidence
-        pipeline_stage = pr.flat_map(produce_evidence, targets, 
-            workers=num_workers_produce,
-            maxsize=max_queued_produce_to_score,
-            on_start=produce_evidence_local_init_baked, 
-            on_done=produce_evidence_local_shutdown)
+        pipeline_stage1 = pr.flat_map(produce_evidence, targets, 
+            workers=self.workers_production,
+            maxsize=self.queue_produce,
+            on_start=produce_evidence_local_init_baked)
 
         #pipeline stage for scoring the evidence sets
         #includes writing to elasticsearch
-        pipeline_stage = pr.each(score_producer, pipeline_stage, 
-            workers=num_workers_score,
-            maxsize=max_queued_score_out,
-            on_start=score_producer_local_init_baked, 
-            on_done=score_producer_local_shutdown)
+        pipeline_stage2 = pr.map(score_producer, pipeline_stage1, 
+            workers=self.workers_score,
+            maxsize=self.queue_score,
+            on_start=score_producer_local_init_baked)
 
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
 
-        #loop over the end of the pipeline to make sure everything is finished
-        self.logger.info('stages created, running scoring and writing')
-        pr.run(pipeline_stage)
-        self.logger.info('stages created, ran scoring and writing')
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
 
-        #cleanup elasticsearch
-        if not dry_run:
-            self.logger.info('flushing data to index')
-            self.es_loader.flush_all_and_wait(Const.ELASTICSEARCH_DATA_ASSOCIATION_INDEX_NAME)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.es_loader.restore_after_bulk_indexing()
-            self.logger.info('flushed data to index')
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
+
+            #load into elasticsearch
+            self.logger.info('stages created, running scoring and writing')
+            client = es
+            chunk_size = 1000 #TODO make configurable
+            actions = self.elasticsearch_actions(pipeline_stage2, 
+                self.es_index, self.es_doc)
+            failcount = 0
+
+            if not dry_run:
+                for result in elasticsearch.helpers.parallel_bulk(client, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, chunk_size=chunk_size):
+            #    for result in elasticsearch.helpers.streaming_bulk(client, actions,
+            #            chunk_size=chunk_size):
+            #    for result in elasticsearch.helpers.bulk(new_es_client(self.es_hosts), actions,
+            #            chunk_size=chunk_size):    
+                    success, details = result
+                    if not success:
+                        failcount += 1
+
+                if failcount:
+                    raise RuntimeError("%s relations failed to index" % failcount)
 
         self.logger.info("DONE")
 
     """
+    Generates elasticsearch action objects from the results iterator
+
+    Output suitable for use with elasticsearch.helpers 
+    """
+    def elasticsearch_actions(self, results, index, doc):
+        for r in results:
+            if r is not None:
+                element_id, score = r
+                action = {}
+                action["_index"] = index
+                action["_type"] = doc
+                action["_id"] = element_id
+                #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+                #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+                action["_source"] = score
+                yield action
+                    
+    """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
 
         #number of eco entries
         association_count = 0
         #Note: try to avoid doing this more than once!
-        for association in esquery.get_all_associations():
+        for association in Search().using(es).index(index).query(MatchAll()).scan():
             association_count += 1
             if association_count % 1000 == 0:
                 self.logger.debug("checking %d", association_count)

@@ -1,0 +1,1097 @@
+{
+  "evidencestring": {
+    "dynamic_templates": [
+      {
+        "scores": {
+          "path_match": "scores.*",
+          "mapping": {
+            "type": "float"
+          }
+        }
+      },
+      {
+        "do_not_index_evidence": {
+          "path_match": "evidence.*",
+          "path_unmatch": "evidence.evidence_codes*",
+          "mapping": {
+            "enabled": false
+          }
+        }
+      },
+      {
+        "do_not_index_drug": {
+          "path_match": "drug.*",
+          "mapping": {
+            "enabled": false
+          }
+        }
+      },
+      {
+        "do_not_index_unique_ass": {
+          "path_match": "unique_association_fields.*",
+          "mapping": {
+            "enabled": false
+          }
+        }
+      }
+    ],
+    "properties": {
+      "access_level": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "disease": {
+        "properties": {
+          "biosample": {
+            "properties": {
+              "id": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              },
+              "name": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              }
+            }
+          },
+          "efo_info": {
+            "properties": {
+              "efo_id": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              },
+              "label": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              },
+              "path": {
+                "type": "keyword"
+              },
+              "therapeutic_area": {
+                "properties": {
+                  "codes": {
+                    "type": "text",
+                    "fields": {
+                      "keyword": {
+                        "type": "keyword",
+                        "ignore_above": 256
+                      }
+                    }
+                  },
+                  "labels": {
+                    "type": "text",
+                    "fields": {
+                      "keyword": {
+                        "type": "keyword",
+                        "ignore_above": 256
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "id": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "source_name": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          }
+        }
+      },
+      "drug": {
+        "properties": {
+          "id": {
+            "type": "text"
+          },
+          "max_phase_for_all_diseases": {
+            "type": "object",
+            "enabled": false
+          },
+          "molecule_name": {
+            "type": "text"
+          },
+          "molecule_type": {
+            "type": "text"
+          },
+          "withdrawn_country": {
+            "type": "text"
+          },
+          "withdrawn_reason": {
+            "type": "text"
+          },
+          "withdrawn_year": {
+            "type": "text"
+          }
+        }
+      },
+      "evidence": {
+        "properties": {
+          "biological_model": {
+            "type": "object",
+            "enabled": false
+          },
+          "clinical_significance": {
+            "type": "text"
+          },
+          "comparison_name": {
+            "type": "text"
+          },
+          "confidence_level": {
+            "type": "text"
+          },
+          "date_asserted": {
+            "type": "date"
+          },
+          "disease_model_association": {
+            "type": "object",
+            "enabled": false
+          },
+          "drug2clinic": {
+            "type": "object",
+            "enabled": false
+          },
+          "evidence_codes": {
+            "type": "keyword"
+          },
+          "evidence_codes_info": {
+            "properties": {
+              "eco_id": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              },
+              "label": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              }
+            }
+          },
+          "experiment_overview": {
+            "type": "text"
+          },
+          "gene2variant": {
+            "type": "object",
+            "enabled": false
+          },
+          "is_associated": {
+            "type": "boolean"
+          },
+          "known_mutations": {
+            "type": "object",
+            "enabled": false
+          },
+          "literature_ref": {
+            "type": "object",
+            "enabled": false
+          },
+          "log2_fold_change": {
+            "type": "object",
+            "enabled": false
+          },
+          "organism_part": {
+            "type": "text"
+          },
+          "orthologs": {
+            "type": "object",
+            "enabled": false
+          },
+          "provenance_type": {
+            "properties": {
+              "database": {
+                "properties": {
+                  "dbxref": {
+                    "type": "object",
+                    "enabled": false
+                  },
+                  "id": {
+                    "type": "text"
+                  },
+                  "version": {
+                    "type": "keyword"
+                  }
+                }
+              },
+              "expert": {
+                "type": "object",
+                "enabled": false
+              },
+              "literature": {
+                "type": "object",
+                "enabled": false
+              }
+            }
+          },
+          "reference_replicates_n": {
+            "type": "long"
+          },
+          "reference_sample": {
+            "type": "text"
+          },
+          "resource_score": {
+            "type": "object",
+            "enabled": false
+          },
+          "target2drug": {
+            "type": "object",
+            "enabled": false
+          },
+          "test_replicates_n": {
+            "type": "long"
+          },
+          "test_sample": {
+            "type": "text"
+          },
+          "unique_experiment_reference": {
+            "type": "text"
+          },
+          "urls": {
+            "type": "object",
+            "enabled": false
+          },
+          "variant2disease": {
+            "type": "object",
+            "enabled": false
+          }
+        }
+      },
+      "id": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "literature": {
+        "properties": {
+          "abstract": {
+            "type": "text",
+            "analyzer": "english"
+          },
+          "journal_data": {
+            "properties": {
+              "medlineAbbreviation": {
+                "type": "keyword"
+              }
+            }
+          },
+          "references": {
+            "properties": {
+              "lit_id": {
+                "type": "keyword"
+              }
+            }
+          },
+          "title": {
+            "type": "text",
+            "analyzer": "english"
+          },
+          "year": {
+            "type": "date",
+            "format": "yyyy"
+          }
+        }
+      },
+      "private": {
+        "properties": {
+          "datasource": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "datatype": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "eco_codes": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "efo_codes": {
+            "type": "keyword"
+          },
+          "facets": {
+            "properties": {
+              "go": {
+                "properties": {
+                  "biological_process": {
+                    "properties": {
+                      "code": {
+                        "type": "text",
+                        "fields": {
+                          "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                          }
+                        }
+                      },
+                      "term": {
+                        "type": "text",
+                        "fields": {
+                          "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "cellular_component": {
+                    "properties": {
+                      "code": {
+                        "type": "text",
+                        "fields": {
+                          "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                          }
+                        }
+                      },
+                      "term": {
+                        "type": "text",
+                        "fields": {
+                          "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "molecular_function": {
+                    "properties": {
+                      "code": {
+                        "type": "text",
+                        "fields": {
+                          "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                          }
+                        }
+                      },
+                      "term": {
+                        "type": "text",
+                        "fields": {
+                          "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "literature": {
+                "properties": {
+                  "abstract_lemmas": {
+                    "properties": {
+                      "count": {
+                        "type": "long"
+                      },
+                      "value": {
+                        "type": "keyword"
+                      }
+                    }
+                  },
+                  "chemicals": {
+                    "properties": {
+                      "name": {
+                        "type": "keyword"
+                      },
+                      "registryNumber": {
+                        "type": "keyword"
+                      }
+                    }
+                  },
+                  "doi": {
+                    "type": "keyword"
+                  },
+                  "mesh_heading": {
+                    "properties": {
+                      "id": {
+                        "type": "keyword"
+                      },
+                      "label": {
+                        "type": "keyword"
+                      }
+                    }
+                  },
+                  "noun_chunks": {
+                    "type": "keyword"
+                  },
+                  "pub_type": {
+                    "type": "keyword"
+                  }
+                }
+              },
+              "reactome": {
+                "properties": {
+                  "pathway_code": {
+                    "type": "keyword"
+                  },
+                  "pathway_type_code": {
+                    "type": "keyword"
+                  }
+                }
+              },
+              "target_class": {
+                "properties": {
+                  "level1": {
+                    "properties": {
+                      "id": {
+                        "type": "long"
+                      },
+                      "label": {
+                        "type": "text",
+                        "fields": {
+                          "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "level2": {
+                    "properties": {
+                      "id": {
+                        "type": "long"
+                      },
+                      "label": {
+                        "type": "text",
+                        "fields": {
+                          "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "uniprot_keywords": {
+                "type": "keyword"
+              }
+            }
+          }
+        }
+      },
+      "scores": {
+        "properties": {
+          "association_score": {
+            "type": "float"
+          }
+        }
+      },
+      "sourceID": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "target": {
+        "properties": {
+          "activity": {
+            "type": "keyword"
+          },
+          "binding_subunit_known": {
+            "type": "boolean"
+          },
+          "complex_id": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "gene_info": {
+            "properties": {
+              "geneid": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              },
+              "name": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              },
+              "symbol": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              }
+            }
+          },
+          "id": {
+            "type": "keyword"
+          },
+          "target_class": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "target_name": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "target_type": {
+            "type": "keyword"
+          },
+          "tier": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          }
+        }
+      },
+      "type": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "unique_association_fields": {
+        "properties": {
+          "alleleOrigin": {
+            "type": "text"
+          },
+          "biological_objects": {
+            "type": "text"
+          },
+          "biological_subjects": {
+            "type": "text"
+          },
+          "cases": {
+            "type": "text"
+          },
+          "chembl_molecules": {
+            "type": "text"
+          },
+          "chembl_targets": {
+            "type": "text"
+          },
+          "clinvarAccession": {
+            "type": "text"
+          },
+          "comparison_name": {
+            "type": "text"
+          },
+          "confidence_interval": {
+            "type": "text"
+          },
+          "datasource": {
+            "type": "text"
+          },
+          "dbSnps": {
+            "type": "text"
+          },
+          "disease": {
+            "type": "text"
+          },
+          "disease_acronym": {
+            "type": "text"
+          },
+          "disease_id": {
+            "type": "text"
+          },
+          "disease_iri": {
+            "type": "text"
+          },
+          "disease_phenodigm_id": {
+            "type": "text"
+          },
+          "disease_phenodigm_name": {
+            "type": "text"
+          },
+          "disease_uri": {
+            "type": "text"
+          },
+          "efo_classification": {
+            "type": "text"
+          },
+          "efo_id": {
+            "type": "text"
+          },
+          "evidence_level": {
+            "type": "text"
+          },
+          "gene": {
+            "type": "text"
+          },
+          "geneID": {
+            "type": "text"
+          },
+          "gene_name": {
+            "type": "text"
+          },
+          "gene_set": {
+            "type": "text"
+          },
+          "gwas_panel_resolution": {
+            "type": "text"
+          },
+          "human_gene_id": {
+            "type": "text"
+          },
+          "method": {
+            "type": "text"
+          },
+          "method_description": {
+            "type": "text"
+          },
+          "model_description": {
+            "type": "text"
+          },
+          "model_gene_id": {
+            "type": "text"
+          },
+          "model_genetic_background": {
+            "type": "text"
+          },
+          "mutationDescription": {
+            "type": "text"
+          },
+          "mutation_type": {
+            "type": "text"
+          },
+          "mutations": {
+            "type": "text"
+          },
+          "object": {
+            "type": "text"
+          },
+          "odd_ratio": {
+            "type": "text"
+          },
+          "odds_ratio": {
+            "type": "text"
+          },
+          "original_disease_label": {
+            "type": "text"
+          },
+          "original_disease_name": {
+            "type": "text"
+          },
+          "panel_diseasegroup": {
+            "type": "text"
+          },
+          "panel_diseasesubgroup": {
+            "type": "text"
+          },
+          "panel_id": {
+            "type": "text"
+          },
+          "panel_name": {
+            "type": "text"
+          },
+          "panel_version": {
+            "type": "text"
+          },
+          "pathway_id": {
+            "type": "text"
+          },
+          "phenotype": {
+            "type": "text"
+          },
+          "pmid": {
+            "type": "text"
+          },
+          "predictionModel": {
+            "type": "text"
+          },
+          "previous_code": {
+            "type": "text"
+          },
+          "probe_id": {
+            "type": "text"
+          },
+          "projectName": {
+            "type": "text"
+          },
+          "publicationIDs": {
+            "type": "text"
+          },
+          "pubmed_refs": {
+            "type": "text"
+          },
+          "pvalue": {
+            "type": "text"
+          },
+          "reaction_activity": {
+            "type": "text"
+          },
+          "reaction_id": {
+            "type": "text"
+          },
+          "role": {
+            "type": "text"
+          },
+          "role_description": {
+            "type": "text"
+          },
+          "sample_size": {
+            "type": "text"
+          },
+          "score": {
+            "type": "text"
+          },
+          "source_id": {
+            "type": "text"
+          },
+          "species": {
+            "type": "text"
+          },
+          "study_id": {
+            "type": "text"
+          },
+          "study_name": {
+            "type": "text"
+          },
+          "symbol": {
+            "type": "text"
+          },
+          "target": {
+            "type": "text"
+          },
+          "target_id": {
+            "type": "text"
+          },
+          "tumor_type": {
+            "type": "text"
+          },
+          "tumor_type_acronym": {
+            "type": "text"
+          },
+          "uniprot_release": {
+            "type": "text"
+          },
+          "unique_id": {
+            "type": "text"
+          },
+          "url": {
+            "type": "text"
+          },
+          "variant": {
+            "type": "text"
+          },
+          "variant_id": {
+            "type": "text"
+          }
+        }
+      },
+      "validated_against_schema_version": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "variant": {
+        "properties": {
+          "id": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "type": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "_default_": {
+    "dynamic_templates": [
+      {
+        "scores": {
+          "path_match": "scores.*",
+          "mapping": {
+            "type": "float"
+          }
+        }
+      },
+      {
+        "do_not_index_evidence": {
+          "path_match": "evidence.*",
+          "path_unmatch": "evidence.evidence_codes*",
+          "mapping": {
+            "enabled": false
+          }
+        }
+      },
+      {
+        "do_not_index_drug": {
+          "path_match": "drug.*",
+          "mapping": {
+            "enabled": false
+          }
+        }
+      },
+      {
+        "do_not_index_unique_ass": {
+          "path_match": "unique_association_fields.*",
+          "mapping": {
+            "enabled": false
+          }
+        }
+      }
+    ],
+    "properties": {
+      "disease": {
+        "properties": {
+          "efo_info": {
+            "properties": {
+              "path": {
+                "type": "keyword"
+              }
+            }
+          },
+          "id": {
+            "type": "keyword"
+          }
+        }
+      },
+      "evidence": {
+        "properties": {
+          "evidence_codes": {
+            "type": "keyword"
+          },
+          "provenance_type": {
+            "properties": {
+              "database": {
+                "properties": {
+                  "version": {
+                    "type": "keyword"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "literature": {
+        "properties": {
+          "abstract": {
+            "type": "text",
+            "analyzer": "english"
+          },
+          "journal_data": {
+            "properties": {
+              "medlineAbbreviation": {
+                "type": "keyword"
+              }
+            }
+          },
+          "references": {
+            "properties": {
+              "lit_id": {
+                "type": "keyword"
+              }
+            }
+          },
+          "title": {
+            "type": "text",
+            "analyzer": "english"
+          },
+          "year": {
+            "type": "date",
+            "format": "yyyy"
+          }
+        }
+      },
+      "private": {
+        "properties": {
+          "efo_codes": {
+            "type": "keyword"
+          },
+          "facets": {
+            "properties": {
+              "literature": {
+                "properties": {
+                  "abstract_lemmas": {
+                    "properties": {
+                      "count": {
+                        "type": "long"
+                      },
+                      "value": {
+                        "type": "keyword"
+                      }
+                    }
+                  },
+                  "chemicals": {
+                    "properties": {
+                      "name": {
+                        "type": "keyword"
+                      },
+                      "registryNumber": {
+                        "type": "keyword"
+                      }
+                    }
+                  },
+                  "doi": {
+                    "type": "keyword"
+                  },
+                  "mesh_heading": {
+                    "properties": {
+                      "id": {
+                        "type": "keyword"
+                      },
+                      "label": {
+                        "type": "keyword"
+                      }
+                    }
+                  },
+                  "noun_chunks": {
+                    "type": "keyword"
+                  },
+                  "pub_type": {
+                    "type": "keyword"
+                  }
+                }
+              },
+              "reactome": {
+                "properties": {
+                  "pathway_code": {
+                    "type": "keyword"
+                  },
+                  "pathway_type_code": {
+                    "type": "keyword"
+                  }
+                }
+              },
+              "uniprot_keywords": {
+                "type": "keyword"
+              }
+            }
+          }
+        }
+      },
+      "target": {
+        "properties": {
+          "activity": {
+            "type": "keyword"
+          },
+          "id": {
+            "type": "keyword"
+          },
+          "target_type": {
+            "type": "keyword"
+          }
+        }
+      }
+    }
+  }
+}

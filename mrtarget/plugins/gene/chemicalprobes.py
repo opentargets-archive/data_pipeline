@@ -10,20 +10,11 @@ class ChemicalProbes(IPlugin):
     # Initiate ChemicalProbes object
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        self.loader = None
-        self.r_server = None
-        self.esquery = None
         self.ensembl_current = {}
         self.symbols = {}
         self.chemicalprobes = {}
 
-    def print_name(self):
-        self._logger.info("Chemical Probes plugin")
-
-    def merge_data(self, genes, loader, r_server, data_config):
-
-        self.loader = loader
-        self.r_server = r_server
+    def merge_data(self, genes, es, r_server, data_config, es_config):
 
         try:
             # Parse chemical probes data into self.chemicalprobes

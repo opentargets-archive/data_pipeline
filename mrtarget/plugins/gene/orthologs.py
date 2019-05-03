@@ -12,11 +12,7 @@ class Orthologs(IPlugin):
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
 
-
-    def print_name(self):
-        self._logger.info("This is plugin ORTHOLOGS")
-
-    def merge_data(self, genes, loader, r_server, data_config):
+    def merge_data(self, genes, es, r_server, data_config, es_config):
 
         #turn the species id/label mappings into a dict from the argument list
         self.orthologs_species = dict()
