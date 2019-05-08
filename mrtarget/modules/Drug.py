@@ -211,10 +211,10 @@ class DrugProcess(object):
             assert isinstance(mol["first_approval"], unicode) \
                     or isinstance(mol["first_approval"], int)
             if isinstance(mol["first_approval"], unicode):
-                drug["first_approval"] = mol["first_approval"]
+                drug["year_first_approved"] = mol["first_approval"]
             else:
                 #this should be an integer?
-                drug["first_approval"] = unicode(str(mol["first_approval"]), "utf-8")
+                drug["year_first_approved"] = unicode(str(mol["first_approval"]), "utf-8")
 
         if "max_phase" in mol and mol["max_phase"] is not None:
             #TODO check this is 0 1 2 3 4
