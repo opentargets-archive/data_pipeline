@@ -8,7 +8,6 @@ from elasticsearch_dsl.query import MatchAll
 from opentargets_urlzsource import URLZSource
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.connection import new_es_client
-from mrtarget.common.chembl_lookup import ChEMBLLookup
 
 import tempfile
 import dbm
@@ -204,6 +203,11 @@ class DrugProcess(object):
             assert isinstance(mol["molecule_type"], unicode)
             drug["type"] = mol["molecule_type"]
             
+        if "pref_name" in mol and mol["pref_name"] is not None:
+            #TODO casing? always uppercase, do we inital case, lower case?
+            assert isinstance(mol["pref_name"], unicode)
+            drug["pref_name"] = mol["pref_name"]
+            
         if "first_approval" in mol and mol["first_approval"] is not None:
             #if its a unicode, use it
             #if its an int, convert it to unicode
@@ -225,39 +229,6 @@ class DrugProcess(object):
             else:
                 #this should be an integer?
                 drug["max_clinical_trial_phase"] = unicode(str(mol["max_phase"]), "utf-8")
-
-        if "chebi_par_id" in mol and mol["chebi_par_id"] is not None:
-            #if its a unicode, use it
-            #if its an int, convert it to unicode
-            #if its anything else, error
-            assert isinstance(mol["chebi_par_id"], unicode) \
-                    or isinstance(mol["chebi_par_id"], int)
-            if isinstance(mol["chebi_par_id"], unicode):
-                drug["chebi_par_id"] = mol["chebi_par_id"]
-            else:
-                #this should be an integer?
-                drug["chebi_par_id"] = unicode(str(mol["chebi_par_id"]), "utf-8")
-
-            
-        if "pref_name" in mol and mol["pref_name"] is not None:
-            #TODO casing? always uppercase, do we inital case, lower case?
-            assert isinstance(mol["pref_name"], unicode)
-            drug["pref_name"] = mol["pref_name"]
-            
-        if "therapeutic_flag" in mol and mol["therapeutic_flag"] is not None:
-            #TODO check always true?
-            assert isinstance(mol["therapeutic_flag"], bool)
-            drug["therapeutic_flag"] = mol["therapeutic_flag"]
-            
-        if "usan_stem" in mol and mol["usan_stem"] is not None:
-            #may be prefix or suffix
-            assert isinstance(mol["usan_stem"], unicode)
-            drug["usan_stem"] = mol["usan_stem"]
-
-        if "parenteral" in mol and mol["parenteral"] is not None:
-            #TODO check always true
-            assert isinstance(mol["parenteral"], bool)
-            drug["parenteral"] = mol["parenteral"]
 
         if "withdrawn_flag" in mol and mol["withdrawn_flag"] is not None:
             #TODO check always true
@@ -288,7 +259,6 @@ class DrugProcess(object):
             else:
                 #this should be an integer?
                 drug["withdrawn_year"] = unicode(str(mol["withdrawn_year"]), "utf-8")
-
 
         if "withdrawn_country" in mol and mol["withdrawn_country"] is not None:
             #TODO check always string
@@ -323,27 +293,6 @@ class DrugProcess(object):
                 drug["black_box_warning"] = True
             else:
                 raise ValueError("Unexpected value for black_box_warning: %d"%bbw)
-
-        if "molecule_hierarchy" in mol and mol["molecule_hierarchy"] is not None:
-
-            if "molecule_chembl_id" in mol["molecule_hierarchy"] \
-                    and mol["molecule_hierarchy"]["molecule_chembl_id"] is not None:
-                #TODO is this needed? same as id ?
-                if "molecule_hierarchy" not in drug:
-                    drug["molecule_hierarchy"] = {}
-                assert isinstance(mol["molecule_hierarchy"]["molecule_chembl_id"], unicode)
-                drug["molecule_hierarchy"]["molecule_chembl_id"] = \
-                    mol["molecule_hierarchy"]["molecule_chembl_id"]
-
-            if "parent_chembl_id" in mol["molecule_hierarchy"] \
-                    and mol["molecule_hierarchy"]["parent_chembl_id"] is not None:
-                #TODO is this needed? same as id ?
-                if "molecule_hierarchy" not in drug:
-                    drug["molecule_hierarchy"] = {}
-                assert isinstance(mol["molecule_hierarchy"]["parent_chembl_id"], unicode)
-                drug["molecule_hierarchy"]["parent_chembl_id"] = \
-                    mol["molecule_hierarchy"]["parent_chembl_id"]
-
 
         if "molecule_synonyms" in mol and mol["molecule_synonyms"] is not None:
             # use set to avoid duplicates
@@ -393,7 +342,7 @@ class DrugProcess(object):
                     references[ref_type].add(ref_id)
             
             for ref_type in references:
-                if "references" not in drug:
+                if "cross_references" not in drug:
                     drug["cross_references"] = []
 
                 reference = {}
@@ -402,7 +351,17 @@ class DrugProcess(object):
                 #TODO build a URL list that can handle multiple ids (when possible)
                 drug["cross_references"].append(reference)
 
+        if "chebi_par_id" in mol and mol["chebi_par_id"] is not None:
+            assert isinstance(mol["chebi_par_id"], int)
+            chebi_id = unicode(str(mol["chebi_par_id"]), "utf-8")
 
+            if "cross_references" not in drug:
+                drug["cross_references"] = []
+            reference = {}
+            reference["source"] = "ChEBI"
+            reference["ids"] = [chebi_id]
+            #TODO build a URL 
+            drug["cross_references"].append(reference)
 
 
         if indications is not None and len(indications) > 0:
