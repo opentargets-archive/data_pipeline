@@ -4,7 +4,13 @@ from mrtarget.common.DataStructure import JSONSerializable
 from opentargets_ontologyutils.rdf_utils import OntologyClassReader, DiseaseUtils
 import opentargets_ontologyutils.efo
 from rdflib import URIRef
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
+import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
+import simplejson as json
+from opentargets_urlzsource import URLZSource
 
 '''
 Module to Fetch the EFO ontology and store it in ElasticSearch to be used in evidence and association processing. 
@@ -79,22 +85,44 @@ class EFO(JSONSerializable):
         self._private['suggestions']['input'].append(self.get_id())
 
 
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(items, index, doc):
+    for efo_id, efo_obj in items:
+        action = {}
+        action["_index"] = index
+        action["_type"] = doc
+        action["_id"] = efo_id
+        #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+        #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+        action["_source"] = efo_obj.to_json()
+
+        yield action
+
 class EfoProcess():
 
-    def __init__(self,
-                 loader,
-                 efo_uri,
-                 hpo_uri,
-                 mp_uri,
-                 disease_phenotype_uris
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+                 efo_uri, hpo_uri, mp_uri,
+                 disease_phenotype_uris,
+                 workers_write, queue_write
                  ):
-        self.loader = loader
-        self.efos = OrderedDict()
-        self.logger = logging.getLogger(__name__+".EfoProcess")
+        self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
+        self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.efo_uri = efo_uri
         self.hpo_uri = hpo_uri
         self.mp_uri = mp_uri
         self.disease_phenotype_uris = disease_phenotype_uris
+        self.workers_write = workers_write
+        self.queue_write = queue_write
+
+        self.efos = OrderedDict()
+        self.logger = logging.getLogger(__name__+".EfoProcess")
 
     def process_all(self, dry_run):
         self._process_ontology_data()
@@ -156,7 +184,7 @@ class EfoProcess():
                 phenotypes = disease_phenotypes[uri]['phenotypes']
 
             if uri not in self.disease_ontology.classes_paths:
-                logger.warning("Unable to find %s", uri)
+                self.logger.warning("Unable to find %s", uri)
                 continue
 
 
@@ -181,48 +209,45 @@ class EfoProcess():
                 efo.children = self.disease_ontology.children[uri]
 
             #logger.debug(str(classes_path['ids']))
-            logger.debug("done %s %s %s", id, uri, label)
+            self.logger.debug("done %s %s %s", id, uri, label)
 
             if id in self.efos:
-                logger.warning("duplicate %s", id)
+                self.logger.warning("duplicate %s", id)
                 continue
             self.efos[id] = efo
 
     def _store_efo(self, dry_run):
-        logger.info("writing to elasticsearch")
 
-        #setup elasticsearch
-        if not dry_run:
-            self.loader.create_new_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
-            #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(
-                self.loader.get_versioned_index(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME))
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
 
-        for efo_id, efo_obj in self.efos.items():
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
+        es = new_es_client(self.es_hosts)
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
+
+            #write into elasticsearch
+            chunk_size = 1000 #TODO make configurable
+            actions = elasticsearch_actions(self.efos.items(), self.es_index, self.es_doc)
+            failcount = 0
             if not dry_run:
-                logger.debug("putting %s", efo_id)
-                self.loader.put(index_name=Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME,
-                                doc_type=Const.ELASTICSEARCH_EFO_LABEL_DOC_NAME,
-                                ID=efo_id,
-                                body = efo_obj)
+                for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, 
+                        chunk_size=chunk_size):
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
-        #cleanup elasticsearch
-        if not dry_run:
-            logger.debug("Flushing elasticsearch")
-            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EFO_LABEL_INDEX_NAME)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
-            logger.debug("Flushed elasticsearch")
-
-        logger.info("wrote to elasticsearch")
+                if failcount:
+                    raise RuntimeError("%s failed to index" % failcount)
 
         
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
         self.logger.info("Starting QC")
         #number of EFO terms
         efo_term_count = 0
@@ -235,7 +260,7 @@ class EfoProcess():
 
         #loop over all efo terms and calculate the metrics
         #Note: try to avoid doing this more than once!
-        for efo_term in esquery.get_all_diseases():
+        for efo_term in Search().using(es).index(index).query(MatchAll()).scan():
             efo_term_count += 1
 
             #path_labels is a list of lists of all paths to the root

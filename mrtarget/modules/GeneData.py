@@ -1,10 +1,15 @@
 import logging
 from collections import OrderedDict
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.ElasticsearchLoader import Loader
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.constants import Const
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
+from opentargets_urlzsource import URLZSource
+
+import simplejson as json
 from yapsy.PluginManager import PluginManager
+import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
 UNI_ID_ORG_PREFIX = 'http://identifiers.org/uniprot/'
 ENS_ID_ORG_PREFIX = 'http://identifiers.org/ensembl/'
@@ -292,6 +297,25 @@ class GeneSet():
                          ens_active, ens_active / tot * 100.)
         return stats
 
+
+"""
+Generates elasticsearch action objects from the results iterator
+
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(genes, index, doc):
+    for geneid, gene in genes.iterate():
+        action = {}
+        action["_index"] = index
+        action["_type"] = doc
+        action["_id"] = geneid
+        #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+        #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+        action["_source"] = gene.to_json()
+
+        yield action
+
+
 class GeneManager():
     """
     Merge data available in ?elasticsearch into proper json objects
@@ -304,18 +328,28 @@ class GeneManager():
 
     """
 
-    def __init__(self,
-                 loader,
-                 r_server,
-                 plugin_paths,
-                 plugin_order):
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, 
+            es_settings, r_server,
+            plugin_paths, plugin_order, 
+            data_config, es_config,
+            workers_write, queue_write):
 
-        self.loader = loader
+        self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
+        self.es_mappings = es_mappings
+        self.es_settings = es_settings
         self.r_server = r_server
+        self.plugin_order = plugin_order
+        self.data_config = data_config
+        self.es_config = es_config
+        self.workers_write = workers_write
+        self.queue_write = queue_write
+
         self.genes = GeneSet()
         self._logger = logging.getLogger(__name__)
 
-        self._logger.info("Preparing the plug in management system")
+        self._logger.debug("Preparing the plug in management system")
         # Build the manager
         self.simplePluginManager = PluginManager()
         # Tell it the default place(s) where to find plugins
@@ -325,52 +359,54 @@ class GeneManager():
         # Load all plugins
         self.simplePluginManager.collectPlugins()
 
-        self.plugin_order = plugin_order
+
+    def merge_all(self,  dry_run):
 
 
-    def merge_all(self, data_config, dry_run = False):
+        es = new_es_client(self.es_hosts)
 
+        #run the actual plugins
         for plugin_name in self.plugin_order:
             plugin = self.simplePluginManager.getPluginByName(plugin_name)
-            plugin.plugin_object.print_name()
-            plugin.plugin_object.merge_data(genes=self.genes, 
-                loader=self.loader, r_server=self.r_server, data_config=data_config)
+            plugin.plugin_object.merge_data(self.genes, 
+                es, self.r_server, 
+                self.data_config, self.es_config)
 
-        self._store_data(dry_run=dry_run)
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
 
-    def _store_data(self, dry_run = False):
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
 
-        if not dry_run:
-            self.loader.create_new_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
-            #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(
-                self.loader.get_versioned_index(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME))
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
-        for geneid, gene in self.genes.iterate():
-            gene.preprocess()
+            #write into elasticsearch
+            chunk_size = 1000 #TODO make configurable
+            actions = elasticsearch_actions(self.genes, self.es_index, self.es_doc)
+            failcount = 0
             if not dry_run:
-                self.loader.put(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME,
-                    Const.ELASTICSEARCH_GENE_NAME_DOC_NAME,
-                    geneid, gene.to_json())
+                for result in elasticsearch.helpers.parallel_bulk(es, actions,
+                        thread_count=self.workers_write, queue_size=self.queue_write, 
+                        chunk_size=chunk_size):
+                    success, details = result
+                    if not success:
+                        failcount += 1
 
-        if not dry_run:
-            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_GENE_NAME_INDEX_NAME)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
-        self._logger.info('all gene objects pushed to elasticsearch')
+                if failcount:
+                    raise RuntimeError("%s failed to index" % failcount)
+
 
 
     """
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
 
         #number of gene entries
         gene_count = 0
         #Note: try to avoid doing this more than once!
-        for gene_entry in esquery.get_all_targets():
+        for gene_entry in Search().using(es).index(index).query(MatchAll()).scan():
             gene_count += 1
 
         #put the metrics into a single dict

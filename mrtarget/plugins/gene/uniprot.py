@@ -1,8 +1,8 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.constants import Const
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from elasticsearch.exceptions import NotFoundError
-from mrtarget.modules.Reactome import ReactomeRetriever
+import jsonpickle
+import base64
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll, Match
 import logging
 
 
@@ -23,14 +23,6 @@ class Uniprot(IPlugin):
 
     def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(__name__)
-
-    def print_name(self):
-        self._logger.info("Uniprot (and Reactome) gene data plugin")
-
-    def merge_data(self, genes, loader, r_server, data_config):
-
-        esquery = ESQuery(loader.es)
-        reactome_retriever = ReactomeRetriever(loader.es)
         self.missing_ensembl = set()
         self.missing_reactome = set()
 
@@ -106,14 +98,14 @@ class Uniprot(IPlugin):
 
     def merge_data(self, genes, es, r_server, data_config, es_config):
 
-        try:
-            esquery.count_elements_in_index(Const.ELASTICSEARCH_UNIPROT_INDEX_NAME)
-        except NotFoundError as ex:
-            self._logger.error('no Uniprot index found in ES. Skipping. Has the --uniprot step been run? Are you pointing to the correct index? %s' % ex)
-            raise ex
+        index = es_config.uni.name
+        reactome_retriever = ReactomeRetriever(es, es_config.rea.name)
 
         c = 0
-        for seqrec in esquery.get_all_uniprot_entries():
+        for seqrec in Search().using(es).index(index).query(MatchAll()).scan():
+            #these are base 64 encoded json - need to decode
+            #TODO access the source directly
+            seqrec = jsonpickle.decode(base64.b64decode(seqrec['entry']))
             c += 1
             if c % 1000 == 0:
                 self._logger.info("%i entries retrieved for uniprot" % c)

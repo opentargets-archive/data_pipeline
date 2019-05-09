@@ -1,6 +1,5 @@
 import logging
 from yapsy.IPlugin import IPlugin
-from mrtarget.Settings import Config
 from opentargets_urlzsource import URLZSource
 from mrtarget.common.safercast import SaferBool, SaferFloat, SaferInt
 from itertools import compress
@@ -21,20 +20,11 @@ class Tractability(IPlugin):
     # Initiate Tractability object
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        self.loader = None
-        self.r_server = None
-        self.esquery = None
         self.ensembl_current = {}
         self.symbols = {}
         self.tractability = {}
 
-    def print_name(self):
-        self._logger.info("Tractability plugin")
-
-    def merge_data(self, genes, loader, r_server, data_config):
-
-        self.loader = loader
-        self.r_server = r_server
+    def merge_data(self, genes, es, r_server, data_config, es_config):
 
         try:
             # Parse tractability data into self.tractability

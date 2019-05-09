@@ -1,0 +1,60 @@
+rea:
+  name: master_reactome-data
+  doc: reactome-reaction
+  mapping: mrtarget/resources/es/rea_mappings.json
+  setting: mrtarget/resources/es/rea_settings.json
+ens:
+  name: master_ensembl-data
+  doc: ensembl-gene
+  mapping: mrtarget/resources/es/ens_mappings.json
+  setting: mrtarget/resources/es/ens_settings.json
+uni:
+  name: master_uniprot-data
+  doc: uniprot-gene
+  mapping: mrtarget/resources/es/uni_mappings.json
+  setting: mrtarget/resources/es/uni_settings.json
+efo:
+  name: master_efo-data
+  doc: efo
+  mapping: mrtarget/resources/es/efo_mappings.json
+  setting: mrtarget/resources/es/efo_settings.json
+eco:
+  name: master_eco-data
+  doc: eco
+  mapping: mrtarget/resources/es/eco_mappings.json
+  setting: mrtarget/resources/es/eco_settings.json
+hpa:
+  name: master_expression-data
+  doc: expression
+  mapping: mrtarget/resources/es/hpa_mappings.json
+  setting: mrtarget/resources/es/hpa_settings.json
+gen:
+  name: master_gene-data
+  doc: genedata
+  mapping: mrtarget/resources/es/gen_mappings.json
+  setting: mrtarget/resources/es/gen_settings.json
+val-right:
+  name: master_evidence-data
+  doc: evidencestring
+  mapping: mrtarget/resources/es/val_right_mappings.json
+  setting: mrtarget/resources/es/val_right_settings.json
+val-wrong:
+  name: master_invalid-evidence-data
+  doc: evidencestring
+  mapping: mrtarget/resources/es/val_wrong_mappings.json
+  setting: mrtarget/resources/es/val_wrong_settings.json
+asc:
+  name: master_association-data
+  doc: association
+  mapping: mrtarget/resources/es/as_mappings.json
+  setting: mrtarget/resources/es/as_settings.json
+sea:
+  name: master_search-data
+  doc: search-object
+  mapping: mrtarget/resources/es/sea_mappings.json
+  setting: mrtarget/resources/es/sea_settings.json
+ddr:
+  name: master_relation-data
+  doc: relation
+  mapping: mrtarget/resources/es/ddr_mappings.json
+  setting: mrtarget/resources/es/ddr_settings.json

@@ -16,8 +16,6 @@ import numpy as np
 import cProfile
 np.seterr(divide='warn', invalid='warn')
 
-from mrtarget.Settings import Config
-
 try:
     import cPickle as pickle
 except ImportError:

@@ -11,6 +11,9 @@
 # see the technical release notes for the location of this file for each release
 #data-config: 
 
+#location to read the elasticsearch configuration from
+# see the technical release notes for the location of this file for each release
+#es-config: 
 
 #python logging file location
 #log-config: mrtarget/resources/logging.ini

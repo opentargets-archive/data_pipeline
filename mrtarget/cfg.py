@@ -17,13 +17,13 @@ def setup_ops_parser():
     p.add('--data-config', help='path to data config file (YAML)',
         env_var="DATA_CONFIG", action='store')
 
+    # configuration file with es related settings
+    p.add('--es-config', help='path to elasticsearch config file (YAML)',
+        env_var="ES_CONFIG", action='store', default="mrtarget.es.yml")
+
     # logging
     p.add("--log-config", help="logging configuration file",
         env_var="LOG_CONFIG", action='store', default='mrtarget/resources/logging.ini')
-
-    # take the release tag from the command line, but fall back to environment or ini files
-    p.add('--release-tag', help="identifier for data storage for this release",
-        env_var="ES_PREFIX", action='store', default="master")
 
     # handle stage-specific QC
     p.add("--qc-out", help="TSV file to write/update qc information")
@@ -56,19 +56,67 @@ def setup_ops_parser():
     #if there are multiple parallel operations happening at once, and
     #there usually are, then this could be many more than that
 
+    p.add("--rea-workers-writer", help="# of procs for rea writers",
+        env_var="REA_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--rea-queue-write", help="size of rea writer queue (in chunks)",
+        env_var="REA_QUEUE_WRITE", action='store', default=8, type=int)
+
+    p.add("--ens-workers-writer", help="# of procs for ens writers",
+        env_var="ENS_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--ens-queue-write", help="size of ens writer queue (in chunks)",
+        env_var="ENS_QUEUE_WRITE", action='store', default=8, type=int)
+        
+    p.add("--uni-workers-writer", help="# of procs for uni writers",
+        env_var="UNI_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--uni-queue-write", help="size of uni writer queue (in chunks)",
+        env_var="UNI_QUEUE_WRITE", action='store', default=8, type=int)
+        
+    p.add("--gen-workers-writer", help="# of procs for gen writers",
+        env_var="GEN_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--gen-queue-write", help="size of gen writer queue (in chunks)",
+        env_var="GEN_QUEUE_WRITE", action='store', default=8, type=int)
+
+    p.add("--eco-workers-writer", help="# of procs for eco writers",
+        env_var="ECO_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--eco-queue-write", help="size of eco writer queue (in chunks)",
+        env_var="ECO_QUEUE_WRITE", action='store', default=8, type=int)
+
+    p.add("--efo-workers-writer", help="# of procs for efo writers",
+        env_var="EFO_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--efo-queue-write", help="size of efo writer queue (in chunks)",
+        env_var="EFO_QUEUE_WRITE", action='store', default=8, type=int)
+        
+    p.add("--hpa-workers-writer", help="# of procs for hpa writers",
+        env_var="HPA_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--hpa-queue-write", help="size of hpa writer queue (in chunks)",
+        env_var="HPA_QUEUE_WRITE", action='store', default=8, type=int)
+        
     p.add("--val-workers-validator", help="# of procs for validation workers",
         env_var="VAL_WORKERS_VALIDATOR", action='store', default=4, type=int)
+    p.add("--val-queue-validator", help="size of validation validator queue",
+        env_var="VAL_QUEUE_VALIDATOR", action='store', default=1000, type=int)
     p.add("--val-workers-writer", help="# of procs for validation writers",
         env_var="VAL_WORKERS_WRITER", action='store', default=4, type=int)
-    p.add("--val-queue-validator-writer", help="size of validation writer to worker queue",
-        env_var="VAL_QUEUE_VALIDATOR_WRITER", action='store', default=1000, type=int)
+    p.add("--val-queue-validator-writer", help="size of validation writer queue (in chunks)",
+        env_var="VAL_QUEUE_VALIDATOR_WRITER", action='store', default=8, type=int)
 
     p.add("--as-workers-production", help="# of procs for assocation pair producers",
         env_var="AS_WORKERS_PRODUCTION", action='store', default=4, type=int)
     p.add("--as-workers-score", help="# of procs for assocation pair scoring",
         env_var="AS_WORKERS_SCORE", action='store', default=4, type=int)
-    p.add("--as-queue-production-score", help="size of assocation producer to scorer queue",
-        env_var="AS_QUEUE_PRODUCTION_SCORE", action='store', default=1000, type=int)
+    p.add("--as-workers-writer", help="# of procs for association pair writers",
+        env_var="AS_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--as-queue-production", help="size of assocation production queue",
+        env_var="AS_QUEUE_PRODUCTION", action='store', default=1000, type=int)
+    p.add("--as-queue-score", help="size of assocation score queue",
+        env_var="AS_QUEUE_SCORE", action='store', default=1000, type=int)
+    p.add("--as-queue-write", help="size of association pair writer queue (in chunks)",
+        env_var="AS_QUEUE_WRITE", action='store', default=8, type=int)
+        
+    p.add("--sea-workers-writer", help="# of procs for sea writers",
+        env_var="SEA_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--sea-queue-write", help="size of sea writer queue (in chunks)",
+        env_var="SEA_QUEUE_WRITE", action='store', default=8, type=int)
 
     p.add("--ddr-workers-production", help="# of procs for relation pair producers",
         env_var="DDR_WORKERS_PRODUCTION", action='store', default=4, type=int)
@@ -149,8 +197,8 @@ def get_ops_args():
     return args
 
 
-def get_data_config(data_url):  
-    with URLZSource(data_url).open() as r_file:
+def get_config(url):  
+    with URLZSource(url).open() as r_file:
         #note us safe loading as described at https://pyyaml.org/wiki/PyYAMLDocumentation
         #TL;DR - only dicts and lists and primitives
         data_config = yaml.safe_load(r_file)
