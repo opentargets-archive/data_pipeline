@@ -17,7 +17,7 @@ class ChEMBL(IPlugin):
             mechanism_uri=data_config.chembl_mechanism,
             component_uri=data_config.chembl_component,
             protein_uri=data_config.chembl_protein,
-            molecule_set_uri_pattern=data_config.chembl_molecule_set_uri_pattern)
+            molecule_uri=data_config.chembl_molecule)
 
         self._logger.info("Retrieving ChEMBL Drug")
         chembl_handler.download_molecules_linked_to_target()

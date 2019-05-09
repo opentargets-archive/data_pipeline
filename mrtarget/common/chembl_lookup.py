@@ -41,19 +41,20 @@ class ChEMBLLookup(object):
     Internal function to populate a dictionary like object on creation
     '''
     def populate_molecules_dict(self):
-        self._logger.debug('ChEMBL getting Molecule from ' + self.molecule_uri)
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
         t_filename = tempfile.NamedTemporaryFile(delete=False).name
         dumb_dict = dbm.open(t_filename, 'n')
         shelve_out = shelve.Shelf(dict=dumb_dict)
-        with URLZSource(self.molecule_uri).open() as f_obj:
-            for line in f_obj:
-                #TODO handle malformed JSON lines better
-                mol = json.loads(line)
-                shelve_out[str(mol["molecule_chembl_id"])] = mol
+        for uri in self.molecule_uri:
+            self._logger.debug('ChEMBL getting Molecule from %s', uri)
+            with URLZSource(uri).open() as f_obj:
+                for line in f_obj:
+                    #TODO handle malformed JSON lines better
+                    mol = json.loads(line)
+                    shelve_out[str(mol["molecule_chembl_id"])] = mol
 
-        self._logger.debug('ChEMBL Molecule loading done. ')
+        self._logger.debug('ChEMBL Molecule loading done.')
         return shelve_out
 
 
