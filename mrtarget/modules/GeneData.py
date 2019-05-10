@@ -86,52 +86,6 @@ class Gene(JSONSerializable):
         else:
             self.id = None
 
-
-    def load_hgnc_data_from_json(self, data):
-
-        if 'ensembl_gene_id' in data:
-            self.ensembl_gene_id = data['ensembl_gene_id']
-            if not self.ensembl_gene_id:
-                self.ensembl_gene_id = data['ensembl_id_supplied_by_ensembl']
-            if 'hgnc_id' in data:
-                self.hgnc_id = data['hgnc_id']
-            if 'symbol' in data:
-                self.approved_symbol = data['symbol']
-            if 'name' in data:
-                self.approved_name = data['name']
-            if 'status' in data:
-                self.status = data['status']
-            if 'locus_group' in data:
-                self.locus_group = data['locus_group']
-            if 'prev_symbols' in data:
-                self.previous_symbols = data['prev_symbols']
-            if 'prev_names' in data:
-                self.previous_names = data['prev_names']
-            if 'alias_symbol' in data:
-                self.symbol_synonyms.extend( data['alias_symbol'])
-            if 'alias_name' in data:
-                self.name_synonyms = data['alias_name']
-            if 'enzyme_ids' in data:
-                self.enzyme_ids = data['enzyme_ids']
-            if 'entrez_id' in data:
-                self.entrez_gene_id = data['entrez_id']
-            if 'refseq_accession' in data:
-                self.refseq_ids = data['refseq_accession']
-            if 'gene_family_tag' in data:
-                self.gene_family_tag = data['gene_family_tag']
-            if 'gene_family_description' in data:
-                self.gene_family_description = data['gene_family_description']
-            if 'ccds_ids' in data:
-                self.ccds_ids = data['ccds_ids']
-            if 'vega_id' in data:
-                self.vega_ids = data['vega_id']
-            if 'uniprot_ids' in data:
-                self.uniprot_accessions = data['uniprot_ids']
-                if not self.uniprot_id:
-                    self.uniprot_id = self.uniprot_accessions[0]
-            if 'pubmed_id' in data:
-                self.pubmed_ids = data['pubmed_id']
-
     def get_id_org(self):
         return ENS_ID_ORG_PREFIX + self.ensembl_gene_id
 
