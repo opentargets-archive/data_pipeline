@@ -24,7 +24,6 @@ setup(name=p.__pkgname__, version=p.__version__,
 "envparse", #TODO remove when migration to ConfigArgParse is complete
 "ConfigArgParse[yaml]",
 "elasticsearch-dsl>=5.0.0,<6.0.0",
-"frozendict",
 "networkx",
 "requests",
 "jsonpickle",

@@ -163,8 +163,13 @@ class DrugProcess(object):
 
                 reference = {}
                 reference["source"] = ref_type
-                reference["ids"] = sorted(references[ref_type])
+                reference["ids"] = tuple(sorted(references[ref_type]))
                 #TODO build a URL list that can handle multiple ids (when possible)
+                if reference not in out["references"]:
+                    out["references"].append(reference)
+            
+            if "references" in out:
+                out["references"] = sorted(out["references"])
 
         #handle target information from target endpoint
         if "target_chembl_id" in mech and mech["target_chembl_id"] is not None:
@@ -337,7 +342,7 @@ class DrugProcess(object):
 
                 reference = {}
                 reference["source"] = ref_type
-                reference["ids"] = sorted(references[ref_type])
+                reference["ids"] = tuple(sorted(references[ref_type]))
                 #TODO build a URL list that can handle multiple ids (when possible)
                 drug["cross_references"].append(reference)
 
@@ -349,10 +354,14 @@ class DrugProcess(object):
                 drug["cross_references"] = []
             reference = {}
             reference["source"] = "ChEBI"
-            reference["ids"] = [chebi_id]
+            reference["ids"] = (chebi_id,)
             #TODO build a URL 
-            drug["cross_references"].append(reference)
+            if reference not in drug["cross_references"]:
+                drug["cross_references"].append(reference)
 
+        #sort cross references for consistent order after all possible ones have been added
+        if "cross_references" in drug:
+            drug["cross_references"] = sorted(drug["cross_references"])
 
         if indications is not None and len(indications) > 0:
             drug["indications"] = []
@@ -425,6 +434,7 @@ class DrugProcess(object):
             indications_list = []
             if ident in indications_list:
                 indications_list = indications[ident]
+            
             mechanisms_list = []
             if ident in mechanisms:
                 mechanisms_list = mechanisms[ident]
@@ -433,9 +443,12 @@ class DrugProcess(object):
                 indications_list, mechanisms_list,
                 targets)
 
+            #TODO append information from children
+
             # only keep those with indications or mechanisms 
             if drug["number_of_indications"] > 0 \
                     or drug["number_of_mechanisms_of_action"] > 0:
+                self.logger.debug("storing %s",ident)
                 drugs[ident] = drug
 
         return drugs
