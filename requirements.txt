@@ -13,6 +13,7 @@ dill==0.2.5
 elasticsearch==5.5.3
 elasticsearch-dsl==5.4.0
 envparse==0.2.0
+frozendict==1.2
 functools32==3.2.3.post2
 future==0.17.1
 idna==2.8
