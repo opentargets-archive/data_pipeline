@@ -81,7 +81,8 @@ class DrugProcess(object):
                         raise e
                         
                     key = key_f(obj)
-                    shelf[str(key)] = obj
+                    if key is not None:
+                        shelf[str(key)] = obj
         return shelf
 
     def create_shelf_multi(self, uris, key_f):
@@ -101,14 +102,15 @@ class DrugProcess(object):
                         self.logger.error("Unable to read line %d %s", line_no, uri)
                         raise e
 
-                    key = str(key_f(obj))
-                    if key not in shelf:
-                        shelf[key] = [obj]
-                    else:
-                        shelf[key] = shelf[key]+[obj]
+                    key = key_f(obj)
+                    if key is not None:
+                        if key not in shelf:
+                            shelf[str(key)] = [obj]
+                        else:
+                            shelf[str(key)] = shelf[str(key)]+[obj]
         return shelf
 
-    def handle_indications(self, indication):
+    def handle_indication(self, indication):
         out = {}
 
         if "efo_id" in indication \
@@ -209,16 +211,10 @@ class DrugProcess(object):
             drug["pref_name"] = mol["pref_name"]
             
         if "first_approval" in mol and mol["first_approval"] is not None:
-            #if its a unicode, use it
-            #if its an int, convert it to unicode
-            #if its anything else, error
-            assert isinstance(mol["first_approval"], unicode) \
-                    or isinstance(mol["first_approval"], int)
-            if isinstance(mol["first_approval"], unicode):
-                drug["year_first_approved"] = mol["first_approval"]
-            else:
-                #this should be an integer?
-                drug["year_first_approved"] = unicode(str(mol["first_approval"]), "utf-8")
+            assert isinstance(mol["first_approval"], int)
+            assert mol["first_approval"] > 1900
+            assert mol["first_approval"] < 2100
+            drug["year_first_approved"] = mol["first_approval"]
 
         if "max_phase" in mol and mol["max_phase"] is not None:
             #TODO check this is 0 1 2 3 4
@@ -249,16 +245,10 @@ class DrugProcess(object):
             drug["withdrawn_reason"] = sorted(reasons)
 
         if "withdrawn_year" in mol and mol["withdrawn_year"] is not None:
-            #if its a unicode, use it
-            #if its an int, convert it to unicode
-            #if its anything else, error
-            assert isinstance(mol["withdrawn_year"], unicode) \
-                    or isinstance(mol["withdrawn_year"], int)
-            if isinstance(mol["withdrawn_year"], unicode):
-                drug["withdrawn_year"] = mol["withdrawn_year"]
-            else:
-                #this should be an integer?
-                drug["withdrawn_year"] = unicode(str(mol["withdrawn_year"]), "utf-8")
+            assert isinstance(mol["withdrawn_year"], int)
+            assert mol["withdrawn_year"] > 1900
+            assert mol["withdrawn_year"] < 2100
+            drug["withdrawn_year"] = mol["withdrawn_year"]
 
         if "withdrawn_country" in mol and mol["withdrawn_country"] is not None:
             #TODO check always string
@@ -367,7 +357,7 @@ class DrugProcess(object):
         if indications is not None and len(indications) > 0:
             drug["indications"] = []
             for indication in indications:
-                out = self.handle_indications(indication)
+                out = self.handle_indication(indication)
                 drug["indications"].append(out)
             drug["number_of_indications"] = len(drug["indications"])
         else:
@@ -395,7 +385,16 @@ class DrugProcess(object):
         # it is easier for partners to add information to existing chembl records
 
         # TODO potentially load these in separate processes?
-        mols = self.create_shelf(self.chembl_molecule_uris, lambda x : x["molecule_chembl_id"])
+
+        def get_parent_id(mol):
+            #if it has a parent use the parents id
+            if "molecule_heirarchy" in mol and "parent_chembl_id" in mol["molecule_hierarchy"]:
+                return mol["molecule_hierarchy"]["parent_chembl_id"]
+            else:
+            #if there is no parent, use its own id
+                return mol["molecule_chembl_id"]
+
+        mols = self.create_shelf_multi(self.chembl_molecule_uris, get_parent_id)
         indications = self.create_shelf_multi(self.chembl_indication_uris, lambda x : x["molecule_chembl_id"])
         mechanisms = self.create_shelf_multi(self.chembl_mechanism_uris, lambda x : x["molecule_chembl_id"])
         targets = self.create_shelf_multi(self.chembl_target_uris, lambda x : x["target_chembl_id"])
@@ -406,7 +405,23 @@ class DrugProcess(object):
         #TODO finish
 
         for ident in mols:
-            mol = mols[ident]
+
+            parent_mol = None
+            child_mols = set()
+
+            for mol in mols[ident]:
+                if mol["molecule_chembl_id"] == ident:
+                    #this is the parent
+                    assert parent_mol is None
+                    parent_mol = mol
+                else:
+                    #this is a child
+                    assert mol not in child_mols
+                    child_mols.add(mol)
+
+            #TODO sure no grandparenting
+            child_mols = sorted(child_mols)
+
             indications_list = []
             if ident in indications_list:
                 indications_list = indications[ident]
@@ -414,7 +429,7 @@ class DrugProcess(object):
             if ident in mechanisms:
                 mechanisms_list = mechanisms[ident]
 
-            drug = self.handle_drug(ident, mol,
+            drug = self.handle_drug(ident, parent_mol,
                 indications_list, mechanisms_list,
                 targets)
 
