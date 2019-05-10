@@ -86,40 +86,6 @@ class Gene(JSONSerializable):
         else:
             self.id = None
 
-    def load_ensembl_data(self, data):
-
-        if 'id' in data:
-            self.is_active_in_ensembl = True
-            self.ensembl_gene_id = data['id']
-        if 'assembly_name' in data:
-            self.ensembl_assembly_name = data['assembly_name']
-        if 'biotype' in data:
-            self.biotype = data['biotype']
-        if 'description' in data:
-            self.ensembl_description = data['description'].split(' [')[0]
-            if not self.approved_name:
-                self.approved_name= self.ensembl_description
-        if 'end' in data:
-            self.gene_end = data['end']
-        if 'start' in data:
-            self.gene_start = data['start']
-        if 'strand' in data:
-            self.strand = data['strand']
-        if 'seq_region_name' in data:
-            self.chromosome = data['seq_region_name']
-        if 'display_name' in data:
-            self.ensembl_external_name = data['display_name']
-            if not self.approved_symbol:
-                self.approved_symbol= data['display_name']
-        if 'version' in data:
-            self.ensembl_gene_version = data['version']
-        if 'cytobands' in data:
-            self.cytobands = data['cytobands']
-        if 'ensembl_release' in data:
-            self.ensembl_release = data['ensembl_release']
-        is_reference = (data['is_reference'] and data['id'].startswith('ENSG'))
-        self.is_ensembl_reference = is_reference
-
     def get_id_org(self):
         return ENS_ID_ORG_PREFIX + self.ensembl_gene_id
 
