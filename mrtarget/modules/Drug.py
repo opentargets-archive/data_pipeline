@@ -31,6 +31,16 @@ def elasticsearch_actions(items, index, doc):
 
         yield action
 
+def get_parent_id(mol):
+    #if it has a parent use the parents id
+    if "molecule_hierarchy" in mol and mol["molecule_hierarchy"] is not None \
+            and "parent_chembl_id" in mol["molecule_hierarchy"] \
+            and mol["molecule_hierarchy"]["parent_chembl_id"] is not None:
+        return mol["molecule_hierarchy"]["parent_chembl_id"]
+    else:
+    #if there is no parent, use its own id
+        #print("Unable to find .molecule_hierarchy.parent_chembl_id for %s"%mol["molecule_chembl_id"])
+        return mol["molecule_chembl_id"]
 
 class DrugProcess(object):
 
@@ -82,6 +92,8 @@ class DrugProcess(object):
                         
                     key = key_f(obj)
                     if key is not None:
+                        if str(key) in shelf:
+                            raise ValueError("Duplicate key %s in uri %s" % (key,uri))
                         shelf[str(key)] = obj
         return shelf
 
@@ -104,7 +116,7 @@ class DrugProcess(object):
 
                     key = key_f(obj)
                     if key is not None:
-                        if key not in shelf:
+                        if str(key) not in shelf:
                             shelf[str(key)] = [obj]
                         else:
                             shelf[str(key)] = shelf[str(key)]+[obj]
@@ -202,29 +214,29 @@ class DrugProcess(object):
 
         if "internal_compound" in mol and mol["internal_compound"] is not None:
             # note, not in chembl
-            assert isinstance(mol["internal_compound"], bool)
+            assert isinstance(mol["internal_compound"], bool), ident
             drug["internal_compound"] = mol["internal_compound"]
 
         if "molecule_type" in mol and mol["molecule_type"] is not None:
             #TODO format check
-            assert isinstance(mol["molecule_type"], unicode)
+            assert isinstance(mol["molecule_type"], unicode), ident
             drug["type"] = mol["molecule_type"]
             
         if "pref_name" in mol and mol["pref_name"] is not None:
             #TODO casing? always uppercase, do we inital case, lower case?
-            assert isinstance(mol["pref_name"], unicode)
+            assert isinstance(mol["pref_name"], unicode), ident
             drug["pref_name"] = mol["pref_name"]
             
         if "first_approval" in mol and mol["first_approval"] is not None:
-            assert isinstance(mol["first_approval"], int)
-            assert mol["first_approval"] > 1900
-            assert mol["first_approval"] < 2100
+            assert isinstance(mol["first_approval"], int), ident
+            assert mol["first_approval"] > 1900, ident
+            assert mol["first_approval"] < 2100, ident
             drug["year_first_approved"] = mol["first_approval"]
 
         if "max_phase" in mol and mol["max_phase"] is not None:
             #TODO check this is 0 1 2 3 4
             assert isinstance(mol["max_phase"], unicode) \
-                    or isinstance(mol["max_phase"], int)
+                    or isinstance(mol["max_phase"], int), ident
             if isinstance(mol["max_phase"], unicode):
                 drug["max_clinical_trial_phase"] = mol["max_phase"]
             else:
@@ -233,7 +245,7 @@ class DrugProcess(object):
 
         if "withdrawn_flag" in mol and mol["withdrawn_flag"] is not None:
             #TODO check always true
-            assert isinstance(mol["withdrawn_flag"], bool)
+            assert isinstance(mol["withdrawn_flag"], bool), ident
             drug["withdrawn_flag"] = mol["withdrawn_flag"]
 
         if "withdrawn_reason" in mol and mol["withdrawn_reason"] is not None:
@@ -244,15 +256,15 @@ class DrugProcess(object):
             #  "Self-poisoning"
             #  "Self-Poisonings"
             reasons = set()
-            assert isinstance(mol["withdrawn_reason"], unicode)
+            assert isinstance(mol["withdrawn_reason"], unicode), ident
             for reason in mol["withdrawn_reason"].split(";"):
                 reasons.add(reason.strip())
             drug["withdrawn_reason"] = sorted(reasons)
 
         if "withdrawn_year" in mol and mol["withdrawn_year"] is not None:
-            assert isinstance(mol["withdrawn_year"], int)
-            assert mol["withdrawn_year"] > 1900
-            assert mol["withdrawn_year"] < 2100
+            assert isinstance(mol["withdrawn_year"], int), ident
+            assert mol["withdrawn_year"] > 1900, ident
+            assert mol["withdrawn_year"] < 2100, ident
             drug["withdrawn_year"] = mol["withdrawn_year"]
 
         if "withdrawn_country" in mol and mol["withdrawn_country"] is not None:
@@ -261,7 +273,7 @@ class DrugProcess(object):
             #split and trim by semicolon
             #TODO casing?
             countries = set()
-            assert isinstance(mol["withdrawn_country"], unicode)
+            assert isinstance(mol["withdrawn_country"], unicode), ident
             for country in mol["withdrawn_country"].split(";"):
                 countries.add(country.strip())
             drug["withdrawn_country"] = sorted(countries)
@@ -271,7 +283,7 @@ class DrugProcess(object):
             #TODO check only present when withdrawn_flag
             #TODO casing?
             classes = set()
-            assert isinstance(mol["withdrawn_class"], unicode)
+            assert isinstance(mol["withdrawn_class"], unicode), ident
             for clazz in mol["withdrawn_class"].split(";"):
                 classes.add(clazz.strip())
             drug["withdrawn_class"] = sorted(classes)
@@ -279,7 +291,8 @@ class DrugProcess(object):
         if "black_box_warning" in mol and mol["black_box_warning"] is not None:
             #unicode converted to true/false
             #check it comes in as a unicode
-            assert isinstance(mol["black_box_warning"], unicode)
+            assert isinstance(mol["black_box_warning"], unicode), \
+                "%s black_box_warning = %s " % (ident,repr(mol["black_box_warning"]))
             #convert unicode to an integer - will throw if it can't
             bbw = int(mol["black_box_warning"])
             if bbw == 0:
@@ -363,25 +376,67 @@ class DrugProcess(object):
         if "cross_references" in drug:
             drug["cross_references"] = sorted(drug["cross_references"])
 
-        if indications is not None and len(indications) > 0:
+        if ident in indications:
             drug["indications"] = []
-            for indication in indications:
+            for indication in indications[ident]:
                 out = self.handle_indication(indication)
                 drug["indications"].append(out)
-            drug["number_of_indications"] = len(drug["indications"])
-        else:
-            drug["number_of_indications"] = 0
 
-        if mechanisms is not None and len(mechanisms) > 0:
+        if ident in mechanisms:
             drug["mechanisms_of_action"] = []
-            for mechanism in mechanisms:
+            for mechanism in mechanisms[ident]:
                 out = self.handle_mechanism(mechanism, all_targets)
                 drug["mechanisms_of_action"].append(out)
-            drug["number_of_mechanisms_of_action"] = len(drug["mechanisms_of_action"])
-        else:
-            drug["number_of_mechanisms_of_action"] = 0
 
         return drug
+
+
+    def handle_drug_child(self, drug, ident, mol, indications, mechanisms, targets):
+
+        #get a drug object for the child, validated and cleaned
+        child_drug = self.handle_drug(ident, mol, indications, mechanisms, targets)
+
+        #add extra information to the drug based on the child
+
+        if "child_chembl_ids" not in drug:
+            drug["child_chembl_ids"] = []
+        drug["child_chembl_ids"].append(child_drug["id"])
+
+        if "synonyms" in child_drug:
+            for synonym in child_drug["synonyms"]:
+                if "synonyms" in drug:
+                    if synonym not in drug["synonyms"]:
+                        drug["synonyms"].append(synonym)
+                        drug["synonyms"] = sorted(drug["synonyms"])
+                else:
+                    drug["synonyms"] = [synonym]
+
+        if "trade_names" in child_drug:
+            for name in child_drug["trade_names"]:
+                if "trade_names" in drug:
+                    if name not in drug["trade_names"]:
+                        drug["trade_names"].append(name)
+                        drug["trade_names"] = sorted(drug["trade_names"])
+                else:
+                    drug["trade_names"] = [name]
+
+        if "indications" in child_drug:
+            for indication in child_drug["indications"]:
+                if "indications" in drug:
+                    if indication not in drug["indications"]:
+                        drug["indications"].append(indication)
+                else:
+                    drug["indications"] = [indication]
+
+        if "mechanisms_of_action" in child_drug:
+            for mechanism in child_drug["mechanisms_of_action"]:
+                if "mechanisms_of_action" in drug:
+                    if mechanism not in drug["mechanisms_of_action"]:
+                        drug["mechanisms_of_action"].append(mechanism)
+                else:
+                    drug["mechanisms_of_action"] = [mechanism]
+
+
 
     def generate(self):
 
@@ -394,14 +449,6 @@ class DrugProcess(object):
         # it is easier for partners to add information to existing chembl records
 
         # TODO potentially load these in separate processes?
-
-        def get_parent_id(mol):
-            #if it has a parent use the parents id
-            if "molecule_heirarchy" in mol and "parent_chembl_id" in mol["molecule_hierarchy"]:
-                return mol["molecule_hierarchy"]["parent_chembl_id"]
-            else:
-            #if there is no parent, use its own id
-                return mol["molecule_chembl_id"]
 
         mols = self.create_shelf_multi(self.chembl_molecule_uris, get_parent_id)
         indications = self.create_shelf_multi(self.chembl_indication_uris, lambda x : x["molecule_chembl_id"])
@@ -416,7 +463,7 @@ class DrugProcess(object):
         for ident in mols:
 
             parent_mol = None
-            child_mols = set()
+            child_mols = []
 
             for mol in mols[ident]:
                 if mol["molecule_chembl_id"] == ident:
@@ -426,24 +473,30 @@ class DrugProcess(object):
                 else:
                     #this is a child
                     assert mol not in child_mols
-                    child_mols.add(mol)
+                    child_mols.append(mol)
 
             #TODO sure no grandparenting
             child_mols = sorted(child_mols)
 
-            indications_list = []
-            if ident in indications_list:
-                indications_list = indications[ident]
-            
-            mechanisms_list = []
-            if ident in mechanisms:
-                mechanisms_list = mechanisms[ident]
-
             drug = self.handle_drug(ident, parent_mol,
-                indications_list, mechanisms_list,
+                indications, mechanisms,
                 targets)
 
-            #TODO append information from children
+            #append information from children
+            for child_mol in child_mols:
+                self.handle_drug_child(drug, child_mol["molecule_chembl_id"], child_mol,
+                    indications, mechanisms,
+                    targets)
+
+            if "indications" in drug:
+                drug["number_of_indications"] = len(drug["indications"])
+            else:
+                drug["number_of_indications"] = 0
+
+            if "mechanisms_of_action" in drug:
+                drug["number_of_mechanisms_of_action"] = len(drug["mechanisms_of_action"])
+            else:
+                drug["number_of_mechanisms_of_action"] = 0
 
             # only keep those with indications or mechanisms 
             if drug["number_of_indications"] > 0 \
