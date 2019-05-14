@@ -70,6 +70,7 @@ class UniprotDownloader(object):
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
             items = generate_uniprot(self.uri)
+            actions = elasticsearch_actions(items, self.es_index, self.es_doc)
 
             #write into elasticsearch
             failcount = 0
