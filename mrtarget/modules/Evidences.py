@@ -367,26 +367,30 @@ def process_evidences_pipeline(filenames, first_n,
         with ElasticsearchBulkIndexManager(es, es_index_invalid, settings_invalid, mappings_invalid):
 
             #load into elasticsearch
-            thread_count = workers_write
-            queue_size = queue_write
             chunk_size = 1000 #TODO make configurable
             actions = elasticsearch_actions(pl_stage, 
                 es_index_valid, es_index_invalid, 
                 es_doc_valid, es_doc_invalid)
             failcount = 0
-            
+
             if not dry_run:
-                #parallel_bulk can hang since it uses threads, safer to use streaming
-                #for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                #        thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
-                for result in elasticsearch.helpers.streaming_bulk(es, actions,
-                        chunk_size=chunk_size):
-                    success, details = result
+                results = None
+                if workers_write > 0:
+                    # this can silently crash ?
+                    results = elasticsearch.helpers.parallel_bulk(es, actions,
+                            thread_count=workers_write,
+                            queue_size=queue_write, 
+                            chunk_size=chunk_size)
+                else:
+                    results = elasticsearch.helpers.streaming_bulk(es, actions,
+                            chunk_size=chunk_size)
+                for success, details in results:
                     if not success:
                         failcount += 1
 
                 if failcount:
                     raise RuntimeError("%s relations failed to index" % failcount)
+
             logger.info('stages created, ran scoring and writing')
 
 

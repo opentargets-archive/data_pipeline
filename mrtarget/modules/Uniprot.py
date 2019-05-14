@@ -65,26 +65,32 @@ class UniprotDownloader(object):
 
         with URLZSource(self.es_settings).open() as settings_file:
             settings = json.load(settings_file)
-
+        chunk_size = 1000 # TODO make configurable
         es = new_es_client(self.es_hosts)
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
             items = generate_uniprot(self.uri)
+            actions = elasticsearch_actions(items, self.es_index, self.es_doc)
 
             #write into elasticsearch
             failcount = 0
+
             if not dry_run:
-                chunk_size = 1000 #TODO make configurable
-                actions = elasticsearch_actions(items, self.es_index, self.es_doc)
-                for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                        thread_count=self.workers_write, queue_size=self.queue_write, 
-                        chunk_size=chunk_size):
-                    success, details = result
+                results = None
+                if self.workers_write > 0:
+                    results = elasticsearch.helpers.parallel_bulk(es, actions,
+                            thread_count=self.workers_write,
+                            queue_size=self.queue_write, 
+                            chunk_size=chunk_size)
+                else:
+                    results = elasticsearch.helpers.streaming_bulk(es, actions,
+                            chunk_size=chunk_size)
+                for success, details in results:
                     if not success:
                         failcount += 1
 
                 if failcount:
-                    raise RuntimeError("%s failed to index" % failcount)
+                    raise RuntimeError("%s relations failed to index" % failcount)
 
     def qc(self, es, index):
         """Run a series of QC tests on EFO elasticsearch index. Returns a dictionary

@@ -156,19 +156,26 @@ Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
 performance loading
 """
 def store_in_elasticsearch(results, es, dry_run, workers_write, queue_write, index, doc):
-    thread_count = workers_write
-    queue_size = queue_write
     chunk_size = 1000 #TODO make configurable
     actions = elasticsearch_actions(results, dry_run, index, doc)
     failcount = 0
-    for result in elasticsearch.helpers.parallel_bulk(es, actions,
-            thread_count=thread_count, queue_size=queue_size, chunk_size=chunk_size):
-        success, details = result
-        if not success:
-            failcount += 1
 
-    if failcount:
-        raise RuntimeError("%s relations failed to index" % failcount)
+    if not dry_run:
+        results = None
+        if workers_write > 0:
+            results = elasticsearch.helpers.parallel_bulk(es, actions,
+                    thread_count=workers_write,
+                    queue_size=queue_write, 
+                    chunk_size=chunk_size)
+        else:
+            results = elasticsearch.helpers.streaming_bulk(es, actions,
+                    chunk_size=chunk_size)
+        for success, details in results:
+            if not success:
+                failcount += 1
+
+        if failcount:
+            raise RuntimeError("%s relations failed to index" % failcount)
 
 """
 Generates elasticsearch action objects from the results iterator
