@@ -428,7 +428,9 @@ class DataDrivenRelationProcess(object):
             ddr_workers_write,
             ddr_queue_production_score,
             ddr_queue_score_result,
-            ddr_queue_write):
+            ddr_queue_write,
+            score_threshold,
+            evidence_count):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_doc = es_doc
@@ -443,14 +445,18 @@ class DataDrivenRelationProcess(object):
         self.ddr_queue_production_score = ddr_queue_production_score
         self.ddr_queue_score_result = ddr_queue_score_result
         self.ddr_queue_write = ddr_queue_write
+        self.score_threshold = score_threshold
+        self.evidence_count = evidence_count
 
         self.logger = logging.getLogger(__name__)
 
     def process_all(self, dry_run):
 
         es = new_es_client(self.es_hosts)
-
-        target_data, disease_data = get_disease_to_targets_vectors(0.1, 3, es, self.es_index_assoc)
+        threshold = 0.1
+        evidence_count = 3
+        target_data, disease_data = get_disease_to_targets_vectors(
+                self.score_threshold, self.evidence_count, es, self.es_index_assoc)
 
         if len(target_data) == 0 or len(disease_data) == 0:
             raise Exception('Could not find a set of targets AND diseases that had the sufficient number'
