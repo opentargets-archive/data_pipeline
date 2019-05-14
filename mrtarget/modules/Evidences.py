@@ -367,7 +367,6 @@ def process_evidences_pipeline(filenames, first_n,
         with ElasticsearchBulkIndexManager(es, es_index_invalid, settings_invalid, mappings_invalid):
 
             #load into elasticsearch
-            queue_size = queue_write
             chunk_size = 1000 #TODO make configurable
             actions = elasticsearch_actions(pl_stage, 
                 es_index_valid, es_index_invalid, 
@@ -377,6 +376,7 @@ def process_evidences_pipeline(filenames, first_n,
             if not dry_run:
                 results = None
                 if workers_write > 0:
+                    # this can silently crash ?
                     results = elasticsearch.helpers.parallel_bulk(es, actions,
                             thread_count=workers_write,
                             queue_size=queue_write, 
