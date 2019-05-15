@@ -529,13 +529,16 @@ class ScoringProcess():
             failcount = 0
 
             if not dry_run:
-                for result in elasticsearch.helpers.parallel_bulk(client, actions,
-                        thread_count=self.workers_write, queue_size=self.queue_write, chunk_size=chunk_size):
-            #    for result in elasticsearch.helpers.streaming_bulk(client, actions,
-            #            chunk_size=chunk_size):
-            #    for result in elasticsearch.helpers.bulk(new_es_client(self.es_hosts), actions,
-            #            chunk_size=chunk_size):    
-                    success, details = result
+                results = None
+                if self.workers_write > 0:
+                    results = elasticsearch.helpers.parallel_bulk(client, actions,
+                            thread_count=self.workers_write,
+                            queue_size=self.queue_write, 
+                            chunk_size=chunk_size)
+                else:
+                    results = elasticsearch.helpers.streaming_bulk(client, actions,
+                            chunk_size=chunk_size)
+                for success, details in results:
                     if not success:
                         failcount += 1
 
