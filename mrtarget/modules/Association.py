@@ -323,7 +323,7 @@ def get_evidence_for_target_simple(es, target, index):
 
     for ev in helpers.scan(client=es, query=query_body,
         index=index, size=1000):
-        yield ev.to_dict()
+        yield ev['_source']
 
 def produce_evidence(target, es, es_index_val_right,
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
@@ -364,7 +364,7 @@ def produce_evidence(target, es, es_index_val_right,
                 is_direct = True
                 break
 
-        return_values.append((key[0],key[1], evidence.to_json(), is_direct))
+        return_values.append((key[0],key[1], evidence, is_direct))
 
     return return_values
 
