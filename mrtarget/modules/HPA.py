@@ -555,12 +555,23 @@ class HPAProcess():
             chunk_size = 1000 #TODO make configurable
             actions = elasticsearch_actions(self.hpa_merged_table, dry_run, self.es_index, self.es_doc)
             failcount = 0
-            for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                    thread_count=self.workers_write, queue_size=self.queue_write, 
-                    chunk_size=chunk_size):
-                success, details = result
-                if not success:
-                    failcount += 1
+
+            if not dry_run:
+                results = None
+                if self.workers_write > 0:
+                    results = elasticsearch.helpers.parallel_bulk(es, actions,
+                            thread_count=self.workers_write,
+                            queue_size=self.queue_write, 
+                            chunk_size=chunk_size)
+                else:
+                    results = elasticsearch.helpers.streaming_bulk(es, actions,
+                            chunk_size=chunk_size)
+                for success, details in results:
+                    if not success:
+                        failcount += 1
+
+                if failcount:
+                    raise RuntimeError("%s relations failed to index" % failcount)
         
         if failcount:
             raise RuntimeError("%s failed to index" % failcount)

@@ -56,36 +56,50 @@ def setup_ops_parser():
     #if there are multiple parallel operations happening at once, and
     #there usually are, then this could be many more than that
 
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--rea-workers-writer", help="# of procs for rea writers",
         env_var="REA_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--rea-queue-write", help="size of rea writer queue (in chunks)",
         env_var="REA_QUEUE_WRITE", action='store', default=8, type=int)
 
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--ens-workers-writer", help="# of procs for ens writers",
         env_var="ENS_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--ens-queue-write", help="size of ens writer queue (in chunks)",
         env_var="ENS_QUEUE_WRITE", action='store', default=8, type=int)
         
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--uni-workers-writer", help="# of procs for uni writers",
         env_var="UNI_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--uni-queue-write", help="size of uni writer queue (in chunks)",
         env_var="UNI_QUEUE_WRITE", action='store', default=8, type=int)
         
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--gen-workers-writer", help="# of procs for gen writers",
         env_var="GEN_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--gen-queue-write", help="size of gen writer queue (in chunks)",
         env_var="GEN_QUEUE_WRITE", action='store', default=8, type=int)
 
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--eco-workers-writer", help="# of procs for eco writers",
         env_var="ECO_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--eco-queue-write", help="size of eco writer queue (in chunks)",
         env_var="ECO_QUEUE_WRITE", action='store', default=8, type=int)
 
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--efo-workers-writer", help="# of procs for efo writers",
         env_var="EFO_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--efo-queue-write", help="size of efo writer queue (in chunks)",
         env_var="EFO_QUEUE_WRITE", action='store', default=8, type=int)
         
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--hpa-workers-writer", help="# of procs for hpa writers",
         env_var="HPA_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--hpa-queue-write", help="size of hpa writer queue (in chunks)",
@@ -95,6 +109,8 @@ def setup_ops_parser():
         env_var="VAL_WORKERS_VALIDATOR", action='store', default=4, type=int)
     p.add("--val-queue-validator", help="size of validation validator queue",
         env_var="VAL_QUEUE_VALIDATOR", action='store', default=1000, type=int)
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--val-workers-writer", help="# of procs for validation writers",
         env_var="VAL_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--val-queue-validator-writer", help="size of validation writer queue (in chunks)",
@@ -104,6 +120,8 @@ def setup_ops_parser():
         env_var="AS_WORKERS_PRODUCTION", action='store', default=4, type=int)
     p.add("--as-workers-score", help="# of procs for assocation pair scoring",
         env_var="AS_WORKERS_SCORE", action='store', default=4, type=int)
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--as-workers-writer", help="# of procs for association pair writers",
         env_var="AS_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--as-queue-production", help="size of assocation production queue",
@@ -113,6 +131,8 @@ def setup_ops_parser():
     p.add("--as-queue-write", help="size of association pair writer queue (in chunks)",
         env_var="AS_QUEUE_WRITE", action='store', default=8, type=int)
         
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--sea-workers-writer", help="# of procs for sea writers",
         env_var="SEA_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--sea-queue-write", help="size of sea writer queue (in chunks)",
@@ -122,6 +142,8 @@ def setup_ops_parser():
         env_var="DDR_WORKERS_PRODUCTION", action='store', default=4, type=int)
     p.add("--ddr-workers-score", help="# of procs for relation pair scoring",
         env_var="DDR_WORKERS_SCORE", action='store', default=4, type=int)
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--ddr-workers-write", help="# of threads for relation writing",
         env_var="DDR_WORKERS_WRITE", action='store', default=8, type=int)
     p.add("--ddr-queue-production-score", help="size of relation producer to scorer queue",

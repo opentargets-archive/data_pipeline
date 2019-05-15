@@ -86,165 +86,6 @@ class Gene(JSONSerializable):
         else:
             self.id = None
 
-
-    def load_hgnc_data_from_json(self, data):
-
-        if 'ensembl_gene_id' in data:
-            self.ensembl_gene_id = data['ensembl_gene_id']
-            if not self.ensembl_gene_id:
-                self.ensembl_gene_id = data['ensembl_id_supplied_by_ensembl']
-            if 'hgnc_id' in data:
-                self.hgnc_id = data['hgnc_id']
-            if 'symbol' in data:
-                self.approved_symbol = data['symbol']
-            if 'name' in data:
-                self.approved_name = data['name']
-            if 'status' in data:
-                self.status = data['status']
-            if 'locus_group' in data:
-                self.locus_group = data['locus_group']
-            if 'prev_symbols' in data:
-                self.previous_symbols = data['prev_symbols']
-            if 'prev_names' in data:
-                self.previous_names = data['prev_names']
-            if 'alias_symbol' in data:
-                self.symbol_synonyms.extend( data['alias_symbol'])
-            if 'alias_name' in data:
-                self.name_synonyms = data['alias_name']
-            if 'enzyme_ids' in data:
-                self.enzyme_ids = data['enzyme_ids']
-            if 'entrez_id' in data:
-                self.entrez_gene_id = data['entrez_id']
-            if 'refseq_accession' in data:
-                self.refseq_ids = data['refseq_accession']
-            if 'gene_family_tag' in data:
-                self.gene_family_tag = data['gene_family_tag']
-            if 'gene_family_description' in data:
-                self.gene_family_description = data['gene_family_description']
-            if 'ccds_ids' in data:
-                self.ccds_ids = data['ccds_ids']
-            if 'vega_id' in data:
-                self.vega_ids = data['vega_id']
-            if 'uniprot_ids' in data:
-                self.uniprot_accessions = data['uniprot_ids']
-                if not self.uniprot_id:
-                    self.uniprot_id = self.uniprot_accessions[0]
-            if 'pubmed_id' in data:
-                self.pubmed_ids = data['pubmed_id']
-
-    def load_ensembl_data(self, data):
-
-        if 'id' in data:
-            self.is_active_in_ensembl = True
-            self.ensembl_gene_id = data['id']
-        if 'assembly_name' in data:
-            self.ensembl_assembly_name = data['assembly_name']
-        if 'biotype' in data:
-            self.biotype = data['biotype']
-        if 'description' in data:
-            self.ensembl_description = data['description'].split(' [')[0]
-            if not self.approved_name:
-                self.approved_name= self.ensembl_description
-        if 'end' in data:
-            self.gene_end = data['end']
-        if 'start' in data:
-            self.gene_start = data['start']
-        if 'strand' in data:
-            self.strand = data['strand']
-        if 'seq_region_name' in data:
-            self.chromosome = data['seq_region_name']
-        if 'display_name' in data:
-            self.ensembl_external_name = data['display_name']
-            if not self.approved_symbol:
-                self.approved_symbol= data['display_name']
-        if 'version' in data:
-            self.ensembl_gene_version = data['version']
-        if 'cytobands' in data:
-            self.cytobands = data['cytobands']
-        if 'ensembl_release' in data:
-            self.ensembl_release = data['ensembl_release']
-        is_reference = (data['is_reference'] and data['id'].startswith('ENSG'))
-        self.is_ensembl_reference = is_reference
-
-
-    def load_uniprot_entry(self, seqrec, reactome_retriever):
-        self.uniprot_id = seqrec.id
-        self.is_in_swissprot = True
-        if seqrec.dbxrefs:
-            self.dbxrefs.extend(seqrec.dbxrefs)
-            self.dbxrefs= sorted(list(set(self.dbxrefs)))
-        for k, v in seqrec.annotations.items():
-            if k == 'accessions':
-                self.uniprot_accessions = v
-            if k == 'keywords':
-                self.uniprot_keywords = v
-            if k == 'comment_function':
-                self.uniprot_function = v
-            if k == 'comment_similarity':
-                self.uniprot_similarity = v
-            if k == 'comment_subunit':
-                self.uniprot_subunit = v
-            if k == 'comment_subcellularlocation_location':
-                self.uniprot_subcellular_location = v
-            if k == 'comment_pathway':
-                self.uniprot_pathway = v
-            if k == 'gene_name_primary':
-                if not self.approved_symbol:
-                    self.approved_symbol= v
-                elif v!= self.approved_symbol:
-                    if v not in self.symbol_synonyms:
-                        self.symbol_synonyms.append(v)
-            if k == 'gene_name_synonym':
-                for symbol in v:
-                    if symbol not in self.symbol_synonyms:
-                        self.symbol_synonyms.append(symbol)
-            if k.startswith('recommendedName'):
-                self.name_synonyms.extend(v)
-            if k.startswith('alternativeName'):
-                self.name_synonyms.extend(v)
-        self.name_synonyms.append(seqrec.description)
-        self.name_synonyms = list(set(self.name_synonyms))
-        if 'GO' in  seqrec.annotations['dbxref_extended']:
-            self.go = seqrec.annotations['dbxref_extended']['GO']
-        if 'Reactome' in  seqrec.annotations['dbxref_extended']:
-            self.reactome = seqrec.annotations['dbxref_extended']['Reactome']
-            self._extend_reactome_data(reactome_retriever)
-        if 'PDB' in  seqrec.annotations['dbxref_extended']:
-            self.pdb = seqrec.annotations['dbxref_extended']['PDB']
-        if 'ChEMBL' in  seqrec.annotations['dbxref_extended']:
-            self.chembl = seqrec.annotations['dbxref_extended']['ChEMBL']
-        if 'DrugBank' in  seqrec.annotations['dbxref_extended']:
-            self.drugbank = seqrec.annotations['dbxref_extended']['DrugBank']
-        if 'Pfam' in  seqrec.annotations['dbxref_extended']:
-            self.pfam = seqrec.annotations['dbxref_extended']['Pfam']
-        if 'InterPro' in  seqrec.annotations['dbxref_extended']:
-            self.interpro = seqrec.annotations['dbxref_extended']['InterPro']
-
-    def _extend_reactome_data(self, reactome_retriever):
-        for r in self.reactome:
-            key, reaction = r['id'], r['value']
-            reaction['pathway types'] = []
-            for reaction_type in self._get_pathway_type(key, reactome_retriever):
-                reaction['pathway types'].append(reaction_type)
-        return
-
-    def _get_pathway_type(self, reaction_id, reactome_retriever):
-        types = []
-        try:
-            reaction = reactome_retriever.get_reaction(reaction_id)
-            type_codes =[]
-            for path in reaction.path:
-                if len(path)>1:
-                    type_codes.append(path[1])
-            for type_code in type_codes:
-                types.append({'pathway type':type_code,
-                              'pathway type name': reactome_retriever.get_reaction(type_code).label
-                              })
-        except:
-            logger = logging.getLogger(__name__)
-            logger.warn("cannot find additional info for reactome pathway %s. | SKIPPED"%reaction_id)
-        return types
-
     def get_id_org(self):
         return ENS_ID_ORG_PREFIX + self.ensembl_gene_id
 
@@ -463,16 +304,23 @@ class GeneManager():
             chunk_size = 1000 #TODO make configurable
             actions = elasticsearch_actions(self.genes, self.es_index, self.es_doc)
             failcount = 0
+
             if not dry_run:
-                for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                        thread_count=self.workers_write, queue_size=self.queue_write, 
-                        chunk_size=chunk_size):
-                    success, details = result
+                results = None
+                if self.workers_write > 0:
+                    results = elasticsearch.helpers.parallel_bulk(es, actions,
+                            thread_count=self.workers_write,
+                            queue_size=self.queue_write, 
+                            chunk_size=chunk_size)
+                else:
+                    results = elasticsearch.helpers.streaming_bulk(es, actions,
+                            chunk_size=chunk_size)
+                for success, details in results:
                     if not success:
                         failcount += 1
 
                 if failcount:
-                    raise RuntimeError("%s failed to index" % failcount)
+                    raise RuntimeError("%s relations failed to index" % failcount)
 
 
 

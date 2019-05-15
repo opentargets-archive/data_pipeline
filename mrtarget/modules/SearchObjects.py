@@ -188,12 +188,23 @@ def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_
         chunk_size = 1000 #TODO make configurable
         actions = elasticsearch_actions(so_it, dry_run, index, doc)
         failcount = 0
-        for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                thread_count=workers_write, queue_size=queue_write, 
-                chunk_size=chunk_size):
-            success, details = result
-            if not success:
-                failcount += 1
+
+        if not dry_run:
+            results = None
+            if workers_write > 0:
+                results = elasticsearch.helpers.parallel_bulk(es, actions,
+                        thread_count=workers_write,
+                        queue_size=queue_write, 
+                        chunk_size=chunk_size)
+            else:
+                results = elasticsearch.helpers.streaming_bulk(es, actions,
+                        chunk_size=chunk_size)
+            for success, details in results:
+                if not success:
+                    failcount += 1
+
+            if failcount:
+                raise RuntimeError("%s relations failed to index" % failcount)
 
 class SearchObjectProcess(object):
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
