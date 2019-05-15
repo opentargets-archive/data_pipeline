@@ -153,6 +153,8 @@ def setup_ops_parser():
     p.add("--ddr-queue-write", help="size of relation writer queue (in chunks)",
         env_var="DDR_QUEUE_WRITE", action='store', default=8, type=int)
 
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
     p.add("--drg-workers-writer", help="# of procs for drug writers",
         env_var="DRG_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--drg-queue-write", help="size of drug writer queue (in chunks)",

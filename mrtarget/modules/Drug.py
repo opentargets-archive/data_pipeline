@@ -521,15 +521,21 @@ class DrugProcess(object):
             actions = elasticsearch_actions(data.items(), self.es_index, self.es_doc)
             failcount = 0
             if not dry_run:
-                for result in elasticsearch.helpers.parallel_bulk(es, actions,
-                        thread_count=self.workers_write, queue_size=self.queue_write, 
-                        chunk_size=chunk_size):
-                    success, details = result
+                results = None
+                if self.workers_write > 0:
+                    results = elasticsearch.helpers.parallel_bulk(es, actions,
+                            thread_count=self.workers_write,
+                            queue_size=self.queue_write, 
+                            chunk_size=chunk_size)
+                else:
+                    results = elasticsearch.helpers.streaming_bulk(es, actions,
+                            chunk_size=chunk_size)
+                for success, details in results:
                     if not success:
                         failcount += 1
 
                 if failcount:
-                    raise RuntimeError("%s failed to index" % failcount)
+                    raise RuntimeError("%s relations failed to index" % failcount)
         
         self.logger.debug("Completed storage")
 
