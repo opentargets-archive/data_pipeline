@@ -94,7 +94,7 @@ class GeneLookUpTable(object):
     def __contains__(self, key, r_server=None):
         return self._table.__contains__(key, r_server=self._get_r_server(r_server))
 
-    def __getitem__(self, key, r_server = None):
+    def get_gene(self, key, r_server = None):
         if key in self:
             return self._table.get(key, r_server=self._get_r_server(r_server))
 
@@ -104,6 +104,9 @@ class GeneLookUpTable(object):
         #store it in redis for later
         self.set_gene(gene, r_server)
         return gene
+
+    def __getitem__(self, key, r_server = None):
+        return self.get_gene(key,r_server)
 
     def __setitem__(self, key, value, r_server=None):
         self._table.set(key, value, self._get_r_server(r_server))
