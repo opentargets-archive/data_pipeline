@@ -122,15 +122,8 @@ $(LOG_PATH)/out.ddr.log : $(LOG_PATH)/out.as.log
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --ddr 2>&1 | tee $(LOG_PATH)/out.ddr.log
 
-.PHONY: metrics
-metrics: $(LOG_PATH)/out.metric.log
-
-$(LOG_PATH)/out.metric.log : $(LOG_PATH)/out.as.log
-	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --metric 2>&1 | tee $(LOG_PATH)/out.metric.log
-
 .PHONY: all
-all: metrics relationship_data search_data association_qc
+all: relationship_data search_data association_qc
 
 # Utility targets
 # thanks to https://stackoverflow.com/a/15058900
