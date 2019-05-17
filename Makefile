@@ -101,13 +101,6 @@ $(LOG_PATH)/out.as.log : $(LOG_PATH)/out.val.log $(LOG_PATH)/out.hpa.log
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --as 2>&1 | tee $(LOG_PATH)/out.as.log
 
-.PHONY: association_qc
-association_qc: $(LOG_PATH)/out.qc.log
-
-$(LOG_PATH)/out.qc.log : $(LOG_PATH)/out.as.log
-	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --qc 2>&1 | tee $(LOG_PATH)/out.qc.log
-
 .PHONY: search_data
 search_data: $(LOG_PATH)/out.sea.log
 
@@ -123,7 +116,7 @@ $(LOG_PATH)/out.ddr.log : $(LOG_PATH)/out.as.log
 	$(MRTARGET_CMD) --ddr 2>&1 | tee $(LOG_PATH)/out.ddr.log
 
 .PHONY: all
-all: relationship_data search_data association_qc
+all: relationship_data search_data 
 
 # Utility targets
 # thanks to https://stackoverflow.com/a/15058900
