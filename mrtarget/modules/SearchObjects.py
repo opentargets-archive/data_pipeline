@@ -336,7 +336,7 @@ class SearchObjectProcess(object):
         if target_id:
             s = s.query(ConstantScore(filter={"term":{"target.id":target_id}}))
         if disease_id:
-            s = s.query(ConstantScore(filter={"term":{"disease.id":target_id}}))
+            s = s.query(ConstantScore(filter={"term":{"disease.id":disease_id}}))
         s = s.sort("-harmonic-sum.overall")
         s._source = ['id','harmonic-sum.overall']
         s.aggs.bucket("direct_associations","filter",
