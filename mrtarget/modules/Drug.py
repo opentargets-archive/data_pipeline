@@ -8,6 +8,7 @@ from elasticsearch_dsl.query import MatchAll
 from opentargets_urlzsource import URLZSource
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.connection import new_es_client
+from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 
 import tempfile
 import dbm
@@ -42,9 +43,11 @@ def get_parent_id(mol):
         #print("Unable to find .molecule_hierarchy.parent_chembl_id for %s"%mol["molecule_chembl_id"])
         return mol["molecule_chembl_id"]
 
+
 class DrugProcess(object):
 
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+            es_index_gene, es_index_efo,
             workers_write, queue_write,
             chembl_target_uris, 
             chembl_mechanism_uris, 
@@ -57,6 +60,8 @@ class DrugProcess(object):
         self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
+        self.es_index_gene = es_index_gene
+        self.es_index_efo = es_index_efo
         self.workers_write = workers_write
         self.queue_write = queue_write
         self.chembl_target_uris = chembl_target_uris
@@ -68,9 +73,11 @@ class DrugProcess(object):
 
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self, dry_run):
-        drugs = self.generate()
-        self.store(dry_run, drugs)
+    def process_all(self, dry_run, redis_client):
+        es = new_es_client(self.es_hosts)
+
+        drugs = self.generate(es, redis_client)
+        self.store(es, dry_run, drugs)
 
 
     def create_shelf(self, uris, key_f):
@@ -116,10 +123,10 @@ class DrugProcess(object):
 
                     key = key_f(obj)
                     if key is not None:
-                        if str(key) not in shelf:
-                            shelf[str(key)] = [obj]
-                        else:
-                            shelf[str(key)] = shelf[str(key)]+[obj]
+                        key_s = str(key)
+                        existing = shelf.get(key_s,[])
+                        existing.append(obj)
+                        shelf[key_s] = existing
         return shelf
 
     def handle_indication(self, indication):
@@ -128,11 +135,25 @@ class DrugProcess(object):
         if "efo_id" in indication \
                 and indication["efo_id"] is not None \
                 and indication["efo_id"] is not "*":
-            #TODO ideally we want a full URI here
-            #TODO make sure this is an ID we care about
-            #TODO make sure this is with an underscore not colon
+            
+            efo_id = indication["efo_id"]
+            #make sure this is with an underscore not colon
+            efo_id = efo_id.replace(":","_")
+
             out["efo_id"] = indication["efo_id"]
-            #TODO get label from our EFO index
+
+            if efo_id not in self.lookup_data.available_efos:
+                self.logger.warn("Unable to find %s", efo_id)
+                return None
+
+
+            stored_efo = self.lookup_data.available_efos.get_efo(efo_id)
+
+            #get label from our EFO index
+            out["efo_label"] = stored_efo["label"]
+
+            #get full URI from our EFO index
+            out["efo_uri"] = stored_efo["code"]
 
         return out
 
@@ -141,6 +162,64 @@ class DrugProcess(object):
     '''
     def handle_mechanism(self, mech, targets):
         out = {}
+
+        #handle target information from target endpoint
+        #do this first, so we can stop early if its a target we are not interested in
+        if "target_chembl_id" in mech and mech["target_chembl_id"] is not None:
+            assert isinstance(mech["target_chembl_id"], unicode)
+            target_id = mech["target_chembl_id"]
+            target = targets[target_id]
+
+            if "target_components" not in target \
+                or target["target_components"] is None \
+                or len(target["target_components"]) == 0:
+                # we can't handle this at the moment, skipping
+                #self.logger.warning("No component for %s",target_id)
+                return None
+            if len(target["target_components"]) > 1:
+                # we can't handle this at the moment, skipping
+                #self.logger.warning("Multiple component for %s",target_id)
+                return None
+
+            assert "accession" in target["target_components"][0]                
+
+            target_accession = target["target_components"][0]["accession"]
+            #at the end of this we need a valid ensembl id that we have in the gene index
+            ensembl_id = None
+            if target_accession in self.lookup_data.available_genes:
+                ensembl_id = target_accession
+            elif target_accession in self.lookup_data.uni2ens:
+                ensembl_id = self.lookup_data.uni2ens[target_accession]
+            else:
+                self.logger.warning("Unrecognized target accession %s",target_accession)
+                return None
+
+            out["target_ensembl_id"] = ensembl_id
+
+            gene = self.lookup_data.available_genes[ensembl_id]
+
+            if "approved_name" in gene and gene["approved_name"] is not None and len(gene["approved_name"]) > 0:
+                assert isinstance(target["pref_name"], unicode)
+                out["target_name"] = gene["approved_name"]
+            elif "pref_name" in target and target["pref_name"] is not None:
+                #fall back to using chembl name
+                assert isinstance(target["pref_name"], unicode)
+                self.logger.warning("Unable to find approved name for %s",ensembl_id)
+                out["target_name"] = target["pref_name"]
+
+            #TODO target_symbols
+
+            #add some information from the chembl source
+            # TODO what if this is different from ensembl ?
+            if "target_type" in target and target["target_type"] is not None:
+                #TODO check this can be lower cased
+                assert isinstance(target["target_type"], unicode)
+                out["target_type"] = target["target_type"].lower()
+
+        else:
+            # no target_chembl_id - should this be dropped?
+            self.logger.warning("no target_chembl_id found")
+            return None
 
         if "action_type" in mech and mech["action_type"] is not None:
             # convert to lowercase
@@ -183,23 +262,6 @@ class DrugProcess(object):
             if "references" in out:
                 out["references"] = sorted(out["references"])
 
-        #handle target information from target endpoint
-        if "target_chembl_id" in mech and mech["target_chembl_id"] is not None:
-            assert isinstance(mech["target_chembl_id"], unicode)
-            target_id = mech["target_chembl_id"]
-            target = targets[target_id]
-
-            if "target_type" in target and target["target_type"] is not None:
-                #TODO check this can be lower cased
-                assert isinstance(target["target_type"], unicode)
-                out["target_type"] = target["target_type"].lower()
-
-            if "pref_name" in target and target["pref_name"] is not None:
-                assert isinstance(target["pref_name"], unicode)
-                out["target_name"] = target["pref_name"]
-
-            #TODO target_symbols
-
         return out
 
 
@@ -234,14 +296,10 @@ class DrugProcess(object):
             drug["year_first_approved"] = mol["first_approval"]
 
         if "max_phase" in mol and mol["max_phase"] is not None:
-            #TODO check this is 0 1 2 3 4
-            assert isinstance(mol["max_phase"], unicode) \
-                    or isinstance(mol["max_phase"], int), ident
-            if isinstance(mol["max_phase"], unicode):
-                drug["max_clinical_trial_phase"] = mol["max_phase"]
-            else:
-                #this should be an integer?
-                drug["max_clinical_trial_phase"] = unicode(str(mol["max_phase"]), "utf-8")
+            #check this is 0 1 2 3 4
+            assert isinstance(mol["max_phase"], int), ident
+            #this should be an integer?
+            drug["max_clinical_trial_phase"] = mol["max_phase"]
 
         if "withdrawn_flag" in mol and mol["withdrawn_flag"] is not None:
             #TODO check always true
@@ -380,13 +438,15 @@ class DrugProcess(object):
             drug["indications"] = []
             for indication in indications[ident]:
                 out = self.handle_indication(indication)
-                drug["indications"].append(out)
+                if out is not None:
+                    drug["indications"].append(out)
 
         if ident in mechanisms:
             drug["mechanisms_of_action"] = []
             for mechanism in mechanisms[ident]:
                 out = self.handle_mechanism(mechanism, all_targets)
-                drug["mechanisms_of_action"].append(out)
+                if out is not None:
+                    drug["mechanisms_of_action"].append(out)
 
         return drug
 
@@ -438,11 +498,21 @@ class DrugProcess(object):
 
 
 
-    def generate(self):
+    def generate(self, es, redis_client):
 
         # pre-load into indexed shelf dicts
 
         self.logger.debug("Starting pre-loading")
+
+        #create lookup tables
+        self.lookup_data = LookUpDataRetriever(es, redis_client, 
+            ( 
+                LookUpDataType.TARGET, 
+                LookUpDataType.DISEASE
+            ),
+            gene_index=self.es_index_gene,
+            efo_index=self.es_index_efo).lookup
+
 
         # these are all separate files
         # intentional, partly because its what chembl API gives us, and partly because
@@ -450,11 +520,18 @@ class DrugProcess(object):
 
         # TODO potentially load these in separate processes?
 
+        self.logger.debug("Loading molecules")
         mols = self.create_shelf_multi(self.chembl_molecule_uris, get_parent_id)
+        self.logger.debug("Loaded %d molecules", len(mols))
+        self.logger.debug("Loading indications")
         indications = self.create_shelf_multi(self.chembl_indication_uris, lambda x : x["molecule_chembl_id"])
+        self.logger.debug("Loaded %d indications", len(indications))
+        self.logger.debug("Loading mechanisms")
         mechanisms = self.create_shelf_multi(self.chembl_mechanism_uris, lambda x : x["molecule_chembl_id"])
-        targets = self.create_shelf_multi(self.chembl_target_uris, lambda x : x["target_chembl_id"])
-
+        self.logger.debug("Loaded %d mechanisms", len(mechanisms))
+        self.logger.debug("Loading targets")
+        targets = self.create_shelf(self.chembl_target_uris, lambda x : x["target_chembl_id"])
+        self.logger.debug("Loaded %d targets", len(targets))
         self.logger.debug("Completed pre-loading")
 
         drugs = {}
@@ -475,8 +552,12 @@ class DrugProcess(object):
                     assert mol not in child_mols
                     child_mols.append(mol)
 
+            assert parent_mol is not None, ident
+
+            self.logger.debug("Handling %s and %d children",parent_mol["molecule_chembl_id"], len(child_mols))
+
             #TODO sure no grandparenting
-            child_mols = sorted(child_mols)
+            #child_mols = sorted(child_mols)
 
             drug = self.handle_drug(ident, parent_mol,
                 indications, mechanisms,
@@ -501,12 +582,11 @@ class DrugProcess(object):
             # only keep those with indications or mechanisms 
             if drug["number_of_indications"] > 0 \
                     or drug["number_of_mechanisms_of_action"] > 0:
-                self.logger.debug("storing %s",ident)
                 drugs[ident] = drug
 
         return drugs
 
-    def store(self, dry_run, data):
+    def store(self, es, dry_run, data):
         self.logger.debug("Starting storage")
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
@@ -514,7 +594,6 @@ class DrugProcess(object):
         with URLZSource(self.es_settings).open() as settings_file:
             settings = json.load(settings_file)
 
-        es = new_es_client(self.es_hosts)
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable

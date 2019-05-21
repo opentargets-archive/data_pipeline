@@ -203,8 +203,9 @@ def main():
 
         if args.drg:
             process = DrugProcess(args.elasticseach_nodes, es_config.drg.name, 
-                es_config.drg.doc, es_config.drg.mapping, es_config.drg.setting,
-                args.drg_workers_writer, args.drg_queue_write, 
+                    es_config.drg.doc, es_config.drg.mapping, es_config.drg.setting,
+                    es_config.gen.name, es_config.efo.name,
+                    args.drg_workers_writer, args.drg_queue_write, 
                     data_config.chembl_target, 
                     data_config.chembl_mechanism, 
                     data_config.chembl_component, 
@@ -212,7 +213,7 @@ def main():
                     data_config.chembl_molecule,
                     data_config.chembl_indication)
             if not args.qc_only:
-                process.process_all(args.dry_run)
+                process.process_all(args.dry_run, redis)
             if not args.skip_qc:
                 qc_metrics.update(process.qc(es, es_config.drg.name))
 
