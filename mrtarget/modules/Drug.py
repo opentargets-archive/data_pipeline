@@ -130,11 +130,11 @@ class DrugProcess(object):
         return shelf
 
     def handle_indication(self, indication):
-        out = {}
 
         if "efo_id" in indication \
                 and indication["efo_id"] is not None \
                 and indication["efo_id"] is not "*":
+            out = {}
             
             efo_id = indication["efo_id"]
             #make sure this is with an underscore not colon
@@ -156,7 +156,10 @@ class DrugProcess(object):
 
             # TODO indication references
 
-        return out
+            return out
+        else:
+            #indication without EFO ID, skipping
+            return None
 
     '''
     This will create the mechanism ES dictionary from the provided shelf dict
@@ -177,38 +180,42 @@ class DrugProcess(object):
                 # we can't handle this at the moment, skipping
                 #self.logger.warning("No component for %s",target_id)
                 return None
-            if len(target["target_components"]) > 1:
-                # we can't handle this at the moment, skipping
-                #self.logger.warning("Multiple component for %s",target_id)
-                return None
 
-            assert "accession" in target["target_components"][0]                
+            for target_component in target["target_components"]:
 
-            target_accession = target["target_components"][0]["accession"]
-            #at the end of this we need a valid ensembl id that we have in the gene index
-            ensembl_id = None
-            if target_accession in self.lookup_data.available_genes:
-                ensembl_id = target_accession
-            elif target_accession in self.lookup_data.uni2ens:
-                ensembl_id = self.lookup_data.uni2ens[target_accession]
-            else:
-                self.logger.warning("Unrecognized target accession %s",target_accession)
-                return None
+                out_component = {}
+                assert "accession" in target_component                
+                target_accession = target_component["accession"]
 
-            out["target_ensembl_id"] = ensembl_id
+                #at the end of this we need a valid ensembl id that we have in the gene index
+                ensembl_id = None
+                if target_accession in self.lookup_data.available_genes:
+                    ensembl_id = target_accession
+                    out_component["ensembl"] = ensembl_id
+                elif target_accession in self.lookup_data.uni2ens:
+                    out_component["uniprot"] = target_accession
+                    ensembl_id = self.lookup_data.uni2ens[target_accession]
+                    out_component["ensembl"] = ensembl_id
+                else:
+                    self.logger.warning("Unrecognized target accession %s",target_accession)
+                    return None
 
-            gene = self.lookup_data.available_genes[ensembl_id]
+                gene = self.lookup_data.available_genes[ensembl_id]
 
-            if "approved_name" in gene and gene["approved_name"] is not None and len(gene["approved_name"]) > 0:
-                assert isinstance(target["pref_name"], unicode)
-                out["target_name"] = gene["approved_name"]
-            elif "pref_name" in target and target["pref_name"] is not None:
-                #fall back to using chembl name
-                assert isinstance(target["pref_name"], unicode)
-                self.logger.warning("Unable to find approved name for %s",ensembl_id)
-                out["target_name"] = target["pref_name"]
+                if "approved_name" in gene \
+                        and gene["approved_name"] is not None \
+                        and len(gene["approved_name"]) > 0:
+                    out_component["approved_name"] = gene["approved_name"]
 
-            #TODO target_symbols
+                if "approved_symbol" in gene \
+                        and gene["approved_symbol"] is not None \
+                        and len(gene["approved_symbol"]) > 0:
+                    assert isinstance(gene["approved_symbol"], unicode)
+                    out_component["approved_symbol"] = gene["approved_symbol"]
+
+                if "target_components" not in out:
+                    out["target_components"] = []
+                out["target_components"].append(out_component)
 
             #add some information from the chembl source
             # TODO what if this is different from ensembl ?
