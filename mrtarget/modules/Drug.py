@@ -14,6 +14,7 @@ import tempfile
 import dbm
 import shelve
 import codecs
+import urllib
 
 """
 Generates elasticsearch action objects from the results iterator
@@ -129,13 +130,47 @@ class DrugProcess(object):
                         shelf[key_s] = existing
         return shelf
 
+    def build_urls(self, source, ids):
+        urls = []
+
+        if source == "FDA":
+            for id in ids:
+                args = {}
+                args["search"] = "set_id:%s" % id
+                urls.append("https://api.fda.gov/drug/label.json?"+urllib.urlencode(args))
+        elif source == "ATC":
+            for id in ids:
+                args = {}
+                args["code"] = id
+                urls.append("http://www.whocc.no/atc_ddd_index/?"+urllib.urlencode(args))
+        elif source == "DailyMed":
+            for id in ids:
+                #these already come from chembl with setid= in the identifer
+                urls.append("http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?"+id)
+        elif source == "ClinicalTrials":
+            args = {}
+            args["id"] = "OR".join(['"%s"' % id for id in ids])
+            urls.append("https://clinicaltrials.gov/search?"+urllib.urlencode(args))
+        elif source == "PubMed":
+            args = {}
+            args["query"] = " OR ".join(['EXT_ID:%s' % id for id in ids])
+            urls.append("https://europepmc.org/search?"+urllib.urlencode(args))
+        else:
+            # TODO only report each source once
+            self.logger.warning("Unregonized source %s", source)
+            return None
+
+        return urls
+
+
+
     def handle_indication(self, indication):
 
         if "efo_id" in indication \
                 and indication["efo_id"] is not None \
                 and indication["efo_id"] is not "*":
             out = {}
-            
+
             efo_id = indication["efo_id"]
             #make sure this is with an underscore not colon
             efo_id = efo_id.replace(":","_")
@@ -143,7 +178,9 @@ class DrugProcess(object):
             out["efo_id"] = efo_id
 
             if efo_id not in self.lookup_data.available_efos:
-                self.logger.warn("Unable to find %s", efo_id)
+                # TODO throw an exception to allow to bubble up
+                # TODO only log each one once
+                self.logger.warning("Unrecognized disease %s",efo_id)
                 return None
 
             stored_efo = self.lookup_data.available_efos.get_efo(efo_id)
@@ -154,7 +191,50 @@ class DrugProcess(object):
             #get full URI from our EFO index
             out["efo_uri"] = stored_efo["code"]
 
-            # TODO indication references
+            #max phase
+            if "max_phase_for_ind" in indication \
+                    and indication["max_phase_for_ind"] is not None:
+                assert isinstance(indication["max_phase_for_ind"], int)
+                out["max_phase_for_indication"] = indication["max_phase_for_ind"]
+
+            # indication references
+            if "indication_refs" in indication and indication["indication_refs"] is not None:
+                references = {}
+                for ref in indication["indication_refs"]:
+                    if "ref_type" in ref and ref["ref_type"] is not None \
+                            and "ref_id" in ref and ref["ref_id"] is not None:
+
+                        #don't keep the URL, can build a better one later to handle multi-id
+
+                        assert isinstance(ref["ref_type"], unicode)
+                        ref_type = ref["ref_type"]
+                        assert isinstance(ref["ref_id"], unicode)
+                        ref_id = ref["ref_id"] 
+
+                        #create a set to ensure uniqueness
+                        if ref_type not in references:
+                            references[ref_type] = set()
+                        references[ref_type].add(ref_id)
+                    else:
+                        # warn if one of these is missing
+                        self.logger.warn("missing ref_type and/or ref_id")
+                
+                for ref_type in references:
+                    if "references" not in out:
+                        out["references"] = []
+
+                    reference = {}
+                    reference["source"] = ref_type
+                    reference["ids"] = tuple(sorted(references[ref_type]))
+                    urls = self.build_urls(reference["source"], reference["ids"])
+                    if urls is not None:
+                        reference["urls"] = urls
+                    #TODO build a URL list that can handle multiple ids (when possible)
+                    if reference not in out["references"]:
+                        out["references"].append(reference)
+                
+                if "references" in out:
+                    out["references"] = sorted(out["references"])
 
             return out
         else:
@@ -197,6 +277,7 @@ class DrugProcess(object):
                     ensembl_id = self.lookup_data.uni2ens[target_accession]
                     out_component["ensembl"] = ensembl_id
                 else:
+                    # TODO only log each one once
                     self.logger.warning("Unrecognized target accession %s",target_accession)
                     return None
 
@@ -265,6 +346,9 @@ class DrugProcess(object):
                 reference = {}
                 reference["source"] = ref_type
                 reference["ids"] = tuple(sorted(references[ref_type]))
+                urls = self.build_urls(reference["source"], reference["ids"])
+                if urls is not None:
+                    reference["urls"] = urls
                 #TODO build a URL list that can handle multiple ids (when possible)
                 if reference not in out["references"]:
                     out["references"].append(reference)
@@ -534,7 +618,7 @@ class DrugProcess(object):
 
         # pre-load into indexed shelf dicts
 
-        self.logger.debug("Starting pre-loading")
+        self.logger.info("Starting pre-loading")
 
         #create lookup tables
         self.lookup_data = LookUpDataRetriever(es, redis_client, 
@@ -564,7 +648,7 @@ class DrugProcess(object):
         self.logger.debug("Loading targets")
         targets = self.create_shelf(self.chembl_target_uris, lambda x : x["target_chembl_id"])
         self.logger.debug("Loaded %d targets", len(targets))
-        self.logger.debug("Completed pre-loading")
+        self.logger.info("Completed pre-loading")
 
         drugs = {}
         #TODO finish
@@ -586,10 +670,9 @@ class DrugProcess(object):
 
             assert parent_mol is not None, ident
 
-            self.logger.debug("Handling %s and %d children",parent_mol["molecule_chembl_id"], len(child_mols))
-
             #TODO sure no grandparenting
-            #child_mols = sorted(child_mols)
+            
+            child_mols = sorted(child_mols)
 
             drug = self.handle_drug(ident, parent_mol,
                 indications, mechanisms,
@@ -619,7 +702,7 @@ class DrugProcess(object):
         return drugs
 
     def store(self, es, dry_run, data):
-        self.logger.debug("Starting storage")
+        self.logger.info("Starting drug storage")
         with URLZSource(self.es_mappings).open() as mappings_file:
             mappings = json.load(mappings_file)
 
