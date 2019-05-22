@@ -140,12 +140,11 @@ class DrugProcess(object):
             #make sure this is with an underscore not colon
             efo_id = efo_id.replace(":","_")
 
-            out["efo_id"] = indication["efo_id"]
+            out["efo_id"] = efo_id
 
             if efo_id not in self.lookup_data.available_efos:
                 self.logger.warn("Unable to find %s", efo_id)
                 return None
-
 
             stored_efo = self.lookup_data.available_efos.get_efo(efo_id)
 
@@ -154,6 +153,8 @@ class DrugProcess(object):
 
             #get full URI from our EFO index
             out["efo_uri"] = stored_efo["code"]
+
+            # TODO indication references
 
         return out
 
@@ -212,8 +213,8 @@ class DrugProcess(object):
             #add some information from the chembl source
             # TODO what if this is different from ensembl ?
             if "target_type" in target and target["target_type"] is not None:
-                #TODO check this can be lower cased
                 assert isinstance(target["target_type"], unicode)
+                #chembl stores them as all-caps, we want them to be pretty
                 out["target_type"] = target["target_type"].lower()
 
         else:
@@ -232,7 +233,6 @@ class DrugProcess(object):
         if "mechanism_refs" in mech and mech["mechanism_refs"] is not None:
             references = {}
             for ref in mech["mechanism_refs"]:
-                #TODO warn if one of these is missing
                 if "ref_type" in ref and ref["ref_type"] is not None \
                         and "ref_id" in ref and ref["ref_id"] is not None:
 
@@ -247,6 +247,9 @@ class DrugProcess(object):
                     if ref_type not in references:
                         references[ref_type] = set()
                     references[ref_type].add(ref_id)
+                else:
+                    # warn if one of these is missing
+                    self.logger.warn("missing ref_type and/or ref_id")
             
             for ref_type in references:
                 if "references" not in out:
@@ -471,6 +474,8 @@ class DrugProcess(object):
                 else:
                     drug["synonyms"] = [synonym]
 
+        # TODO add child prefered name as a synonym ?
+
         if "trade_names" in child_drug:
             for name in child_drug["trade_names"]:
                 if "trade_names" in drug:
@@ -496,7 +501,27 @@ class DrugProcess(object):
                 else:
                     drug["mechanisms_of_action"] = [mechanism]
 
+        if "max_clinical_trial_phase" in child_drug:
+            if "max_clinical_trial_phase" in drug:
+                #compare and take highest
+                if child_drug["max_clinical_trial_phase"] > drug["max_clinical_trial_phase"]:
+                    drug["max_clinical_trial_phase"] = child_drug["max_clinical_trial_phase"]
+            else:
+                #in child but not parent, add to parent
+                drug["max_clinical_trial_phase"] = child_drug["max_clinical_trial_phase"]
 
+        if "year_first_approved" in child_drug:
+            if "year_first_approved" in drug:
+                #compare and take lowest
+                if child_drug["year_first_approved"] < drug["year_first_approved"]:
+                    drug["year_first_approved"] = child_drug["year_first_approved"]
+            else:
+                #in child but not parent, add to parent
+                drug["year_first_approved"] = child_drug["year_first_approved"]
+
+        # TODO withdrawn_year and other withdrawn
+
+        # TODO black box warning
 
     def generate(self, es, redis_client):
 
