@@ -197,7 +197,7 @@ By default, the docker compose file will *not use a locally built image* because
 Docker-compose has the ability to layer multiple docker-compose.yml files together; by default, `docker-compose.override.yml` will be added to `docker-compose.yml`. This can be used to use an override to build the image locally i.e.:
 
 ```sh
-docker-compose run --rm -f docker-compose.yml -f docker-compose.dev.yml mrtarget --dry-run my-elasticsearch-prefix
+docker-compose run --rm -f docker-compose.yml -f docker-compose.override.yml mrtarget --dry-run my-elasticsearch-prefix
 ```
 
 This is done because overrides cannot remove previous values, so once a build directive has been specified it will always be used. Therefore, the build instruction must be outside of the default docker-compose.yml to support cases where the pipeline should be run but not built.
