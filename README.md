@@ -192,8 +192,6 @@ TODO: write me.
 
 Included in the repository is a `docker-compose.yml` file. This can be used by [docker-compose] (https://docs.docker.com/compose/) to orchestrate the relevant docker containers required to run the platform.
 
-By default, the docker compose file will *not use a locally built image* because it will download the latest image from [quay.io/opentargets/mrtarget](https://www.quay.io/repository/opentargets/mrtarget). So any changes made will not be applied by default.
-
 Docker-compose has the ability to layer multiple docker-compose.yml files together; by default, `docker-compose.override.yml` will be added to `docker-compose.yml`. This can be used to use an override to build the image locally i.e.:
 
 ```sh
