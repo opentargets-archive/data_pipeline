@@ -305,6 +305,10 @@ class DrugProcess(object):
                 #chembl stores them as all-caps, we want them to be pretty
                 out["target_type"] = target["target_type"].lower()
 
+            if "pref_name" in target and target["pref_name"] is not None:
+                assert isinstance(target["pref_name"], unicode)
+                out["target_name"] = target["pref_name"]
+
         else:
             # no target_chembl_id - should this be dropped?
             self.logger.warning("no target_chembl_id found")
@@ -317,6 +321,7 @@ class DrugProcess(object):
         if "mechanism_of_action" in mech and mech["mechanism_of_action"] is not None:
             assert isinstance(mech["mechanism_of_action"], unicode)
             out["description"] = mech["mechanism_of_action"]
+
 
         if "mechanism_refs" in mech and mech["mechanism_refs"] is not None:
             references = {}
