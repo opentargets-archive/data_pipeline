@@ -568,6 +568,9 @@
                   }
                 }
               },
+              "safety":  {
+                "type": "keyword"
+              },
               "uniprot_keywords": {
                 "type": "keyword"
               }
