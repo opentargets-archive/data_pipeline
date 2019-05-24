@@ -86,6 +86,23 @@ class Association(JSONSerializable):
     def set_id(self):
         self.id = '%s-%s' % (self.target['id'], self.disease['id'])
 
+    def _inject_safety_in_target(self, gene_obj):
+
+        if gene_obj:
+            # inject safety data from the gene into the assoc
+            safety_fields = ["pmid"]
+
+            if gene_obj.safety:
+                # we do have safety data
+                self.target['safety'] = copy.deepcopy(gene_obj.safety)
+
+                # build facet for the types
+                self.private['facets']['safety'] = []
+                for safety in gene_obj.safety:
+                    for cat in safety_fields:
+                        self.private['facets']['safety'].append(safety[cat])
+
+
     def _inject_tractability_in_target(self, gene_obj):
         def _create_facet(categories_dict):
             if isinstance(categories_dict, dict):
@@ -138,6 +155,8 @@ class Association(JSONSerializable):
         genes_info=ExtendedInfoGene(gene)
 
         self._inject_tractability_in_target(gene)
+
+        self._inject_safety_in_target(gene)
 
         '''collect data to use for free text search'''
         for el in ['geneid', 'name', 'symbol']:
@@ -489,7 +508,6 @@ class ScoringProcess():
         targets = self.get_targets(es)
 
         self.logger.info('setting up stages')
-
         #bake the arguments for the setup into function objects
         produce_evidence_local_init_baked = functools.partial(produce_evidence_local_init, 
             self.es_hosts, self.es_index_val_right,
