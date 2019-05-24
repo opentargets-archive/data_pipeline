@@ -101,13 +101,6 @@ $(LOG_PATH)/out.as.log : $(LOG_PATH)/out.val.log $(LOG_PATH)/out.hpa.log
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --as 2>&1 | tee $(LOG_PATH)/out.as.log
 
-.PHONY: association_qc
-association_qc: $(LOG_PATH)/out.qc.log
-
-$(LOG_PATH)/out.qc.log : $(LOG_PATH)/out.as.log
-	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --qc 2>&1 | tee $(LOG_PATH)/out.qc.log
-
 .PHONY: search_data
 search_data: $(LOG_PATH)/out.sea.log
 
@@ -129,15 +122,8 @@ $(LOG_PATH)/out.drg.log :
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --drg 2>&1 | tee $(LOG_PATH)/out.drg.log
 
-.PHONY: metrics
-metrics: $(LOG_PATH)/out.metric.log
-
-$(LOG_PATH)/out.metric.log : $(LOG_PATH)/out.as.log
-	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --metric 2>&1 | tee $(LOG_PATH)/out.metric.log
-
 .PHONY: all
-all: metrics relationship_data search_data association_qc drug_data
+all: relationship_data search_data drug_data
 
 # Utility targets
 # thanks to https://stackoverflow.com/a/15058900
@@ -145,7 +131,6 @@ all: metrics relationship_data search_data association_qc drug_data
 no_targets__:
 list:
 	@sh -c "$(MAKE) -p no_targets__ | awk -F':' '/^[a-zA-Z0-9][^\$$#\/\\t=]*:([^=]|$$)/ {split(\$$1,A,/ /);for(i in A)print A[i]}' | grep -v '__\$$' | sort"
-
 
 .PHONY: no_targets__ shell
 no_targets__:
