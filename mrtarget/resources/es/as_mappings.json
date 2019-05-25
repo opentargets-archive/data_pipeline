@@ -570,12 +570,7 @@
               },
               "safety": {
                 "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
+                "fielddata": true
               },
               "uniprot_keywords": {
                 "type": "keyword"
