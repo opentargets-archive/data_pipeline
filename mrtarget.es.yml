@@ -58,3 +58,8 @@ ddr:
   doc: relation
   mapping: mrtarget/resources/es/ddr_mappings.json
   setting: mrtarget/resources/es/ddr_settings.json
+drg:
+  name: master_drug-data
+  doc: drug
+  mapping: mrtarget/resources/es/drg_mappings.json
+  setting: mrtarget/resources/es/drg_settings.json

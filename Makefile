@@ -115,8 +115,15 @@ $(LOG_PATH)/out.ddr.log : $(LOG_PATH)/out.as.log
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --ddr 2>&1 | tee $(LOG_PATH)/out.ddr.log
 
+.PHONY: drug_data
+drug_data: $(LOG_PATH)/out.drg.log
+
+$(LOG_PATH)/out.drg.log : 
+	mkdir -p $(LOG_PATH)
+	$(MRTARGET_CMD) --drg 2>&1 | tee $(LOG_PATH)/out.drg.log
+
 .PHONY: all
-all: relationship_data search_data 
+all: relationship_data search_data drug_data
 
 # Utility targets
 # thanks to https://stackoverflow.com/a/15058900
@@ -124,7 +131,6 @@ all: relationship_data search_data
 no_targets__:
 list:
 	@sh -c "$(MAKE) -p no_targets__ | awk -F':' '/^[a-zA-Z0-9][^\$$#\/\\t=]*:([^=]|$$)/ {split(\$$1,A,/ /);for(i in A)print A[i]}' | grep -v '__\$$' | sort"
-
 
 .PHONY: no_targets__ shell
 no_targets__:

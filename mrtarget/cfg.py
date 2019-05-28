@@ -153,6 +153,13 @@ def setup_ops_parser():
     p.add("--ddr-queue-write", help="size of relation writer queue (in chunks)",
         env_var="DDR_QUEUE_WRITE", action='store', default=8, type=int)
 
+    # if 0 use main thread for writing
+    # if >0 use that many threads for writing
+    p.add("--drg-workers-writer", help="# of procs for drug writers",
+        env_var="DRG_WORKERS_WRITER", action='store', default=4, type=int)
+    p.add("--drg-queue-write", help="size of drug writer queue (in chunks)",
+        env_var="DRG_QUEUE_WRITE", action='store', default=8, type=int)
+
     # for debugging
     p.add("--dry-run", help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
         action='store_true', default=False)
@@ -198,6 +205,10 @@ def setup_ops_parser():
     # additional information to add
     p.add("--ddr", help="compute data driven t2t and d2d relations, store in elasticsearch",
         action="store_true")
+    p.add("--drg", help="process drugs, store in elasticsearch",
+        action="store_true")
+
+
 
     return p
 

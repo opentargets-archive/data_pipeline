@@ -3,7 +3,7 @@ import logging
 
 import itertools
 import shelve
-import dumbdbm
+import dbm
 import tempfile
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import Match
@@ -13,7 +13,7 @@ import simplejson as json
 
 class ChEMBLLookup(object):
     def __init__(self, target_uri, mechanism_uri, component_uri, protein_uri, 
-            molecule_set_uri_pattern):
+            molecule_uri):
         super(ChEMBLLookup, self).__init__()
         self._logger = logging.getLogger(__name__)
         
@@ -22,7 +22,7 @@ class ChEMBLLookup(object):
         self.mechanism_uri = mechanism_uri
         self.component_uri = component_uri
         self.protein_uri = protein_uri
-        self.molecule_set_uri_pattern = molecule_set_uri_pattern
+        self.molecule_uri = molecule_uri
 
         self.protein_class = dict()
         self.target_component = dict()
@@ -37,19 +37,24 @@ class ChEMBLLookup(object):
         self.protein_class_label_to_id = {}
         self.molecules_dict = self.populate_molecules_dict()
 
+    '''
+    Internal function to populate a dictionary like object on creation
+    '''
     def populate_molecules_dict(self):
-        self._logger.debug('ChEMBL getting Molecule from ' + self.molecule_set_uri_pattern)
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
         t_filename = tempfile.NamedTemporaryFile(delete=False).name
-        dumb_dict = dumbdbm.open(t_filename)
+        dumb_dict = dbm.open(t_filename, 'n')
         shelve_out = shelve.Shelf(dict=dumb_dict)
-        with URLZSource(self.molecule_set_uri_pattern).open() as f_obj:
-            for line in f_obj:
-                mol = json.loads(line)
-                shelve_out[str(mol["molecule_chembl_id"])] = mol
+        for uri in self.molecule_uri:
+            self._logger.debug('ChEMBL getting Molecule from %s', uri)
+            with URLZSource(uri).open() as f_obj:
+                for line in f_obj:
+                    #TODO handle malformed JSON lines better
+                    mol = json.loads(line)
+                    shelve_out[str(mol["molecule_chembl_id"])] = mol
 
-        self._logger.debug('ChEMBL Molecule loading done. ')
+        self._logger.debug('ChEMBL Molecule loading done.')
         return shelve_out
 
 
@@ -59,27 +64,29 @@ class ChEMBLLookup(object):
 
         '''fetches all the targets from chembl and store their data and a mapping to uniprot id'''
 
-        with URLZSource(self.target_uri).open() as f_obj:
-            for line in f_obj:
-                i = json.loads(line)
-                if 'target_components' in i and \
-                        i['target_components'] and \
-                        'accession' in i['target_components'][0] and \
-                        i['target_components'][0]['accession']:
-                    uniprot_id = i['target_components'][0]['accession']
-                    self.targets[uniprot_id] = i
-                    self.uni2chembl[uniprot_id] = i['target_chembl_id']
+        for uri in self.target_uri:
+            with URLZSource(uri).open() as f_obj:
+                for line in f_obj:
+                    i = json.loads(line)
+                    if 'target_components' in i and \
+                            i['target_components'] and \
+                            'accession' in i['target_components'][0] and \
+                            i['target_components'][0]['accession']:
+                        uniprot_id = i['target_components'][0]['accession']
+                        self.targets[uniprot_id] = i
+                        self.uni2chembl[uniprot_id] = i['target_chembl_id']
 
         allowed_target_chembl_ids = set(self.uni2chembl.values())
-        with URLZSource(self.mechanism_uri).open() as f_obj:
-            for line in f_obj:
-                i = json.loads(line)
-                self.mechanisms[i['record_id']] = i
-                target_id = i['target_chembl_id']
-                if target_id in allowed_target_chembl_ids:
-                    if target_id not in self.target2molecule:
-                        self.target2molecule[target_id] = set()
-                    self.target2molecule[target_id].add(i['molecule_chembl_id'])
+        for uri in self.mechanism_uri:
+            with URLZSource(uri).open() as f_obj:
+                for line in f_obj:
+                    i = json.loads(line)
+                    self.mechanisms[i['record_id']] = i
+                    target_id = i['target_chembl_id']
+                    if target_id in allowed_target_chembl_ids:
+                        if target_id not in self.target2molecule:
+                            self.target2molecule[target_id] = set()
+                        self.target2molecule[target_id].add(i['molecule_chembl_id'])
 
         required_molecules = set()
         self._logger.info('chembl t2m mols')
@@ -96,21 +103,22 @@ class ChEMBLLookup(object):
     def download_protein_classification(self):
         '''fetches targets components from chembls and inject the target class data in self.protein_classification'''
 
-        with URLZSource(self.protein_uri).open() as f_obj:
-            for line in f_obj:
-                i = json.loads(line)
-                protein_class_id = i.pop('protein_class_id')
-                protein_class_data = dict((k, dict(label=v, id='')) for k, v in i.items() if v)  # remove values with none
-                self.protein_class[protein_class_id] = protein_class_data
+        for uri in self.protein_uri:
+            with URLZSource(uri).open() as f_obj:
+                for line in f_obj:
+                    i = json.loads(line)
+                    protein_class_id = i.pop('protein_class_id')
+                    protein_class_data = dict((k, dict(label=v, id='')) for k, v in i.items() if v)  # remove values with none
+                    self.protein_class[protein_class_id] = protein_class_data
 
-                max_level = 0
-                label = ''
-                for k, v in protein_class_data.items():
-                    level = int(k[1])
-                    if level >= max_level:
-                        max_level = level
-                        label = v['label']
-                self.protein_class_label_to_id[label] = protein_class_id
+                    max_level = 0
+                    label = ''
+                    for k, v in protein_class_data.items():
+                        level = int(k[1])
+                        if level >= max_level:
+                            max_level = level
+                            label = v['label']
+                    self.protein_class_label_to_id[label] = protein_class_id
 
         '''inject missing ids'''
         for k, v in self.protein_class.items():
@@ -119,15 +127,16 @@ class ChEMBLLookup(object):
                 if label in self.protein_class_label_to_id:
                     data['id'] = self.protein_class_label_to_id[label]
 
-        with URLZSource(self.component_uri).open() as f_obj:
-            for line in f_obj:
-                i = json.loads(line)
-                if 'accession' in i:
-                    if i['accession'] not in self.protein_classification:
-                        self.protein_classification[i['accession']] = []
-                    for classification in i['protein_classifications']:
-                        protein_class_id = classification['protein_classification_id']
-                        self.protein_classification[i['accession']].append(self.protein_class[protein_class_id])
+        for uri in self.component_uri:
+            with URLZSource(uri).open() as f_obj:
+                for line in f_obj:
+                    i = json.loads(line)
+                    if 'accession' in i:
+                        if i['accession'] not in self.protein_classification:
+                            self.protein_classification[i['accession']] = []
+                        for classification in i['protein_classifications']:
+                            protein_class_id = classification['protein_classification_id']
+                            self.protein_classification[i['accession']].append(self.protein_class[protein_class_id])
 
     def get_molecules_from_evidence(self, es, index):
 
