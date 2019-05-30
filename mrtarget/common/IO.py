@@ -6,13 +6,18 @@ import logging
 import os.path
 import requests as r
 import requests_file
-
+import mrtarget
+import pkg_resources as res
 from opentargets_urlzsource import URLZSource
-from mrtarget.common import urllify
 
 
-_l = logging.getLogger(__name__)
 
+def urllify(string_name):
+    """return a file:// urlified simple path to a file:// is :// is not contained in it"""
+    if '://' in string_name:
+        return string_name
+    else:
+        return 'file://'+os.path.abspath(string_name)
 
 def check_to_open(filename):
     """check if `filename` is a fetchable uri and returns True in the case is true False otherwise"""
@@ -23,13 +28,9 @@ def check_to_open(filename):
         f = r_session.get(url_name, stream=True)
         is_ok = True
 
-        #logging in child processess can lead to hung threads
-        # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/
-        #_l.debug("check to open uri %s", url_name)
         try:
             f.raise_for_status()
         except Exception as e:
-            _l.exception(e)
             is_ok = False
         finally:
             f.close()
@@ -46,9 +47,6 @@ def open_to_write(filename):
 
 def open_to_read(filename):
     """return an iterator from izip (filename, (enumerate(file_handle, start=1))"""
-    #logging in child processess can lead to hung threads
-    # see https://codewithoutrules.com/2018/09/04/python-multiprocessing/
-    #_l.debug('generate an iterator of (filename,enumerate) for filename %s', filename)
     it = more_itertools.with_iter(URLZSource(filename).open())
     return itertools.izip(itertools.cycle([filename]), enumerate(it, start=1))
 
@@ -62,8 +60,24 @@ def make_iter_lines(iterable_of_filenames, first_n=0):
 
     in_handles = itertools.imap(open_to_read, it)
 
-    _l.debug('create a iterable of lines from all file handles')
     it_lines = itertools.chain.from_iterable(itertools.ifilter(lambda e: e is not None, in_handles))
 
     return more_itertools.take(first_n, it_lines) \
         if first_n > 0 else it_lines
+
+
+def file_or_resource(fname):
+    '''get filename and check if in getcwd then get from
+    the package resources folder
+    '''
+    filename = os.path.expanduser(fname)
+
+    resource_package = mrtarget.__name__
+    resource_path = '/'.join(('resources', filename))
+
+    if filename is not None:
+        abs_filename = os.path.join(os.path.abspath(os.getcwd()), filename) \
+                       if not os.path.isabs(filename) else filename
+
+        return abs_filename if os.path.isfile(abs_filename) \
+            else res.resource_filename(resource_package, resource_path)

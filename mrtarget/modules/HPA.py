@@ -10,11 +10,12 @@ import pypeln.process as pr
 import petl
 import more_itertools
 from opentargets_urlzsource import URLZSource
+import elasticsearch
+from elasticsearch_dsl import Search
+from elasticsearch_dsl.query import MatchAll
 
-from mrtarget.common.ElasticsearchQuery import ESQuery, Loader
-
-from mrtarget.constants import Const
-from mrtarget.Settings import Config #TODO remove this eventually
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.connection import new_es_client
 from addict import Dict
 from mrtarget.common.DataStructure import JSONSerializable, json_serialize, PipelineEncoder
@@ -46,8 +47,6 @@ def reliability_from_text(key):
 class HPAExpression(Dict, JSONSerializable):
     def __init__(self, *args, **kwargs):
         super(HPAExpression, self).__init__(*args, **kwargs)
-        if 'data_release' not in self:
-            self.data_release = Config.RELEASE_VERSION
 
         if 'tissues' not in self:
             self.tissues = []
@@ -135,8 +134,7 @@ class HPAExpression(Dict, JSONSerializable):
 
 
 def format_expression(rec):
-    d = HPAExpression(gene=rec['gene'],
-                      data_release=Config.RELEASE_VERSION)
+    d = HPAExpression(gene=rec['gene'])
 
     # for each tissue
     for el in rec['data']:
@@ -171,8 +169,7 @@ def format_expression(rec):
 
 def format_expression_with_rna(rec):
     # get gene,result,data = rec
-    exp = HPAExpression(gene=rec['gene'],
-                        data_release=Config.RELEASE_VERSION)
+    exp = HPAExpression(gene=rec['gene'])
 
     if rec['result']:
         exp.update(rec['result'])
@@ -478,61 +475,57 @@ class HPADataDownloader():
 
         return t_join
 
+"""
+Generates elasticsearch action objects from the results iterator
 
-def write_on_start(es_hosts):
-    kwargs = {}
-    es_client = new_es_client(es_hosts)
-    kwargs['es_loader'] = Loader(es=es_client)
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(hpa_merged_table, dry_run, index, doc):
+    for entry in hpa_merged_table.data():
+        hpa = entry[0]
+        if not dry_run:
+            action = {}
+            action["_index"] = index
+            action["_type"] = doc
+            action["_id"] = hpa['gene']
+            #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
+            #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
+            action["_source"] = hpa
 
-    return kwargs
-
-def write_on_done(status, resources):
-    resources['es_loader'].flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-    resources['es_loader'].close()
-
-def write_to_elastic(data, resources):
-    hpa = data[0]
-    resources['es_loader'].put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-        Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-        ID=hpa['gene'], body=hpa)
-
-
+            yield action
 
 class HPAProcess():
-    def __init__(self, loader, r_server, 
-            es_hosts,
+    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
+            r_server, 
             tissue_translation_map_url, 
             tissue_curation_map_url,
             normal_tissue_url,
-            rna_level_url,
-            rna_value_url,
-            rna_zscore_url):
-        self.loader = loader
-        self.r_server = r_server
+            rna_level_url, rna_value_url, rna_zscore_url, 
+            workers_write, queue_write):
         self.es_hosts = es_hosts
+        self.es_index = es_index
+        self.es_doc = es_doc
+        self.es_mappings = es_mappings
+        self.es_settings = es_settings
+        self.r_server = r_server
+
+        self.workers_write = workers_write
+        self.queue_write = queue_write
+
         self.downloader = HPADataDownloader(tissue_translation_map_url, 
-            tissue_curation_map_url,
-            normal_tissue_url,
-            rna_level_url,
-            rna_value_url,
-            rna_zscore_url)
+            tissue_curation_map_url, normal_tissue_url,
+            rna_level_url, rna_value_url, rna_zscore_url)
         self.logger = logging.getLogger(__name__)
         self.hpa_normal_table = None
         self.hpa_rna_table = None
         self.hpa_merged_table = None
 
     def process_all(self, dry_run):
-        self.hpa_normal_table = self.process_normal_tissue()
-        self.hpa_rna_table = self.process_rna()
+        self.hpa_normal_table = self.downloader.retrieve_normal_tissue_data()
+        self.hpa_rna_table = self.downloader.retrieve_rna_data()
         self.hpa_merged_table = self.process_join()
 
         self.store_data(dry_run)
-
-    def process_normal_tissue(self):
-        return self.downloader.retrieve_normal_tissue_data()
-
-    def process_rna(self):
-        return self.downloader.retrieve_rna_data()
 
     def process_join(self):
         hpa_merged_table = (
@@ -549,33 +542,39 @@ class HPAProcess():
 
         self.logger.debug('calling to create new expression index')
 
-        #setup elasticsearch
-        if not dry_run:
-            self.loader.create_new_index(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-            #need to directly get the versioned index name for this function
-            self.loader.prepare_for_bulk_indexing(
-                self.loader.get_versioned_index(
-                    Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME))
+        with URLZSource(self.es_mappings).open() as mappings_file:
+            mappings = json.load(mappings_file)
+
+        with URLZSource(self.es_settings).open() as settings_file:
+            settings = json.load(settings_file)
+
+        es = new_es_client(self.es_hosts)
+        with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
   
-        self.logger.info('starting to write to elasticsearch') 
+            #write into elasticsearch
+            chunk_size = 1000 #TODO make configurable
+            actions = elasticsearch_actions(self.hpa_merged_table, dry_run, self.es_index, self.es_doc)
+            failcount = 0
 
-
-        for entry in self.hpa_merged_table.data():
-            hpa = entry[0]
             if not dry_run:
-                self.loader.put(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME,
-                    Const.ELASTICSEARCH_EXPRESSION_DOC_NAME,
-                    ID=hpa['gene'], body=hpa)
-            
+                results = None
+                if self.workers_write > 0:
+                    results = elasticsearch.helpers.parallel_bulk(es, actions,
+                            thread_count=self.workers_write,
+                            queue_size=self.queue_write, 
+                            chunk_size=chunk_size)
+                else:
+                    results = elasticsearch.helpers.streaming_bulk(es, actions,
+                            chunk_size=chunk_size)
+                for success, details in results:
+                    if not success:
+                        failcount += 1
 
-        #cleanup elasticsearch
-        if not dry_run:
-            self.loader.flush_all_and_wait(Const.ELASTICSEARCH_EXPRESSION_INDEX_NAME)
-            #restore old pre-load settings
-            #note this automatically does all prepared indexes
-            self.loader.restore_after_bulk_indexing()
+                if failcount:
+                    raise RuntimeError("%s relations failed to index" % failcount)
         
-        self.logger.info('all expressions objects pushed to elasticsearch')
+        if failcount:
+            raise RuntimeError("%s failed to index" % failcount)
 
         self.logger.info('missing tissues %s', str(_missing_tissues))
 
@@ -584,13 +583,13 @@ class HPAProcess():
     Run a series of QC tests on EFO elasticsearch index. Returns a dictionary
     of string test names and result objects
     """
-    def qc(self, esquery):
+    def qc(self, es, index):
         self.logger.info("Starting QC")
 
         #number of hpa entries
         hpa_count = 0
         #Note: try to avoid doing this more than once!
-        for hpa_entry in esquery.get_all_hpa():
+        for hpa_entry in Search().using(es).index(index).query(MatchAll()).scan():
             hpa_count += 1
 
         #put the metrics into a single dict

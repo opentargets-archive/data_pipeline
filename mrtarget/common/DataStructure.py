@@ -3,8 +3,6 @@ from UserDict import UserDict
 
 from datetime import datetime, date
 
-from mrtarget.Settings import Config
-
 
 
 class PipelineEncoder(json.JSONEncoder):

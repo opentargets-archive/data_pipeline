@@ -6,7 +6,6 @@ import simplejson as json
 from collections import Counter
 
 import jsonpickle
-from mrtarget.common import require_all
 from mrtarget.common.connection import new_redis_client
 jsonpickle.set_preferred_backend('simplejson')
 import logging
@@ -17,16 +16,12 @@ import numpy as np
 import cProfile
 np.seterr(divide='warn', invalid='warn')
 
-from mrtarget.Settings import Config
-
 try:
     import cPickle as pickle
 except ImportError:
     import pickle
 import time
 from multiprocessing import Process, current_process
-
-logger = logging.getLogger(__name__)
 
 import signal
 
@@ -74,7 +69,9 @@ class RedisLookupTable(object):
         self.r_server = new_redis_client() if not r_server else r_server
         self.default_ttl = ttl
 
-        require_all(self.r_server is not None)
+        if self.r_server is None:
+            raise RuntimeError("r_server must not be None")
+
 
     def set(self, key, obj, r_server = None, ttl = None):
         self._get_r_server(r_server).setex(self._get_key_namespace(key),

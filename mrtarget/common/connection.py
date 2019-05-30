@@ -7,8 +7,6 @@ from elasticsearch import RequestsHttpConnection
 from redislite import Redis
 import redis.exceptions as redis_ex
 
-from mrtarget.Settings import Config
-
 # just one redis instance per app
 r_instance = {'instance': None}
 

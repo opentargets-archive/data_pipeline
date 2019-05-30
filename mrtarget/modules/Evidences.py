@@ -1,22 +1,30 @@
 import hashlib
 import logging
 import os
-import json
+import simplejson as json
 import pypeln.process as pr
 import addict
 import codecs
 import functools
 import itertools
 
+import elasticsearch
+
 import opentargets_validator.helpers
 import mrtarget.common.IO as IO
 
-from mrtarget.Settings import Config
-
+from mrtarget.common.connection import new_es_client
+from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
-from mrtarget.common.EvidencesHelpers import make_validated_evs_obj, reduce_tuple_with_sum, setup_writers
 from mrtarget.common.EvidenceString import EvidenceManager, Evidence
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from opentargets_urlzsource import URLZSource
+
+def make_validated_evs_obj(filename, hash, line, line_n, is_valid=False, explanation_type='', explanation_str='',
+                           target_id=None, efo_id=None, data_type=None, id=None):
+    return addict.Dict(is_valid=is_valid, explanation_type=explanation_type, explanation_str=explanation_str,
+                       target_id=target_id, efo_id=efo_id, data_type=data_type, id=id, line=line, line_n=line_n,
+                       filename=filename, hash=hash)
 
 
 def fix_and_score_evidence(validated_evs, datasources_to_datatypes, evidence_manager):
@@ -70,9 +78,7 @@ validation
 """
 def validation_on_start(luts, eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
-    logger = logging.getLogger(__name__ + '_' + str(os.getpid()))
-
-    logger.debug("called validate_evidence on_start from %s", str(os.getpid()))
+    logger = logging.getLogger(__name__)
 
     validator = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
 
@@ -264,13 +270,45 @@ def validate_evidence(line, logger, validator, luts, datasources_to_datatypes):
         validated_evs.explanation_str = str(e)
         return validated_evs, None
 
+"""
+Generates elasticsearch action objects from the results iterator
 
-def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
-        dry_run, output_folder,
-        num_workers, num_writers, max_queued_events, 
-        eco_scores_uri, schema_uri, es_hosts, excluded_biotypes, 
+Output suitable for use with elasticsearch.helpers 
+"""
+def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_invalid):
+    for line in lines:
+        (left, right) = line
+        if right is not None:
+            #valid
+            action = {}
+            action["_index"] = index_valid
+            action["_type"] = doc_valid
+            action["_id"] = right['hash']
+            action["_source"] = right['line']
+            #print("  valid %s" % action["_id"])
+            yield action
+        elif left is not None:
+            #invalid
+            action = {}
+            action["_index"] = index_invalid
+            action["_type"] = doc_invalid
+            action["_id"] = left['id']
+            action["_source"] = left
+            #print("invalid %s" % action["_id"])
+            yield action
+
+def process_evidences_pipeline(filenames, first_n, 
+        es_hosts, es_index_valid, es_index_invalid, es_doc_valid, es_doc_invalid, 
+        es_mappings_valid, es_mappings_invalid, 
+        es_settings_valid, es_settings_invalid, 
+        es_index_gene, es_index_eco, es_index_efo,
+        redis_client,
+        dry_run, workers_validation, queue_validation, workers_write, queue_write, 
+        eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
+
     logger = logging.getLogger(__name__)
+    es = new_es_client(es_hosts)
 
     if not filenames:
         logger.error('tried to run with no filenames at all')
@@ -289,9 +327,15 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     logger.info('start evidence processing pipeline')
 
     #load lookup tables
-    lookup_data = LookUpDataRetriever(es_client,
-        redis_client, [], 
-        ( LookUpDataType.TARGET, LookUpDataType.DISEASE,LookUpDataType.ECO)).lookup
+    lookup_data = LookUpDataRetriever(es, redis_client, 
+        ( 
+            LookUpDataType.TARGET, 
+            LookUpDataType.DISEASE, 
+            LookUpDataType.ECO 
+        ),
+        gene_index=es_index_gene,
+        eco_index=es_index_eco,
+        efo_index=es_index_efo).lookup
 
     #create a iterable of lines from all file handles
     evs = IO.make_iter_lines(checked_filenames, first_n)
@@ -300,32 +344,57 @@ def process_evidences_pipeline(filenames, first_n, es_client, redis_client,
     validation_on_start_baked = functools.partial(validation_on_start, 
         lookup_data, eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes)
 
-    writer_global_init, writer_local_init, writer_main, writer_local_shutdown, writer_global_shutdown = setup_writers(
-        dry_run, es_hosts, output_folder)
-    if writer_global_init:
-        writer_global_init()
-
     #here is the pipeline definition
     pl_stage = pr.map(process_evidence, evs, 
-        workers=num_workers, maxsize=max_queued_events,
+        workers=workers_validation, maxsize=queue_validation,
         on_start=validation_on_start_baked)
 
-    pl_stage = pr.map(writer_main, pl_stage, 
-        workers=num_writers, maxsize=max_queued_events,
-        on_start=writer_local_init,
-        on_done=writer_local_shutdown)
+    logger.info('stages created, running scoring and writing')
 
-    logger.info('run evidence processing pipeline')
-    results = reduce_tuple_with_sum(pr.to_iterable(pl_stage))
+    with URLZSource(es_mappings_valid).open() as mappings_file:
+        mappings_valid = json.load(mappings_file)
 
-    #perform any single-thread cleanup
-    if writer_global_shutdown:
-        writer_global_shutdown()
+    with URLZSource(es_mappings_invalid).open() as mappings_file:
+        mappings_invalid = json.load(mappings_file)
 
-    logger.info("results (failed: %s, succeed: %s)", results[0], results[1])
+    with URLZSource(es_settings_valid).open() as settings_file:
+        settings_valid = json.load(settings_file)
+
+    with URLZSource(es_settings_invalid).open() as settings_file:
+        settings_invalid = json.load(settings_file)
+
+    with ElasticsearchBulkIndexManager(es, es_index_valid, settings_valid, mappings_valid):
+        with ElasticsearchBulkIndexManager(es, es_index_invalid, settings_invalid, mappings_invalid):
+
+            #load into elasticsearch
+            chunk_size = 1000 #TODO make configurable
+            actions = elasticsearch_actions(pl_stage, 
+                es_index_valid, es_index_invalid, 
+                es_doc_valid, es_doc_invalid)
+            failcount = 0
+
+            if not dry_run:
+                results = None
+                if workers_write > 0:
+                    # this can silently crash ?
+                    results = elasticsearch.helpers.parallel_bulk(es, actions,
+                            thread_count=workers_write,
+                            queue_size=queue_write, 
+                            chunk_size=chunk_size)
+                else:
+                    results = elasticsearch.helpers.streaming_bulk(es, actions,
+                            chunk_size=chunk_size)
+                for success, details in results:
+                    if not success:
+                        failcount += 1
+
+                if failcount:
+                    raise RuntimeError("%s relations failed to index" % failcount)
+
+            logger.info('stages created, ran scoring and writing')
+
+
     if failed_filenames:
         raise RuntimeError('unable to handle %s', str(failed_filenames))
 
-    if not results[1]:
-        raise RuntimeError("No evidence was sucessful!")
 

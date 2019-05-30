@@ -1,5 +1,4 @@
 from yapsy.IPlugin import IPlugin
-from mrtarget.Settings import Config
 from opentargets_urlzsource import URLZSource
 import traceback
 import logging
@@ -111,8 +110,8 @@ BIOMARKER_DISEASE_MAPPINGS = {
     "Malignant_peripheral_nerve_sheat_tumor" : { 'label' : "Malignant peripheral nerve sheath tumor", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000760" },
     "Malignant_rhabdoid_tumor" : { 'label' : "Malignant rhabdoid tumour", 'url' : "http://www.ebi.ac.uk/efo/EFO_0005701" },
     "Megakaryoblastic_leukemia" : { 'label' : "Adult acute megakaryoblastic leukemia", 'url' : "http://www.ebi.ac.uk/efo/EFO_1001932" },
-    "Myelodisplasic_proliferative_syndrome" : { 'label' : "Myelodisplasic proliferative syndrome", 'url' : "" },
-    "Myelodisplasic_syndrome" : { 'label' : "Myelodisplasic syndrome", 'url' : "" },
+    "Myelodisplasic_proliferative_syndrome" : { 'label' : "Myelodysplastic proliferative syndrome", 'url' : "http://www.ebi.ac.uk/efo/EFO_1000388" },
+    "Myelodisplasic_syndrome" : { 'label' : "Myelodysplastic syndrome", 'url' : "http://www.ebi.ac.uk/efo/EFO_0000198" },
     "Neuroendocrine_tumor" : { 'label' : "Neuroendocrine tumor", 'url' : "http://www.ebi.ac.uk/efo/EFO_1001901" },
     "Non_small_cell_lung_cancer" : { 'label' : "Non-small cell lung cancer", 'url' : "http://www.ebi.ac.uk/efo/EFO_0003060" },
     "NUT_midline_carcinoma" : { 'label' : "NUT midline carcinoma", 'url' : "http://www.ebi.ac.uk/efo/EFO_0005783" },
@@ -149,20 +148,11 @@ class CancerBiomarkers(IPlugin):
     # Initiate CancerBiomarker object
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        self.loader = None
-        self.r_server = None
-        self.esquery = None
         self.ensembl_current = {}
         self.symbols = {}
         self.cancerbiomarkers = {}
 
-    def print_name(self):
-        self._logger.info("Cancer Biomarkers plugin")
-
-    def merge_data(self, genes, loader, r_server, data_config):
-
-        self.loader = loader
-        self.r_server = r_server
+    def merge_data(self, genes, es, r_server, data_config, es_config):
 
         try:
             # Parse cancer biomarker data into self.cancerbiomarkers

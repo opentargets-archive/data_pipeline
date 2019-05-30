@@ -22,6 +22,8 @@ Downloads and processes information into a local index for performance.
 #### `--gen` Target
 Downloads and processes information from various sources. Is built around a "plugin" structure. Constructs an Elasticsarch index containg most of the information about each Target within the platform.
 It requires `--rea` reactome, `--ens` Ensembl, and `--unic` Uniprot steps.
+Note: HGNC,Ensembl,Uniprot plugins should always be first, as they initialize the gene list used in other plugins.
+Note: Chembl is required by the `--sea` step below.
 #### `--efo` Disease
 Downloads and processes the Experimental Factor Ontology, as well as Human Phenotype Ontology
 and other sources. Constructs an Elasticsarch index containg the information about each Disease within the platform.
@@ -83,22 +85,23 @@ You can install Kibana in a variety of ways, including via [docker](https://www.
 
 Once Kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
 
-#### Configuration
+### Configuration
 
 The configuration of the pipeline can be spit into three aspects - Operations, Data, and Legacy
 
-##### Operations
+#### Operations
 Here the execution parameters of the pipeline can be controlled. For example, the address of the Elasticsearch server, use of an embedded Redis instance, number of worker threads, etc.
 
 It makes use of the [ConfigArgParse](https://pypi.org/project/ConfigArgParse/) library to allow these to be specified on the command line, environemnt varibale, or in a config file (in decreasing order of precendence). 
 
 See the default `mrtarget.ops.yml` file for detailed comments describing the avaliable options, or use the `--help` command line argument.
 
-##### Data
+#### Data
 These options describe how the data is to be processed. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. See the [OpenTargets blog](https://blog.opentargets.org/) for links to technical notes with the relevant file for each release. 
 
-##### Legacy
-This covers configuration that has not yet been updated to one of the options above. This might be becuase it is particularly tightly entwined within the rest of the codebase, or becuase there is little demand for it to be separated. It includes the files `mrtarget/Settings.py`, `mrtarget/constants.py`, and `mrtarget/ElasticsearchConfig.py`. Any changes to these settings typically require editing code files, though some may be modified via environment variables.
+#### Elasticsearch
+These options describe how Elasticsearch is to be configured. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. Default settings are included
+in the respository as they are specific to a particular version of the pipeline and are not expected to change substantially between releases.
 
 ### Execution
 
@@ -189,12 +192,10 @@ TODO: write me.
 
 Included in the repository is a `docker-compose.yml` file. This can be used by [docker-compose] (https://docs.docker.com/compose/) to orchestrate the relevant docker containers required to run the platform.
 
-By default, the docker compose file will *not use a locally built image* because it will download the latest image from [quay.io/opentargets/mrtarget](https://www.quay.io/repository/opentargets/mrtarget). So any changes made will not be applied by default.
-
 Docker-compose has the ability to layer multiple docker-compose.yml files together; by default, `docker-compose.override.yml` will be added to `docker-compose.yml`. This can be used to use an override to build the image locally i.e.:
 
 ```sh
-docker-compose run --rm -f docker-compose.yml -f docker-compose.dev.yml mrtarget --dry-run my-elasticsearch-prefix
+docker-compose run --rm -f docker-compose.yml -f docker-compose.override.yml mrtarget --dry-run my-elasticsearch-prefix
 ```
 
 This is done because overrides cannot remove previous values, so once a build directive has been specified it will always be used. Therefore, the build instruction must be outside of the default docker-compose.yml to support cases where the pipeline should be run but not built.

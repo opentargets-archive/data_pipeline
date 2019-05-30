@@ -1,7 +1,6 @@
 import logging
 from distutils.util import strtobool
 
-_l = logging.getLogger(__name__)
 
 class SaferCast(object):
     """
@@ -10,8 +9,7 @@ class SaferCast(object):
 
     This base class wraps the generalisation and common functions.
     """
-    @staticmethod
-    def _catch_with_fallback(func, value, fallback):
+    def _catch_with_fallback(self, func, value, fallback):
         """
         It executes func(value) wrapped by try catch finally if fallback is not None
 
@@ -26,7 +24,7 @@ class SaferCast(object):
             try:
                 v = func(value)
             except:
-                _l.warning("fallback '%s' was used as the str value to cast '%s' but caused an exception",
+                self._logger.warning("fallback '%s' was used as the str value to cast '%s' but caused an exception",
                            v, value)
                 pass
             finally:
@@ -47,7 +45,7 @@ class SaferCast(object):
 
         if callable(func):
             self._logger.debug("save callable object and set lambda for a later use")
-            self._fallback = lambda v: SaferCast._catch_with_fallback(func, v, with_fallback)
+            self._fallback = lambda v: self._catch_with_fallback(func, v, with_fallback)
 
         else:
             msg = "constructor parameter must be a callable, function or method (lambda included)"

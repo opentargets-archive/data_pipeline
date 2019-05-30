@@ -1,0 +1,109 @@
+{
+  "expression": {
+    "properties": {
+      "cancer": {
+        "type": "object"
+      },
+      "data_release": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "gene": {
+        "type": "keyword"
+      },
+      "subcellular_location": {
+        "type": "object"
+      },
+      "tissues": {
+        "properties": {
+          "anatomical_systems": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "efo_code": {
+            "type": "keyword"
+          },
+          "label": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "organs": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 256
+              }
+            }
+          },
+          "protein": {
+            "properties": {
+              "cell_type": {
+                "properties": {
+                  "level": {
+                    "type": "long"
+                  },
+                  "name": {
+                    "type": "text",
+                    "fields": {
+                      "keyword": {
+                        "type": "keyword",
+                        "ignore_above": 256
+                      }
+                    }
+                  },
+                  "reliability": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "level": {
+                "type": "long"
+              },
+              "reliability": {
+                "type": "boolean"
+              }
+            }
+          },
+          "rna": {
+            "properties": {
+              "level": {
+                "type": "long"
+              },
+              "unit": {
+                "type": "text",
+                "fields": {
+                  "keyword": {
+                    "type": "keyword",
+                    "ignore_above": 256
+                  }
+                }
+              },
+              "value": {
+                "type": "float"
+              },
+              "zscore": {
+                "type": "long"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

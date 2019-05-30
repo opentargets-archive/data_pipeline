@@ -7,8 +7,7 @@ from mrtarget.common.LookupTables import EFOLookUpTable
 from mrtarget.common.LookupTables import HPALookUpTable
 from mrtarget.common.LookupTables import GeneLookUpTable
 
-from mrtarget.Settings import Config, file_or_resource
-from mrtarget.common import require_all
+from mrtarget.common.IO import file_or_resource
 
 
 class LookUpData():
@@ -51,10 +50,13 @@ class LookUpDataRetriever(object):
     def __init__(self,
                  es,
                  r_server,
-                 targets,
                  data_types,
                  hpo_uri = None,
-                 mp_uri = None
+                 mp_uri = None,
+                 gene_index = None,
+                 eco_index = None,
+                 hpa_index = None,
+                 efo_index = None
                  ):
         self.es = es
         self.r_server = r_server
@@ -63,18 +65,20 @@ class LookUpDataRetriever(object):
 
         self._logger = logging.getLogger(__name__)
 
-        # TODO: run the steps in parallel to speedup loading times
         for dt in data_types:
             self._logger.info("get %s info"%dt)
             start_time = time.time()
             if dt == LookUpDataType.TARGET:
-                self._get_gene_info(targets, True)
+                self._get_gene_info(gene_index)
             elif dt == LookUpDataType.DISEASE:
-                self.lookup.available_efos = EFOLookUpTable(self.es, 'EFO_LOOKUP', self.r_server)
+                self.lookup.available_efos = EFOLookUpTable(self.es, 
+                    efo_index, 'EFO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.ECO:
-                self.lookup.available_ecos = ECOLookUpTable(self.es, 'ECO_LOOKUP', self.r_server)
+                self.lookup.available_ecos = ECOLookUpTable(self.es, 
+                    eco_index, 'ECO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.HPA:
-                self.lookup.available_hpa = HPALookUpTable(self.es, 'HPA_LOOKUP', self.r_server)
+                self.lookup.available_hpa = HPALookUpTable(self.es, 
+                    hpa_index, 'HPA_LOOKUP', self.r_server)
 
             self._logger.info("loaded %s in %ss" % (dt, str(int(time.time() - start_time))))
 
@@ -82,13 +86,9 @@ class LookUpDataRetriever(object):
         self.r_server = r_server
         self.lookup.set_r_server(r_server)
 
-    def _get_gene_info(self, targets=[], autoload = True):
+    def _get_gene_info(self, gene_index):
         self._logger.info('getting gene info')
-        self.lookup.available_genes = GeneLookUpTable(self.es,
-                                                      'GENE_LOOKUP',
-                                                      self.r_server,
-                                                      targets = targets,
-                                                      autoload = autoload)
+        self.lookup.available_genes = GeneLookUpTable(self.es, gene_index, 'GENE_LOOKUP', self.r_server)
         self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
         self._get_non_reference_gene_mappings()
 

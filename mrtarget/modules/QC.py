@@ -4,10 +4,6 @@ import csv
 import os.path
 from numbers import Number
 
-
-from mrtarget.common.ElasticsearchQuery import ESQuery
-from mrtarget.constants import Const
-
 class QCMetrics(object):
     def __init__(self):
         self.metrics = dict()

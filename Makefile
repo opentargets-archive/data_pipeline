@@ -53,7 +53,6 @@ uni: $(LOG_PATH)/out.uni.log
 $(LOG_PATH)/out.uni.log :
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --unic 2>&1 | tee $(LOG_PATH)/out.uni.log
-	sleep 60
 
 .PHONY: hpa
 hpa: $(LOG_PATH)/out.hpa.log
@@ -61,7 +60,6 @@ hpa: $(LOG_PATH)/out.hpa.log
 $(LOG_PATH)/out.hpa.log : 
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --hpa 2>&1 | tee $(LOG_PATH)/out.hpa.log
-	sleep 60
 
 .PHONY: efo
 efo: $(LOG_PATH)/out.efo.log
@@ -69,7 +67,6 @@ efo: $(LOG_PATH)/out.efo.log
 $(LOG_PATH)/out.efo.log : 
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --efo 2>&1 | tee $(LOG_PATH)/out.efo.log
-	sleep 60
 
 
 .PHONY: eco
@@ -78,7 +75,6 @@ eco: $(LOG_PATH)/out.eco.log
 $(LOG_PATH)/out.eco.log : 
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --eco 2>&1 | tee $(LOG_PATH)/out.eco.log
-	sleep 60
 
 
 .PHONY: base_gene
@@ -87,7 +83,6 @@ base_gene: $(LOG_PATH)/out.gen.log
 $(LOG_PATH)/out.gen.log : $(LOG_PATH)/out.rea.log $(LOG_PATH)/out.ens.log $(LOG_PATH)/out.uni.log
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --gen 2>&1 | tee $(LOG_PATH)/out.gen.log
-	sleep 60
 
 .PHONY: base
 base: base_gene efo eco hpa
@@ -98,7 +93,6 @@ validate_all : $(LOG_PATH)/out.val.log
 $(LOG_PATH)/out.val.log : $(LOG_PATH)/out.gen.log $(LOG_PATH)/out.efo.log $(LOG_PATH)/out.eco.log
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --val 2>&1 | tee $(LOG_PATH)/out.val.log
-	sleep 60
 
 .PHONY: association_scores
 association_scores: $(LOG_PATH)/out.as.log 
@@ -106,13 +100,6 @@ association_scores: $(LOG_PATH)/out.as.log
 $(LOG_PATH)/out.as.log : $(LOG_PATH)/out.val.log $(LOG_PATH)/out.hpa.log
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --as 2>&1 | tee $(LOG_PATH)/out.as.log
-
-.PHONY: association_qc
-association_qc: $(LOG_PATH)/out.qc.log
-
-$(LOG_PATH)/out.qc.log : $(LOG_PATH)/out.as.log
-	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --qc 2>&1 | tee $(LOG_PATH)/out.qc.log
 
 .PHONY: search_data
 search_data: $(LOG_PATH)/out.sea.log
@@ -128,15 +115,15 @@ $(LOG_PATH)/out.ddr.log : $(LOG_PATH)/out.as.log
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --ddr 2>&1 | tee $(LOG_PATH)/out.ddr.log
 
-.PHONY: metrics
-metrics: $(LOG_PATH)/out.metric.log
+.PHONY: drug_data
+drug_data: $(LOG_PATH)/out.drg.log
 
-$(LOG_PATH)/out.metric.log : $(LOG_PATH)/out.as.log
+$(LOG_PATH)/out.drg.log : 
 	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --metric 2>&1 | tee $(LOG_PATH)/out.metric.log
+	$(MRTARGET_CMD) --drg 2>&1 | tee $(LOG_PATH)/out.drg.log
 
 .PHONY: all
-all: metrics relationship_data search_data association_qc
+all: relationship_data search_data drug_data
 
 # Utility targets
 # thanks to https://stackoverflow.com/a/15058900
@@ -144,7 +131,6 @@ all: metrics relationship_data search_data association_qc
 no_targets__:
 list:
 	@sh -c "$(MAKE) -p no_targets__ | awk -F':' '/^[a-zA-Z0-9][^\$$#\/\\t=]*:([^=]|$$)/ {split(\$$1,A,/ /);for(i in A)print A[i]}' | grep -v '__\$$' | sort"
-
 
 .PHONY: no_targets__ shell
 no_targets__:

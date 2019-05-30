@@ -1,7 +1,6 @@
 import json
 import unittest
 
-from mrtarget.Settings import Config
 from mrtarget.common.DataStructure import JSONSerializable
 
 
