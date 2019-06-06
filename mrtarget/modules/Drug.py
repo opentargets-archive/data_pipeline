@@ -377,6 +377,9 @@ class DrugProcess(object):
             # note, not in chembl
             assert isinstance(mol["internal_compound"], bool), ident
             drug["internal_compound"] = mol["internal_compound"]
+        else:
+            #default to explicitly false 
+            drug["internal_compound"] = False
 
         if "molecule_type" in mol and mol["molecule_type"] is not None:
             #TODO format check
