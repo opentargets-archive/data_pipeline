@@ -75,7 +75,7 @@ class LookUpDataRetriever(object):
                     efo_index, 'EFO_LOOKUP', self.r_server)
             elif dt == LookUpDataType.ECO:
                 self.lookup.available_ecos = ECOLookUpTable(self.es, 
-                    eco_index, 'ECO_LOOKUP', self.r_server)
+                    eco_index)
             elif dt == LookUpDataType.HPA:
                 self.lookup.available_hpa = HPALookUpTable(self.es, 
                     hpa_index, 'HPA_LOOKUP', self.r_server)

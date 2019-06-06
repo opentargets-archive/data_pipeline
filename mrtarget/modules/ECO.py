@@ -27,18 +27,22 @@ class ECO(JSONSerializable):
                  path=[],
                  path_codes=[],
                  path_labels=[],
-                 # id_org=None,
                  ):
         self.code = code
         self.label = label
         self.path = path
         self.path_codes = path_codes
         self.path_labels = path_labels
-        # self.id_org = id_org
-
+        
     def get_id(self):
-        # return self.code
-        return ECOLookUpTable.get_ontology_code_from_url(self.code)
+        #note, this is not a guaranteed solution
+        #to do it properly, it has to be from the actual
+        #ontology file or from OLS API
+        if '/' in self.code:
+            return self.code.split('/')[-1]
+        else:
+            #assume already a short code
+            return self.code
 
 """
 Generates elasticsearch action objects from the results iterator
@@ -142,26 +146,3 @@ class EcoProcess():
         metrics["eco.count"] = eco_count
 
         return metrics
-
-
-ECO_SCORES_HEADERS = ["uri", "code", "score"]
-
-def load_eco_scores_table(filename, eco_lut_obj):
-    #logger has to be built inside the process when multiprocessing
-    logger = logging.getLogger(__name__)
-
-    table = {}
-    if check_to_open(filename):
-        with URLZSource(filename).open() as r_file:
-            for i, d in enumerate(csv.DictReader(r_file, fieldnames=ECO_SCORES_HEADERS, dialect='excel-tab'), start=1):
-                #lookup tables use short ids not full iri
-                eco_uri = d["uri"]
-                short_eco_code = ECOLookUpTable.get_ontology_code_from_url(eco_uri)
-                if short_eco_code in eco_lut_obj:
-                    table[eco_uri] = float(d["score"])
-                else:
-                    logger.error("eco uri '%s' from eco scores file at line %d is not part of the ECO LUT so not using it", eco_uri, i)
-    else:
-        logger.error("eco_scores file %s does not exist", filename)
-
-    return table
