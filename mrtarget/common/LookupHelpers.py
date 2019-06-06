@@ -78,7 +78,7 @@ class LookUpDataRetriever(object):
                     eco_index)
             elif dt == LookUpDataType.HPA:
                 self.lookup.available_hpa = HPALookUpTable(self.es, 
-                    hpa_index, 'HPA_LOOKUP', self.r_server)
+                    hpa_index)
 
             self._logger.info("loaded %s in %ss" % (dt, str(int(time.time() - start_time))))
 
