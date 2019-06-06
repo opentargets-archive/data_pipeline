@@ -15,7 +15,6 @@ import mrtarget.common.IO as IO
 
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
-from mrtarget.common.EvidenceJsonUtils import DatatStructureFlattener
 from mrtarget.common.EvidenceString import EvidenceManager, Evidence
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from opentargets_urlzsource import URLZSource
@@ -111,7 +110,8 @@ def validate_evidence(line, logger, validator, luts, datasources_to_datatypes):
 
         try:
             parsed_line = json.loads(decoded_line)
-            validated_evs['id'] = str(DatatStructureFlattener(parsed_line).get_hexdigest())
+            hash_line = hashlib.md5(json.dumps(parsed_line, sort_keys=True).encode("utf-8")).hexdigest()
+            validated_evs['id'] = str(hash_line)
         except Exception as e:
             validated_evs.explanation_type = 'unparseable_json'
             validated_evs['id'] = str(hashlib.md5(decoded_line).hexdigest())
@@ -172,8 +172,8 @@ def validate_evidence(line, logger, validator, luts, datasources_to_datatypes):
             validated_evs.efo_id = evidence_obj.disease.id
 
         # flatten but is it always valid unique_association_fields?
-        validated_evs.hash = \
-            DatatStructureFlattener(evidence_obj.unique_association_fields).get_hexdigest()
+        validated_evs.hash = hashlib.md5(json.dumps(evidence_obj.unique_association_fields, 
+            sort_keys=True).encode("utf-8")).hexdigest()
         evidence_obj['id'] = str(validated_evs.hash)
 
         disease_failed = False
