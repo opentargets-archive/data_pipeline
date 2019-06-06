@@ -397,8 +397,9 @@ def score_producer(data,
             # to fill from Redis cache lookup_data
             hpa_data = HPAExpression()
             try:
-                hpa_data.update(
-                    lookup_data.available_hpa.get_hpa(target, r_server))
+                hpa_index = lookup_data.available_hpa.get_hpa(target)
+                if hpa_index is not None:
+                    hpa_data.update(hpa_index)
             except KeyError:
                 pass
             except Exception as e:

@@ -10,50 +10,20 @@ class HPALookUpTable(object):
     """
 
     def __init__(self,
-                 es, index,
-                 namespace,
-                 r_server,
-                 ttl=(60 * 60 * 24 + 7)):
+                 es, index):
         self._es = es
-        self.r_server = r_server
         self._es_index = index
-        self._table = RedisLookupTablePickle(namespace=namespace,
-                                             r_server=self.r_server,
-                                             ttl=ttl)
         self._logger = logging.getLogger(__name__)
 
-        if self.r_server:
-            self._load_hpa_data(self.r_server)
-
-    def _load_hpa_data(self, r_server=None):
-        for el in Search().using(self._es).index(self._es_index).query(MatchAll()).scan():
-            el = el.to_dict()
-            self.set_hpa(el, r_server=self._get_r_server(r_server))
-
-    def get_hpa(self, idx, r_server=None):
-        return self._table.get(idx, r_server=self._get_r_server(r_server))
-
-    def set_hpa(self, hpa, r_server=None):
-        self._table.set(hpa['gene'], hpa,
-                r_server=self._get_r_server(r_server))
-
-    def get_available_hpa_ids(self, r_server=None):
-        return self._table.keys(self._get_r_server(r_server))
-
-    def __contains__(self, key, r_server=None):
-        return self._table.__contains__(key, r_server=self._get_r_server(r_server))
-
-    def __getitem__(self, key, r_server=None):
-        return self.get_hpa(key, r_server=self._get_r_server(r_server))
-
-    def __setitem__(self, key, value, r_server=None):
-        self._table.set(key, value, r_server=self._get_r_server(r_server))
-
-    def keys(self, r_server=None):
-        return self._table.keys(self._get_r_server(r_server))
-
-    def _get_r_server(self, r_server=None):
-        return r_server if r_server else self.r_server
+    def get_hpa(self, hpa_id):
+        response = Search().using(self._es).index(self._es_index).query(Match(_id=hpa_id))[0:1].execute()
+        if response.hits.total == 0:
+            #no hit, return None
+            return None
+        else:
+            #exactly one hit, return it
+            return response.hits[0].to_dict()
+        #can't have multiple hits, primary key!
 
 class GeneLookUpTable(object):
     """
