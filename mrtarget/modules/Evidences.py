@@ -40,7 +40,7 @@ def fix_and_score_evidence(validated_evs, datasources_to_datatypes, evidence_man
         datasource=fixed_ev.datasource)
     if is_valid:
         # add scoring to evidence string
-        fixed_ev.score_evidence(evidence_manager.score_modifiers)
+        fixed_ev.score_evidence()
 
         # extend data in evidencestring
         fixed_ev_ext = evidence_manager.get_extended_evidence(fixed_ev)

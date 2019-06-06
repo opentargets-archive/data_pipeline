@@ -8,10 +8,11 @@ import csv
 from mrtarget.common.DataStructure import JSONSerializable, PipelineEncoder
 from mrtarget.common.IO import check_to_open,file_or_resource
 from mrtarget.modules import GeneData
-from mrtarget.modules.ECO import ECO, load_eco_scores_table
+from mrtarget.modules.ECO import ECO
 from mrtarget.modules.EFO import EFO, get_ontology_code_from_url
 from mrtarget.modules.GeneData import Gene
 
+from opentargets_urlzsource import URLZSource
 
 class DataNormaliser(object):
     def __init__(self, min_value, max_value, old_min_value=0., old_max_value=1., cap=True):
@@ -128,14 +129,22 @@ class EvidenceManager():
         self.available_ecos = lookup_data.available_ecos
         self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
-        self._get_eco_scoring_values(self.available_ecos, eco_scores_uri)
+
+        #pre-load eco scores into memory
+        self.eco_scores = {}
+        with URLZSource(eco_scores_uri).open() as r_file:
+            for row in csv.DictReader(r_file, fieldnames=["uri", "code", "score"], 
+                    dialect='excel-tab'):
+                eco_uri = row["uri"]
+                self.eco_scores[eco_uri] = float(row["score"])
+
+
         self.uni_header = GeneData.UNI_ID_ORG_PREFIX
         self.ens_header = GeneData.ENS_ID_ORG_PREFIX
 
         self.excluded_biotypes = excluded_biotypes
         self.datasources_to_datatypes = datasources_to_datatypes
 
-        self._get_score_modifiers()
 
     # @do_profile()#follow=[])
     def fix_evidence(self, evidence):
@@ -503,7 +512,7 @@ class EvidenceManager():
     def _get_eco_obj(self, ecoid):
         try:
             eco = ECO(ecoid)
-            eco.load_json(self.available_ecos[ecoid])
+            eco.load_json(self.available_ecos.get_eco(ecoid))
             return eco
         except KeyError:
             return None
@@ -536,14 +545,6 @@ class EvidenceManager():
             ensemblid = EvidenceManager._map_to_reference_ensembl_gene(ensemblid, non_reference_genes) or ensemblid
         return ensemblid
 
-    def _get_eco_scoring_values(self, eco_lut_obj, eco_scores_uri):
-        self.eco_scores = load_eco_scores_table(
-            filename=eco_scores_uri, 
-            eco_lut_obj=eco_lut_obj)
-
-    #TODO remove this
-    def _get_score_modifiers(self):
-        self.score_modifiers = {}
 
 
 class Evidence(JSONSerializable):
@@ -571,7 +572,7 @@ class Evidence(JSONSerializable):
     def load_json(self, data):
         self.evidence = json.loads(data)
 
-    def score_evidence(self, modifiers={}):
+    def score_evidence(self):
         self.evidence['scores'] = dict(association_score=0.,
                                        )
         try:
@@ -672,11 +673,6 @@ class Evidence(JSONSerializable):
         except Exception as e:
             self.logger.error(
                 "Cannot score evidence %s of type %s. Error: %s" % (self.evidence['id'], self.evidence['type'], e))
-
-        # Apply rescaling to scores
-        if self.evidence['sourceID'] in modifiers:
-            self.evidence['scores']['association_score'] = modifiers[self.evidence['sourceID']](
-                self.evidence['scores']['association_score'])
 
     @staticmethod
     def _get_score_from_pvalue_linear(pvalue, range_min=1, range_max=1e-10, out_range_min=0., out_range_max=1.):
