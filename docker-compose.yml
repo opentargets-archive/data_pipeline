@@ -38,15 +38,6 @@ services:
     depends_on:
       - elasticsearch
 
-  redis:
-    image: redis
-    ports:
-      - 6379:6379
-    healthcheck:
-      test: ["CMD", "redis-cli", "PING"]
-      interval: 1s
-      timeout: 60s
-      retries: 60
     
   mrtarget:
     image: mrtarget:latest
@@ -54,11 +45,8 @@ services:
       context: ./
     depends_on:
       - elasticsearch
-      - redis
     environment:
       - ELASTICSEARCH_NODES=http://elasticsearch:9200
-      - CTTV_REDIS_REMOTE=true
-      - CTTV_REDIS_SERVER=redis:6379
     volumes:
       - ./log:/usr/src/app/log
       - ./json:/usr/src/app/json

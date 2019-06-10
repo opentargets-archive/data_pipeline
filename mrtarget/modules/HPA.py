@@ -496,7 +496,6 @@ def elasticsearch_actions(hpa_merged_table, dry_run, index, doc):
 
 class HPAProcess():
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
-            r_server, 
             tissue_translation_map_url, 
             tissue_curation_map_url,
             normal_tissue_url,
@@ -507,7 +506,6 @@ class HPAProcess():
         self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
-        self.r_server = r_server
 
         self.workers_write = workers_write
         self.queue_write = queue_write

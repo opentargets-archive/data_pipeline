@@ -249,8 +249,7 @@ class GeneManager():
     """
 
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, 
-            es_settings, r_server,
-            plugin_paths, plugin_order, 
+            es_settings, plugin_paths, plugin_order, 
             data_config, es_config,
             workers_write, queue_write):
 
@@ -259,7 +258,6 @@ class GeneManager():
         self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
-        self.r_server = r_server
         self.plugin_order = plugin_order
         self.data_config = data_config
         self.es_config = es_config
@@ -288,8 +286,10 @@ class GeneManager():
         #run the actual plugins
         for plugin_name in self.plugin_order:
             plugin = self.simplePluginManager.getPluginByName(plugin_name)
+
+            # TODO remove the former redis object from all plugins
             plugin.plugin_object.merge_data(self.genes, 
-                es, self.r_server, 
+                es, None, 
                 self.data_config, self.es_config)
 
         with URLZSource(self.es_mappings).open() as mappings_file:

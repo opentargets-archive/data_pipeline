@@ -12,31 +12,12 @@ from mrtarget.common.IO import file_or_resource
 
 class LookUpData():
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
-
         self.available_genes = None
         self.available_efos = None
         self.available_ecos = None
         self.available_hpa = None
-        self.uni2ens = None
         self.non_reference_genes = None
-
         self.mp_ontology = None
-
-    def set_r_server(self, r_server):
-        self.logger.debug('setting r_server to all lookup tables from external r_server')
-        if self.available_ecos:
-            self.available_ecos.r_server = r_server
-            self.available_ecos._table.set_r_server(r_server)
-        if self.available_efos:
-            self.available_efos.r_server = r_server
-            self.available_efos._table.set_r_server(r_server)
-        if self.available_hpa:
-            self.available_hpa.r_server = r_server
-            self.available_hpa._table.set_r_server(r_server)
-        if self.available_genes:
-            self.available_genes.r_server = r_server
-            self.available_genes._table.set_r_server(r_server)
 
 
 class LookUpDataType(object):
@@ -45,52 +26,32 @@ class LookUpDataType(object):
     ECO = 'eco'
     HPA = 'hpa'
 
-
 class LookUpDataRetriever(object):
     def __init__(self,
                  es,
-                 r_server,
                  data_types,
-                 hpo_uri = None,
-                 mp_uri = None,
                  gene_index = None,
                  eco_index = None,
                  hpa_index = None,
                  efo_index = None
                  ):
         self.es = es
-        self.r_server = r_server
 
         self.lookup = LookUpData()
 
         self._logger = logging.getLogger(__name__)
 
         for dt in data_types:
-            self._logger.info("get %s info"%dt)
-            start_time = time.time()
             if dt == LookUpDataType.TARGET:
-                self._get_gene_info(gene_index)
+                self.lookup.available_genes = GeneLookUpTable(self.es, gene_index)
+                self._get_non_reference_gene_mappings()
             elif dt == LookUpDataType.DISEASE:
-                self.lookup.available_efos = EFOLookUpTable(self.es, 
-                    efo_index, 'EFO_LOOKUP', self.r_server)
+                self.lookup.available_efos = EFOLookUpTable(self.es, efo_index)
             elif dt == LookUpDataType.ECO:
-                self.lookup.available_ecos = ECOLookUpTable(self.es, 
-                    eco_index)
+                self.lookup.available_ecos = ECOLookUpTable(self.es, eco_index)
             elif dt == LookUpDataType.HPA:
-                self.lookup.available_hpa = HPALookUpTable(self.es, 
-                    hpa_index)
+                self.lookup.available_hpa = HPALookUpTable(self.es, hpa_index)
 
-            self._logger.info("loaded %s in %ss" % (dt, str(int(time.time() - start_time))))
-
-    def set_r_server(self, r_server):
-        self.r_server = r_server
-        self.lookup.set_r_server(r_server)
-
-    def _get_gene_info(self, gene_index):
-        self._logger.info('getting gene info')
-        self.lookup.available_genes = GeneLookUpTable(self.es, gene_index, 'GENE_LOOKUP', self.r_server)
-        self.lookup.uni2ens = self.lookup.available_genes.uniprot2ensembl
-        self._get_non_reference_gene_mappings()
 
     def _get_non_reference_gene_mappings(self):
         self.lookup.non_reference_genes = {}

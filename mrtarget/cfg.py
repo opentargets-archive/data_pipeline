@@ -26,23 +26,14 @@ def setup_ops_parser():
         env_var="LOG_CONFIG", action='store', default='mrtarget/resources/logging.ini')
 
     # handle stage-specific QC
-    p.add("--qc-out", help="TSV file to write/update qc information")
-    p.add("--qc-in", help="TSV file to read qc information for comparison")
+    p.add("--qc-out", help="TSV file to write/update qc information",
+        env_var="QC_OUT")
+    p.add("--qc-in", help="TSV file to read qc information for comparison",
+        env_var="QC_IN")
     p.add("--qc-only", help="only run the qc and not the stage itself",
-        action="store_true", default=False)
+        env_var="QC_ONLY", action="store_true", default=False)
     p.add("--skip-qc", help="do not run the qc for this stage",
-        action="store_true", default=False)
-
-    # use an external redis rather than spawning one ourselves
-    p.add("--redis-remote", help="connect to a remote redis, instead of starting an embedded one",
-        action='store_true', default=False,
-        env_var='REDIS_REMOTE')
-    p.add("--redis-host", help="redis host",
-        action='store', default='localhost',
-        env_var='REDIS_HOST')
-    p.add("--redis-port", help="redis port",
-        action='store', default='6379',
-        env_var='REDIS_PORT')
+        env_var="SKIP_QC", action="store_true", default=False)
 
     # elasticsearch
     p.add("--elasticseach-nodes", help="elasticsearch host(s)",
@@ -220,12 +211,6 @@ def get_ops_args():
 
     #output all configuration values, useful for debugging
     p.print_values()
-
-    #WARNING
-    #this is a horrible hack and should be removed 
-    #once lookup and queues are handled better
-    mrtarget.common.connection.default_host = args.redis_host
-    mrtarget.common.connection.default_port = args.redis_port
 
     return args
 

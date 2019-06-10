@@ -38,19 +38,6 @@
 #skip running the qc
 #skip-qc: false
 
-
-
-#if this is true, an embedded redis will never be created
-#redis-remote: false
-
-#hostname of a remote redis to use
-#if using embedded redis, this should be localhost
-#redis-hostname: localhost
-
-#port to use for redis
-#redis-port: 6379
-
-
 #location of the elasticsearch nodes
 #multiple values can be specified as a list for use with a cluster
 #elasticseach-nodes: ["localhost:9200"]
