@@ -45,13 +45,13 @@ class GeneLookUpTable(object):
             Bool(should=[
                 Match(uniprot_id=uniprot_id),
                 Match(uniprot_accessions=uniprot_id)
-            ]))[0:1].execute()
+            ]))[0:1].source(includes=["ensembl_gene_id"]).execute()
         if response.hits.total == 0:
             #no hit, return None
             return None
         elif response.hits.total == 1:
             #exactly one hit, return it
-            return response.hits[0].to_dict()
+            return response.hits[0].ensembl_gene_id
         else:
             #more then one hit, throw error
             raise ValueError("Multiple genes with uniprot %s" %(uniprot_id))
