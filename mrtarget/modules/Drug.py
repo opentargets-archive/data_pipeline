@@ -279,8 +279,8 @@ class DrugProcess(object):
                     else:
                         # TODO only log each one once
                         self.logger.warning("Unrecognized target accession %s",target_accession)
-                        return None
-
+                        continue
+                        
                 gene = self.lookup_data.available_genes.get_gene(ensembl_id)
 
                 if "approved_name" in gene \
