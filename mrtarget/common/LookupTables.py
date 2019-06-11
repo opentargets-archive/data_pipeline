@@ -3,15 +3,12 @@ import logging
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import Match,Bool
 
-from cachetools import cached, LFUCache
-
 class HPALookUpTable(object):
 
     def __init__(self, es, index):
         self._es = es
         self._es_index = index
 
-#    @cached(cache=LFUCache(512))
     def get_hpa(self, hpa_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=hpa_id))[0:1].execute()
         if response.hits.total == 0:
@@ -28,7 +25,6 @@ class GeneLookUpTable(object):
         self._es = es
         self._es_index = es_index
 
-#    @cached(cache=LFUCache(512))
     def get_gene(self, gene_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].execute()
         if response.hits.total == 0:
@@ -39,7 +35,6 @@ class GeneLookUpTable(object):
             return response.hits[0].to_dict()
         #can't have multiple hits, primary key!
 
-#    @cached(cache=LFUCache(512))
     def get_uniprot2ensembl(self, uniprot_id):
         response = Search().using(self._es).index(self._es_index).query(
             Bool(should=[
@@ -56,7 +51,6 @@ class GeneLookUpTable(object):
             #more then one hit, throw error
             raise ValueError("Multiple genes with uniprot %s" %(uniprot_id))
 
-#    @cached(cache=LFUCache(512))
     def __contains__(self, gene_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].source(False).execute()
         if response.hits.total == 0:
@@ -72,7 +66,6 @@ class ECOLookUpTable(object):
         self._es = es
         self._es_index = es_index
 
-#    @cached(cache=LFUCache(512))
     def get_eco(self, eco_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=eco_id))[0:1].execute()
         return response.hits[0].to_dict()
@@ -94,7 +87,6 @@ class EFOLookUpTable(object):
             #assume already a short code
             return url
 
-#    @cached(cache=LFUCache(512))
     def get_efo(self, efo_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].execute()
         if response.hits.total == 0:
@@ -105,7 +97,6 @@ class EFOLookUpTable(object):
             return response.hits[0].to_dict()
         #can't have multiple hits, primary key!
 
-#    @cached(cache=LFUCache(512))
     def __contains__(self, efo_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].source(False).execute()
         if response.hits.total == 0:

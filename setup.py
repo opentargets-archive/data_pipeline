@@ -19,7 +19,6 @@ setup(name=p.__pkgname__, version=p.__version__,
 "future",
 "addict",
 "envparse", #TODO remove when migration to ConfigArgParse is complete
-"cachetools",
 "ConfigArgParse[yaml]",
 "elasticsearch-dsl>=5.0.0,<6.0.0",
 "networkx",
