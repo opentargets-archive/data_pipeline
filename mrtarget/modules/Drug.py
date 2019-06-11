@@ -266,6 +266,9 @@ class DrugProcess(object):
                 out_component = {}
                 assert "accession" in target_component                
                 target_accession = target_component["accession"]
+                if target_accession is None:
+                    self.logger.warning("skipping unaccessioned component in %s", target_id)
+                    continue
 
                 #at the end of this we need a valid ensembl id that we have in the gene index
                 ensembl_id = None
@@ -273,14 +276,21 @@ class DrugProcess(object):
                     ensembl_id = target_accession
                     out_component["ensembl"] = ensembl_id
                 else:
-                    ensembl_id = self.lookup_data.available_genes.get_uniprot2ensembl(target_accession)
+                    try:
+                        ensembl_id = self.lookup_data.available_genes.get_uniprot2ensembl(target_accession)
+                    except ValueError as e:
+                        #multiple ensembl ids per protein
+                        #log with a warning, and ignore
+                        self.logger.warning("multiple ensembl ids for uniprot id %s",target_accession)
+                        continue
+
                     if ensembl_id is not None:
                         out_component["ensembl"] = ensembl_id
                     else:
                         # TODO only log each one once
                         self.logger.warning("Unrecognized target accession %s",target_accession)
                         continue
-                        
+
                 gene = self.lookup_data.available_genes.get_gene(ensembl_id)
 
                 if "approved_name" in gene \

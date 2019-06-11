@@ -26,6 +26,7 @@ class GeneLookUpTable(object):
         self._es_index = es_index
 
     def get_gene(self, gene_id):
+        assert gene_id is not None
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].execute()
         if response.hits.total == 0:
             #no hit, return None
@@ -36,6 +37,7 @@ class GeneLookUpTable(object):
         #can't have multiple hits, primary key!
 
     def get_uniprot2ensembl(self, uniprot_id):
+        assert uniprot_id is not None
         response = Search().using(self._es).index(self._es_index).query(
             Bool(should=[
                 Match(uniprot_id=uniprot_id),
