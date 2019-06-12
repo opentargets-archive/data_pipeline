@@ -17,9 +17,6 @@ setup(name=p.__pkgname__, version=p.__version__,
       # unpinned dependencies
       install_requires=[
 "future",
-"redislite",
-#AF 15/11/18 transitive pinning to 2.x.x to solve AttributeError: 'UnixDomainSocketConnection' object has no attribute '_buffer_cutoff' 
-"redis<=2.10.6",
 "addict",
 "envparse", #TODO remove when migration to ConfigArgParse is complete
 "ConfigArgParse[yaml]",

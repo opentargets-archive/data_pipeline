@@ -127,7 +127,6 @@ class EvidenceManager():
         self.available_genes = lookup_data.available_genes
         self.available_efos = lookup_data.available_efos
         self.available_ecos = lookup_data.available_ecos
-        self.uni2ens = lookup_data.uni2ens
         self.non_reference_genes = lookup_data.non_reference_genes
 
         #pre-load eco scores into memory
@@ -221,11 +220,7 @@ class EvidenceManager():
                 self.logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
         # Remove identifiers.org from genes and map to ensembl ids
-        self.fix_target_id(evidence,
-                                      self.uni2ens,
-                                      self.available_genes,
-                                      self.non_reference_genes
-                                      )
+        self.fix_target_id(evidence, self.available_genes, self.non_reference_genes )
 
         # Remove identifiers.org from cttv activity  and target type ids
         if 'target_type' in evidence['target']:
@@ -267,7 +262,7 @@ class EvidenceManager():
 
         return Evidence(evidence,self.datasources_to_datatypes), fixed
 
-    def normalise_target_id(self, evidence, uni2ens, available_genes,non_reference_genes ):
+    def normalise_target_id(self, evidence, available_genes,non_reference_genes ):
 
         target_id = evidence['target']['id']
         new_target_id = None
@@ -277,7 +272,7 @@ class EvidenceManager():
                 if '-' in target_id:
                     target_id = target_id.split('-')[0]
                 uniprotid = target_id.split(GeneData.UNI_ID_ORG_PREFIX)[1].strip()
-                ensemblid = uni2ens[uniprotid]
+                ensemblid = available_genes.get_uniprot2ensemb(uniprotid)
                 new_target_id = self.get_reference_ensembl_id(ensemblid,
                                                                          available_genes=available_genes,
                                                                          non_reference_genes=non_reference_genes)
@@ -298,20 +293,18 @@ class EvidenceManager():
     def is_excluded_by_biotype(self, datasource, gene_id):
         is_excluded = False
         if datasource in self.excluded_biotypes:
-            gene_obj = self.available_genes[gene_id]
+            gene_obj = self.available_genes.get_gene(gene_id)
             if gene_obj['biotype'] in self.excluded_biotypes[datasource]:
                 is_excluded = True
 
         return is_excluded
 
-    def fix_target_id(self, evidence,uni2ens, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
+    def fix_target_id(self, evidence, available_genes, non_reference_genes, logger=logging.getLogger(__name__)) :
         target_id = evidence['target']['id']
 
         try:
-            new_target_id, id_not_in_ensembl = self.normalise_target_id(evidence,
-                                                                                   uni2ens,
-                                                                                   available_genes,
-                                                                                   non_reference_genes)
+            new_target_id, id_not_in_ensembl = self.normalise_target_id(
+                evidence, available_genes, non_reference_genes)
         except KeyError:
             self.logger.error("cannot find an ensembl ID for: %s" % target_id)
             id_not_in_ensembl = True
@@ -501,12 +494,12 @@ class EvidenceManager():
 
     def _get_gene_obj(self, geneid):
         gene = Gene(geneid)
-        gene.load_json(self.available_genes[geneid])
+        gene.load_json(self.available_genes.get_gene(geneid))
         return gene
 
     def _get_efo_obj(self, efoid):
         efo = EFO(efoid)
-        efo.load_json(self.available_efos[efoid])
+        efo.load_json(self.available_efos.get_efo(efoid))
         return efo
 
     def _get_eco_obj(self, ecoid):

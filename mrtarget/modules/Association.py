@@ -9,7 +9,7 @@ from collections import defaultdict
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.DataStructure import JSONSerializable
-from mrtarget.common.connection import new_es_client, new_redis_client
+from mrtarget.common.connection import new_es_client
 from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
 from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer
 from mrtarget.modules.EFO import EFO
@@ -368,18 +368,24 @@ def produce_evidence(target, es, es_index_val_right,
 
     return return_values
 
-def score_producer_local_init(redis_host, redis_port, 
-        lookup_data, datasources_to_datatypes, dry_run):
-
-    #set the R server to lookup into
-    r_server = new_redis_client(redis_host, redis_port)
-
+def score_producer_local_init(datasources_to_datatypes, dry_run, es_hosts,
+        es_index_gene, es_index_eco, es_index_hpa, es_index_efo):
     scorer = Scorer()
-
-    return scorer, r_server, lookup_data, datasources_to_datatypes, dry_run
+    lookup_data = LookUpDataRetriever(new_es_client(es_hosts), 
+        (
+            LookUpDataType.DISEASE,
+            LookUpDataType.TARGET,
+            LookUpDataType.ECO,
+            LookUpDataType.HPA
+        ),
+        gene_index=es_index_gene,
+        eco_index=es_index_eco,
+        hpa_index=es_index_hpa,
+        efo_index=es_index_efo).lookup
+    return scorer, lookup_data, datasources_to_datatypes, dry_run
 
 def score_producer(data, 
-        scorer, r_server, lookup_data, datasources_to_datatypes, dry_run):
+        scorer, lookup_data, datasources_to_datatypes, dry_run):
     target, disease, evidence, is_direct = data
 
     if evidence:
@@ -389,12 +395,12 @@ def score_producer(data,
         if score: 
 
             gene_data = Gene()
-            gene_data.load_json(
-                lookup_data.available_genes.get_gene(target, r_server))
+            gene_data_index = lookup_data.available_genes.get_gene(target)
+            if gene_data_index != None:
+                gene_data.load_json(gene_data_index)
             score.set_target_data(gene_data)
 
             # create a hpa expression empty jsonserializable class
-            # to fill from Redis cache lookup_data
             hpa_data = HPAExpression()
             try:
                 hpa_index = lookup_data.available_hpa.get_hpa(target)
@@ -414,7 +420,7 @@ def score_producer(data,
 
             disease_data = EFO()
             disease_data.load_json(
-                lookup_data.available_efos.get_efo(disease, r_server))
+                lookup_data.available_efos.get_efo(disease))
 
             score.set_disease_data(disease_data)
 
@@ -432,7 +438,6 @@ class ScoringProcess():
 
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
             es_index_gene, es_index_eco, es_index_val_right, es_index_hpa, es_index_efo,
-            redis_host, redis_port, 
             workers_write, workers_production, workers_score, 
             queue_score, queue_produce, queue_write, 
             scoring_weights, is_direct_do_not_propagate,
@@ -451,9 +456,6 @@ class ScoringProcess():
         self.es_index_hpa = es_index_hpa
         self.es_index_efo = es_index_efo
 
-        self.redis_host = redis_host
-        self.redis_port = redis_port
-        self.r_server = new_redis_client(self.redis_host, self.redis_port)
         self.workers_write = workers_write
         self.workers_production = workers_production
         self.workers_score = workers_score
@@ -470,22 +472,10 @@ class ScoringProcess():
         for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).scan():
             yield str(target.meta.id)
 
-    def process_all(self, dry_run, 
-            ):
+    def process_all(self, dry_run):
 
+        # do not pass this es object to other processess, single process only!
         es = new_es_client(self.es_hosts)
-
-        lookup_data = LookUpDataRetriever(es, self.r_server,
-            (
-                LookUpDataType.DISEASE,
-                LookUpDataType.TARGET,
-                LookUpDataType.ECO,
-                LookUpDataType.HPA
-            ),
-            gene_index=self.es_index_gene,
-            eco_index=self.es_index_eco,
-            hpa_index=self.es_index_hpa,
-            efo_index=self.es_index_efo).lookup
 
         targets = self.get_targets(es)
 
@@ -496,9 +486,9 @@ class ScoringProcess():
             self.es_hosts, self.es_index_val_right,
             self.scoring_weights, self.is_direct_do_not_propagate, 
             self.datasources_to_datatypes)
-        score_producer_local_init_baked = functools.partial(score_producer_local_init, 
-            self.redis_host, self.redis_port, lookup_data, self.datasources_to_datatypes, 
-            dry_run)
+        score_producer_local_init_baked = functools.partial(score_producer_local_init,
+            self.datasources_to_datatypes, dry_run, self.es_hosts,
+            self.es_index_gene, self.es_index_eco, self.es_index_hpa, self.es_index_efo)
         
         #pipeline stage for making the lists of the target/disease pairs and evidence
         pipeline_stage1 = pr.flat_map(produce_evidence, targets, 
@@ -518,9 +508,7 @@ class ScoringProcess():
 
         with URLZSource(self.es_settings).open() as settings_file:
             settings = json.load(settings_file)
-
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
-
             #load into elasticsearch
             self.logger.info('stages created, running scoring and writing')
             client = es
@@ -532,11 +520,13 @@ class ScoringProcess():
             if not dry_run:
                 results = None
                 if self.workers_write > 0:
+                    self.logger.debug("Using parallel bulk writer for Elasticearch")
                     results = elasticsearch.helpers.parallel_bulk(client, actions,
                             thread_count=self.workers_write,
                             queue_size=self.queue_write, 
                             chunk_size=chunk_size)
                 else:
+                    self.logger.debug("Using streaming bulk writer for Elasticearch")
                     results = elasticsearch.helpers.streaming_bulk(client, actions,
                             chunk_size=chunk_size)
                 for success, details in results:

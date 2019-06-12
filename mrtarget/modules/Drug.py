@@ -74,10 +74,10 @@ class DrugProcess(object):
 
         self.logger = logging.getLogger(__name__)
 
-    def process_all(self, dry_run, redis_client):
+    def process_all(self, dry_run):
         es = new_es_client(self.es_hosts)
 
-        drugs = self.generate(es, redis_client)
+        drugs = self.generate(es)
         self.store(es, dry_run, drugs)
 
 
@@ -266,22 +266,32 @@ class DrugProcess(object):
                 out_component = {}
                 assert "accession" in target_component                
                 target_accession = target_component["accession"]
+                if target_accession is None:
+                    self.logger.warning("skipping unaccessioned component in %s", target_id)
+                    continue
 
                 #at the end of this we need a valid ensembl id that we have in the gene index
                 ensembl_id = None
                 if target_accession in self.lookup_data.available_genes:
                     ensembl_id = target_accession
                     out_component["ensembl"] = ensembl_id
-                elif target_accession in self.lookup_data.uni2ens:
-                    out_component["uniprot"] = target_accession
-                    ensembl_id = self.lookup_data.uni2ens[target_accession]
-                    out_component["ensembl"] = ensembl_id
                 else:
-                    # TODO only log each one once
-                    self.logger.warning("Unrecognized target accession %s",target_accession)
-                    return None
+                    try:
+                        ensembl_id = self.lookup_data.available_genes.get_uniprot2ensembl(target_accession)
+                    except ValueError as e:
+                        #multiple ensembl ids per protein
+                        #log with a warning, and ignore
+                        self.logger.warning("multiple ensembl ids for uniprot id %s",target_accession)
+                        continue
 
-                gene = self.lookup_data.available_genes[ensembl_id]
+                    if ensembl_id is not None:
+                        out_component["ensembl"] = ensembl_id
+                    else:
+                        # TODO only log each one once
+                        self.logger.warning("Unrecognized target accession %s",target_accession)
+                        continue
+
+                gene = self.lookup_data.available_genes.get_gene(ensembl_id)
 
                 if "approved_name" in gene \
                         and gene["approved_name"] is not None \
@@ -622,14 +632,14 @@ class DrugProcess(object):
 
         # TODO black box warning
 
-    def generate(self, es, redis_client):
+    def generate(self, es):
 
         # pre-load into indexed shelf dicts
 
         self.logger.info("Starting pre-loading")
 
         #create lookup tables
-        self.lookup_data = LookUpDataRetriever(es, redis_client, 
+        self.lookup_data = LookUpDataRetriever(es,  
             ( 
                 LookUpDataType.TARGET, 
                 LookUpDataType.DISEASE

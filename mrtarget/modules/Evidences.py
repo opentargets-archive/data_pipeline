@@ -75,18 +75,28 @@ def process_evidence(line, logger, validator, luts, datasources_to_datatypes, ev
 This function is called once in each child process to do local setup for 
 validation
 """
-def validation_on_start(luts, eco_scores_uri, schema_uri, excluded_biotypes, 
-        datasources_to_datatypes):
+def validation_on_start(eco_scores_uri, schema_uri, excluded_biotypes, 
+        datasources_to_datatypes, es_hosts, es_index_gene, es_index_eco, es_index_efo):
     logger = logging.getLogger(__name__)
 
     validator = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
 
-    luts = luts
+    lookup_data = LookUpDataRetriever(new_es_client(es_hosts), 
+    (
+        LookUpDataType.DISEASE,
+        LookUpDataType.TARGET,
+        LookUpDataType.ECO
+    ),
+    gene_index=es_index_gene,
+    eco_index=es_index_eco,
+    efo_index=es_index_efo).lookup
+
+
     datasources_to_datatypes = datasources_to_datatypes
-    evidence_manager = EvidenceManager(luts, eco_scores_uri, 
+    evidence_manager = EvidenceManager(lookup_data, eco_scores_uri, 
         excluded_biotypes, datasources_to_datatypes)
 
-    return logger, validator, luts, datasources_to_datatypes, evidence_manager
+    return logger, validator, lookup_data, datasources_to_datatypes, evidence_manager
 
 def validate_evidence(line, logger, validator, luts, datasources_to_datatypes):
     """this function is called once per line until number of lines is exhausted. 
@@ -181,7 +191,7 @@ def validate_evidence(line, logger, validator, luts, datasources_to_datatypes):
 
         if efo_id:
             # Check disease term or phenotype term
-            #redis/elasticsearch is based on short ontology id, not full iri
+            # elasticsearch is based on short ontology id, not full iri
             if '/' in efo_id:
                 short_efo_id = luts.available_efos.get_ontology_code_from_url(efo_id)
             else:
@@ -216,33 +226,30 @@ def validate_evidence(line, logger, validator, luts, datasources_to_datatypes):
 
             elif 'uniprot' in target_id:
                 uniprot_id = target_id.split('/')[-1]
-                if uniprot_id not in luts.uni2ens:
+                ensembl_id = luts.available_genes.get_uniprot2ensembl(uniprot_id)
+
+                if ensembl_id is None:
                     validated_evs.explanation_type = 'unknown_uniprot_entry'
                     validated_evs.explanation_str = uniprot_id
                     target_failed = True
 
-                elif not luts.uni2ens[uniprot_id]:
-                    validated_evs.explanation_type = 'missing_ensembl_xref_for_uniprot_entry'
-                    validated_evs.explanation_str = uniprot_id
-                    target_failed = True
-
-                elif (uniprot_id in luts.uni2ens) and \
-                        luts.uni2ens[uniprot_id] in luts.available_genes and \
-                        'is_reference' in luts.available_genes[luts.uni2ens[uniprot_id]] and \
-                        (not luts.available_genes[luts.uni2ens[uniprot_id]]['is_reference'] is True):
+                elif (ensembl_id is not None) and \
+                        ensembl_id in luts.available_genes and \
+                        'is_reference' in luts.available_genes.get_gene(ensembl_id) and \
+                        (not luts.available_genes.get_gene(ensembl_id)['is_reference'] is True):
                     validated_evs.explanation_type = 'nonref_ensembl_xref_for_uniprot_entry'
                     validated_evs.explanation_str = uniprot_id
                     target_failed = True
                 else:
                     try:
-                        reference_target_list = luts.available_genes[luts.uni2ens[uniprot_id]]['is_reference'] is True
+                        reference_target_list = luts.available_genes.get_gene(ensembl_id)['is_reference'] is True
                     except KeyError:
                         reference_target_list = []
 
                     if reference_target_list:
                         target_id = 'http://identifiers.org/ensembl/%s' % reference_target_list[0]
                     else:
-                        target_id =luts.uni2ens[uniprot_id]
+                        target_id = ensembl_id
                     if target_id is None:
                         validated_evs.explanation_type = 'missing_target_id_for_protein'
                         validated_evs.explanation_str = uniprot_id
@@ -302,12 +309,13 @@ def process_evidences_pipeline(filenames, first_n,
         es_mappings_valid, es_mappings_invalid, 
         es_settings_valid, es_settings_invalid, 
         es_index_gene, es_index_eco, es_index_efo,
-        redis_client,
         dry_run, workers_validation, queue_validation, workers_write, queue_write, 
         eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
 
     logger = logging.getLogger(__name__)
+
+    # do not pass this es object to other processess, single process only!
     es = new_es_client(es_hosts)
 
     if not filenames:
@@ -326,23 +334,13 @@ def process_evidences_pipeline(filenames, first_n,
 
     logger.info('start evidence processing pipeline')
 
-    #load lookup tables
-    lookup_data = LookUpDataRetriever(es, redis_client, 
-        ( 
-            LookUpDataType.TARGET, 
-            LookUpDataType.DISEASE, 
-            LookUpDataType.ECO 
-        ),
-        gene_index=es_index_gene,
-        eco_index=es_index_eco,
-        efo_index=es_index_efo).lookup
-
     #create a iterable of lines from all file handles
     evs = IO.make_iter_lines(checked_filenames, first_n)
 
     #create functions with pre-baked arguments
     validation_on_start_baked = functools.partial(validation_on_start, 
-        lookup_data, eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes)
+         eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes,
+         es_hosts, es_index_gene, es_index_eco, es_index_efo)
 
     #here is the pipeline definition
     pl_stage = pr.map(process_evidence, evs, 
@@ -363,9 +361,8 @@ def process_evidences_pipeline(filenames, first_n,
     with URLZSource(es_settings_invalid).open() as settings_file:
         settings_invalid = json.load(settings_file)
 
-    with ElasticsearchBulkIndexManager(es, es_index_valid, settings_valid, mappings_valid):
-        with ElasticsearchBulkIndexManager(es, es_index_invalid, settings_invalid, mappings_invalid):
-
+    with ElasticsearchBulkIndexManager(es, es_index_invalid, settings_invalid, mappings_invalid):
+        with ElasticsearchBulkIndexManager(es, es_index_valid, settings_valid, mappings_valid):
             #load into elasticsearch
             chunk_size = 1000 #TODO make configurable
             actions = elasticsearch_actions(pl_stage, 
@@ -376,14 +373,17 @@ def process_evidences_pipeline(filenames, first_n,
             if not dry_run:
                 results = None
                 if workers_write > 0:
+                    logger.debug("Using parallel bulk writer for Elasticearch")
                     # this can silently crash ?
                     results = elasticsearch.helpers.parallel_bulk(es, actions,
                             thread_count=workers_write,
                             queue_size=queue_write, 
                             chunk_size=chunk_size)
                 else:
+                    logger.debug("Using streaming bulk writer for Elasticearch")
                     results = elasticsearch.helpers.streaming_bulk(es, actions,
                             chunk_size=chunk_size)
+
                 for success, details in results:
                     if not success:
                         failcount += 1
@@ -391,6 +391,7 @@ def process_evidences_pipeline(filenames, first_n,
                 if failcount:
                     raise RuntimeError("%s relations failed to index" % failcount)
 
+            print('stages created, ran scoring and writing')
             logger.info('stages created, ran scoring and writing')
 
 

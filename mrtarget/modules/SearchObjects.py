@@ -209,7 +209,7 @@ def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_
 class SearchObjectProcess(object):
     def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
             es_index_gene, es_index_efo, es_index_val_right,es_index_assoc,
-            r_server, workers_write, queue_write,
+            workers_write, queue_write,
             chembl_target_uri, 
             chembl_mechanism_uri, 
             chembl_component_uri, 
@@ -224,7 +224,6 @@ class SearchObjectProcess(object):
         self.es_index_efo = es_index_efo
         self.es_index_val_right = es_index_val_right
         self.es_index_assoc = es_index_assoc
-        self.r_server = r_server
         self.workers_write = workers_write
         self.queue_write = queue_write
         self.chembl_target_uri = chembl_target_uri
