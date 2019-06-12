@@ -77,7 +77,7 @@ class Uniprot(IPlugin):
                     r['value']['pathway name'] = reaction["label"]
                     r['value']['pathway types'] = []
                     type_codes =[]
-                    for path in r['value']['path']:
+                    for path in reaction['path']:
                         if len(path) > 1:
                             type_codes.append(path[1])
                     for type_code in type_codes:
