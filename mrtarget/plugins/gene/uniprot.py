@@ -73,7 +73,8 @@ class Uniprot(IPlugin):
                 if reaction is None:
                     self.missing_reactome.add(r["id"])
                 else:
-                    r['value'] = reaction
+                    r['value'] = {}
+                    r['value']['pathway name'] = reaction["label"]
                     r['value']['pathway types'] = []
                     type_codes =[]
                     for path in r['value']['path']:
