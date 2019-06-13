@@ -306,12 +306,16 @@ def elasticsearch_actions(lines, index_valid, index_invalid):
             #print("invalid %s" % action["_id"])
             yield action
 
-def process_evidences_pipeline(filenames, first_n, 
+
+def process_evidences_pipeline(
+        filenames, first_n,
         es_hosts, es_index_valid, es_index_invalid, 
         es_mappings_valid, es_mappings_invalid, 
         es_settings_valid, es_settings_invalid, 
         es_index_gene, es_index_eco, es_index_efo,
-        dry_run, workers_validation, queue_validation, workers_write, queue_write, 
+        dry_run,
+        append_data,
+        workers_validation, queue_validation, workers_write, queue_write,
         cache_target, cache_target_u2e, cache_target_contains,
         cache_eco, cache_efo, cache_efo_contains,
         eco_scores_uri, schema_uri, excluded_biotypes, 
@@ -367,8 +371,8 @@ def process_evidences_pipeline(filenames, first_n,
     with URLZSource(es_settings_invalid).open() as settings_file:
         settings_invalid = json.load(settings_file)
 
-    with ElasticsearchBulkIndexManager(es, es_index_invalid, settings_invalid, mappings_invalid):
-        with ElasticsearchBulkIndexManager(es, es_index_valid, settings_valid, mappings_valid):
+    with ElasticsearchBulkIndexManager(es, es_index_invalid, settings_invalid, mappings_invalid, append_data):
+        with ElasticsearchBulkIndexManager(es, es_index_valid, settings_valid, mappings_valid, append_data):
             #load into elasticsearch
             chunk_size = 1000 #TODO make configurable
             actions = elasticsearch_actions(pl_stage, 
