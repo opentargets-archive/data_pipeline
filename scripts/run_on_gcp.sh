@@ -125,25 +125,12 @@ services:
     depends_on:
       - elasticsearch
 
-  redis:
-    image: redis
-    ports:
-      - 6379:6379
-    healthcheck:
-      test: ["CMD", "redis-cli", "PING"]
-      interval: 1s
-      timeout: 60s
-      retries: 60
-    
   mrtarget:
     image: quay.io/opentargets/mrtarget:latest
     depends_on:
       - elasticsearch
-      - redis
     environment:
       - ELASTICSEARCH_NODES=http://elasticsearch:9200
-      - CTTV_REDIS_REMOTE=true
-      - CTTV_REDIS_SERVER=redis:6379
       - SCHEMA_VERSION=1.3.0
       - NUMBER_TO_KEEP=100000000
       - ES_PREFIX=latest
@@ -191,8 +178,8 @@ volumes:
 
 EOF
 
-#start services (elastic, redis), then wait a bit
-gcloud compute ssh $NAME --command 'sudo docker-compose up -d elasticsearch redis'
+#start services (elastic), then wait a bit
+gcloud compute ssh $NAME --command 'sudo docker-compose up -d elasticsearch'
 sleep 30
 
 #Connect to the machine and use docker compose to run the pipeline
