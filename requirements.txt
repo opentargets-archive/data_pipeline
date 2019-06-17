@@ -12,7 +12,6 @@ decorator==4.4.0
 dill==0.2.5
 elasticsearch==5.5.3
 elasticsearch-dsl==5.4.0
-envparse==0.2.0
 functools32==3.2.3.post2
 future==0.17.1
 idna==2.8
