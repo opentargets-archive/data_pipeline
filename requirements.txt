@@ -10,8 +10,7 @@ ConfigArgParse==0.14.0
 coverage==4.5.3
 decorator==4.4.0
 dill==0.2.5
-elasticsearch==5.5.3
-elasticsearch-dsl==5.4.0
+elasticsearch-dsl==7.0.0
 envparse==0.2.0
 functools32==3.2.3.post2
 future==0.17.1

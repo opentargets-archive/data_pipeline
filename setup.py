@@ -20,7 +20,7 @@ setup(name=p.__pkgname__, version=p.__version__,
 "addict",
 "envparse", #TODO remove when migration to ConfigArgParse is complete
 "ConfigArgParse[yaml]",
-"elasticsearch-dsl>=5.0.0,<6.0.0",
+"elasticsearch-dsl>=7.0.0,<8.0.0",
 "networkx",
 "requests",
 "jsonpickle",
