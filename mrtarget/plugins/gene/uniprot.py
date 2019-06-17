@@ -14,7 +14,7 @@ class ReactomeRetriever():
     def get_reaction(self, reaction_id):
         response = Search().using(self.es).index(self.index).query(Match(_id=reaction_id))[0:1].execute()
         if response.hits.total > 0:
-            return response.hits[0]
+            return response.hits[0].to_dict()
         else:
             return None
 
@@ -73,16 +73,17 @@ class Uniprot(IPlugin):
                 if reaction is None:
                     self.missing_reactome.add(r["id"])
                 else:
-                    r['value'] = reaction
+                    r['value'] = {}
+                    r['value']['pathway name'] = reaction["label"]
                     r['value']['pathway types'] = []
                     type_codes =[]
-                    for path in r['value'].path:
+                    for path in reaction['path']:
                         if len(path) > 1:
                             type_codes.append(path[1])
                     for type_code in type_codes:
                         r['value']['pathway types'].append({
                             'pathway type':type_code,
-                            'pathway type name': reactome_retriever.get_reaction(type_code).label
+                            'pathway type name': reactome_retriever.get_reaction(type_code)['label']
                             })
         if 'PDB' in  seqrec.annotations['dbxref_extended']:
             gene.pdb = seqrec.annotations['dbxref_extended']['PDB']
