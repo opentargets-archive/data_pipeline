@@ -272,7 +272,7 @@ class EvidenceManager():
                 if '-' in target_id:
                     target_id = target_id.split('-')[0]
                 uniprotid = target_id.split(GeneData.UNI_ID_ORG_PREFIX)[1].strip()
-                ensemblid = available_genes.get_uniprot2ensemb(uniprotid)
+                ensemblid = available_genes.get_uniprot2ensembl(uniprotid)
                 new_target_id = self.get_reference_ensembl_id(ensemblid,
                                                                          available_genes=available_genes,
                                                                          non_reference_genes=non_reference_genes)
