@@ -1,5 +1,5 @@
 {
-  "search-object-disease": {
+  "search-object": {
     "dynamic_templates": [],
     "properties": {
       "association_counts": {
@@ -259,15 +259,8 @@
             "ignore_above": 256
           }
         }
-      }
-    }
-  },
-  "_default_": {
-    "dynamic_templates": []
-  },
-  "search-object-target": {
-    "dynamic_templates": [],
-    "properties": {
+      },
+
       "approved_name": {
         "type": "text",
         "fields": {
@@ -286,16 +279,6 @@
           }
         }
       },
-      "association_counts": {
-        "properties": {
-          "direct": {
-            "type": "long"
-          },
-          "total": {
-            "type": "long"
-          }
-        }
-      },
       "biotype": {
         "type": "text",
         "fields": {
@@ -305,69 +288,7 @@
           }
         }
       },
-      "description": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "drugs": {
-        "properties": {
-          "chembl_drugs": {
-            "properties": {
-              "id": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              },
-              "synonyms": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              }
-            }
-          },
-          "drugbank": {
-            "type": "text",
-            "fields": {
-              "keyword": {
-                "type": "keyword",
-                "ignore_above": 256
-              }
-            }
-          },
-          "evidence_data": {
-            "type": "text",
-            "fields": {
-              "keyword": {
-                "type": "keyword",
-                "ignore_above": 256
-              }
-            }
-          }
-        }
-      },
       "ensembl_gene_id": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "full_name": {
         "type": "text",
         "fields": {
           "keyword": {
@@ -386,24 +307,6 @@
         }
       },
       "hgnc_id": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "id": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "name": {
         "type": "text",
         "fields": {
           "keyword": {
@@ -766,118 +669,7 @@
           }
         }
       },
-      "private": {
-        "properties": {
-          "suggestions": {
-            "properties": {
-              "input": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              },
-              "output": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              },
-              "payload": {
-                "properties": {
-                  "description": {
-                    "type": "text",
-                    "fields": {
-                      "keyword": {
-                        "type": "keyword",
-                        "ignore_above": 256
-                      }
-                    }
-                  },
-                  "dull_name": {
-                    "type": "text",
-                    "fields": {
-                      "keyword": {
-                        "type": "keyword",
-                        "ignore_above": 256
-                      }
-                    }
-                  },
-                  "id": {
-                    "type": "text",
-                    "fields": {
-                      "keyword": {
-                        "type": "keyword",
-                        "ignore_above": 256
-                      }
-                    }
-                  },
-                  "title": {
-                    "type": "text",
-                    "fields": {
-                      "keyword": {
-                        "type": "keyword",
-                        "ignore_above": 256
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
       "symbol_synonyms": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "top_associations": {
-        "properties": {
-          "direct": {
-            "properties": {
-              "id": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              },
-              "score": {
-                "type": "float"
-              }
-            }
-          },
-          "total": {
-            "properties": {
-              "id": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              },
-              "score": {
-                "type": "float"
-              }
-            }
-          }
-        }
-      },
-      "type": {
         "type": "text",
         "fields": {
           "keyword": {
