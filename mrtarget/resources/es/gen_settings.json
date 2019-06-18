@@ -8,13 +8,6 @@
     },
     "analysis": {
       "filter": {
-        "simple_filter": {
-          "token_chars": [
-            "letter",
-            "digit"
-          ],
-          "type": "standard"
-        },
         "edgeNGram_filter": {
           "token_chars": [
             "letter",
@@ -44,7 +37,6 @@
           "filter": [
             "lowercase",
             "asciifolding",
-            "simple_filter",
             "fingerprint"
           ],
           "type": "custom",
