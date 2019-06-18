@@ -486,7 +486,7 @@ def elasticsearch_actions(hpa_merged_table, dry_run, index, doc):
         if not dry_run:
             action = {}
             action["_index"] = index
-            action["_type"] = doc
+            #action["_type"] = doc
             action["_id"] = hpa['gene']
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.

@@ -195,7 +195,7 @@ def elasticsearch_actions(results, dry_run, index, doc):
             if not dry_run:
                 action = {}
                 action["_index"] = index
-                action["_type"] = doc
+                #action["_type"] = doc
                 action["_id"] = r.id
                 #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
                 #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.

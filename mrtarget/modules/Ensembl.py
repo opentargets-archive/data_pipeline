@@ -19,7 +19,7 @@ def elasticsearch_actions(lines, index, doc):
         entry = json.loads(line)
         action = {}
         action["_index"] = index
-        action["_type"] = doc
+        #action["_type"] = doc
         action["_id"] = entry['id']
         action["_source"] = line
 

@@ -1,10 +1,8 @@
 {
-  "uniprot-gene": {
-    "properties": {
-      "entry": {
-        "type": "binary",
-        "store": true
-      }
+  "properties": {
+    "entry": {
+      "type": "binary",
+      "store": true
     }
   }
 }

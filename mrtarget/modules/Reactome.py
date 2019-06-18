@@ -112,7 +112,7 @@ def elasticsearch_actions(reactions, index, doc):
     for reaction in reactions:
         action = {}
         action["_index"] = index
-        action["_type"] = doc
+        #action["_type"] = doc
         action["_id"] = reaction["id"]
         #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
         #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.

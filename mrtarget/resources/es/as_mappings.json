@@ -1,765 +1,763 @@
 {
-  "association": {
-    "dynamic_templates": [],
-    "properties": {
-      "disease": {
-        "properties": {
-          "efo_info": {
-            "properties": {
-              "efo_id": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
+  "dynamic_templates": [],
+  "properties": {
+    "disease": {
+      "properties": {
+        "efo_info": {
+          "properties": {
+            "efo_id": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
                 }
-              },
-              "label": {
-                "type": "keyword"
-              },
-              "path": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
+              }
+            },
+            "label": {
+              "type": "keyword"
+            },
+            "path": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
                 }
-              },
-              "therapeutic_area": {
-                "properties": {
-                  "codes": {
-                    "type": "text",
-                    "fields": {
-                      "keyword": {
-                        "type": "keyword",
-                        "ignore_above": 256
-                      }
+              }
+            },
+            "therapeutic_area": {
+              "properties": {
+                "codes": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
                     }
-                  },
-                  "label": {
-                    "type": "keyword"
-                  },
-                  "labels": {
-                    "type": "text",
-                    "fields": {
-                      "keyword": {
-                        "type": "keyword",
-                        "ignore_above": 256
-                      }
+                  }
+                },
+                "label": {
+                  "type": "keyword"
+                },
+                "labels": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
                     }
                   }
                 }
-              }
-            }
-          },
-          "id": {
-            "type": "keyword"
-          }
-        }
-      },
-      "evidence_count": {
-        "properties": {
-          "datasources": {
-            "properties": {
-              "cancer_gene_census": {
-                "type": "float"
-              },
-              "chembl": {
-                "type": "float"
-              },
-              "crispr": {
-                "type": "float"
-              },
-              "europepmc": {
-                "type": "float"
-              },
-              "eva": {
-                "type": "float"
-              },
-              "eva_somatic": {
-                "type": "float"
-              },
-              "expression_atlas": {
-                "type": "float"
-              },
-              "gene2phenotype": {
-                "type": "float"
-              },
-              "genomics_england": {
-                "type": "float"
-              },
-              "gwas_catalog": {
-                "type": "float"
-              },
-              "intogen": {
-                "type": "float"
-              },
-              "phenodigm": {
-                "type": "float"
-              },
-              "phewas_catalog": {
-                "type": "float"
-              },
-              "postgap": {
-                "type": "float"
-              },
-              "progeny": {
-                "type": "float"
-              },
-              "reactome": {
-                "type": "float"
-              },
-              "slapenrich": {
-                "type": "float"
-              },
-              "sysbio": {
-                "type": "float"
-              },
-              "uniprot": {
-                "type": "float"
-              },
-              "uniprot_literature": {
-                "type": "float"
-              },
-              "uniprot_somatic": {
-                "type": "float"
-              }
-            }
-          },
-          "datatypes": {
-            "properties": {
-              "affected_pathway": {
-                "type": "float"
-              },
-              "animal_model": {
-                "type": "float"
-              },
-              "genetic_association": {
-                "type": "float"
-              },
-              "known_drug": {
-                "type": "float"
-              },
-              "literature": {
-                "type": "float"
-              },
-              "rna_expression": {
-                "type": "float"
-              },
-              "somatic_mutation": {
-                "type": "float"
-              }
-            }
-          },
-          "total": {
-            "type": "float"
-          }
-        }
-      },
-      "harmonic-sum": {
-        "properties": {
-          "datasources": {
-            "properties": {
-              "cancer_gene_census": {
-                "type": "float"
-              },
-              "chembl": {
-                "type": "float"
-              },
-              "crispr": {
-                "type": "float"
-              },
-              "europepmc": {
-                "type": "float"
-              },
-              "eva": {
-                "type": "float"
-              },
-              "eva_somatic": {
-                "type": "float"
-              },
-              "expression_atlas": {
-                "type": "float"
-              },
-              "gene2phenotype": {
-                "type": "float"
-              },
-              "genomics_england": {
-                "type": "float"
-              },
-              "gwas_catalog": {
-                "type": "float"
-              },
-              "intogen": {
-                "type": "float"
-              },
-              "phenodigm": {
-                "type": "float"
-              },
-              "phewas_catalog": {
-                "type": "float"
-              },
-              "postgap": {
-                "type": "float"
-              },
-              "progeny": {
-                "type": "float"
-              },
-              "reactome": {
-                "type": "float"
-              },
-              "slapenrich": {
-                "type": "float"
-              },
-              "sysbio": {
-                "type": "float"
-              },
-              "uniprot": {
-                "type": "float"
-              },
-              "uniprot_literature": {
-                "type": "float"
-              },
-              "uniprot_somatic": {
-                "type": "float"
-              }
-            }
-          },
-          "datatypes": {
-            "properties": {
-              "affected_pathway": {
-                "type": "float"
-              },
-              "animal_model": {
-                "type": "float"
-              },
-              "genetic_association": {
-                "type": "float"
-              },
-              "known_drug": {
-                "type": "float"
-              },
-              "literature": {
-                "type": "float"
-              },
-              "rna_expression": {
-                "type": "float"
-              },
-              "somatic_mutation": {
-                "type": "float"
-              }
-            }
-          },
-          "overall": {
-            "type": "float"
-          }
-        }
-      },
-      "id": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "is_direct": {
-        "type": "boolean"
-      },
-      "max": {
-        "properties": {
-          "datasources": {
-            "properties": {
-              "cancer_gene_census": {
-                "type": "float"
-              },
-              "chembl": {
-                "type": "float"
-              },
-              "crispr": {
-                "type": "float"
-              },
-              "europepmc": {
-                "type": "float"
-              },
-              "eva": {
-                "type": "float"
-              },
-              "eva_somatic": {
-                "type": "float"
-              },
-              "expression_atlas": {
-                "type": "float"
-              },
-              "gene2phenotype": {
-                "type": "float"
-              },
-              "genomics_england": {
-                "type": "float"
-              },
-              "gwas_catalog": {
-                "type": "float"
-              },
-              "intogen": {
-                "type": "float"
-              },
-              "phenodigm": {
-                "type": "float"
-              },
-              "phewas_catalog": {
-                "type": "float"
-              },
-              "postgap": {
-                "type": "float"
-              },
-              "progeny": {
-                "type": "float"
-              },
-              "reactome": {
-                "type": "float"
-              },
-              "slapenrich": {
-                "type": "float"
-              },
-              "sysbio": {
-                "type": "float"
-              },
-              "uniprot": {
-                "type": "float"
-              },
-              "uniprot_literature": {
-                "type": "float"
-              },
-              "uniprot_somatic": {
-                "type": "float"
-              }
-            }
-          },
-          "datatypes": {
-            "properties": {
-              "affected_pathway": {
-                "type": "float"
-              },
-              "animal_model": {
-                "type": "float"
-              },
-              "genetic_association": {
-                "type": "float"
-              },
-              "known_drug": {
-                "type": "float"
-              },
-              "literature": {
-                "type": "float"
-              },
-              "rna_expression": {
-                "type": "float"
-              },
-              "somatic_mutation": {
-                "type": "float"
               }
             }
           }
+        },
+        "id": {
+          "type": "keyword"
         }
-      },
-      "private": {
-        "properties": {
-          "efo_codes": {
-            "type": "keyword"
-          },
-          "facets": {
-            "properties": {
-              "datasource": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              },
-              "datatype": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              },
-              "expression_tissues": {
-                "properties": {
-                  "protein": {
-                    "properties": {
-                      "id": {
-                        "type": "text",
-                        "fields": {
-                          "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                          }
-                        }
-                      },
-                      "level": {
-                        "type": "long"
-                      }
-                    }
-                  },
-                  "rna": {
-                    "properties": {
-                      "id": {
-                        "type": "text",
-                        "fields": {
-                          "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                          }
-                        }
-                      },
-                      "level": {
-                        "type": "long"
-                      }
-                    }
-                  },
-                  "zscore": {
-                    "properties": {
-                      "id": {
-                        "type": "text",
-                        "fields": {
-                          "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                          }
-                        }
-                      },
-                      "level": {
-                        "type": "long"
-                      }
-                    }
-                  }
-                }
-              },
-              "free_text_search": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              },
-              "go": {
-                "properties": {
-                  "biological_process": {
-                    "properties": {
-                      "code": {
-                        "type": "text",
-                        "fields": {
-                          "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                          }
-                        }
-                      },
-                      "term": {
-                        "type": "text",
-                        "fields": {
-                          "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "cellular_component": {
-                    "properties": {
-                      "code": {
-                        "type": "text",
-                        "fields": {
-                          "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                          }
-                        }
-                      },
-                      "term": {
-                        "type": "text",
-                        "fields": {
-                          "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "molecular_function": {
-                    "properties": {
-                      "code": {
-                        "type": "text",
-                        "fields": {
-                          "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                          }
-                        }
-                      },
-                      "term": {
-                        "type": "text",
-                        "fields": {
-                          "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              "reactome": {
-                "properties": {
-                  "pathway_code": {
-                    "type": "keyword"
-                  },
-                  "pathway_type_code": {
-                    "type": "keyword"
-                  }
-                }
-              },
-              "target_class": {
-                "properties": {
-                  "level1": {
-                    "properties": {
-                      "id": {
-                        "type": "long"
-                      },
-                      "label": {
-                        "type": "keyword"
-                      }
-                    }
-                  },
-                  "level2": {
-                    "properties": {
-                      "id": {
-                        "type": "long"
-                      },
-                      "label": {
-                        "type": "keyword"
-                      }
-                    }
-                  }
-                }
-              },
-              "tractability": {
-                "properties": {
-                  "antibody": {
-                    "type": "keyword"
-                  },
-                  "combined": {
-                    "type": "keyword"
-                  },
-                  "smallmolecule": {
-                    "type": "keyword"
-                  }
-                }
-              },
-              "uniprot_keywords": {
-                "type": "keyword"
-              }
+      }
+    },
+    "evidence_count": {
+      "properties": {
+        "datasources": {
+          "properties": {
+            "cancer_gene_census": {
+              "type": "float"
+            },
+            "chembl": {
+              "type": "float"
+            },
+            "crispr": {
+              "type": "float"
+            },
+            "europepmc": {
+              "type": "float"
+            },
+            "eva": {
+              "type": "float"
+            },
+            "eva_somatic": {
+              "type": "float"
+            },
+            "expression_atlas": {
+              "type": "float"
+            },
+            "gene2phenotype": {
+              "type": "float"
+            },
+            "genomics_england": {
+              "type": "float"
+            },
+            "gwas_catalog": {
+              "type": "float"
+            },
+            "intogen": {
+              "type": "float"
+            },
+            "phenodigm": {
+              "type": "float"
+            },
+            "phewas_catalog": {
+              "type": "float"
+            },
+            "postgap": {
+              "type": "float"
+            },
+            "progeny": {
+              "type": "float"
+            },
+            "reactome": {
+              "type": "float"
+            },
+            "slapenrich": {
+              "type": "float"
+            },
+            "sysbio": {
+              "type": "float"
+            },
+            "uniprot": {
+              "type": "float"
+            },
+            "uniprot_literature": {
+              "type": "float"
+            },
+            "uniprot_somatic": {
+              "type": "float"
+            }
+          }
+        },
+        "datatypes": {
+          "properties": {
+            "affected_pathway": {
+              "type": "float"
+            },
+            "animal_model": {
+              "type": "float"
+            },
+            "genetic_association": {
+              "type": "float"
+            },
+            "known_drug": {
+              "type": "float"
+            },
+            "literature": {
+              "type": "float"
+            },
+            "rna_expression": {
+              "type": "float"
+            },
+            "somatic_mutation": {
+              "type": "float"
+            }
+          }
+        },
+        "total": {
+          "type": "float"
+        }
+      }
+    },
+    "harmonic-sum": {
+      "properties": {
+        "datasources": {
+          "properties": {
+            "cancer_gene_census": {
+              "type": "float"
+            },
+            "chembl": {
+              "type": "float"
+            },
+            "crispr": {
+              "type": "float"
+            },
+            "europepmc": {
+              "type": "float"
+            },
+            "eva": {
+              "type": "float"
+            },
+            "eva_somatic": {
+              "type": "float"
+            },
+            "expression_atlas": {
+              "type": "float"
+            },
+            "gene2phenotype": {
+              "type": "float"
+            },
+            "genomics_england": {
+              "type": "float"
+            },
+            "gwas_catalog": {
+              "type": "float"
+            },
+            "intogen": {
+              "type": "float"
+            },
+            "phenodigm": {
+              "type": "float"
+            },
+            "phewas_catalog": {
+              "type": "float"
+            },
+            "postgap": {
+              "type": "float"
+            },
+            "progeny": {
+              "type": "float"
+            },
+            "reactome": {
+              "type": "float"
+            },
+            "slapenrich": {
+              "type": "float"
+            },
+            "sysbio": {
+              "type": "float"
+            },
+            "uniprot": {
+              "type": "float"
+            },
+            "uniprot_literature": {
+              "type": "float"
+            },
+            "uniprot_somatic": {
+              "type": "float"
+            }
+          }
+        },
+        "datatypes": {
+          "properties": {
+            "affected_pathway": {
+              "type": "float"
+            },
+            "animal_model": {
+              "type": "float"
+            },
+            "genetic_association": {
+              "type": "float"
+            },
+            "known_drug": {
+              "type": "float"
+            },
+            "literature": {
+              "type": "float"
+            },
+            "rna_expression": {
+              "type": "float"
+            },
+            "somatic_mutation": {
+              "type": "float"
+            }
+          }
+        },
+        "overall": {
+          "type": "float"
+        }
+      }
+    },
+    "id": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "is_direct": {
+      "type": "boolean"
+    },
+    "max": {
+      "properties": {
+        "datasources": {
+          "properties": {
+            "cancer_gene_census": {
+              "type": "float"
+            },
+            "chembl": {
+              "type": "float"
+            },
+            "crispr": {
+              "type": "float"
+            },
+            "europepmc": {
+              "type": "float"
+            },
+            "eva": {
+              "type": "float"
+            },
+            "eva_somatic": {
+              "type": "float"
+            },
+            "expression_atlas": {
+              "type": "float"
+            },
+            "gene2phenotype": {
+              "type": "float"
+            },
+            "genomics_england": {
+              "type": "float"
+            },
+            "gwas_catalog": {
+              "type": "float"
+            },
+            "intogen": {
+              "type": "float"
+            },
+            "phenodigm": {
+              "type": "float"
+            },
+            "phewas_catalog": {
+              "type": "float"
+            },
+            "postgap": {
+              "type": "float"
+            },
+            "progeny": {
+              "type": "float"
+            },
+            "reactome": {
+              "type": "float"
+            },
+            "slapenrich": {
+              "type": "float"
+            },
+            "sysbio": {
+              "type": "float"
+            },
+            "uniprot": {
+              "type": "float"
+            },
+            "uniprot_literature": {
+              "type": "float"
+            },
+            "uniprot_somatic": {
+              "type": "float"
+            }
+          }
+        },
+        "datatypes": {
+          "properties": {
+            "affected_pathway": {
+              "type": "float"
+            },
+            "animal_model": {
+              "type": "float"
+            },
+            "genetic_association": {
+              "type": "float"
+            },
+            "known_drug": {
+              "type": "float"
+            },
+            "literature": {
+              "type": "float"
+            },
+            "rna_expression": {
+              "type": "float"
+            },
+            "somatic_mutation": {
+              "type": "float"
             }
           }
         }
-      },
-      "sum": {
-        "properties": {
-          "datasources": {
-            "properties": {
-              "cancer_gene_census": {
-                "type": "float"
-              },
-              "chembl": {
-                "type": "float"
-              },
-              "crispr": {
-                "type": "float"
-              },
-              "europepmc": {
-                "type": "float"
-              },
-              "eva": {
-                "type": "float"
-              },
-              "eva_somatic": {
-                "type": "float"
-              },
-              "expression_atlas": {
-                "type": "float"
-              },
-              "gene2phenotype": {
-                "type": "float"
-              },
-              "genomics_england": {
-                "type": "float"
-              },
-              "gwas_catalog": {
-                "type": "float"
-              },
-              "intogen": {
-                "type": "float"
-              },
-              "phenodigm": {
-                "type": "float"
-              },
-              "phewas_catalog": {
-                "type": "float"
-              },
-              "postgap": {
-                "type": "float"
-              },
-              "progeny": {
-                "type": "float"
-              },
-              "reactome": {
-                "type": "float"
-              },
-              "slapenrich": {
-                "type": "float"
-              },
-              "sysbio": {
-                "type": "float"
-              },
-              "uniprot": {
-                "type": "float"
-              },
-              "uniprot_literature": {
-                "type": "float"
-              },
-              "uniprot_somatic": {
-                "type": "float"
+      }
+    },
+    "private": {
+      "properties": {
+        "efo_codes": {
+          "type": "keyword"
+        },
+        "facets": {
+          "properties": {
+            "datasource": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
               }
-            }
-          },
-          "datatypes": {
-            "properties": {
-              "affected_pathway": {
-                "type": "float"
-              },
-              "animal_model": {
-                "type": "float"
-              },
-              "genetic_association": {
-                "type": "float"
-              },
-              "known_drug": {
-                "type": "float"
-              },
-              "literature": {
-                "type": "float"
-              },
-              "rna_expression": {
-                "type": "float"
-              },
-              "somatic_mutation": {
-                "type": "float"
+            },
+            "datatype": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
               }
+            },
+            "expression_tissues": {
+              "properties": {
+                "protein": {
+                  "properties": {
+                    "id": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    },
+                    "level": {
+                      "type": "long"
+                    }
+                  }
+                },
+                "rna": {
+                  "properties": {
+                    "id": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    },
+                    "level": {
+                      "type": "long"
+                    }
+                  }
+                },
+                "zscore": {
+                  "properties": {
+                    "id": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    },
+                    "level": {
+                      "type": "long"
+                    }
+                  }
+                }
+              }
+            },
+            "free_text_search": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "go": {
+              "properties": {
+                "biological_process": {
+                  "properties": {
+                    "code": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    },
+                    "term": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    }
+                  }
+                },
+                "cellular_component": {
+                  "properties": {
+                    "code": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    },
+                    "term": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    }
+                  }
+                },
+                "molecular_function": {
+                  "properties": {
+                    "code": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    },
+                    "term": {
+                      "type": "text",
+                      "fields": {
+                        "keyword": {
+                          "type": "keyword",
+                          "ignore_above": 256
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "reactome": {
+              "properties": {
+                "pathway_code": {
+                  "type": "keyword"
+                },
+                "pathway_type_code": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "target_class": {
+              "properties": {
+                "level1": {
+                  "properties": {
+                    "id": {
+                      "type": "long"
+                    },
+                    "label": {
+                      "type": "keyword"
+                    }
+                  }
+                },
+                "level2": {
+                  "properties": {
+                    "id": {
+                      "type": "long"
+                    },
+                    "label": {
+                      "type": "keyword"
+                    }
+                  }
+                }
+              }
+            },
+            "tractability": {
+              "properties": {
+                "antibody": {
+                  "type": "keyword"
+                },
+                "combined": {
+                  "type": "keyword"
+                },
+                "smallmolecule": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "uniprot_keywords": {
+              "type": "keyword"
             }
           }
         }
-      },
-      "target": {
-        "properties": {
-          "activity": {
-            "type": "keyword"
-          },
-          "gene_info": {
-            "properties": {
-              "geneid": {
-                "type": "text",
-                "fields": {
-                  "keyword": {
-                    "type": "keyword",
-                    "ignore_above": 256
-                  }
-                }
-              },
-              "name": {
-                "type": "keyword"
-              },
-              "symbol": {
-                "type": "keyword"
-              }
+      }
+    },
+    "sum": {
+      "properties": {
+        "datasources": {
+          "properties": {
+            "cancer_gene_census": {
+              "type": "float"
+            },
+            "chembl": {
+              "type": "float"
+            },
+            "crispr": {
+              "type": "float"
+            },
+            "europepmc": {
+              "type": "float"
+            },
+            "eva": {
+              "type": "float"
+            },
+            "eva_somatic": {
+              "type": "float"
+            },
+            "expression_atlas": {
+              "type": "float"
+            },
+            "gene2phenotype": {
+              "type": "float"
+            },
+            "genomics_england": {
+              "type": "float"
+            },
+            "gwas_catalog": {
+              "type": "float"
+            },
+            "intogen": {
+              "type": "float"
+            },
+            "phenodigm": {
+              "type": "float"
+            },
+            "phewas_catalog": {
+              "type": "float"
+            },
+            "postgap": {
+              "type": "float"
+            },
+            "progeny": {
+              "type": "float"
+            },
+            "reactome": {
+              "type": "float"
+            },
+            "slapenrich": {
+              "type": "float"
+            },
+            "sysbio": {
+              "type": "float"
+            },
+            "uniprot": {
+              "type": "float"
+            },
+            "uniprot_literature": {
+              "type": "float"
+            },
+            "uniprot_somatic": {
+              "type": "float"
             }
-          },
-          "id": {
-            "type": "keyword"
-          },
-          "tractability": {
-            "properties": {
-              "antibody": {
-                "properties": {
-                  "buckets": {
-                    "type": "long"
-                  },
-                  "categories": {
-                    "properties": {
-                      "clinical_precedence": {
-                        "type": "float"
-                      },
-                      "predicted_tractable_high_confidence": {
-                        "type": "float"
-                      },
-                      "predicted_tractable_med_low_confidence": {
-                        "type": "float"
-                      }
+          }
+        },
+        "datatypes": {
+          "properties": {
+            "affected_pathway": {
+              "type": "float"
+            },
+            "animal_model": {
+              "type": "float"
+            },
+            "genetic_association": {
+              "type": "float"
+            },
+            "known_drug": {
+              "type": "float"
+            },
+            "literature": {
+              "type": "float"
+            },
+            "rna_expression": {
+              "type": "float"
+            },
+            "somatic_mutation": {
+              "type": "float"
+            }
+          }
+        }
+      }
+    },
+    "target": {
+      "properties": {
+        "activity": {
+          "type": "keyword"
+        },
+        "gene_info": {
+          "properties": {
+            "geneid": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "name": {
+              "type": "keyword"
+            },
+            "symbol": {
+              "type": "keyword"
+            }
+          }
+        },
+        "id": {
+          "type": "keyword"
+        },
+        "tractability": {
+          "properties": {
+            "antibody": {
+              "properties": {
+                "buckets": {
+                  "type": "long"
+                },
+                "categories": {
+                  "properties": {
+                    "clinical_precedence": {
+                      "type": "float"
+                    },
+                    "predicted_tractable_high_confidence": {
+                      "type": "float"
+                    },
+                    "predicted_tractable_med_low_confidence": {
+                      "type": "float"
                     }
-                  },
-                  "top_category": {
-                    "type": "text",
-                    "fields": {
-                      "keyword": {
-                        "type": "keyword",
-                        "ignore_above": 256
-                      }
+                  }
+                },
+                "top_category": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
                     }
                   }
                 }
-              },
-              "smallmolecule": {
-                "properties": {
-                  "categories": {
-                    "properties": {
-                      "clinical_precedence": {
-                        "type": "float"
-                      },
-                      "discovery_precedence": {
-                        "type": "float"
-                      },
-                      "predicted_tractable": {
-                        "type": "float"
-                      }
+              }
+            },
+            "smallmolecule": {
+              "properties": {
+                "categories": {
+                  "properties": {
+                    "clinical_precedence": {
+                      "type": "float"
+                    },
+                    "discovery_precedence": {
+                      "type": "float"
+                    },
+                    "predicted_tractable": {
+                      "type": "float"
                     }
-                  },
-                  "ensemble": {
-                    "type": "float"
-                  },
-                  "high_quality_compounds": {
-                    "type": "long"
-                  },
-                  "small_molecule_genome_member": {
-                    "type": "boolean"
-                  },
-                  "top_category": {
-                    "type": "text",
-                    "fields": {
-                      "keyword": {
-                        "type": "keyword",
-                        "ignore_above": 256
-                      }
+                  }
+                },
+                "ensemble": {
+                  "type": "float"
+                },
+                "high_quality_compounds": {
+                  "type": "long"
+                },
+                "small_molecule_genome_member": {
+                  "type": "boolean"
+                },
+                "top_category": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
                     }
                   }
                 }

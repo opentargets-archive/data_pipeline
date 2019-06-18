@@ -2,6 +2,7 @@
   "index": {
     "refresh_interval": "1s",
     "number_of_shards": "16",
+    "max_ngram_diff":6,
     "translog": {
       "durability": "request"
     },

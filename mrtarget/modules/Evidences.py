@@ -289,7 +289,7 @@ def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_inva
             #valid
             action = {}
             action["_index"] = index_valid
-            action["_type"] = doc_valid
+            #action["_type"] = doc_valid
             action["_id"] = right['hash']
             action["_source"] = right['line']
             #print("  valid %s" % action["_id"])
@@ -298,7 +298,7 @@ def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_inva
             #invalid
             action = {}
             action["_index"] = index_invalid
-            action["_type"] = doc_invalid
+            #action["_type"] = doc_invalid
             action["_id"] = left['id']
             action["_source"] = left
             #print("invalid %s" % action["_id"])

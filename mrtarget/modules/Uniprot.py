@@ -24,7 +24,7 @@ def elasticsearch_actions(entries, index, doc):
 
         action = {}
         action["_index"] = index
-        action["_type"] = doc
+        #action["_type"] = doc
         action["_id"] = entry.id
         action["_source"] = {'entry': json_seqrec}
 
