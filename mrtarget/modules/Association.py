@@ -1,7 +1,6 @@
 import logging
 import copy
 
-import functional
 import functools
 import itertools
 from collections import defaultdict
@@ -89,17 +88,21 @@ class Association(JSONSerializable):
     def _inject_tractability_in_target(self, gene_obj):
         def _create_facet(categories_dict):
             if isinstance(categories_dict, dict):
-                return functional.seq(categories_dict.viewitems())\
-                    .filter(lambda e: e[1] > 0)\
-                    .map(lambda e: e[0]).to_list()
+                result = []
+                for e in categories_dict.viewitems():
+                    if e[1] > 0:
+                        result.append(e[0])
+                return result
             else:
                 return []
 
         def _merge_facets(the_dict):
             if isinstance(the_dict, dict):
-                return functional.seq(the_dict.viewitems())\
-                    .flat_map(lambda e: itertools.imap(lambda el: e[0] + '_' + el,e[1]))\
-                    .to_list()
+                result = []
+                for e in the_dict.viewitems():
+                    for el in e[1]:
+                        result.append(e[0] + '_' + el)
+                return result
             else:
                 return []
 
