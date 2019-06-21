@@ -30,7 +30,6 @@ services:
       interval: 30s
       timeout: 500s
       retries:  30
-    network_mode: "host"
         
   kibana:
     image: docker.elastic.co/kibana/kibana-oss:7.1.1
@@ -41,7 +40,6 @@ services:
       - xpack.security.enabled=false
     depends_on:
       - elasticsearch
-    network_mode: "host"
 
     
   mrtarget:
@@ -58,7 +56,6 @@ services:
       - ./log:/usr/src/app/log
       - ./json:/usr/src/app/json
       - ./qc:/usr/src/app/qc
-    network_mode: "host"
 
 volumes:
   esdata:
