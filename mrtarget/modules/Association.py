@@ -324,7 +324,7 @@ def get_evidence_for_target_simple(es, target, index):
                 ]},
     }
 
-    for ev in helpers.scan(client=es, query=query_body,
+    for ev in helpers.scan(client=es, query=query_body, scroll='4h',
         index=index, size=1000):
         yield ev['_source']
 
@@ -472,7 +472,7 @@ class ScoringProcess():
 
 
     def get_targets(self, es):
-        for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).scan():
+        for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).params(scroll = '4h').scan():
             yield str(target.meta.id)
 
     def process_all(self, dry_run):
@@ -568,7 +568,7 @@ class ScoringProcess():
         #number of eco entries
         association_count = 0
         #Note: try to avoid doing this more than once!
-        for association in Search().using(es).index(index).query(MatchAll()).scan():
+        for association in Search().using(es).index(index).query(MatchAll()).params(scroll = '4h').scan():
             association_count += 1
             if association_count % 1000 == 0:
                 self.logger.debug("checking %d", association_count)
