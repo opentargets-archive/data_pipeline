@@ -17,14 +17,13 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(entries, index, doc):
+def elasticsearch_actions(entries, index):
     for entry in entries:
         #horrible hack, just save it as a blob
         json_seqrec = base64.b64encode(jsonpickle.encode(entry))
 
         action = {}
         action["_index"] = index
-        #action["_type"] = doc
         action["_id"] = entry.id
         action["_source"] = {'entry': json_seqrec}
 
@@ -42,11 +41,10 @@ def generate_uniprot(uri):
             yield entry
 
 class UniprotDownloader(object):
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             uri, workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.uri = uri
@@ -70,7 +68,7 @@ class UniprotDownloader(object):
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
             items = generate_uniprot(self.uri)
-            actions = elasticsearch_actions(items, self.es_index, self.es_doc)
+            actions = elasticsearch_actions(items, self.es_index)
 
             #write into elasticsearch
             failcount = 0

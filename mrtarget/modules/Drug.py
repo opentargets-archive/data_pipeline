@@ -21,11 +21,10 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(items, index, doc):
+def elasticsearch_actions(items, index):
     for ident, item in items:
         action = {}
         action["_index"] = index
-        action["_type"] = doc
         action["_id"] = ident
         #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
         #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -47,7 +46,7 @@ def get_parent_id(mol):
 
 class DrugProcess(object):
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             es_index_gene, es_index_efo,
             workers_write, queue_write,
             chembl_target_uris, 
@@ -58,7 +57,6 @@ class DrugProcess(object):
             chembl_indication_uris):
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.es_index_gene = es_index_gene
@@ -730,7 +728,7 @@ class DrugProcess(object):
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(data.items(), self.es_index, self.es_doc)
+            actions = elasticsearch_actions(data.items(), self.es_index)
             failcount = 0
             if not dry_run:
                 results = None

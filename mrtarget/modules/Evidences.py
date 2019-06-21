@@ -282,14 +282,13 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_invalid):
+def elasticsearch_actions(lines, index_valid, index_invalid):
     for line in lines:
         (left, right) = line
         if right is not None:
             #valid
             action = {}
             action["_index"] = index_valid
-            #action["_type"] = doc_valid
             action["_id"] = right['hash']
             action["_source"] = right['line']
             #print("  valid %s" % action["_id"])
@@ -298,14 +297,13 @@ def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_inva
             #invalid
             action = {}
             action["_index"] = index_invalid
-            #action["_type"] = doc_invalid
             action["_id"] = left['id']
             action["_source"] = left
             #print("invalid %s" % action["_id"])
             yield action
 
 def process_evidences_pipeline(filenames, first_n, 
-        es_hosts, es_index_valid, es_index_invalid, es_doc_valid, es_doc_invalid, 
+        es_hosts, es_index_valid, es_index_invalid, 
         es_mappings_valid, es_mappings_invalid, 
         es_settings_valid, es_settings_invalid, 
         es_index_gene, es_index_eco, es_index_efo,
@@ -366,8 +364,7 @@ def process_evidences_pipeline(filenames, first_n,
             #load into elasticsearch
             chunk_size = 1000 #TODO make configurable
             actions = elasticsearch_actions(pl_stage, 
-                es_index_valid, es_index_invalid, 
-                es_doc_valid, es_doc_invalid)
+                es_index_valid, es_index_invalid)
             failcount = 0
 
             if not dry_run:

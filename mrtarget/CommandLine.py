@@ -64,7 +64,7 @@ def main():
 
     if args.rea:
         process = ReactomeProcess(args.elasticseach_nodes, es_config.rea.name, 
-            es_config.rea.doc, es_config.rea.mapping, es_config.rea.setting,
+            es_config.rea.mapping, es_config.rea.setting,
             data_config.reactome_pathway_data, data_config.reactome_pathway_relation,
             args.rea_workers_writer, args.rea_queue_write)
         if not args.qc_only:
@@ -73,7 +73,7 @@ def main():
             qc_metrics.update(process.qc(es, es_config.rea.name))
     if args.ens:
         process = EnsemblProcess(args.elasticseach_nodes, es_config.ens.name, 
-            es_config.ens.doc, es_config.ens.mapping, es_config.ens.setting,
+            es_config.ens.mapping, es_config.ens.setting,
             data_config.ensembl_filename, args.ens_workers_writer, args.ens_queue_write)
         if not args.qc_only:
             process.process(args.dry_run)
@@ -81,7 +81,7 @@ def main():
             qc_metrics.update(process.qc(es, es_config.ens.name))
     if args.unic:
         process = UniprotDownloader(args.elasticseach_nodes, es_config.uni.name, 
-            es_config.uni.doc, es_config.uni.mapping, es_config.uni.setting,
+            es_config.uni.mapping, es_config.uni.setting,
             data_config.uniprot_uri, args.uni_workers_writer, args.uni_queue_write)
         if not args.qc_only:
             process.process(args.dry_run)
@@ -90,7 +90,7 @@ def main():
 
     if args.gen:
         process = GeneManager(args.elasticseach_nodes, es_config.gen.name, 
-            es_config.gen.doc, es_config.gen.mapping, es_config.gen.setting, 
+            es_config.gen.mapping, es_config.gen.setting, 
             args.gen_plugin_places, data_config.gene_data_plugin_names,
             data_config, es_config,
             args.gen_workers_writer, args.gen_queue_write )
@@ -101,7 +101,7 @@ def main():
 
     if args.efo:
         process = EfoProcess(args.elasticseach_nodes, es_config.efo.name, 
-            es_config.efo.doc, es_config.efo.mapping, es_config.efo.setting, 
+            es_config.efo.mapping, es_config.efo.setting, 
             data_config.ontology_efo, data_config.ontology_hpo, 
             data_config.ontology_mp, data_config.disease_phenotype,
             args.efo_workers_writer, args.efo_queue_write)
@@ -111,7 +111,7 @@ def main():
             qc_metrics.update(process.qc(es, es_config.efo.name))
     if args.eco:
         process = EcoProcess(args.elasticseach_nodes, es_config.eco.name, 
-            es_config.eco.doc, es_config.eco.mapping, es_config.eco.setting,
+            es_config.eco.mapping, es_config.eco.setting,
             data_config.ontology_eco, data_config.ontology_so,
             args.eco_workers_writer, args.eco_queue_write)
         if not args.qc_only:
@@ -122,7 +122,6 @@ def main():
     if args.val:
         process_evidences_pipeline(data_config.input_file, args.val_first_n,
             args.elasticseach_nodes, es_config.val_right.name, es_config.val_wrong.name, 
-            es_config.val_right.doc, es_config.val_wrong.doc, 
             es_config.val_right.mapping, es_config.val_wrong.mapping, 
             es_config.val_right.setting, es_config.val_wrong.setting, 
             es_config.gen.name, es_config.eco.name, es_config.efo.name,
@@ -135,7 +134,7 @@ def main():
         #TODO qc
 
     if args.hpa:
-        process = HPAProcess(args.elasticseach_nodes, es_config.hpa.name, es_config.hpa.doc, 
+        process = HPAProcess(args.elasticseach_nodes, es_config.hpa.name, 
                 es_config.hpa.mapping, es_config.hpa.setting,
                 data_config.tissue_translation_map, data_config.tissue_curation_map,
                 data_config.hpa_normal_tissue, data_config.hpa_rna_level, 
@@ -148,7 +147,7 @@ def main():
 
     if args.assoc:
         process = ScoringProcess(args.elasticseach_nodes, es_config.asc.name, 
-                es_config.asc.doc, es_config.asc.mapping, es_config.asc.setting,
+                es_config.asc.mapping, es_config.asc.setting,
                 es_config.gen.name, es_config.eco.name, es_config.val_right.name, es_config.hpa.name, es_config.efo.name,
                 args.as_workers_writer, args.as_workers_production, args.as_workers_score, 
                 args.as_queue_score, args.as_queue_production, args.as_queue_write,
@@ -161,7 +160,7 @@ def main():
         
     if args.ddr:
         process = DataDrivenRelationProcess(args.elasticseach_nodes, 
-                es_config.ddr.name, es_config.ddr.doc, 
+                es_config.ddr.name, 
                 es_config.ddr.mapping, es_config.ddr.setting,
                 es_config.efo.name, es_config.gen.name, es_config.asc.name, 
                 args.ddr_workers_production,
@@ -178,7 +177,7 @@ def main():
 
     if args.sea:
         process = SearchObjectProcess(args.elasticseach_nodes, 
-                es_config.sea.name, es_config.sea.doc, 
+                es_config.sea.name,  
                 es_config.sea.mapping, es_config.sea.setting, 
                 es_config.gen.name, es_config.efo.name, es_config.val_right.name,
                 es_config.asc.name, 
@@ -195,7 +194,7 @@ def main():
 
     if args.drg:
         process = DrugProcess(args.elasticseach_nodes, es_config.drg.name, 
-                es_config.drg.doc, es_config.drg.mapping, es_config.drg.setting,
+                es_config.drg.mapping, es_config.drg.setting,
                 es_config.gen.name, es_config.efo.name,
                 args.drg_workers_writer, args.drg_queue_write, 
                 data_config.chembl_target, 

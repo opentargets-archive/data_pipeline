@@ -480,13 +480,12 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(hpa_merged_table, dry_run, index, doc):
+def elasticsearch_actions(hpa_merged_table, dry_run, index):
     for entry in hpa_merged_table.data():
         hpa = entry[0]
         if not dry_run:
             action = {}
             action["_index"] = index
-            #action["_type"] = doc
             action["_id"] = hpa['gene']
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -495,7 +494,7 @@ def elasticsearch_actions(hpa_merged_table, dry_run, index, doc):
             yield action
 
 class HPAProcess():
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings, 
             tissue_translation_map_url, 
             tissue_curation_map_url,
             normal_tissue_url,
@@ -503,7 +502,6 @@ class HPAProcess():
             workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
 
@@ -551,7 +549,7 @@ class HPAProcess():
   
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(self.hpa_merged_table, dry_run, self.es_index, self.es_doc)
+            actions = elasticsearch_actions(self.hpa_merged_table, dry_run, self.es_index)
             failcount = 0
 
             if not dry_run:

@@ -436,7 +436,7 @@ def score_producer(data,
 
 class ScoringProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             es_index_gene, es_index_eco, es_index_val_right, es_index_hpa, es_index_efo,
             workers_write, workers_production, workers_score, 
             queue_score, queue_produce, queue_write, 
@@ -447,7 +447,6 @@ class ScoringProcess():
 
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.es_index_gene = es_index_gene
@@ -513,8 +512,7 @@ class ScoringProcess():
             self.logger.info('stages created, running scoring and writing')
             client = es
             chunk_size = 1000 #TODO make configurable
-            actions = self.elasticsearch_actions(pipeline_stage2, 
-                self.es_index, self.es_doc)
+            actions = self.elasticsearch_actions(pipeline_stage2, self.es_index)
             failcount = 0
 
             if not dry_run:
@@ -543,13 +541,12 @@ class ScoringProcess():
 
     Output suitable for use with elasticsearch.helpers 
     """
-    def elasticsearch_actions(self, results, index, doc):
+    def elasticsearch_actions(self, results, index):
         for r in results:
             if r is not None:
                 element_id, score = r
                 action = {}
                 action["_index"] = index
-                #action["_type"] = doc
                 action["_id"] = element_id
                 #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
                 #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.

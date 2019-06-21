@@ -14,12 +14,11 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(lines, index, doc):
+def elasticsearch_actions(lines, index):
     for line in lines:
         entry = json.loads(line)
         action = {}
         action["_index"] = index
-        #action["_type"] = doc
         action["_id"] = entry['id']
         action["_source"] = line
 
@@ -33,11 +32,10 @@ class EnsemblProcess(object):
     e.g.
     python create_genes_dictionary.py -o "./" -e -z -n homo_sapiens_core_93_38
     """
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             ensembl_filename, workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.ensembl_filename = ensembl_filename
@@ -63,7 +61,7 @@ class EnsemblProcess(object):
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):   
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(lines, self.es_index, self.es_doc)
+            actions = elasticsearch_actions(lines, self.es_index)
             failcount = 0
 
             if not dry_run:
