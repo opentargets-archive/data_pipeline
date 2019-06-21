@@ -48,8 +48,8 @@ services:
       context: ./
     depends_on:
       - elasticsearch
-    #environment:
-    #  - ELASTICSEARCH_NODES=http://elasticsearch:9200
+    environment:
+      - ELASTICSEARCH_NODES=http://elasticsearch:9200
     tmpfs:
       - /tmp
     volumes:
