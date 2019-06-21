@@ -37,8 +37,11 @@ def setup_ops_parser():
 
     # elasticsearch
     p.add("--elasticseach-nodes", help="elasticsearch host(s)",
-        action='append', default=['localhost:9200'],
+        action='append',
         env_var='ELASTICSEARCH_NODES')
+        # To handle a default that is *only* used if *nothing* is specified, we have
+        # to do it ourselves later. Otherwise the "default" is always present and
+        # values are appended to it.
     p.add("--elasticsearch-folder", help="write to files instead of a live elasticsearch server",
         action='store') #this only applies to --val at the moment
 
@@ -208,6 +211,11 @@ def get_ops_args():
     #dont use parse_args because that will error
     #if there are extra arguments e.g. for plugins
     args = p.parse_known_args()[0]
+
+    #to handle a default on elasticsearch nodes (which is a list)
+    #we need to see if it was not previously specified and then replace it
+    if args.elasticseach_nodes == None:
+        args.elasticseach_nodes = ['http://localhost:9200']
 
     #output all configuration values, useful for debugging
     p.print_values()

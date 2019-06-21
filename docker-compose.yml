@@ -3,18 +3,20 @@ services:
       
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.1.1
-    #image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.0
     ports:
       - 9200:9200
+      - 9300:9300
     environment:
       #use a single node
-      - "discovery.type=single-node"
+      - discovery.type=single-node
       #ensure we do bootstrap tests
-      #- "es.enforce.bootstrap.checks=true"
+      #- es.enforce.bootstrap.checks=true
       #disable memory swapping to disk for performance
-      - "bootstrap.memory_lock=true"
+      - bootstrap.memory_lock=true
       #allow downloading from google buckets
       - repositories.url.allowed_urls=https://storage.googleapis.com/*,https://*.amazonaws.com/*
+      # increase write queue size for bulk tasks
+      - thread_pool.write.queue_size=1000
     volumes:
       #use a volume for persistence / performance
       - esdata:/usr/share/elasticsearch/data
@@ -28,10 +30,10 @@ services:
       interval: 30s
       timeout: 500s
       retries:  30
+    network_mode: "host"
         
   kibana:
     image: docker.elastic.co/kibana/kibana-oss:7.1.1
-    #image: docker.elastic.co/kibana/kibana-oss:6.8.0
     ports:
       - 5601:5601
     environment:
@@ -39,6 +41,7 @@ services:
       - xpack.security.enabled=false
     depends_on:
       - elasticsearch
+    network_mode: "host"
 
     
   mrtarget:
@@ -47,12 +50,15 @@ services:
       context: ./
     depends_on:
       - elasticsearch
-    environment:
-      - ELASTICSEARCH_NODES=http://elasticsearch:9200
+    #environment:
+    #  - ELASTICSEARCH_NODES=http://elasticsearch:9200
+    tmpfs:
+      - /tmp
     volumes:
       - ./log:/usr/src/app/log
       - ./json:/usr/src/app/json
       - ./qc:/usr/src/app/qc
+    network_mode: "host"
 
 volumes:
   esdata:
