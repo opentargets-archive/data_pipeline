@@ -11,7 +11,8 @@ class HPALookUpTable(object):
 
     def get_hpa(self, hpa_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=hpa_id))[0:1].execute()
-        if response.hits.total == 0:
+        #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
+        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
             #no hit, return None
             return None
         else:
@@ -28,7 +29,8 @@ class GeneLookUpTable(object):
     def get_gene(self, gene_id):
         assert gene_id is not None
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].execute()
-        if response.hits.total == 0:
+        #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
+        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
             #no hit, return None
             return None
         else:
@@ -43,10 +45,11 @@ class GeneLookUpTable(object):
                 Match(uniprot_id=uniprot_id),
                 Match(uniprot_accessions=uniprot_id)
             ]))[0:1].source(includes=["ensembl_gene_id"]).execute()
-        if response.hits.total == 0:
+        #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html            
+        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
             #no hit, return None
             return None
-        elif response.hits.total == 1:
+        elif int(response.hits.total.value) == 1 or len(response.hits) == 1:
             #exactly one hit, return it
             return response.hits[0].ensembl_gene_id
         else:
@@ -55,12 +58,13 @@ class GeneLookUpTable(object):
 
     def __contains__(self, gene_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].source(False).execute()
-        if response.hits.total == 0:
-            #no hit
-            return False
-        else:
+        #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
+        if int(response.hits.total.value) > 0 or len(response.hits) > 0:
             #exactly one hit
             return True
+        else:
+            #no hit
+            return False
         #can't have multiple hits, primary key!
 
 class ECOLookUpTable(object):
@@ -91,7 +95,8 @@ class EFOLookUpTable(object):
 
     def get_efo(self, efo_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].execute()
-        if response.hits.total == 0:
+        #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
+        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
             #no hit, return None
             return None
         else:
@@ -101,7 +106,8 @@ class EFOLookUpTable(object):
 
     def __contains__(self, efo_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].source(False).execute()
-        if response.hits.total == 0:
+        #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
+        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
             #no hit
             return False
         else:

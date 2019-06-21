@@ -175,7 +175,6 @@ def elasticsearch_actions(items, dry_run, index, doc):
         if not dry_run:
             action = {}
             action["_index"] = index
-            #action["_type"] = doc
             action["_id"] = so.id
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -349,10 +348,11 @@ class SearchObjectProcess(object):
 
         #{"total"=[{"id":"xxx","score":"y.y"}],"direct"=[{"id":"xxx","score":"y.y"}]}
         return ({
-                "total": [{"id":h.id,"score":min(h["harmonic-sum"]["overall"],1.0)} for h in r.hits],
-                "direct": [{"id":h.id,"score":min(h["harmonic-sum"]["overall"],1.0)} for h in r.aggregations.direct_associations.top_direct_ass.hits]
+                "total": [{"id":h.id,"score":min(float(h["harmonic-sum"]["overall"]),1.0)} for h in r.hits],
+                "direct": [{"id":h.id,"score":min(float(h["harmonic-sum"]["overall"]),1.0)} for h in r.aggregations.direct_associations.top_direct_ass.hits]
             },
             {
-                "total":r.hits.total,
-                "direct":r.aggregations.direct_associations.top_direct_ass.hits.total,
+                #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
+                "total":int(r.hits.total.value),
+                "direct":int(r.aggregations.direct_associations.top_direct_ass.hits.total.value),
             })

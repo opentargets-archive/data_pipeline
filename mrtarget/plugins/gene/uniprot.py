@@ -13,7 +13,7 @@ class ReactomeRetriever():
 
     def get_reaction(self, reaction_id):
         response = Search().using(self.es).index(self.index).query(Match(_id=reaction_id))[0:1].execute()
-        if response.hits.total > 0:
+        if int(response.hits.total.value) > 0 and len(response.hits) > 0:
             return response.hits[0].to_dict()
         else:
             return None
