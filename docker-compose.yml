@@ -17,6 +17,8 @@ services:
       - repositories.url.allowed_urls=https://storage.googleapis.com/*,https://*.amazonaws.com/*
       # increase write queue size for bulk tasks
       - thread_pool.write.queue_size=1000
+      # increase number of open scroll requests at a time
+      - search.max_open_scroll_context=5000
     volumes:
       #use a volume for persistence / performance
       - esdata:/usr/share/elasticsearch/data
