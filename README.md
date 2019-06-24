@@ -92,7 +92,7 @@ Once Kibana is installed and deployed, check that it is working by browsing to `
 The configuration of the pipeline can be spit into three aspects - Operations, Data, and Legacy
 
 #### Operations
-Here the execution parameters of the pipeline can be controlled. For example, the address of the Elasticsearch server, use of an embedded Redis instance, number of worker threads, etc.
+Here the execution parameters of the pipeline can be controlled. For example, the address of the Elasticsearch server, number of worker threads, etc.
 
 It makes use of the [ConfigArgParse](https://pypi.org/project/ConfigArgParse/) library to allow these to be specified on the command line, environemnt varibale, or in a config file (in decreasing order of precendence). 
 
@@ -160,7 +160,7 @@ There are several targets which speed up common tasks, such as
 
 *Shell completion*: most shells will complete the list of targets when `<TAB>` is pressed. This is a useful way of seeing which target(s) are available.
 
-*Parallel execution*: `make -j` will run all the dependencies of a target in parallel. Useful for the `load_data` and `validate_all` stages. Using a value will limit to only that number of jobs e.g. `-j 4` will limit to 4. Using `-l x` will only create new jobs if the total load on the machine is below that threashold - usefuul as several of the stages themselves run over multiple processess. These can be combined - for example `make -j 8 -l 4` will spawn up to 8 jobs at the same time as long as the load is less than 4 when creating them. Note that when commands that use Redis are run in parallel, they will each try to start an embedded Redis on the same port and all fail; to solve this, use an shared external Redis instance.
+*Parallel execution*: `make -j` will run all the dependencies of a target in parallel. Useful for the `load_data` and `validate_all` stages. Using a value will limit to only that number of jobs e.g. `-j 4` will limit to 4. Using `-l x` will only create new jobs if the total load on the machine is below that threashold - usefuul as several of the stages themselves run over multiple processess. These can be combined - for example `make -j 8 -l 4` will spawn up to 8 jobs at the same time as long as the load is less than 4 when creating them. 
 
 *Partial execution*: the targets inside the makefile use absolute paths. While this is useful for running the makefile from a directory outside of the root of the project,
 when only a partial execution is desired (e.g. for testing) then the full path will be required.
@@ -214,8 +214,6 @@ It will output to `logs/profile.*.svg` which can be opened with a browser e.g. G
 ### Other development tools
 
 To identify potentially removable code, [Vulture](https://pypi.org/project/vulture/) and/or [Coverage](https://coverage.readthedocs.io/en/v4.5.x/) may be useful.
-
-To look inside Redis, [Redis Desktop Manager](https://redisdesktop.com/) may be useful.
 
 
 # Copyright

@@ -190,7 +190,7 @@ gcloud compute ssh $NAME --command 'sudo docker-compose run --rm --entrypoint ma
 #full build!
 #metrics is broken, so dont do it
 gcloud compute ssh $NAME --command "cat > run.sh" <<EOF
-docker-compose run -d --rm --entrypoint make mrtarget -r -R -j -l 16 relationship_data search_data association_qc
+docker-compose run -d --rm --entrypoint make mrtarget -r -R -j -l 16 all
 EOF
 gcloud compute ssh $NAME --command "chmod +x run.sh"
 #this will take about 18h to build

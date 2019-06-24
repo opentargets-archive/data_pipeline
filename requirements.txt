@@ -11,7 +11,6 @@ coverage==4.5.3
 decorator==4.4.0
 dill==0.2.5
 elasticsearch-dsl==7.0.0
-envparse==0.2.0
 functools32==3.2.3.post2
 future==0.17.1
 idna==2.8
@@ -24,7 +23,6 @@ networkx==2.2
 numpy==1.16.2
 petl==1.2.0
 psutil==5.6.1
-PyFunctional==1.2.0
 pyparsing==2.3.1
 pypeln==0.1.6
 pyrsistent==0.14.11

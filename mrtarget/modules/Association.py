@@ -1,7 +1,6 @@
 import logging
 import copy
 
-import functional
 import functools
 import itertools
 from collections import defaultdict
@@ -89,17 +88,21 @@ class Association(JSONSerializable):
     def _inject_tractability_in_target(self, gene_obj):
         def _create_facet(categories_dict):
             if isinstance(categories_dict, dict):
-                return functional.seq(categories_dict.viewitems())\
-                    .filter(lambda e: e[1] > 0)\
-                    .map(lambda e: e[0]).to_list()
+                result = []
+                for e in categories_dict.viewitems():
+                    if e[1] > 0:
+                        result.append(e[0])
+                return result
             else:
                 return []
 
         def _merge_facets(the_dict):
             if isinstance(the_dict, dict):
-                return functional.seq(the_dict.viewitems())\
-                    .flat_map(lambda e: itertools.imap(lambda el: e[0] + '_' + el,e[1]))\
-                    .to_list()
+                result = []
+                for e in the_dict.viewitems():
+                    for el in e[1]:
+                        result.append(e[0] + '_' + el)
+                return result
             else:
                 return []
 
@@ -321,8 +324,8 @@ def get_evidence_for_target_simple(es, target, index):
             ]
         },
     }
-    
-    for ev in helpers.scan(client=es, query=query_body,
+
+    for ev in helpers.scan(client=es, query=query_body, scroll='4h',
         index=index, size=1000):
         #print(dict(ev['_source']))
         yield dict(ev['_source'])
@@ -473,8 +476,8 @@ class ScoringProcess():
 
 
     def get_targets(self, es):
-        for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).scan():
-            yield target.meta.id
+        for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).params(scroll = '4h').scan():
+            yield str(target.meta.id)
 
     def process_all(self, dry_run):
 
@@ -567,7 +570,7 @@ class ScoringProcess():
         #number of eco entries
         association_count = 0
         #Note: try to avoid doing this more than once!
-        for association in Search().using(es).index(index).query(MatchAll()).scan():
+        for association in Search().using(es).index(index).query(MatchAll()).params(scroll = '4h').scan():
             association_count += 1
             if association_count % 1000 == 0:
                 self.logger.debug("checking %d", association_count)
