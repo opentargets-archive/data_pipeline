@@ -305,25 +305,27 @@ def get_evidence_for_target_simple(es, target, index):
             "constant_score": {
                 "filter": {
                     "term": {
-                        "target.id": str(target)
+                        "target.id": target
                     }
                 }
             }
         },
         '_source': {
-            "includes": 
-                ["target.id",
-                    "private.efo_codes",
-                    "disease.id",
-                    "scores.association_score",
-                    "sourceID",
-                    "id",
-                ]},
+            "includes": [
+                "target.id",
+                "private.efo_codes",
+                "disease.id",
+                "scores.association_score",
+                "sourceID",
+                "id",
+            ]
+        },
     }
 
     for ev in helpers.scan(client=es, query=query_body,
         index=index, size=1000):
-        yield ev['_source']
+        #print(dict(ev))
+        yield dict(ev['_source'])
 
 def produce_evidence(target, es, es_index_val_right,
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
@@ -341,6 +343,9 @@ def produce_evidence(target, es, es_index_val_right,
 
         for efo in efo_list:
             key = (evidence['target']['id'], efo)
+
+            #print(key)
+
             if key not in data_cache:
                 data_cache[key] = []
 
@@ -469,7 +474,7 @@ class ScoringProcess():
 
     def get_targets(self, es):
         for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).scan():
-            yield str(target.meta.id)
+            yield target.meta.id
 
     def process_all(self, dry_run):
 
