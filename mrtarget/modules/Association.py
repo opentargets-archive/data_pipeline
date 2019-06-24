@@ -321,11 +321,10 @@ def get_evidence_for_target_simple(es, target, index):
             ]
         },
     }
-    logger = logging.getLogger(__name__+".get_evidence_for_target_simple()")
+    
     for ev in helpers.scan(client=es, query=query_body,
         index=index, size=1000):
-        #print(dict(ev))
-        logger.debug("handling "+dict(ev['_source']))
+        print(dict(ev['_source']))
         yield dict(ev['_source'])
 
 def produce_evidence(target, es, es_index_val_right,
