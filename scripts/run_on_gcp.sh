@@ -84,16 +84,12 @@ version: "3.6"
 services:
       
   elasticsearch:
-    #image: elasticsearch:5.6.13
-    #note that the docker hub version doesn't allow restores for some reason...
-    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.13
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.1.1
     ports:
       - 9200:9200
     environment:
       # assign more memory to JVM 
       - "ES_JAVA_OPTS=-Xms12g -Xmx12g"
-      #disable xpack as not OSS
-      - "xpack.security.enabled=false"
       #disable memory swapping to disk for performance
       - "bootstrap.memory_lock=true"
       #increase the buffer is used to store newly indexed documents
@@ -101,6 +97,10 @@ services:
       - "indices.memory.index_buffer_size=4g"
       #allow downloading from google buckets
       - repositories.url.allowed_urls=https://storage.googleapis.com/*,https://*.amazonaws.com/*
+      # increase write queue size for bulk tasks
+      - thread_pool.write.queue_size=1000
+      # increase number of open scroll requests at a time
+      - search.max_open_scroll_context=5000
     volumes:
       #use a volume for persistence / performance
       - esdata:/usr/share/elasticsearch/data
@@ -131,9 +131,8 @@ services:
       - elasticsearch
     environment:
       - ELASTICSEARCH_NODES=http://elasticsearch:9200
-      - SCHEMA_VERSION=1.3.0
-      - NUMBER_TO_KEEP=100000000
-      - ES_PREFIX=latest
+    tmpfs:
+      - /tmp
     volumes:
       - ./log:/usr/src/app/log
       - ./json:/usr/src/app/json
@@ -190,7 +189,7 @@ gcloud compute ssh $NAME --command 'sudo docker-compose run --rm --entrypoint ma
 #full build!
 #metrics is broken, so dont do it
 gcloud compute ssh $NAME --command "cat > run.sh" <<EOF
-docker-compose run -d --rm --entrypoint make mrtarget -r -R -j -l 16 all
+docker-compose run -d --rm --entrypoint make mrtarget -r -R all
 EOF
 gcloud compute ssh $NAME --command "chmod +x run.sh"
 #this will take about 18h to build
