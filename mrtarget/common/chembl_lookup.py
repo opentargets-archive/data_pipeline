@@ -42,8 +42,9 @@ class ChEMBLLookup(object):
     '''
     def populate_molecules_dict(self):
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
-        # dumbdbm creates an empty database file. In this way shelve can open it properly.
         t_filename = tempfile.NamedTemporaryFile(delete=False).name
+        # dbm could not work: Eg. dbm.error: cannot add item.
+        # Use dumbdbm for the local execution. Python 3 should fix this issue.
         dumb_dict = dbm.open(t_filename, 'n')
         shelve_out = shelve.Shelf(dict=dumb_dict)
         for uri in self.molecule_uri:
