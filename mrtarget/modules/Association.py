@@ -20,7 +20,7 @@ from opentargets_urlzsource import URLZSource
 import elasticsearch
 from elasticsearch import helpers
 from elasticsearch_dsl import Search
-from elasticsearch_dsl.query import MatchAll
+from elasticsearch_dsl.query import MatchAll, ConstantScore, Q
 import pypeln.process as pr
 import simplejson as json
 
@@ -303,30 +303,10 @@ def produce_evidence_local_init(es_hosts, es_index_val_right,
         is_direct_do_not_propagate, datasources_to_datatypes)
 
 def get_evidence_for_target_simple(es, target, index):
-    query_body = {
-        "query": {
-            "constant_score": {
-                "filter": {
-                    "term": {
-                        "target.id": str(target)
-                    }
-                }
-            }
-        },
-        '_source': {
-            "includes": 
-                ["target.id",
-                    "private.efo_codes",
-                    "disease.id",
-                    "scores.association_score",
-                    "sourceID",
-                    "id",
-                ]},
-    }
-
-    for ev in helpers.scan(client=es, query=query_body, scroll='4h',
-        index=index, size=1000):
-        yield ev['_source']
+    fields = ['target.id', 'private.efo_codes', 'disease.id','scores.association_score','sourceID','id']
+    for ev in Search().using(es).index(index).query(ConstantScore(filter=Q('term', target__id=target))).\
+            source(include=fields).params(scroll='4h',size=1000).scan():
+        yield ev.to_dict()
 
 def produce_evidence(target, es, es_index_val_right,
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
