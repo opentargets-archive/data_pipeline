@@ -11,7 +11,7 @@ class HPALookUpTable(object):
         self._es = es
         self._es_index = index
 
-    @cachetools.func.lru_cache(maxsize=32768)
+    @cachetools.func.lru_cache(maxsize=8192)
     def get_hpa(self, hpa_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=hpa_id))[0:1].execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
@@ -29,7 +29,7 @@ class GeneLookUpTable(object):
         self._es = es
         self._es_index = es_index
 
-    @cachetools.func.lru_cache(maxsize=32768)
+    @cachetools.func.lru_cache(maxsize=8192)
     def get_gene(self, gene_id):
         assert gene_id is not None
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].execute()
@@ -78,7 +78,7 @@ class ECOLookUpTable(object):
         self._es = es
         self._es_index = es_index
 
-    @cachetools.func.lru_cache(maxsize=32768)
+    @cachetools.func.lru_cache(maxsize=8192)
     def get_eco(self, eco_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=eco_id))[0:1].execute()
         return response.hits[0].to_dict()
@@ -100,7 +100,7 @@ class EFOLookUpTable(object):
             #assume already a short code
             return url
 
-    @cachetools.func.lru_cache(maxsize=32768)
+    @cachetools.func.lru_cache(maxsize=8192)
     def get_efo(self, efo_id):
         response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
