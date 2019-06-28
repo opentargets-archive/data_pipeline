@@ -89,10 +89,6 @@ class Gene(JSONSerializable):
     def get_id_org(self):
         return ENS_ID_ORG_PREFIX + self.ensembl_gene_id
 
-    def preprocess(self):
-        self._create_suggestions()
-        self._create_facets()
-
     def _create_suggestions(self):
 
         field_order = [self.approved_symbol,
@@ -295,6 +291,11 @@ class GeneManager():
 
         with URLZSource(self.es_settings).open() as settings_file:
             settings = json.load(settings_file)
+
+        # Hot fix issue 643: missing pathway in the association. Need a review for the reactome functions
+        for geneid, gene in self.genes.iterate():
+            gene._create_suggestions()
+            gene._create_facets()
 
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
 
