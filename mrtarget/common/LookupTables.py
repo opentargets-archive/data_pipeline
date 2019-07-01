@@ -4,6 +4,7 @@ from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import Match,Bool
 
 import cachetools
+import sys
 
 #TODO remove this class, migrate each of these to where they are actually used
 
@@ -13,11 +14,15 @@ class HPALookUpTable(object):
         self._es = es
         self._es_index = index
         #TODO configure size
-        self.cache = cachetools.LRUCache(4096)
+        self.cache = cachetools.LRUCache(1024*64, getsizeof=sys.getsizeof)
+        self.cache.hits = 0
+        self.cache.queries = 0
 
     def get_hpa(self, hpa_id):
 
+        self.cache.queries += 1
         if hpa_id in self.cache:
+            self.cache.hits += 1
             return self.cache[hpa_id]
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=hpa_id))[0:1].execute()
@@ -33,20 +38,34 @@ class HPALookUpTable(object):
             return val
         #can't have multiple hits, primary key!
 
+    def __del__(self):
+        logger = logging.getLogger(__name__+".HPALookUpTable")
+        logger.debug("cache {} occupied {} hitrate".format(
+            (self.cache.currsize*100)/self.cache.maxsize,
+            (self.cache.hits*100)/self.cache.queries ))
+
 class GeneLookUpTable(object):
 
     def __init__(self, es, es_index,):
         self._es = es
         self._es_index = es_index
         #TODO configure size
-        self.cache_gene = cachetools.LRUCache(4096)
-        self.cache_u2e = cachetools.LRUCache(8192)
-        self.cache_contains = cachetools.LRUCache(8192)
+        self.cache_gene = cachetools.LRUCache(1024*1024*1024, getsizeof=sys.getsizeof)
+        self.cache_gene.hits = 0
+        self.cache_gene.queries = 0
+        self.cache_u2e = cachetools.LRUCache(1024*1024*128, getsizeof=sys.getsizeof)
+        self.cache_u2e.hits = 0
+        self.cache_u2e.queries = 0
+        self.cache_contains = cachetools.LRUCache(1024*1024*16, getsizeof=sys.getsizeof)
+        self.cache_contains.hits = 0
+        self.cache_contains.queries = 0
 
     def get_gene(self, gene_id):
         assert gene_id is not None
 
+        self.cache_gene.queries += 1
         if gene_id in self.cache_gene:
+            self.cache_gene.hits += 1
             return self.cache_gene[gene_id]
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].execute()
@@ -65,7 +84,9 @@ class GeneLookUpTable(object):
     def get_uniprot2ensembl(self, uniprot_id):
         assert uniprot_id is not None
 
+        self.cache_u2e.queries += 1
         if uniprot_id in self.cache_u2e:
+            self.cache_u2e.hits += 1
             return self.cache_u2e[uniprot_id]
 
         response = Search().using(self._es).index(self._es_index).query(
@@ -89,8 +110,17 @@ class GeneLookUpTable(object):
 
     def __contains__(self, gene_id):
 
-        if gene_id in self.cache_u2e:
+        self.cache_contains.queries += 1
+        if gene_id in self.cache_contains:
+            self.cache_contains.hits += 1
             return self.cache_contains[gene_id]
+
+        #check the gene cache too
+        if gene_id in self.cache_gene:
+            if self.cache_gene[gene_id] is None:
+                return False
+            else:
+                return True
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].source(False).execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
@@ -104,16 +134,32 @@ class GeneLookUpTable(object):
             return False
         #can't have multiple hits, primary key!
 
+    def __del__(self):
+        logger = logging.getLogger(__name__+".GeneLookUpTable")
+        logger.debug("cache_gene {} occupied {} hitrate".format(
+            (self.cache_gene.currsize*100)/self.cache_gene.maxsize,
+            (self.cache_gene.hits*100)/self.cache_gene.queries ))
+        logger.debug("cache_u2e {} occupied {} hitrate".format(
+            (self.cache_u2e.currsize*100)/self.cache_u2e.maxsize,
+            (self.cache_u2e.hits*100)/self.cache_u2e.queries ))
+        logger.debug("cache_contains {} occupied {} hitrate".format(
+            (self.cache_contains.currsize*100)/self.cache_contains.maxsize,
+            (self.cache_contains.hits*100)/self.cache_contains.queries ))
+
 class ECOLookUpTable(object):
     def __init__(self, es, es_index):
         self._es = es
         self._es_index = es_index
         #TODO configure size
-        self.cache_eco = cachetools.LRUCache(4096)
+        self.cache_eco = cachetools.LRUCache(1024*1024*16, getsizeof=sys.getsizeof)
+        self.cache_eco.hits = 0
+        self.cache_eco.queries = 0
 
     def get_eco(self, eco_id):
 
+        self.cache_eco.queries += 1
         if eco_id in self.cache_eco:
+            self.cache_eco.hits += 1
             return self.cache_eco[eco_id]
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=eco_id))[0:1].execute()
@@ -121,14 +167,24 @@ class ECOLookUpTable(object):
         self.cache_eco[eco_id] = val
         return val
 
+    def __del__(self):
+        logger = logging.getLogger(__name__+".ECOLookUpTable")
+        logger.debug("cache_eco {} occupied {} hitrate".format(
+            (self.cache_eco.currsize*100)/self.cache_eco.maxsize,
+            (self.cache_eco.hits*100)/self.cache_eco.queries ))
+
 class EFOLookUpTable(object):
 
     def __init__(self, es, index):
         self._es = es
         self._es_index = index
         #TODO configure size
-        self.cache_efo = cachetools.LRUCache(4096)
-        self.cache_contains = cachetools.LRUCache(4096)
+        self.cache_efo = cachetools.LRUCache(1024*1024*128, getsizeof=sys.getsizeof)
+        self.cache_efo.hits = 0
+        self.cache_efo.queries = 0
+        self.cache_contains = cachetools.LRUCache(1024*1024*16, getsizeof=sys.getsizeof)
+        self.cache_contains.hits = 0
+        self.cache_contains.queries = 0
 
     @staticmethod
     def get_ontology_code_from_url(url):
@@ -142,8 +198,10 @@ class EFOLookUpTable(object):
             return url
 
     def get_efo(self, efo_id):
-
+        
+        self.cache_efo.queries += 1
         if efo_id in self.cache_efo:
+            self.cache_efo.hits += 1
             return self.cache_efo[efo_id]
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].execute()
@@ -161,8 +219,17 @@ class EFOLookUpTable(object):
 
     def __contains__(self, efo_id):
 
+        self.cache_contains.queries += 1
         if efo_id in self.cache_contains:
+            self.cache_contains.hits += 1
             return self.cache_contains[efo_id]
+
+        #check the main cache too
+        if efo_id in self.cache_efo:
+            if self.cache_efo[efo_id] is None:
+                return False
+            else:
+                return True
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].source(False).execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
@@ -175,3 +242,12 @@ class EFOLookUpTable(object):
             self.cache_contains[efo_id] = True
             return True
         #can't have multiple hits, primary key!
+
+    def __del__(self):
+        logger = logging.getLogger(__name__+".EFOLookUpTable")
+        logger.debug("cache_efo {} occupied {} hitrate".format(
+            (self.cache_efo.currsize*100)/self.cache_efo.maxsize,
+            (self.cache_efo.hits*100)/self.cache_efo.queries ))
+        logger.debug("cache_contains {} occupied {} hitrate".format(
+            (self.cache_contains.currsize*100)/self.cache_contains.maxsize,
+            (self.cache_contains.hits*100)/self.cache_contains.queries ))
