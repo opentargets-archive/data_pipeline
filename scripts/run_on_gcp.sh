@@ -84,9 +84,8 @@ version: "3.6"
 services:
       
   elasticsearch:
-    #image: elasticsearch:5.6.13
     #note that the docker hub version doesn't allow restores for some reason...
-    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.13
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.16
     ports:
       - 9200:9200
     environment:
@@ -116,7 +115,7 @@ services:
       retries:  30
         
   kibana:
-    image: kibana:5.6.13
+    image: kibana:5.6.16
     ports:
       - 5601:5601
     environment:
