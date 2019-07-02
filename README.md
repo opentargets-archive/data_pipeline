@@ -202,18 +202,22 @@ docker-compose run --rm -f docker-compose.yml -f docker-compose.override.yml mrt
 
 This is done because overrides cannot remove previous values, so once a build directive has been specified it will always be used. Therefore, the build instruction must be outside of the default docker-compose.yml to support cases where the pipeline should be run but not built.
 
-### Profiling with PyFlame
+### Profiling
 
-There is some additional configuration to build a docker container that can run the pipeline while profiling it with [PyFlame ](https://github.com/uber/pyflame) to produce
+There is some additional configuration to build a docker container that can run the pipeline while profiling it with [PyFlame](https://github.com/uber/pyflame) to produce
 output that [FlameGraph](https://github.com/brendangregg/FlameGraph) can turn into pretty interactive svg images.
 
 To do this, use the `Dockerfile.pyfile` to build the container, and run it ensuring that the kernel of the host has `kernel.yama.ptrace_scope=0` and `--cap-add=SYS_PTRACE` on the docker container. See the updated entrypoint `scripts/entrypoint.pyflame.sh` for more details.
 
 It will output to `logs/profile.*.svg` which can be opened with a browser e.g. Google Chrome. Note, while profiling performance may be slower.
 
+There is an alternative profiler [py-spy](https://github.com/benfred/py-spy) and associated Dockerfile `Dockerfile.py-spy`.
+
 ### Other development tools
 
 To identify potentially removable code, [Vulture](https://pypi.org/project/vulture/) and/or [Coverage](https://coverage.readthedocs.io/en/v4.5.x/) may be useful.
+
+There is a simple script `scripts/entrypoint.time.sh` that wraps the pipline in GNU time with `-v` for verbose logging. This output includes peak memory consumption.
 
 
 # Copyright
