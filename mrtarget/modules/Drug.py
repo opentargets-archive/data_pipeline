@@ -49,6 +49,8 @@ class DrugProcess(object):
     def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             es_index_gene, es_index_efo,
             workers_write, queue_write,
+            cache_efo, cache_efo_contains,
+            cache_target, cache_target_u2e, cache_target_contains,
             chembl_target_uris, 
             chembl_mechanism_uris, 
             chembl_component_uris, 
@@ -63,6 +65,13 @@ class DrugProcess(object):
         self.es_index_efo = es_index_efo
         self.workers_write = workers_write
         self.queue_write = queue_write
+
+        self.cache_efo = cache_efo
+        self.cache_efo_contains = cache_efo_contains
+        self.cache_target = cache_target
+        self.cache_target_u2e = cache_target_u2e
+        self.cache_target_contains = cache_target_contains
+
         self.chembl_target_uris = chembl_target_uris
         self.chembl_mechanism_uris = chembl_mechanism_uris
         self.chembl_component_uris = chembl_component_uris
@@ -638,8 +647,14 @@ class DrugProcess(object):
 
         #create lookup tables
         self.lookup_data = LookUpDataRetriever(es,  
-            gene_index=self.es_index_gene,
-            efo_index=self.es_index_efo).lookup
+            gene_index = self.es_index_gene,
+            gene_cache_size = self.cache_target,
+            gene_cache_u2e_size = self.cache_target_u2e,
+            gene_cache_contains_size = self.cache_target_contains,
+            efo_index = self.es_index_efo,
+            efo_cache_size = self.cache_efo,
+            efo_cache_contains_size = self.cache_efo_contains
+            ).lookup
 
 
         # these are all separate files

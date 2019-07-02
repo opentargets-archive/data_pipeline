@@ -180,6 +180,16 @@ def setup_ops_parser():
         env_var="DRG_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--drg-queue-write", help="size of drug writer queue (in chunks)",
         env_var="DRG_QUEUE_WRITE", action='store', default=8, type=int)
+    p.add("--drg-cache-efo", help="size of drug cache for diseases (bytes)",
+        env_var="DRG_CACHE_EFO", action='store', default=1024*1024*8, type=int)
+    p.add("--drg-cache-efo-contains", help="size of drug cache for disease existing (bytes)",
+        env_var="DRG_CACHE_EFO_CONTAINS", action='store', default=1024*512, type=int)
+    p.add("--drg-cache-target", help="size of drug cache for target (bytes)",
+        env_var="DRG_CACHE_TARGET", action='store', default=1024*1024*8, type=int)
+    p.add("--drg-cache-target-u2e", help="size of drug cache for target uniprot to ensembl (bytes)",
+        env_var="DRG_CACHE_TARGET_U2E", action='store', default=1024*1024*4, type=int)
+    p.add("--drg-cache-target-contains", help="size of drug cache for target existing (bytes)",
+        env_var="DRG_CACHE_TARGET_CONTAINS", action='store', default=1024*512, type=int)
 
     # for debugging
     p.add("--dry-run", help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",

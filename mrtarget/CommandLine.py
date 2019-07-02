@@ -202,6 +202,8 @@ def main():
                 es_config.drg.mapping, es_config.drg.setting,
                 es_config.gen.name, es_config.efo.name,
                 args.drg_workers_writer, args.drg_queue_write, 
+                args.drg_cache_efo, args.drg_cache_efo_contains,
+                args.drg_cache_target, args.drg_cache_target_u2e, args.drg_cache_target_contains,
                 data_config.chembl_target, 
                 data_config.chembl_mechanism, 
                 data_config.chembl_component, 
