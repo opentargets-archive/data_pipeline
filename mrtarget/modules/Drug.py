@@ -8,7 +8,7 @@ from elasticsearch_dsl.query import MatchAll
 from opentargets_urlzsource import URLZSource
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.connection import new_es_client
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.LookupHelpers import LookUpDataRetriever
 
 import tempfile
 import dbm
@@ -638,10 +638,6 @@ class DrugProcess(object):
 
         #create lookup tables
         self.lookup_data = LookUpDataRetriever(es,  
-            ( 
-                LookUpDataType.TARGET, 
-                LookUpDataType.DISEASE
-            ),
             gene_index=self.es_index_gene,
             efo_index=self.es_index_efo).lookup
 

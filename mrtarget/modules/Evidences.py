@@ -16,7 +16,7 @@ import mrtarget.common.IO as IO
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.EvidenceString import EvidenceManager, Evidence
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.LookupHelpers import LookUpDataRetriever
 from opentargets_urlzsource import URLZSource
 
 def make_validated_evs_obj(filename, hash, line, line_n, is_valid=False, explanation_type='', explanation_str='',
@@ -82,11 +82,6 @@ def validation_on_start(eco_scores_uri, schema_uri, excluded_biotypes,
     validator = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
 
     lookup_data = LookUpDataRetriever(new_es_client(es_hosts), 
-    (
-        LookUpDataType.DISEASE,
-        LookUpDataType.TARGET,
-        LookUpDataType.ECO
-    ),
     gene_index=es_index_gene,
     eco_index=es_index_eco,
     efo_index=es_index_efo).lookup
@@ -388,7 +383,6 @@ def process_evidences_pipeline(filenames, first_n,
                 if failcount:
                     raise RuntimeError("%s relations failed to index" % failcount)
 
-            print('stages created, ran scoring and writing')
             logger.info('stages created, ran scoring and writing')
 
 

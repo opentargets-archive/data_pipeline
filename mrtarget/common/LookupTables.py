@@ -10,11 +10,10 @@ import sys
 
 class HPALookUpTable(object):
 
-    def __init__(self, es, index):
+    def __init__(self, es, index, cachesize):
         self._es = es
         self._es_index = index
-        #TODO configure size
-        self.cache = cachetools.LRUCache(1024*64, getsizeof=sys.getsizeof)
+        self.cache = cachetools.LRUCache(cachesize, getsizeof=sys.getsizeof)
         self.cache.hits = 0
         self.cache.queries = 0
 
@@ -50,17 +49,17 @@ class HPALookUpTable(object):
 
 class GeneLookUpTable(object):
 
-    def __init__(self, es, es_index,):
+    def __init__(self, es, es_index, cache_gene_size, cache_u2e_size, cache_contains_size):
         self._es = es
         self._es_index = es_index
-        #TODO configure size
-        self.cache_gene = cachetools.LRUCache(1024*1024*16, getsizeof=sys.getsizeof)
+
+        self.cache_gene = cachetools.LRUCache(cache_gene_size, getsizeof=sys.getsizeof)
         self.cache_gene.hits = 0
         self.cache_gene.queries = 0
-        self.cache_u2e = cachetools.LRUCache(1024*1024*4, getsizeof=sys.getsizeof)
+        self.cache_u2e = cachetools.LRUCache(cache_u2e_size, getsizeof=sys.getsizeof)
         self.cache_u2e.hits = 0
         self.cache_u2e.queries = 0
-        self.cache_contains = cachetools.LRUCache(1024*512, getsizeof=sys.getsizeof)
+        self.cache_contains = cachetools.LRUCache(cache_contains_size, getsizeof=sys.getsizeof)
         self.cache_contains.hits = 0
         self.cache_contains.queries = 0
 
@@ -166,46 +165,46 @@ class GeneLookUpTable(object):
                 (self.cache_contains.hits*100)/self.cache_contains.queries ))
 
 class ECOLookUpTable(object):
-    def __init__(self, es, es_index):
+    def __init__(self, es, es_index, cache_size):
         self._es = es
         self._es_index = es_index
         #TODO configure size
-        self.cache_eco = cachetools.LRUCache(1024*256, getsizeof=sys.getsizeof)
-        self.cache_eco.hits = 0
-        self.cache_eco.queries = 0
+        self.cache = cachetools.LRUCache(cache_size, getsizeof=sys.getsizeof)
+        self.cache.hits = 0
+        self.cache.queries = 0
 
     def get_eco(self, eco_id):
 
-        self.cache_eco.queries += 1
-        if eco_id in self.cache_eco:
-            self.cache_eco.hits += 1
-            return self.cache_eco[eco_id]
+        self.cache.queries += 1
+        if eco_id in self.cache:
+            self.cache.hits += 1
+            return self.cache[eco_id]
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=eco_id))[0:1].execute()
         val = response.hits[0].to_dict()
-        self.cache_eco[eco_id] = val
+        self.cache[eco_id] = val
         return val
 
     def __del__(self):
         logger = logging.getLogger(__name__+".ECOLookUpTable")
-        if self.cache_eco.queries == 0:
-            logger.debug("cache_eco {} occupied 100 hitrate".format(
-                (self.cache_eco.currsize*100)/self.cache_eco.maxsize))
+        if self.cache.queries == 0:
+            logger.debug("cache {} occupied 100 hitrate".format(
+                (self.cache.currsize*100)/self.cache.maxsize))
         else:
-            logger.debug("cache_eco {} occupied {} hitrate".format(
-                (self.cache_eco.currsize*100)/self.cache_eco.maxsize,
-                (self.cache_eco.hits*100)/self.cache_eco.queries ))
+            logger.debug("cache {} occupied {} hitrate".format(
+                (self.cache.currsize*100)/self.cache.maxsize,
+                (self.cache.hits*100)/self.cache.queries ))
 
 class EFOLookUpTable(object):
 
-    def __init__(self, es, index):
+    def __init__(self, es, index, cache_efo_size, cache_contains_size):
         self._es = es
         self._es_index = index
         #TODO configure size
-        self.cache_efo = cachetools.LRUCache(1024*1024*8, getsizeof=sys.getsizeof)
+        self.cache_efo = cachetools.LRUCache(cache_efo_size, getsizeof=sys.getsizeof)
         self.cache_efo.hits = 0
         self.cache_efo.queries = 0
-        self.cache_contains = cachetools.LRUCache(1024*512, getsizeof=sys.getsizeof)
+        self.cache_contains = cachetools.LRUCache(cache_contains_size, getsizeof=sys.getsizeof)
         self.cache_contains.hits = 0
         self.cache_contains.queries = 0
 

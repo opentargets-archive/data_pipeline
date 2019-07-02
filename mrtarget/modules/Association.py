@@ -9,7 +9,7 @@ from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.connection import new_es_client
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.LookupHelpers import LookUpDataRetriever
 from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer
 from mrtarget.modules.EFO import EFO
 from mrtarget.common.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
@@ -355,19 +355,24 @@ def produce_evidence(target, es, es_index_val_right,
     return return_values
 
 def score_producer_local_init(datasources_to_datatypes, dry_run, es_hosts,
-        es_index_gene, es_index_eco, es_index_hpa, es_index_efo):
+        es_index_gene, es_index_eco, es_index_hpa, es_index_efo,
+        gene_cache_size, gene_cache_u2e_size, gene_cache_contains_size,
+        eco_cache_size, hpa_cache_size,
+        efo_cache_size, efo_cache_contains_size):
     scorer = Scorer()
     lookup_data = LookUpDataRetriever(new_es_client(es_hosts), 
-        (
-            LookUpDataType.DISEASE,
-            LookUpDataType.TARGET,
-            LookUpDataType.ECO,
-            LookUpDataType.HPA
-        ),
         gene_index=es_index_gene,
+        gene_cache_size = gene_cache_size,
+        gene_cache_u2e_size = gene_cache_u2e_size,
+        gene_cache_contains_size = gene_cache_contains_size,
         eco_index=es_index_eco,
+        eco_cache_size = eco_cache_size,
         hpa_index=es_index_hpa,
-        efo_index=es_index_efo).lookup
+        hpa_cache_size = hpa_cache_size,
+        efo_index=es_index_efo,
+        efo_cache_size = efo_cache_size,
+        efo_cache_contains_size = efo_cache_contains_size
+        ).lookup
     return scorer, lookup_data, datasources_to_datatypes, dry_run
 
 def score_producer(data, 
@@ -426,6 +431,9 @@ class ScoringProcess():
             es_index_gene, es_index_eco, es_index_val_right, es_index_hpa, es_index_efo,
             workers_write, workers_production, workers_score, 
             queue_score, queue_produce, queue_write, 
+            cache_hpa, cache_eco,
+            cache_efo, cache_efo_contains,
+            cache_target, cache_target_u2e, cache_target_contains,
             scoring_weights, is_direct_do_not_propagate,
             datasources_to_datatypes):
 
@@ -447,6 +455,14 @@ class ScoringProcess():
         self.queue_write = queue_write
         self.queue_produce = queue_produce
         self.queue_score = queue_score
+
+        self.cache_hpa = cache_hpa
+        self.cache_eco = cache_eco
+        self.cache_efo = cache_efo
+        self.cache_efo_contains = cache_efo_contains
+        self.cache_target = cache_target
+        self.cache_target_u2e = cache_target_u2e
+        self.cache_target_contains = cache_target_contains
 
         self.scoring_weights = scoring_weights
         self.is_direct_do_not_propagate = is_direct_do_not_propagate
@@ -473,7 +489,10 @@ class ScoringProcess():
             self.datasources_to_datatypes)
         score_producer_local_init_baked = functools.partial(score_producer_local_init,
             self.datasources_to_datatypes, dry_run, self.es_hosts,
-            self.es_index_gene, self.es_index_eco, self.es_index_hpa, self.es_index_efo)
+            self.es_index_gene, self.es_index_eco, self.es_index_hpa, self.es_index_efo,
+            self.cache_target, self.cache_target_u2e, self.cache_target_contains,
+            self.cache_eco, self.cache_hpa,
+            self.cache_efo, self.cache_efo_contains)
         
         #pipeline stage for making the lists of the target/disease pairs and evidence
         pipeline_stage1 = pr.flat_map(produce_evidence, targets, 
