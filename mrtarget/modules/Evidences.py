@@ -76,15 +76,24 @@ This function is called once in each child process to do local setup for
 validation
 """
 def validation_on_start(eco_scores_uri, schema_uri, excluded_biotypes, 
-        datasources_to_datatypes, es_hosts, es_index_gene, es_index_eco, es_index_efo):
+        datasources_to_datatypes, es_hosts, es_index_gene, es_index_eco, es_index_efo,
+        cache_target, cache_target_u2e, cache_target_contains,
+        cache_eco, cache_efo, cache_efo_contains):
     logger = logging.getLogger(__name__)
 
     validator = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
 
     lookup_data = LookUpDataRetriever(new_es_client(es_hosts), 
-    gene_index=es_index_gene,
-    eco_index=es_index_eco,
-    efo_index=es_index_efo).lookup
+        gene_index=es_index_gene,
+        gene_cache_size = cache_target,
+        gene_cache_u2e_size = cache_target_u2e,
+        gene_cache_contains_size = cache_target_contains,
+        eco_index=es_index_eco,
+        eco_cache_size = cache_efo_contains,
+        efo_index=es_index_efo,
+        efo_cache_size = cache_efo,
+        efo_cache_contains_size = efo_cache_contains_size
+        ).lookup
 
 
     datasources_to_datatypes = datasources_to_datatypes
@@ -303,6 +312,8 @@ def process_evidences_pipeline(filenames, first_n,
         es_settings_valid, es_settings_invalid, 
         es_index_gene, es_index_eco, es_index_efo,
         dry_run, workers_validation, queue_validation, workers_write, queue_write, 
+        cache_target, cache_target_u2e, cache_target_contains,
+        cache_eco, cache_efo, cache_efo_contains,
         eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
 
@@ -332,8 +343,10 @@ def process_evidences_pipeline(filenames, first_n,
 
     #create functions with pre-baked arguments
     validation_on_start_baked = functools.partial(validation_on_start, 
-         eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes,
-         es_hosts, es_index_gene, es_index_eco, es_index_efo)
+        eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes,
+        es_hosts, es_index_gene, es_index_eco, es_index_efo,
+        cache_target, cache_target_u2e, cache_target_contains,
+        cache_eco, cache_efo, cache_efo_contains)
 
     #here is the pipeline definition
     pl_stage = pr.map(process_evidence, evs, 

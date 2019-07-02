@@ -128,6 +128,8 @@ def main():
             args.dry_run, 
             args.val_workers_validator, args.val_queue_validator,
             args.val_workers_writer, args.val_queue_validator_writer,
+            args.val_cache_target, args.val_cache_target_u2e, args.val_cache_target_contains,
+            args.val_cache_eco, args.val_cache_efo, args.val_cache_efo_contains,
             data_config.eco_scores, data_config.schema,
             data_config.excluded_biotypes, data_config.datasources_to_datatypes)
 

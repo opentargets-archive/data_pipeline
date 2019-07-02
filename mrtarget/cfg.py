@@ -109,6 +109,18 @@ def setup_ops_parser():
         env_var="VAL_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--val-queue-validator-writer", help="size of validation writer queue (in chunks)",
         env_var="VAL_QUEUE_VALIDATOR_WRITER", action='store', default=8, type=int)
+    p.add("--val-cache-eco", help="size of validation cache for eco (bytes)",
+        env_var="VAL_CACHE_ECO", action='store', default=1024*256, type=int)
+    p.add("--val-cache-efo", help="size of validation cache for diseases (bytes)",
+        env_var="VAL_CACHE_EFO", action='store', default=1024*1024*8, type=int)
+    p.add("--val-cache-efo-contains", help="size of validation cache for disease existing (bytes)",
+        env_var="VAL_CACHE_EFO_CONTAINS", action='store', default=1024*512, type=int)
+    p.add("--val-cache-target", help="size of validation cache for target (bytes)",
+        env_var="VAL_CACHE_TARGET", action='store', default=1024*1024*8, type=int)
+    p.add("--val-cache-target-u2e", help="size of validation cache for target uniprot to ensembl (bytes)",
+        env_var="VAL_CACHE_TARGET_U2E", action='store', default=1024*1024*4, type=int)
+    p.add("--val-cache-target-contains", help="size of validation cache for target existing (bytes)",
+        env_var="VAL_CACHE_TARGET_CONTAINS", action='store', default=1024*512, type=int)
 
     p.add("--as-workers-production", help="# of procs for assocation pair producers",
         env_var="AS_WORKERS_PRODUCTION", action='store', default=4, type=int)
