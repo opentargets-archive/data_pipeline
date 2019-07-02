@@ -92,7 +92,7 @@ def validation_on_start(eco_scores_uri, schema_uri, excluded_biotypes,
         eco_cache_size = cache_efo_contains,
         efo_index=es_index_efo,
         efo_cache_size = cache_efo,
-        efo_cache_contains_size = efo_cache_contains_size
+        efo_cache_contains_size = cache_efo_contains
         ).lookup
 
 
