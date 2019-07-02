@@ -54,13 +54,13 @@ class GeneLookUpTable(object):
         self._es = es
         self._es_index = es_index
         #TODO configure size
-        self.cache_gene = cachetools.LRUCache(1024*1024*1024, getsizeof=sys.getsizeof)
+        self.cache_gene = cachetools.LRUCache(1024*1024*16, getsizeof=sys.getsizeof)
         self.cache_gene.hits = 0
         self.cache_gene.queries = 0
-        self.cache_u2e = cachetools.LRUCache(1024*1024*128, getsizeof=sys.getsizeof)
+        self.cache_u2e = cachetools.LRUCache(1024*1024*4, getsizeof=sys.getsizeof)
         self.cache_u2e.hits = 0
         self.cache_u2e.queries = 0
-        self.cache_contains = cachetools.LRUCache(1024*1024*16, getsizeof=sys.getsizeof)
+        self.cache_contains = cachetools.LRUCache(1024*512, getsizeof=sys.getsizeof)
         self.cache_contains.hits = 0
         self.cache_contains.queries = 0
 
@@ -170,7 +170,7 @@ class ECOLookUpTable(object):
         self._es = es
         self._es_index = es_index
         #TODO configure size
-        self.cache_eco = cachetools.LRUCache(1024*1024*16, getsizeof=sys.getsizeof)
+        self.cache_eco = cachetools.LRUCache(1024*256, getsizeof=sys.getsizeof)
         self.cache_eco.hits = 0
         self.cache_eco.queries = 0
 
@@ -202,10 +202,10 @@ class EFOLookUpTable(object):
         self._es = es
         self._es_index = index
         #TODO configure size
-        self.cache_efo = cachetools.LRUCache(1024*1024*128, getsizeof=sys.getsizeof)
+        self.cache_efo = cachetools.LRUCache(1024*1024*8, getsizeof=sys.getsizeof)
         self.cache_efo.hits = 0
         self.cache_efo.queries = 0
-        self.cache_contains = cachetools.LRUCache(1024*1024*16, getsizeof=sys.getsizeof)
+        self.cache_contains = cachetools.LRUCache(1024*512, getsizeof=sys.getsizeof)
         self.cache_contains.hits = 0
         self.cache_contains.queries = 0
 
