@@ -84,7 +84,7 @@ version: "3.6"
 services:
       
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.1.1
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.2.0
     ports:
       - 9200:9200
     environment:
@@ -116,12 +116,9 @@ services:
       retries:  30
         
   kibana:
-    image: kibana:5.6.13
+    image: docker.elastic.co/kibana/kibana-oss:7.2.0
     ports:
       - 5601:5601
-    environment:
-      #disable xpack as not OSS
-      - xpack.security.enabled=false
     depends_on:
       - elasticsearch
 
