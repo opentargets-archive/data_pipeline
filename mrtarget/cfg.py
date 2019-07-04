@@ -138,7 +138,7 @@ def setup_ops_parser():
         env_var="AS_QUEUE_WRITE", action='store', default=8, type=int)
     p.add("--as-cache-hpa", help="size of association cache for hpa (bytes)",
         env_var="AS_CACHE_HPA", action='store', default=1024*16, type=int)
-    p.add("--as-cache-eco", help="size of association cache for eco (bytes)",
+    p.add("--as-cache-efo", help="size of association cache for efo (bytes)",
         env_var="AS_CACHE_EFO", action='store', default=1024*1024*4, type=int)
     p.add("--as-cache-target", help="size of association cache for target (bytes)",
         env_var="AS_CACHE_TARGET", action='store', default=1024*1024*2, type=int)
