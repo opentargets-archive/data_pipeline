@@ -325,8 +325,6 @@ def produce_evidence(target, es, es_index_val_right,
         for efo in efo_list:
             key = (evidence['target']['id'], efo)
 
-            #print(key)
-
             if key not in data_cache:
                 data_cache[key] = []
 
