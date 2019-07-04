@@ -26,7 +26,7 @@ class HPALookUpTable(object):
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=hpa_id))[0:1].execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
-        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
+        if response.hits.total.value == 0:
             #no hit, return None
             self.cache[hpa_id] = None
             return None
@@ -73,7 +73,7 @@ class GeneLookUpTable(object):
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
-        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
+        if response.hits.total.value == 0:
             #no hit, return None
             self.cache_gene[gene_id] = None
             return None
@@ -98,11 +98,11 @@ class GeneLookUpTable(object):
                 Match(uniprot_accessions=uniprot_id)
             ]))[0:1].source(includes=["ensembl_gene_id"]).execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html            
-        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
+        if response.hits.total.value == 0:
             #no hit, return None
             self.cache_u2e[uniprot_id] = None
             return None
-        elif int(response.hits.total.value) == 1 or len(response.hits) == 1:
+        elif response.hits.total.value == 1:
             #exactly one hit, return it
             val = response.hits[0].ensembl_gene_id
             self.cache_u2e[uniprot_id] = val
@@ -127,7 +127,7 @@ class GeneLookUpTable(object):
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].source(False).execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
-        if int(response.hits.total.value) > 0 or len(response.hits) > 0:
+        if response.hits.total.value > 0:
             #exactly one hit
             self.cache_contains[gene_id] = True
             return True
@@ -181,9 +181,13 @@ class ECOLookUpTable(object):
             return self.cache[eco_id]
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=eco_id))[0:1].execute()
-        val = response.hits[0].to_dict()
-        self.cache[eco_id] = val
-        return val
+        if response.hits.total.value > 0:
+            val = response.hits[0].to_dict()
+            self.cache[eco_id] = val
+            return val
+        else:
+            #more then one hit, throw error
+            raise ValueError("Multiple eco %s" %(eco_id))
 
     def __del__(self):
         logger = logging.getLogger(__name__+".ECOLookUpTable")
@@ -228,7 +232,7 @@ class EFOLookUpTable(object):
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
-        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
+        if response.hits.total.value == 0:
             #no hit, return None
             self.cache_efo[efo_id] = None
             return None
@@ -255,7 +259,7 @@ class EFOLookUpTable(object):
 
         response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].source(False).execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
-        if int(response.hits.total.value) == 0 or len(response.hits) == 0:
+        if response.hits.total.value == 0:
             #no hit
             self.cache_contains[efo_id] = False
             return False
