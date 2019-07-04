@@ -22,16 +22,16 @@ class LookUpData():
 class LookUpDataRetriever(object):
     def __init__(self, es,
             gene_index = None, 
-            gene_cache_size = None,
-            gene_cache_u2e_size = None,
-            gene_cache_contains_size = None, 
+            gene_cache_size = 0,
+            gene_cache_u2e_size = 0,
+            gene_cache_contains_size = 0, 
             eco_index = None,
-            eco_cache_size = None,
+            eco_cache_size = 0,
             hpa_index = None, 
-            hpa_cache_size = None,
+            hpa_cache_size = 0,
             efo_index = None,
-            efo_cache_size = None,
-            efo_cache_contains_size = None
+            efo_cache_size = 0,
+            efo_cache_contains_size = 0
             ):
 
         self.es = es

@@ -150,12 +150,10 @@ def main():
     if args.assoc:
         process = ScoringProcess(args.elasticseach_nodes, es_config.asc.name, 
                 es_config.asc.mapping, es_config.asc.setting,
-                es_config.gen.name, es_config.eco.name, es_config.val_right.name, es_config.hpa.name, es_config.efo.name,
+                es_config.gen.name, es_config.val_right.name, es_config.hpa.name, es_config.efo.name,
                 args.as_workers_writer, args.as_workers_production, args.as_workers_score, 
                 args.as_queue_score, args.as_queue_production, args.as_queue_write,
-                args.as_cache_hpa, args.as_cache_eco,
-                args.as_cache_efo, args.as_cache_efo_contains,
-                args.as_cache_target, args.as_cache_target_u2e, args.as_cache_target_contains,
+                args.as_cache_hpa, args.as_cache_efo, args.as_cache_target, 
                 data_config.scoring_weights, data_config.is_direct_do_not_propagate,
                 data_config.datasources_to_datatypes)
         if not args.qc_only:
