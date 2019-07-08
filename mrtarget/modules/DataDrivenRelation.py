@@ -155,9 +155,9 @@ whilst also respecting the dry run flag given
 Uses elasticsearch.helpers.parallel_bulk with multiple threads for high
 performance loading
 """
-def store_in_elasticsearch(results, es, dry_run, workers_write, queue_write, index, doc):
+def store_in_elasticsearch(results, es, dry_run, workers_write, queue_write, index):
     chunk_size = 1000 #TODO make configurable
-    actions = elasticsearch_actions(results, dry_run, index, doc)
+    actions = elasticsearch_actions(results, dry_run, index)
     failcount = 0
 
     if not dry_run:
@@ -182,7 +182,7 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(results, dry_run, index, doc):
+def elasticsearch_actions(results, dry_run, index):
     for r in results:
         if r:
             subj = copy(r.subject)
@@ -195,7 +195,6 @@ def elasticsearch_actions(results, dry_run, index, doc):
             if not dry_run:
                 action = {}
                 action["_index"] = index
-                action["_type"] = doc + '-' + r.type
                 action["_id"] = r.id
                 #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
                 #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -320,7 +319,7 @@ used to standardize d2d and t2t code path
 def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids, 
         threshold, buckets_number, es, dry_run, 
         workers_production, workers_score, workers_write,
-        queue_production_score, queue_score_result, queue_write, index, doc):
+        queue_production_score, queue_score_result, queue_write, index):
 
     #do some initial setup
     vectorizer = DictVectorizer(sparse=True)
@@ -368,7 +367,7 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
     #store in elasticsearch
     #this could be multi process, but just use a single for now
     store_in_elasticsearch(pipeline_stage, es, dry_run, workers_write, queue_write,
-        index, doc)
+        index)
 
 """
 Function to run in child processess
@@ -427,7 +426,7 @@ def calculate_pair(data, type, row_labels, rows_ids, column_ids, threshold, idf,
 
 class DataDrivenRelationProcess(object):
 
-    def __init__(self, es_hosts, es_index, es_doc, 
+    def __init__(self, es_hosts, es_index, 
             es_mappings, es_settings,
             es_index_efo, es_index_gen, es_index_assoc,
             ddr_workers_production,
@@ -440,7 +439,6 @@ class DataDrivenRelationProcess(object):
             evidence_count):
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.es_index_efo = es_index_efo
@@ -494,7 +492,7 @@ class DataDrivenRelationProcess(object):
                 target_keys, 0.19, 1024, es, dry_run, 
                 self.ddr_workers_production, self.ddr_workers_score, self.ddr_workers_write,
                 self.ddr_queue_production_score, self.ddr_queue_score_result, self.ddr_queue_write, 
-                self.es_index, self.es_doc)
+                self.es_index)
             self.logger.info('handled disease-to-disease')
 
             #calculate and store target-to-target in multiple processess
@@ -503,6 +501,6 @@ class DataDrivenRelationProcess(object):
                 disease_keys, 0.19, 1024, es, dry_run, 
                 self.ddr_workers_production, self.ddr_workers_score, self.ddr_workers_write,
                 self.ddr_queue_production_score, self.ddr_queue_score_result, self.ddr_queue_write, 
-                self.es_index, self.es_doc)
+                self.es_index)
             self.logger.info('handled target-to-target')
 

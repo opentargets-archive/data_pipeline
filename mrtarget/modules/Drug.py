@@ -8,7 +8,7 @@ from elasticsearch_dsl.query import MatchAll
 from opentargets_urlzsource import URLZSource
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.connection import new_es_client
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.LookupHelpers import LookUpDataRetriever
 
 import tempfile
 import dbm
@@ -21,11 +21,10 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(items, index, doc):
+def elasticsearch_actions(items, index):
     for ident, item in items:
         action = {}
         action["_index"] = index
-        action["_type"] = doc
         action["_id"] = ident
         #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
         #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -47,9 +46,11 @@ def get_parent_id(mol):
 
 class DrugProcess(object):
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             es_index_gene, es_index_efo,
             workers_write, queue_write,
+            cache_efo, cache_efo_contains,
+            cache_target, cache_target_u2e, cache_target_contains,
             chembl_target_uris, 
             chembl_mechanism_uris, 
             chembl_component_uris, 
@@ -58,13 +59,19 @@ class DrugProcess(object):
             chembl_indication_uris):
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.es_index_gene = es_index_gene
         self.es_index_efo = es_index_efo
         self.workers_write = workers_write
         self.queue_write = queue_write
+
+        self.cache_efo = cache_efo
+        self.cache_efo_contains = cache_efo_contains
+        self.cache_target = cache_target
+        self.cache_target_u2e = cache_target_u2e
+        self.cache_target_contains = cache_target_contains
+
         self.chembl_target_uris = chembl_target_uris
         self.chembl_mechanism_uris = chembl_mechanism_uris
         self.chembl_component_uris = chembl_component_uris
@@ -82,6 +89,10 @@ class DrugProcess(object):
 
 
     def create_shelf(self, uris, key_f):
+        #sanity check inputs
+        assert uris is not None
+        assert len(uris) > 0
+        
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
@@ -106,6 +117,10 @@ class DrugProcess(object):
         return shelf
 
     def create_shelf_multi(self, uris, key_f):
+        #sanity check inputs
+        assert uris is not None
+        assert len(uris) > 0
+
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
@@ -640,12 +655,14 @@ class DrugProcess(object):
 
         #create lookup tables
         self.lookup_data = LookUpDataRetriever(es,  
-            ( 
-                LookUpDataType.TARGET, 
-                LookUpDataType.DISEASE
-            ),
-            gene_index=self.es_index_gene,
-            efo_index=self.es_index_efo).lookup
+            gene_index = self.es_index_gene,
+            gene_cache_size = self.cache_target,
+            gene_cache_u2e_size = self.cache_target_u2e,
+            gene_cache_contains_size = self.cache_target_contains,
+            efo_index = self.es_index_efo,
+            efo_cache_size = self.cache_efo,
+            efo_cache_contains_size = self.cache_efo_contains
+            ).lookup
 
 
         # these are all separate files
@@ -730,7 +747,7 @@ class DrugProcess(object):
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(data.items(), self.es_index, self.es_doc)
+            actions = elasticsearch_actions(data.items(), self.es_index)
             failcount = 0
             if not dry_run:
                 results = None

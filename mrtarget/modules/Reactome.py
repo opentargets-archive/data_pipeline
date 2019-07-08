@@ -108,11 +108,10 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(reactions, index, doc):
+def elasticsearch_actions(reactions, index):
     for reaction in reactions:
         action = {}
         action["_index"] = index
-        action["_type"] = doc
         action["_id"] = reaction["id"]
         #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
         #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -121,12 +120,11 @@ def elasticsearch_actions(reactions, index, doc):
         yield action
 
 class ReactomeProcess():
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             pathway_data_url, pathway_relation_url,
             workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.downloader = ReactomeDataDownloader(pathway_data_url, pathway_relation_url)
@@ -165,7 +163,7 @@ class ReactomeProcess():
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
             docs = generate_documents(self.g)
-            actions = elasticsearch_actions(docs, self.es_index, self.es_doc)
+            actions = elasticsearch_actions(docs, self.es_index)
             failcount = 0
 
             if not dry_run:
