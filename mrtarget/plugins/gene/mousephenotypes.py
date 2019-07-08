@@ -112,14 +112,9 @@ class MousePhenotypes(IPlugin):
         # for any mouse gene...
         for _, gene in self.mouse_genes.iteritems():
 
-            self._logger.debug('retrieve the human orthologs...')
             for ortholog in gene["human_orthologs"]:
                 human_gene_symbol = ortholog["gene_symbol"]
 
-                #self._logger.debug("Assign %i phenotype categories from mouse %s to human %s",
-                #                    len(gene["phenotypes"]),
-                #                    gene["gene_symbol"],
-                #                    human_gene_symbol)
                 # assign all the phenotypes for this specific gene
                 # all phenotypes are classified per category
                 self.human_genes[human_gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : gene["gene_id"],
