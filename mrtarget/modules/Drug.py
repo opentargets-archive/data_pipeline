@@ -89,6 +89,10 @@ class DrugProcess(object):
 
 
     def create_shelf(self, uris, key_f):
+        #sanity check inputs
+        assert uris is not None
+        assert len(uris) > 0
+        
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
@@ -113,6 +117,10 @@ class DrugProcess(object):
         return shelf
 
     def create_shelf_multi(self, uris, key_f):
+        #sanity check inputs
+        assert uris is not None
+        assert len(uris) > 0
+
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
