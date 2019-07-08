@@ -7,7 +7,6 @@ import functools
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.spatial.distance import pdist
 import pypeln.process as pr
 import elasticsearch
 
