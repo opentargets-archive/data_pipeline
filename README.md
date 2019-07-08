@@ -75,6 +75,8 @@ After deploying elasticsearch, you should check that you can query its API. Runn
 
 For more information on Elasticsearch, see https://www.elastic.co/guide/en/elasticsearch/reference/5.6/getting-started.html
 
+Note: you may need to increase the default size of the write thread pool from 200 to a higher value (e.g. 1000). See https://www.elastic.co/guide/en/elasticsearch/reference/7.1/modules-threadpool.html
+
 #### Kibana
 
 Kibana is useful to browse the output/input of the various steps.

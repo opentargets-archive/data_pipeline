@@ -37,8 +37,11 @@ def setup_ops_parser():
 
     # elasticsearch
     p.add("--elasticseach-nodes", help="elasticsearch host(s)",
-        action='append', default=['localhost:9200'],
+        action='append',
         env_var='ELASTICSEARCH_NODES')
+        # To handle a default that is *only* used if *nothing* is specified, we have
+        # to do it ourselves later. Otherwise the "default" is always present and
+        # values are appended to it.
     p.add("--elasticsearch-folder", help="write to files instead of a live elasticsearch server",
         action='store') #this only applies to --val at the moment
 
@@ -106,6 +109,18 @@ def setup_ops_parser():
         env_var="VAL_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--val-queue-validator-writer", help="size of validation writer queue (in chunks)",
         env_var="VAL_QUEUE_VALIDATOR_WRITER", action='store', default=8, type=int)
+    p.add("--val-cache-eco", help="size of validation cache for eco (bytes)",
+        env_var="VAL_CACHE_ECO", action='store', default=128, type=int)
+    p.add("--val-cache-efo", help="size of validation cache for diseases (bytes)",
+        env_var="VAL_CACHE_EFO", action='store', default=1024*512, type=int)
+    p.add("--val-cache-efo-contains", help="size of validation cache for disease existing (bytes)",
+        env_var="VAL_CACHE_EFO_CONTAINS", action='store', default=1024*32, type=int)
+    p.add("--val-cache-target", help="size of validation cache for target (bytes)",
+        env_var="VAL_CACHE_TARGET", action='store', default=1024*1024, type=int)
+    p.add("--val-cache-target-u2e", help="size of validation cache for target uniprot to ensembl (bytes)",
+        env_var="VAL_CACHE_TARGET_U2E", action='store', default=1024*256, type=int)
+    p.add("--val-cache-target-contains", help="size of validation cache for target existing (bytes)",
+        env_var="VAL_CACHE_TARGET_CONTAINS", action='store', default=1024*64, type=int)
 
     p.add("--as-workers-production", help="# of procs for assocation pair producers",
         env_var="AS_WORKERS_PRODUCTION", action='store', default=4, type=int)
@@ -121,6 +136,13 @@ def setup_ops_parser():
         env_var="AS_QUEUE_SCORE", action='store', default=1000, type=int)
     p.add("--as-queue-write", help="size of association pair writer queue (in chunks)",
         env_var="AS_QUEUE_WRITE", action='store', default=8, type=int)
+    p.add("--as-cache-hpa", help="size of association cache for hpa (bytes)",
+        env_var="AS_CACHE_HPA", action='store', default=1024*4, type=int)
+    p.add("--as-cache-efo", help="size of association cache for efo (bytes)",
+        env_var="AS_CACHE_EFO", action='store', default=1024*1024*4, type=int)
+    p.add("--as-cache-target", help="size of association cache for target (bytes)",
+        env_var="AS_CACHE_TARGET", action='store', default=1024*512, type=int)
+
         
     # if 0 use main thread for writing
     # if >0 use that many threads for writing
@@ -150,6 +172,16 @@ def setup_ops_parser():
         env_var="DRG_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--drg-queue-write", help="size of drug writer queue (in chunks)",
         env_var="DRG_QUEUE_WRITE", action='store', default=8, type=int)
+    p.add("--drg-cache-efo", help="size of drug cache for diseases (bytes)",
+        env_var="DRG_CACHE_EFO", action='store', default=1024*1024*8, type=int)
+    p.add("--drg-cache-efo-contains", help="size of drug cache for disease existing (bytes)",
+        env_var="DRG_CACHE_EFO_CONTAINS", action='store', default=1024*128, type=int)
+    p.add("--drg-cache-target", help="size of drug cache for target (bytes)",
+        env_var="DRG_CACHE_TARGET", action='store', default=1024*1024*8, type=int)
+    p.add("--drg-cache-target-u2e", help="size of drug cache for target uniprot to ensembl (bytes)",
+        env_var="DRG_CACHE_TARGET_U2E", action='store', default=1024*1024, type=int)
+    p.add("--drg-cache-target-contains", help="size of drug cache for target existing (bytes)",
+        env_var="DRG_CACHE_TARGET_CONTAINS", action='store', default=1024*256, type=int)
 
     # for debugging
     p.add("--dry-run", help="do not store data in the backend, useful for dev work. Does not work with all the steps!!",
@@ -208,6 +240,11 @@ def get_ops_args():
     #dont use parse_args because that will error
     #if there are extra arguments e.g. for plugins
     args = p.parse_known_args()[0]
+
+    #to handle a default on elasticsearch nodes (which is a list)
+    #we need to see if it was not previously specified and then replace it
+    if args.elasticseach_nodes == None:
+        args.elasticseach_nodes = ['http://localhost:9200']
 
     #output all configuration values, useful for debugging
     p.print_values()

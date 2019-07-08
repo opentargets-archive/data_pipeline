@@ -170,12 +170,11 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(items, dry_run, index, doc):
+def elasticsearch_actions(items, dry_run, index):
     for so in items:
         if not dry_run:
             action = {}
             action["_index"] = index
-            action["_type"] = doc+'-'+so.type
             action["_id"] = so.id
             #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
             #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -183,10 +182,10 @@ def elasticsearch_actions(items, dry_run, index, doc):
 
             yield action
 
-def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_write):
+def store_in_elasticsearch(so_it, dry_run, es, index, workers_write, queue_write):
         #write into elasticsearch
         chunk_size = 1000 #TODO make configurable
-        actions = elasticsearch_actions(so_it, dry_run, index, doc)
+        actions = elasticsearch_actions(so_it, dry_run, index)
         failcount = 0
 
         if not dry_run:
@@ -207,7 +206,7 @@ def store_in_elasticsearch(so_it, dry_run, es, index, doc, workers_write, queue_
                 raise RuntimeError("%s relations failed to index" % failcount)
 
 class SearchObjectProcess(object):
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings, 
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings, 
             es_index_gene, es_index_efo, es_index_val_right,es_index_assoc,
             workers_write, queue_write,
             chembl_target_uri, 
@@ -217,7 +216,6 @@ class SearchObjectProcess(object):
             chembl_molecule_set_uri_pattern):
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.es_index_gene = es_index_gene
@@ -274,14 +272,14 @@ class SearchObjectProcess(object):
             self.logger.info('handling targets')
             targets = self.get_targets(es)
             so_it = self.handle_search_object(targets, es, SearchObjectTypes.TARGET)
-            store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
+            store_in_elasticsearch(so_it, dry_run, es, self.es_index, 
                 self.workers_write, self.queue_write)
 
             #process diseases
             self.logger.info('handling diseases')
             diseases = self.get_diseases(es)
             so_it = self.handle_search_object(diseases, es, SearchObjectTypes.DISEASE)
-            store_in_elasticsearch(so_it, dry_run, es, self.es_index, self.es_doc, 
+            store_in_elasticsearch(so_it, dry_run, es, self.es_index, 
                 self.workers_write, self.queue_write)
 
 
@@ -349,10 +347,11 @@ class SearchObjectProcess(object):
 
         #{"total"=[{"id":"xxx","score":"y.y"}],"direct"=[{"id":"xxx","score":"y.y"}]}
         return ({
-                "total": [{"id":h.id,"score":min(h["harmonic-sum"]["overall"],1.0)} for h in r.hits],
-                "direct": [{"id":h.id,"score":min(h["harmonic-sum"]["overall"],1.0)} for h in r.aggregations.direct_associations.top_direct_ass.hits]
+                "total": [{"id":h.id,"score":min(float(h["harmonic-sum"]["overall"]),1.0)} for h in r.hits],
+                "direct": [{"id":h.id,"score":min(float(h["harmonic-sum"]["overall"]),1.0)} for h in r.aggregations.direct_associations.top_direct_ass.hits]
             },
             {
-                "total":r.hits.total,
-                "direct":r.aggregations.direct_associations.top_direct_ass.hits.total,
+                #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
+                "total":int(r.hits.total.value),
+                "direct":int(r.aggregations.direct_associations.top_direct_ass.hits.total.value),
             })

@@ -49,11 +49,10 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(items, index, doc):
+def elasticsearch_actions(items, index):
     for eco_id, eco_obj in items:
         action = {}
         action["_index"] = index
-        action["_type"] = doc
         action["_id"] = eco_id
         #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
         #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.
@@ -63,11 +62,10 @@ def elasticsearch_actions(items, index, doc):
 
 class EcoProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             eco_uri, so_uri, workers_write, queue_write):
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.eco_uri = eco_uri
@@ -109,7 +107,7 @@ class EcoProcess():
 
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(self.ecos.items(), self.es_index, self.es_doc)
+            actions = elasticsearch_actions(self.ecos.items(), self.es_index)
             failcount = 0
 
             if not dry_run:

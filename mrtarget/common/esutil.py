@@ -1,6 +1,7 @@
 
 import logging
 import time
+from elasticsearch import RequestError
 
 class ElasticsearchBulkIndexManager(object):
     def __init__(self, client, index_name, settings = {}, mappings = {}):
@@ -31,7 +32,14 @@ class ElasticsearchBulkIndexManager(object):
             "settings": self.settings,
             "mappings": self.mappings
         }
-        self.client.indices.create(index=self.index_name, body=body)
+        try:
+            self.client.indices.create(index=self.index_name, body=body)
+        except RequestError as e:
+            if u'resource_already_exists_exception' == e.error:
+                self.logger.debug("swallowing index exists exception")
+            else:
+                #if it wasn't this error, raise ita gain
+                raise e
 
         #store old settings to restore later, if present
         self.logger.debug("saving old settings for %s", self.index_name)

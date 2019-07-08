@@ -1,169 +1,127 @@
 {
-  "evidencestring": {
-    "dynamic_templates": [
-      {
-        "evidence_string_template": {
-          "path_match": "evidence_string.*",
-          "mapping": {
-            "store": true,
-            "type": "binary"
-          }
+  "dynamic_templates": [
+    {
+      "evidence_string_template": {
+        "path_match": "evidence_string.*",
+        "mapping": {
+          "store": true,
+          "type": "binary"
         }
-      }
-    ],
-    "properties": {
-      "data_source": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "data_source_name": {
-        "type": "keyword"
-      },
-      "data_type": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "disease_id": {
-        "type": "keyword"
-      },
-      "efo_id": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "explanation_str": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "explanation_type": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "filename": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "hash": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "id": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "is_valid": {
-        "type": "boolean"
-      },
-      "json_doc_hashdig": {
-        "type": "keyword"
-      },
-      "json_doc_version": {
-        "type": "integer"
-      },
-      "json_schema_version": {
-        "type": "keyword"
-      },
-      "line": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
-        }
-      },
-      "line_n": {
-        "type": "long"
-      },
-      "release_date": {
-        "type": "date",
-        "format": "basic_date_time_no_millis"
-      },
-      "target_id": {
-        "type": "keyword"
-      },
-      "uniq_assoc_fields_hashdig": {
-        "type": "keyword"
       }
     }
-  },
-  "_default_": {
-    "dynamic_templates": [
-      {
-        "evidence_string_template": {
-          "path_match": "evidence_string.*",
-          "mapping": {
-            "store": true,
-            "type": "binary"
-          }
+  ],
+  "properties": {
+    "data_source": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
         }
       }
-    ],
-    "properties": {
-      "data_source_name": {
-        "type": "keyword"
-      },
-      "disease_id": {
-        "type": "keyword"
-      },
-      "json_doc_hashdig": {
-        "type": "keyword"
-      },
-      "json_doc_version": {
-        "type": "integer"
-      },
-      "json_schema_version": {
-        "type": "keyword"
-      },
-      "release_date": {
-        "type": "date",
-        "format": "basic_date_time_no_millis"
-      },
-      "target_id": {
-        "type": "keyword"
-      },
-      "uniq_assoc_fields_hashdig": {
-        "type": "keyword"
+    },
+    "data_source_name": {
+      "type": "keyword"
+    },
+    "data_type": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
       }
+    },
+    "disease_id": {
+      "type": "keyword"
+    },
+    "efo_id": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "explanation_str": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "explanation_type": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "filename": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "hash": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "id": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "is_valid": {
+      "type": "boolean"
+    },
+    "json_doc_hashdig": {
+      "type": "keyword"
+    },
+    "json_doc_version": {
+      "type": "integer"
+    },
+    "json_schema_version": {
+      "type": "keyword"
+    },
+    "line": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "line_n": {
+      "type": "long"
+    },
+    "release_date": {
+      "type": "date",
+      "format": "basic_date_time_no_millis"
+    },
+    "target_id": {
+      "type": "keyword"
+    },
+    "uniq_assoc_fields_hashdig": {
+      "type": "keyword"
     }
   }
 }
