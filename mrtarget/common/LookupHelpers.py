@@ -19,38 +19,38 @@ class LookUpData():
         self.non_reference_genes = None
         self.mp_ontology = None
 
-
-class LookUpDataType(object):
-    TARGET = 'target'
-    DISEASE = 'disease'
-    ECO = 'eco'
-    HPA = 'hpa'
-
 class LookUpDataRetriever(object):
-    def __init__(self,
-                 es,
-                 data_types,
-                 gene_index = None,
-                 eco_index = None,
-                 hpa_index = None,
-                 efo_index = None
-                 ):
+    def __init__(self, es,
+            gene_index = None, 
+            gene_cache_size = 0,
+            gene_cache_u2e_size = 0,
+            gene_cache_contains_size = 0, 
+            eco_index = None,
+            eco_cache_size = 0,
+            hpa_index = None, 
+            hpa_cache_size = 0,
+            efo_index = None,
+            efo_cache_size = 0,
+            efo_cache_contains_size = 0
+            ):
+
         self.es = es
-
         self.lookup = LookUpData()
-
         self._logger = logging.getLogger(__name__)
 
-        for dt in data_types:
-            if dt == LookUpDataType.TARGET:
-                self.lookup.available_genes = GeneLookUpTable(self.es, gene_index)
-                self._get_non_reference_gene_mappings()
-            elif dt == LookUpDataType.DISEASE:
-                self.lookup.available_efos = EFOLookUpTable(self.es, efo_index)
-            elif dt == LookUpDataType.ECO:
-                self.lookup.available_ecos = ECOLookUpTable(self.es, eco_index)
-            elif dt == LookUpDataType.HPA:
-                self.lookup.available_hpa = HPALookUpTable(self.es, hpa_index)
+        if gene_index is not None:
+            self.lookup.available_genes = GeneLookUpTable(self.es, gene_index,
+                gene_cache_size, gene_cache_u2e_size, gene_cache_contains_size)
+            self._get_non_reference_gene_mappings()
+        if efo_index is not None:
+            self.lookup.available_efos = EFOLookUpTable(self.es, efo_index,
+            efo_cache_size, efo_cache_contains_size)
+        if eco_index is not None:
+            self.lookup.available_ecos = ECOLookUpTable(self.es, eco_index, 
+            eco_cache_size)
+        if hpa_index is not None:
+            self.lookup.available_hpa = HPALookUpTable(self.es, hpa_index, 
+            hpa_cache_size)
 
 
     def _get_non_reference_gene_mappings(self):

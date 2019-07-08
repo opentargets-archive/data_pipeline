@@ -16,7 +16,7 @@ import mrtarget.common.IO as IO
 from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.EvidenceString import EvidenceManager, Evidence
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.LookupHelpers import LookUpDataRetriever
 from opentargets_urlzsource import URLZSource
 
 def make_validated_evs_obj(filename, hash, line, line_n, is_valid=False, explanation_type='', explanation_str='',
@@ -76,20 +76,24 @@ This function is called once in each child process to do local setup for
 validation
 """
 def validation_on_start(eco_scores_uri, schema_uri, excluded_biotypes, 
-        datasources_to_datatypes, es_hosts, es_index_gene, es_index_eco, es_index_efo):
+        datasources_to_datatypes, es_hosts, es_index_gene, es_index_eco, es_index_efo,
+        cache_target, cache_target_u2e, cache_target_contains,
+        cache_eco, cache_efo, cache_efo_contains):
     logger = logging.getLogger(__name__)
 
     validator = opentargets_validator.helpers.generate_validator_from_schema(schema_uri)
 
     lookup_data = LookUpDataRetriever(new_es_client(es_hosts), 
-    (
-        LookUpDataType.DISEASE,
-        LookUpDataType.TARGET,
-        LookUpDataType.ECO
-    ),
-    gene_index=es_index_gene,
-    eco_index=es_index_eco,
-    efo_index=es_index_efo).lookup
+        gene_index=es_index_gene,
+        gene_cache_size = cache_target,
+        gene_cache_u2e_size = cache_target_u2e,
+        gene_cache_contains_size = cache_target_contains,
+        eco_index=es_index_eco,
+        eco_cache_size = cache_efo_contains,
+        efo_index=es_index_efo,
+        efo_cache_size = cache_efo,
+        efo_cache_contains_size = cache_efo_contains
+        ).lookup
 
 
     datasources_to_datatypes = datasources_to_datatypes
@@ -282,14 +286,13 @@ Generates elasticsearch action objects from the results iterator
 
 Output suitable for use with elasticsearch.helpers 
 """
-def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_invalid):
+def elasticsearch_actions(lines, index_valid, index_invalid):
     for line in lines:
         (left, right) = line
         if right is not None:
             #valid
             action = {}
             action["_index"] = index_valid
-            action["_type"] = doc_valid
             action["_id"] = right['hash']
             action["_source"] = right['line']
             #print("  valid %s" % action["_id"])
@@ -298,18 +301,19 @@ def elasticsearch_actions(lines, index_valid, index_invalid, doc_valid, doc_inva
             #invalid
             action = {}
             action["_index"] = index_invalid
-            action["_type"] = doc_invalid
             action["_id"] = left['id']
             action["_source"] = left
             #print("invalid %s" % action["_id"])
             yield action
 
 def process_evidences_pipeline(filenames, first_n, 
-        es_hosts, es_index_valid, es_index_invalid, es_doc_valid, es_doc_invalid, 
+        es_hosts, es_index_valid, es_index_invalid, 
         es_mappings_valid, es_mappings_invalid, 
         es_settings_valid, es_settings_invalid, 
         es_index_gene, es_index_eco, es_index_efo,
         dry_run, workers_validation, queue_validation, workers_write, queue_write, 
+        cache_target, cache_target_u2e, cache_target_contains,
+        cache_eco, cache_efo, cache_efo_contains,
         eco_scores_uri, schema_uri, excluded_biotypes, 
         datasources_to_datatypes):
 
@@ -339,8 +343,10 @@ def process_evidences_pipeline(filenames, first_n,
 
     #create functions with pre-baked arguments
     validation_on_start_baked = functools.partial(validation_on_start, 
-         eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes,
-         es_hosts, es_index_gene, es_index_eco, es_index_efo)
+        eco_scores_uri, schema_uri, excluded_biotypes, datasources_to_datatypes,
+        es_hosts, es_index_gene, es_index_eco, es_index_efo,
+        cache_target, cache_target_u2e, cache_target_contains,
+        cache_eco, cache_efo, cache_efo_contains)
 
     #here is the pipeline definition
     pl_stage = pr.map(process_evidence, evs, 
@@ -366,8 +372,7 @@ def process_evidences_pipeline(filenames, first_n,
             #load into elasticsearch
             chunk_size = 1000 #TODO make configurable
             actions = elasticsearch_actions(pl_stage, 
-                es_index_valid, es_index_invalid, 
-                es_doc_valid, es_doc_invalid)
+                es_index_valid, es_index_invalid)
             failcount = 0
 
             if not dry_run:
@@ -391,7 +396,6 @@ def process_evidences_pipeline(filenames, first_n,
                 if failcount:
                     raise RuntimeError("%s relations failed to index" % failcount)
 
-            print('stages created, ran scoring and writing')
             logger.info('stages created, ran scoring and writing')
 
 

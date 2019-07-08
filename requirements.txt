@@ -3,6 +3,7 @@
 addict==2.2.0
 attrs==19.1.0
 biopython==1.73
+cachetools==3.1.1
 certifi==2019.3.9
 chardet==3.0.4
 codecov==2.0.15
@@ -10,8 +11,7 @@ ConfigArgParse==0.14.0
 coverage==4.5.3
 decorator==4.4.0
 dill==0.2.5
-elasticsearch==5.5.3
-elasticsearch-dsl==5.4.0
+elasticsearch-dsl==7.0.0
 functools32==3.2.3.post2
 future==0.17.1
 idna==2.8
