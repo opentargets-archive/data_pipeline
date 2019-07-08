@@ -1,180 +1,89 @@
 {
-  "relation-shared-disease": {
-    "dynamic_templates": [
-      {
-        "scores": {
-          "path_match": "scores.*",
-          "mapping": {
-            "type": "float"
-          }
-        }
-      }
-    ],
-    "properties": {
-      "counts": {
-        "properties": {
-          "shared_count": {
-            "type": "long"
-          },
-          "union_count": {
-            "type": "long"
-          }
-        }
-      },
-      "id": {
-        "type": "keyword"
-      },
-      "object": {
-        "properties": {
-          "id": {
-            "type": "keyword"
-          },
-          "label": {
-            "type": "text",
-            "fields": {
-              "keyword": {
-                "type": "keyword",
-                "ignore_above": 256
-              }
-            }
-          },
-          "links": {
-            "properties": {
-              "diseases_count": {
-                "type": "long"
-              }
-            }
-          }
-        }
-      },
+  "dynamic_templates": [
+    {
       "scores": {
-        "properties": {
-          "overlap": {
-            "type": "float"
-          }
+        "path_match": "scores.*",
+        "mapping": {
+          "type": "float"
         }
-      },
-      "shared_diseases": {
-        "type": "keyword"
-      },
-      "shared_targets": {
-        "type": "keyword"
-      },
-      "subject": {
-        "properties": {
-          "id": {
-            "type": "keyword"
-          },
-          "label": {
-            "type": "text",
-            "fields": {
-              "keyword": {
-                "type": "keyword",
-                "ignore_above": 256
-              }
-            }
-          },
-          "links": {
-            "properties": {
-              "diseases_count": {
-                "type": "long"
-              }
-            }
-          }
-        }
-      },
-      "type": {
-        "type": "keyword"
       }
     }
-  },
-  "relation-shared-target": {
-    "dynamic_templates": [
-      {
-        "scores": {
-          "path_match": "scores.*",
-          "mapping": {
-            "type": "float"
+  ],
+  "properties": {
+    "counts": {
+      "properties": {
+        "shared_count": {
+          "type": "long"
+        },
+        "union_count": {
+          "type": "long"
+        }
+      }
+    },
+    "id": {
+      "type": "keyword"
+    },
+    "object": {
+      "properties": {
+        "id": {
+          "type": "keyword"
+        },
+        "label": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "links": {
+          "properties": {
+            "diseases_count": {
+              "type": "long"
+            }
           }
         }
       }
-    ],
-    "properties": {
-      "counts": {
-        "properties": {
-          "shared_count": {
-            "type": "long"
-          },
-          "union_count": {
-            "type": "long"
-          }
+    },
+    "scores": {
+      "properties": {
+        "overlap": {
+          "type": "float"
         }
-      },
-      "id": {
-        "type": "keyword"
-      },
-      "object": {
-        "properties": {
-          "id": {
-            "type": "keyword"
-          },
-          "label": {
-            "type": "text",
-            "fields": {
-              "keyword": {
-                "type": "keyword",
-                "ignore_above": 256
-              }
-            }
-          },
-          "links": {
-            "properties": {
-              "targets_count": {
-                "type": "long"
-              }
-            }
-          }
-        }
-      },
-      "scores": {
-        "properties": {
-          "overlap": {
-            "type": "float"
-          }
-        }
-      },
-      "shared_diseases": {
-        "type": "keyword"
-      },
-      "shared_targets": {
-        "type": "keyword"
-      },
-      "subject": {
-        "properties": {
-          "id": {
-            "type": "keyword"
-          },
-          "label": {
-            "type": "text",
-            "fields": {
-              "keyword": {
-                "type": "keyword",
-                "ignore_above": 256
-              }
-            }
-          },
-          "links": {
-            "properties": {
-              "targets_count": {
-                "type": "long"
-              }
-            }
-          }
-        }
-      },
-      "type": {
-        "type": "keyword"
       }
+    },
+    "shared_diseases": {
+      "type": "keyword"
+    },
+    "shared_targets": {
+      "type": "keyword"
+    },
+    "subject": {
+      "properties": {
+        "id": {
+          "type": "keyword"
+        },
+        "label": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "links": {
+          "properties": {
+            "diseases_count": {
+              "type": "long"
+            }
+          }
+        }
+      }
+    },
+    "type": {
+      "type": "keyword"
     }
   }
 }

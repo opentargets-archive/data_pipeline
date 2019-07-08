@@ -9,7 +9,7 @@ from mrtarget.common.connection import new_es_client
 from mrtarget.common.esutil import ElasticsearchBulkIndexManager
 from mrtarget.common.DataStructure import JSONSerializable
 from mrtarget.common.connection import new_es_client
-from mrtarget.common.LookupHelpers import LookUpDataRetriever, LookUpDataType
+from mrtarget.common.LookupHelpers import LookUpDataRetriever
 from mrtarget.common.Scoring import ScoringMethods, HarmonicSumScorer
 from mrtarget.modules.EFO import EFO
 from mrtarget.common.EvidenceString import Evidence, ExtendedInfoGene, ExtendedInfoEFO
@@ -20,7 +20,7 @@ from opentargets_urlzsource import URLZSource
 import elasticsearch
 from elasticsearch import helpers
 from elasticsearch_dsl import Search
-from elasticsearch_dsl.query import MatchAll
+from elasticsearch_dsl.query import MatchAll, ConstantScore, Q
 import pypeln.process as pr
 import simplejson as json
 
@@ -303,30 +303,10 @@ def produce_evidence_local_init(es_hosts, es_index_val_right,
         is_direct_do_not_propagate, datasources_to_datatypes)
 
 def get_evidence_for_target_simple(es, target, index):
-    query_body = {
-        "query": {
-            "constant_score": {
-                "filter": {
-                    "term": {
-                        "target.id": str(target)
-                    }
-                }
-            }
-        },
-        '_source': {
-            "includes": 
-                ["target.id",
-                    "private.efo_codes",
-                    "disease.id",
-                    "scores.association_score",
-                    "sourceID",
-                    "id",
-                ]},
-    }
-
-    for ev in helpers.scan(client=es, query=query_body, scroll='4h',
-        index=index, size=1000):
-        yield ev['_source']
+    fields = ['target.id', 'private.efo_codes', 'disease.id','scores.association_score','sourceID','id']
+    evidence = Search().using(es).index(index).query(ConstantScore(filter=Q('term', target__id=target))).source(include=fields).params(scroll='4h',size=1000).scan() 
+    for ev in evidence:
+        yield ev.to_dict()
 
 def produce_evidence(target, es, es_index_val_right,
         scoring_weights, is_direct_do_not_propagate, datasources_to_datatypes):
@@ -344,6 +324,7 @@ def produce_evidence(target, es, es_index_val_right,
 
         for efo in efo_list:
             key = (evidence['target']['id'], efo)
+
             if key not in data_cache:
                 data_cache[key] = []
 
@@ -372,19 +353,18 @@ def produce_evidence(target, es, es_index_val_right,
     return return_values
 
 def score_producer_local_init(datasources_to_datatypes, dry_run, es_hosts,
-        es_index_gene, es_index_eco, es_index_hpa, es_index_efo):
+        es_index_gene, es_index_hpa, es_index_efo,
+        gene_cache_size, hpa_cache_size,
+        efo_cache_size, ):
     scorer = Scorer()
     lookup_data = LookUpDataRetriever(new_es_client(es_hosts), 
-        (
-            LookUpDataType.DISEASE,
-            LookUpDataType.TARGET,
-            LookUpDataType.ECO,
-            LookUpDataType.HPA
-        ),
         gene_index=es_index_gene,
-        eco_index=es_index_eco,
+        gene_cache_size = gene_cache_size,
         hpa_index=es_index_hpa,
-        efo_index=es_index_efo).lookup
+        hpa_cache_size = hpa_cache_size,
+        efo_index=es_index_efo,
+        efo_cache_size = efo_cache_size
+        ).lookup
     return scorer, lookup_data, datasources_to_datatypes, dry_run
 
 def score_producer(data, 
@@ -439,10 +419,11 @@ def score_producer(data,
 
 class ScoringProcess():
 
-    def __init__(self, es_hosts, es_index, es_doc, es_mappings, es_settings,
-            es_index_gene, es_index_eco, es_index_val_right, es_index_hpa, es_index_efo,
+    def __init__(self, es_hosts, es_index, es_mappings, es_settings,
+            es_index_gene, es_index_val_right, es_index_hpa, es_index_efo,
             workers_write, workers_production, workers_score, 
             queue_score, queue_produce, queue_write, 
+            cache_hpa, cache_efo, cache_target, 
             scoring_weights, is_direct_do_not_propagate,
             datasources_to_datatypes):
 
@@ -450,11 +431,9 @@ class ScoringProcess():
 
         self.es_hosts = es_hosts
         self.es_index = es_index
-        self.es_doc = es_doc
         self.es_mappings = es_mappings
         self.es_settings = es_settings
         self.es_index_gene = es_index_gene
-        self.es_index_eco = es_index_eco
         self.es_index_val_right = es_index_val_right
         self.es_index_hpa = es_index_hpa
         self.es_index_efo = es_index_efo
@@ -465,6 +444,10 @@ class ScoringProcess():
         self.queue_write = queue_write
         self.queue_produce = queue_produce
         self.queue_score = queue_score
+
+        self.cache_hpa = cache_hpa
+        self.cache_efo = cache_efo
+        self.cache_target = cache_target
 
         self.scoring_weights = scoring_weights
         self.is_direct_do_not_propagate = is_direct_do_not_propagate
@@ -491,7 +474,8 @@ class ScoringProcess():
             self.datasources_to_datatypes)
         score_producer_local_init_baked = functools.partial(score_producer_local_init,
             self.datasources_to_datatypes, dry_run, self.es_hosts,
-            self.es_index_gene, self.es_index_eco, self.es_index_hpa, self.es_index_efo)
+            self.es_index_gene, self.es_index_hpa, self.es_index_efo,
+            self.cache_target, self.cache_hpa, self.cache_efo)
         
         #pipeline stage for making the lists of the target/disease pairs and evidence
         pipeline_stage1 = pr.flat_map(produce_evidence, targets, 
@@ -516,8 +500,7 @@ class ScoringProcess():
             self.logger.info('stages created, running scoring and writing')
             client = es
             chunk_size = 1000 #TODO make configurable
-            actions = self.elasticsearch_actions(pipeline_stage2, 
-                self.es_index, self.es_doc)
+            actions = self.elasticsearch_actions(pipeline_stage2, self.es_index)
             failcount = 0
 
             if not dry_run:
@@ -546,13 +529,12 @@ class ScoringProcess():
 
     Output suitable for use with elasticsearch.helpers 
     """
-    def elasticsearch_actions(self, results, index, doc):
+    def elasticsearch_actions(self, results, index):
         for r in results:
             if r is not None:
                 element_id, score = r
                 action = {}
                 action["_index"] = index
-                action["_type"] = doc
                 action["_id"] = element_id
                 #elasticsearch client uses https://github.com/elastic/elasticsearch-py/blob/master/elasticsearch/serializer.py#L24
                 #to turn objects into JSON bodies. This in turn calls json.dumps() using simplejson if present.

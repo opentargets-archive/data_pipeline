@@ -118,7 +118,7 @@ $(LOG_PATH)/out.ddr.log : $(LOG_PATH)/out.as.log
 .PHONY: drug_data
 drug_data: $(LOG_PATH)/out.drg.log
 
-$(LOG_PATH)/out.drg.log : 
+$(LOG_PATH)/out.drg.log : $(LOG_PATH)/out.gen.log $(LOG_PATH)/out.efo.log
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --drg 2>&1 | tee $(LOG_PATH)/out.drg.log
 

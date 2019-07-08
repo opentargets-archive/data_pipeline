@@ -2,18 +2,23 @@ version: "2.4"
 services:
       
   elasticsearch:
-    #image: elasticsearch:5.6.11
-    #note that the docker hub version doesn't allow restores for some reason...
-    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.13
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.2.0
     ports:
       - 9200:9200
+      - 9300:9300
     environment:
-      #disable xpack as not OSS
-      - "xpack.security.enabled=false"
+      #use a single node
+      - discovery.type=single-node
+      #ensure we do bootstrap tests
+      #- es.enforce.bootstrap.checks=true
       #disable memory swapping to disk for performance
-      - "bootstrap.memory_lock=true"
+      - bootstrap.memory_lock=true
       #allow downloading from google buckets
       - repositories.url.allowed_urls=https://storage.googleapis.com/*,https://*.amazonaws.com/*
+      # increase write queue size for bulk tasks
+      - thread_pool.write.queue_size=1000
+      # increase number of open scroll requests at a time
+      - search.max_open_scroll_context=5000
     volumes:
       #use a volume for persistence / performance
       - esdata:/usr/share/elasticsearch/data
@@ -29,7 +34,7 @@ services:
       retries:  30
         
   kibana:
-    image: kibana:5.6.13
+    image: docker.elastic.co/kibana/kibana-oss:7.2.0
     ports:
       - 5601:5601
     environment:
@@ -47,6 +52,8 @@ services:
       - elasticsearch
     environment:
       - ELASTICSEARCH_NODES=http://elasticsearch:9200
+    tmpfs:
+      - /tmp
     volumes:
       - ./log:/usr/src/app/log
       - ./json:/usr/src/app/json
