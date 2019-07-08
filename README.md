@@ -99,7 +99,7 @@ It makes use of the [ConfigArgParse](https://pypi.org/project/ConfigArgParse/) l
 See the default `mrtarget.ops.yml` file for detailed comments describing the avaliable options, or use the `--help` command line argument.
 
 #### Data
-These options describe how the data is to be processed. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. See the [OpenTargets blog](https://blog.opentargets.org/) for links to technical notes with the relevant file for each release. 
+These options describe how the data is to be processed. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. See the [OpenTargets docs](https://docs.targetvalidation.org/technical-pipeline/technical-notes) technical notes with the relevant file for each release. 
 
 #### Elasticsearch
 These options describe how Elasticsearch is to be configured. They are described in a [YAML](https://yaml.org/) file that can be specified to operations. Default settings are included
