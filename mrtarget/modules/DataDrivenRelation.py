@@ -458,8 +458,7 @@ class DataDrivenRelationProcess(object):
     def process_all(self, dry_run):
 
         es = new_es_client(self.es_hosts)
-        threshold = 0.1
-        evidence_count = 3
+
         target_data, disease_data = get_disease_to_targets_vectors(
                 self.score_threshold, self.evidence_count, es, self.es_index_assoc)
 
