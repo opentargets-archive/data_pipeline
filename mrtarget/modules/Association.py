@@ -223,8 +223,8 @@ class Association(JSONSerializable):
 
     def __bool__(self):
         return self.get_scoring_method(ScoringMethods.HARMONIC_SUM).overall != 0
-    def __bool__(self):
-        return self.__bool__()
+        
+    __nonzero__ = __bool__
 
 
 class EvidenceScore(object):
