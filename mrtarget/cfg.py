@@ -192,8 +192,6 @@ def setup_ops_parser():
         action="store_true")
     p.add("--ens", help="retrieve the latest ensembl gene records, store in elasticsearch",
         action="store_true")
-    p.add("--unic", help="cache the uniprot human entries in elasticsearch",
-        action="store_true")
     p.add("--rea", help="download reactome data, process it, and store elasticsearch",
         action="store_true")
 

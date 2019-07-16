@@ -79,14 +79,6 @@ def main():
             process.process(args.dry_run)
         if not args.skip_qc:
             qc_metrics.update(process.qc(es, es_config.ens.name))
-    if args.unic:
-        process = UniprotDownloader(args.elasticseach_nodes, es_config.uni.name, 
-            es_config.uni.mapping, es_config.uni.setting,
-            data_config.uniprot_uri, args.uni_workers_writer, args.uni_queue_write)
-        if not args.qc_only:
-            process.process(args.dry_run)
-        if not args.skip_qc:
-            qc_metrics.update(process.qc(es, es_config.uni.name))
 
     if args.gen:
         process = GeneManager(args.elasticseach_nodes, es_config.gen.name, 
