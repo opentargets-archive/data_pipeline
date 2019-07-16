@@ -156,20 +156,16 @@ class CancerBiomarkers(IPlugin):
 
     def merge_data(self, genes, es, r_server, data_config, es_config):
 
-        try:
-            # Parse cancer biomarker data into self.cancerbiomarkers
-            self.build_json(filename=data_config.biomarker)
+        # Parse cancer biomarker data into self.cancerbiomarkers
+        self.build_json(filename=data_config.biomarker)
 
-            # Iterate through all genes and add cancer biomarkers data if gene symbol is present
-            self._logger.info("Generating Cancer Biomarker data injection")
-            for gene_id, gene in genes.iterate():
-                # Extend gene with related Cancer Biomarker data
-                if gene.approved_symbol in self.cancerbiomarkers:
-                    gene.cancerbiomarkers=self.cancerbiomarkers[gene.approved_symbol]
+        # Iterate through all genes and add cancer biomarkers data if gene symbol is present
+        self._logger.info("Generating Cancer Biomarker data injection")
+        for gene_id, gene in genes.iterate():
+            # Extend gene with related Cancer Biomarker data
+            if gene.approved_symbol in self.cancerbiomarkers:
+                gene.cancerbiomarkers=self.cancerbiomarkers[gene.approved_symbol]
 
-        except Exception as ex:
-            self._logger.exception(str(ex), exc_info=1)
-            raise ex
 
     def build_json(self, filename):
 
@@ -183,8 +179,8 @@ class CancerBiomarkers(IPlugin):
                 PrimaryTumorTypeFullName = row["PrimaryTumorTypeFullName"]
 
                 # Split Source and Gene to separate out multiple entries
-                mSource = list(map(str.strip, Source.split(";")))
-                geneList = list(map(str.strip, Gene.split(";")))
+                mSource = [x.strip() for x in Source.split(";")]
+                geneList = [x.strip() for x in Gene.split(";")]
                 # If the two genes are identical, only keep one copy to prevent duplication of current biomarker
                 if len(geneList)>1:
                     if geneList[0] == geneList[1]:

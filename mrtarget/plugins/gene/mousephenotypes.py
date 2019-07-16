@@ -130,7 +130,9 @@ class MousePhenotypes(IPlugin):
 
             for li, line in enumerate(fi):
                 # a way too many false spaces just to bother people
-                array = list(map(str.strip, line.strip().split("\t")))
+                line = line.strip()
+                array = line.split("\t")
+                array = [x.strip() for x in array]
                 if len(array) == 7:
                     (human_gene_symbol, a, b, c, mouse_gene_symbol, mouse_gene_id, phenotypes_raw) = array
 
@@ -165,7 +167,9 @@ class MousePhenotypes(IPlugin):
             # Allelic Composition	Allele Symbol(s)	Genetic Background	Mammalian Phenotype ID	PubMed ID	MGI Marker Accession ID
             for li, line in enumerate(fi):
                 # a way too many false spaces just to bother people
-                array = list(map(str.strip, line.strip().split("\t")))
+                line = line.strip()
+                array = line.split("\t")
+                array = [x.strip() for x in array]
 
                 #self._logger.debug('mouse KO array %s in line %d', str(array), li)
 
