@@ -547,13 +547,11 @@ class EvidenceManager(object):
 class Evidence(JSONSerializable):
     def __init__(self, evidence, datasources_to_datatypes):
         self.logger = logging.getLogger(__name__)
-        if isinstance(evidence, str) or isinstance(evidence, str):
-            self.load_json(evidence)
-        elif isinstance(evidence, dict):
+        if isinstance(evidence, dict):
             self.evidence = evidence
         else:
-            raise AttributeError(
-                "the evidence should be a dict or a json string to parse, not a " + str(type(evidence)))
+            self.load_json(evidence)
+            
         self.datasource = self.evidence['sourceID']
         self.datatype = datasources_to_datatypes[self.datasource]
 
