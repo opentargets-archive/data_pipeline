@@ -1,4 +1,6 @@
 '''Runs quality control queries on the database'''
+from past.builtins import basestring
+from builtins import object
 import logging
 import csv
 import os.path

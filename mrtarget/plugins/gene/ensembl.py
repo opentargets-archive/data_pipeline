@@ -48,6 +48,8 @@ class Ensembl(IPlugin):
 
         index = es_config.ens.name
 
+        with URLZSource(self.ensembl_filename).open() as ensembl_filename
+
         for row in Search().using(es).index(index).query(MatchAll()).scan():
             gene = None
             if row['id'] in genes:

@@ -1,3 +1,5 @@
+from builtins import str
+from builtins import object
 import logging
 import copy
 
@@ -44,7 +46,7 @@ class Association(JSONSerializable):
         self.is_direct = is_direct
         self.set_id()
 
-        for method_key, method in ScoringMethods.__dict__.items():
+        for method_key, method in list(ScoringMethods.__dict__.items()):
             if not method_key.startswith('_'):
                 self.set_scoring_method(method, AssociationScore(datasources, datatypes))
 
@@ -70,12 +72,12 @@ class Association(JSONSerializable):
                                       expression_tissues=[])
 
     def get_scoring_method(self, method):
-        if method not in ScoringMethods.__dict__.values():
+        if method not in list(ScoringMethods.__dict__.values()):
             raise AttributeError("method need to be a valid ScoringMethods")
         return self.__dict__[method]
 
     def set_scoring_method(self, method, score):
-        if method not in ScoringMethods.__dict__.values():
+        if method not in list(ScoringMethods.__dict__.values()):
             raise AttributeError("method need to be a valid ScoringMethods")
         if not isinstance(score, AssociationScore):
             raise AttributeError("score need to be an instance"
@@ -89,7 +91,7 @@ class Association(JSONSerializable):
         def _create_facet(categories_dict):
             if isinstance(categories_dict, dict):
                 result = []
-                for e in categories_dict.viewitems():
+                for e in categories_dict.items():
                     if e[1] > 0:
                         result.append(e[0])
                 return result
@@ -99,7 +101,7 @@ class Association(JSONSerializable):
         def _merge_facets(the_dict):
             if isinstance(the_dict, dict):
                 result = []
-                for e in the_dict.viewitems():
+                for e in the_dict.items():
                     for el in e[1]:
                         result.append(e[0] + '_' + el)
                 return result
@@ -221,11 +223,11 @@ class Association(JSONSerializable):
 
     def __bool__(self):
         return self.get_scoring_method(ScoringMethods.HARMONIC_SUM).overall != 0
-    def __nonzero__(self):
+    def __bool__(self):
         return self.__bool__()
 
 
-class EvidenceScore():
+class EvidenceScore(object):
     def __init__(self, score, datatype, datasource, is_direct):
         self.score = score
         self.datatype = datatype
@@ -233,7 +235,7 @@ class EvidenceScore():
         self.is_direct = is_direct
 
 
-class Scorer():
+class Scorer(object):
     '''
     Aggregates evidence for a given target-disease pair
     '''
@@ -243,7 +245,7 @@ class Scorer():
     def score(self,target, disease, evidence_scores, is_direct, datasources_to_datatypes):
 
 
-        datasources = datasources_to_datatypes.keys()
+        datasources = list(datasources_to_datatypes.keys())
         datatypes = set(datasources_to_datatypes.values())
 
         association = Association(target, disease, is_direct, datasources, datatypes)
@@ -340,7 +342,7 @@ def produce_evidence(target, es, es_index_val_right,
             row = EvidenceScore(score, data_type, data_source, is_direct)
             data_cache[key].append(row)
 
-    for key,evidence in data_cache.items():
+    for key,evidence in list(data_cache.items()):
         #if any of the evidence is direct, the assication is direct
         is_direct = False
         for e in evidence:
@@ -417,7 +419,7 @@ def score_producer(data,
         return None
 
 
-class ScoringProcess():
+class ScoringProcess(object):
 
     def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             es_index_gene, es_index_val_right, es_index_hpa, es_index_efo,

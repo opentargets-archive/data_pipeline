@@ -1,3 +1,4 @@
+from builtins import object
 import simplejson as json
 import logging
 import more_itertools

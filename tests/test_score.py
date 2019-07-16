@@ -1,3 +1,4 @@
+from builtins import range
 import unittest
 
 from mrtarget.common.Scoring import HarmonicSumScorer
@@ -8,7 +9,7 @@ class HarmonicSumTestCase(unittest.TestCase):
     def test_harmonic_sum(self):
 
         '''test sorting and first value being not scaled'''
-        data = range(2)
+        data = list(range(2))
         buffer = 100
         harmonic_sum_scorer = HarmonicSumScorer(buffer=buffer)
         for i in data:

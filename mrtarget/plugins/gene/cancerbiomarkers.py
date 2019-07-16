@@ -1,3 +1,5 @@
+from builtins import str
+from builtins import map
 from yapsy.IPlugin import IPlugin
 from opentargets_urlzsource import URLZSource
 import traceback
@@ -181,7 +183,7 @@ class CancerBiomarkers(IPlugin):
                 PrimaryTumorTypeFullName = row["PrimaryTumorTypeFullName"]
 
                 # Split Source and Gene to separate out multiple entries
-                mSource = map(str.strip, Source.split(";"))
+                mSource = list(map(str.strip, Source.split(";")))
                 geneList = list(map(str.strip, Gene.split(";")))
                 # If the two genes are identical, only keep one copy to prevent duplication of current biomarker
                 if len(geneList)>1:

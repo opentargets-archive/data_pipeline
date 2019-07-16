@@ -1,3 +1,5 @@
+from builtins import str
+from builtins import object
 import logging
 import csv
 
@@ -20,7 +22,7 @@ class ReactomeNode(TreeNode, JSONSerializable):
         super(ReactomeNode, self).__init__(**kwargs)
 
 
-class ReactomeDataDownloader():
+class ReactomeDataDownloader(object):
 
     def __init__(self, pathway_data_url, pathway_relation_url):
         self.logger = logging.getLogger(__name__)
@@ -119,7 +121,7 @@ def elasticsearch_actions(reactions, index):
 
         yield action
 
-class ReactomeProcess():
+class ReactomeProcess(object):
     def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             pathway_data_url, pathway_relation_url,
             workers_write, queue_write):

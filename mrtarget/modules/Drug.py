@@ -1,3 +1,7 @@
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import object
 import logging
 
 import simplejson as json
@@ -11,10 +15,10 @@ from mrtarget.common.connection import new_es_client
 from mrtarget.common.LookupHelpers import LookUpDataRetriever
 
 import tempfile
-import dbm
+import dbm.ndbm
 import shelve
 import codecs
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 """
 Generates elasticsearch action objects from the results iterator
@@ -98,7 +102,7 @@ class DrugProcess(object):
 
         #note: this file is never deleted!
         filename = tempfile.NamedTemporaryFile(delete=False).name
-        shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
+        shelf = shelve.Shelf(dict=dbm.ndbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
                 f_obj = codecs.getreader("utf-8")(f_obj)
@@ -126,7 +130,7 @@ class DrugProcess(object):
 
         #note: this file is never deleted!
         filename = tempfile.NamedTemporaryFile(delete=False).name
-        shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
+        shelf = shelve.Shelf(dict=dbm.ndbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
                 f_obj = codecs.getreader("utf-8")(f_obj)
@@ -152,12 +156,12 @@ class DrugProcess(object):
             for id in ids:
                 args = {}
                 args["search"] = "set_id:%s" % id
-                urls.append("https://api.fda.gov/drug/label.json?"+urllib.urlencode(args))
+                urls.append("https://api.fda.gov/drug/label.json?"+urllib.parse.urlencode(args))
         elif source == "ATC":
             for id in ids:
                 args = {}
                 args["code"] = id
-                urls.append("http://www.whocc.no/atc_ddd_index/?"+urllib.urlencode(args))
+                urls.append("http://www.whocc.no/atc_ddd_index/?"+urllib.parse.urlencode(args))
         elif source == "DailyMed":
             for id in ids:
                 #these already come from chembl with setid= in the identifer
@@ -165,11 +169,11 @@ class DrugProcess(object):
         elif source == "ClinicalTrials":
             args = {}
             args["id"] = "OR".join(['"%s"' % id for id in ids])
-            urls.append("https://clinicaltrials.gov/search?"+urllib.urlencode(args))
+            urls.append("https://clinicaltrials.gov/search?"+urllib.parse.urlencode(args))
         elif source == "PubMed":
             args = {}
             args["query"] = " OR ".join(['EXT_ID:%s' % id for id in ids])
-            urls.append("https://europepmc.org/search?"+urllib.urlencode(args))
+            urls.append("https://europepmc.org/search?"+urllib.parse.urlencode(args))
         else:
             # TODO only report each source once
             self.logger.warning("Unregonized source %s", source)
@@ -221,9 +225,9 @@ class DrugProcess(object):
 
                         #don't keep the URL, can build a better one later to handle multi-id
 
-                        assert isinstance(ref["ref_type"], unicode)
+                        assert isinstance(ref["ref_type"], str)
                         ref_type = ref["ref_type"]
-                        assert isinstance(ref["ref_id"], unicode)
+                        assert isinstance(ref["ref_id"], str)
                         ref_id = ref["ref_id"] 
 
                         #create a set to ensure uniqueness
@@ -265,7 +269,7 @@ class DrugProcess(object):
         #handle target information from target endpoint
         #do this first, so we can stop early if its a target we are not interested in
         if "target_chembl_id" in mech and mech["target_chembl_id"] is not None:
-            assert isinstance(mech["target_chembl_id"], unicode)
+            assert isinstance(mech["target_chembl_id"], str)
             target_id = mech["target_chembl_id"]
             target = targets[target_id]
 
@@ -316,7 +320,7 @@ class DrugProcess(object):
                 if "approved_symbol" in gene \
                         and gene["approved_symbol"] is not None \
                         and len(gene["approved_symbol"]) > 0:
-                    assert isinstance(gene["approved_symbol"], unicode)
+                    assert isinstance(gene["approved_symbol"], str)
                     out_component["approved_symbol"] = gene["approved_symbol"]
 
                 if "target_components" not in out:
@@ -326,12 +330,12 @@ class DrugProcess(object):
             #add some information from the chembl source
             # TODO what if this is different from ensembl ?
             if "target_type" in target and target["target_type"] is not None:
-                assert isinstance(target["target_type"], unicode)
+                assert isinstance(target["target_type"], str)
                 #chembl stores them as all-caps, we want them to be pretty
                 out["target_type"] = target["target_type"].lower()
 
             if "pref_name" in target and target["pref_name"] is not None:
-                assert isinstance(target["pref_name"], unicode)
+                assert isinstance(target["pref_name"], str)
                 out["target_name"] = target["pref_name"]
 
         else:
@@ -344,7 +348,7 @@ class DrugProcess(object):
             out["action_type"] = mech["action_type"].lower()
 
         if "mechanism_of_action" in mech and mech["mechanism_of_action"] is not None:
-            assert isinstance(mech["mechanism_of_action"], unicode)
+            assert isinstance(mech["mechanism_of_action"], str)
             out["description"] = mech["mechanism_of_action"]
 
 
@@ -356,9 +360,9 @@ class DrugProcess(object):
 
                     #don't keep the URL, can build a better one later to handle multi-id
 
-                    assert isinstance(ref["ref_type"], unicode)
+                    assert isinstance(ref["ref_type"], str)
                     ref_type = ref["ref_type"]
-                    assert isinstance(ref["ref_id"], unicode)
+                    assert isinstance(ref["ref_id"], str)
                     ref_id = ref["ref_id"] 
 
                     #create a set to ensure uniqueness
@@ -408,12 +412,12 @@ class DrugProcess(object):
 
         if "molecule_type" in mol and mol["molecule_type"] is not None:
             #TODO format check
-            assert isinstance(mol["molecule_type"], unicode), ident
+            assert isinstance(mol["molecule_type"], str), ident
             drug["type"] = mol["molecule_type"]
             
         if "pref_name" in mol and mol["pref_name"] is not None:
             #TODO casing? always uppercase, do we inital case, lower case?
-            assert isinstance(mol["pref_name"], unicode), ident
+            assert isinstance(mol["pref_name"], str), ident
             drug["pref_name"] = mol["pref_name"]
             
         if "first_approval" in mol and mol["first_approval"] is not None:
@@ -441,7 +445,7 @@ class DrugProcess(object):
             #  "Self-poisoning"
             #  "Self-Poisonings"
             reasons = set()
-            assert isinstance(mol["withdrawn_reason"], unicode), ident
+            assert isinstance(mol["withdrawn_reason"], str), ident
             for reason in mol["withdrawn_reason"].split(";"):
                 reasons.add(reason.strip())
             drug["withdrawn_reason"] = sorted(reasons)
@@ -458,7 +462,7 @@ class DrugProcess(object):
             #split and trim by semicolon
             #TODO casing?
             countries = set()
-            assert isinstance(mol["withdrawn_country"], unicode), ident
+            assert isinstance(mol["withdrawn_country"], str), ident
             for country in mol["withdrawn_country"].split(";"):
                 countries.add(country.strip())
             drug["withdrawn_country"] = sorted(countries)
@@ -468,7 +472,7 @@ class DrugProcess(object):
             #TODO check only present when withdrawn_flag
             #TODO casing?
             classes = set()
-            assert isinstance(mol["withdrawn_class"], unicode), ident
+            assert isinstance(mol["withdrawn_class"], str), ident
             for clazz in mol["withdrawn_class"].split(";"):
                 classes.add(clazz.strip())
             drug["withdrawn_class"] = sorted(classes)
@@ -476,7 +480,7 @@ class DrugProcess(object):
         if "black_box_warning" in mol and mol["black_box_warning"] is not None:
             #unicode converted to true/false
             #check it comes in as a unicode
-            assert isinstance(mol["black_box_warning"], unicode), \
+            assert isinstance(mol["black_box_warning"], str), \
                 "%s black_box_warning = %s " % (ident,repr(mol["black_box_warning"]))
             #convert unicode to an integer - will throw if it can't
             bbw = int(mol["black_box_warning"])
@@ -498,10 +502,10 @@ class DrugProcess(object):
                         and "syn_type" in molecule_synonym \
                         and molecule_synonym["syn_type"] is not None:
 
-                    assert isinstance(molecule_synonym["syn_type"], unicode)
+                    assert isinstance(molecule_synonym["syn_type"], str)
                     syn_type = molecule_synonym["syn_type"]
                     assert isinstance(
-                            molecule_synonym["molecule_synonym"], unicode)
+                            molecule_synonym["molecule_synonym"], str)
                     synonym = molecule_synonym["molecule_synonym"]
 
                     if "TRADE_NAME" == syn_type.upper():
@@ -524,9 +528,9 @@ class DrugProcess(object):
 
                     #don't keep the URL, can build a better one later to handle multi-id
 
-                    assert isinstance(ref["xref_src"], unicode)
+                    assert isinstance(ref["xref_src"], str)
                     ref_type = ref["xref_src"]
-                    assert isinstance(ref["xref_id"], unicode)
+                    assert isinstance(ref["xref_id"], str)
                     ref_id = ref["xref_id"] 
 
                     #create a set to ensure uniqueness
@@ -546,7 +550,7 @@ class DrugProcess(object):
 
         if "chebi_par_id" in mol and mol["chebi_par_id"] is not None:
             assert isinstance(mol["chebi_par_id"], int)
-            chebi_id = unicode(str(mol["chebi_par_id"]), "utf-8")
+            chebi_id = str(str(mol["chebi_par_id"]), "utf-8")
 
             if "cross_references" not in drug:
                 drug["cross_references"] = []
@@ -747,7 +751,7 @@ class DrugProcess(object):
         with ElasticsearchBulkIndexManager(es, self.es_index, settings, mappings):
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(data.items(), self.es_index)
+            actions = elasticsearch_actions(list(data.items()), self.es_index)
             failcount = 0
             if not dry_run:
                 results = None

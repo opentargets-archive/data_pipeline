@@ -1,3 +1,5 @@
+from builtins import map
+from builtins import str
 import logging
 
 from yapsy.IPlugin import IPlugin
@@ -81,7 +83,7 @@ class MousePhenotypes(IPlugin):
 
         #TODO this is a moderately hideous bit of pointless munging, but I don't have time fix it now!
 
-        for mp_id,label in self.mp_ontology.current_classes.items():
+        for mp_id,label in list(self.mp_ontology.current_classes.items()):
 
             mp_class = {}
             mp_class["label"] = label
@@ -110,7 +112,7 @@ class MousePhenotypes(IPlugin):
         #self._logger.debug("Assigning %i entries to human genes ", len(self.mouse_genes))
 
         # for any mouse gene...
-        for _, gene in self.mouse_genes.iteritems():
+        for _, gene in self.mouse_genes.items():
 
             for ortholog in gene["human_orthologs"]:
                 human_gene_symbol = ortholog["gene_symbol"]
@@ -119,7 +121,7 @@ class MousePhenotypes(IPlugin):
                 # all phenotypes are classified per category
                 self.human_genes[human_gene_symbol]["mouse_orthologs"].append({ "mouse_gene_id" : gene["gene_id"],
                                                                           "mouse_gene_symbol" : gene["gene_symbol"],
-                                                                          "phenotypes" : gene["phenotypes"].values()})
+                                                                          "phenotypes" : list(gene["phenotypes"].values())})
 
     def get_genotype_phenotype(self):
         #self._logger.debug("get_genotype_phenotype")
@@ -128,7 +130,7 @@ class MousePhenotypes(IPlugin):
 
             for li, line in enumerate(fi):
                 # a way too many false spaces just to bother people
-                array = map(str.strip, line.strip().split("\t"))
+                array = list(map(str.strip, line.strip().split("\t")))
                 if len(array) == 7:
                     (human_gene_symbol, a, b, c, mouse_gene_symbol, mouse_gene_id, phenotypes_raw) = array
 
@@ -163,7 +165,7 @@ class MousePhenotypes(IPlugin):
             # Allelic Composition	Allele Symbol(s)	Genetic Background	Mammalian Phenotype ID	PubMed ID	MGI Marker Accession ID
             for li, line in enumerate(fi):
                 # a way too many false spaces just to bother people
-                array = map(str.strip, line.strip().split("\t"))
+                array = list(map(str.strip, line.strip().split("\t")))
 
                 #self._logger.debug('mouse KO array %s in line %d', str(array), li)
 
@@ -185,7 +187,7 @@ class MousePhenotypes(IPlugin):
                             mp_class = self.mps[mp_id_key]
                             mp_label = mp_class["label"]
 
-                            for k, v in PHENOTYPE_CATEGORIES.iteritems():
+                            for k, v in PHENOTYPE_CATEGORIES.items():
                                 if k not in self.mouse_genes[mouse_gene_id]["phenotypes"]:
                                     self.mouse_genes[mouse_gene_id]["phenotypes"][k] = \
                                         {
@@ -195,7 +197,7 @@ class MousePhenotypes(IPlugin):
                                         }
 
                             # it's possible that there are multiple paths to the same root.
-                            mp_category_ids = set(map(lambda x: x[0], mp_class["path_codes"]))
+                            mp_category_ids = set([x[0] for x in mp_class["path_codes"]])
                             for category_id in mp_category_ids:
                                 mp_category_id = category_id.replace("_", ":")
                                 self.mouse_genes[mouse_gene_id]["phenotypes"][mp_category_id]["genotype_phenotype"].append(

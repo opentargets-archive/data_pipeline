@@ -1,4 +1,5 @@
 
+from builtins import object
 import logging
 import time
 from elasticsearch import RequestError

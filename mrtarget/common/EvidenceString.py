@@ -1,3 +1,7 @@
+from __future__ import division
+from builtins import str
+from builtins import object
+from past.utils import old_div
 import copy
 import json
 import logging
@@ -44,7 +48,7 @@ class DataNormaliser(object):
         delta2 = new_range[1] - new_range[0]
         if delta1 or delta2:
             try:
-                normalized = (delta2 * (n - start_range[0]) / delta1) + new_range[0]
+                normalized = (old_div(delta2 * (n - start_range[0]), delta1)) + new_range[0]
             except ZeroDivisionError:
                 normalized = new_range[0]
         else:
@@ -57,7 +61,7 @@ class DataNormaliser(object):
         return normalized
 
 
-class ExtendedInfo():
+class ExtendedInfo(object):
     data = dict()
 
     def extract_info(self, obj):
@@ -121,7 +125,7 @@ class ExtendedInfoECO(ExtendedInfo):
                          label=eco.label),
 
 
-class EvidenceManager():
+class EvidenceManager(object):
     def __init__(self, lookup_data, eco_scores_uri, excluded_biotypes, datasources_to_datatypes):
         self.logger = logging.getLogger(__name__)
         self.available_genes = lookup_data.available_genes
@@ -527,7 +531,7 @@ class EvidenceManager():
 
     @staticmethod
     def _map_to_reference_ensembl_gene(ensg, non_reference_genes, logger=logging.getLogger(__name__)):
-        for symbol, data in non_reference_genes.items():
+        for symbol, data in list(non_reference_genes.items()):
             if ensg in data['alternative']:
                 logger.warning(
                     "Mapped non reference ensembl gene id %s to %s for gene %s" % (ensg, data['reference'], symbol))
@@ -543,7 +547,7 @@ class EvidenceManager():
 class Evidence(JSONSerializable):
     def __init__(self, evidence, datasources_to_datatypes):
         self.logger = logging.getLogger(__name__)
-        if isinstance(evidence, str) or isinstance(evidence, unicode):
+        if isinstance(evidence, str) or isinstance(evidence, str):
             self.load_json(evidence)
         elif isinstance(evidence, dict):
             self.evidence = evidence
@@ -640,7 +644,7 @@ class Evidence(JSONSerializable):
                                 max_sample_size = int(mutation['number_mutated_samples'])
                     if sample_total_coverage > max_sample_size:
                         sample_total_coverage = max_sample_size
-                    frequency = DataNormaliser.renormalize(sample_total_coverage / max_sample_size, [0., 9.], [.5, 1.])
+                    frequency = DataNormaliser.renormalize(old_div(sample_total_coverage, max_sample_size), [0., 9.], [.5, 1.])
                 self.evidence['scores']['association_score'] = float(
                     self.evidence['evidence']['resource_score']['value']) * frequency
             elif self.evidence['type'] == 'literature':
