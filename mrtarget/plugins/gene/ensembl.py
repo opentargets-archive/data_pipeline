@@ -1,9 +1,9 @@
 from yapsy.IPlugin import IPlugin
 from mrtarget.modules.GeneData import Gene
-from elasticsearch_dsl import Search
-from elasticsearch_dsl.query import MatchAll
 import sys
 import logging
+import simplejson as json
+from opentargets_urlzsource import URLZSource
 
 class Ensembl(IPlugin):
 
@@ -46,16 +46,17 @@ class Ensembl(IPlugin):
 
     def merge_data(self, genes, es, r_server, data_config, es_config):
 
-        index = es_config.ens.name
+        ensembl_filename = data_config.ensembl_filename
+        with URLZSource(ensembl_filename).open() as ensembl_file:
+            for line in ensembl_file:
+                content = json.loads(line)
 
-        for row in Search().using(es).index(index).query(MatchAll()).scan():
-            gene = None
-            if row['id'] in genes:
-                gene = genes.get_gene(row['id'])
-            else:
-                gene = Gene()
-            self.load_ensembl_data(gene, row)
-            genes.add_gene(gene)
+                if content['id'] in genes:
+                    gene = genes.get_gene(content['id'])
+                else:
+                    gene = Gene()
+                self.load_ensembl_data(gene, content)
+                genes.add_gene(gene)
 
         self._clean_non_reference_genes(genes)
 
