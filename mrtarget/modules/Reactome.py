@@ -139,7 +139,6 @@ class ReactomeProcess(object):
 
     def process_all(self, dry_run):
 
-        self.relations = dict()
         self.g.add_node('root', name="", species="")
 
         for row in self.downloader.get_pathway_data():
@@ -178,12 +177,12 @@ class ReactomeProcess(object):
                 else:
                     results = elasticsearch.helpers.streaming_bulk(es, actions,
                             chunk_size=chunk_size)
-                for success, details in results:
+                for success, _ in results:
                     if not success:
                         failcount += 1
 
                 if failcount:
-                    raise RuntimeError("%s relations failed to index" % failcount)
+                    raise RuntimeError("%s failed to index" % failcount)
 
 
     """
@@ -196,7 +195,7 @@ class ReactomeProcess(object):
         #number of reactions
         reaction_count = 0
         #Note: try to avoid doing this more than once!
-        for reaction in Search().using(es).index(index).query(MatchAll()).scan():
+        for _ in Search().using(es).index(index).query(MatchAll()).scan():
             reaction_count += 1
 
         #put the metrics into a single dict

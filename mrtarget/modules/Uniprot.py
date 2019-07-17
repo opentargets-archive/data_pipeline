@@ -32,7 +32,7 @@ def elasticsearch_actions(entries, index):
 
 def generate_uniprot(uri):
     with URLZSource(uri).open() as r_file:
-        for event, elem in etree.iterparse(r_file, events=("end",), 
+        for _, elem in etree.iterparse(r_file, events=("end",), 
                 tag='{http://uniprot.org/uniprot}entry'):
 
             #parse the XML into an object
@@ -84,7 +84,7 @@ class UniprotDownloader(object):
                 else:
                     results = elasticsearch.helpers.streaming_bulk(es, actions,
                             chunk_size=chunk_size)
-                for success, details in results:
+                for success, _ in results:
                     if not success:
                         failcount += 1
 
@@ -99,7 +99,7 @@ class UniprotDownloader(object):
         #number of uniprot entries
         uniprot_count = 0
         #Note: try to avoid doing this more than once!
-        for unprot_entry in Search().using(es).index(index).query(MatchAll()).scan():
+        for _ in Search().using(es).index(index).query(MatchAll()).scan():
             uniprot_count += 1
 
             if uniprot_count % 1000 == 0:

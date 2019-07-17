@@ -9,7 +9,6 @@ import simplejson as json
 import itertools
 import functools
 
-import pypeln.process as pr
 import petl
 import more_itertools
 from opentargets_urlzsource import URLZSource

@@ -1,7 +1,6 @@
 from builtins import str
 from yapsy.IPlugin import IPlugin
 from opentargets_urlzsource import URLZSource
-import traceback
 import logging
 import csv
 import configargparse
