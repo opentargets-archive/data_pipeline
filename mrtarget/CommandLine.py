@@ -19,7 +19,6 @@ from mrtarget.modules.HPA import HPAProcess
 from mrtarget.modules.QC import QCMetrics
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
-from mrtarget.modules.Uniprot import UniprotDownloader
 from mrtarget.modules.Drug import DrugProcess
 
 import mrtarget.cfg

@@ -63,14 +63,7 @@ def setup_ops_parser():
         env_var="ENS_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--ens-queue-write", help="size of ens writer queue (in chunks)",
         env_var="ENS_QUEUE_WRITE", action='store', default=8, type=int)
-        
-    # if 0 use main thread for writing
-    # if >0 use that many threads for writing
-    p.add("--uni-workers-writer", help="# of procs for uni writers",
-        env_var="UNI_WORKERS_WRITER", action='store', default=4, type=int)
-    p.add("--uni-queue-write", help="size of uni writer queue (in chunks)",
-        env_var="UNI_QUEUE_WRITE", action='store', default=8, type=int)
-        
+                
     # if 0 use main thread for writing
     # if >0 use that many threads for writing
     p.add("--gen-workers-writer", help="# of procs for gen writers",
