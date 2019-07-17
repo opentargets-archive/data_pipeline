@@ -56,14 +56,7 @@ def setup_ops_parser():
         env_var="REA_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--rea-queue-write", help="size of rea writer queue (in chunks)",
         env_var="REA_QUEUE_WRITE", action='store', default=8, type=int)
-        
-    # if 0 use main thread for writing
-    # if >0 use that many threads for writing
-    p.add("--uni-workers-writer", help="# of procs for uni writers",
-        env_var="UNI_WORKERS_WRITER", action='store', default=4, type=int)
-    p.add("--uni-queue-write", help="size of uni writer queue (in chunks)",
-        env_var="UNI_QUEUE_WRITE", action='store', default=8, type=int)
-        
+
     # if 0 use main thread for writing
     # if >0 use that many threads for writing
     p.add("--gen-workers-writer", help="# of procs for gen writers",
@@ -182,8 +175,6 @@ def setup_ops_parser():
 
     # load supplemental and genetic informtaion from various external resources
     p.add("--hpa", help="download human protein atlas, process, and store in elasticsearch",
-        action="store_true")
-    p.add("--unic", help="cache the uniprot human entries in elasticsearch",
         action="store_true")
     p.add("--rea", help="download reactome data, process it, and store elasticsearch",
         action="store_true")
