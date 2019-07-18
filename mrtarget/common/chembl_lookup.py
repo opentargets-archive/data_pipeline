@@ -8,7 +8,12 @@ import logging
 
 import itertools
 import shelve
-import dbm.ndbm
+import sys
+#for python3 the module name has changed
+if sys.version_info >= (3, 0):
+    import dbm.ndbm as dbm
+else:
+    import dbm as dbm
 import tempfile
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import Match
@@ -50,7 +55,7 @@ class ChEMBLLookup(object):
         t_filename = tempfile.NamedTemporaryFile(delete=False).name
         # dbm could not work: Eg. dbm.error: cannot add item.
         # Use dumbdbm for the local execution. Python 3 should fix this issue.
-        dumb_dict = dbm.ndbm.open(t_filename, 'n')
+        dumb_dict = dbm.open(t_filename, 'n')
         shelve_out = shelve.Shelf(dict=dumb_dict)
         for uri in self.molecule_uri:
             self._logger.debug('ChEMBL getting Molecule from %s', uri)
