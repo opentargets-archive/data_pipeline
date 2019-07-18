@@ -1,6 +1,7 @@
 import csv
 import gzip
 import logging
+import codecs
 
 from yapsy.IPlugin import IPlugin
 import configargparse
@@ -25,8 +26,9 @@ class Orthologs(IPlugin):
 
         self._logger.info("Ortholog parsing - requesting from URL %s",data_config.hgnc_orthologs)
 
-        with URLZSource(data_config.hgnc_orthologs).open() as source:
-            reader = csv.DictReader(source, delimiter="\t")
+        with URLZSource(data_config.hgnc_orthologs).open()as source:
+            #csv module wants "string" not "unicode" so we have to convert it
+            reader = csv.DictReader(codecs.iterdecode(source, 'utf-8'), delimiter="\t")
             for row in reader:
                 if row['human_ensembl_gene'] in genes:
                     self.add_ortholog_data_to_gene(gene=genes[row['human_ensembl_gene']], data=row)

@@ -15,7 +15,13 @@ from mrtarget.common.connection import new_es_client
 from mrtarget.common.LookupHelpers import LookUpDataRetriever
 
 import tempfile
-import dbm.ndbm
+import sys
+#for python3 the module name has changed
+if sys.version_info >= (3, 0):
+    import dbm.ndbm as dbm
+else:
+    import dbm as dbm
+
 import shelve
 import codecs
 import urllib.request, urllib.parse, urllib.error
@@ -102,7 +108,7 @@ class DrugProcess(object):
 
         #note: this file is never deleted!
         filename = tempfile.NamedTemporaryFile(delete=False).name
-        shelf = shelve.Shelf(dict=dbm.ndbm.open(filename, 'n'))
+        shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
                 f_obj = codecs.getreader("utf-8")(f_obj)
@@ -130,7 +136,7 @@ class DrugProcess(object):
 
         #note: this file is never deleted!
         filename = tempfile.NamedTemporaryFile(delete=False).name
-        shelf = shelve.Shelf(dict=dbm.ndbm.open(filename, 'n'))
+        shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
                 f_obj = codecs.getreader("utf-8")(f_obj)
