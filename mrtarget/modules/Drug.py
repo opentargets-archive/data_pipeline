@@ -111,7 +111,9 @@ class DrugProcess(object):
         shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
-                f_obj = codecs.getreader("utf-8")(f_obj)
+                #for python2 we need to decode utf-8
+                if sys.version_info < (3, 0):
+                    f_obj = codecs.getreader("utf-8")(f_obj)
                 for line_no, line in enumerate(f_obj):
                     try:
                         obj = json.loads(line)
@@ -121,9 +123,9 @@ class DrugProcess(object):
                         
                     key = key_f(obj)
                     if key is not None:
-                        if str(key) in shelf:
+                        if key in shelf:
                             raise ValueError("Duplicate key %s in uri %s" % (key,uri))
-                        shelf[str(key)] = obj
+                        shelf[key] = obj
         return shelf
 
     def create_shelf_multi(self, uris, key_f):
@@ -139,7 +141,9 @@ class DrugProcess(object):
         shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
-                f_obj = codecs.getreader("utf-8")(f_obj)
+                #for python2 we need to decode utf-8
+                if sys.version_info < (3, 0):
+                    f_obj = codecs.getreader("utf-8")(f_obj)
                 for line_no, line in enumerate(f_obj):
                     try:
                         obj = json.loads(line)
@@ -149,10 +153,9 @@ class DrugProcess(object):
 
                     key = key_f(obj)
                     if key is not None:
-                        key_s = str(key)
-                        existing = shelf.get(key_s,[])
+                        existing = shelf.get(key,[])
                         existing.append(obj)
-                        shelf[key_s] = existing
+                        shelf[key] = existing
         return shelf
 
     def build_urls(self, source, ids):
@@ -259,7 +262,7 @@ class DrugProcess(object):
                         out["references"].append(reference)
                 
                 if "references" in out:
-                    out["references"] = sorted(out["references"])
+                    out["references"] = sorted(out["references"],key = lambda x:x["source"])
 
             return out
         else:
@@ -394,7 +397,7 @@ class DrugProcess(object):
                     out["references"].append(reference)
             
             if "references" in out:
-                out["references"] = sorted(out["references"])
+                out["references"] = sorted(out["references"],key=lambda x : x["source"])
 
         return out
 
@@ -556,7 +559,7 @@ class DrugProcess(object):
 
         if "chebi_par_id" in mol and mol["chebi_par_id"] is not None:
             assert isinstance(mol["chebi_par_id"], int)
-            chebi_id = str(str(mol["chebi_par_id"]), "utf-8")
+            chebi_id = mol["chebi_par_id"]
 
             if "cross_references" not in drug:
                 drug["cross_references"] = []
@@ -569,7 +572,7 @@ class DrugProcess(object):
 
         #sort cross references for consistent order after all possible ones have been added
         if "cross_references" in drug:
-            drug["cross_references"] = sorted(drug["cross_references"])
+            drug["cross_references"] = sorted(drug["cross_references"],key=lambda x: x["source"])
 
         if ident in indications:
             drug["indications"] = []
@@ -717,7 +720,7 @@ class DrugProcess(object):
 
             #TODO sure no grandparenting
             
-            child_mols = sorted(child_mols)
+            child_mols = sorted(child_mols, key = lambda x: x["molecule_chembl_id"])
 
             drug = self.handle_drug(ident, parent_mol,
                 indications, mechanisms,
