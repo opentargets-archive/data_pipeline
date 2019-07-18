@@ -44,16 +44,6 @@ $(LOG_PATH)/out.ens.log :
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --ens 2>&1 | tee $(LOG_PATH)/out.ens.log
 
-.PHONY: unic
-unic: uni
-
-.PHONY: uni
-uni: $(LOG_PATH)/out.uni.log
-
-$(LOG_PATH)/out.uni.log :
-	mkdir -p $(LOG_PATH)
-	$(MRTARGET_CMD) --unic 2>&1 | tee $(LOG_PATH)/out.uni.log
-
 .PHONY: hpa
 hpa: $(LOG_PATH)/out.hpa.log
 
@@ -80,7 +70,7 @@ $(LOG_PATH)/out.eco.log :
 .PHONY: base_gene
 base_gene: $(LOG_PATH)/out.gen.log	
 
-$(LOG_PATH)/out.gen.log : $(LOG_PATH)/out.rea.log $(LOG_PATH)/out.ens.log $(LOG_PATH)/out.uni.log
+$(LOG_PATH)/out.gen.log : $(LOG_PATH)/out.rea.log $(LOG_PATH)/out.ens.log 
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --gen 2>&1 | tee $(LOG_PATH)/out.gen.log
 
