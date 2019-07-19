@@ -1,8 +1,10 @@
 from yapsy.IPlugin import IPlugin
 import jsonpickle
-import base64
+import lxml.etree as etree
 from elasticsearch_dsl import Search
-from elasticsearch_dsl.query import MatchAll, Match
+from elasticsearch_dsl.query import Match
+from opentargets_urlzsource import URLZSource
+from mrtarget.common.UniprotIO import Parser
 import logging
 
 
@@ -96,17 +98,23 @@ class Uniprot(IPlugin):
         if 'InterPro' in  seqrec.annotations['dbxref_extended']:
             gene.interpro = seqrec.annotations['dbxref_extended']['InterPro']
 
+    def generate_uniprot(self, uri):
+        with URLZSource(uri).open() as r_file:
+            for event, elem in etree.iterparse(r_file, events=("end",), 
+                    tag='{http://uniprot.org/uniprot}entry'):
+
+                #parse the XML into an object
+                entry = Parser(elem, return_raw_comments=False).parse()
+                elem.clear()
+
+                yield entry
 
     def merge_data(self, genes, es, r_server, data_config, es_config):
 
-        index = es_config.uni.name
         reactome_retriever = ReactomeRetriever(es, es_config.rea.name)
-
         c = 0
-        for seqrec in Search().using(es).index(index).query(MatchAll()).scan():
-            #these are base 64 encoded json - need to decode
-            #TODO access the source directly
-            seqrec = jsonpickle.decode(base64.b64decode(seqrec['entry']))
+        for seqrec in self.generate_uniprot(data_config.uniprot_uri):
+
             c += 1
             if c % 1000 == 0:
                 self._logger.info("%i entries retrieved for uniprot" % c)
