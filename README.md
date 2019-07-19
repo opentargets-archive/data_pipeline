@@ -13,13 +13,12 @@ The pipeline can be broken down in a number of steps, each of which can be run a
 
 #### `--rea` Reactome
 Downloads and processes information into a local index for performance.
-#### `--unic` Uniprot
-Downloads and processes information into a local index for performance.
 #### `--hpa` Expression
 Downloads and processes information into a local index for performance.
 #### `--gen` Target
 Downloads and processes information from various sources. Is built around a "plugin" structure. Constructs an Elasticsarch index containg most of the information about each Target within the platform.
-It requires `--rea` reactome, and `--unic` Uniprot steps.
+
+It requires `--rea` reactome step.
 Note: HGNC,Ensembl,Uniprot plugins should always be first, as they initialize the gene list used in other plugins.
 Note: Chembl is required by the `--sea` step below.
 #### `--efo` Disease
