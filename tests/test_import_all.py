@@ -28,11 +28,9 @@ class ImportTestCase(unittest.TestCase):
         import mrtarget.modules.Drug
         import mrtarget.modules.ECO
         import mrtarget.modules.EFO
-        import mrtarget.modules.Ensembl
         import mrtarget.modules.Evidences
         import mrtarget.modules.GeneData
         import mrtarget.modules.HPA
         import mrtarget.modules.QC
         import mrtarget.modules.Reactome
         import mrtarget.modules.SearchObjects
-        import mrtarget.modules.Uniprot

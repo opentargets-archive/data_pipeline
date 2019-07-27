@@ -13,13 +13,11 @@ from mrtarget.modules.Association import ScoringProcess
 from mrtarget.modules.DataDrivenRelation import DataDrivenRelationProcess
 from mrtarget.modules.ECO import EcoProcess
 from mrtarget.modules.EFO import EfoProcess
-from mrtarget.modules.Ensembl import EnsemblProcess
 from mrtarget.modules.GeneData import GeneManager
 from mrtarget.modules.HPA import HPAProcess
 from mrtarget.modules.QC import QCMetrics
 from mrtarget.modules.Reactome import ReactomeProcess
 from mrtarget.modules.SearchObjects import SearchObjectProcess
-from mrtarget.modules.Uniprot import UniprotDownloader
 from mrtarget.modules.Drug import DrugProcess
 
 import mrtarget.cfg
@@ -71,22 +69,6 @@ def main():
             process.process_all(args.dry_run)
         if not args.skip_qc:
             qc_metrics.update(process.qc(es, es_config.rea.name))
-    if args.ens:
-        process = EnsemblProcess(args.elasticseach_nodes, es_config.ens.name, 
-            es_config.ens.mapping, es_config.ens.setting,
-            data_config.ensembl_filename, args.ens_workers_writer, args.ens_queue_write)
-        if not args.qc_only:
-            process.process(args.dry_run)
-        if not args.skip_qc:
-            qc_metrics.update(process.qc(es, es_config.ens.name))
-    if args.unic:
-        process = UniprotDownloader(args.elasticseach_nodes, es_config.uni.name, 
-            es_config.uni.mapping, es_config.uni.setting,
-            data_config.uniprot_uri, args.uni_workers_writer, args.uni_queue_write)
-        if not args.qc_only:
-            process.process(args.dry_run)
-        if not args.skip_qc:
-            qc_metrics.update(process.qc(es, es_config.uni.name))
 
     if args.gen:
         process = GeneManager(args.elasticseach_nodes, es_config.gen.name, 
