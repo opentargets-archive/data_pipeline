@@ -9,11 +9,7 @@ import logging
 import itertools
 import shelve
 import sys
-#for python3 the module name has changed
-if sys.version_info >= (3, 0):
-    import dbm.ndbm as dbm
-else:
-    import dbm as dbm
+import dbm
 import tempfile
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import Match
