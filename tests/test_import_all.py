@@ -34,4 +34,3 @@ class ImportTestCase(unittest.TestCase):
         import mrtarget.modules.QC
         import mrtarget.modules.Reactome
         import mrtarget.modules.SearchObjects
-        import mrtarget.modules.Uniprot

@@ -64,7 +64,7 @@ $(LOG_PATH)/out.eco.log :
 .PHONY: base_gene
 base_gene: $(LOG_PATH)/out.gen.log	
 
-$(LOG_PATH)/out.gen.log : $(LOG_PATH)/out.rea.log
+$(LOG_PATH)/out.gen.log : $(LOG_PATH)/out.rea.log 
 	mkdir -p $(LOG_PATH)
 	$(MRTARGET_CMD) --gen 2>&1 | tee $(LOG_PATH)/out.gen.log
 
