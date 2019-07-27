@@ -44,12 +44,10 @@ class JSONSerializable(object):
                           cls=PipelineEncoder)
 
     def load_json(self, data):
-        if isinstance(data, str) or isinstance(data, str):
-            self.__dict__.update(**json.loads(data))
-        elif isinstance(data, dict):#already parsed json obj
+        if isinstance(data, dict):#already parsed json obj
             self.__dict__.update(**data)
         else:
-            raise AttributeError("cannot load JSON object from %s type"%str(type(data)))
+            self.__dict__.update(**json.loads(data))
 
 
 class TreeNode(object):
