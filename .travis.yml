@@ -1,8 +1,6 @@
 sudo: required
+dist: bionic   # required for Python >= 3.7
 language: python
-# cache:
-#   directories:
-#     - "$HOME/google-cloud-sdk/"
 services:
   - docker
 env:
