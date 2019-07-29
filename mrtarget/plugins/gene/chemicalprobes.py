@@ -1,3 +1,4 @@
+from builtins import str
 from yapsy.IPlugin import IPlugin
 from opentargets_urlzsource import URLZSource
 import logging

@@ -1,3 +1,4 @@
+from builtins import object
 import logging
 from collections import OrderedDict
 from mrtarget.common.DataStructure import JSONSerializable
@@ -101,7 +102,7 @@ def elasticsearch_actions(items, index):
 
         yield action
 
-class EfoProcess():
+class EfoProcess(object):
 
     def __init__(self, es_hosts, es_index, es_mappings, es_settings,
                  efo_uri, hpo_uri, mp_uri,
@@ -227,7 +228,7 @@ class EfoProcess():
 
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(self.efos.items(), self.es_index)
+            actions = elasticsearch_actions(list(self.efos.items()), self.es_index)
             failcount = 0
 
             if not dry_run:

@@ -1,13 +1,16 @@
+from __future__ import division
+from past.utils import old_div
+from builtins import object
 import numpy as np
 
 
-class ScoringMethods():
+class ScoringMethods(object):
     HARMONIC_SUM = 'harmonic-sum'
     SUM = 'sum'
     MAX = 'max'
 
 
-class HarmonicSumScorer():
+class HarmonicSumScorer(object):
 
     def __init__(self, buffer=100):
         """
@@ -74,7 +77,7 @@ class HarmonicSumScorer():
             harmonic_sum (float): the harmonic sum of the data passed
         """
         data.sort(reverse=True)
-        harmonic_sum = sum(s / ((i+1) ** scale_factor) for i, s in enumerate(data))
+        harmonic_sum = sum(old_div(s, ((i+1) ** scale_factor)) for i, s in enumerate(data))
         if cap is not None and \
                         harmonic_sum > cap:
             return cap

@@ -1,3 +1,4 @@
+from builtins import object
 from yapsy.IPlugin import IPlugin
 import jsonpickle
 import lxml.etree as etree
@@ -8,7 +9,7 @@ from mrtarget.common.UniprotIO import Parser
 import logging
 
 
-class ReactomeRetriever():
+class ReactomeRetriever(object):
     def __init__(self, es, index):
         self.es = es
         self.index = index
@@ -35,7 +36,7 @@ class Uniprot(IPlugin):
         if seqrec.dbxrefs:
             gene.dbxrefs.extend(seqrec.dbxrefs)
             gene.dbxrefs= sorted(list(set(gene.dbxrefs)))
-        for k, v in seqrec.annotations.items():
+        for k, v in list(seqrec.annotations.items()):
             if k == 'accessions':
                 gene.uniprot_accessions = v
             if k == 'keywords':

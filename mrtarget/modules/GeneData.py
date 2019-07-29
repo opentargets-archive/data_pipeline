@@ -1,3 +1,7 @@
+from __future__ import division
+from __future__ import print_function
+from builtins import object
+from past.utils import old_div
 import logging
 from collections import OrderedDict
 from mrtarget.common.DataStructure import JSONSerializable
@@ -120,7 +124,7 @@ class Gene(JSONSerializable):
         try:
             self._private['suggestions']['input'] = [x.lower() for x in self._private['suggestions']['input']]
         except:
-            print "error", repr(self._private['suggestions']['input'])
+            print("error", repr(self._private['suggestions']['input']))
 
     def _create_facets(self):
         self._private['facets'] = dict()
@@ -144,7 +148,7 @@ class Gene(JSONSerializable):
 
 
 
-class GeneSet():
+class GeneSet(object):
     def __init__(self):
         self.genes = OrderedDict()
 
@@ -171,7 +175,7 @@ class GeneSet():
 
 
     def iterate(self):
-        for k, v in self.genes.iteritems():
+        for k, v in self.genes.items():
             yield k, v
 
     def __len__(self):
@@ -188,7 +192,7 @@ class GeneSet():
 
         ens, hgnc, other, ens_active, uni, swiss = 0., 0., 0., 0., 0., 0.
 
-        for geneid, gene in self.genes.items():
+        for geneid, gene in list(self.genes.items()):
             if geneid.startswith('ENS'):
                 ens += 1
             elif geneid.startswith('HGNC:'):
@@ -205,12 +209,12 @@ class GeneSet():
 
         tot = len(self)
         stats = stats % (tot,
-                         ens, ens / tot * 100.,
-                         hgnc, hgnc / tot * 100.,
-                         other, other / tot * 100.,
-                         uni, uni / tot * 100.,
-                         swiss, swiss / tot * 100.,
-                         ens_active, ens_active / tot * 100.)
+                         ens, old_div(ens, tot * 100.),
+                         hgnc, old_div(hgnc, tot * 100.),
+                         other, old_div(other, tot * 100.),
+                         uni, old_div(uni, tot * 100.),
+                         swiss, old_div(swiss, tot * 100.),
+                         ens_active, old_div(ens_active, tot * 100.))
         return stats
 
 
@@ -231,7 +235,7 @@ def elasticsearch_actions(genes, index):
         yield action
 
 
-class GeneManager():
+class GeneManager(object):
     """
     Merge data available in ?elasticsearch into proper json objects
 

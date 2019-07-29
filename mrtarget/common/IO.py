@@ -48,7 +48,7 @@ def open_to_write(filename):
 def open_to_read(filename):
     """return an iterator from izip (filename, (enumerate(file_handle, start=1))"""
     it = more_itertools.with_iter(URLZSource(filename).open())
-    return itertools.izip(itertools.cycle([filename]), enumerate(it, start=1))
+    return zip(itertools.cycle([filename]), enumerate(it, start=1))
 
 
 def make_iter_lines(iterable_of_filenames, first_n=0):
@@ -58,9 +58,9 @@ def make_iter_lines(iterable_of_filenames, first_n=0):
     """
     it = iter(iterable_of_filenames)
 
-    in_handles = itertools.imap(open_to_read, it)
+    in_handles = map(open_to_read, it)
 
-    it_lines = itertools.chain.from_iterable(itertools.ifilter(lambda e: e is not None, in_handles))
+    it_lines = itertools.chain.from_iterable(filter(lambda e: e is not None, in_handles))
 
     return more_itertools.take(first_n, it_lines) \
         if first_n > 0 else it_lines
