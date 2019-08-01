@@ -29,5 +29,4 @@ class DataStructureTests(unittest.TestCase):
         js.load_json({'name2': 'value2'})
         self.assertEqual(js.name2, 'value2', "Failed to deserialise from json string")
 
-        self.assertRaises(AttributeError, curry(js.load_json, 4))
 

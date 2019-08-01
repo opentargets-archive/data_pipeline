@@ -5,8 +5,11 @@
 
 # Usage: filter_logs <log files>
 
+from __future__ import print_function
+from future import standard_library
+standard_library.install_aliases()
 import sys
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 # If this is set to True, remove the query string part of the URL, i.e. the part after /?
 STRIP_QUERY = False
@@ -49,7 +52,7 @@ for filename in sys.argv[1:]:
 # Output unique list
 unique_urls = set(urls)
 for url in unique_urls:
-    print url
+    print(url)
 
 
 

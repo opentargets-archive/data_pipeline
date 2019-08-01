@@ -1,9 +1,14 @@
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import range
+from builtins import object
 import functools
 import logging
 
 import itertools
 import shelve
-import dbm
+import dbm.ndbm
 import tempfile
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import Match
@@ -45,7 +50,7 @@ class ChEMBLLookup(object):
         t_filename = tempfile.NamedTemporaryFile(delete=False).name
         # dbm could not work: Eg. dbm.error: cannot add item.
         # Use dumbdbm for the local execution. Python 3 should fix this issue.
-        dumb_dict = dbm.open(t_filename, 'n')
+        dumb_dict = dbm.ndbm.open(t_filename, 'n')
         shelve_out = shelve.Shelf(dict=dumb_dict)
         for uri in self.molecule_uri:
             self._logger.debug('ChEMBL getting Molecule from %s', uri)
@@ -91,7 +96,7 @@ class ChEMBLLookup(object):
 
         required_molecules = set()
         self._logger.info('chembl t2m mols')
-        for molecules in self.target2molecule.values():
+        for molecules in list(self.target2molecule.values()):
             for molecule in molecules:
                 required_molecules.add(molecule)
         required_molecules = list(required_molecules)
@@ -109,12 +114,12 @@ class ChEMBLLookup(object):
                 for line in f_obj:
                     i = json.loads(line)
                     protein_class_id = i.pop('protein_class_id')
-                    protein_class_data = dict((k, dict(label=v, id='')) for k, v in i.items() if v)  # remove values with none
+                    protein_class_data = dict((k, dict(label=v, id='')) for k, v in list(i.items()) if v)  # remove values with none
                     self.protein_class[protein_class_id] = protein_class_data
 
                     max_level = 0
                     label = ''
-                    for k, v in protein_class_data.items():
+                    for k, v in list(protein_class_data.items()):
                         level = int(k[1])
                         if level >= max_level:
                             max_level = level
@@ -122,8 +127,8 @@ class ChEMBLLookup(object):
                     self.protein_class_label_to_id[label] = protein_class_id
 
         '''inject missing ids'''
-        for k, v in self.protein_class.items():
-            for level, data in v.items():
+        for k, v in list(self.protein_class.items()):
+            for level, data in list(v.items()):
                 label = data['label']
                 if label in self.protein_class_label_to_id:
                     data['id'] = self.protein_class_label_to_id[label]
@@ -182,7 +187,7 @@ class ChEMBLLookup(object):
 
         data = {'molecules':[]}
         for mol_k in molecule_set:
-            if self.molecules_dict.has_key(mol_k):
+            if mol_k in self.molecules_dict:
                 data['molecules'].append(self.molecules_dict[mol_k])
             else:
                 raise ValueError('problem retrieving the molecule info from the local db', str(mol_k))
@@ -191,7 +196,7 @@ class ChEMBLLookup(object):
         if 'molecules' in data:
             map_f = functools.partial(_append_to_mol2syn, molecules_syn_dict)
             mols_without_syn = \
-                list(itertools.ifilterfalse(lambda mol: mol is None, itertools.imap(map_f, data['molecules'])))
+                list(itertools.filterfalse(lambda mol: mol is None, map(map_f, data['molecules'])))
             if mols_without_syn:
                 self._logger.debug('molecule list with no synonyms %s', str(mols_without_syn))
 

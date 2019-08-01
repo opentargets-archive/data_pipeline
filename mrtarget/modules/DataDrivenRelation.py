@@ -1,3 +1,9 @@
+from __future__ import division
+from builtins import str
+from builtins import zip
+from builtins import range
+from past.utils import old_div
+from builtins import object
 import logging
 import sys, os
 import time
@@ -74,7 +80,7 @@ class LocalTfidfTransformer(TfidfTransformer):
             # log+1 instead of log makes sure terms with zero idf don't get
             # suppressed entirely.
             # idf = np.log(df / n_samples)
-            idf = df / n_samples
+            idf = old_div(df, n_samples)
             self._idf_diag = sp.spdiags(idf,
                 diags=0, m=n_features, n=n_features)
         return self
@@ -134,7 +140,7 @@ class OverlapDistance(object):
             xy_union = set()
         else:
             xy_union = x_nz | y_nz
-            distance = math.sqrt(sum((idf_[i] for i in xy_intersection)) / sum((idf_[i] for i in xy_union)))
+            distance = math.sqrt(old_div(sum((idf_[i] for i in xy_intersection)), sum((idf_[i] for i in xy_union))))
         return distance, x_nz, y_nz, xy_intersection, xy_union
 
     @staticmethod
@@ -143,7 +149,7 @@ class OverlapDistance(object):
         union_wc = max(x_sum, y_sum)
         # union_wc = (x_sum+y_sum)/2.
         ratio_above_threshold = (1./threshold)**2
-        ratio_wc = union_wc/shared_wc
+        ratio_wc = old_div(union_wc,shared_wc)
         return ratio_wc<ratio_above_threshold
 
 
@@ -340,7 +346,7 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
             buckets[bucket].append(i)
         vector_hashes[i]=digested
 
-    idf = dict(zip(vectorizer.feature_names_, list(tdidf_transformer.idf_)))
+    idf = dict(list(zip(vectorizer.feature_names_, list(tdidf_transformer.idf_))))
     idf_ = 1-tdidf_transformer.idf_
 
     #now everything is computed that can be baked into the function arguments
@@ -352,7 +358,7 @@ def handle_pairs(type, subject_labels, subject_data, subject_ids, other_ids,
         type, subject_labels, subject_ids, other_ids, threshold, idf, idf_)
 
     #create stage for producing disease-to-disease
-    pipeline_stage = pr.flat_map(produce_pairs, range(len(subject_ids)), 
+    pipeline_stage = pr.flat_map(produce_pairs, list(range(len(subject_ids))), 
         workers=workers_production,
         maxsize=queue_production_score,
         on_start=produce_pairs_local_init_baked)

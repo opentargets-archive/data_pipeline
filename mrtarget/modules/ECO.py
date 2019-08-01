@@ -1,3 +1,4 @@
+from builtins import object
 from collections import OrderedDict
 
 import csv
@@ -60,7 +61,7 @@ def elasticsearch_actions(items, index):
 
         yield action
 
-class EcoProcess():
+class EcoProcess(object):
 
     def __init__(self, es_hosts, es_index, es_mappings, es_settings,
             eco_uri, so_uri, workers_write, queue_write):
@@ -84,7 +85,7 @@ class EcoProcess():
         opentargets_ontologyutils.eco_so.load_evidence_classes(self.evidence_ontology, 
             self.so_uri, self.eco_uri)
 
-        for uri,label in self.evidence_ontology.current_classes.items():
+        for uri,label in list(self.evidence_ontology.current_classes.items()):
             eco = ECO(uri,
                       label,
                       self.evidence_ontology.classes_paths[uri]['all'],
@@ -107,7 +108,7 @@ class EcoProcess():
 
             #write into elasticsearch
             chunk_size = 1000 #TODO make configurable
-            actions = elasticsearch_actions(self.ecos.items(), self.es_index)
+            actions = elasticsearch_actions(list(self.ecos.items()), self.es_index)
             failcount = 0
 
             if not dry_run:

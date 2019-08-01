@@ -56,7 +56,7 @@ def setup_ops_parser():
         env_var="REA_WORKERS_WRITER", action='store', default=4, type=int)
     p.add("--rea-queue-write", help="size of rea writer queue (in chunks)",
         env_var="REA_QUEUE_WRITE", action='store', default=8, type=int)
-        
+    
     # if 0 use main thread for writing
     # if >0 use that many threads for writing
     p.add("--gen-workers-writer", help="# of procs for gen writers",
@@ -107,6 +107,8 @@ def setup_ops_parser():
         env_var="VAL_CACHE_TARGET_U2E", action='store', default=1024*256, type=int)
     p.add("--val-cache-target-contains", help="size of validation cache for target existing (bytes)",
         env_var="VAL_CACHE_TARGET_CONTAINS", action='store', default=1024*64, type=int)
+    p.add("--val-append-data", help="append to existing data instead of replacing existing data from a previous --val run",
+        env_var="VAL_APPEND_DATA", action='store_true', default=False)
 
     p.add("--as-workers-production", help="# of procs for assocation pair producers",
         env_var="AS_WORKERS_PRODUCTION", action='store', default=4, type=int)
