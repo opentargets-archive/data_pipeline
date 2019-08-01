@@ -38,7 +38,7 @@ class Orthologs(IPlugin):
             if data['ortholog_species'] in self.orthologs_species:
                 # get rid of some redundant (ie.human) field that we are going to
                 # get from other sources anyways
-                ortholog_data = dict((k, v) for (k, v) in data.iteritems() if k.startswith('ortholog'))
+                ortholog_data = dict((k, v) for (k, v) in data.items() if k.startswith('ortholog'))
 
                 # split the fields with multiple values into lists
                 if 'ortholog_species_assert_ids' in data:

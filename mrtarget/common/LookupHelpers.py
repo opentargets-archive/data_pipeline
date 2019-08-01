@@ -1,3 +1,4 @@
+from builtins import object
 import logging
 import os
 import time
@@ -10,7 +11,7 @@ from mrtarget.common.LookupTables import GeneLookUpTable
 from mrtarget.common.IO import file_or_resource
 
 
-class LookUpData():
+class LookUpData(object):
     def __init__(self):
         self.available_genes = None
         self.available_efos = None

@@ -1,3 +1,6 @@
+from __future__ import division
+from builtins import object
+from past.utils import old_div
 import logging
 
 from elasticsearch_dsl import Search
@@ -41,11 +44,11 @@ class HPALookUpTable(object):
         logger = logging.getLogger(__name__+".HPALookUpTable")
         if self.cache.queries == 0:
             logger.debug("cache {} occupied 100 hitrate".format(
-                (self.cache.currsize*100)/self.cache.maxsize))
+                old_div((self.cache.currsize*100),self.cache.maxsize)))
         else:
             logger.debug("cache {} occupied {} hitrate".format(
-                (self.cache.currsize*100)/self.cache.maxsize,
-                (self.cache.hits*100)/self.cache.queries ))
+                old_div((self.cache.currsize*100),self.cache.maxsize),
+                old_div((self.cache.hits*100),self.cache.queries) ))
 
 class GeneLookUpTable(object):
 
@@ -142,27 +145,27 @@ class GeneLookUpTable(object):
 
         if self.cache_gene.queries == 0:
             logger.debug("cache_gene {} occupied 100 hitrate".format(
-                (self.cache_gene.currsize*100)/self.cache_gene.maxsize))
+                old_div((self.cache_gene.currsize*100),self.cache_gene.maxsize)))
         else:
             logger.debug("cache_gene {} occupied {} hitrate".format(
-                (self.cache_gene.currsize*100)/self.cache_gene.maxsize,
-                (self.cache_gene.hits*100)/self.cache_gene.queries ))
+                old_div((self.cache_gene.currsize*100),self.cache_gene.maxsize),
+                old_div((self.cache_gene.hits*100),self.cache_gene.queries) ))
 
         if self.cache_u2e.queries == 0:
             logger.debug("cache_u2e {} occupied 100 hitrate".format(
-                (self.cache_u2e.currsize*100)/self.cache_u2e.maxsize))
+                old_div((self.cache_u2e.currsize*100),self.cache_u2e.maxsize)))
         else:
             logger.debug("cache_u2e {} occupied {} hitrate".format(
-                (self.cache_u2e.currsize*100)/self.cache_u2e.maxsize,
-                (self.cache_u2e.hits*100)/self.cache_u2e.queries ))
+                old_div((self.cache_u2e.currsize*100),self.cache_u2e.maxsize),
+                old_div((self.cache_u2e.hits*100),self.cache_u2e.queries) ))
 
         if self.cache_contains.queries == 0:
             logger.debug("cache_contains {} occupied 100 hitrate".format(
-                (self.cache_contains.currsize*100)/self.cache_contains.maxsize))
+                old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize)))
         else:
             logger.debug("cache_contains {} occupied {} hitrate".format(
-                (self.cache_contains.currsize*100)/self.cache_contains.maxsize,
-                (self.cache_contains.hits*100)/self.cache_contains.queries ))
+                old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize),
+                old_div((self.cache_contains.hits*100),self.cache_contains.queries) ))
 
 class ECOLookUpTable(object):
     def __init__(self, es, es_index, cache_size):
@@ -193,11 +196,11 @@ class ECOLookUpTable(object):
         logger = logging.getLogger(__name__+".ECOLookUpTable")
         if self.cache.queries == 0:
             logger.debug("cache {} occupied 100 hitrate".format(
-                (self.cache.currsize*100)/self.cache.maxsize))
+                old_div((self.cache.currsize*100),self.cache.maxsize)))
         else:
             logger.debug("cache {} occupied {} hitrate".format(
-                (self.cache.currsize*100)/self.cache.maxsize,
-                (self.cache.hits*100)/self.cache.queries ))
+                old_div((self.cache.currsize*100),self.cache.maxsize),
+                old_div((self.cache.hits*100),self.cache.queries) ))
 
 class EFOLookUpTable(object):
 
@@ -274,16 +277,16 @@ class EFOLookUpTable(object):
 
         if self.cache_efo.queries == 0:
             logger.debug("cache_efo {} occupied 100 hitrate".format(
-                (self.cache_efo.currsize*100)/self.cache_efo.maxsize))
+                old_div((self.cache_efo.currsize*100),self.cache_efo.maxsize)))
         else:
             logger.debug("cache_efo {} occupied {} hitrate".format(
-                (self.cache_efo.currsize*100)/self.cache_efo.maxsize,
-                (self.cache_efo.hits*100)/self.cache_efo.queries ))
+                old_div((self.cache_efo.currsize*100),self.cache_efo.maxsize),
+                old_div((self.cache_efo.hits*100),self.cache_efo.queries) ))
 
         if self.cache_contains.queries == 0:
             logger.debug("cache_contains {} occupied 100 hitrate".format(
-                (self.cache_contains.currsize*100)/self.cache_contains.maxsize))
+                old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize)))
         else:
             logger.debug("cache_contains {} occupied {} hitrate".format(
-                (self.cache_contains.currsize*100)/self.cache_contains.maxsize,
-                (self.cache_contains.hits*100)/self.cache_contains.queries ))
+                old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize),
+                old_div((self.cache_contains.hits*100),self.cache_contains.queries) ))

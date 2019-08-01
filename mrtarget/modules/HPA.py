@@ -1,4 +1,7 @@
 from __future__ import absolute_import
+from builtins import str
+from builtins import range
+from builtins import object
 import logging
 import re
 import csv
@@ -286,21 +289,21 @@ def hpa2tissues(hpa=None):
     def _split_tissue(k, v):
         rna_level = v['rna']['level'] if v['rna'] else -1
         '''from tissue dict to rna and protein dicts pair'''
-        rna = list(itertools.imap(lambda e: {'id': '_'.join([str(e), k]),
+        rna = list(map(lambda e: {'id': '_'.join([str(e), k]),
                                       'level': e} if v['rna'] else {},
-                           xrange(0, rna_level + 1) if rna_level >= 0 else xrange(-1, 0)))
+                           range(0, rna_level + 1) if rna_level >= 0 else range(-1, 0)))
 
         zscore_level = v['rna']['zscore'] if v['rna'] else -1
         '''from tissue dict to rna and protein dicts pair'''
-        zscore = list(itertools.imap(lambda e: {'id': '_'.join([str(e), k]),
+        zscore = list(map(lambda e: {'id': '_'.join([str(e), k]),
                                       'level': e} if v['rna'] else {},
-                           xrange(0, zscore_level + 1) if zscore_level >= 0 else xrange(-1, 0)))
+                           range(0, zscore_level + 1) if zscore_level >= 0 else range(-1, 0)))
 
 
         pro_level = v['protein']['level'] if v['protein'] else -1
-        protein = list(itertools.imap(lambda e: {'id': '_'.join([str(e), k]),
+        protein = list(map(lambda e: {'id': '_'.join([str(e), k]),
                                           'level': e} if v['protein'] else {},
-                               xrange(0, pro_level + 1) if pro_level >= 0 else xrange(-1, 0)))
+                               range(0, pro_level + 1) if pro_level >= 0 else range(-1, 0)))
 
         return (rna, protein, zscore)
 
@@ -326,7 +329,7 @@ def hpa2tissues(hpa=None):
             'protein': proteins,
             'zscore': zscores}
 
-class HPADataDownloader():
+class HPADataDownloader(object):
     def __init__(self, tissue_translation_map, 
             tissue_curation_map,
             normal_tissue_url,
@@ -492,7 +495,7 @@ def elasticsearch_actions(hpa_merged_table, dry_run, index):
 
             yield action
 
-class HPAProcess():
+class HPAProcess(object):
     def __init__(self, es_hosts, es_index, es_mappings, es_settings, 
             tissue_translation_map_url, 
             tissue_curation_map_url,
