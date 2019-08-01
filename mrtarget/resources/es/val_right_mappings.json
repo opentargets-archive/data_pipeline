@@ -151,13 +151,19 @@
           "type": "text",
           "fields": {
             "keyword": {
-              "type":  "keyword",
+              "type": "keyword",
               "ignore_above": 256
             }
           }
         },
         "molecule_type": {
-          "type": "text"
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
         },
         "withdrawn_country": {
           "type": "text"
