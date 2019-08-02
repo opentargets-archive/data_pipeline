@@ -158,6 +158,18 @@ class DrugProcess(object):
                         shelf[key] = existing
         return shelf
 
+
+    def clean_ids(self, source, ids):
+        if source == "ClinicalTrials":
+            #can be comma separated, so split em
+            split_ids = set()
+            for id in ids:
+                for split_id in id.split(","):
+                    split_id = split_id.strip()
+                    split_ids.add(split_id)
+            ids = sorted(split_ids)
+        return ids
+
     def build_urls(self, source, ids):
         urls = []
 
@@ -170,11 +182,11 @@ class DrugProcess(object):
             for id in ids:
                 args = {}
                 args["code"] = id
-                urls.append("http://www.whocc.no/atc_ddd_index/?"+urllib.parse.urlencode(args))
+                urls.append("https://www.whocc.no/atc_ddd_index/?"+urllib.parse.urlencode(args))
         elif source == "DailyMed":
             for id in ids:
                 #these already come from chembl with setid= in the identifer
-                urls.append("http://dailymed.nlm.nih.gov/dailymed/lookup.cfm?"+id)
+                urls.append("https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?"+id)
         elif source == "ClinicalTrials":
             args = {}
             args["id"] = "OR".join(['"%s"' % id for id in ids])
@@ -183,9 +195,29 @@ class DrugProcess(object):
             args = {}
             args["query"] = " OR ".join(['EXT_ID:%s' % id for id in ids])
             urls.append("https://europepmc.org/search?"+urllib.parse.urlencode(args))
+        elif source == "Wikipedia":
+            for id in ids:
+                urls.append("https://www.wikipedia.org/"+id)
+        elif source == "DOI":
+            for id in ids:
+                urls.append("http://dx.doi.org/"+id)
+        elif source == "Other":
+            #assume this is an url
+            #TODO check?
+            for id in ids:
+                urls.append(id)
+        elif source == "ISBN":
+            #we can't do anything useful with these
+            pass
+        elif source == "KEGG":
+            for id in ids:
+                urls.append("https://www.genome.jp/dbget-bin/www_bget?dr:"+id)
+        elif source == "PMC":
+            for id in ids:
+                urls.append("https://www.ncbi.nlm.nih.gov/pmc/articles/"+id)
         else:
             # TODO only report each source once
-            self.logger.warning("Unregonized source %s", source)
+            self.logger.warning("Unregonized source %s for %s", source, ids)
             return None
 
         return urls
@@ -254,6 +286,7 @@ class DrugProcess(object):
                     reference = {}
                     reference["source"] = ref_type
                     reference["ids"] = tuple(sorted(references[ref_type]))
+                    reference["ids"] = self.clean_ids(reference["source"], reference["ids"])
                     urls = self.build_urls(reference["source"], reference["ids"])
                     if urls is not None:
                         reference["urls"] = urls
@@ -389,6 +422,7 @@ class DrugProcess(object):
                 reference = {}
                 reference["source"] = ref_type
                 reference["ids"] = tuple(sorted(references[ref_type]))
+                reference["ids"] = self.clean_ids(reference["source"], reference["ids"])
                 urls = self.build_urls(reference["source"], reference["ids"])
                 if urls is not None:
                     reference["urls"] = urls

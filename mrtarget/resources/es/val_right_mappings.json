@@ -148,10 +148,22 @@
           "enabled": false
         },
         "molecule_name": {
-          "type": "text"
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
         },
         "molecule_type": {
-          "type": "text"
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
         },
         "withdrawn_country": {
           "type": "text"
@@ -187,8 +199,24 @@
           "enabled": false
         },
         "drug2clinic": {
-          "type": "object",
-          "enabled": false
+          "properties" : {
+            "status" : {
+              "type" : "keyword"
+            },
+            "clinical_trial_phase" : {
+              "properties" : {
+                "label" : {
+                  "type" : "keyword"
+                },
+                "numeric_index" : {
+                  "type" : "integer"
+                }
+              }
+            },
+            "urls" : {
+              "type": "nested"
+            }
+          }
         },
         "evidence_codes": {
           "type": "keyword"
