@@ -18,9 +18,9 @@ import tempfile
 import sys
 #for python3 the module name has changed
 if sys.version_info >= (3, 0):
-    import dbm.ndbm as dbm
+    import dbm
 else:
-    import dbm as dbm
+    import anydbm as dbm
 
 import shelve
 import codecs
