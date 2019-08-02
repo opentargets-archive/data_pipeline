@@ -1,7 +1,10 @@
 from builtins import str
 from builtins import object
 import simplejson as json
-from UserDict import UserDict
+try:
+    from UserDict import UserDict
+except ImportError:
+    from collections import UserDict
 
 from datetime import datetime, date
 

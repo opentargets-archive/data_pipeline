@@ -12,7 +12,9 @@ coverage==4.5.3
 decorator==4.4.0
 dill==0.2.5
 elasticsearch-dsl==7.0.0
-functools32==3.2.3.post2
+#this is a backport and should be removed for py3
+#this syntax only works for pip > 6
+functools32==3.2.3.post2 ; python_version < '3'
 future==0.17.1
 idna==2.8
 isodate==0.6.0

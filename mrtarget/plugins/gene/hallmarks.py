@@ -3,6 +3,8 @@ from opentargets_urlzsource import URLZSource
 import re
 import logging
 import csv
+import sys
+import codecs
 import configargparse
 
 class Hallmarks(IPlugin):
@@ -38,7 +40,15 @@ class Hallmarks(IPlugin):
         # Just for reference: column names are: "ID_CENSUS_ANNOT", "ID_CENSUS", "ID_GENE", "GENE_NAME", "CELL_TYPE",
         # "PUBMED_PMID", "ID_DATA_CATEGORY", "DESCRIPTION", "DISPLAY", "SHORT", "CELL_LINE", "DESCRIPTION_1")
         with URLZSource(filename).open() as r_file:
-            for i, row in enumerate(csv.DictReader(r_file, dialect='excel-tab'), start=1):
+
+            #for python3 we need to decode utf-8 since csv won't handle it
+            if sys.version_info >= (3, 0):
+                r_file = codecs.iterdecode(r_file, 'utf-8')
+
+            source = csv.DictReader(
+                    r_file,
+                    dialect='excel-tab')
+            for i, row in enumerate(source, start=1):
 
                 PMID = re.sub(r'^"|"$', '', row["PUBMED_PMID"])
                 Short = re.sub(r'^"|"$', '', row["SHORT"])

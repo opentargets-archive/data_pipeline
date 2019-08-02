@@ -1,8 +1,6 @@
 sudo: required
+dist: bionic   # required for Python >= 3.7
 language: python
-# cache:
-#   directories:
-#     - "$HOME/google-cloud-sdk/"
 services:
   - docker
 env:
@@ -11,6 +9,7 @@ env:
     - QUAY_REPO="quay.io/opentargets/mrtarget"
 python:
   - 2.7
+  - 3.7
 before_install:
   - docker pull docker.elastic.co/elasticsearch/elasticsearch:7.2.0
   - docker run -d -p 9200:9200 -p 9300:9300 --name=es elasticsearch:7.2.0

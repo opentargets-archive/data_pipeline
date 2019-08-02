@@ -199,7 +199,7 @@ def setup_ops_parser():
     p.add("--val", help="check json file, validate, and store in elasticsearch",
         action="store_true")
     p.add("--val-first-n", help="read only the first n lines from each input file",
-        env_var="VAL_FIRST_N", type=int)
+        env_var="VAL_FIRST_N", type=int, default=0)
 
     # this has to be stored as "assoc" instead of "as" because "as" is a reserved name when accessing it later e.g. `args.as`
     p.add("--as", help="compute association scores, store in elasticsearch",

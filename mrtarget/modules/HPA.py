@@ -8,6 +8,7 @@ import csv
 import simplejson as json
 import itertools
 import functools
+import codecs
 
 import petl
 import more_itertools
@@ -355,10 +356,11 @@ class HPADataDownloader(object):
 
 
         with URLZSource(self.tissue_curation_map).open() as r_file:
-            t2m['curations'] = {el['name']: el['canonical']
-                                    for el in csv.DictReader(r_file,
-                                              fieldnames=['name', 'canonical'],
-                                              delimiter='\t')}
+            for line in r_file:
+                line = line.strip()
+                line = line.split('\t')
+                t2m['curations'][line[0].strip()] = line[1].strip()
+
         self.t2m = t2m
 
     def retrieve_normal_tissue_data(self):

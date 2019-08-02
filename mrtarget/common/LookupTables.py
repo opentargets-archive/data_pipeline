@@ -43,8 +43,9 @@ class HPALookUpTable(object):
     def __del__(self):
         logger = logging.getLogger(__name__+".HPALookUpTable")
         if self.cache.queries == 0:
-            logger.debug("cache {} occupied 100 hitrate".format(
-                old_div((self.cache.currsize*100),self.cache.maxsize)))
+            if self.cache.maxsize > 0:
+                logger.debug("cache {} occupied 100 hitrate".format(
+                    old_div((self.cache.currsize*100),self.cache.maxsize)))
         else:
             logger.debug("cache {} occupied {} hitrate".format(
                 old_div((self.cache.currsize*100),self.cache.maxsize),
@@ -144,24 +145,27 @@ class GeneLookUpTable(object):
         logger = logging.getLogger(__name__+".GeneLookUpTable")
 
         if self.cache_gene.queries == 0:
-            logger.debug("cache_gene {} occupied 100 hitrate".format(
-                old_div((self.cache_gene.currsize*100),self.cache_gene.maxsize)))
+            if self.cache_gene.maxsize > 0:
+                logger.debug("cache_gene {} occupied 100 hitrate".format(
+                    old_div((self.cache_gene.currsize*100),self.cache_gene.maxsize)))
         else:
             logger.debug("cache_gene {} occupied {} hitrate".format(
                 old_div((self.cache_gene.currsize*100),self.cache_gene.maxsize),
                 old_div((self.cache_gene.hits*100),self.cache_gene.queries) ))
 
         if self.cache_u2e.queries == 0:
-            logger.debug("cache_u2e {} occupied 100 hitrate".format(
-                old_div((self.cache_u2e.currsize*100),self.cache_u2e.maxsize)))
+            if self.cache_u2e.maxsize > 0:
+                logger.debug("cache_u2e {} occupied 100 hitrate".format(
+                    old_div((self.cache_u2e.currsize*100),self.cache_u2e.maxsize)))
         else:
             logger.debug("cache_u2e {} occupied {} hitrate".format(
                 old_div((self.cache_u2e.currsize*100),self.cache_u2e.maxsize),
                 old_div((self.cache_u2e.hits*100),self.cache_u2e.queries) ))
 
         if self.cache_contains.queries == 0:
-            logger.debug("cache_contains {} occupied 100 hitrate".format(
-                old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize)))
+            if self.cache_contains.maxsize > 0:
+                logger.debug("cache_contains {} occupied 100 hitrate".format(
+                    old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize)))
         else:
             logger.debug("cache_contains {} occupied {} hitrate".format(
                 old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize),
@@ -195,8 +199,9 @@ class ECOLookUpTable(object):
     def __del__(self):
         logger = logging.getLogger(__name__+".ECOLookUpTable")
         if self.cache.queries == 0:
-            logger.debug("cache {} occupied 100 hitrate".format(
-                old_div((self.cache.currsize*100),self.cache.maxsize)))
+            if self.cache.maxsize > 0:
+                logger.debug("cache {} occupied 100 hitrate".format(
+                    old_div((self.cache.currsize*100),self.cache.maxsize)))
         else:
             logger.debug("cache {} occupied {} hitrate".format(
                 old_div((self.cache.currsize*100),self.cache.maxsize),
@@ -276,16 +281,18 @@ class EFOLookUpTable(object):
         logger = logging.getLogger(__name__+".EFOLookUpTable")
 
         if self.cache_efo.queries == 0:
-            logger.debug("cache_efo {} occupied 100 hitrate".format(
-                old_div((self.cache_efo.currsize*100),self.cache_efo.maxsize)))
+            if self.cache_efo.maxsize > 0:
+                logger.debug("cache_efo {} occupied 100 hitrate".format(
+                    old_div((self.cache_efo.currsize*100),self.cache_efo.maxsize)))
         else:
             logger.debug("cache_efo {} occupied {} hitrate".format(
                 old_div((self.cache_efo.currsize*100),self.cache_efo.maxsize),
                 old_div((self.cache_efo.hits*100),self.cache_efo.queries) ))
 
         if self.cache_contains.queries == 0:
-            logger.debug("cache_contains {} occupied 100 hitrate".format(
-                old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize)))
+            if self.cache_contains.maxsize > 0:
+                logger.debug("cache_contains {} occupied 100 hitrate".format(
+                    old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize)))
         else:
             logger.debug("cache_contains {} occupied {} hitrate".format(
                 old_div((self.cache_contains.currsize*100),self.cache_contains.maxsize),
