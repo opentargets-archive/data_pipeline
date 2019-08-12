@@ -1,6 +1,5 @@
 from future import standard_library
 standard_library.install_aliases()
-from builtins import str
 from builtins import range
 from builtins import object
 import functools
@@ -11,6 +10,7 @@ import shelve
 import sys#for python3 the module name has changed	import dbm
 if sys.version_info >= (3, 0):	
     import dbm
+    from builtins import str
 else:	
     import anydbm as dbm
 import tempfile
