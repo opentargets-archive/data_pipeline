@@ -1,6 +1,5 @@
 from future import standard_library
 standard_library.install_aliases()
-from builtins import str
 from builtins import object
 import logging
 
@@ -19,6 +18,7 @@ import sys
 #for python3 the module name has changed
 if sys.version_info >= (3, 0):
     import dbm
+    from builtins import str
 else:
     import anydbm as dbm
 
@@ -107,7 +107,7 @@ class DrugProcess(object):
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
         #note: this file is never deleted!
-        filename = tempfile.NamedTemporaryFile(delete=False).name
+        filename = tempfile.NamedTemporaryFile(delete=True).name
         shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
@@ -137,7 +137,7 @@ class DrugProcess(object):
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
         #note: this file is never deleted!
-        filename = tempfile.NamedTemporaryFile(delete=False).name
+        filename = tempfile.NamedTemporaryFile(delete=True).name
         shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
