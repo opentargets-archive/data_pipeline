@@ -225,6 +225,7 @@ Output suitable for use with elasticsearch.helpers
 """
 def elasticsearch_actions(genes, index):
     for geneid, gene in genes.iterate():
+        gene.preprocess()
         action = {}
         action["_index"] = index
         action["_id"] = geneid
