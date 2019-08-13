@@ -15,6 +15,7 @@ from mrtarget.common.LookupHelpers import LookUpDataRetriever
 
 import tempfile
 import sys
+import unicodedata
 #for python3 the module name has changed
 if sys.version_info >= (3, 0):
     import dbm
@@ -98,6 +99,15 @@ class DrugProcess(object):
         self.store(es, dry_run, drugs)
 
 
+    # to avoid: String or Integer object expected for key, unicode found
+    def verify_key(self, key_value):
+        key = key_value
+        if not isinstance(key_value, str):
+            key = unicodedata.normalize('NFKD', key_value).encode('ascii','ignore')
+
+        return key
+
+
     def create_shelf(self, uris, key_f):
         #sanity check inputs
         assert uris is not None
@@ -121,7 +131,8 @@ class DrugProcess(object):
                         self.logger.error("Unable to read line %d %s %s", line_no, uri, e)
                         raise e
                         
-                    key = key_f(obj)
+                    key_value = key_f(obj)
+                    key = self.verify_key(key_value)
                     if key is not None:
                         if key in shelf:
                             raise ValueError("Duplicate key %s in uri %s" % (key,uri))
@@ -151,7 +162,8 @@ class DrugProcess(object):
                         self.logger.error("Unable to read line %d %s", line_no, uri)
                         raise e
 
-                    key = key_f(obj)
+                    key_value = key_f(obj)
+                    key = self.verify_key(key_value)
                     if key is not None:
                         existing = shelf.get(key,[])
                         existing.append(obj)
