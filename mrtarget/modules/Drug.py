@@ -141,6 +141,7 @@ class DrugProcess(object):
 
     def create_shelf_multi(self, uris, key_f):
         #sanity check inputs
+        print 'sanity check begin=='+uris+'=='
         assert uris is not None
         assert len(uris) > 0
 
