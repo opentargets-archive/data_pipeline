@@ -747,6 +747,7 @@ class DrugProcess(object):
             child_mols = []
 
             for mol in mols[ident]:
+                mol["molecule_chembl_id"] = self.str_hook(mol["molecule_chembl_id"])
                 if mol["molecule_chembl_id"] == ident:
                     #this is the parent
                     assert parent_mol is None
