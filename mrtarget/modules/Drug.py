@@ -610,6 +610,7 @@ class DrugProcess(object):
         if "cross_references" in drug:
             drug["cross_references"] = sorted(drug["cross_references"],key=lambda x: x["source"])
 
+        print type(ident)
         if ident in indications:
             drug["indications"] = []
             for indication in indications[ident]:
