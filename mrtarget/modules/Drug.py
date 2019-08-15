@@ -610,8 +610,6 @@ class DrugProcess(object):
         if "cross_references" in drug:
             drug["cross_references"] = sorted(drug["cross_references"],key=lambda x: x["source"])
 
-        print type(ident)
-        print ident
         if ident in indications:
             drug["indications"] = []
             for indication in indications[ident]:
@@ -632,8 +630,6 @@ class DrugProcess(object):
     def handle_drug_child(self, drug, ident, mol, indications, mechanisms, targets):
 
         #get a drug object for the child, validated and cleaned
-        print 'handle_drug_child'
-        print type(ident)
         child_drug = self.handle_drug(ident, mol, indications, mechanisms, targets)
 
         #add extra information to the drug based on the child
@@ -740,9 +736,7 @@ class DrugProcess(object):
 
         drugs = {}
         #TODO finish
-        print 'inside generate'
         for ident in mols:
-            print type(ident)
             parent_mol = None
             child_mols = []
 
@@ -770,8 +764,6 @@ class DrugProcess(object):
 
             #append information from children
             for child_mol in child_mols:
-                print 'child_mol possible lambda'
-                print type(child_mol["molecule_chembl_id"])
                 self.handle_drug_child(drug, child_mol["molecule_chembl_id"], child_mol,
                     indications, mechanisms,
                     targets)
