@@ -1,6 +1,5 @@
 from future import standard_library
 standard_library.install_aliases()
-from builtins import str
 from builtins import range
 from builtins import object
 import functools
@@ -11,6 +10,7 @@ import shelve
 import sys#for python3 the module name has changed	import dbm
 if sys.version_info >= (3, 0):	
     import dbm
+    from builtins import str
 else:	
     import anydbm as dbm
 import tempfile
@@ -51,7 +51,7 @@ class ChEMBLLookup(object):
     '''
     def populate_molecules_dict(self):
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
-        t_filename = tempfile.NamedTemporaryFile(delete=False).name
+        t_filename = tempfile.NamedTemporaryFile(delete=True).name
         # dbm could not work: Eg. dbm.error: cannot add item.
         # Use dumbdbm for the local execution. Python 3 should fix this issue.
         dumb_dict = dbm.open(t_filename, 'n')
