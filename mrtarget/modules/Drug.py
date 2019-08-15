@@ -1,6 +1,5 @@
 from future import standard_library
 standard_library.install_aliases()
-from builtins import str
 from builtins import object
 import logging
 
@@ -16,9 +15,11 @@ from mrtarget.common.LookupHelpers import LookUpDataRetriever
 
 import tempfile
 import sys
+import unicodedata
 #for python3 the module name has changed
 if sys.version_info >= (3, 0):
     import dbm
+    from builtins import str
 else:
     import anydbm as dbm
 
@@ -66,7 +67,7 @@ class DrugProcess(object):
             chembl_component_uris, 
             chembl_protein_uris, 
             chembl_molecule_uris,
-            chembl_indication_uris):
+            chembl_drug_indication_uris):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_mappings = es_mappings
@@ -87,7 +88,7 @@ class DrugProcess(object):
         self.chembl_component_uris = chembl_component_uris
         self.chembl_protein_uris = chembl_protein_uris
         self.chembl_molecule_uris = chembl_molecule_uris
-        self.chembl_indication_uris = chembl_indication_uris
+        self.chembl_drug_indication_uris = chembl_drug_indication_uris
 
         self.logger = logging.getLogger(__name__)
 
@@ -96,6 +97,18 @@ class DrugProcess(object):
 
         drugs = self.generate(es)
         self.store(es, dry_run, drugs)
+
+
+    # to avoid: String or Integer object expected for key, unicode found.
+    # to validate assert below
+    def str_hook(self, value):
+        new_value = value
+        if not isinstance(value, str):
+            #new_value = value.encode('UTF-8')
+            new_value = unicodedata.normalize('NFKD', value).encode('ascii','ignore')
+
+        assert isinstance(new_value, str)
+        return new_value
 
 
     def create_shelf(self, uris, key_f):
@@ -107,7 +120,7 @@ class DrugProcess(object):
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
         #note: this file is never deleted!
-        filename = tempfile.NamedTemporaryFile(delete=False).name
+        filename = tempfile.NamedTemporaryFile(delete=True).name
         shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
@@ -121,12 +134,14 @@ class DrugProcess(object):
                         self.logger.error("Unable to read line %d %s %s", line_no, uri, e)
                         raise e
                         
-                    key = key_f(obj)
+                    key_value = key_f(obj)
+                    key = self.str_hook(key_value)
                     if key is not None:
                         if key in shelf:
                             raise ValueError("Duplicate key %s in uri %s" % (key,uri))
                         shelf[key] = obj
         return shelf
+
 
     def create_shelf_multi(self, uris, key_f):
         #sanity check inputs
@@ -137,7 +152,7 @@ class DrugProcess(object):
         # dumbdbm creates an empty database file. In this way shelve can open it properly.
 
         #note: this file is never deleted!
-        filename = tempfile.NamedTemporaryFile(delete=False).name
+        filename = tempfile.NamedTemporaryFile(delete=True).name
         shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
@@ -151,7 +166,8 @@ class DrugProcess(object):
                         self.logger.error("Unable to read line %d %s", line_no, uri)
                         raise e
 
-                    key = key_f(obj)
+                    key_value = key_f(obj)
+                    key = self.str_hook(key_value)
                     if key is not None:
                         existing = shelf.get(key,[])
                         existing.append(obj)
@@ -265,11 +281,8 @@ class DrugProcess(object):
                             and "ref_id" in ref and ref["ref_id"] is not None:
 
                         #don't keep the URL, can build a better one later to handle multi-id
-
-                        assert isinstance(ref["ref_type"], str)
-                        ref_type = ref["ref_type"]
-                        assert isinstance(ref["ref_id"], str)
-                        ref_id = ref["ref_id"] 
+                        ref_type = self.str_hook(ref["ref_type"])
+                        ref_id = self.str_hook(ref["ref_id"])
 
                         #create a set to ensure uniqueness
                         if ref_type not in references:
@@ -311,8 +324,7 @@ class DrugProcess(object):
         #handle target information from target endpoint
         #do this first, so we can stop early if its a target we are not interested in
         if "target_chembl_id" in mech and mech["target_chembl_id"] is not None:
-            assert isinstance(mech["target_chembl_id"], str)
-            target_id = mech["target_chembl_id"]
+            target_id = self.str_hook(mech["target_chembl_id"])
             target = targets[target_id]
 
             if "target_components" not in target \
@@ -362,8 +374,7 @@ class DrugProcess(object):
                 if "approved_symbol" in gene \
                         and gene["approved_symbol"] is not None \
                         and len(gene["approved_symbol"]) > 0:
-                    assert isinstance(gene["approved_symbol"], str)
-                    out_component["approved_symbol"] = gene["approved_symbol"]
+                    out_component["approved_symbol"] = self.str_hook(gene["approved_symbol"])
 
                 if "target_components" not in out:
                     out["target_components"] = []
@@ -372,13 +383,11 @@ class DrugProcess(object):
             #add some information from the chembl source
             # TODO what if this is different from ensembl ?
             if "target_type" in target and target["target_type"] is not None:
-                assert isinstance(target["target_type"], str)
                 #chembl stores them as all-caps, we want them to be pretty
-                out["target_type"] = target["target_type"].lower()
+                out["target_type"] = self.str_hook(target["target_type"].lower())
 
             if "pref_name" in target and target["pref_name"] is not None:
-                assert isinstance(target["pref_name"], str)
-                out["target_name"] = target["pref_name"]
+                out["target_name"] = self.str_hook(target["pref_name"])
 
         else:
             # no target_chembl_id - should this be dropped?
@@ -390,9 +399,7 @@ class DrugProcess(object):
             out["action_type"] = mech["action_type"].lower()
 
         if "mechanism_of_action" in mech and mech["mechanism_of_action"] is not None:
-            assert isinstance(mech["mechanism_of_action"], str)
-            out["description"] = mech["mechanism_of_action"]
-
+            out["description"] = self.str_hook(mech["mechanism_of_action"])
 
         if "mechanism_refs" in mech and mech["mechanism_refs"] is not None:
             references = {}
@@ -401,11 +408,8 @@ class DrugProcess(object):
                         and "ref_id" in ref and ref["ref_id"] is not None:
 
                     #don't keep the URL, can build a better one later to handle multi-id
-
-                    assert isinstance(ref["ref_type"], str)
-                    ref_type = ref["ref_type"]
-                    assert isinstance(ref["ref_id"], str)
-                    ref_id = ref["ref_id"] 
+                    ref_type = self.str_hook(ref["ref_type"])
+                    ref_id = self.str_hook(ref["ref_id"])
 
                     #create a set to ensure uniqueness
                     if ref_type not in references:
@@ -455,29 +459,33 @@ class DrugProcess(object):
 
         if "molecule_type" in mol and mol["molecule_type"] is not None:
             #TODO format check
-            assert isinstance(mol["molecule_type"], str), ident
-            drug["type"] = mol["molecule_type"]
+
+            #assert isinstance(mol["molecule_type"], str), ident
+            drug["type"] = self.str_hook(mol["molecule_type"])
             
         if "pref_name" in mol and mol["pref_name"] is not None:
             #TODO casing? always uppercase, do we inital case, lower case?
-            assert isinstance(mol["pref_name"], str), ident
-            drug["pref_name"] = mol["pref_name"]
+            #assert isinstance(mol["pref_name"], str), ident
+            drug["pref_name"] = self.str_hook(mol["pref_name"])
             
         if "first_approval" in mol and mol["first_approval"] is not None:
-            assert isinstance(mol["first_approval"], int), ident
-            assert mol["first_approval"] > 1900, ident
-            assert mol["first_approval"] < 2100, ident
+            # assert isinstance(mol["first_approval"], int), ident (???)
+            assert isinstance(mol["first_approval"], int)
+            assert mol["first_approval"] > 1900
+            assert mol["first_approval"] < 2100
             drug["year_first_approved"] = mol["first_approval"]
 
         if "max_phase" in mol and mol["max_phase"] is not None:
             #check this is 0 1 2 3 4
-            assert isinstance(mol["max_phase"], int), ident
+            # assert isinstance(mol["max_phase"], int), ident
+            assert isinstance(mol["max_phase"], int)
+
             #this should be an integer?
             drug["max_clinical_trial_phase"] = mol["max_phase"]
 
         if "withdrawn_flag" in mol and mol["withdrawn_flag"] is not None:
             #TODO check always true
-            assert isinstance(mol["withdrawn_flag"], bool), ident
+            assert isinstance(mol["withdrawn_flag"], bool)
             drug["withdrawn_flag"] = mol["withdrawn_flag"]
 
         if "withdrawn_reason" in mol and mol["withdrawn_reason"] is not None:
@@ -488,15 +496,15 @@ class DrugProcess(object):
             #  "Self-poisoning"
             #  "Self-Poisonings"
             reasons = set()
-            assert isinstance(mol["withdrawn_reason"], str), ident
-            for reason in mol["withdrawn_reason"].split(";"):
+            mol_withdraw_reason = self.str_hook(mol["withdrawn_reason"])
+            for reason in mol_withdraw_reason.split(";"):
                 reasons.add(reason.strip())
             drug["withdrawn_reason"] = sorted(reasons)
 
         if "withdrawn_year" in mol and mol["withdrawn_year"] is not None:
-            assert isinstance(mol["withdrawn_year"], int), ident
-            assert mol["withdrawn_year"] > 1900, ident
-            assert mol["withdrawn_year"] < 2100, ident
+            assert isinstance(mol["withdrawn_year"], int)
+            assert mol["withdrawn_year"] > 1900
+            assert mol["withdrawn_year"] < 2100
             drug["withdrawn_year"] = mol["withdrawn_year"]
 
         if "withdrawn_country" in mol and mol["withdrawn_country"] is not None:
@@ -505,8 +513,8 @@ class DrugProcess(object):
             #split and trim by semicolon
             #TODO casing?
             countries = set()
-            assert isinstance(mol["withdrawn_country"], str), ident
-            for country in mol["withdrawn_country"].split(";"):
+            mol_withdraw_country = self.str_hook(mol["withdrawn_country"])
+            for country in mol_withdraw_country.split(";"):
                 countries.add(country.strip())
             drug["withdrawn_country"] = sorted(countries)
 
@@ -515,16 +523,16 @@ class DrugProcess(object):
             #TODO check only present when withdrawn_flag
             #TODO casing?
             classes = set()
-            assert isinstance(mol["withdrawn_class"], str), ident
-            for clazz in mol["withdrawn_class"].split(";"):
+            mol_withdraw_class = self.str_hook(mol["withdrawn_class"])
+            for clazz in mol_withdraw_class.split(";"):
                 classes.add(clazz.strip())
             drug["withdrawn_class"] = sorted(classes)
 
         if "black_box_warning" in mol and mol["black_box_warning"] is not None:
             #unicode converted to true/false
             #check it comes in as a unicode
-            assert isinstance(mol["black_box_warning"], str), \
-                "%s black_box_warning = %s " % (ident,repr(mol["black_box_warning"]))
+            #assert isinstance(mol["black_box_warning"], str), \
+            #    "%s black_box_warning = %s " % (ident,repr(mol["black_box_warning"]))
             #convert unicode to an integer - will throw if it can't
             bbw = int(mol["black_box_warning"])
             if bbw == 0:
@@ -545,11 +553,8 @@ class DrugProcess(object):
                         and "syn_type" in molecule_synonym \
                         and molecule_synonym["syn_type"] is not None:
 
-                    assert isinstance(molecule_synonym["syn_type"], str)
-                    syn_type = molecule_synonym["syn_type"]
-                    assert isinstance(
-                            molecule_synonym["molecule_synonym"], str)
-                    synonym = molecule_synonym["molecule_synonym"]
+                    syn_type = self.str_hook(molecule_synonym["syn_type"])
+                    synonym = self.str_hook(molecule_synonym["molecule_synonym"])
 
                     if "TRADE_NAME" == syn_type.upper():
                         trade_names.add(synonym)
@@ -570,11 +575,8 @@ class DrugProcess(object):
                         and "xref_id" in ref and ref["xref_id"] is not None:
 
                     #don't keep the URL, can build a better one later to handle multi-id
-
-                    assert isinstance(ref["xref_src"], str)
-                    ref_type = ref["xref_src"]
-                    assert isinstance(ref["xref_id"], str)
-                    ref_id = ref["xref_id"] 
+                    ref_type = self.str_hook(ref["xref_src"])
+                    ref_id = self.str_hook(ref["xref_id"])
 
                     #create a set to ensure uniqueness
                     if ref_type not in references:
@@ -722,7 +724,7 @@ class DrugProcess(object):
         mols = self.create_shelf_multi(self.chembl_molecule_uris, get_parent_id)
         self.logger.debug("Loaded %d molecules", len(mols))
         self.logger.debug("Loading indications")
-        indications = self.create_shelf_multi(self.chembl_indication_uris, lambda x : x["molecule_chembl_id"])
+        indications = self.create_shelf_multi(self.chembl_drug_indication_uris, lambda x : x["molecule_chembl_id"])
         self.logger.debug("Loaded %d indications", len(indications))
         self.logger.debug("Loading mechanisms")
         mechanisms = self.create_shelf_multi(self.chembl_mechanism_uris, lambda x : x["molecule_chembl_id"])
@@ -741,6 +743,7 @@ class DrugProcess(object):
             child_mols = []
 
             for mol in mols[ident]:
+                mol["molecule_chembl_id"] = self.str_hook(mol["molecule_chembl_id"])
                 if mol["molecule_chembl_id"] == ident:
                     #this is the parent
                     assert parent_mol is None
@@ -750,6 +753,7 @@ class DrugProcess(object):
                     assert mol not in child_mols
                     child_mols.append(mol)
 
+            # ToDo: check with AF
             assert parent_mol is not None, ident
 
             #TODO sure no grandparenting
