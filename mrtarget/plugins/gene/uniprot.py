@@ -38,7 +38,9 @@ class Uniprot(IPlugin):
             gene.dbxrefs= sorted(list(set(gene.dbxrefs)))
         for k, v in list(seqrec.annotations.items()):
             if k == 'accessions':
-                gene.uniprot_accessions = v
+                #gene.uniprot_accessions = v
+                acc_set = set(gene.uniprot_accessions.append(v))
+                gene.uniprot_accessions = list(acc_set)
             if k == 'keywords':
                 gene.uniprot_keywords = v
             if k == 'comment_function':
