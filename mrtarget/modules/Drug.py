@@ -736,9 +736,7 @@ class DrugProcess(object):
 
         drugs = {}
         #TODO finish
-
         for ident in mols:
-
             parent_mol = None
             child_mols = []
 
