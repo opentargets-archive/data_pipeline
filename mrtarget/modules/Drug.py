@@ -67,7 +67,7 @@ class DrugProcess(object):
             chembl_component_uris, 
             chembl_protein_uris, 
             chembl_molecule_uris,
-            chembl_drug_indication_uris):
+            chembl_indication_uris):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_mappings = es_mappings
@@ -88,7 +88,7 @@ class DrugProcess(object):
         self.chembl_component_uris = chembl_component_uris
         self.chembl_protein_uris = chembl_protein_uris
         self.chembl_molecule_uris = chembl_molecule_uris
-        self.chembl_drug_indication_uris = chembl_drug_indication_uris
+        self.chembl_indication_uris = chembl_indication_uris
 
         self.logger = logging.getLogger(__name__)
 
@@ -724,7 +724,7 @@ class DrugProcess(object):
         mols = self.create_shelf_multi(self.chembl_molecule_uris, get_parent_id)
         self.logger.debug("Loaded %d molecules", len(mols))
         self.logger.debug("Loading indications")
-        indications = self.create_shelf_multi(self.chembl_drug_indication_uris, lambda x : x["molecule_chembl_id"])
+        indications = self.create_shelf_multi(self.chembl_indication_uris, lambda x : x["molecule_chembl_id"])
         self.logger.debug("Loaded %d indications", len(indications))
         self.logger.debug("Loading mechanisms")
         mechanisms = self.create_shelf_multi(self.chembl_mechanism_uris, lambda x : x["molecule_chembl_id"])
