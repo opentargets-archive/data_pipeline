@@ -39,7 +39,9 @@ class Uniprot(IPlugin):
         for k, v in list(seqrec.annotations.items()):
             if k == 'accessions':
                 #gene.uniprot_accessions = v
-                acc_set = set(gene.uniprot_accessions.append(v))
+                # to avoid NoneType error
+                gene.uniprot_accessions.extend(v)
+                acc_set = set(gene.uniprot_accessions)
                 gene.uniprot_accessions = list(acc_set)
             if k == 'keywords':
                 gene.uniprot_keywords = v

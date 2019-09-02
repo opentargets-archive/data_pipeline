@@ -54,7 +54,9 @@ class HGNC(IPlugin):
                 gene.vega_ids = data['vega_id']
             if 'uniprot_ids' in data:
                 #gene.uniprot_accessions = data['uniprot_ids']
-                acc_set = set(gene.uniprot_accessions.append(data['uniprot_ids']))
+                # Split the set(list) to avoid erroor Nonetype
+                gene.uniprot_accessions.extend(data['uniprot_ids'])
+                acc_set = set(gene.uniprot_accessions)
                 gene.uniprot_accessions = list(acc_set)
 
 
