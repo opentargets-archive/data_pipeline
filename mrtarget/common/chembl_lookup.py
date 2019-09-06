@@ -113,21 +113,18 @@ class ChEMBLLookup(object):
     def download_protein_classification(self):
         '''fetches targets components from chembls and inject the target class data in self.protein_classification'''
 
+        def _from_class_obj_to_id_label(obj_dict):
+            pass
+
         for uri in self.protein_uri:
             with URLZSource(uri).open() as f_obj:
                 for line in f_obj:
                     i = json.loads(line)
                     protein_class_id = i.pop('protein_class_id')
-                    protein_class_data = dict((k, dict(label=v, id='')) for k, v in list(i.items()) if v)  # remove values with none
+                    gen = ((k, dict(label=v, id='')) for k, v in i.items() if v)
+                    protein_class_data = sorted(gen, key=lambda x: x[0], reverse=True)
                     self.protein_class[protein_class_id] = protein_class_data
-
-                    max_level = 0
-                    label = ''
-                    for k, v in list(protein_class_data.items()):
-                        level = int(k[1])
-                        if level >= max_level:
-                            max_level = level
-                            label = v['label']
+                    label = protein_class_data[0][1]['label']
                     self.protein_class_label_to_id[label] = protein_class_id
 
         '''inject missing ids'''

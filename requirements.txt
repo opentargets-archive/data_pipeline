@@ -21,7 +21,7 @@ isodate==0.6.0
 jsonpickle==1.1
 jsonschema==3.0.0a3
 lxml==4.3.2
-more-itertools==5.0.0
+more-itertools==7.2.0
 networkx==2.2
 numpy==1.16.2
 petl==1.2.0
