@@ -75,7 +75,7 @@ class GeneLookUpTable(object):
             self.cache_gene.hits += 1
             return self.cache_gene[gene_id]
 
-        response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].execute()
+        response = Search().using(self._es).index(self._es_index).extra(track_total_hits=True).query(Match(_id=gene_id))[0:1].execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
         if response.hits.total.value == 0:
             #no hit, return None
@@ -96,7 +96,7 @@ class GeneLookUpTable(object):
             self.cache_u2e.hits += 1
             return self.cache_u2e[uniprot_id]
 
-        response = Search().using(self._es).index(self._es_index).query(
+        response = Search().using(self._es).index(self._es_index).extra(track_total_hits=True).query(
             Bool(should=[
                 Match(uniprot_id=uniprot_id),
                 Match(uniprot_accessions=uniprot_id)
@@ -129,7 +129,7 @@ class GeneLookUpTable(object):
             else:
                 return True
 
-        response = Search().using(self._es).index(self._es_index).query(Match(_id=gene_id))[0:1].source(False).execute()
+        response = Search().using(self._es).index(self._es_index).extra(track_total_hits=True).query(Match(_id=gene_id))[0:1].source(False).execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
         if response.hits.total.value > 0:
             #exactly one hit
@@ -187,7 +187,7 @@ class ECOLookUpTable(object):
             self.cache.hits += 1
             return self.cache[eco_id]
 
-        response = Search().using(self._es).index(self._es_index).query(Match(_id=eco_id))[0:1].execute()
+        response = Search().using(self._es).index(self._es_index).extra(track_total_hits=True).query(Match(_id=eco_id))[0:1].execute()
         if response.hits.total.value > 0:
             val = response.hits[0].to_dict()
             self.cache[eco_id] = val
@@ -238,7 +238,7 @@ class EFOLookUpTable(object):
             self.cache_efo.hits += 1
             return self.cache_efo[efo_id]
 
-        response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].execute()
+        response = Search().using(self._es).index(self._es_index).extra(track_total_hits=True).query(Match(_id=efo_id))[0:1].execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
         if response.hits.total.value == 0:
             #no hit, return None
@@ -265,7 +265,7 @@ class EFOLookUpTable(object):
             else:
                 return True
 
-        response = Search().using(self._es).index(self._es_index).query(Match(_id=efo_id))[0:1].source(False).execute()
+        response = Search().using(self._es).index(self._es_index).extra(track_total_hits=True).query(Match(_id=efo_id))[0:1].source(False).execute()
         #see https://www.elastic.co/guide/en/elasticsearch/reference/7.x/search-request-track-total-hits.html
         if response.hits.total.value == 0:
             #no hit
