@@ -110,32 +110,43 @@ class ChEMBLLookup(object):
             self.populate_synonyms_for_molecule(required_molecules[i:i + batch_size],
                                                  self.molecule2synonyms)
 
-    def download_protein_classification(self):
-        '''fetches targets components from chembls and inject the target class data in self.protein_classification'''
+    @staticmethod
+    def __extract_protein_classes_from(uris):
+        """uris is a list of filenames: str
+        returns ({id:[{label:l, id:id},...],...}, {label:id,...})
+        """
+        classes = {}
+        classes_inv_idx = {}
 
-        for uri in self.protein_uri:
+        for uri in uris:
             with URLZSource(uri).open() as f_obj:
                 for line in f_obj:
                     i = json.loads(line)
                     protein_class_id = i.pop('protein_class_id')
-                    protein_class_data = dict((k, dict(label=v, id='')) for k, v in list(i.items()) if v)  # remove values with none
-                    self.protein_class[protein_class_id] = protein_class_data
 
-                    max_level = 0
-                    label = ''
-                    for k, v in list(protein_class_data.items()):
-                        level = int(k[1])
-                        if level >= max_level:
-                            max_level = level
-                            label = v['label']
-                    self.protein_class_label_to_id[label] = protein_class_id
+                    gen = ((k, dict(label=v, id='')) for k, v in i.items() if v)
+                    protein_class_data = sorted(gen, key=lambda x: x[0], reverse=True)
+
+                    classes[protein_class_id] = protein_class_data
+
+                    label = protein_class_data[0][1]['label']
+                    classes_inv_idx[label] = protein_class_id
 
         '''inject missing ids'''
-        for k, v in list(self.protein_class.items()):
-            for level, data in list(v.items()):
+        for k, v in classes.items():
+            for level, data in v:
                 label = data['label']
-                if label in self.protein_class_label_to_id:
-                    data['id'] = self.protein_class_label_to_id[label]
+                if label in classes_inv_idx:
+                    data['id'] = classes_inv_idx[label]
+
+        return classes, classes_inv_idx
+
+
+    def download_protein_classification(self):
+        '''fetches targets components from chembls and inject the target class data in self.protein_classification'''
+
+        self.protein_class, self.protein_class_label_to_id = \
+            self.__extract_protein_classes_from(self.protein_uri)
 
         for uri in self.component_uri:
             with URLZSource(uri).open() as f_obj:
