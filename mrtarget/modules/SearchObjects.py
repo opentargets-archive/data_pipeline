@@ -286,11 +286,11 @@ class SearchObjectProcess(object):
 
 
     def get_targets(self, es):
-        for target in Search().using(es).index(self.es_index_gene).query(MatchAll()).scan():
+        for target in Search().using(es).index(self.es_index_gene).extra(track_total_hits=True).query(MatchAll()).scan():
             yield target.to_dict()
     
     def get_diseases(self, es):
-        for disease in Search().using(es).index(self.es_index_efo).query(MatchAll()).scan():
+        for disease in Search().using(es).index(self.es_index_efo).extra(track_total_hits=True).query(MatchAll()).scan():
             yield disease.to_dict()
 
     def handle_search_object(self, data_it, es, search_type):
@@ -331,7 +331,7 @@ class SearchObjectProcess(object):
             yield so
 
     def get_associations(self, target_id, disease_id, es):
-        s = Search().using(es).index(self.es_index_assoc)[:20]
+        s = Search().using(es).index(self.es_index_assoc).extra(track_total_hits=True)[:20]
         if target_id:
             s = s.query(ConstantScore(filter={"term":{"target.id":target_id}}))
         if disease_id:
