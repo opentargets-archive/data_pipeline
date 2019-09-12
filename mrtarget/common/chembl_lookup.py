@@ -169,7 +169,7 @@ class ChEMBLLookup(object):
                             self.protein_classification[i['accession']] = []
                         for classification in i['protein_classifications']:
                             protein_class_id = classification['protein_classification_id']
-                            self.protein_classification[i['accession']].append(self.protein_class[protein_class_id])
+                            self.protein_classification[i['accession']].append(dict(self.protein_class[protein_class_id]))
 
     def get_molecules_from_evidence(self, es, index):
 
