@@ -1,6 +1,5 @@
 from future import standard_library
 standard_library.install_aliases()
-from builtins import str
 from builtins import range
 from builtins import object
 import functools
@@ -11,14 +10,17 @@ import shelve
 import sys#for python3 the module name has changed	import dbm
 if sys.version_info >= (3, 0):	
     import dbm
+    from builtins import str
 else:	
     import anydbm as dbm
+
 import tempfile
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import Match
 
 from opentargets_urlzsource import URLZSource
 import simplejson as json
+import unicodedata
 
 class ChEMBLLookup(object):
     def __init__(self, target_uri, mechanism_uri, component_uri, protein_uri, 
@@ -47,11 +49,21 @@ class ChEMBLLookup(object):
         self.molecules_dict = self.populate_molecules_dict()
 
     '''
+    To remove when Py3 will be the default language
+    '''
+    def str_hook(self, value):
+        new_value = value
+        if not isinstance(value, str):
+            new_value = unicodedata.normalize('NFKD', value).encode('ascii','ignore')
+
+        assert isinstance(new_value, str)
+        return new_value
+    '''
     Internal function to populate a dictionary like object on creation
     '''
     def populate_molecules_dict(self):
         # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
-        t_filename = tempfile.NamedTemporaryFile(delete=False).name
+        t_filename = tempfile.NamedTemporaryFile(delete=True).name
         # dbm could not work: Eg. dbm.error: cannot add item.
         # Use dumbdbm for the local execution. Python 3 should fix this issue.
         dumb_dict = dbm.open(t_filename, 'n')
@@ -157,7 +169,7 @@ class ChEMBLLookup(object):
                             self.protein_classification[i['accession']] = []
                         for classification in i['protein_classifications']:
                             protein_class_id = classification['protein_classification_id']
-                            self.protein_classification[i['accession']].append(self.protein_class[protein_class_id])
+                            self.protein_classification[i['accession']].append(dict(self.protein_class[protein_class_id]))
 
     def get_molecules_from_evidence(self, es, index):
 
@@ -167,13 +179,13 @@ class ChEMBLLookup(object):
             e = e.to_dict()
             #get information from URLs that we need to extract short ids
             #e.g. https://www.ebi.ac.uk/chembl/compound/inspect/CHEMBL502835
-            molecule_ids = [i['url'].split('/')[-1] for i in e['evidence']['target2drug']['urls'] if
+            molecule_ids = [self.str_hook(i['url'].split('/')[-1]) for i in e['evidence']['target2drug']['urls'] if
                            '/compound/' in i['url']]
             if molecule_ids:
                 molecule_id=molecule_ids[0]
 
-                disease_id = e['disease']['id']
-                target_id = e['target']['id']
+                disease_id = self.str_hook(e['disease']['id'])
+                target_id = self.str_hook(e['target']['id'])
                 if disease_id not in self.disease2molecule:
                     self.disease2molecule[disease_id]=set()
                 self.disease2molecule[disease_id].add(molecule_id)
