@@ -15,7 +15,7 @@ class ReactomeRetriever(object):
         self.index = index
 
     def get_reaction(self, reaction_id):
-        response = Search().using(self.es).index(self.index).query(Match(_id=reaction_id))[0:1].execute()
+        response = Search().using(self.es).index(self.index).extra(track_total_hits=True).query(Match(_id=reaction_id))[0:1].execute()
         if int(response.hits.total.value) > 0 and len(response.hits) > 0:
             return response.hits[0].to_dict()
         else:
@@ -38,7 +38,11 @@ class Uniprot(IPlugin):
             gene.dbxrefs= sorted(list(set(gene.dbxrefs)))
         for k, v in list(seqrec.annotations.items()):
             if k == 'accessions':
-                gene.uniprot_accessions = v
+                #gene.uniprot_accessions = v
+                # to avoid NoneType error
+                gene.uniprot_accessions.extend(v)
+                acc_set = set(gene.uniprot_accessions)
+                gene.uniprot_accessions = list(acc_set)
             if k == 'keywords':
                 gene.uniprot_keywords = v
             if k == 'comment_function':
