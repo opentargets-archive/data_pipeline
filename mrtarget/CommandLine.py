@@ -190,7 +190,8 @@ def main():
                 data_config.chembl_component, 
                 data_config.chembl_protein, 
                 data_config.chembl_molecule,
-                data_config.chembl_indication)
+                data_config.chembl_indication,
+                data_config.adverse_events)
         if not args.qc_only:
             process.process_all(args.dry_run)
         if not args.skip_qc:
