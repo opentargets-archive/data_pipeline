@@ -46,7 +46,8 @@ class EFO(JSONSerializable):
                  path_labels=[],
                  therapeutic_labels=[],
                  therapeutic_codes=[],
-                 definition=""):
+                 definition="",
+                 definition_alternatives=[]):
         self.code = code
         self.label = label
         self.efo_synonyms = synonyms
@@ -58,6 +59,7 @@ class EFO(JSONSerializable):
         self.therapeutic_codes = therapeutic_codes
         # self.id_org = id_org
         self.definition = definition
+        self.definition_alternatives = definition_alternatives
         self.children=[]
 
     def get_id(self):
@@ -155,8 +157,11 @@ class EfoProcess(object):
 
             #create a text block definition/description by joining others together
             definition = ''
+            definition_alternatives = []
             if 'http://purl.obolibrary.org/obo/IAO_0000115' in properties:
-                definition = ". ".join(properties['http://purl.obolibrary.org/obo/IAO_0000115'])
+                definitions = tuple(properties['http://purl.obolibrary.org/obo/IAO_0000115'])
+                definition = definitions[0]
+                definition_alternatives = definitions[1:]
 
             #build a set of all the relevant synonyms
             synonyms = set()            
@@ -201,7 +206,8 @@ class EfoProcess(object):
                       path_labels=classes_path['labels'],
                       therapeutic_labels=therapeutic_labels,
                       therapeutic_codes=therapeutic_codes,
-                      definition=definition
+                      definition=definition,
+                      definition_alternatives=definition_alternatives
                       )
 
             if uri in self.disease_ontology.children:
