@@ -46,6 +46,6 @@ Yapsy==1.12.0
 #when installing from GitHub, a specific commit must be used for consistency
 #and to ensure dependency caching works as intended
 #git+https://github.com/opentargets/ontology-utils.git@5c7ef98f90b52412ffd9e02ae4d5fe18c0f117ec#egg=opentargets-ontologyutils
-opentargets-ontologyutils=1.2.3
+opentargets-ontologyutils==1.2.3
 opentargets-urlzsource==1.0.0
 opentargets-validator==0.4.0
