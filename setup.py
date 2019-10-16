@@ -18,6 +18,7 @@ setup(name=p.__pkgname__, version=p.__version__,
       install_requires=[
 "future",
 "addict",
+"cachetools",
 "ConfigArgParse[yaml]",
 "elasticsearch-dsl>=7.0.0,<8.0.0",
 "networkx",
