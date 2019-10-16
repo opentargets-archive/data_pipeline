@@ -22,10 +22,12 @@ if sys.version_info >= (3, 0):
     from builtins import str
 else:
     import anydbm as dbm
-
+from csv import DictReader
 import shelve
 import codecs
 import urllib.request, urllib.parse, urllib.error
+from numbers import Number
+
 
 """
 Generates elasticsearch action objects from the results iterator
@@ -43,6 +45,7 @@ def elasticsearch_actions(items, index):
 
         yield action
 
+
 def get_parent_id(mol):
     #if it has a parent use the parents id
     if "molecule_hierarchy" in mol and mol["molecule_hierarchy"] is not None \
@@ -53,7 +56,6 @@ def get_parent_id(mol):
     #if there is no parent, use its own id
         #print("Unable to find .molecule_hierarchy.parent_chembl_id for %s"%mol["molecule_chembl_id"])
         return mol["molecule_chembl_id"]
-
 
 class DrugProcess(object):
 
@@ -67,7 +69,8 @@ class DrugProcess(object):
             chembl_component_uris, 
             chembl_protein_uris, 
             chembl_molecule_uris,
-            chembl_indication_uris):
+            chembl_indication_uris,
+            adverse_events_uris):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_mappings = es_mappings
@@ -90,6 +93,8 @@ class DrugProcess(object):
         self.chembl_molecule_uris = chembl_molecule_uris
         self.chembl_indication_uris = chembl_indication_uris
 
+        self.adverse_events_uris = adverse_events_uris
+
         self.logger = logging.getLogger(__name__)
 
     def process_all(self, dry_run):
@@ -97,7 +102,6 @@ class DrugProcess(object):
 
         drugs = self.generate(es)
         self.store(es, dry_run, drugs)
-
 
     # to avoid: String or Integer object expected for key, unicode found.
     # to validate assert below
@@ -109,7 +113,6 @@ class DrugProcess(object):
 
         assert isinstance(new_value, str)
         return new_value
-
 
     def create_shelf(self, uris, key_f):
         #sanity check inputs
@@ -142,7 +145,6 @@ class DrugProcess(object):
                         shelf[key] = obj
         return shelf
 
-
     def create_shelf_multi(self, uris, key_f):
         #sanity check inputs
         assert uris is not None
@@ -174,6 +176,30 @@ class DrugProcess(object):
                         shelf[key] = existing
         return shelf
 
+    def create_shelf_csv(self, uris, key_col):
+        # sanity check inputs
+        assert uris is not None
+        assert len(uris) > 0
+
+        # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
+        # dumbdbm creates an empty database file. In this way shelve can open it properly.
+
+        #note: this file is never deleted!
+        filename = tempfile.NamedTemporaryFile(delete=True).name
+        shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
+        for uri in uris:
+            with URLZSource(uri).open() as f_obj:
+                f_obj = codecs.getreader("utf-8")(f_obj)
+                for row in DictReader(f_obj):
+                    key_value = row[key_col]
+                    key = self.str_hook(key_value)
+                    if key is not None:
+                        row_dict = dict(row)
+                        del row_dict[key_col]
+                        existing = shelf.get(key,[])
+                        existing.append(row_dict)
+                        shelf[key] = existing
+        return shelf
 
     def clean_ids(self, source, ids):
         if source == "ClinicalTrials":
@@ -237,7 +263,6 @@ class DrugProcess(object):
             return None
 
         return urls
-
 
 
     def handle_indication(self, indication):
@@ -444,7 +469,7 @@ class DrugProcess(object):
     This will create the drug dictionary object suitable for storing in elasticsearch
     from the provided shelf-backed dictionaries of relevant chembl endpoint data
     '''
-    def handle_drug(self, ident, mol, indications, mechanisms, all_targets):
+    def handle_drug(self, ident, mol, indications, mechanisms, all_targets, adverse_events):
 
         drug = {}
         drug["id"] = ident
@@ -624,13 +649,42 @@ class DrugProcess(object):
                 if out is not None:
                     drug["mechanisms_of_action"].append(out)
 
+        # add adverse events
+        if ident in adverse_events:
+            drug["adverse_events"] = []
+            for adverse_event in adverse_events[ident]:
+                assert "event" in adverse_event
+                assert "count" in adverse_event
+                assert "llr" in adverse_event
+                assert "critval" in adverse_event
+
+                # critval is the same per-drug for all adverse events
+
+                drug["adverse_events"] = {}
+                if "critval" not in drug["adverse_events"]:
+                    drug["adverse_events"]["critval"] = float(adverse_event["critval"])
+                else:
+                    assert drug["adverse_events"]["critval"] == float(adverse_event["critval"])
+
+                if "significant" not in drug["adverse_events"]:
+                    drug["adverse_events"]["significant"] = []
+                drug["adverse_events"]["significant"].append({
+                    "event": adverse_event["event"],
+                    "count": int(adverse_event["count"]),
+                    "llr": float(adverse_event["llr"])
+                })
+            
+            
+            if "significant" not in drug["adverse_events"]:
+                drug["adverse_events"]["significant"].sort(cmp=lambda x:x["llr"], reverse=True)
+
         return drug
 
 
-    def handle_drug_child(self, drug, ident, mol, indications, mechanisms, targets):
+    def handle_drug_child(self, drug, ident, mol, indications, mechanisms, targets, adverse_events):
 
         #get a drug object for the child, validated and cleaned
-        child_drug = self.handle_drug(ident, mol, indications, mechanisms, targets)
+        child_drug = self.handle_drug(ident, mol, indications, mechanisms, targets, adverse_events)
 
         #add extra information to the drug based on the child
 
@@ -696,6 +750,8 @@ class DrugProcess(object):
 
         # TODO black box warning
 
+        # TODO adverse events (at the moment there shouldn't be any about child drugs)
+
     def generate(self, es):
 
         # pre-load into indexed shelf dicts
@@ -732,7 +788,9 @@ class DrugProcess(object):
         self.logger.debug("Loading targets")
         targets = self.create_shelf(self.chembl_target_uris, lambda x : x["target_chembl_id"])
         self.logger.debug("Loaded %d targets", len(targets))
-        self.logger.info("Completed pre-loading")
+        adverse_events = self.create_shelf_csv(self.adverse_events_uris, "chembl_id")
+        self.logger.debug("Loaded %d adverse events", len(adverse_events))
+        self.logger.info("Completed pre-loading")        
 
         drugs = {}
         #TODO finish
@@ -760,13 +818,13 @@ class DrugProcess(object):
 
             drug = self.handle_drug(ident, parent_mol,
                 indications, mechanisms,
-                targets)
+                targets, adverse_events)
 
             #append information from children
             for child_mol in child_mols:
                 self.handle_drug_child(drug, child_mol["molecule_chembl_id"], child_mol,
                     indications, mechanisms,
-                    targets)
+                    targets, adverse_events)
 
             if "indications" in drug:
                 drug["number_of_indications"] = len(drug["indications"])
@@ -779,9 +837,11 @@ class DrugProcess(object):
                 drug["number_of_mechanisms_of_action"] = 0
 
             # only keep those with indications or mechanisms 
-            if drug["number_of_indications"] > 0 \
-                    or drug["number_of_mechanisms_of_action"] > 0:
-                drugs[ident] = drug
+            if drug["number_of_indications"] == 0 \
+                    and drug["number_of_mechanisms_of_action"] == 0:
+                continue
+
+            drugs[ident] = drug
 
         return drugs
 
