@@ -98,7 +98,7 @@ class ElasticsearchBulkIndexManager(object):
         #temporarily, will use more disk as things are copied around
         #but in the end should be smaller and more performant
         self.logger.debug("Force merging %s", self.index_name)
-        self.client.indices.forcemerge(index=self.index_name)
+        self.client.indices.forcemerge(index=self.index_name, max_num_segments=1)
 
         #wait for everthing to sort itself out
         #self.wait_for_status(u"yellow")
