@@ -84,7 +84,7 @@ version: "3.6"
 services:
       
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.2.0
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.4.0
     ports:
       - 9200:9200
     environment:
@@ -116,7 +116,7 @@ services:
       retries:  30
         
   kibana:
-    image: docker.elastic.co/kibana/kibana-oss:7.2.0
+    image: docker.elastic.co/kibana/kibana-oss:7.4.0
     ports:
       - 5601:5601
     depends_on:
