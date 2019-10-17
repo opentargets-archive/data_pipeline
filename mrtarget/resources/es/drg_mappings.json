@@ -5,7 +5,12 @@
         "ids" : {
           "type": "keyword"
         }
-      }
+      },
+      "type":  "object"
+    },
+    "canonical_smiles" : {
+      "index": false,
+      "type":  "keyword"
     }
   }
 }

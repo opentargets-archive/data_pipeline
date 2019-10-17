@@ -631,6 +631,13 @@ class DrugProcess(object):
             if reference not in drug["cross_references"]:
                 drug["cross_references"].append(reference)
 
+        # add smiles
+        if "molecule_structures" in mol and \
+                mol["molecule_structures"] is not None and \
+                "canonical_smiles" in mol["molecule_structures"]:
+            # TODO validate ?
+            drug["canonical_smiles"] = mol["molecule_structures"]["canonical_smiles"]
+
         #sort cross references for consistent order after all possible ones have been added
         if "cross_references" in drug:
             drug["cross_references"] = sorted(drug["cross_references"],key=lambda x: x["source"])
