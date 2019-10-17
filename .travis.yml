@@ -11,8 +11,8 @@ python:
   - 2.7
   - 3.7
 before_install:
-  - docker pull docker.elastic.co/elasticsearch/elasticsearch:7.2.0
-  - docker run -d -p 9200:9200 -p 9300:9300 --name=es elasticsearch:7.2.0
+  - docker pull docker.elastic.co/elasticsearch/elasticsearch:7.4.0
+  - docker run -d -p 9200:9200 -p 9300:9300 --name=es elasticsearch:7.4.0
 install:
   - pip install -r requirements.txt
   - pip install -r requirements.dev.txt
