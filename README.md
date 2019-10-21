@@ -50,36 +50,35 @@ Please note that several steps require large amounts of CPU and memory, particul
 
 #### Elasticsearch
 
-You should have Elasticsearch avaliable to be used the pipeline code. Note that Elasticsearch v6 is not currently supported by the pipeline, and therefore 5.6 is the latest version (as of writing). And Elasticsearch instance can be run using Docker containers. 
+You should have an Elasticsearch instance running to use the pipeline code.
+An Elasticsearch instance can be run using Docker containers.
+As of the time of this writing the pipeline worked with Elasticsearch 7.2;
+see the file docker-compose.yaml in this folder for an updated suggestion.
 
-After deploying elasticsearch, you should check that you can query its API. Running `curl localhost:9200` should show something like:
-```json
+After deploying Elasticsearch, you should check that you can query its API.
+Running `curl localhost:9200` should show something like:
+```
 {
-  "name": "Wr5vnJs",
-  "cluster_name": "elasticsearch",
-  "cluster_uuid": "6BlykLd8Sj2mxswcump2wA",
-  "version": {
-    "number": "5.6.13",
-    "build_hash": "bc3eef4",
-    "build_date": "2018-08-16T15:25:17.293Z",
-    "build_snapshot": false,
-    "lucene_version": "6.6.1"
-  },
-  "tagline": "You Know, for Search"
+  "name" : "9dfc91506114",
+  …
+  "tagline" : "You Know, for Search"
 }
 ```
 
-For more information on Elasticsearch, see https://www.elastic.co/guide/en/elasticsearch/reference/5.6/getting-started.html
+For more information on Elasticsearch,
+see <https://www.elastic.co/guide/en/elasticsearch/reference/7.2/getting-started.html>
 
-Note: you may need to increase the default size of the write thread pool from 200 to a higher value (e.g. 1000). See https://www.elastic.co/guide/en/elasticsearch/reference/7.1/modules-threadpool.html
+Note: you may need to increase the default queue size of the write thread pool
+from 200 to a higher value (e.g. 1000).
+See <https://www.elastic.co/guide/en/elasticsearch/reference/7.2/modules-threadpool.html>
 
 #### Kibana
 
 Kibana is useful to browse the output/input of the various steps.
 
-You can install Kibana in a variety of ways, including via [docker](https://www.elastic.co/guide/en/kibana/5.6/docker.html)
+You can install Kibana in a variety of ways, including via [docker](https://www.elastic.co/guide/en/kibana/7.2/docker.html)
 
-**Important:** Kibana version [must be compatible](https://www.elastic.co/support/matrix#show_compatibility) with Elasticsearch.
+**Important:** the Kibana version [must be compatible](https://www.elastic.co/support/matrix#show_compatibility) with Elasticsearch.
 
 Once Kibana is installed and deployed, check that it is working by browsing to `http://localhost:5601`
 
