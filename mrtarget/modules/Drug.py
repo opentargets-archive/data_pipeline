@@ -22,7 +22,7 @@ if sys.version_info >= (3, 0):
     from builtins import str
 else:
     import anydbm as dbm
-from csv import DictReader
+import csv
 import shelve
 import codecs
 import urllib.request, urllib.parse, urllib.error
@@ -66,11 +66,12 @@ class DrugProcess(object):
             cache_target, cache_target_u2e, cache_target_contains,
             chembl_target_uris, 
             chembl_mechanism_uris, 
-            chembl_component_uris, 
+            chembl_component_uris,
             chembl_protein_uris, 
             chembl_molecule_uris,
             chembl_indication_uris,
-            adverse_events_uris):
+            adverse_events_uris,
+            drugbank_uris):
         self.es_hosts = es_hosts
         self.es_index = es_index
         self.es_mappings = es_mappings
@@ -94,6 +95,8 @@ class DrugProcess(object):
         self.chembl_indication_uris = chembl_indication_uris
 
         self.adverse_events_uris = adverse_events_uris
+
+        self.drugbank_uris = drugbank_uris
 
         self.logger = logging.getLogger(__name__)
 
@@ -176,7 +179,7 @@ class DrugProcess(object):
                         shelf[key] = existing
         return shelf
 
-    def create_shelf_csv(self, uris, key_col):
+    def create_shelf_multi_csv(self, uris, key_col, dialect):
         # sanity check inputs
         assert uris is not None
         assert len(uris) > 0
@@ -190,7 +193,7 @@ class DrugProcess(object):
         for uri in uris:
             with URLZSource(uri).open() as f_obj:
                 f_obj = codecs.getreader("utf-8")(f_obj)
-                for row in DictReader(f_obj):
+                for row in csv.DictReader(f_obj, dialect=dialect):
                     key_value = row[key_col]
                     key = self.str_hook(key_value)
                     if key is not None:
@@ -199,6 +202,31 @@ class DrugProcess(object):
                         existing = shelf.get(key,[])
                         existing.append(row_dict)
                         shelf[key] = existing
+        return shelf
+
+    def create_shelf_csv(self, uris, key_col, dialect):
+        # sanity check inputs
+        assert uris is not None
+        assert len(uris) > 0
+
+        # Shelve creates a file with specific database. Using a temp file requires a workaround to open it.
+        # dumbdbm creates an empty database file. In this way shelve can open it properly.
+
+        #note: this file is never deleted!
+        filename = tempfile.NamedTemporaryFile(delete=True).name
+        shelf = shelve.Shelf(dict=dbm.open(filename, 'n'))
+        for uri in uris:
+            with URLZSource(uri).open() as f_obj:
+                f_obj = codecs.getreader("utf-8")(f_obj)
+                for row in csv.DictReader(f_obj, dialect=dialect):
+                    key_value = row[key_col]
+                    key = self.str_hook(key_value)
+                    if key is not None:
+                        if key in shelf:
+                            raise ValueError("Duplicate key %s in uri %s" % (key,uri))
+                        row_dict = dict(row)
+                        del row_dict[key_col]
+                        shelf[key] = row_dict
         return shelf
 
     def clean_ids(self, source, ids):
@@ -469,7 +497,8 @@ class DrugProcess(object):
     This will create the drug dictionary object suitable for storing in elasticsearch
     from the provided shelf-backed dictionaries of relevant chembl endpoint data
     '''
-    def handle_drug(self, ident, mol, indications, mechanisms, all_targets, adverse_events):
+    def handle_drug(self, ident, mol, indications, mechanisms, all_targets, 
+            adverse_events, drugbank_ids):
 
         drug = {}
         drug["id"] = ident
@@ -618,6 +647,16 @@ class DrugProcess(object):
                 #TODO build a URL list that can handle multiple ids (when possible)
                 drug["cross_references"].append(reference)
 
+        # add a drugbank crossreference if applicable
+        if ident in drugbank_ids:
+            for drugbank_id in drugbank_ids[ident]:
+                reference = {}
+                reference["source"] = "drugbank"
+                reference["ids"] = (drugbank_id["To src:'2'"],)
+                if "cross_references" not in drug:
+                    drug["cross_references"] = []
+                drug["cross_references"].append(reference)
+
         if "chebi_par_id" in mol and mol["chebi_par_id"] is not None:
             assert isinstance(mol["chebi_par_id"], int)
             chebi_id = mol["chebi_par_id"]
@@ -688,10 +727,12 @@ class DrugProcess(object):
         return drug
 
 
-    def handle_drug_child(self, drug, ident, mol, indications, mechanisms, targets, adverse_events):
+    def handle_drug_child(self, drug, ident, mol, indications, mechanisms, targets, 
+            adverse_events, drugbank_ids):
 
         #get a drug object for the child, validated and cleaned
-        child_drug = self.handle_drug(ident, mol, indications, mechanisms, targets, adverse_events)
+        child_drug = self.handle_drug(ident, mol, indications, mechanisms, targets, 
+            adverse_events, drugbank_ids)
 
         #add extra information to the drug based on the child
 
@@ -753,11 +794,27 @@ class DrugProcess(object):
                 #in child but not parent, add to parent
                 drug["year_first_approved"] = child_drug["year_first_approved"]
 
+        if "cross_references" in child_drug:
+            if "cross_references" in drug:
+                #merge and unique
+                # note dict is not hashable so cant use a simple set
+                cross_references = list(drug["cross_references"])
+                for other_cross_reference in child_drug["cross_references"]:
+                    if other_cross_reference not in cross_references:
+                        cross_references.append(other_cross_reference)
+                drug["cross_references"] = tuple(cross_references)
+            else:
+                #in child but not parent, add to parent
+                drug["cross_references"] = child_drug["cross_references"]
+
+
         # TODO withdrawn_year and other withdrawn
 
         # TODO black box warning
 
         # TODO adverse events (at the moment there shouldn't be any about child drugs)
+
+        
 
     def generate(self, es):
 
@@ -795,8 +852,11 @@ class DrugProcess(object):
         self.logger.debug("Loading targets")
         targets = self.create_shelf(self.chembl_target_uris, lambda x : x["target_chembl_id"])
         self.logger.debug("Loaded %d targets", len(targets))
-        adverse_events = self.create_shelf_csv(self.adverse_events_uris, "chembl_id")
+        adverse_events = self.create_shelf_multi_csv(self.adverse_events_uris, "chembl_id", csv.excel)
         self.logger.debug("Loaded %d adverse events", len(adverse_events))
+        #technically this can be duplicate e.g. CHEMBL1236107
+        drugbank_ids = self.create_shelf_multi_csv(self.drugbank_uris, "From src:'1'", csv.excel_tab)
+        self.logger.debug("Loaded %d drugbank ids", len(drugbank_ids))
         self.logger.info("Completed pre-loading")        
 
         drugs = {}
@@ -825,13 +885,13 @@ class DrugProcess(object):
 
             drug = self.handle_drug(ident, parent_mol,
                 indications, mechanisms,
-                targets, adverse_events)
+                targets, adverse_events, drugbank_ids)
 
             #append information from children
             for child_mol in child_mols:
                 self.handle_drug_child(drug, child_mol["molecule_chembl_id"], child_mol,
                     indications, mechanisms,
-                    targets, adverse_events)
+                    targets, adverse_events, drugbank_ids)
 
             if "indications" in drug:
                 drug["number_of_indications"] = len(drug["indications"])
