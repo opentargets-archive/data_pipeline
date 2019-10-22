@@ -55,15 +55,15 @@ You should have Elasticsearch avaliable to be used the pipeline code. Note that 
 After deploying elasticsearch, you should check that you can query its API. Running `curl localhost:9200` should show something like:
 ```json
 {
-  "name": "Wr5vnJs",
+  "name": "xxxxx",
   "cluster_name": "elasticsearch",
-  "cluster_uuid": "6BlykLd8Sj2mxswcump2wA",
+  "cluster_uuid": "xxxxxxxxxx",
   "version": {
-    "number": "5.6.13",
-    "build_hash": "bc3eef4",
-    "build_date": "2018-08-16T15:25:17.293Z",
+    "number": "x.x.x",
+    "build_hash": "xxxxx",
+    "build_date": "yyyy-mm-ddThh:mm:ss.sssZ",
     "build_snapshot": false,
-    "lucene_version": "6.6.1"
+    "lucene_version": "x.x.x"
   },
   "tagline": "You Know, for Search"
 }
