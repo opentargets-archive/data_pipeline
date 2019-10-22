@@ -658,7 +658,8 @@ class DrugProcess(object):
 
         # add adverse events
         if ident in adverse_events:
-            drug["adverse_events"] = []
+            drug["adverse_events"] = {}
+            drug["adverse_events"]["significant"] = []
             for adverse_event in adverse_events[ident]:
                 assert "event" in adverse_event
                 assert "count" in adverse_event
@@ -666,24 +667,18 @@ class DrugProcess(object):
                 assert "critval" in adverse_event
 
                 # critval is the same per-drug for all adverse events
-
-                drug["adverse_events"] = {}
                 if "critval" not in drug["adverse_events"]:
                     drug["adverse_events"]["critval"] = float(adverse_event["critval"])
                 else:
                     assert drug["adverse_events"]["critval"] == float(adverse_event["critval"])
 
-                if "significant" not in drug["adverse_events"]:
-                    drug["adverse_events"]["significant"] = []
                 drug["adverse_events"]["significant"].append({
                     "event": adverse_event["event"],
                     "count": int(adverse_event["count"]),
                     "llr": float(adverse_event["llr"])
                 })
             
-            
-            if "significant" not in drug["adverse_events"]:
-                drug["adverse_events"]["significant"].sort(cmp=lambda x:x["llr"], reverse=True)
+            drug["adverse_events"]["significant"].sort(key=lambda x:x["llr"], reverse=True)
 
         return drug
 
