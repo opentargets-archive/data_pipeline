@@ -27,6 +27,7 @@ import shelve
 import codecs
 import urllib.request, urllib.parse, urllib.error
 from numbers import Number
+from collections import defaultdict
 
 
 """
@@ -830,6 +831,25 @@ class DrugProcess(object):
 
             if "indications" in drug:
                 drug["number_of_indications"] = len(drug["indications"])
+                # buld a summary of therapeutic areas covered by indications
+                # TODO avoid repeat EFO lookup by doing inside handle_indication()
+                indication_therapeutic_areas = defaultdict(int)
+                for indication in drug["indications"]:
+                    efo_id = indication["efo_id"]
+                    stored_efo = self.lookup_data.available_efos.get_efo(efo_id)
+                    if "therapeutic_codes" in stored_efo and "therapeutic_labels" in stored_efo:
+                        for ta_code, ta_label in zip(
+                                stored_efo["therapeutic_codes"], stored_efo["therapeutic_labels"]):
+                            indication_therapeutic_areas[ta_code, ta_label] += 1
+                drug["indication_therapeutic_areas"] = []
+                for (ta_code, ta_label), value in sorted(
+                        indication_therapeutic_areas.items(), key=lambda x: x[1], reverse=True):
+                    indication_therapeutic_area = {}
+                    indication_therapeutic_area["therapeutic_code"] = ta_code
+                    indication_therapeutic_area["therapeutic_label"] = ta_label
+                    indication_therapeutic_area["count"] = value
+                    drug["indication_therapeutic_areas"].append(indication_therapeutic_area)
+                drug["indication_therapeutic_areas"] = tuple(drug["indication_therapeutic_areas"])
             else:
                 drug["number_of_indications"] = 0
 
