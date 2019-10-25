@@ -11,6 +11,22 @@
     "canonical_smiles" : {
       "index": false,
       "type":  "keyword"
+    },
+    "indication_therapeutic_areas" : {
+      "properties": {
+        "therapeutic_code" : {
+          "index": false,
+          "type":  "keyword"
+        },
+        "therapeutic_label" : {
+          "index": false,
+          "type":  "keyword"
+        },
+        "count" : {
+          "index": false,
+          "type":  "long"
+        }
+      }
     }
   }
 }
