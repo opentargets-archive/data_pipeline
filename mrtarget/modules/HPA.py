@@ -378,6 +378,7 @@ class HPADataDownloader(object):
                      'Reliability': 'reliability',
                      'Gene': 'gene'})
             .cut('tissue', 'cell_type', 'level', 'reliability', 'gene')
+            .select(lambda rec: str(rec['level']) != 'N/A')
             .addfield('tissue_label',
                       lambda rec: name_from_tissue(rec['tissue'].strip(), self.t2m))
             .addfield('tissue_code',
