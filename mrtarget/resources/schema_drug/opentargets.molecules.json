@@ -1,0 +1,109 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "http://example.com/product.schema.json",
+    "title": "Drug",
+    "description": "OpenTargets drug index records for molecules",
+    "type": "object",
+    "properties": {
+      "molecule_chembl_id": {
+        "description" : "This is the id of the parent molecule id. May or may not be chembl identifier, despite name.",
+        "type":"string"
+      },
+      "internal_compound": {
+        "description" : "Marker for internal (i.e. non-public) data. If ommitted, defaults to false",
+        "type":"boolean"
+      },
+      "molecule_type": {
+        "description" : "",
+        "type":"string"
+      },
+      "pref_name": {
+        "description" : "preferred name to use for this molecules",
+        "type":"string"
+      },
+      "first_approval": {
+        "description" : "year first approved",
+        "type":"integer",
+        "exclusiveMaximum": 2100,
+        "exclusiveMinimum": 1900
+      },
+      "max_phase": {
+        "description" : "the highest clinical trial phase that has ever been reached for this molecule",
+        "type":"integer",
+        "maximum": 4,
+        "minimum": 0
+      },
+      "withdrawn_flag": {
+        "description" : "marker for if this has ever been withdrawn for any reason anywhere",
+        "type":"boolean"
+      },
+      "withdrawn_reason": {
+        "description" : "semicolon separate list of reasons why this was withdrawn, if avaliable",
+        "type":"string"
+      },
+      "withdrawn_year": {
+        "description" : "year this was first withdrawn, if avaliable",
+        "type":"integer",
+        "exclusiveMaximum": 2100,
+        "exclusiveMinimum": 1900
+      },
+      "withdrawn_country": {
+        "description" : "semicolon separate list of countries this has been withdrawn in, if avaliable",
+        "type":"string"
+      },
+      "withdrawn_class": {
+        "description" : "semicolon separate list of reasons why this was withdrawn, if avaliable",
+        "type":"string"
+      },
+      "black_box_warning": {
+        "description" : "0 == False , 1 == True for if there is a 'black box warning' associated with this molecule",
+        "type":"integer",
+        "enum" : [
+          0,
+          1
+        ]
+      },
+      "molecule_synonyms": {
+        "description" : "Synonyms for this molecule. Will be uniqued. Any without molecule_synonym and syn_type will be ignored",
+        "type":"object",
+        "properties": {
+          "molecule_synonym": {
+            "description" : "synonym for this drug",
+            "type":"string"
+          },
+          "syn_type": {
+            "description" : "TRADE_NAME if this is a trade name",
+            "type":"string"
+          }
+        },
+        "required" : [
+          "molecule_synonym",
+          "syn_type"
+        ]
+      },
+      "cross_references": {
+        "description" : "Cross references for this molecule. Will be uniqued. Anything without xref_id and xref_src will be ignored",
+        "type":"object",
+        "properties": {
+          "xref_id": {
+            "description" : "identifier to use for the cross reference",
+            "type":"string"
+          },
+          "xref_src": {
+            "description" : "where the cross reference is from ",
+            "type":"string"
+          }
+        }
+      },
+      "molecule_structures": {
+        "description" : "holder for molecular structures",
+        "type":"object",
+        "properties": {
+          "canonical_smiles": {
+            "description" : "canonical SMILES representation of this drug",
+            "type":"string"
+          }
+        }
+      }
+    }
+  }
