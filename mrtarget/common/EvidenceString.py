@@ -631,20 +631,8 @@ class Evidence(JSONSerializable):
                 self.evidence['scores']['association_score'] = float(
                     self.evidence['evidence']['disease_model_association']['resource_score']['value'])
             elif self.evidence['type'] == 'somatic_mutation':
-                frequency = 1.
-                if 'known_mutations' in self.evidence['evidence'] and self.evidence['evidence']['known_mutations']:
-                    sample_total_coverage = 1.
-                    max_sample_size = 1.
-                    for mutation in self.evidence['evidence']['known_mutations']:
-                        if 'number_samples_with_mutation_type' in mutation:
-                            sample_total_coverage += int(mutation['number_samples_with_mutation_type'])
-                            if int(mutation['number_mutated_samples']) > max_sample_size:
-                                max_sample_size = int(mutation['number_mutated_samples'])
-                    if sample_total_coverage > max_sample_size:
-                        sample_total_coverage = max_sample_size
-                    frequency = DataNormaliser.renormalize(old_div(sample_total_coverage, max_sample_size), [0., 9.], [.5, 1.])
                 self.evidence['scores']['association_score'] = float(
-                    self.evidence['evidence']['resource_score']['value']) * frequency
+                    self.evidence['evidence']['resource_score']['value'])
             elif self.evidence['type'] == 'literature':
                 score = float(self.evidence['evidence']['resource_score']['value'])
                 if self.evidence['sourceID'] == 'europepmc':
