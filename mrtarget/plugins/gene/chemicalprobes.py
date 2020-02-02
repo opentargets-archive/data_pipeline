@@ -66,7 +66,6 @@ class ChemicalProbes(IPlugin):
         with URLZSource(filename2).open() as r_file:
             for i, row in enumerate(csv.DictReader(r_file, dialect='excel-tab'), start=1):
                 PMdata = {
-                    "probenumber": row["nr_of_probes"],
                     "link": "https://probeminer.icr.ac.uk/#/"+row["uniprot_symbol"]
                 }
                 if row["hgnc_symbol"] not in self.chemicalprobes:
