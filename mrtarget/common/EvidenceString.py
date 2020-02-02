@@ -631,8 +631,12 @@ class Evidence(JSONSerializable):
                 self.evidence['scores']['association_score'] = float(
                     self.evidence['evidence']['disease_model_association']['resource_score']['value'])
             elif self.evidence['type'] == 'somatic_mutation':
-                self.evidence['scores']['association_score'] = float(
-                    self.evidence['evidence']['resource_score']['value'])
+                # If score is a probability use it directly, if it is a p-value (IntOGen since Nov 2019) linearise it
+                if self.evidence['evidence']['resource_score']['type']== 'pvalue':
+                    self.evidence['scores']['association_score'] = self._get_score_from_pvalue_linear(float(self.evidence['evidence']['resource_score']['value']),
+                                                               range_min=0.05)
+                else:
+                    self.evidence['scores']['association_score'] = float(self.evidence['evidence']['resource_score']['value'])
             elif self.evidence['type'] == 'literature':
                 score = float(self.evidence['evidence']['resource_score']['value'])
                 if self.evidence['sourceID'] == 'europepmc':
