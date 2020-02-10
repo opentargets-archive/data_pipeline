@@ -595,6 +595,16 @@ class Evidence(JSONSerializable):
                                                         self.evidence['evidence']['variant2disease']['resource_score'][
                                                             'value'],
                                                         no_of_cases)
+
+                    # Locus to gene score is applied without modifications for genetics portal sourced evidences:
+                    elif  self.evidence['sourceID'] == 'ot_genetics_portal':
+                        try:
+                            score =  self.evidence['evidence']['gene2variant']['resource_score']['value']
+                        except KeyError:
+                            self.logger.error("Cannot score gentics portal evidence: variant: {}, study: {}".format(
+                                self.evidence['variant']['id'], self.evidence['unique_association_fields']['study']))
+                            pass
+
                     else:
                         g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
 
