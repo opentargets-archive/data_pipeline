@@ -634,7 +634,7 @@ class Evidence(JSONSerializable):
                 # If score is a probability use it directly, if it is a p-value (IntOGen since Nov 2019) linearise it
                 if self.evidence['evidence']['resource_score']['type']== 'pvalue':
                     self.evidence['scores']['association_score'] = self._get_score_from_pvalue_linear(float(self.evidence['evidence']['resource_score']['value']),
-                                                               range_min=0.05)
+                                                               range_min=0.1, out_range_min=0.25)
                 else:
                     self.evidence['scores']['association_score'] = float(self.evidence['evidence']['resource_score']['value'])
             elif self.evidence['type'] == 'literature':
@@ -643,6 +643,7 @@ class Evidence(JSONSerializable):
                     score = score / 100.
                     if score > 1:
                         score = 1.
+                self.evidence['scores']['association_score'] = score
                 self.evidence['scores']['association_score'] = score
             elif self.evidence['type'] == 'affected_pathway':
                 # TODO: Implement two types of scoring for sysbio - based on p-value range & based on rank-based score range
