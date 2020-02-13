@@ -648,7 +648,7 @@ class Evidence(JSONSerializable):
                 # If score is a probability use it directly, if it is a p-value (IntOGen since Nov 2019) linearise it
                 if self.evidence['evidence']['resource_score']['type']== 'pvalue':
                     self.evidence['scores']['association_score'] = self._get_score_from_pvalue_linear(float(self.evidence['evidence']['resource_score']['value']),
-                                                               range_min=0.05)
+                                                               range_min=0.1, out_range_min=0.25)
                 else:
                     self.evidence['scores']['association_score'] = float(self.evidence['evidence']['resource_score']['value'])
             elif self.evidence['type'] == 'literature':
