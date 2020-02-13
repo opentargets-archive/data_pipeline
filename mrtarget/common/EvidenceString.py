@@ -589,6 +589,7 @@ class Evidence(JSONSerializable):
                 score = 0.
                 if 'gene2variant' in self.evidence['evidence']:
 
+                    # Score calculation for phewas catalog and the 23andme dataset:
                     if self.evidence['sourceID'] in ['phewas_catalog','twentythreeandme']:
                         no_of_cases = self.evidence['unique_association_fields']['cases']
                         score = self._score_phewas_data(self.evidence['sourceID'],
@@ -596,15 +597,17 @@ class Evidence(JSONSerializable):
                                                             'value'],
                                                         no_of_cases)
 
-                    # Locus to gene score is applied without modifications for genetics portal sourced evidences:
+                    # Score calculation for genetics portal sourced evidence:
                     elif  self.evidence['sourceID'] == 'ot_genetics_portal':
                         try:
+                            # Locus 2 gene core directly used as evidence score:
                             score =  self.evidence['evidence']['gene2variant']['resource_score']['value']
                         except KeyError:
                             self.logger.error("Cannot score gentics portal evidence: variant: {}, study: {}".format(
                                 self.evidence['variant']['id'], self.evidence['unique_association_fields']['study']))
-                            pass
+                            raise
 
+                    # Scoring other genetics evidences:
                     else:
                         g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
 
@@ -617,6 +620,7 @@ class Evidence(JSONSerializable):
                             # this should not happen?
                             v2d_score = 0.
 
+                        # GWAS Catalog is still a supported evidence source:
                         if self.evidence['sourceID'] == 'gwas_catalog':
                             sample_size = self.evidence['evidence']['variant2disease']['gwas_sample_size']
                             p_value = self.evidence['evidence']['variant2disease']['resource_score']['value']
