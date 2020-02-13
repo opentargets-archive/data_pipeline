@@ -644,7 +644,6 @@ class Evidence(JSONSerializable):
                     if score > 1:
                         score = 1.
                 self.evidence['scores']['association_score'] = score
-                self.evidence['scores']['association_score'] = score
             elif self.evidence['type'] == 'affected_pathway':
                 # TODO: Implement two types of scoring for sysbio - based on p-value range & based on rank-based score range
                 if self.evidence['sourceID'] == 'sysbio':
