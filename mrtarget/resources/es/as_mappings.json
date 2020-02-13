@@ -91,6 +91,9 @@
             "gwas_catalog": {
               "type": "float"
             },
+            "ot_genetics_portal": {
+              "type": "float"
+            },
             "intogen": {
               "type": "float"
             },
@@ -188,6 +191,9 @@
               "type": "float"
             },
             "gwas_catalog": {
+              "type": "float"
+            },
+            "ot_genetics_portal": {
               "type": "float"
             },
             "intogen": {
@@ -299,6 +305,9 @@
               "type": "float"
             },
             "gwas_catalog": {
+              "type": "float"
+            },
+            "ot_genetics_portal": {
               "type": "float"
             },
             "intogen": {
@@ -605,6 +614,9 @@
               "type": "float"
             },
             "gwas_catalog": {
+              "type": "float"
+            },
+            "ot_genetics_portal": {
               "type": "float"
             },
             "intogen": {
