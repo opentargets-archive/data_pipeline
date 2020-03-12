@@ -216,10 +216,10 @@ class EvidenceManager(object):
                 if 'gene2variant' in evidence['evidence']:
                     if 'resource_score' not in evidence['evidence']['gene2variant']:
                         evidence['evidence']['gene2variant']['resource_score'] = {}
-                    evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
-                    evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
-                    if available_score != self.eco_scores[eco_uri]:
-                        fixed = True
+                        evidence['evidence']['gene2variant']['resource_score']['value'] = self.eco_scores[eco_uri]
+                        evidence['evidence']['gene2variant']['resource_score']['type'] = 'probability'
+                        if available_score != self.eco_scores[eco_uri]:
+                            fixed = True
             else:
                 self.logger.warning("Cannot find a score for eco code %s in evidence id %s" % (eco_uri, evidence['id']))
 
