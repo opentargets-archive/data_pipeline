@@ -58,13 +58,16 @@ class Tractability(IPlugin):
                 try:
                     # Get lists of small molecule and antibody buckets
                     buckets = list(row[k] for k in
-                                   ("Bucket_1", "Bucket_2", "Bucket_3", "Bucket_4", "Bucket_5", "Bucket_6", "Bucket_7",
-                                    "Bucket_8"))
+                                   ("Bucket_1_sm", "Bucket_2_sm", "Bucket_3_sm", "Bucket_4_sm", "Bucket_5_sm", "Bucket_6_sm", "Bucket_7_sm",
+                                    "Bucket_8_sm"))
                     buckets_ab = list(row[k] for k in
                                       ("Bucket_1_ab", "Bucket_2_ab", "Bucket_3_ab", "Bucket_4_ab", "Bucket_5_ab",
                                        "Bucket_6_ab", "Bucket_7_ab", "Bucket_8_ab", "Bucket_9_ab"))
+                    buckets_othercl = list(row[k] for k in ("Bucket_1_othercl", "Bucket_2_othercl", "Bucket_3_othercl"))
+
                     sm_buckets = list(compress(sm_bucket_list, [x == '1' for x in buckets]))
                     ab_buckets = list(compress(ab_bucket_list, [x == '1' for x in buckets_ab]))
+                    othercl_buckets = list(compress(ab_bucket_list, [x == '1' for x in buckets_othercl]))
 
                     # struct is built inline as the most pythonic way is preferable and more explicit
                     #
@@ -72,13 +75,13 @@ class Tractability(IPlugin):
                         'smallmolecule': {
                             'buckets': sm_buckets,  # list of buckets
                             'categories': {
-                                'clinical_precedence': to_float(row["Clinical_Precedence"]),
-                                'discovery_precedence': to_float(row["Discovery_Precedence"]),
-                                'predicted_tractable': to_float(row["Predicted_Tractable"])
+                                'clinical_precedence': to_float(row["Clinical_Precedence_sm"]),
+                                'discovery_precedence': to_float(row["Discovery_Precedence_sm"]),
+                                'predicted_tractable': to_float(row["Predicted_Tractable_sm"])
                             },
-                            'top_category': row["Category"],
+                            'top_category': row["Category_sm"],
                             # TODO drugebility score not used at the moment but in a future
-                            'ensemble': to_float(row["ensemble"]),
+                            # 'ensemble': to_float(row["ensemble"]),
                             'high_quality_compounds':
                                 to_int(row["High_Quality_ChEMBL_compounds"]),
                             'small_molecule_genome_member':
@@ -90,12 +93,20 @@ class Tractability(IPlugin):
                                 'clinical_precedence':
                                     to_float(row["Clinical_Precedence_ab"]),
                                 'predicted_tractable_high_confidence':
-                                    to_float(row["Predicted_Tractable__High_confidence"]),
+                                    to_float(row["Predicted_Tractable_ab_High_confidence"]),
                                 'predicted_tractable_med_low_confidence':
-                                    to_float(row["Predicted_Tractable__Medium_to_low_confidence"])
+                                    to_float(row["Predicted_Tractable_ab_Medium_to_low_confidence"])
                             },
                             'top_category': row["Category_ab"]
+                        },
+                        'other_modalities': {
+                            'buckets': othercl_buckets,
+                            'categories': {
+                                'clinical_precedence':
+                                    to_float(row["Clinical_Precedence_othercl"])
+                            }
                         }
+
                     }
 
                     # Add data for current gene to self.tractability
