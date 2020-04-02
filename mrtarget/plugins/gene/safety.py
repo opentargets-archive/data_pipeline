@@ -29,7 +29,7 @@ class Safety(IPlugin):
                 if hasattr(gene, 'safety'):
                     gene.safety['experimental_toxicity'] = self.experimental_toxicity[gene.id]
                 else:
-                    gene.safety = {'experimental_toxicity':self.experimental_toxicity[gene.id]}
+                    gene.safety = {'experimental_toxicity' : self.experimental_toxicity[gene.id]}
 
     def build_json_safety(self, filename):
         with URLZSource(filename).open() as r_file:
@@ -47,9 +47,8 @@ class Safety(IPlugin):
                 toxicity_json = self.exp_toxicity_json_format(row)
                 genekey = row["ensembl_gene_id"].strip()
                 if genekey not in self.experimental_toxicity:
-                    self.experimental_toxicity[genekey]= [toxicity_json]
-                else:
-                    self.experimental_toxicity[genekey].append(toxicity_json)
+                    self.experimental_toxicity[genekey]= []
+                self.experimental_toxicity[genekey].append(toxicity_json)
 
     # Shape the info as the user requested
     def exp_toxicity_json_format(self, row):
@@ -60,8 +59,7 @@ class Safety(IPlugin):
                     exp_toxicity_dict[key] = value
                 else:
                     if "experiment_details" not in exp_toxicity_dict:
-                        exp_toxicity_dict["experiment_details"] = {key : value}
-                    else:
-                        exp_toxicity_dict["experiment_details"][key] = value
+                        exp_toxicity_dict["experiment_details"] = {}
+                    exp_toxicity_dict["experiment_details"][key] = value
 
         return exp_toxicity_dict
