@@ -11,8 +11,8 @@ python:
   - 2.7
   - 3.7
 before_install:
-  - docker pull docker.elastic.co/elasticsearch/elasticsearch:7.4.0
-  - docker run -d -p 9200:9200 -p 9300:9300 --name=es elasticsearch:7.4.0
+  - docker pull docker.elastic.co/elasticsearch/elasticsearch:7.6.1
+  - docker run -d -p 9200:9200 -p 9300:9300 --name=es elasticsearch:7.6.1
 install:
   - pip install -r requirements.txt
   - pip install -r requirements.dev.txt
@@ -20,7 +20,7 @@ install:
   - pipdeptree
 script:
   - mkdir log
-  - export DATA_CONFIG="https://storage.googleapis.com/open-targets-data-releases/19.04/input/mrtarget.data.19.04.5.yml" && make help dry_run 
+  - export DATA_CONFIG="https://storage.googleapis.com/open-targets-data-releases/20.04/input/mrtarget.data.20.04.yml" && make help dry_run 
   - pytest --cov=mrtarget --cov-report term tests/ --fulltrace
 notifications:
   email:
