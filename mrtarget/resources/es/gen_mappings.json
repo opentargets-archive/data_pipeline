@@ -2309,6 +2309,9 @@
         },
         "smallmolecule": {
           "properties": {
+            "buckets": {
+              "type": "long"
+            },
             "categories": {
               "properties": {
                 "clinical_precedence": {
@@ -2322,9 +2325,6 @@
                 }
               }
             },
-            "ensemble": {
-              "type": "float"
-            },
             "high_quality_compounds": {
               "type": "long"
             },
@@ -2337,6 +2337,20 @@
                 "keyword": {
                   "type": "keyword",
                   "ignore_above": 256
+                }
+              }
+            }
+          }
+        },
+        "other_modalities": {
+          "properties": {
+            "buckets": {
+              "type": "long"
+            },
+            "categories": {
+              "properties": {
+                "clinical_precedence": {
+                  "type": "float"
                 }
               }
             }
