@@ -591,7 +591,7 @@ class Evidence(JSONSerializable):
 
                     # Score calculation for phewas catalog and the 23andme dataset:
                     if self.evidence['sourceID'] in ['phewas_catalog','twentythreeandme']:
-                        no_of_cases = self.evidence['unique_association_fields']['cases']
+                        no_of_cases = self.evidence['evidence']['variant2disease']['cases']
                         score = self._score_phewas_data(self.evidence['sourceID'],
                                                         self.evidence['evidence']['variant2disease']['resource_score'][
                                                             'value'],
