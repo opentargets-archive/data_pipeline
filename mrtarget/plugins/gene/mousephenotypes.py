@@ -72,7 +72,8 @@ class MousePhenotypes(IPlugin):
             ''' extend gene with related mouse phenotype data '''
             if gene.approved_symbol in self.human_genes:
                     #self._logger.debug("Adding %i phenotype data from MGI to gene %s" % (len(self.human_genes[gene.approved_symbol]["mouse_orthologs"][0]["phenotypes"]), gene.approved_symbol))
-                    gene.mouse_phenotypes = self.human_genes[gene.approved_symbol]["mouse_orthologs"]
+                    mouse_phenotypes = self.human_genes[gene.approved_symbol]["mouse_orthologs"]
+                    gene.mouse_phenotypes = mouse_phenotypes if len(mouse_phenotypes) > 0 else None
 
     def _get_mp_classes(self, mp_uri):
         #self._logger.debug("_get_mp_classes")
