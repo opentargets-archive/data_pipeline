@@ -530,7 +530,6 @@ class DrugProcess(object):
             }]
         }
         """
-        assert _ind1["efo_id"] is _ind2["efo_id"], "Cannot concatenate indictors with different EFO IDs."
         _ind1["max_phase_for_indication"] = max(_ind1["max_phase_for_indication"], _ind2["max_phase_for_indication"])
         newSources = []
         for i in _ind2["references"]:
