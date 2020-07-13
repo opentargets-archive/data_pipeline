@@ -184,7 +184,35 @@ This will run a tagged version, so if you want use something else or to make you
 
 ## Contributing
 
-TODO: write me. 
+TODO: write me.
+
+### Setting up on PyCharm Professional (on Linux)
+
+The simplest way to ensure that the dependencies on your development machine match those in production is to have the project
+interpreter be the same interpreter as will be used in production. 
+
+This can be achieved by configuring the project to use a Docker container as the interpreter. In order to do this you need
+to have Docker installed locally on your machine. 
+
+1. Amend the `Dockerfile` so the final two lines are as follows:
+
+```dockerfile
+#ENTRYPOINT [ "scripts/entrypoint.sh" ]
+CMD ["python3"]
+``` 
+
+2. Build the Docker image by executing the following command from the directory containing the Dockerfile: `docker build --tag data-pipeline-env .`
+
+3. Clean up with `git checkout HEAD -- Dockerfile`
+
+4. Go to 'Settings -> Project Interpreter' and then:
+  - Select 'Add'
+  - Select Docker from the options on the lefthand side
+  - Select 'New' and then 'Unix Socket'. The installed Docker instance will be found and you will see a 'connection successful' message.
+  - Select the image from the dropdown list from set 2. 
+  
+Now PyCharm will use an instance of the container when working on the data-pipeline so you can be sure that your development and production environments are the same.
+ 
 
 ### Development with docker-compose
 
