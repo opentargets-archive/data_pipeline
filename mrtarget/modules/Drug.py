@@ -530,7 +530,7 @@ class DrugProcess(object):
             }]
         }
         """
-        assert _ind1["efo_id"] is _ind2["efo_id"], "Cannot concatenate indictors with different EFO IDs."
+
         _ind1["max_phase_for_indication"] = max(_ind1["max_phase_for_indication"], _ind2["max_phase_for_indication"])
         newSources = []
         for i in _ind2["references"]:
@@ -905,6 +905,30 @@ class DrugProcess(object):
 
         # TODO adverse events (at the moment there shouldn't be any about child drugs)
 
+    def generateAggregatedIndicationRefs(self, drug):
+        """
+        Adds additional field to drug object 'indication_refs' which is a concatentation
+        of each indications references.
+        "indication_refs": [
+            {
+            ref_type,
+            ref_url,
+            ref_id
+            }, ... {}
+        ]
+        """
+        aggregatedRefs = []
+        if "indications" in drug:
+            for indicator in drug["indications"]:
+                for reference in indicator["references"]:
+                    for src in range(len(reference["ids"])):
+                        ref = {}
+                        ref["ref_type"] = reference.get("source")
+                        ref["ref_url"] = reference.get("ids")[src]
+                        ref["ref_id"] = reference.get("urls")[src]
+                        aggregatedRefs.append(ref)
+        return aggregatedRefs
+
     def generate(self, es):
 
         # pre-load into indexed shelf dicts
@@ -1001,6 +1025,7 @@ class DrugProcess(object):
                     indication_therapeutic_area["count"] = value
                     drug["indication_therapeutic_areas"].append(indication_therapeutic_area)
                 drug["indication_therapeutic_areas"] = tuple(drug["indication_therapeutic_areas"])
+
             else:
                 drug["number_of_indications"] = 0
 
@@ -1009,6 +1034,8 @@ class DrugProcess(object):
             else:
                 drug["number_of_mechanisms_of_action"] = 0
 
+            # Aggregate indication refs, empty array if no indications present.
+            drug["indication_refs"] = self.generateAggregatedIndicationRefs(drug)
             # only keep those with indications or mechanisms 
             if drug["number_of_indications"] == 0 \
                     and drug["number_of_mechanisms_of_action"] == 0:
