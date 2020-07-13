@@ -854,7 +854,7 @@ class DrugProcess(object):
                         parentIndications[indication.get("efo_id")] = indication
                         parent["indications"].append(indication)
                     # if indication already in parent merge new with old
-                    else:
+                    elif indication.get("efo_id") in parentIndications:
                         self.concatenate_two_indicators_with_matching_efos(parentIndications.get(indication.get("efo_id")), indication)
                 # parent has no indications
                 else:
