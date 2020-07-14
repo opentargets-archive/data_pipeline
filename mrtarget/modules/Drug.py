@@ -929,7 +929,12 @@ class DrugProcess(object):
                         id = reference.get("ids")[src]
                         source = reference.get("source")
                         ref["ref_type"] = source
-                        ref["ref_url"] = self.build_urls(source, [id])
+                        urls = self.build_urls(source, [id])
+                        if len(urls) is 1:
+                            ref["ref_url"] = urls[0]
+                        else:
+                            # fallback if there was a problem creating url.
+                            ref["ref_url"] = ""
                         ref["ref_id"] = id
                         aggregatedRefs.append(ref)
         return aggregatedRefs
