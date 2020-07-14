@@ -921,11 +921,16 @@ class DrugProcess(object):
         if "indications" in drug:
             for indicator in drug["indications"]:
                 for reference in indicator["references"]:
-                    for src in range(len(reference["ids"])):
+                    numIds = len(reference["ids"])
+                    # references are already aggregated by source so we need to rebuild the urls
+                    # as stand alone entities.
+                    for src in range(numIds):
                         ref = {}
-                        ref["ref_type"] = reference.get("source")
-                        ref["ref_url"] = reference.get("ids")[src]
-                        ref["ref_id"] = reference.get("urls")[src]
+                        id = reference.get("ids")[src]
+                        source = reference.get("source")
+                        ref["ref_type"] = source
+                        ref["ref_url"] = self.build_urls(source, [id])
+                        ref["ref_id"] = id
                         aggregatedRefs.append(ref)
         return aggregatedRefs
 
