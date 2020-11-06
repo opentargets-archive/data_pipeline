@@ -607,6 +607,41 @@ class Evidence(JSONSerializable):
                                 self.evidence['variant']['id'], self.evidence['unique_association_fields']['study']))
                             raise
 
+                    # Evidence score for EVA sources evidences are generated based on clinical significance:
+                    elif self.evidence['sourceID'] == 'eva':
+                        clinical_significance_mapping = {
+                            # Less severe:
+                            'association not found': 0.01,  
+                            'benign': 0.01,
+                            'not provided': 0.01,
+                            'likely benign': 0.01,    
+                            
+                            # More severe:
+                            'conflicting interpretations of pathogenicity': 0.3,   
+                            'other': 0.3,
+                            'uncertain significance': 0.3,
+                            
+                            # Moderately severe
+                            'risk factor': 0.5,
+                            'affects': 0.5,
+                            
+                            # Most severe:
+                            'likely pathogenic' : 1,
+                            'association': 1,
+                            'drug response': 1,
+                            'protective': 1,
+                            'pathogenic': 1,
+                        }
+
+                        # the clinical significance is an array, we map each terms to a score value:
+                        clin_sig_scores = [clinical_significance_mapping[x] if x in clinical_significance_mapping else self.logger.error(f"Cannot map EVA clinical significance: {x}") for x in self.evidence['evidence']['variant2disease']['clinical_significance']]
+
+                        # chosing the most severe significance value:
+                        try:
+                            score = max(clin_sig_scores)
+                        except:
+                            raise ValueError('Some of the EVA clinical significance value is not mapped.')
+                    
                     # Scoring other genetics evidences:
                     else:
                         g2v_score = self.evidence['evidence']['gene2variant']['resource_score']['value']
