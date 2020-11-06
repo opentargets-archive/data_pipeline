@@ -634,7 +634,7 @@ class Evidence(JSONSerializable):
                         }
 
                         # the clinical significance is an array, we map each terms to a score value:
-                        clin_sig_scores = [clinical_significance_mapping[x] if x in clinical_significance_mapping else self.logger.error(f"Cannot map EVA clinical significance: {x}") for x in self.evidence['evidence']['clinical_significance']]
+                        clin_sig_scores = [clinical_significance_mapping[x] if x in clinical_significance_mapping else self.logger.error(f"Cannot map EVA clinical significance: {x}") for x in self.evidence['evidence']['variant2disease']['clinical_significance']]
 
                         # chosing the most severe significance value:
                         try:
