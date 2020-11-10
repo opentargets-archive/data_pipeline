@@ -611,10 +611,10 @@ class Evidence(JSONSerializable):
                     elif self.evidence['sourceID'] == 'eva':
                         clinical_significance_mapping = {
                             # Less severe:
-                            'association not found': 0.01,  
-                            'benign': 0.01,
-                            'not provided': 0.01,
-                            'likely benign': 0.01,    
+                            'association not found': 0.0,  
+                            'benign': 0.0,
+                            'not provided': 0.0,
+                            'likely benign': 0.0,
                             
                             # More severe:
                             'conflicting interpretations of pathogenicity': 0.3,   
