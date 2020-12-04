@@ -306,7 +306,9 @@ def produce_evidence_local_init(es_hosts, es_index_val_right,
 
 def get_evidence_for_target_simple(es, target, index):
     fields = ['target.id', 'private.efo_codes', 'disease.id','scores.association_score','sourceID','id']
-    evidence = Search().using(es).index(index).query(ConstantScore(filter=Q('term', target__id=target))).source(include=fields).params(scroll='4h',size=1000).scan() 
+    evidence = Search().using(es).index(index).query(
+        ConstantScore(filter=Q('term', target__id=target))
+    ).source(includes=fields).params(scroll='4h', size=1000).scan()
     for ev in evidence:
         yield ev.to_dict()
 

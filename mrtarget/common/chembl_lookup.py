@@ -175,7 +175,7 @@ class ChEMBLLookup(object):
 
         fields = ['target.id','disease.id', 'evidence.target2drug.urls']
         for e in Search().using(es).index(index).query(
-            Match(type="known_drug")).source(include=fields).scan():
+            Match(type="known_drug")).source(includes=fields).scan():
             e = e.to_dict()
             #get information from URLs that we need to extract short ids
             #e.g. https://www.ebi.ac.uk/chembl/compound/inspect/CHEMBL502835
