@@ -51,9 +51,9 @@ class Hallmarks(IPlugin):
             for i, row in enumerate(source, start=1):
 
                 PMID = re.sub(r'^"|"$', '', row["PUBMED_PMID"])
-                Short = re.sub(r'^"|"$', '', row["SHORT"])
-                GeneSymbol = re.sub(r'^"|"$', '', row["GENE_NAME"])
-                Description_1 = re.sub(r'^"|"$', '', row["DESCRIPTION_1"])
+                Short = re.sub(r'^"|"$', '', row["IMPACT"])
+                GeneSymbol = re.sub(r'^"|"$', '', row["GENE_SYMBOL"])
+                Description_1 = re.sub(r'^"|"$', '', row["HALLMARK"])
                 Description_1.rstrip()
                 Description = re.sub(r'^"|"$', '', row["DESCRIPTION"])
 
