@@ -64,8 +64,8 @@ class Hallmarks(IPlugin):
                     promote  = False
                     suppress = False
 
-                    if Short == 'a': promote = True
-                    if Short == 's': suppress = True
+                    if Short == 'promotes': promote = True
+                    if Short == 'suppresses': suppress = True
 
                     line = {
                              "label": Description_1,
