@@ -43,7 +43,7 @@ class Hallmarks(IPlugin):
 
             #for python3 we need to decode utf-8 since csv won't handle it
             if sys.version_info >= (3, 0):
-                r_file = codecs.iterdecode(r_file, 'utf-8')
+                r_file = codecs.iterdecode(r_file, 'utf-8', errors='ignore')
 
             source = csv.DictReader(
                     r_file,
