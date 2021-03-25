@@ -30,7 +30,7 @@ pyparsing==2.3.1
 pypeln==0.1.6
 pyrsistent==0.14.11
 python-dateutil==2.8.0
-PyYAML==5.1
+PyYAML==5.4
 rdflib==4.2.2
 requests==2.21.0
 requests-file==1.4.3
