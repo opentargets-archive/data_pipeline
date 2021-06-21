@@ -134,8 +134,8 @@ class MousePhenotypes(IPlugin):
                 line = line.strip()
                 array = line.split("\t")
                 array = [x.strip() for x in array]
-                if len(array) == 7:
-                    (human_gene_symbol, a, b, c, mouse_gene_symbol, mouse_gene_id, phenotypes_raw) = array
+                if len(array) == 5:
+                    (human_gene_symbol, a, mouse_gene_symbol, mouse_gene_id, phenotypes_raw) = array
 
                     # at least 1 phenotype in phenotypes_raw
                     if len(phenotypes_raw) > 0:
